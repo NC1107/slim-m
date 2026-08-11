@@ -79,8 +79,8 @@ class _MediaCapabilitySectionState
       title: 'Device capabilities',
       description:
           'Whether this build can actually open a microphone or '
-          'capture your screen here. Checking may prompt for '
-          'permission, so nothing runs until you ask.',
+          'camera, or capture your screen here. Checking may prompt '
+          'for permission, so nothing runs until you ask.',
       children: [
         AppButton(
           label: _buttonLabel(),
@@ -103,6 +103,7 @@ class _MediaCapabilitySectionState
                 label: 'Microphone',
                 result: _results['microphone']!,
               ),
+              _CapabilityRow(label: 'Camera', result: _results['camera']!),
               _CapabilityRow(
                 label: 'Screen capture',
                 result: _results['screen_capture']!,

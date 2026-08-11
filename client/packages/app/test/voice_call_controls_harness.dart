@@ -18,7 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-/// Mirrors `voice_settings_screen.dart`'s own private key: that screen's
+/// Mirrors `voice_settings_controller.dart`'s own private key: that file's
 /// `VoiceSettingsController` is the real one under test here too, loaded from
 /// `SharedPreferences` exactly as it is in the app, rather than swapped for a
 /// fake - the bug this covers is that a saved value was never read back.

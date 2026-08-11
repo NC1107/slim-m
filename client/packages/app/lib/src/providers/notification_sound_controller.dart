@@ -25,8 +25,7 @@ import 'notification_sound_rules.dart';
 import 'notification_sound_settings.dart';
 import 'providers.dart';
 import 'voice_controller.dart';
-import '../screens/voice_settings_screen.dart'
-    show voiceSettingsControllerProvider;
+import 'voice_settings_controller.dart' show voiceSettingsControllerProvider;
 
 class NotificationSoundController {
   NotificationSoundController(this._ref, {SoundPlayer? player})

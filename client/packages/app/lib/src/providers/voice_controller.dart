@@ -20,6 +20,7 @@ import 'call_recap.dart';
 import 'providers.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
+import 'voice_settings_controller.dart';
 import 'voice_sfu_security.dart';
 import 'voice_state.dart';
 
@@ -127,6 +128,18 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// for the live in-call control.
   void setCameraPreference(bool enabled) {
     state = state.copyWith(cameraEnabled: enabled);
+  }
+
+  /// Seeds [setCameraPreference] from the persisted setting Voice Settings
+  /// writes, for the one moment [join]'s own preference-carrying (see
+  /// [leave]) has nothing yet to carry: a fresh app launch's first call.
+  ///
+  /// Explicit and awaited once from bootstrap, `ThemeController.restore`'s
+  /// own shape, rather than read from this constructor: a constructor read
+  /// would make every existing test building a bare [VoiceController]
+  /// depend on mocked shared preferences it has no reason to set up.
+  Future<void> restoreCameraPreference() async {
+    setCameraPreference(await loadCameraOnJoinPreference(_ref));
   }
 
   /// A channel switch (or a [leave]) mid-join starts or ends a newer call on

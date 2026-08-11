@@ -42,9 +42,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_settings_controller.dart'
+    show voiceSettingsControllerProvider;
 import '../widgets/camera_source_sheet.dart';
 import '../widgets/screen_source_sheet.dart';
-import 'voice_settings_screen.dart' show voiceSettingsControllerProvider;
 
 class CallControls extends ConsumerStatefulWidget {
   const CallControls({

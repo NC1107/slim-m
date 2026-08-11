@@ -19,6 +19,7 @@ import 'src/providers/display_preferences.dart';
 import 'src/providers/providers.dart';
 import 'src/providers/push_controller.dart';
 import 'src/providers/sync_controller.dart';
+import 'src/providers/voice_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
 
@@ -59,7 +60,7 @@ Future<void> main() async {
 
 /// The async sequence [StartupApp] masks: session restore (so the router's
 /// first redirect already knows the answer instead of showing sign-in and
-/// jumping to channels a frame later), the four preference-controller
+/// jumping to channels a frame later), the five preference-controller
 /// restores, sync/push bring-up, and the desktop window shell's own
 /// listener/tray registration - a no-op on every platform but a real
 /// desktop build. The sync and push controllers are read here rather than
@@ -72,6 +73,9 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   await container.read(timeFormatControllerProvider.notifier).restore();
   await container.read(motionPreferenceControllerProvider.notifier).restore();
   await container.read(highContrastControllerProvider.notifier).restore();
+  await container
+      .read(voiceControllerProvider.notifier)
+      .restoreCameraPreference();
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
