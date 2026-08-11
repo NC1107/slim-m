@@ -30,6 +30,7 @@ use crate::ids::ChannelId;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Channel, DM_CHANNEL_KIND, DeleteChannelError};
+use crate::voice::VoiceError;
 
 const CHANNEL_BODY_LIMIT: usize = 4 * 1024;
 /// A one-line header, not a description field: long enough for a real
@@ -282,16 +283,40 @@ async fn delete(
     }
 
     match state.store.delete_channel(channel_id).await {
-        // Only a genuine delete is worth publishing; a retry changes nothing.
-        Ok(true) => {
-            state.hub.publish(Event::ChannelDeleted { channel_id });
+        Ok(deleted) => {
+            end_voice_room(&state, channel_id).await;
+            // Only a genuine delete is worth publishing; a retry changes nothing.
+            if deleted {
+                state.hub.publish(Event::ChannelDeleted { channel_id });
+            }
             Ok(StatusCode::NO_CONTENT)
         }
-        Ok(false) => Ok(StatusCode::NO_CONTENT),
         Err(DeleteChannelError::LastChannel) => Err(ApiError::Conflict(
             "cannot delete the deployment's last channel",
         )),
         Err(DeleteChannelError::Internal(e)) => Err(e.into()),
+    }
+}
+
+/// Ends any voice room the deleted channel was still hosting.
+///
+/// A LiveKit token is a bearer credential this server cannot revoke, so
+/// deleting the channel row on its own left a live call running in a channel
+/// that no longer existed, with every participant free to stay and anybody
+/// holding an unexpired token free to rejoin it.
+///
+/// Called for every deleted channel rather than only a `voice` one, and on an
+/// idempotent retry as well as a genuine delete: the end state this wants is
+/// "no room", which is already true for a channel that never had one, and a
+/// retry is the natural second chance if the first attempt could not reach
+/// the SFU.
+async fn end_voice_room(state: &AppState, channel_id: ChannelId) {
+    match state.voice.delete_room(channel_id).await {
+        // No SFU configured at all: there is no room to end.
+        Ok(()) | Err(VoiceError::Unavailable) => {}
+        Err(VoiceError::Internal(err)) => {
+            tracing::warn!(%err, "could not end the deleted channel's voice room");
+        }
     }
 }
 
