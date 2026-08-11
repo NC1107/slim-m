@@ -323,27 +323,23 @@ class _InviteRowState extends ConsumerState<_InviteRow>
       ],
       // A revoked invite reserves the revoke slot rather than dropping it.
       actions: [
-        SettingsEntityActions(
-          children: [
-            AppIconButton(
-              icon: AppIcons.copy,
-              semanticLabel: 'Copy invite code',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: invite.code));
-                showAppSnackbar(context, 'Invite code copied.');
-              },
-            ),
-            if (!invite.revoked)
-              AppIconButton(
-                icon: AppIcons.revoke,
-                semanticLabel: 'Revoke invite',
-                variant: AppIconButtonVariant.danger,
-                onPressed: _busy ? null : _revoke,
-              )
-            else
-              null,
-          ],
+        AppIconButton(
+          icon: AppIcons.copy,
+          semanticLabel: 'Copy invite code',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: invite.code));
+            showAppSnackbar(context, 'Invite code copied.');
+          },
         ),
+        if (!invite.revoked)
+          AppIconButton(
+            icon: AppIcons.revoke,
+            semanticLabel: 'Revoke invite',
+            variant: AppIconButtonVariant.danger,
+            onPressed: _busy ? null : _revoke,
+          )
+        else
+          null,
       ],
       error: actionError,
       onErrorRetry: _busy ? null : _revoke,

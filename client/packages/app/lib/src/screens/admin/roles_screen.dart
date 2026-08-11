@@ -115,34 +115,30 @@ class _RoleRowState extends ConsumerState<_RoleRow>
               : '$count permissions',
         ),
       ],
+      // @everyone can't be assigned or deleted; nulls reserve those slots so edit still lands at a shared x.
       actions: [
-        // @everyone can't be assigned or deleted; nulls reserve those slots so edit still lands at a shared x.
-        SettingsEntityActions(
-          children: [
-            if (!role.isEveryone)
-              AppIconButton(
-                icon: AppIcons.assignRole,
-                semanticLabel: 'Assign ${role.name} to members',
-                onPressed: () => showRoleAssignSheet(context, role),
-              )
-            else
-              null,
-            AppIconButton(
-              icon: AppIcons.edit,
-              semanticLabel: 'Edit ${role.name}',
-              onPressed: () => showRoleEditorSheet(context, role: role),
-            ),
-            if (!role.isEveryone)
-              AppIconButton(
-                icon: AppIcons.delete,
-                semanticLabel: 'Delete ${role.name}',
-                variant: AppIconButtonVariant.danger,
-                onPressed: _busy ? null : _delete,
-              )
-            else
-              null,
-          ],
+        if (!role.isEveryone)
+          AppIconButton(
+            icon: AppIcons.assignRole,
+            semanticLabel: 'Assign ${role.name} to members',
+            onPressed: () => showRoleAssignSheet(context, role),
+          )
+        else
+          null,
+        AppIconButton(
+          icon: AppIcons.edit,
+          semanticLabel: 'Edit ${role.name}',
+          onPressed: () => showRoleEditorSheet(context, role: role),
         ),
+        if (!role.isEveryone)
+          AppIconButton(
+            icon: AppIcons.delete,
+            semanticLabel: 'Delete ${role.name}',
+            variant: AppIconButtonVariant.danger,
+            onPressed: _busy ? null : _delete,
+          )
+        else
+          null,
       ],
       error: actionError,
       onErrorDismiss: clearActionError,

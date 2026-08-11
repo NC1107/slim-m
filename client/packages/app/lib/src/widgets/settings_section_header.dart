@@ -32,20 +32,10 @@ import 'package:slimm_design_system/design_system.dart';
 /// genuinely needs to name a run of sections should bring it back
 /// deliberately rather than inherit it as dead code.
 class SettingsSectionHeader extends StatelessWidget {
-  const SettingsSectionHeader(
-    this.title, {
-    super.key,
-    this.description,
-    this.action,
-  });
+  const SettingsSectionHeader(this.title, {super.key, this.description});
 
   final String title;
   final String? description;
-
-  /// A control pinned to the end of the title line: the one place a
-  /// section-level action (add, refresh) belongs, so it is never mistaken for
-  /// a row inside the group it acts on.
-  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -55,36 +45,26 @@ class SettingsSectionHeader extends StatelessWidget {
         top: AppSpacing.s24,
         bottom: AppSpacing.s8,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    title,
-                    style: AppText.ui.copyWith(
-                      color: tokens.textPrimary,
-                      fontWeight: AppWeights.semi,
-                    ),
-                  ),
-                ),
-                if (description != null) ...[
-                  const SizedBox(height: AppSpacing.s4),
-                  Text(
-                    description!,
-                    style: AppText.caption.copyWith(
-                      color: tokens.textSecondary,
-                    ),
-                  ),
-                ],
-              ],
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: AppText.ui.copyWith(
+                color: tokens.textPrimary,
+                fontWeight: AppWeights.semi,
+              ),
             ),
           ),
-          if (action != null) action!,
+          if (description != null) ...[
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              description!,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ],
         ],
       ),
     );
@@ -114,7 +94,6 @@ class SettingsSectionCard extends StatelessWidget {
     this.title,
     required this.children,
     this.description,
-    this.action,
     this.crossAxisAlignment = CrossAxisAlignment.start,
   });
 
@@ -134,10 +113,6 @@ class SettingsSectionCard extends StatelessWidget {
   final String? title;
   final String? description;
 
-  /// Passed through to [SettingsSectionHeader.action]: a section-level
-  /// control, outside the card, beside the name of what it acts on.
-  final Widget? action;
-
   final List<Widget> children;
 
   /// The card's own inner column, not `stretch`: a row widget (`AppListRow`,
@@ -149,22 +124,29 @@ class SettingsSectionCard extends StatelessWidget {
   final CrossAxisAlignment crossAxisAlignment;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      if (title != null)
-        SettingsSectionHeader(title!, description: description, action: action),
-      AppCard(
-        padding: const EdgeInsets.all(AppSpacing.s8),
-        child: Material(
-          type: MaterialType.transparency,
-          child: Column(
-            crossAxisAlignment: crossAxisAlignment,
-            mainAxisSize: MainAxisSize.min,
-            children: children,
+  Widget build(BuildContext context) {
+    // A description with no title had nowhere to render and no test caught it; this catches it instead.
+    assert(
+      title != null || description == null,
+      'SettingsSectionCard.description needs a title to render under',
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (title != null)
+          SettingsSectionHeader(title!, description: description),
+        AppCard(
+          padding: const EdgeInsets.all(AppSpacing.s8),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Column(
+              crossAxisAlignment: crossAxisAlignment,
+              mainAxisSize: MainAxisSize.min,
+              children: children,
+            ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }

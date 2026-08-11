@@ -66,10 +66,16 @@ class SettingsEntityRow extends StatelessWidget {
   /// passes none rather than an empty string, so no blank line is reserved.
   final List<Widget> details;
 
-  /// Trailing controls, usually [AppIconButton]s. Rendered in a fixed-width
+  /// Trailing controls, usually [AppIconButton]s, rendered in a fixed-width
   /// cluster so every row in a list lands its buttons at the same x even when
-  /// one row offers fewer of them; see [SettingsEntityActions].
-  final List<Widget> actions;
+  /// one row offers fewer of them.
+  ///
+  /// A null entry reserves an empty slot one [AppIconButton] wide rather than
+  /// letting the remaining controls slide left. This row owns that layout
+  /// itself - there used to be a second, publicly constructible widget for it
+  /// that two call sites wrapped their own flat list in, producing a row
+  /// nested one deep inside itself. Pass the flat list directly.
+  final List<Widget?> actions;
 
   /// A failure from this row's own action, shown under it and staying until
   /// dealt with rather than vanishing on a timer - see `run_guarded.dart`.
@@ -127,7 +133,7 @@ class SettingsEntityRow extends StatelessWidget {
                   ],
                 ),
               ),
-              if (actions.isNotEmpty) SettingsEntityActions(children: actions),
+              if (actions.isNotEmpty) _SettingsEntityActions(children: actions),
             ],
           ),
           if (error != null) ...[
@@ -187,15 +193,23 @@ class SettingsEntityDetail extends StatelessWidget {
   }
 }
 
-/// The trailing action cluster, reserving a slot for every position even where
-/// a given row offers no control for it.
+/// The trailing action cluster [SettingsEntityRow] renders its own [actions]
+/// through, reserving a slot for every position even where a given row
+/// offers no control for it.
 ///
-/// `roles_screen.dart` already did this by hand, with a `SizedBox` of the
+/// `roles_screen.dart` used to do this by hand, with a `SizedBox` of the
 /// button's own width standing in for the delete and assign actions
 /// `@everyone` does not get, and a comment explaining why. Without it the
-/// remaining buttons slide right and no two rows in the list line up. Pulling
-/// it in here means a caller passes nulls in the right positions and gets the
-/// alignment rather than having to know to rebuild it.
+/// remaining buttons slide right and no two rows in the list line up.
+///
+/// Private rather than exported: it used to be a second publicly
+/// constructible widget, and two call sites wrapped their own flat action
+/// list in one, producing one of these nested inside another - harmless
+/// visually (Flutter tolerates a redundant `Row`), but two calling
+/// conventions for the same parameter with nothing telling a caller which
+/// theirs needed. `SettingsEntityRow.actions` is the only calling
+/// convention now; this class is how it renders that list, not a second way
+/// to build one.
 ///
 /// The reserved slot is one [AppIconButton] wide, which is what makes the
 /// alignment exact rather than approximate. A bare [Icon] or an [AppButton]
@@ -203,8 +217,8 @@ class SettingsEntityDetail extends StatelessWidget {
 /// is sized for the button it stands in for and not for those. Every real
 /// caller passes [AppIconButton]s; a caller needing a different control
 /// beside a reserved slot should pass its own sized placeholder, not a null.
-class SettingsEntityActions extends StatelessWidget {
-  const SettingsEntityActions({super.key, required this.children});
+class _SettingsEntityActions extends StatelessWidget {
+  const _SettingsEntityActions({required this.children});
 
   /// A null entry reserves an empty slot one [AppIconButton] wide.
   final List<Widget?> children;

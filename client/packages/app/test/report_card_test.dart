@@ -65,7 +65,14 @@ void main() {
       profiles: {'subject-1': 'Bob', 'reporter-2': 'Carol'},
     );
 
-    expect(find.text('Reported user'), findsOneWidget);
+    expect(
+      find.text('Reported user'),
+      findsOneWidget,
+      reason:
+          'the card title only, now that the row below it says "Subject" '
+          'rather than repeating the title verbatim',
+    );
+    expect(find.text('Subject'), findsOneWidget);
     expect(find.text('Bob'), findsOneWidget);
     expect(find.text('Reporter'), findsOneWidget);
     expect(find.text('Carol'), findsOneWidget);

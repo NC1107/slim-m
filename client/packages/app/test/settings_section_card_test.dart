@@ -115,32 +115,19 @@ void main() {
     );
   });
 
-  testWidgets('a header action sits on the title line, outside the card', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        SettingsSectionCard(
-          title: 'Roles',
-          action: IconButton(icon: const Icon(AppIcons.add), onPressed: () {}),
-          children: const [Text('a role')],
+  testWidgets(
+    'a description with no title asserts rather than silently dropping both',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const SettingsSectionCard(
+            description: 'Never rendered.',
+            children: [Text('a phone')],
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(
-      find.descendant(
-        of: find.byType(AppCard),
-        matching: find.byType(IconButton),
-      ),
-      findsNothing,
-      reason:
-          'a section-level action acts on the whole group, so it must not '
-          'read as one of the rows inside it',
-    );
-    expect(
-      tester.getRect(find.byType(IconButton)).center.dy,
-      closeTo(tester.getRect(find.text('Roles')).center.dy, 1),
-    );
-  });
+      expect(tester.takeException(), isAssertionError);
+    },
+  );
 }

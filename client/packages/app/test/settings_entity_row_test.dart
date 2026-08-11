@@ -11,6 +11,11 @@
 /// And only `roles_screen` reserved empty action slots, with its own comment
 /// explaining why: without it, a row offering fewer buttons slides its
 /// remaining ones right and no two rows in the list line up.
+///
+/// `actions` used to accept `List<Widget>`, and two call sites wrapped their
+/// own reserved-slot row around it to get nullable elements, nesting one
+/// inside the other; this test enshrined that double-wrap as the documented
+/// shape until it was caught. `actions` is `List<Widget?>` now, passed flat.
 library;
 
 import 'package:flutter/material.dart';
@@ -122,23 +127,19 @@ void main() {
     Widget row(bool canDelete) => SettingsEntityRow(
       headline: canDelete ? 'moderator' : '@everyone',
       actions: [
-        SettingsEntityActions(
-          children: [
-            AppIconButton(
-              icon: AppIcons.edit,
-              semanticLabel: 'Edit',
-              onPressed: () {},
-            ),
-            if (canDelete)
-              AppIconButton(
-                icon: AppIcons.delete,
-                semanticLabel: 'Delete',
-                onPressed: () {},
-              )
-            else
-              null,
-          ],
+        AppIconButton(
+          icon: AppIcons.edit,
+          semanticLabel: 'Edit',
+          onPressed: () {},
         ),
+        if (canDelete)
+          AppIconButton(
+            icon: AppIcons.delete,
+            semanticLabel: 'Delete',
+            onPressed: () {},
+          )
+        else
+          null,
       ],
     );
 
