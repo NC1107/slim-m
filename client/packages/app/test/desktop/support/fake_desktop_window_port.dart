@@ -23,6 +23,8 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   int unmaximizeCalls = 0;
   int startDraggingCalls = 0;
   int destroyCalls = 0;
+  int showCalls = 0;
+  int restoreCalls = 0;
 
   void emit(DesktopWindowEventKind kind) => _controller.add(kind);
 
@@ -67,11 +69,11 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   @override
   Future<void> setFullScreen(bool value) async {}
   @override
-  Future<void> show() async {}
+  Future<void> show() async => showCalls++;
   @override
   Future<bool> isVisible() async => visible;
   @override
-  Future<void> restore() async {}
+  Future<void> restore() async => restoreCalls++;
   @override
   Future<void> setPreventClose(bool value) async {}
   @override

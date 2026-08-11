@@ -3,15 +3,20 @@
 # server on a CI runner - never this developer's own display) and checks
 # decision 0012's own claims: the window appears, a fresh launch matches the
 # documented default size, a saved geometry changes the next launch's size,
-# and a close request no longer terminates the process. See docs/decisions/
-# 0012-desktop-window-shell.md for what this can and cannot prove.
+# a close request no longer terminates the process, and a second launch
+# hands off to the first rather than spawning its own window. See
+# docs/decisions/0012-desktop-window-shell.md for what this can and cannot
+# prove; the caller must run this under a real D-Bus session bus (see
+# client-ci.yml's dbus-run-session wrapper) or the last check below is
+# meaningless, since GApplication's own single-instance activation needs one.
 #
 # There is no org.kde.StatusNotifierWatcher on this bus - fluxbox is a plain
 # window manager, not a full desktop shell - so the close path here always
-# takes the minimizeToTaskbar fallback, never hideToTray. The final assertion
-# checks the window is still listed by wmctrl after close, not only that the
-# process is still alive: both branches leave the process running, so liveness
-# alone cannot tell a correct fallback from a wrongly hidden, unreachable window.
+# takes the minimizeToTaskbar fallback, never hideToTray. The final close
+# assertion checks the window is still listed by wmctrl after close, not only
+# that the process is still alive: both branches leave the process running,
+# so liveness alone cannot tell a correct fallback from a wrongly hidden,
+# unreachable window.
 set -euo pipefail
 
 BUNDLE="${1:?usage: desktop-shell-smoke.sh <bundle-dir>}"
@@ -110,4 +115,31 @@ if ! wmctrl -l | grep -q "slim-m"; then
   exit 1
 fi
 echo "process still running and its window still reachable after close, as decision 0012's fallback expects"
+echo "::endgroup::"
+
+echo "::group::a second launch hands off to the first process instead of spawning a new one"
+"$BIN" &
+SECOND_PID=$!
+waited=0
+while kill -0 "$SECOND_PID" 2>/dev/null; do
+  sleep 0.5
+  waited=$((waited + 1))
+  if [ "$waited" -ge 20 ]; then
+    echo "::error::the second launch is still running after 10s; it should hand off to the first process and exit"
+    kill -9 "$SECOND_PID" 2>/dev/null || true
+    exit 1
+  fi
+done
+sleep 1
+window_count="$(wmctrl -l | grep -c "slim-m" || true)"
+if [ "$window_count" -ne 1 ]; then
+  echo "::error::expected exactly one slim-m window after a second launch, found ${window_count}"
+  wmctrl -l
+  exit 1
+fi
+if ! kill -0 "$APP_PID" 2>/dev/null; then
+  echo "::error::the original process exited; a second launch should focus it, not replace it"
+  exit 1
+fi
+echo "the second launch exited after handing off, exactly one window remains, and it is still the original process's"
 echo "::endgroup::"

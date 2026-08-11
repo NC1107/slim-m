@@ -11,6 +11,7 @@
 library;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/services.dart' show MethodCall, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -42,6 +43,10 @@ class DesktopWindowShell {
   /// otherwise never resolve, which is the same silent-forever startup
   /// screen a thrown exception used to cause before this file caught one.
   static const _setupTimeout = Duration(seconds: 5);
+
+  /// Named to match `linux_second_instance_channel.cc`, the only sender.
+  static const _secondInstanceChannelName =
+      'top.npcserver.slimm/linux_second_instance';
 
   static DesktopWindowController? _controller;
   static DesktopTrayController? _trayController;
@@ -127,6 +132,34 @@ class DesktopWindowShell {
       case WindowRunState.windowed:
         break;
     }
+  }
+
+  /// Registers the Linux-only receiving end of
+  /// `linux_second_instance_channel.cc`'s notification that a launcher
+  /// click re-entered the native `activate` handler in this process rather
+  /// than starting a second one. `main.dart` calls this right after
+  /// [applyInitialGeometry], before there is a [ProviderContainer], since a
+  /// second launch racing the very start of this process is not something
+  /// any later ordering could rule out.
+  static void registerSecondInstanceHandler() {
+    if (currentDesktopPlatform() == null) return;
+    const MethodChannel(
+      _secondInstanceChannelName,
+    ).setMethodCallHandler(_onSecondInstanceCall);
+  }
+
+  /// show() is the same call [DesktopTrayController]'s own toggle makes to
+  /// un-hide a tray-hidden window; restore() additionally raises one that
+  /// was only minimised or merely behind other windows - both reuse the
+  /// port's existing methods rather than a second "make it visible" path.
+  /// Best-effort: the process-level dedup this exists for already happened
+  /// natively, in `my_application.cc`'s own early return, before this ran.
+  static Future<void> _onSecondInstanceCall(MethodCall call) async {
+    if (call.method != 'focus') return;
+    try {
+      await _port.show();
+      await _port.restore();
+    } catch (_) {}
   }
 
   /// Wires geometry persistence, close-to-tray/minimise, and the tray icon

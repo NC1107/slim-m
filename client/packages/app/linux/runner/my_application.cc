@@ -7,11 +7,15 @@
 
 #include "clipboard_image_channel.h"
 #include "flutter/generated_plugin_registrant.h"
+#include "linux_second_instance_channel.h"
 #include "linux_tray_probe_channel.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  // Non-null once activation has run once; see my_application_activate.
+  GtkWindow* window;
+  FlBinaryMessenger* messenger;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -24,8 +28,16 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+
+  if (self->window != nullptr) {
+    // A second launch re-entered this process; bring the window back.
+    linux_second_instance_channel_notify_focus();
+    return;
+  }
+
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  self->window = window;
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -77,15 +89,18 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
+  self->messenger = fl_engine_get_binary_messenger(fl_view_get_engine(view));
+
   // The desktop half of composer_clipboard_image_stub.dart's channel; see
   // clipboard_image_channel.h.
-  clipboard_image_channel_register(
-      fl_engine_get_binary_messenger(fl_view_get_engine(view)));
+  clipboard_image_channel_register(self->messenger);
 
   // The desktop half of linux_tray_probe.dart's channel; see
   // linux_tray_probe_channel.h.
-  linux_tray_probe_channel_register(
-      fl_engine_get_binary_messenger(fl_view_get_engine(view)));
+  linux_tray_probe_channel_register(self->messenger);
+
+  // DesktopWindowShell's channel; see linux_second_instance_channel.h.
+  linux_second_instance_channel_register(self->messenger);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -100,8 +115,10 @@ static gboolean my_application_local_command_line(GApplication* application,
 
   g_autoptr(GError) error = nullptr;
   if (!g_application_register(application, nullptr, &error)) {
-    g_warning("Failed to register: %s", error->message);
-    *exit_status = 1;
+    // No session bus reachable: activate locally rather than refuse to start.
+    g_warning("Failed to register application: %s", error->message);
+    my_application_activate(application);
+    *exit_status = 0;
     return TRUE;
   }
 
@@ -154,10 +171,8 @@ MyApplication* my_application_new() {
   // the application to be recognized beyond its binary name.
   g_set_prgname(APPLICATION_ID);
 
-  // NON_UNIQUE means a second launch while already running in the tray
-  // spawns a second process instead of focusing the first - still open,
-  // named rather than fixed in decision 0012's own desktop shell pass.
+  // No NON_UNIQUE flag: a second launch now re-enters activate() above.
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_NON_UNIQUE, nullptr));
+                                     G_APPLICATION_DEFAULT_FLAGS, nullptr));
 }
