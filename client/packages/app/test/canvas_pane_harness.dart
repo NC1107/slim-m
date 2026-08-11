@@ -126,6 +126,7 @@ class CanvasPaneFixture {
     this.mePermissions = 0,
     int? channelPermissions,
     this.opsPostStatus = 201,
+    this.placeStatus = 201,
     this.attachmentFetchStatus = 200,
   }) : channelPermissions = channelPermissions ?? mePermissions;
 
@@ -138,6 +139,13 @@ class CanvasPaneFixture {
   /// The status `POST .../canvas/ops` answers with, so a test can drive the
   /// controller's failure path (a revert) without a real server refusal.
   final int opsPostStatus;
+
+  /// The status `POST .../canvas/objects` (a plain stroke, note, shape or
+  /// image placement) answers with - the sibling of [opsPostStatus] for the
+  /// `place` route rather than the op-stream one, so a test can drive a
+  /// refused draw (403 forbidden, timeout freeze; 409 channel full) without
+  /// a real server refusal.
+  final int placeStatus;
 
   /// The status `GET .../attachments/{id}` answers with. 200 serves a real
   /// decodable PNG, so a test can prove an image object placed by anyone
@@ -287,6 +295,13 @@ class CanvasPaneFixture {
             }
             if (request.method == 'POST') {
               final body = jsonDecode(request.body) as Map<String, dynamic>;
+              if (placeStatus != 201) {
+                return http.Response(
+                  jsonEncode({'error': 'no'}),
+                  placeStatus,
+                  headers: {'content-type': 'application/json'},
+                );
+              }
               posted.add(body);
               return http.Response(
                 jsonEncode({

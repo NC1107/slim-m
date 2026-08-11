@@ -3,6 +3,8 @@
 /// and actions, opened by `Ctrl K` or by tapping the rail's search field.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +24,11 @@ import 'channel_rail.dart' show selectedChannelId;
 import 'command_palette_items.dart';
 
 /// The design's floating card width; not on the spacing grid because it is
-/// the palette's own measured size, like the rail widths beside it.
+/// the palette's own measured size, like the rail widths beside it. Clamped
+/// per build against the viewport (see [_CommandPaletteContentState.build])
+/// - this is the one overlay in the app that never adopted `showAppSheet`'s
+/// phone/desktop split, so the fixed 480 overflowed a 390-wide phone
+/// symmetrically by 45px a side, cropping the leading edge of every row.
 const double _paletteWidth = 480;
 const double _resultsMaxHeight = 360;
 
@@ -169,6 +175,11 @@ class _CommandPaletteContentState
     final me = ref.watch(meProvider).valueOrNull;
     final permissions = ref.watch(myPermissionsProvider);
     final personalSpaceHidden = ref.watch(personalSpaceVisibilityProvider);
+    // Clamped against the viewport; see the doc comment on _paletteWidth.
+    final paletteWidth = math.min(
+      _paletteWidth,
+      MediaQuery.sizeOf(context).width - 2 * AppSpacing.s24,
+    );
 
     return Align(
       alignment: const Alignment(0, -0.5),
@@ -177,7 +188,7 @@ class _CommandPaletteContentState
         child: Material(
           type: MaterialType.transparency,
           child: AppMenu(
-            width: _paletteWidth,
+            width: paletteWidth,
             children: [
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s8),

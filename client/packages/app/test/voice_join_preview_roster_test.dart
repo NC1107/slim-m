@@ -10,7 +10,8 @@
 /// The three answers the roster can give have to stay three different
 /// things. A deployment with no SFU configured never leaves "not known", so
 /// rendering that as an empty room would claim this client checked when it
-/// never did.
+/// never did - and it gets its own honest sentence rather than nothing at
+/// all, which used to read as a stalled load or a missing widget.
 library;
 
 import 'package:flutter/material.dart';
@@ -74,13 +75,20 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('a roster that has not answered claims nothing', (tester) async {
-    await _pump(tester, const AsyncLoading());
+  testWidgets(
+    'a roster that has not answered gets its own honest sentence, not '
+    'silence and not an empty room',
+    (tester) async {
+      await _pump(tester, const AsyncLoading());
 
-    expect(find.text('This Space has no voice configured.'), findsOneWidget);
-    expect(find.textContaining('Nobody is in this call'), findsNothing);
-    expect(find.textContaining('here'), findsNothing);
-  });
+      expect(find.text('This Space has no voice configured.'), findsOneWidget);
+      expect(find.textContaining('Nobody is in this call'), findsNothing);
+      expect(
+        find.text("Can't tell who else is here right now."),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('a checked, empty room says so', (tester) async {
     await _pump(tester, const AsyncData([]));

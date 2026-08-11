@@ -98,6 +98,16 @@ class MessageStore {
     return query.watchSingleOrNull();
   }
 
+  /// [watchChannelRow]'s own snapshot: a thread included, unlike
+  /// [allChannels], for a caller that wants today's answer once rather than
+  /// a subscription - a widget test proving a row was written being the
+  /// usual reason, since a stream's own `.first` needs the fake test clock
+  /// pumped for its subscription-cleanup timer to ever resolve.
+  Future<Channel?> channelRow(String channelId) {
+    final query = db.select(db.channels)..where((c) => c.id.equals(channelId));
+    return query.getSingleOrNull();
+  }
+
   /// Whether a channel row exists locally.
   Future<bool> hasChannel(String channelId) async {
     final row = await (db.select(db.channels)

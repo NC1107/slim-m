@@ -251,4 +251,26 @@ void main() {
 
     await teardown(tester, setup.container, setup.db);
   });
+
+  /// overlays.md: the palette's fixed 480-wide `AppMenu` overflowed a
+  /// 390-wide phone symmetrically by 45px a side, cropping the leading edge
+  /// of every row - the one overlay in the set that never adopted
+  /// `showAppSheet`'s own phone/desktop split.
+  testWidgets('the palette never grows wider than the phone viewport', (
+    tester,
+  ) async {
+    final setup = setupPalette();
+    await pump(tester, setup.container, size: const Size(390, 844));
+
+    await pressCtrlK(tester);
+
+    final menu = tester.widget<AppMenu>(find.byType(AppMenu));
+    expect(
+      menu.width,
+      lessThanOrEqualTo(390),
+      reason: 'a menu wider than the viewport crops on both edges',
+    );
+
+    await teardown(tester, setup.container, setup.db);
+  });
 }

@@ -51,4 +51,40 @@ void main() {
       expect(find.text('Nothing on this canvas yet'), findsNothing);
     },
   );
+
+  /// canvas.md: a refused stroke leaves nothing drawn (`_document.kill`
+  /// reduces `objectCount` back to zero), and the hint used to reappear
+  /// with its own pen-tool invitation directly under a banner saying that
+  /// exact drawing action had just failed - the timeout-freeze case named
+  /// in `canvas-error-draw-forbidden-timeout-freeze`.
+  testWidgets(
+    "a refused stroke's error banner suppresses the empty hint, rather "
+    'than inviting the same refused action again',
+    (tester) async {
+      final fixture = CanvasPaneFixture(placeStatus: 403);
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+
+      await pumpCanvasPane(tester, container);
+      expect(find.text('Nothing on this canvas yet'), findsOneWidget);
+
+      final gesture = await tester.startGesture(const Offset(100, 100));
+      await gesture.moveTo(const Offset(160, 140));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("You don't have permission to draw here right now."),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Nothing on this canvas yet'),
+        findsNothing,
+        reason:
+            'the refusal already explains the empty canvas; the pen-tool '
+            'invitation would only invite the identical refusal again',
+      );
+    },
+  );
 }

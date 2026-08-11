@@ -22,4 +22,16 @@ extension SlimmApiThreads on SlimmApi {
     );
     return Channel.fromJson(json as Map<String, dynamic>);
   }
+
+  /// What [channelId] is a thread's own channel hangs off, if it is one -
+  /// the lookup a thread panel opened cold (a deep link, a reload, or a
+  /// notification) needs, since none of those ever went through
+  /// [openThread] on this device and so never learned the parent any other
+  /// way. Masked to all-null exactly like [SlimmApiChannelAdmin
+  /// .getChannelPermissions], so this can never be used to probe whether an
+  /// unviewable channel exists. See docs/decisions/0011-per-channel-permissions.md.
+  Future<ThreadParent> getThreadParent(String channelId) async {
+    final json = await _send('GET', '/channels/$channelId/thread-parent');
+    return ThreadParent.fromJson(json as Map<String, dynamic>);
+  }
 }

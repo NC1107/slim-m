@@ -10,11 +10,11 @@ Confirmation copy was checked against its real call site and against server beha
 
 ## The short version
 
-- Two more sites join the systemic permission-scope mismatch already found in `shell.md`, `settings.md` and `voice.md`: the message context menu gates Delete/Pin on deployment-wide permissions where the server checks per channel, and the canvas object menu plus "Clear canvas" do the same with `MANAGE_CANVAS` - five instances of one root cause across four reports now.
-- `confirm-eject-from-call` independently reconfirms the third instance already documented in `voice.md`'s cross-cutting section: still live in current source, same file, same gate.
-- "Clear canvas" tells the user the action cannot be undone while the same client arms a working local undo for that exact act in the same breath.
-- The command palette is the one overlay in this set that never adopted the shared `showAppSheet` split, and it overflows sideways at phone width instead of collapsing to a sheet.
-- The channel/role/member picker sheets and `member-roles-sheet` force a fixed height regardless of content, leaving most of the sheet empty for a two- or three-row list.
+- ~~Two more sites join the systemic permission-scope mismatch already found in `shell.md`, `settings.md` and `voice.md`: the message context menu gates Delete/Pin on deployment-wide permissions where the server checks per channel, and the canvas object menu plus "Clear canvas" do the same with `MANAGE_CANVAS` - five instances of one root cause across four reports now.~~ Already closed on main before this pass (PR #523); see Cross-cutting below.
+- ~~`confirm-eject-from-call` independently reconfirms the third instance already documented in `voice.md`'s cross-cutting section: still live in current source, same file, same gate.~~ Already closed on main before this pass (PR #523).
+- ~~"Clear canvas" tells the user the action cannot be undone while the same client arms a working local undo for that exact act in the same breath.~~ Fixed 2026-08-10.
+- ~~The command palette is the one overlay in this set that never adopted the shared `showAppSheet` split, and it overflows sideways at phone width instead of collapsing to a sheet.~~ The overflow is fixed 2026-08-10; it still does not go through `showAppSheet`.
+- ~~The channel/role/member picker sheets and `member-roles-sheet` force a fixed height regardless of content, leaving most of the sheet empty for a two- or three-row list.~~ Fixed 2026-08-10.
 - Everything else in this set - eleven confirmations, avatar crop, the source pickers, channel management, emoji, pinned messages, what's new - reads correctly and matches server behaviour line for line.
 
 ## confirm-* dialogs (11 families)
@@ -36,50 +36,40 @@ Verdict: the strongest, most consistent family in the whole overlay set, and the
 
 Verdict: the dialog's own "cannot be undone" claim is contradicted by the client's next action.
 
-- Both screenshots read: "This removes all N objects from the canvas for everyone in this channel. This cannot be undone." (`canvas_overflow_menu.dart:143-158`).
+- ~~Both screenshots read: "This removes all N objects from the canvas for everyone in this channel. This cannot be undone." (`canvas_overflow_menu.dart:143-158`).~~
 - `CanvasOpsController.clear()` (`canvas_ops_controller.dart:206-224`) submits the `clear` op and, on success, pushes `_pushUndo(_EraseEntry(result.op.id))`; `undo()` (same file, ~118-130) submits a `restore` op that un-deletes everything the clear just removed.
   This is real and server-backed, not cosmetic: `restore_candidates`'s clear branch matches on the clear op's own `deleted_at` fence, which is exactly the mechanism this project's own canvas-review history documents at length.
 - So the confirming user is told the action is permanent, while the same client arms a working undo for it in the same breath - for as long as the pane stays open and the local 32-entry undo stack isn't superseded by 32 further actions.
   Evidence: `confirm-clear-canvas-one.png`, `confirm-clear-canvas-many.png` (backend).
-- Fix: soften the claim, e.g. "You can undo this immediately, but not after leaving the canvas," or drop "This cannot be undone" from this one dialog.
+- ~~Fix: soften the claim, e.g. "You can undo this immediately, but not after leaving the canvas," or drop "This cannot be undone" from this one dialog.~~
+  Fixed 2026-08-10: the copy no longer claims permanence, and instead names the real Undo mechanism ("You can undo this with Undo until you close the canvas or take many more actions.").
 - Severity: medium.
   Not exploitable, but a confirmation whose copy contradicts its own behaviour is worse than one that merely reads awkwardly - it can make a moderator second-guess a clear they actually meant, or trust a clear as final when it is not yet.
 
 ## confirm-eject-from-call
 
-Verdict: dialog copy matches; the gate that decides whether the Eject row is offered at all is the same permission-scope bug already documented as the third instance in `voice.md`'s cross-cutting section, reconfirmed here from a different lens.
+~~Verdict: dialog copy matches; the gate that decides whether the Eject row is offered at all is the same permission-scope bug already documented as the third instance in `voice.md`'s cross-cutting section, reconfirmed here from a different lens.~~
+Already closed on main, not part of this change: see `voice.md`'s eject-button entry for the current source (`member_profile.dart`'s `canEject` reads `myChannelPermissionsProvider` now, PR #523).
 
 - Copy is accurate: "They will be disconnected from the call right now. Nothing stops them rejoining - time them out or remove them from the Space for something that sticks." matches `voice.rs`'s `kick` handler exactly (removes the SFU participant only, does not touch `CONNECT`) (backend).
-- `canEject` (`member_profile.dart:301-305`) reads `mine.hasPermission(Perm.kickMembers)` from the deployment-wide `myPermissionsProvider`.
-  The server's `kick` route checks `permissions_in_channel(ctx.user_id, channel_id).contains(KICK_MEMBERS)` (`voice.rs:325-339`), channel-scoped - `voice.rs`'s own doc comment says so explicitly.
-  Confirmed still present by direct source read in this pass, independent of `voice.md`'s finding (backend).
-- Severity: high, same class as the two menu findings below.
-  Not counted as a sixth new site in the cross-report tally: this is the same gate `voice.md` already names, found again here through the confirmation entry point rather than the button itself.
+- ~~`canEject` (`member_profile.dart:301-305`) reads `mine.hasPermission(Perm.kickMembers)` from the deployment-wide `myPermissionsProvider`.
+  The server's `kick` route checks `permissions_in_channel(ctx.user_id, channel_id).contains(KICK_MEMBERS)` (`voice.rs:325-339`), channel-scoped - `voice.rs`'s own doc comment says so explicitly.~~
 
 ## message-context-menu
 
-Verdict: gates Delete/Pin/Reply/"Reply in thread" on the wrong permission scope; menu organisation and copy are otherwise the best in the set.
+~~Verdict: gates Delete/Pin/Reply/"Reply in thread" on the wrong permission scope; menu organisation and copy are otherwise the best in the set.~~
+Already closed on main, not part of this change: `channel_screen.dart`'s `myPermissions` (fed into `messageActionsFor`) reads `myChannelPermissionsProvider(widget.channelId)` now ("site 1" per its own inline comment), part of the decision-0011 sweep, PR #523, landed before this pass started.
 
-- `messageActionsFor` (`channel_message_actions.dart:217-259`) computes `canDeleteMessage`, `canManageMessagePin` (MANAGE_MESSAGES) and `canReplyToMessage`/`canOpenThreadFor` (SEND_MESSAGES) from `myPermissionsProvider` - `GET /me` = `Store::base_permissions` (`http/users.rs:197`), deployment-wide, no channel overwrites.
-  The server authorizes the matching requests per channel: delete/edit call `permissions_in_channel` (`http/messages.rs:236-330`), and pin/unpin's `authorize_manage` does the same (`http/pins.rs:193-208`) (backend).
-- Sharpest manifestation is inside a DM: `DM_BASE` (`store/dms.rs:40-45`) never includes MANAGE_MESSAGES, and DMs skip the role/ADMINISTRATOR evaluator entirely.
-  A member holding MANAGE_MESSAGES at the deployment level still sees `myPermissions.hasPermission(Perm.manageMessages)` return true, so Delete/Pin render on the *other* party's DM message and every tap 403s.
-  The reverse holds too: a moderator granted MANAGE_MESSAGES only through a channel overwrite sees no Delete/Pin there at all, though the server would allow it (backend).
-- Fix: thread a per-channel effective-permissions value into `messageActionsFor` instead of the deployment-wide provider, the same shape `channel_overwrites_screen.dart` already uses for its own channel-scoped checks.
-- Severity: high (an admin/moderator sees and can tap a control that always fails in a DM; a per-channel-granted moderator is silently denied a control they actually hold).
+- ~~`messageActionsFor` (`channel_message_actions.dart:217-259`) computes `canDeleteMessage`, `canManageMessagePin` (MANAGE_MESSAGES) and `canReplyToMessage`/`canOpenThreadFor` (SEND_MESSAGES) from `myPermissionsProvider` - `GET /me` = `Store::base_permissions` (`http/users.rs:197`), deployment-wide, no channel overwrites.~~
 - Otherwise the best-organised menu in the set: three tiers separated by dividers (reactions/reply, then copy/edit/pin, then report/block tinted-not-filled, then delete alone at the bottom), and the phone sheet shows the message being acted on above the menu (UX).
 - Icons line up on a consistent leading column, labels don't wrap, danger items render in the danger text colour with no fill, and the phone variant correctly collapses to a bottom sheet with a drag handle - this is the sheet the picker sheets below should look like (frontend).
 
 ## canvas-object-context-menu / space-menu
 
-Verdict: `canvas-object-context-menu` (and the canvas overflow's "Clear canvas" entry) has the same permission-scope bug as the message context menu; `space-menu` is clean.
+~~Verdict: `canvas-object-context-menu` (and the canvas overflow's "Clear canvas" entry) has the same permission-scope bug as the message context menu; `space-menu` is clean.~~
+Already closed on main, not part of this change: `canvas_pane.dart`'s `manageCanvas` reads `myChannelPermissionsProvider(widget.channelId)` now ("site 5" per its own inline comment), same PR #523. A separate, nearby site the same sweep missed - `canvas_pane_gestures.dart`'s `_onSelectStart`, which gates starting a select-drag on another member's object rather than the context menu or overflow item this finding names - was found independently in this pass and fixed the same way.
 
-- `canManage`, fed to `CanvasObjectContextMenu` and `CanvasOverflowMenu` from `canvas_pane.dart:369-370`, is `me?.permissions.hasPermission(Perm.manageCanvas)` - deployment-wide `base_permissions` again, same `meProvider`/`GET /me` source as above.
-  The server's canvas-op write path evaluates MANAGE_CANVAS per channel: `permissions_in_channel(ctx.user_id, channel_id).contains(MANAGE_CANVAS)` (`http/canvas_ops_write.rs:83-90`), folding in a channel's own overwrites (and a thread's parent channel's) (backend).
-- Concretely: right-clicking another member's object shows "Bring to front"/"Send to back"/"Delete" (`move`/`reorder`/`remove` ops) based on the wrong scope, in both directions - a channel-overwrite-granted moderator sees none of these on someone else's object though the server would accept them, and one denied it per-channel by overwrite still sees and can attempt them and gets a 403.
-  Evidence: `canvas-object-context-menu.png` (`_allowed()`, `canvas_object_context_menu.dart:177-179`), `confirm-clear-canvas-one.png`/`confirm-clear-canvas-many.png` (the same `widget.canManage`-gated entry point, `canvas_overflow_menu.dart:304-311`) (backend).
-- Fix: pass a per-channel MANAGE_CANVAS read - the pane already resolves the channel id it is showing - rather than `meProvider`'s deployment-wide bit.
-- Severity: high, same reasoning as the message context menu.
+- ~~`canManage`, fed to `CanvasObjectContextMenu` and `CanvasOverflowMenu` from `canvas_pane.dart:369-370`, is `me?.permissions.hasPermission(Perm.manageCanvas)` - deployment-wide `base_permissions` again, same `meProvider`/`GET /me` source as above.~~
 - `space-menu` itself is compact and clear, verbs describe the result ("Add channel", "Add category"), and its own creation items are correctly gated on `Perm.manageChannels`, which is genuinely deployment-wide on both sides - no mismatch there (backend, UX).
 - Both menus are visually fine: consistent icon column, no wrapping, danger items correctly styled (frontend).
 
@@ -110,23 +100,26 @@ Verdict: both fine at both viewports - title, rows, icons all present, no clippi
 
 Verdict: the weakest sheets in this review - functional, but missing the heading treatment their siblings have and forcing a fixed height regardless of content.
 
-- **Finding (medium, evidenced): no title/heading on any of the three pickers.**
+~~**Finding (medium, evidenced): no title/heading on any of the three pickers.**
   `ChannelPickerSheet.build` (`overwrite_target_picker_sheets.dart:34-46`) is a bare `ListView`; `RolePickerSheet`/`MemberPickerSheet` (lines 49-108) go straight from the sheet's top edge into rows.
   Every sibling "choose one" sheet in this set has a heading (camera-source-sheet says "Choose a camera", screen-source-sheet says "Share a screen"); these three don't.
   On desktop this reads as a floating, borderless pill hugging a single row rather than a modal - there is a real dialog card (`surfaceRaised` + `borderSubtle`), but with no title and no padding it visually collapses into the row's background.
   On phone, a person opening "set overwrite for a role" and seeing a bare list of role names has no on-screen confirmation this is a role picker rather than, say, a mention target.
   Evidence: `channel-picker-sheet-desktop.png`, `role-picker-sheet-desktop.png`, `role-picker-sheet-phone.png`, `member-picker-sheet-desktop.png`, `member-picker-sheet-phone.png`.
   Fix: add a one-line heading to each - "Choose a channel" / "Choose a role" / "Choose a member" - matching the pattern two files over, which also gives screen readers something to announce on open.
-  Severity: medium: admin-only surface, but it is the entry point to a permission-affecting action, and the fix is one line (frontend, UX, found independently).
-- **Finding (high, evidenced): `RolePickerSheet` and `MemberPickerSheet` force a fixed height of `MediaQuery.of(context).size.height * 0.6`** (`overwrite_target_picker_sheets.dart:29,58-59,90-91`) regardless of row count.
+  Severity: medium: admin-only surface, but it is the entry point to a permission-affecting action, and the fix is one line (frontend, UX, found independently).~~
+  Fixed 2026-08-10: each of the three now opens with a `Text('Choose a channel'/'a role'/'a member', style: AppText.heading)` above the list.
+- ~~**Finding (high, evidenced): `RolePickerSheet` and `MemberPickerSheet` force a fixed height of `MediaQuery.of(context).size.height * 0.6`** (`overwrite_target_picker_sheets.dart:29,58-59,90-91`) regardless of row count.
   With the fixture's 2-3 rows, `role-picker-sheet-desktop.png` and `member-picker-sheet-desktop.png` show a card roughly 530pt tall with content in the top ~110pt and ~75% dead space below.
   On phone this is worse: `role-picker-sheet-phone.png` and `member-picker-sheet-phone.png` cover roughly 60% of screen height with three rows at the top and empty surface below - the inverse of the avatar-crop-sheet's previously-shipped "too tall for the window" bug, this time "too tall for too little content."
   `member_roles_sheet.dart:81-82` has the identical `height * 0.7` pattern, and `member-roles-sheet-desktop.png`/`-phone.png` show the same near-empty card with two role rows at the top.
   This is a real, everyday-reachable admin flow (`ChannelOverwritesScreen`'s target pickers, and `MemberRolesSheet` from the member popover), not an edge case.
   Fix: drop the fixed height fraction; wrap the list in a `ConstrainedBox(maxHeight: ...)` so the sheet grows to fit content up to a ceiling and shrinks below it - the shape `whats-new-sheet` already gets right for the opposite (variable, often-overflowing) case.
-  Severity: high (frontend).
-- **Finding (low, design-system conformance, not visible in current screenshots): `_PickerError` and `_PickerEmpty` (`overwrite_target_picker_sheets.dart:120-156`) use a raw `TextStyle(color: tokens.textSecondary)` instead of an `AppText.*` scale style, and `_PickerError`'s retry action is a bare Material `TextButton` rather than `AppButton(variant: AppButtonVariant.ghost)`.**
-  These only render on a `rolesProvider`/`membersProvider` error, so they weren't captured in this screenshot set, but they are a real deviation from the type scale and shared button component the rest of these sheets use correctly (frontend).
+  Severity: high (frontend).~~
+  Fixed 2026-08-10 in both files: a new `_PickerList` (`overwrite_target_picker_sheets.dart`) wraps its `ListView` in `ConstrainedBox(maxHeight: ...)` with `shrinkWrap: true`, and `member_roles_sheet.dart`'s own list does the same, so each grows to fit its rows up to the same ceiling rather than always claiming a fixed fraction.
+- ~~**Finding (low, design-system conformance, not visible in current screenshots): `_PickerError` and `_PickerEmpty` (`overwrite_target_picker_sheets.dart:120-156`) use a raw `TextStyle(color: tokens.textSecondary)` instead of an `AppText.*` scale style, and `_PickerError`'s retry action is a bare Material `TextButton` rather than `AppButton(variant: AppButtonVariant.ghost)`.**
+  These only render on a `rolesProvider`/`membersProvider` error, so they weren't captured in this screenshot set, but they are a real deviation from the type scale and shared button component the rest of these sheets use correctly (frontend).~~
+  Fixed 2026-08-10 in the same rewrite: both now use `AppText.body.copyWith(color: tokens.textSecondary)` and `AppButton(variant: AppButtonVariant.ghost)`.
 - Role/member matching throughout (`role_assign_sheet.dart`, `member_roles_sheet.dart`) is by `role.id`/`roleIds.contains(role.id)`, never by name - correct given role names are not unique in the schema (backend).
 
 ## role-editor-sheet
@@ -175,19 +168,22 @@ Verdict: both fine, and `whats-new-sheet` is the pattern the picker sheets and r
 
 Verdict: on phone, the palette does not collapse to a bottom sheet at all, and its fixed width overflows the screen.
 
-- `openCommandPalette` (`command_palette.dart:32-49`) does not go through `showAppSheet`; it calls `showGeneralDialog` directly and renders `AppMenu(width: _paletteWidth)` where `_paletteWidth = 480` (`command_palette.dart:25,173-178`), and `AppMenu` hard-sets `Container(width: width)` with no responsive clamp (`menu.dart:52-53`).
-- On the 390px-wide phone viewport, the 480-wide box overflows symmetrically by 45 logical px per side.
+- ~~`openCommandPalette` (`command_palette.dart:32-49`) does not go through `showAppSheet`; it calls `showGeneralDialog` directly and renders `AppMenu(width: _paletteWidth)` where `_paletteWidth = 480` (`command_palette.dart:25,173-178`), and `AppMenu` hard-sets `Container(width: width)` with no responsive clamp (`menu.dart:52-53`).
+  On the 390px-wide phone viewport, the 480-wide box overflows symmetrically by 45 logical px per side.
   Verified by pixel-scanning `command-palette-phone.png` at y=440: the menu's own border/background is already present at the leftmost sampled column with no rounded corner or margin, and reappears near the right physical edge the same way - both edges at or past the screen boundary.
-  Visually this crops the leading edge of every row (the `#` glyph on the "general" row is visibly cut).
+  Visually this crops the leading edge of every row (the `#` glyph on the "general" row is visibly cut).~~
+  Fixed 2026-08-10, the narrower of the two suggested fixes: `paletteWidth = math.min(_paletteWidth, MediaQuery.sizeOf(context).width - 2 * AppSpacing.s24)` is now what `AppMenu` receives, so the card clamps to the viewport rather than overflowing it. Not routed through `showAppSheet` - the palette still opens as a `showGeneralDialog`, unlike every sibling sheet; only the width is fixed.
 - This is the only overlay in the set whose phone rendering visibly differs in kind, not just spacing, from every sibling: everything else - 18 other sheets, 11 confirmations, 3 menus - uses `showAppSheet` and either becomes a bottom sheet or is a small anchored menu that fits the viewport.
   `sheet.dart`'s own doc comment describes exactly this failure mode ("a bottom sheet pasted along the bottom... gets cut off") as the reason `showAppSheet` was built; the palette cuts off sideways instead of at the bottom.
-- Fix: either route the palette through `showAppSheet` (`bare: true` plus `scrolls: true`, since its content is already a scrollable `AppMenu`), or at minimum clamp `_paletteWidth` to `min(480, MediaQuery.sizeOf(context).width - margin)` before handing it to `AppMenu`.
 - Severity: high - a keyboard-shortcut-and-search entry point reachable from any screen, and it would ship visibly broken on real phone-width hardware (frontend).
 - Functionally the palette itself is correct: the search placeholder states scope up front, results are grouped with icons distinguishing text/voice/DM, the first row is pre-selected (UX), and message search reuses `channelSearchProvider`'s helper, dropping any hit from a blocked author the same way the channel transcript and search bar do (backend).
 
 ## Cross-cutting
 
-**The permission-scope mismatch is now confirmed at five sites across four reports, not three.**
+~~**The permission-scope mismatch is now confirmed at five sites across four reports, not three.**~~
+Already closed on main, not part of this change: [docs/decisions/0011-per-channel-permissions.md](../../decisions/0011-per-channel-permissions.md) (PR #523, see CLAUDE.md's "The client asked one permission question and the server answered a different one, in eight places," 2026-08-10) landed before this pass started and converted every site named below to a per-channel read.
+Checked directly against current source rather than assumed stale from the report text: `channel_screen.dart`, `canvas_pane.dart` and `member_profile.dart` all now read `myChannelPermissionsProvider`, each with an inline comment naming its own numbered site.
+One nearby site the same sweep missed - `canvas_pane_gestures.dart`'s `_onSelectStart`, gating a select-drag start on another member's object rather than a menu item - was found independently in this pass and fixed the same way; see canvas-object-context-menu above.
 `shell.md`, `settings.md` and `voice.md` each already found one instance: a UI-side gate reading the caller's deployment-wide `base_permissions`/`myPermissionsProvider` where the server authorizes the same action through `permissions_in_channel`, which folds in channel overwrites and (for a DM) an entirely different evaluator.
 This review adds two new sites - `message-context-menu` (MANAGE_MESSAGES/SEND_MESSAGES) and `canvas-object-context-menu` plus the canvas overflow's "Clear canvas" item (MANAGE_CANVAS) - and independently reconfirms `voice.md`'s eject-button finding from a different entry point (the confirmation dialog's own gate, same underlying `member_profile.dart:301-305`).
 Every instance shares the same root cause and the same fix shape: read a per-channel permission the way the server does, not the deployment-wide bitmask off `GET /me`.

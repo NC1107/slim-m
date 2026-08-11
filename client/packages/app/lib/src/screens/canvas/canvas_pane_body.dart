@@ -23,6 +23,7 @@ import 'canvas_activity_panel.dart';
 import 'canvas_bar.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_object_context_menu.dart';
+import 'canvas_pane_hints.dart';
 import 'canvas_presence_geometry.dart'
     show presenceTileIdentity, presenceTileKind;
 import 'canvas_presence_layer.dart';
@@ -46,6 +47,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.onRecenter,
     required this.error,
     required this.onDismissError,
+    this.onRetryError,
     required this.truncated,
     required this.loading,
     required this.onStroke,
@@ -99,6 +101,14 @@ class CanvasPaneBody extends StatefulWidget {
   final VoidCallback onRecenter;
   final String? error;
   final VoidCallback onDismissError;
+
+  /// Re-runs the viewport fetch that produced [error] - non-null only for
+  /// the almost-certainly-transient "could not be loaded" case, where the
+  /// one recovery on screen used to be closing and reopening the pane, with
+  /// nothing on screen telling a person to do that. Null for every other
+  /// error this pane shows (forbidden, refused, timeout freeze), each of
+  /// which would just fail the identical way again.
+  final VoidCallback? onRetryError;
   final bool truncated;
   final bool loading;
   final StrokeCommitted onStroke;
@@ -223,6 +233,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
                 child: AppErrorState(
                   message: widget.error!,
                   onDismiss: widget.onDismissError,
+                  onRetry: widget.onRetryError,
                 ),
               ),
             if (widget.truncated)
@@ -340,6 +351,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     builder: (context, count, child) => CanvasActivityPanel(
       activityLog: widget.activityLog,
       summary: _summary(),
+      objectCount: count,
     ),
   );
 
@@ -351,8 +363,12 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
       child: Stack(
         children: [
           child!,
-          // A blank canvas otherwise looks identical to a broken one; the screen-reader label above already says so, so this is ignored by pointers and excluded from semantics rather than doubling that node.
-          if (count == 0 && !widget.loading) _emptyHint(tokens),
+          // A blank canvas otherwise looks identical to a broken one; the screen-reader label above already says so for a screen reader, and this is the sighted-user half of that same guarantee.
+          if (widget.loading)
+            CanvasLoadingHint(tokens: tokens)
+          // Never alongside an error banner: see CanvasEmptyHint's own doc.
+          else if (count == 0 && widget.error == null)
+            CanvasEmptyHint(tokens: tokens),
         ],
       ),
     ),
@@ -425,41 +441,6 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           hideSelfCamera: widget.selfBubbleHidden,
         ),
       ],
-    ),
-  );
-
-  Widget _emptyHint(AppTokens tokens) => Positioned.fill(
-    child: IgnorePointer(
-      child: ExcludeSemantics(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  AppIcons.pen,
-                  size: AppSizes.icon24,
-                  color: tokens.textDisabled,
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                Text(
-                  'Nothing on this canvas yet',
-                  style: AppText.body.copyWith(color: tokens.textSecondary),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.s4),
-                Text(
-                  'Draw with the pen, drop a note or a shape, or paste an '
-                  'image from "More canvas actions"',
-                  style: AppText.caption.copyWith(color: tokens.textDisabled),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     ),
   );
 

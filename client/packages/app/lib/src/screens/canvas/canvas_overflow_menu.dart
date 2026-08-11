@@ -140,17 +140,26 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     widget.onShowTile(key);
   }
 
+  /// The confirmation names the real Undo path rather than claiming
+  /// permanence: `CanvasOpsController.clear()` arms a genuine, server-backed
+  /// Undo for exactly this action (a `restore` op against the clear's own
+  /// `deleted_at` fence), and the audience who sees this dialog is the same
+  /// audience whose own dock carries the Undo control that would
+  /// immediately falsify a "cannot be undone" claim.
   Future<void> _requestClear() async {
     _controller.hide();
     final count = widget.objectCount.value;
+    final message = count == 1
+        ? 'This removes the one object on the canvas for everyone in this '
+              'channel.'
+        : 'This removes all $count objects from the canvas for everyone in '
+              'this channel.';
     final confirmed = await confirmDangerousAction(
       context,
       title: 'Clear this canvas?',
-      message: count == 1
-          ? 'This removes the one object on the canvas for everyone in '
-                'this channel. This cannot be undone.'
-          : 'This removes all $count objects from the canvas for everyone '
-                'in this channel. This cannot be undone.',
+      message:
+          '$message You can undo this with Undo until you close the '
+          'canvas or take many more actions.',
       confirmLabel: 'Clear canvas',
       cancelLabel: 'Keep canvas',
     );
@@ -212,6 +221,10 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
     );
   }
 
+  /// `width: 280` below: 200 truncated this menu's own longest labels
+  /// ("Paste image" with its Ctrl+V hint, "Hide my camera bubble") to
+  /// "Paste i…"/"Hide my camera bu…" - narrower than `AppMenu`'s own 250
+  /// default for no reason tied to this menu's own content.
   Widget _buildMenu() {
     return Positioned(
       left: 0,
@@ -231,7 +244,7 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
             child: ValueListenableBuilder<String?>(
               valueListenable: widget.selection,
               builder: (context, selected, _) => AppMenu(
-                width: 200,
+                width: 280,
                 children: [
                   AppMenuItem(
                     label: 'Paste image',

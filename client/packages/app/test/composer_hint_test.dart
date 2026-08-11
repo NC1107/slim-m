@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:slimm_app/src/providers/threads.dart';
 
 import 'composer_harness.dart';
 
@@ -24,6 +25,24 @@ void main() {
   });
 
   tearDown(() => controller.dispose());
+
+  /// shell.md's finding: at the exact width the two-pane rail-plus-content
+  /// layout begins, the hint wrapped to a second line and grew the composer
+  /// by a full extra line for no content reason.
+  testWidgets('the hint never wraps to a second line', (tester) async {
+    await tester.pumpWidget(
+      composerHarness(
+        controller: controller,
+        sends: sends,
+        platform: TargetPlatform.iOS,
+        channelName: 'general',
+      ),
+    );
+
+    final hint = tester.widget<Text>(find.byKey(_hintKey));
+    expect(hint.maxLines, 1);
+    expect(hint.overflow, TextOverflow.ellipsis);
+  });
 
   testWidgets('a named channel still shows "Message #name"', (tester) async {
     await tester.pumpWidget(
@@ -54,4 +73,25 @@ void main() {
     final hint = tester.widget<Text>(find.byKey(_hintKey));
     expect(hint.textSpan!.toPlainText(), 'Message');
   });
+
+  /// Ties the constant a thread's local channel row is actually stored with
+  /// (`providers/threads.dart`) to this behaviour, not just a bare `''`
+  /// literal: a non-empty placeholder there was a real bug, rendering
+  /// "Message #Thread" for every warm-opened thread.
+  testWidgets(
+    "a thread's own channel-name constant drops the hash the same way",
+    (tester) async {
+      await tester.pumpWidget(
+        composerHarness(
+          controller: controller,
+          sends: sends,
+          platform: TargetPlatform.iOS,
+          channelName: threadChannelName,
+        ),
+      );
+
+      final hint = tester.widget<Text>(find.byKey(_hintKey));
+      expect(hint.textSpan!.toPlainText(), 'Message');
+    },
+  );
 }

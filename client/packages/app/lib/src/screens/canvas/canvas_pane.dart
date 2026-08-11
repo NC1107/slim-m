@@ -288,11 +288,17 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'The canvas could not be loaded.';
+          _error = _genericLoadError;
         });
       }
     }
   }
+
+  /// [_error]'s exact text for an almost-certainly-transient fetch failure -
+  /// shared with the `onRetryError` gate below, so the one error this pane
+  /// can meaningfully retry (re-running [_fetch]) is identified by more than
+  /// a string literal repeated in two places.
+  static const _genericLoadError = 'The canvas could not be loaded.';
 
   void _onStroke(List<Offset> worldPoints) {
     final selfId = ref.read(meProvider).valueOrNull?.id;
@@ -401,6 +407,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onRecenter: _onRecenter,
           error: _error,
           onDismissError: () => setState(() => _error = null),
+          onRetryError: _error == _genericLoadError
+              ? () => unawaited(_fetch())
+              : null,
           truncated: _truncated,
           loading: _loading,
           onStroke: _onStroke,

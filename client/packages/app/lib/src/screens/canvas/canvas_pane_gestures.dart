@@ -73,10 +73,15 @@ extension _CanvasPaneGestures on _CanvasPaneState {
 
   void _onSelectStart(Offset world) {
     final me = ref.read(meProvider).valueOrNull;
+    // A safe read, not a cold one: build() already watches this same family instance every frame.
+    final manageCanvas = ref
+        .read(myChannelPermissionsProvider(widget.channelId))
+        .hasPermission(Perm.manageCanvas);
     _ops.beginSelect(
       world,
-      manageCanvas: me?.permissions.hasPermission(Perm.manageCanvas) ?? false,
+      manageCanvas: manageCanvas,
       selfId: me?.id,
+      touch: AppTouchTargets.of(context),
     );
   }
 

@@ -12,11 +12,34 @@ import 'package:slimm_api/api.dart' as api;
 
 import 'providers.dart';
 
-/// Display copy for a thread's local channel row: never sent or read on the
-/// wire (the server stores a thread's own `name` as empty, mirroring a DM),
-/// so this is the one place that substitution happens, the same shape
-/// `channelFromDm` follows for a DM's name.
-const String threadChannelName = 'Thread';
+/// The local channel row's `name` for a thread: empty, mirroring the
+/// server's own `Store::open_thread`, which inserts `''` for the identical
+/// reason (`channel_screen.dart`'s `hashChannelName`/`ChannelStartHeader`
+/// both special-case an empty name to drop the "#name" clause rather than
+/// substitute one). `ThreadScreen`'s own AppBar title never reads this
+/// field - it is `threadParentProvider`'s job - so nothing here is ever
+/// shown as-is; this exists only so the composer and transcript hints see
+/// the same "no name" signal a thread's own server row would answer with.
+/// A non-empty placeholder here was a real, if invisible, bug: the composer
+/// hint would have rendered "Message #Thread" instead of "Message" for
+/// every warm-opened thread, the exact dangling-hash failure this constant
+/// exists to avoid, just with the wrong value.
+const String threadChannelName = '';
+
+/// What a thread's own channel id hangs off, for a thread panel opened cold
+/// - a deep link, a reload, or a notification - that never went through
+/// [openThreadFromMessage] on this device and so never learned its parent
+/// any other way. `autoDispose` and fetched fresh on every watch, the same
+/// shape `channelPermissionsProvider.dart` already uses: the answer is
+/// immutable once a thread exists (a channel id and a message id, neither
+/// of which can change), so there is nothing to invalidate - the one
+/// exception is the parent channel's own name, which can be renamed after
+/// the fact, an accepted staleness window closed by the next screen open
+/// rather than a live event.
+final threadParentProvider = FutureProvider.autoDispose
+    .family<api.ThreadParent, String>(
+      (ref, channelId) => ref.watch(apiProvider).getThreadParent(channelId),
+    );
 
 /// Opens (or reuses) the thread hanging off [messageId] in [channelId], and
 /// gets it into the local store with an initial page of whatever it already

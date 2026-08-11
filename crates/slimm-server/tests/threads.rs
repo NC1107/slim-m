@@ -371,3 +371,126 @@ async fn a_message_carries_its_thread_channel_id_once_one_is_opened() {
         .unwrap();
     assert_eq!(row["thread_channel_id"], thread_id);
 }
+
+/// `GET /channels/{channel_id}/thread-parent`: a cold-opened thread panel's
+/// own lookup, keyed only on the thread's own channel id. Bob never opens
+/// the thread himself here; only the parent's own VIEW_CHANNEL is what has
+/// to carry him through.
+#[tokio::test]
+async fn thread_parent_route_answers_the_real_parent_for_a_viewer() {
+    let (store, _guard) = new_store("slimm-threads-parent-route").await;
+    let (_admin_id, admin) = register(&store, "admin").await;
+    let (_bob_id, bob) = register(&store, "bob").await;
+    let app = app(store.clone());
+    let channel = store.list_channels().await.unwrap()[0].id.to_string();
+    let messages = format!("/channels/{channel}/messages");
+
+    let parent = send(&app, &messages, &admin, "root").await;
+    let parent_id = parent["id"].as_str().unwrap().to_owned();
+    let thread = open_thread(&app, &messages, &parent_id, &admin).await;
+    let thread_id = thread["id"].as_str().unwrap().to_owned();
+
+    let answer = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                &format!("/channels/{thread_id}/thread-parent"),
+                &bob,
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(answer["parent_channel_id"], channel);
+    assert_eq!(answer["parent_message_id"], parent_id);
+    assert_eq!(answer["parent_channel_name"], "general");
+}
+
+/// An ordinary, non-thread channel answers all-null, the same shape as one
+/// the caller cannot view - never a distinguishable "not a thread" error.
+#[tokio::test]
+async fn thread_parent_route_answers_all_null_for_an_ordinary_channel() {
+    let (store, _guard) = new_store("slimm-threads-parent-not-a-thread").await;
+    let (_admin_id, admin) = register(&store, "admin").await;
+    let app = app(store.clone());
+    let channel = store.list_channels().await.unwrap()[0].id.to_string();
+
+    let answer = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                &format!("/channels/{channel}/thread-parent"),
+                &admin,
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(answer["parent_channel_id"].is_null());
+    assert!(answer["parent_channel_name"].is_null());
+    assert!(answer["parent_message_id"].is_null());
+}
+
+/// The same existence-masking rule `getChannelPermissions` already applies:
+/// a thread the caller cannot view answers identically to one that does not
+/// exist, so this route cannot become a second channel-existence oracle.
+#[tokio::test]
+async fn thread_parent_route_masks_a_thread_the_caller_cannot_view() {
+    let (store, _guard) = new_store("slimm-threads-parent-masked").await;
+    let (_admin_id, admin) = register(&store, "admin").await;
+    let (bob_id, bob) = register(&store, "bob").await;
+    let app = app(store.clone());
+    let channel = store.list_channels().await.unwrap()[0].id.to_string();
+    let messages = format!("/channels/{channel}/messages");
+
+    let parent = send(&app, &messages, &admin, "root").await;
+    let parent_id = parent["id"].as_str().unwrap().to_owned();
+    let thread = open_thread(&app, &messages, &parent_id, &admin).await;
+    let thread_id = thread["id"].as_str().unwrap().to_owned();
+
+    let overwrite_uri = format!("/channels/{channel}/overwrites/member/{bob_id}");
+    app.clone()
+        .oneshot(request(
+            "PUT",
+            &overwrite_uri,
+            &admin,
+            Some(json!({ "allow": 0, "deny": Permissions::VIEW_CHANNEL.bits() })),
+        ))
+        .await
+        .unwrap();
+
+    let masked = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                &format!("/channels/{thread_id}/thread-parent"),
+                &bob,
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(masked["parent_channel_id"].is_null());
+    assert!(masked["parent_channel_name"].is_null());
+    assert!(masked["parent_message_id"].is_null());
+
+    let fabricated = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                &format!("/channels/{}/thread-parent", Uuid::now_v7()),
+                &bob,
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        masked, fabricated,
+        "a real thread bob cannot view must answer byte-identically to a fabricated id"
+    );
+}

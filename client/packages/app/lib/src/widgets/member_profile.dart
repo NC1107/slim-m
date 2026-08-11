@@ -9,7 +9,12 @@
 /// social verbs, moderation, block - and a section you have no rights or
 /// context for is *absent* rather than present-and-disabled, which is what
 /// keeps a plain member's popover to two verbs instead of a wall of greyed
-/// rows.
+/// rows. That rule has to be applied per row, not per section: the
+/// moderation section's own timeout-chips row is absent while a timeout is
+/// already in force (the badge above already carries it), and
+/// `showModeration` must agree with that or a caller who can only time out
+/// still sees a MODERATION header sitting over nothing, for an already
+/// timed-out member.
 ///
 /// Everything in the call section is local to this listener and never reaches
 /// the room; anything room-visible sits under the MODERATION label, which is
@@ -308,8 +313,10 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         inCallTogether &&
         voice.channelId != null &&
         voiceChannelPermissions.hasPermission(Perm.kickMembers);
+    // See the library doc above for why this must agree with showModeration.
+    final canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null;
     final showModeration =
-        canTimeOut || canRemove || canManageRoles || canEject;
+        canOfferTimeoutChips || canRemove || canManageRoles || canEject;
 
     // Captured before onDone, whose Navigator.pop disposes this element.
     void run(Future<void> Function(ProviderContainer container) action) {
@@ -388,8 +395,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             },
           ),
         // Absent while one is in force: the badge above already carries it.
-        if (canTimeOut && profile.timedOutUntil == null)
-          TimeoutDurationChips(onChosen: _timeOut),
+        if (canOfferTimeoutChips) TimeoutDurationChips(onChosen: _timeOut),
         if (canEject)
           AppMenuItem(
             label: 'Eject from call...',

@@ -119,7 +119,9 @@ class CanvasQuickPlacement {
   }
 
   static String _explain(api.ApiException error) => switch (error) {
-    api.ForbiddenException() => 'You cannot draw on this canvas right now.',
+    // Worded as a permission state, never as an outage that invites a retry.
+    api.ForbiddenException() =>
+      "You don't have permission to draw here right now.",
     api.ConflictException() => 'This canvas is full.',
     api.BadRequestException() => 'That was refused as too large.',
     _ => 'That could not be placed.',

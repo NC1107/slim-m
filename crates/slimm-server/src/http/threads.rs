@@ -9,12 +9,13 @@
 use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::request::Parts;
-use axum::routing::post;
+use axum::routing::{get, post};
+use serde::Serialize;
 
 use super::AppState;
 use super::channels::ChannelDto;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
@@ -22,12 +23,14 @@ use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::OpenThreadError;
 
-/// The thread route, mounted by [`super::router`].
+/// The thread routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
-    Router::new().route(
-        "/channels/{channel_id}/messages/{message_id}/thread",
-        post(open),
-    )
+    Router::new()
+        .route(
+            "/channels/{channel_id}/messages/{message_id}/thread",
+            post(open),
+        )
+        .route("/channels/{channel_id}/thread-parent", get(thread_parent))
 }
 
 /// Opens (or reuses) the thread hanging off a message.
@@ -79,6 +82,61 @@ async fn open(
         });
     }
     Ok(Json(thread.channel.into()))
+}
+
+#[derive(Serialize)]
+struct ThreadParentDto {
+    parent_channel_id: Option<String>,
+    parent_channel_name: Option<String>,
+    parent_message_id: Option<String>,
+}
+
+impl ThreadParentDto {
+    const NONE: Self = Self {
+        parent_channel_id: None,
+        parent_channel_name: None,
+        parent_message_id: None,
+    };
+}
+
+/// `GET /channels/{channel_id}/thread-parent`: what a cold-opened thread
+/// panel needs to orient itself - a deep link, a reload, or a notification
+/// never appears in `listChannels`/`listDirectMessages`, so it never learns
+/// its own parent any other way.
+///
+/// All three fields answer together, masked to all-null exactly the way
+/// `getChannelPermissions` masks its own bitmask: whenever `channel_id`
+/// does not exist, is not a thread, or the caller lacks VIEW_CHANNEL there
+/// (already resolved through the thread-to-parent rule), so this cannot
+/// become a second channel-existence oracle - see
+/// docs/decisions/0011-per-channel-permissions.md for the precedent this
+/// reuses rather than reinvents.
+async fn thread_parent(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<ThreadParentDto>, ApiError> {
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let permissions = state
+        .store
+        .permissions_in_channel(ctx.user_id, channel_id)
+        .await?;
+    if !permissions.contains(Permissions::VIEW_CHANNEL) {
+        return Ok(Json(ThreadParentDto::NONE));
+    }
+    let Some(parent) = state.store.thread_parent(channel_id).await? else {
+        return Ok(Json(ThreadParentDto::NONE));
+    };
+    let name = state
+        .store
+        .channel(parent.parent_channel_id)
+        .await?
+        .map(|c| c.name);
+    Ok(Json(ThreadParentDto {
+        parent_channel_id: Some(parent.parent_channel_id.to_string()),
+        parent_channel_name: name,
+        parent_message_id: Some(parent.parent_message_id.to_string()),
+    }))
 }
 
 /// Publishes a `ThreadUpdated` frame when `channel_id` is a thread's own

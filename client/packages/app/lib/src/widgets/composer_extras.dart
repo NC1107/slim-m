@@ -191,6 +191,8 @@ class _ComposerFieldState extends State<ComposerField> {
               IgnorePointer(
                 child: Text.rich(
                   key: const Key('composer-hint'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   TextSpan(
                     // textSecondary, matching AppInput's hint: this input is
                     // active, and textDisabled's AA exemption does not apply.

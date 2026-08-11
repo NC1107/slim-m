@@ -85,24 +85,95 @@
 /// out on it, and `scripts/lib/e2e_threads.py` waits on the back button's
 /// tooltip instead, for reasons its own module doc gives. Do not read this
 /// wrapper as making the title findable from a browser; it does not.
+///
+/// The title itself is "Thread in #general" once [threadParentProvider]
+/// resolves, closing this screen's own worst orientation gap: a plain
+/// "Thread" gave a person returning after a while, or arriving from a
+/// notification, no way to tell which conversation a thread belonged to.
+/// Plain "Thread" is what it falls back to while that answer is still in
+/// flight, on error, or for a channel [threadParentProvider] genuinely
+/// cannot resolve (a deleted parent, a permission lost between opening the
+/// notification and this screen mounting) - never a stale or invented name.
+///
+/// The same resolved answer also closes a second, separate bug: a thread
+/// opened cold never got a local `channels` row at all (see above), so
+/// `MessageStore.setReadMarker`'s plain `UPDATE` silently no-op'd and the
+/// unread divider sat above the first message every session even though the
+/// server's own read state was correct. `_ensureThreadChannelRow` upserts a
+/// real row - carrying the *real* `parentMessageId` this fetch resolved,
+/// not a placeholder - the moment that answer lands, which both
+/// materialises a row for the read marker to update and keeps
+/// `replaceChannels`'s pruning rule (`parentMessageId IS NOT NULL`) from
+/// ever mistaking this thread for one that dropped off the server's list.
+/// It runs once, from `initState`, off a direct `ref.read(...future)`
+/// rather than a `ref.listen` reacting to the same provider `build()`
+/// separately watches for the title: two independent consumers of one
+/// cached fetch (Riverpod dedupes the request itself), not one mechanism
+/// doing double duty - simpler to reason about, and to test, than a
+/// listener whose firing depends on this widget's own rebuild timing.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/providers.dart';
+import '../providers/threads.dart';
 import '../routing/close_screen.dart';
 import '../routing/routes.dart';
 import '../widgets/compact_channel_app_bar.dart' show ChannelSearchAction;
 import 'channel_screen.dart';
 
-class ThreadScreen extends StatelessWidget {
+class ThreadScreen extends ConsumerStatefulWidget {
   const ThreadScreen({required this.channelId, super.key});
 
   final String channelId;
 
   @override
+  ConsumerState<ThreadScreen> createState() => _ThreadScreenState();
+}
+
+class _ThreadScreenState extends ConsumerState<ThreadScreen> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_ensureThreadChannelRow());
+  }
+
+  Future<void> _ensureThreadChannelRow() async {
+    final api.ThreadParent parent;
+    try {
+      parent = await ref.read(threadParentProvider(widget.channelId).future);
+    } on api.ApiException {
+      // Best effort: the title stays "Thread" and the read marker stays unfixed for this session, same as today.
+      return;
+    }
+    if (!parent.isThread || !mounted) return;
+    final store = await ref.read(storeProvider.future);
+    await store.upsertChannels([
+      api.Channel(
+        id: widget.channelId,
+        name: threadChannelName,
+        kind: 'text',
+        createdAt: 0,
+        parentMessageId: parent.parentMessageId,
+      ),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final parentName = ref
+        .watch(threadParentProvider(widget.channelId))
+        .valueOrNull
+        ?.parentChannelName;
+    final title = parentName == null || parentName.isEmpty
+        ? 'Thread'
+        : 'Thread in #$parentName';
     return Scaffold(
       appBar: AppBar(
         // The automatic back button is a Material glyph; BackToButton's is the Lucide one every other screen uses.
@@ -111,18 +182,14 @@ class ThreadScreen extends StatelessWidget {
           fallback: Routes.channels,
         ),
         // container: true gives the title its own semantics node; see the doc comment above.
-        title: Semantics(
-          header: true,
-          container: true,
-          child: const Text('Thread'),
-        ),
+        title: Semantics(header: true, container: true, child: Text(title)),
         shape: Border(bottom: BorderSide(color: tokens.borderSubtle)),
         actions: [
-          ChannelSearchAction(channelId: channelId),
+          ChannelSearchAction(channelId: widget.channelId),
           const SizedBox(width: AppSpacing.s8),
         ],
       ),
-      body: ChannelScreen(channelId: channelId, isThread: true),
+      body: ChannelScreen(channelId: widget.channelId, isThread: true),
     );
   }
 }

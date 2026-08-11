@@ -119,6 +119,29 @@ class ChannelCategory {
       );
 }
 
+/// What [SlimmApiThreads.getThreadParent] answers: the channel and message a
+/// thread hangs off, or all-null together if the given id is not a thread the
+/// caller can see - see that method's own doc comment for the masking rule.
+class ThreadParent {
+  const ThreadParent({
+    this.parentChannelId,
+    this.parentChannelName,
+    this.parentMessageId,
+  });
+
+  final String? parentChannelId;
+  final String? parentChannelName;
+  final String? parentMessageId;
+
+  bool get isThread => parentChannelId != null;
+
+  factory ThreadParent.fromJson(Map<String, dynamic> json) => ThreadParent(
+        parentChannelId: json['parent_channel_id'] as String?,
+        parentChannelName: json['parent_channel_name'] as String?,
+        parentMessageId: json['parent_message_id'] as String?,
+      );
+}
+
 /// One rail section's ordered contents, as a drag produces: the category it
 /// names (null for the implicit uncategorised section) and every channel now
 /// filed under it, in display order. The request shape

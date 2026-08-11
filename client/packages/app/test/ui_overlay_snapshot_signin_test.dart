@@ -333,16 +333,18 @@ void main() {
       await _finish(tester, 'submit-username-taken-desktop');
     });
 
+    /// The real string http/auth.rs's validate_password sends for this
+    /// failure, not an invented approximation.
     testWidgets('a bad request names what the server rejected', (tester) async {
       await _pumpSignIn(
         tester,
         authResponder: (r) => _jsonResponse({
-          'error': 'password must be at least 8 characters',
+          'error': 'password must be 8 to 1024 characters',
         }, 400),
       );
       await submitSignIn(tester);
       expect(
-        find.text('password must be at least 8 characters'),
+        find.text('password must be 8 to 1024 characters'),
         findsOneWidget,
       );
       await _finish(tester, 'submit-bad-request-desktop');

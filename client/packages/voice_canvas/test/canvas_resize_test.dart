@@ -33,6 +33,28 @@ void main() {
       expect(hitTestResizeHandle(_box, const Offset(120, 100), 1), isNull);
     });
 
+    /// canvas.md: a 28px-diameter default hit circle is well under this
+    /// product's own 44-48dp touch-target floor, and a caller on a touch
+    /// surface has to be able to widen it.
+    test('an explicit hitRadius widens what a corner catches', () {
+      final justOutsideDefault = Offset(100 + resizeHandleHitRadius + 1, 100);
+      expect(
+        hitTestResizeHandle(_box, justOutsideDefault, 1),
+        isNull,
+        reason: 'the default radius must not already reach this far',
+      );
+      expect(
+        hitTestResizeHandle(
+          _box,
+          justOutsideDefault,
+          1,
+          hitRadius: touchResizeHandleHitRadius,
+        ),
+        ResizeCorner.topLeft,
+        reason: 'the touch radius must reach further than the default one',
+      );
+    });
+
     test(
       'the world-space radius shrinks as zoom grows, so a handle never '
       'balloons zoomed in',

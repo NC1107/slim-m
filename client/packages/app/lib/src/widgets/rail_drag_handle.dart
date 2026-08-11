@@ -75,6 +75,14 @@ import 'channel_rail.dart';
 /// also publish its own tap action bled this control's label onto an
 /// unrelated ancestor's - found by dumping the real semantics tree, not by
 /// reading the widget, since nothing about the code looked wrong.
+///
+/// The collapsed icon is coloured [AppTokens.textSecondary], not
+/// [AppTokens.borderSubtle] the way the open-state hairline is: it is the
+/// *only* way back once the rail is gone, and borderSubtle reads at roughly
+/// 1.3:1 against the surface in both themes, well under WCAG 1.4.11's 3:1
+/// floor for a UI component boundary, where textSecondary already clears
+/// the stricter 4.5:1 AA text floor (`contrast_test.dart`) and so clears
+/// this one with room, while staying the same muted, undecorated register.
 class RailDragHandle extends ConsumerStatefulWidget {
   const RailDragHandle({super.key});
 
@@ -95,6 +103,8 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
     final touch = AppTouchTargets.of(context);
     final hitWidth = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
     final lineColor = _hovered ? tokens.accentFill : tokens.borderSubtle;
+    // See this class's own doc for why this is textSecondary, not borderSubtle.
+    final iconColor = _hovered ? tokens.accentFill : tokens.textSecondary;
 
     // See this class's own doc for why Semantics sits where it does below.
     final gestureChain = Semantics(
@@ -128,7 +138,7 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
                     child: Icon(
                       AppIcons.sidebar,
                       size: AppSizes.icon16,
-                      color: lineColor,
+                      color: iconColor,
                     ),
                   ),
                 ),

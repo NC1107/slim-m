@@ -87,6 +87,9 @@ void main() {
   });
 
   group('VoiceRejoinScreen', () {
+    /// voice.md: nothing distinguished "this describes the call that just
+    /// ended" from "this is who is currently in the call," directly under
+    /// the present-tense "Nobody is in this call yet." sentence.
     testWidgets('shows the recap for a real, worthwhile call', (tester) async {
       final recap = _recap(channelId: 'channel-1');
 
@@ -106,6 +109,7 @@ void main() {
       expect(find.byType(CallRecapCard), findsOneWidget);
       expect(find.text('3 min'), findsOneWidget);
       expect(find.text('You left this call.'), findsNothing);
+      expect(find.text('Your last call'), findsOneWidget);
     });
 
     testWidgets('falls back to the plain notice for a call not worth showing', (
