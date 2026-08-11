@@ -12,6 +12,43 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A flatpak manifest already existed, and it did not yet know about the tray icon (2026-08-11)
+
+Assigned as "`packaging/flatpak/*.yaml` does not exist, build it."
+That premise was two entries in this file, both stale: PR #407 built and merged the manifest on 2026-08-05, wired into `release.yml`'s `linux-client` job, built and installed twice by its own account in `packaging/flatpak/README.md`.
+Both stale entries are struck through now rather than left to mislead the next reader; read `packaging/flatpak/README.md` for the manifest's own full account, this entry is what a second pass over already-shipped work found.
+
+**The gap was real, just not the one named.**
+`docs/decisions/0012-desktop-window-shell.md`'s close-to-tray window shell (PR #533, 2026-08-09) added `tray_manager`, whose Linux plugin links `libayatana-appindicator3` directly - a real `DT_NEEDED`, not a `dlopen` - and the Freedesktop runtime carries none of that indicator stack.
+Confirmed with `find` inside the runtime, not assumed.
+A flatpak built from a bundle with that plugin in it would fail to start, not merely fail to show a tray icon.
+
+**Fixed by vendoring `flathub/shared-modules`' own `libayatana-appindicator` module** (five nested sub-modules: `intltool`, `libdbusmenu`, `ayatana-ido`, `libayatana-indicator`, `libayatana-appindicator` itself) under `packaging/flatpak/shared-modules/`, referenced by path from the top-level manifest rather than as a git submodule, since this repo has no other submodule to justify the mechanism.
+Plus `--talk-name=org.kde.StatusNotifierWatcher`, the grant Vesktop's own manifest (Discord's unofficial flatpak, same `tray_manager` shape) uses for a `StatusNotifierItem` to register itself.
+
+**The rpm was checked for the identical gap, on the assumption it would need the identical fix, and that assumption was wrong - caught before merge by a review that asked for the actual command's output rather than the reasoning behind it.**
+The first version of this change added `Requires: libayatana-appindicator3.so.1()(64bit)` to the spec, reasoning that `libtray_manager_plugin.so` sits inside `__requires_exclude`'s `lib.*_plugin\.so` pattern the same way `libwebrtc.so`'s internals do, so rpm's scan would miss this dependency too.
+That reasoning read the regex backwards: `__requires_exclude` filters the generated dependency *string*, not files matching a path, and only a string shaped like `lib*_plugin.so` matches it - `libayatana-appindicator3.so.1()(64bit)` never does, regex or no.
+Proven rather than argued: `/usr/lib/rpm/elfdeps --requires` against the real built plugin lists the soname plainly, and building the actual spec with the added line removed still produces an rpm whose `rpm -qpR` already carries `libappindicator3.so.1()(64bit)` (this machine's own soname naming, see below) with nothing declared for it - rpm's own scan finds it unprompted.
+The line was dropped rather than kept as tidiness, because an explicit `Requires:` here would have pinned one soname where the auto-generated one tracks whatever the binary actually links, and because a comment describing a filtering mechanism the code does not implement is worse than no comment at all.
+`packaging/rpm/README.md`'s dependency table carries the corrected finding, including the `elfdeps`/`rpm -qpR` evidence and the Ubuntu-versus-Fedora soname difference that made the wrong reasoning easy to reach for in the first place.
+
+**Verified past parsing: this pass reached a real, installed build**, not just a manifest that loads.
+`org.flatpak.Builder` (the only `flatpak-builder` available on this box; the native package isn't installed here) built the whole manifest clean, including the five-module indicator chain compiling from source, and `flatpak install --user` accepted the resulting bundle.
+Read directly out of the installed tree, never launched: `libayatana-appindicator3.so.1` and its four dependencies all landed under `/app/lib`, and `readelf -d` against every one of them resolves entirely to either that same set or a library the runtime already carries - nothing dangling.
+`/etc/ld.so.conf` inside the sandbox lists a bare `/app/lib`, confirming the mechanism that makes this work needs no extra `LD_LIBRARY_PATH`.
+The app itself was never launched, on any display, matching the same limit the manifest's own README already states for everything else in it.
+
+**One finding worth keeping on its own: the soname a build produces depends on which pkg-config name the build host offers, not on the library itself.**
+`tray_manager`'s CMake tries `ayatana-appindicator3-0.1` first, falling back to the older `appindicator3-0.1`.
+`release.yml` installs `libayatana-appindicator3-dev` on `ubuntu-latest`, and that Ubuntu package ships only the `ayatana-appindicator3-0.1.pc` name (checked against `packages.ubuntu.com`'s own file listing) - so the real, CI-built tarball links `libayatana-appindicator3.so.1`, matching this fix.
+Building the identical source locally on this Fedora box, where `appindicator3-0.1.pc` exists but the `ayatana-`-prefixed one does not, linked the older `libappindicator3.so.1` instead - confirmed with `readelf -d`, not guessed, and the reason this local verification build could prove the new module's own dependency chain resolves cleanly but could not reproduce the exact bytes CI ships.
+
+**A `flatpak-builder`-as-a-flatpak operational trap, recorded in the README for the next rebuild.**
+The first attempt died with `Error: renameat(checkout-union-*, idotypebuiltins.c): Invalid cross-device link` - a real kernel `EXDEV`, triggered the first time this manifest ever had a module that compiles anything (everything before this was `cp`/`patchelf` on prebuilt files).
+Fixed by pointing `TMPDIR` and `--state-dir` at the same granted filesystem as `--repo`, rather than letting `org.flatpak.Builder`'s own sandbox default them elsewhere.
+Likely specific to running the sandboxed `org.flatpak.Builder` rather than a native `flatpak-builder` binary, which is what `release.yml` actually installs and runs - unconfirmed, since nothing here can run that job for real.
+
 ## e2e was red for two days, again, and the naive fix would have been the same mistake twice (2026-08-11)
 
 `scripts/e2e.sh` failed on every completed run for about two days: 57 runs since PR #495 landed (2026-08-09T00:24), 46 of them a genuine failure and 11 cancelled (this workflow keeps an unconditional `cancel-in-progress`, since it is not a required check).
@@ -1935,7 +1972,7 @@ Known residuals, deliberately shipped:
 - The delete-account error path reports its failure but still strands the user.
 - ~~Malformed query strings and JSON bodies still return axum's default error rather than the uniform JSON error contract.~~ Fixed 2026-07-28: `http::extract::{Json, Query, Bytes}` now wrap axum's own extractors and map their rejections to `ApiError`.
 - `revoke_device` does not itself publish `SessionRevoked`, and that is the layering rather than a gap: the handler holds the hub, so `DELETE /devices/{id}` publishes for every session the removal revoked. Read twice as an open bug before somebody checked. Covered by a test since 2026-07-28 that also asserts a *second* device's socket survives, so a revocation that fanned out to the whole account would fail rather than look correct.
-- ~~`packaging/flatpak/*.yaml` and `packaging/rpm/*.spec` still do not exist, so a tagged release warns and skips both Linux artifacts.~~ Half fixed, 2026-07-28: `packaging/rpm/slim-m-client.spec` exists (alongside `packaging/fedora/` and `packaging/linux/`), the `linux-client` job builds it, and the `copr` job submitted client 0.6.0 to Fedora COPR the same day (see `docs/ROADMAP.md`). Only the flatpak half of this residual still holds; `packaging/flatpak/*.yaml` does not exist, so that half of a tagged release still warns and skips, and Phase 9 still owns it. This line went uncorrected for two days next to a section of this same file ("Running the Fedora build, and what it found") that opens "The rpm was installed and used" and discusses that spec's `Recommends` line - the kind of contradiction a stale entry is supposed to make obvious rather than hide.
+- ~~`packaging/flatpak/*.yaml` and `packaging/rpm/*.spec` still do not exist, so a tagged release warns and skips both Linux artifacts.~~ Half fixed, 2026-07-28: `packaging/rpm/slim-m-client.spec` exists (alongside `packaging/fedora/` and `packaging/linux/`), the `linux-client` job builds it, and the `copr` job submitted client 0.6.0 to Fedora COPR the same day (see `docs/ROADMAP.md`). ~~Only the flatpak half of this residual still holds; `packaging/flatpak/*.yaml` does not exist, so that half of a tagged release still warns and skips, and Phase 9 still owns it.~~ Closed 2026-08-05 (PR #407): `packaging/flatpak/top.npcserver.slimm.yaml` exists, is wired into `release.yml`'s `linux-client` job behind its own `continue-on-error` (its README says why), and has been built and installed for real with `org.flatpak.Builder`, twice as of that PR. This line went uncorrected for two days next to a section of this same file ("Running the Fedora build, and what it found") that opens "The rpm was installed and used" and discusses that spec's `Recommends` line - the kind of contradiction a stale entry is supposed to make obvious rather than hide. See "A flatpak manifest already existed, and it did not yet know about the tray icon" near the top of this file for what a second look found still missing, closed 2026-08-11.
 
 ## Push credentials and identifiers
 
@@ -2207,7 +2244,7 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 - **Adding Play internal testers needs the owner.** There is no Play Developer API credential anywhere: `~/.secrets/slim-m/` holds only the Firebase/FCM service account, which is scoped to messaging and cannot touch Play. Tester lists live in Play Console > Test and release > Testing > Internal testing > Testers, and each tester must then accept the opt-in link before the build appears for them.
 - A real Android device test of the push path end-to-end (the last Phase 3 exit criterion with any work left).
 - Reviewer protection on the `release` and `testflight` GitHub Environments (they exist but are ungated).
-- ~~Flatpak and rpm packaging manifests (`packaging/flatpak/*.yaml`, `packaging/rpm/*.spec`); the release jobs warn-and-skip until they exist.~~ Half stale, checked 2026-07-30: the rpm spec exists and ships (`packaging/rpm/slim-m-client.spec`, the `linux-client` and `copr` jobs, client 0.6.0 landed on Fedora COPR 2026-07-28). Only the flatpak manifest is still missing; see the corrected residual above.
+- ~~Flatpak and rpm packaging manifests (`packaging/flatpak/*.yaml`, `packaging/rpm/*.spec`); the release jobs warn-and-skip until they exist.~~ Half stale, checked 2026-07-30: the rpm spec exists and ships (`packaging/rpm/slim-m-client.spec`, the `linux-client` and `copr` jobs, client 0.6.0 landed on Fedora COPR 2026-07-28). ~~Only the flatpak manifest is still missing; see the corrected residual above.~~ Closed 2026-08-05 (PR #407), hardened for the tray icon 2026-08-11; see the corrected residual above and the top-of-file entry.
 - Optional GPG signing secret for the Linux client checksums.
 - A decision on whether to keep release-please's auto-PR flow or switch to manual tag-based releases (to keep the repo at zero open PRs).
 - ~~Where rendered API docs should live.~~ Settled 2026-07-26: nowhere. GitLab renders an OpenAPI file in its repo browser the way GitHub renders a README, GitHub has no equivalent, and building redoc HTML into a run artifact nobody downloads is not worth a job. The render step is gone; `redocly lint` stays, since that is the schema-ci gate. `schema/openapi.yaml` is read as the source. If a browsable copy is ever wanted: `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`.

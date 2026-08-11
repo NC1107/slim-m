@@ -19,6 +19,10 @@
 # installable bundle. The app has not been launched from that bundle, so the
 # runtime permissions below are reasoned from source and from a working
 # Element (Electron+WebRTC) manifest, not confirmed on a running instance.
+# Updated 2026-08-11 for the close-to-tray window shell (PR #533): the bundle
+# now hard-links against libayatana-appindicator3, absent from the runtime, so
+# a libayatana-appindicator module builds it. See the README's own account of
+# what this pass could and could not verify locally.
 
 app-id: top.npcserver.slimm
 runtime: org.freedesktop.Platform
@@ -41,8 +45,14 @@ finish-args:
   - --talk-name=org.freedesktop.secrets
   # Belt-and-suspenders PipeWire socket access alongside the ScreenCast portal (again matches Element).
   - --filesystem=xdg-run/pipewire-0
+  # tray_manager registers a StatusNotifierItem; this is the watcher every desktop implements (Vesktop's grant).
+  - --talk-name=org.kde.StatusNotifierWatcher
 
 modules:
+  # tray_manager links libayatana-appindicator3 directly (not dlopen'd), and
+  # the runtime carries none of this stack. flathub/shared-modules' own
+  # module, vendored rather than a git submodule since this repo has no other.
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
   - name: slim-m-client
     buildsystem: simple
     only-arches:
