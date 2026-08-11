@@ -441,6 +441,9 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
               .screenShareViewFor,
           tileOverrides: _tileOverrides,
           onCommitTile: (key, rect) => unawaited(_slotSync.commit(key, rect)),
+          onVideoInterest: ref
+              .read(voiceControllerProvider.notifier)
+              .setVideoInterest,
           activityLog: _activityLog,
           selfBubbleHidden: selfPresence.hidden,
           onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,

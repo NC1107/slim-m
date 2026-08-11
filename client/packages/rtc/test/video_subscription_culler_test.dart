@@ -1,0 +1,243 @@
+// SPDX-License-Identifier: Apache-2.0
+/// [VideoSubscriptionCuller]: the dwell before an unwanted track is
+/// unsubscribed, the immediate resubscribe when it is wanted again, and the
+/// two things that must never happen - a track thrashing at the boundary,
+/// and audio being touched at all.
+///
+/// Every assertion here reads the fake room's own resulting subscription
+/// set rather than counting calls, because a test that only proves a method
+/// was invoked would pass just as happily against a culler that invoked it
+/// on the wrong track.
+library;
+
+import 'package:fake_async/fake_async.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_rtc/rtc.dart';
+
+/// A room's worth of publications, all subscribed to begin with, that
+/// really do change state when the culler acts on them.
+class _FakeRoom {
+  _FakeRoom(this.keys) : subscribed = keys.toSet();
+
+  final List<String> keys;
+  final Set<String> subscribed;
+  int subscribeCalls = 0;
+  int unsubscribeCalls = 0;
+
+  /// Rebuilt lazily on every read, so each [VideoSubscriptionCuller.apply]
+  /// sees the state the previous one actually left behind.
+  Iterable<VideoSubscriptionRef> get refs => keys.map(
+        (key) => (
+          key: key,
+          subscribed: subscribed.contains(key),
+          subscribe: () async {
+            subscribeCalls++;
+            subscribed.add(key);
+          },
+          unsubscribe: () async {
+            unsubscribeCalls++;
+            subscribed.remove(key);
+          },
+        ),
+      );
+
+  void drop(String key) {
+    keys.remove(key);
+    subscribed.remove(key);
+  }
+}
+
+/// A culler wired the way [VoiceSession] wires it: a due dwell asks the
+/// owner to walk the room again, and the owner calls back into [apply].
+({VideoSubscriptionCuller culler, int Function() dueCount}) _wire(
+  _FakeRoom room, {
+  Duration dwell = videoSubscriptionDwell,
+}) {
+  var due = 0;
+  late final VideoSubscriptionCuller culler;
+  culler = VideoSubscriptionCuller(
+    dwell: dwell,
+    onDue: () {
+      due++;
+      culler.apply(room.refs);
+    },
+  );
+  return (culler: culler, dueCount: () => due);
+}
+
+void main() {
+  test('a tile leaving the interest set survives right up to the dwell', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a', 'camera:b'});
+      wired.culler.apply(room.refs);
+      expect(room.subscribed, {'camera:a', 'camera:b'});
+
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      expect(
+        room.subscribed,
+        {'camera:a', 'camera:b'},
+        reason: 'nothing may be torn down before the dwell has run',
+      );
+
+      async.elapse(videoSubscriptionDwell - const Duration(milliseconds: 1));
+      wired.culler.apply(room.refs);
+      expect(room.subscribed, {'camera:a', 'camera:b'});
+
+      async.elapse(const Duration(milliseconds: 1));
+      expect(wired.dueCount(), 1);
+      expect(room.subscribed, {'camera:a'});
+      wired.culler.dispose();
+    });
+  });
+
+  test('a tile that comes back inside the dwell never thrashes', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a', 'camera:b'});
+      wired.culler.apply(room.refs);
+      room.subscribeCalls = 0;
+
+      // Out of the band, back inside it well before the dwell, three times.
+      for (var i = 0; i < 3; i++) {
+        wired.culler.setInterest({'camera:a'});
+        wired.culler.apply(room.refs);
+        async.elapse(const Duration(seconds: 1));
+        wired.culler.setInterest({'camera:a', 'camera:b'});
+        wired.culler.apply(room.refs);
+        async.elapse(const Duration(seconds: 1));
+      }
+      async.elapse(const Duration(minutes: 1));
+
+      expect(room.subscribed, {'camera:a', 'camera:b'});
+      expect(room.unsubscribeCalls, 0);
+      expect(room.subscribeCalls, 0, reason: 'nothing was ever torn down');
+      expect(wired.dueCount(), 0);
+      wired.culler.dispose();
+    });
+  });
+
+  test('a tile wanted again after a cull is resubscribed with no dwell', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      async.elapse(videoSubscriptionDwell);
+      expect(room.subscribed, {'camera:a'});
+
+      wired.culler.setInterest({'camera:a', 'camera:b'});
+      wired.culler.apply(room.refs);
+      expect(
+        room.subscribed,
+        {'camera:a', 'camera:b'},
+        reason: 'resubscribing is immediate, with no elapsed time at all',
+      );
+      wired.culler.dispose();
+    });
+  });
+
+  test('a screen share is culled exactly as a camera is', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'screen:a']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      async.elapse(videoSubscriptionDwell);
+      expect(room.subscribed, {'camera:a'});
+      wired.culler.dispose();
+    });
+  });
+
+  test('audio is never unsubscribed, whatever the interest set says', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'audio:a', 'microphone:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest(const <String>{});
+      wired.culler.apply(room.refs);
+      async.elapse(const Duration(minutes: 5));
+
+      expect(
+        room.subscribed,
+        {'audio:a', 'microphone:b'},
+        reason: 'only the camera was ever a candidate',
+      );
+      expect(room.unsubscribeCalls, 1);
+      wired.culler.dispose();
+    });
+  });
+
+  test('a null interest is not an empty one: everything stays subscribed', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest(null);
+      wired.culler.apply(room.refs);
+      async.elapse(const Duration(minutes: 5));
+
+      expect(room.subscribed, {'camera:a', 'camera:b'});
+      expect(room.unsubscribeCalls, 0);
+      wired.culler.dispose();
+    });
+  });
+
+  test('handing the decision back mid-dwell cancels it', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      async.elapse(const Duration(seconds: 1));
+
+      // The canvas unmounting, with no further apply to reconcile through.
+      wired.culler.setInterest(null);
+      async.elapse(const Duration(minutes: 5));
+
+      expect(room.subscribed, {'camera:a', 'camera:b'});
+      expect(wired.dueCount(), 0);
+      wired.culler.dispose();
+    });
+  });
+
+  test('a participant who leaves mid-dwell drops their pending cull', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      async.elapse(const Duration(seconds: 1));
+
+      room.drop('camera:b');
+      wired.culler.apply(room.refs);
+      async.elapse(const Duration(minutes: 5));
+
+      expect(wired.dueCount(), 0, reason: 'no timer survived the departure');
+      expect(room.subscribed, {'camera:a'});
+      wired.culler.dispose();
+    });
+  });
+
+  test('disposing leaves no timer running', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      wired.culler.dispose();
+      async.elapse(const Duration(minutes: 5));
+
+      expect(wired.dueCount(), 0);
+      expect(room.subscribed, {'camera:a', 'camera:b'});
+    });
+  });
+
+  test('the kind of a tile key is its prefix, and a bare key has none', () {
+    expect(videoSubscriptionKind('camera:019f-abc'), 'camera');
+    expect(videoSubscriptionKind('screen:019f-abc'), 'screen');
+    expect(videoSubscriptionKind('nonsense'), 'nonsense');
+    expect(cullableTrackKinds, {'camera', 'screen'});
+  });
+}

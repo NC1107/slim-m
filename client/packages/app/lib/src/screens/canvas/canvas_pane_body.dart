@@ -76,6 +76,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.screenShareViewFor,
     required this.tileOverrides,
     required this.onCommitTile,
+    required this.onVideoInterest,
     required this.selfBubbleHidden,
     required this.onToggleSelfBubbleHidden,
     this.callDock,
@@ -175,6 +176,10 @@ class CanvasPaneBody extends StatefulWidget {
   /// Sends one tile key's current arrangement to the server - see
   /// `CanvasPresenceLayer.onCommit`'s own doc for exactly when this fires.
   final void Function(String key, Rect rect) onCommitTile;
+
+  /// Which tiles currently want video, forwarded from [CanvasPresenceLayer]
+  /// to the live session; see that widget's own [onVideoInterest] doc.
+  final void Function(Set<String>? tileKeys) onVideoInterest;
 
   /// The caller's own standing "never show my own camera" preference -
   /// distinct from [tileOverrides], which is per-call; see
@@ -326,7 +331,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     final byIdentity = {for (final p in widget.callParticipants) p.identity: p};
     final tiles = <CanvasHiddenTile>[];
     for (final key in widget.tileOverrides.hiddenKeys) {
-      final isScreen = presenceTileKind(key) == 'screen';
+      final isScreen = presenceTileKind(key) == screenTrackKind;
       final identity = presenceTileIdentity(key);
       final participant = byIdentity[identity];
       if (participant == null) continue;
@@ -440,6 +445,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           screenShareViewFor: widget.screenShareViewFor,
           overrides: widget.tileOverrides,
           onCommit: widget.onCommitTile,
+          onVideoInterest: widget.onVideoInterest,
           hideSelfCamera: widget.selfBubbleHidden,
         ),
       ],

@@ -367,6 +367,12 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// [VoiceSession.cameraViewFor].
   Widget cameraViewFor(String identity) => _session.cameraViewFor(identity);
 
+  /// Declares which presence tiles a surface currently wants video for, so
+  /// the rest can be unsubscribed; see [VoiceSession.setVideoInterest].
+  /// Null hands the decision back, and is what a surface says on unmount.
+  void setVideoInterest(Set<String>? tileKeys) =>
+      _session.setVideoInterest(tileKeys);
+
   /// Whether switching cameras is a bare flip (mobile) rather than a picker.
   bool get canFlipCamera => _session.canFlipCamera;
 

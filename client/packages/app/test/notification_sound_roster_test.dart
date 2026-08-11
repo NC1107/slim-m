@@ -62,6 +62,8 @@ class _FakeSession implements VoiceSession {
   @override
   Widget cameraViewFor(String identity) => throw UnimplementedError();
   @override
+  void setVideoInterest(Set<String>? tileKeys) {}
+  @override
   bool get canFlipCamera => false;
   @override
   bool get cameraNeedsSelection => false;

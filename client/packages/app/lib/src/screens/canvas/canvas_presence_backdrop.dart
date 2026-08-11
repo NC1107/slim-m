@@ -131,8 +131,8 @@ class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
     Camera camera,
     Map<String, VoiceParticipant> byIdentity,
   ) {
-    final isScreen = key.startsWith('screen:');
-    final identity = key.substring(key.indexOf(':') + 1);
+    final isScreen = presenceTileKind(key) == screenTrackKind;
+    final identity = presenceTileIdentity(key);
     final participant = byIdentity[identity];
     if (participant == null) return null;
     final screen = presenceScreenRect(worldRect, camera);
