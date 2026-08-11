@@ -70,7 +70,37 @@ That asymmetry, not the shadow fix, is the actual reason this was the only surfa
 `thread` showed an unread badge and a placeholder "There is more history above." line at the ordinary budget, and neither at one extra pump, where the start header instead read "Replies to the original message appear here." - `channel_screen.dart`'s own read-marking and history-pagination probes, both real async calls, simply had not resolved yet at the earlier point.
 No overflow, no exception, no empty frame at either point; both are real, valid product states along the same loading sequence, so this is recorded rather than fixed.
 
-**`renderSurface`'s own pump count is unchanged.** Widening it unconditionally would have meant re-verifying all ~2,300 tests across every surface this harness renders - voice, canvas, DM calls, every overlay - for a class of bug this pass found in exactly one place; the prior author's own reasoning for leaving it alone (a wider budget could newly fail `client-ci` on some surface nobody has checked yet) still holds, and the check above is real evidence for the answer rather than a guess: report card was the only surface with an actual defect, so a broad rewrite was not worth the risk it would have reintroduced.
+~~**`renderSurface`'s own pump count is unchanged.**~~ Narrowly reopened the same day; see "A mid-flight capture is now a test failure, not a silent pass" below - `admin-reports` gets one targeted extra pump now, unconditional widening still did not happen, and the manual sweep this paragraph rested on is now a permanent, automated gate rather than a one-time check.
+
+## A mid-flight capture is now a test failure, not a silent pass (2026-08-11)
+
+The entry above found the report card bug and fixed the one overflow it caused, but left the gate itself unable to see the *class*: nothing stopped a future surface from capturing its own unresolved placeholder the same way, silently, the way this one did for as long as it existed.
+Read this before touching `test/support/mid_flight_capture.dart`, `renderSurface`'s `settleNestedResolve`/`knownTransient` parameters, or `ui_snapshot_test.dart`'s `_nestedResolveSurfaces`/`_knownTransientSurfaces` sets.
+
+**The gate: read every visible string right where the settle budget says "done," pump a further three bare frames, and fail if that changed anything.**
+`expectSettled` (`test/support/mid_flight_capture.dart`) does exactly that - `renderedText` walks every mounted `Text`, plain or rich - and it runs inside `renderSurface` for every surface the matrix renders, unconditionally, before `writeSnapshot` ever gets a chance to run (its own real-shadow repaint pumps a couple more frames under `SLIMM_UI_SNAPSHOTS=1`, which would let a genuine mid-flight capture resolve unexamined ahead of the read and mask exactly this).
+A bare `pump()` carries no `Duration`, so it cannot hang the way `pumpAndSettle` does on a perpetual spinner - it only flushes microtasks already completed by the time it runs and paints one more frame, it never waits for a running ticker to finish, which is what makes it safe to run unconditionally across every state this matrix deliberately renders, connecting spinners included.
+
+**Reproduced the actual finding rather than trusting the manual sweep the prior entry described: rendering the whole `screens` category under this gate found exactly two failures, `admin-reports` (8) and `thread` (12), and nothing else out of 314 tests.**
+That is the same split the prior entry's own by-hand check reported, now automated and permanent instead of a one-time claim.
+
+**`admin-reports` was a real, still-open instance of the class, not fixed by the prior entry's own `Expanded`/ellipsis change - the resolve timing and the row's overflow are two separate problems.**
+`ReportCard`'s nested resolve still does not land within the harness's ordinary two-pump budget with or without that fix, so the matrix was still capturing `'Loading...'` as the reporter name in every prior run, silently, exactly as before - the fix only stopped a *long* resolved name from overflowing once one eventually rendered.
+`renderSurface` gained `settleNestedResolve`, one further bare pump run before anything is captured, and `ui_snapshot_test.dart`'s `_nestedResolveSurfaces` set turns it on for `admin-reports` alone - the harness-level fix available from this scope, `report_card.dart` itself being another agent's.
+The captured PNG now shows `Reporter Ada Lovelace`, not `Loading...`, confirmed by reading it rather than trusting the assertion.
+
+**`thread` is genuinely benign, not fixed - two valid states along one loading sequence, never a placeholder standing in for content**, matching the prior entry's own read of it (an unread badge and a start-header line settling a beat after the ordinary budget, no overflow either side).
+`renderSurface`'s `knownTransient` flag is the escape hatch, turned on for `thread` alone via `_knownTransientSurfaces`; it is not a blanket allowance, and a new surface earns its own entry there only with a same-shape investigation, not by default.
+
+**The acceptance test: revert the prior entry's `report_card.dart` fix by hand (the `Expanded` back to a bare `Text` beside a `Spacer`) and rerun `admin-reports at phone-portrait`.**
+It fails, on the harness's own pre-existing overflow assertion - `settleNestedResolve` already gives the resolve enough time to land before that assertion runs, so the long name is what overflows, caught directly rather than needing `expectSettled`'s own comparison to notice.
+Restored by hand afterward, byte-identical (`git diff` empty), and green again.
+Mutation-tested three ways, each failing exactly the test built for it and nothing else: `extraSettlePumps` set to zero, `admin-reports` dropped from `_nestedResolveSurfaces`, and `thread` dropped from `_knownTransientSurfaces`.
+
+**Does this close the class, or only narrow it?** Only narrows it.
+`expectSettled` is bounded at three extra pumps; a resolve chained deeper than that would still slip through unnoticed, the same way the original two-pump budget let this one through.
+It also only catches a *text* difference - a resolve that changes an image, a colour, or a layout with no textual signal (an avatar swapping from a placeholder to a real picture, say) is invisible to it, since `renderedText` reads `Text` widgets only.
+And it is wired into `ui_snapshot_test.dart`'s `renderSurface` alone; the sibling overlay harnesses (`ui_overlay_snapshot_*_test.dart`) and `design_system`'s own golden matrix have their own rendering paths and are not covered by this gate at all.
 
 ## A screen share outliving its call, and how far the platform's own stop mechanism actually reaches (2026-08-10)
 
