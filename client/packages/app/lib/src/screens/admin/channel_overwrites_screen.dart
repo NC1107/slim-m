@@ -23,6 +23,7 @@ import '../settings_screen_scaffold.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_section_header.dart';
 import 'overwrite_target_picker_sheets.dart';
 import 'permission_overwrite_row.dart';
 
@@ -95,6 +96,21 @@ class _ChannelOverwritesScreenState
     }
   }
 
+  /// Submitting can be refused for a permission left at Inherit, which is the
+  /// default and is never dimmed, so nothing on screen suggests it carries a
+  /// cost.
+  ///
+  /// The server's escalation check is `granted = allow.remove(old_allow)
+  /// .union(old_deny.remove(deny))`, and it requires the caller's own
+  /// permissions to contain that. The second half is the trap: if the target
+  /// already carries a bit *denied* by a prior overwrite - invisible here by
+  /// design, since there is no read-back endpoint - then resubmitting with it
+  /// at Inherit rather than Deny un-denies it, and un-denying counts as
+  /// granting exactly as Allow does. A caller who does not hold that bit at
+  /// their own base level has the whole call refused with a generic 403.
+  /// `PermissionOverwriteRow`'s own doc says Deny "carries no such check and
+  /// is always offered" and said nothing about Inherit's identical implicit
+  /// cost; Clear (see [_clear]) has the same exposure.
   Future<void> _set() async {
     var allow = 0;
     var deny = 0;
@@ -206,21 +222,31 @@ class _ChannelOverwritesScreenState
               'bypasses channel overwrites entirely, so one would do nothing.',
             ),
           ),
-          const SizedBox(height: AppSpacing.s16),
-          AppCard(
+          const SizedBox(height: AppSpacing.s8),
+          // Inherit and Clear read as always-safe and are not; see _set's doc.
+          const AppCallout(
+            tone: AppCalloutTone.warn,
+            child: Text(
+              'Leaving a permission at "Inherit", or using Clear, can still '
+              'be refused. Un-denying a permission counts as granting it, so '
+              'if this role or member was already denied something you do '
+              'not hold yourself, the whole change comes back refused. This '
+              'screen cannot show which permissions that applies to.',
+            ),
+          ),
+          SettingsSectionCard(
             title: 'Channel',
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s8,
-              vertical: AppSpacing.s8,
-            ),
-            child: AppListRow(
-              label: _channel?.name ?? 'Choose a channel',
-              trailing: const Icon(
-                AppIcons.chevronRight,
-                size: AppSizes.icon16,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppListRow(
+                label: _channel?.name ?? 'Choose a channel',
+                trailing: const Icon(
+                  AppIcons.chevronRight,
+                  size: AppSizes.icon16,
+                ),
+                onTap: _pickChannel,
               ),
-              onTap: _pickChannel,
-            ),
+            ],
           ),
           if (_channel != null) ...[
             const SizedBox(height: AppSpacing.s12),
@@ -238,35 +264,41 @@ class _ChannelOverwritesScreenState
                 _resetTarget();
               }),
             ),
-            const SizedBox(height: AppSpacing.s12),
-            AppCard(
+            SettingsSectionCard(
               title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s8,
-                vertical: AppSpacing.s8,
-              ),
-              child: AppListRow(
-                label:
-                    _targetLabel ??
-                    'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
-                trailing: const Icon(
-                  AppIcons.chevronRight,
-                  size: AppSizes.icon16,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppListRow(
+                  label:
+                      _targetLabel ??
+                      'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
+                  trailing: const Icon(
+                    AppIcons.chevronRight,
+                    size: AppSizes.icon16,
+                  ),
+                  onTap: _pickTarget,
                 ),
-                onTap: _pickTarget,
-              ),
+              ],
             ),
           ],
           if (_targetId != null) ...[
-            const SizedBox(height: AppSpacing.s16),
-            for (final (bit, label) in Perm.channelOverwriteEditable)
-              PermissionOverwriteRow(
-                label: label,
-                value: _state[bit]!,
-                allowEnabled: myPermissions.hasPermission(bit),
-                onChanged: (v) => setState(() => _state[bit] = v),
-              ),
-            const SizedBox(height: AppSpacing.s8),
+            SettingsSectionCard(
+              title: 'Permissions',
+              description:
+                  'Each one starts at Inherit because this screen cannot '
+                  'read back what is already set.',
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (bit, label) in Perm.channelOverwriteEditable)
+                  PermissionOverwriteRow(
+                    label: label,
+                    value: _state[bit]!,
+                    allowEnabled: myPermissions.hasPermission(bit),
+                    onChanged: (v) => setState(() => _state[bit] = v),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s12),
             Row(
               children: [
                 Expanded(

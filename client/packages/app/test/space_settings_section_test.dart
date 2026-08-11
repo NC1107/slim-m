@@ -23,6 +23,7 @@ import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/channel_permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/widgets/settings_notice.dart';
 import 'package:slimm_app/src/widgets/space_settings_section.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -178,4 +179,43 @@ void main() {
       );
     },
   );
+
+  testWidgets('a caller holding none of the gating bits gets a stated reason, '
+      'not a blank page', (tester) async {
+    await _pump(tester, _container(0));
+
+    expect(
+      find.byType(SettingsNotice),
+      findsOneWidget,
+      reason:
+          'this widget is SpaceSettingsScreen\'s entire body, so returning '
+          'SizedBox.shrink() rendered a bare app bar over blank white. The '
+          'path that matters is not a stray URL: this watches '
+          'myPermissionsProvider, so a member demoted while the screen is '
+          'open watches it collapse to that blank page.',
+    );
+    expect(
+      find.textContaining('None of your roles grant access'),
+      findsOneWidget,
+    );
+    expect(
+      find.byType(AppCard),
+      findsNothing,
+      reason: 'nothing is reachable, so no group should render',
+    );
+  });
+
+  testWidgets('the notice states what would put something here', (
+    tester,
+  ) async {
+    await _pump(tester, _container(0));
+
+    expect(
+      find.textContaining('An administrator can grant you one of those'),
+      findsOneWidget,
+      reason:
+          'a stated absence that does not say what would change it is only '
+          'half the fix',
+    );
+  });
 }

@@ -298,23 +298,12 @@ void main() {
     _expectClearOfIndicator(tester, find.byType(ListView), 'the invite list');
   });
 
-  testWidgets('the roles body is inset even when the list is empty', (
-    tester,
-  ) async {
+  testWidgets('the roles list is inset even when it is empty', (tester) async {
     await _pump(tester, const RolesScreen());
 
-    // The empty list renders its named empty state now, not a bare ListView;
-    // the Center fills the body, so its box reports the inset.
-    _expectClearOfIndicator(
-      tester,
-      find
-          .ancestor(
-            of: find.text('No roles yet. Create one with the + above.'),
-            matching: find.byType(Center),
-          )
-          .first,
-      'the roles empty state',
-    );
+    // Roles now shares the invites/emoji screens' default scrollable frame,
+    // so it is the outer ListView reporting the inset, empty list or not.
+    _expectClearOfIndicator(tester, find.byType(ListView), 'the roles list');
   });
 
   testWidgets('the reports body is inset even when the queue is empty', (

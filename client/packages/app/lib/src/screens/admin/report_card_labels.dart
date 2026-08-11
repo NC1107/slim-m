@@ -55,18 +55,25 @@ class ReportLabeledValue extends StatelessWidget {
 /// The reporter's name for the "Reporter" line. [id] itself null (the
 /// server already anonymized that account) and a batch fetch that came back
 /// without it (deleted since) read the same honest way; an id not yet asked
-/// for reads as still loading.
+/// for reads as still loading, the same "Loading..." wording [subjectHeadline]
+/// and [authorHeadline] use for the identical not-yet-fetched state, so a
+/// card does not describe one unresolved id two different ways.
 String reporterLabel(String? id, Map<String, api.UserProfile?> profiles) {
   if (id == null) return 'a deleted account';
-  if (!profiles.containsKey(id)) return 'someone';
+  if (!profiles.containsKey(id)) return 'Loading...';
   return profiles[id]?.displayName ?? 'a deleted account';
 }
 
 /// The reported user's name for a user report's headline: the same three
 /// states as [reporterLabel], worded to stand alone rather than complete a
 /// sentence.
+///
+/// "Loading...", never "Resolving...": a headline sitting directly above an
+/// `AppButton(label: 'Resolve')` and a "Resolve this report?" dialog cannot
+/// share that verb, or a moderator reads it as the report already being
+/// resolved.
 String subjectHeadline(String id, Map<String, api.UserProfile?> profiles) {
-  if (!profiles.containsKey(id)) return 'Resolving...';
+  if (!profiles.containsKey(id)) return 'Loading...';
   return profiles[id]?.displayName ?? 'Deleted account';
 }
 
@@ -74,9 +81,11 @@ String subjectHeadline(String id, Map<String, api.UserProfile?> profiles) {
 ///
 /// A null id is not a lookup that failed: the server sends none when the
 /// message has been hard-deleted or its author anonymized, and saying so is
-/// more use to a moderator than a name that would be wrong.
+/// more use to a moderator than a name that would be wrong. See
+/// [subjectHeadline] for why the not-yet-fetched case says "Loading..."
+/// rather than "Resolving...".
 String authorHeadline(String? id, Map<String, api.UserProfile?> profiles) {
   if (id == null) return 'Author no longer on this Space';
-  if (!profiles.containsKey(id)) return 'Resolving...';
+  if (!profiles.containsKey(id)) return 'Loading...';
   return profiles[id]?.displayName ?? 'Deleted account';
 }

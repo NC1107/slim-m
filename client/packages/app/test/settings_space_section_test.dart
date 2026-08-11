@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_app/src/widgets/settings_notice.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'settings_harness.dart';
@@ -20,10 +21,17 @@ import 'settings_harness.dart';
 void main() {
   setUpAll(mockAppVersion);
 
-  testWidgets('an ordinary member with none of the gating bits sees the '
-      'screen render nothing at all', (tester) async {
+  testWidgets('an ordinary member with none of the gating bits sees a stated '
+      'reason and not one gated row', (tester) async {
     await pumpSpaceSettings(tester, 0);
 
+    expect(
+      find.byType(SettingsNotice),
+      findsOneWidget,
+      reason:
+          'this used to render nothing at all, which is a bare app bar over '
+          'a blank page; see decision 0013',
+    );
     expect(find.byType(ListTile), findsNothing);
     expect(find.text('Reports'), findsNothing);
     expect(find.text('Invites'), findsNothing);

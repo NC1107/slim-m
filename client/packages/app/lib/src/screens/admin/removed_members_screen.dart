@@ -17,6 +17,9 @@ import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/settings_entity_row.dart';
+import '../../widgets/settings_notice.dart';
+import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 
 class RemovedMembersScreen extends ConsumerWidget {
@@ -30,36 +33,33 @@ class RemovedMembersScreen extends ConsumerWidget {
       title: 'Removed members',
       backTooltip: 'Back to Space settings',
       backFallback: Routes.spaceSettings,
-      scrollable: false,
-      padding: EdgeInsets.zero,
       child: AppAsyncView<List<api.SpaceRemoval>>(
         value: AppAsyncState(data: removals.valueOrNull, error: removals.error),
+        center: false,
         errorMessage: 'Could not load the removals.',
         onRetry: () => ref.invalidate(removedMembersProvider),
         isEmpty: (list) => list.isEmpty,
         emptyMessage: 'Nobody has been removed from this Space.',
-        data: (context, list) => ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s8),
-          itemBuilder: (context, i) => _RemovalCard(removal: list[i]),
+        // One group, so a section header would only restate the app bar.
+        data: (context, list) => SettingsSectionCard(
+          children: [for (final removal in list) _RemovalRow(removal: removal)],
         ),
       ),
     );
   }
 }
 
-class _RemovalCard extends ConsumerStatefulWidget {
-  const _RemovalCard({required this.removal});
+class _RemovalRow extends ConsumerStatefulWidget {
+  const _RemovalRow({required this.removal});
 
   final api.SpaceRemoval removal;
 
   @override
-  ConsumerState<_RemovalCard> createState() => _RemovalCardState();
+  ConsumerState<_RemovalRow> createState() => _RemovalRowState();
 }
 
-class _RemovalCardState extends ConsumerState<_RemovalCard>
-    with GuardedActionState<_RemovalCard> {
+class _RemovalRowState extends ConsumerState<_RemovalRow>
+    with GuardedActionState<_RemovalRow> {
   bool _busy = false;
 
   Future<void> _restore() async {
@@ -79,58 +79,28 @@ class _RemovalCardState extends ConsumerState<_RemovalCard>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final removal = widget.removal;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      removal.displayName,
-                      style: AppText.body.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: AppWeights.semi,
-                      ),
-                    ),
-                    Text(
-                      '@${removal.username}',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AppButton(
-                label: 'Let back in',
-                variant: AppButtonVariant.secondary,
-                size: AppButtonSize.sm,
-                onPressed: _busy ? null : _restore,
-              ),
-            ],
-          ),
-          if (removal.reason != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            Text(
-              removal.reason!,
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-          ],
-          if (actionError != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            AppErrorState(message: actionError!, onDismiss: clearActionError),
-          ],
-        ],
-      ),
+    return SettingsEntityRow(
+      headline: removal.displayName,
+      details: [
+        SettingsEntityDetail('@${removal.username}'),
+        // Wrapped: the one line here a person typed, and the point of the screen.
+        if (removal.reason case final reason?)
+          SettingsEntityDetail(reason, wrap: true)
+        else
+          const SettingsAbsentValue('No reason given.'),
+      ],
+      actions: [
+        AppButton(
+          label: 'Let back in',
+          variant: AppButtonVariant.secondary,
+          size: AppButtonSize.sm,
+          onPressed: _busy ? null : _restore,
+        ),
+      ],
+      error: actionError,
+      onErrorDismiss: clearActionError,
     );
   }
 }

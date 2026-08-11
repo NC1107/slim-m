@@ -183,7 +183,7 @@ class _PermissionRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
+              style: AppText.ui.copyWith(
                 color: enabled ? tokens.textPrimary : tokens.textSecondary,
               ),
             ),

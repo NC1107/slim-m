@@ -69,4 +69,65 @@ void main() {
 
     expect(find.text('They are not told.'), findsOneWidget);
   });
+
+  testWidgets('adds no horizontal inset of its own, so the screen frame is '
+      'the only thing that sets one', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        const SettingsSectionCard(
+          title: 'Devices',
+          children: [Text('a phone')],
+        ),
+      ),
+    );
+
+    final body = tester.getRect(find.byType(Scaffold));
+    final card = tester.getRect(find.byType(AppCard));
+
+    expect(
+      card.left,
+      body.left,
+      reason:
+          'decision 0013: a section owns no horizontal padding. This used to '
+          'add AppSpacing.s16 on top of the frame\'s own, which is why '
+          'personal and Space settings sat at 32 while every admin screen sat '
+          'at 16 - three insets across screens one tap apart.',
+    );
+    expect(card.right, body.right);
+  });
+
+  testWidgets('the header lines up with the card it names', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        const SettingsSectionCard(
+          title: 'Devices',
+          children: [Text('a phone')],
+        ),
+      ),
+    );
+
+    expect(
+      tester.getRect(find.text('Devices')).left,
+      tester.getRect(find.byType(AppCard)).left,
+      reason:
+          'a header indented differently from its own card reads as belonging '
+          'to something else',
+    );
+  });
+
+  testWidgets(
+    'a description with no title asserts rather than silently dropping both',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const SettingsSectionCard(
+            description: 'Never rendered.',
+            children: [Text('a phone')],
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isAssertionError);
+    },
+  );
 }

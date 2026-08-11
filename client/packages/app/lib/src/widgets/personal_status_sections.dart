@@ -18,6 +18,7 @@ import 'presence_menu.dart' show applyPresenceVisibility, presenceOptions;
 import 'run_guarded.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
+import 'settings_toggle_row.dart';
 
 /// Sets the caller's own visibility preference via `PATCH /presence`. See
 /// [presenceVisibilityDisplayProvider] for why the selected segment is a
@@ -99,28 +100,12 @@ class NotificationsSection extends ConsumerWidget {
           ),
           label: status.label,
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s16,
-            vertical: AppSpacing.s8,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Play a sound for messages, mentions and errors',
-                  style: TextStyle(color: tokens.textPrimary),
-                ),
-              ),
-              AppToggle(
-                value: soundsEnabled,
-                onChanged: (value) => ref
-                    .read(messageSoundSettingsProvider.notifier)
-                    .setEnabled(value),
-                semanticLabel: 'Play a sound for messages, mentions and errors',
-              ),
-            ],
-          ),
+        SettingsToggleRow(
+          label: 'Play a sound for messages, mentions and errors',
+          value: soundsEnabled,
+          onChanged: (value) =>
+              ref.read(messageSoundSettingsProvider.notifier).setEnabled(value),
+          semanticLabel: 'Play a sound for messages, mentions and errors',
         ),
         const _NotificationPreferenceRow(),
       ],

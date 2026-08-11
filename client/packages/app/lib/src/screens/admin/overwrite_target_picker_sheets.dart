@@ -59,9 +59,11 @@ class RolePickerSheet extends ConsumerWidget {
       height: MediaQuery.of(context).size.height * _pickerSheetHeightFraction,
       child: roles.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _PickerError(
-          message: 'Could not load roles.',
-          onRetry: () => ref.invalidate(rolesProvider),
+        error: (e, _) => Center(
+          child: AppErrorState(
+            message: 'Could not load roles.',
+            onRetry: () => ref.invalidate(rolesProvider),
+          ),
         ),
         data: (list) => list.isEmpty
             ? const _PickerEmpty(message: 'No roles yet.')
@@ -91,9 +93,11 @@ class MemberPickerSheet extends ConsumerWidget {
       height: MediaQuery.of(context).size.height * _pickerSheetHeightFraction,
       child: members.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _PickerError(
-          message: 'Could not load members.',
-          onRetry: () => ref.invalidate(membersProvider),
+        error: (e, _) => Center(
+          child: AppErrorState(
+            message: 'Could not load members.',
+            onRetry: () => ref.invalidate(membersProvider),
+          ),
         ),
         data: (list) => list.isEmpty
             ? const _PickerEmpty(message: 'No members yet.')
@@ -114,35 +118,6 @@ class MemberPickerSheet extends ConsumerWidget {
   }
 }
 
-class _PickerError extends StatelessWidget {
-  const _PickerError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              style: TextStyle(color: tokens.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.s12),
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _PickerEmpty extends StatelessWidget {
   const _PickerEmpty({required this.message});
 
@@ -152,7 +127,10 @@ class _PickerEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Center(
-      child: Text(message, style: TextStyle(color: tokens.textSecondary)),
+      child: Text(
+        message,
+        style: AppText.body.copyWith(color: tokens.textSecondary),
+      ),
     );
   }
 }
