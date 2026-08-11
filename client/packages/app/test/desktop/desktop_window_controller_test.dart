@@ -184,7 +184,7 @@ void main() {
         store: store,
         platform: DesktopPlatform.linux,
         trayAvailable: () async => true,
-        onShow: () => showCount++,
+        onShow: (_) => showCount++,
       )..start();
 
       port.emit(DesktopWindowEventKind.show);
@@ -192,6 +192,69 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(showCount, 1);
+      controller.dispose();
+    });
+
+    test('carries null when no close has been routed yet', () async {
+      final port = FakeDesktopWindowPort();
+      final store = await _store();
+      CloseAction? seen = CloseAction.hideToTray;
+      final controller = DesktopWindowController(
+        port: port,
+        store: store,
+        platform: DesktopPlatform.linux,
+        trayAvailable: () async => true,
+        onShow: (action) => seen = action,
+      )..start();
+
+      port.emit(DesktopWindowEventKind.show);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(seen, isNull);
+      controller.dispose();
+    });
+
+    test('carries hideToTray, not minimizeToTaskbar, after a close that '
+        'resolved to hiding', () async {
+      final port = FakeDesktopWindowPort();
+      final store = await _store();
+      CloseAction? seen;
+      final controller = DesktopWindowController(
+        port: port,
+        store: store,
+        platform: DesktopPlatform.linux,
+        trayAvailable: () async => true,
+        onShow: (action) => seen = action,
+      )..start();
+
+      port.emit(DesktopWindowEventKind.close);
+      await Future<void>.delayed(Duration.zero);
+      port.emit(DesktopWindowEventKind.show);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(seen, CloseAction.hideToTray);
+      controller.dispose();
+    });
+
+    test('carries minimizeToTaskbar, not hideToTray, after a close that '
+        'resolved to minimising', () async {
+      final port = FakeDesktopWindowPort();
+      final store = await _store();
+      CloseAction? seen;
+      final controller = DesktopWindowController(
+        port: port,
+        store: store,
+        platform: DesktopPlatform.linux,
+        trayAvailable: () async => false,
+        onShow: (action) => seen = action,
+      )..start();
+
+      port.emit(DesktopWindowEventKind.close);
+      await Future<void>.delayed(Duration.zero);
+      port.emit(DesktopWindowEventKind.show);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(seen, CloseAction.minimizeToTaskbar);
       controller.dispose();
     });
   });

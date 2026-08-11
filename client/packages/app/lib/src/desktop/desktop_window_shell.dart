@@ -211,7 +211,7 @@ class DesktopWindowShell {
       store: store,
       platform: platform,
       trayAvailable: trayAvailable,
-      onShow: () => _offerFirstRunNoticeIfNeeded(container),
+      onShow: (action) => _offerFirstRunNoticeIfNeeded(container, action),
     )..start();
 
     await _port.setPreventClose(true);
@@ -225,11 +225,17 @@ class DesktopWindowShell {
     await _trayController!.start();
   }
 
+  /// [action] is null on a show that was never preceded by a routed close
+  /// on this controller (the very first launch) - nothing happened yet to
+  /// describe, so there is nothing to offer.
   static Future<void> _offerFirstRunNoticeIfNeeded(
     ProviderContainer container,
+    CloseAction? action,
   ) async {
+    if (action == null) return;
     final notice = await container.read(firstRunTrayNoticeProvider.future);
-    if (notice.hasBeenShown) return;
-    container.read(firstRunTrayNoticeVisibleProvider.notifier).state = true;
+    if (notice.hasBeenShown(action)) return;
+    container.read(firstRunTrayNoticeCloseActionProvider.notifier).state =
+        action;
   }
 }

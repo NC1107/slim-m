@@ -44,14 +44,19 @@ class DesktopWindowController {
   /// not a startup-time check.
   final Future<bool> Function() trayAvailable;
 
-  /// Fired once per window-show, so a caller can offer the first-time-only
-  /// tray notice at the one moment the window is back on screen to show it.
-  final void Function()? onShow;
+  /// Fired once per window-show, carrying whichever [CloseAction] the most
+  /// recently routed close actually resolved to (null if this controller has
+  /// never routed one yet) - not re-probed at show time, since the tray
+  /// probe is live and could answer differently by then, and a caller
+  /// describing what just happened has to describe the real resolved
+  /// outcome rather than a fresh guess.
+  final void Function(CloseAction? lastCloseAction)? onShow;
 
   final Duration debounce;
 
   Timer? _debounceTimer;
   StreamSubscription<DesktopWindowEventKind>? _subscription;
+  CloseAction? _lastCloseAction;
 
   void start() {
     _subscription = port.events.listen(_onEvent);
@@ -75,7 +80,7 @@ class DesktopWindowController {
       case DesktopWindowEventKind.close:
         await requestClose();
       case DesktopWindowEventKind.show:
-        onShow?.call();
+        onShow?.call(_lastCloseAction);
     }
   }
 
@@ -130,6 +135,7 @@ class DesktopWindowController {
       platform: platform,
       trayAvailable: await trayAvailable(),
     );
+    _lastCloseAction = action;
     switch (action) {
       case CloseAction.hideToTray:
         await port.hide();
