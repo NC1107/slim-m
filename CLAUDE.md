@@ -2083,7 +2083,14 @@ What guards it now is a test asserting the ceiling override keeps the temp guard
   **The client is registered again as of 2026-07-27**, tracked at `client/` with the version in `client/pubspec.yaml`, and the manifest seeded to 0.2.3 so it continues from the last hand-cut tag rather than proposing 1.0.0. It was pulled during Phase 1 "until it has real content" and that note outlived its reason by several phases, which is why every client release since had to be tagged by hand.
   The pipeline never stopped expecting it: `release.yml` already read `client--release_created`, `client--tag_name` and `client--version`, and only the `packages` entry was missing.
   A client release is now the same two steps as a server one: merge the work, then merge the `chore(main): release client X.Y.Z` PR it opens. That second merge is what tags `client-vX.Y.Z` and builds the TestFlight and Play artifacts. Hand-tagging still works, since the jobs keep their `refs/tags/client-v` branch.
-- `dart format` is strict (tall style, Flutter 3.44.x). Write short unambiguous lines; the client cannot be formatted or analyzed locally here, so CI is the check.
+- `dart format` is strict (tall style, Flutter 3.44.x). Write short unambiguous lines.
+  ~~The client cannot be formatted or analyzed locally here, so CI is the check.~~
+  Wrong, corrected 2026-08-11: both run locally and have for a long time.
+  `dart format --output=none --set-exit-if-changed .` from `client/` reports 915 files and 0 changed against a clean main, and `dart analyze` answers on any file in the workspace.
+  This mattered rather than being a tidy-up: the line told an agent its only feedback was a CI round trip, so a formatting or analysis failure that one local command would have caught became a red PR instead.
+  **One real trap remains, and it is what the stale line was probably remembering.**
+  `dart analyze` reports a wall of unresolved-package errors in a fresh `git worktree` until `flutter pub get` has run inside it, because the workspace's `.dart_tool` package resolution is per-checkout and is not shared from the main tree.
+  Two agents hit that on the same day and both read it as real compile errors in their own change; the fix is one `flutter pub get`, and the tell is that the errors name imports rather than anything you wrote.
 
 Environment note: the Claude Code auto-mode classifier blocks creating GitHub repositories and some repo-settings changes; the owner must do those (or grant `Bash(gh:*)`). Plain `git push` works.
 The "Allow GitHub Actions to create and approve pull requests" repo setting was enabled so release-please can open PRs (`gh api -X PUT repos/NC1107/slim-m/actions/permissions/workflow -F can_approve_pull_request_reviews=true -f default_workflow_permissions=write`).
