@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.39.0](https://github.com/NC1107/slim-m/compare/client-v0.38.0...client-v0.39.0) (2026-08-11)
+
+
+### Features
+
+* **client:** decrypt the sealed push preview on a locked iPhone ([#574](https://github.com/NC1107/slim-m/issues/574)) ([9a7ef9e](https://github.com/NC1107/slim-m/commit/9a7ef9e373e9f7854b62276f3a948f1013535229))
+* **client:** expand a canvas presence tile to full screen ([#573](https://github.com/NC1107/slim-m/issues/573)) ([b060908](https://github.com/NC1107/slim-m/commit/b060908406dc5f3569e48a0c8026c20b1b28a421))
+* **client:** let a person turn on the decrypted push preview ([#577](https://github.com/NC1107/slim-m/issues/577)) ([8277ef4](https://github.com/NC1107/slim-m/commit/8277ef4a28281dc240cd83eccb5b3134ec22eccf))
+
+
+### Bug Fixes
+
+* **client:** drop the reacted chip's marker dot, lean on fill and weight ([#578](https://github.com/NC1107/slim-m/issues/578)) ([2d0a4b2](https://github.com/NC1107/slim-m/commit/2d0a4b25fd1e5413496eb019c48fe0982a296b32))
+* **client:** guard a hang-up that a newer join already superseded ([#580](https://github.com/NC1107/slim-m/issues/580)) ([def6924](https://github.com/NC1107/slim-m/commit/def69248244bd547b4c61f808ef82605d224ab2b))
+* **client:** the update notes stopped being written twelve releases ago ([#579](https://github.com/NC1107/slim-m/issues/579)) ([da0e239](https://github.com/NC1107/slim-m/commit/da0e2397175716556eae89b1330f8f3f8b82efda))
+
 ## [0.38.0](https://github.com/NC1107/slim-m/compare/client-v0.37.0...client-v0.38.0) (2026-08-11)
 
 
