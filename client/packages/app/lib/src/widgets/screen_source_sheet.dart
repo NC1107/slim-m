@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Choosing which screen to share, on the desktops that make the app ask.
+/// Built on `device_choice_sheet.dart`, the shape `camera_source_sheet.dart`
+/// shares.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
+
+import 'device_choice_sheet.dart';
 
 /// Returns the chosen source, or null if the sheet was dismissed.
 Future<ScreenShareSource?> showScreenSourceSheet(
@@ -13,57 +17,12 @@ Future<ScreenShareSource?> showScreenSourceSheet(
 ) {
   return showAppSheet<ScreenShareSource>(
     context,
-    builder: (context) => _ScreenSourceSheet(sources: sources),
+    builder: (context) => DeviceChoiceSheet<ScreenShareSource>(
+      title: 'Share a screen',
+      caption: 'Everyone in the call will see it until you stop sharing.',
+      icon: AppIcons.screenShare,
+      items: sources,
+      labelOf: (source) => source.name,
+    ),
   );
-}
-
-class _ScreenSourceSheet extends StatelessWidget {
-  const _ScreenSourceSheet({required this.sources});
-
-  final List<ScreenShareSource> sources;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              0,
-              AppSpacing.s16,
-              AppSpacing.s4,
-            ),
-            child: Text('Share a screen', style: AppText.heading),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              0,
-              AppSpacing.s16,
-              AppSpacing.s12,
-            ),
-            child: Text(
-              'Everyone in the call will see it until you stop sharing.',
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-          ),
-          for (final source in sources)
-            AppListRow(
-              label: source.name,
-              leading: Icon(
-                AppIcons.screenShare,
-                size: AppSizes.icon16,
-                color: tokens.textSecondary,
-              ),
-              onTap: () => Navigator.of(context).pop(source),
-            ),
-          const SizedBox(height: AppSpacing.s8),
-        ],
-      ),
-    );
-  }
 }

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Choosing which camera to publish, on the desktops (and browsers) where
-/// more than one may exist. Mirrors `screen_source_sheet.dart` exactly.
+/// more than one may exist. Built on `device_choice_sheet.dart`, the shape
+/// `screen_source_sheet.dart` shares.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
+
+import 'device_choice_sheet.dart';
 
 /// Returns the chosen device, or null if the sheet was dismissed.
 Future<CameraDevice?> showCameraDeviceSheet(
@@ -14,45 +17,11 @@ Future<CameraDevice?> showCameraDeviceSheet(
 ) {
   return showAppSheet<CameraDevice>(
     context,
-    builder: (context) => _CameraDeviceSheet(devices: devices),
+    builder: (context) => DeviceChoiceSheet<CameraDevice>(
+      title: 'Choose a camera',
+      icon: AppIcons.camera,
+      items: devices,
+      labelOf: (device) => device.label,
+    ),
   );
-}
-
-class _CameraDeviceSheet extends StatelessWidget {
-  const _CameraDeviceSheet({required this.devices});
-
-  final List<CameraDevice> devices;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              0,
-              AppSpacing.s16,
-              AppSpacing.s12,
-            ),
-            child: Text('Choose a camera', style: AppText.heading),
-          ),
-          for (final device in devices)
-            AppListRow(
-              label: device.label,
-              leading: Icon(
-                AppIcons.camera,
-                size: AppSizes.icon16,
-                color: tokens.textSecondary,
-              ),
-              onTap: () => Navigator.of(context).pop(device),
-            ),
-          const SizedBox(height: AppSpacing.s8),
-        ],
-      ),
-    );
-  }
 }

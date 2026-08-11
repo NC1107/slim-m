@@ -1,0 +1,4 @@
+{
+  "internal_error": "internal error",
+  "password_length_error": "password must be 8 to 1024 characters"
+}

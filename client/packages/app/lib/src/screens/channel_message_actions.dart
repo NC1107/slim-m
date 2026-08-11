@@ -132,10 +132,8 @@ Future<void> confirmAndDeleteMessage(
 ) async {
   final confirmed = await confirmDangerousAction(
     context,
-    title: 'Delete message?',
-    message:
-        'This removes it for everyone in the channel. '
-        'This cannot be undone.',
+    title: deleteMessageConfirmTitle,
+    message: deleteMessageConfirmMessage,
     confirmLabel: 'Delete',
   );
   if (!confirmed || !context.mounted) return;

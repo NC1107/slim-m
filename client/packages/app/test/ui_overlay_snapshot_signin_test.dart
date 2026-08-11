@@ -22,7 +22,10 @@ import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/onboarding_error_strings.dart';
 import 'ui_snapshot_support.dart';
+
+final _errorStrings = OnboardingErrorStrings.load();
 
 const _viewport = Size(1400, 880);
 const _server = 'https://chat.example';
@@ -338,15 +341,11 @@ void main() {
     testWidgets('a bad request names what the server rejected', (tester) async {
       await _pumpSignIn(
         tester,
-        authResponder: (r) => _jsonResponse({
-          'error': 'password must be 8 to 1024 characters',
-        }, 400),
+        authResponder: (r) =>
+            _jsonResponse({'error': _errorStrings.passwordLengthError}, 400),
       );
       await submitSignIn(tester);
-      expect(
-        find.text('password must be 8 to 1024 characters'),
-        findsOneWidget,
-      );
+      expect(find.text(_errorStrings.passwordLengthError), findsOneWidget);
       await _finish(tester, 'submit-bad-request-desktop');
     });
 

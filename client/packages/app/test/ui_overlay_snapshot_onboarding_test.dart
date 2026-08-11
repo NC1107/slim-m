@@ -28,7 +28,10 @@ import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/onboarding_error_strings.dart';
 import 'ui_snapshot_support.dart';
+
+final _errorStrings = OnboardingErrorStrings.load();
 
 const _viewport = Size(1400, 880);
 
@@ -226,7 +229,7 @@ void main() {
     testWidgets('server refused with its own message', (tester) async {
       await _pumpOnboarding(
         tester,
-        checkBody: const {'error': 'internal error'},
+        checkBody: {'error': _errorStrings.internalError},
         checkStatus: 500,
       );
       await _openInviteDialog(tester);
@@ -239,7 +242,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('internal error'), findsOneWidget);
+      expect(find.textContaining(_errorStrings.internalError), findsOneWidget);
       await _finish(tester, 'invite-dialog-server-refused-desktop');
     });
   });

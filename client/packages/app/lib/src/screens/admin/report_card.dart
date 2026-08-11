@@ -35,6 +35,7 @@ import '../../widgets/channel_rail.dart' show selectedChannelId;
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/message_jump.dart';
 import '../../widgets/message_text.dart';
+import '../../widgets/moderation_unavailable_caption.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
 import 'report_card_actions.dart';
@@ -247,6 +248,16 @@ class _ReportCardState extends ConsumerState<ReportCard>
             ),
           ],
         ),
+        // Only shown when it would clarify something: without either bit, no quick actions was already the ordinary reason.
+        if (isSelf &&
+            (mine.hasPermission(Perm.kickMembers) ||
+                mine.hasPermission(Perm.banMembers))) ...[
+          const SizedBox(height: AppSpacing.s4),
+          const ModerationUnavailableCaption(
+            "This report names you - you can't time yourself out or remove "
+            'yourself.',
+          ),
+        ],
         if (hasQuickActions) ...[
           const SizedBox(height: AppSpacing.s12),
           ReportQuickActions(

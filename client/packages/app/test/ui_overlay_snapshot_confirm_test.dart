@@ -34,18 +34,14 @@ import 'ui_snapshot_support.dart';
 final _confirms = <String, FutureOr<void> Function(BuildContext)>{
   'confirm-delete-message': (context) => confirmDangerousAction(
     context,
-    title: 'Delete message?',
-    message:
-        'This removes it for everyone in the channel. '
-        'This cannot be undone.',
+    title: deleteMessageConfirmTitle,
+    message: deleteMessageConfirmMessage,
     confirmLabel: 'Delete',
   ),
   'confirm-delete-reported-message': (context) => confirmDangerousAction(
     context,
-    title: 'Delete this message?',
-    message:
-        'This removes it for everyone in the channel. This cannot be '
-        'undone.',
+    title: deleteMessageConfirmTitle,
+    message: deleteMessageConfirmMessage,
     confirmLabel: 'Delete',
   ),
   'confirm-delete-emoji': (context) => confirmDangerousAction(

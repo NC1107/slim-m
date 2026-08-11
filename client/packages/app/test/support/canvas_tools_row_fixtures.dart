@@ -48,6 +48,7 @@ Widget wrapCanvasToolsRow(Widget child, {double width = 800, bool? touch}) =>
 CanvasToolsRow buildCanvasToolsRow({
   CanvasTool tool = CanvasTool.pen,
   ValueChanged<CanvasTool>? onToolChanged,
+  bool canDraw = true,
   bool canUndo = false,
   VoidCallback? onUndo,
   bool canManage = false,
@@ -73,6 +74,7 @@ CanvasToolsRow buildCanvasToolsRow({
 }) => CanvasToolsRow(
   tool: tool,
   onToolChanged: onToolChanged ?? (_) {},
+  canDraw: canDraw,
   canUndo: canUndo,
   onUndo: onUndo ?? () {},
   canManage: canManage,

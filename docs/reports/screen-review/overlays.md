@@ -26,9 +26,10 @@ Verdict: the strongest, most consistent family in the whole overlay set, and the
 - The danger action is always `AppButtonVariant.danger` (outlined, no fill, `button.dart:91-94`); cancel is always ghost, in a 50/50 `Expanded` split, on the left (frontend, UX).
 - Every message states the consequence and names the target; every genuinely irreversible action carries "This cannot be undone," and `confirm-set-overwrite` correctly omits it since an overwrite can be replaced again (UX).
 - Phone variants collapse to a real bottom sheet with a drag handle and `SafeArea`; desktop is a centred card; no clipping or overflow at the longest body text tried, three lines with embedded quotes on `confirm-set-overwrite` (frontend, UX).
-- **Finding (low, evidenced): two call sites for the identical action use different titles.** `channel_message_actions.dart` (a message's own actions menu) says "Delete message?"; `report_card_actions.dart` (a moderator deleting a reported message) says "Delete this message?" - one word apart, same body copy, same consequence.
+~~**Finding (low, evidenced): two call sites for the identical action use different titles.** `channel_message_actions.dart` (a message's own actions menu) says "Delete message?"; `report_card_actions.dart` (a moderator deleting a reported message) says "Delete this message?" - one word apart, same body copy, same consequence.
   Evidence: `confirm-delete-message-desktop.png` vs `confirm-delete-reported-message-desktop.png`.
-  Fix: use one title everywhere delete-message appears (UX).
+  Fix: use one title everywhere delete-message appears (UX).~~
+  Fixed 2026-08-11: both call sites now read `deleteMessageConfirmTitle`/`deleteMessageConfirmMessage`, two shared constants added to `confirm_dialog.dart` rather than two hand-typed copies, so the two titles cannot diverge again without changing both at once. `delete_message_confirm_copy_test.dart` drives both real call sites' dialogs and asserts the rendered title text is identical.
 - The remaining nine families - delete-role, delete-category, delete-emoji, delete-message/delete-reported-message copy itself, dismiss-report, resolve-report, remove-from-space, revoke-invite, set-overwrite/clear-overwrite - were each checked claim-by-claim against the store and route behaviour they describe and all matched exactly, including several specific claims (invites revoked on removal, sign-in refused after removal, restore availability, no reopen route for a resolved report) verified line by line rather than assumed (backend).
   `set-overwrite`/`clear-overwrite` is also the one admin surface reviewed here where the client-side escalation guard is already correctly channel-scoped on both sides (`overwrites.rs:108,127-130,175,184-191` uses `permissions_in_channel`, not `base_permissions`) - the exception that shows what the other findings below should look like (backend).
 
@@ -93,8 +94,9 @@ Verdict: the previously-shipped "buttons pushed off the bottom" bug is fixed at 
 Verdict: both fine at both viewports - title, rows, icons all present, no clipping.
 
 - `screen-source-sheet` states the consequence up front ("Everyone in the call will see it until you stop sharing.") before listing choices, exactly the right place for that warning rather than burying it in a later confirm (UX).
-- **Finding (low, duplication): the two files are near-byte-identical** (`camera_source_sheet.dart`, `screen_source_sheet.dart`), same `SafeArea` -> `Column` -> heading -> `AppListRow` loop, differing only in heading text, icon and one extra caption line.
-  Worth collapsing into one parameterised `_DeviceChoiceSheet(title, caption, icon, items)`, the same near-copy pattern `member_roles_sheet.dart`'s own doc comment already flags elsewhere in this codebase (frontend).
+~~**Finding (low, duplication): the two files are near-byte-identical** (`camera_source_sheet.dart`, `screen_source_sheet.dart`), same `SafeArea` -> `Column` -> heading -> `AppListRow` loop, differing only in heading text, icon and one extra caption line.
+  Worth collapsing into one parameterised `_DeviceChoiceSheet(title, caption, icon, items)`, the same near-copy pattern `member_roles_sheet.dart`'s own doc comment already flags elsewhere in this codebase (frontend).~~
+  Fixed 2026-08-11, exactly that shape: both files now build a shared `DeviceChoiceSheet<T>` (`widgets/device_choice_sheet.dart`), each supplying only its own title, optional caption, icon, item list and label function. `showCameraDeviceSheet`/`showScreenSourceSheet`'s public signatures are unchanged; `source_picker_sheets_test.dart` still passes unmodified, which is the evidence the refactor changed nothing behavioural.
 
 ## channel-picker-sheet / role-picker-sheet / member-picker-sheet / member-roles-sheet
 

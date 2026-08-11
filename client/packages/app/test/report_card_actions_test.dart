@@ -279,17 +279,35 @@ void main() {
       expect(harness.calls, contains(const Call('PATCH', '/reports/r1')));
     });
 
-    testWidgets('is absent on your own report of yourself', (tester) async {
-      await pumpReports(
-        tester,
-        reports: [
-          reportJson(id: 'r1', subjectKind: 'user', subjectId: 'mod-1'),
-        ],
-        permissions: Perm.kickMembers,
-      );
+    testWidgets(
+      'is absent on your own report of yourself, with a caption saying why',
+      (tester) async {
+        await pumpReports(
+          tester,
+          reports: [
+            reportJson(id: 'r1', subjectKind: 'user', subjectId: 'mod-1'),
+          ],
+          permissions: Perm.kickMembers,
+        );
 
-      expect(find.byType(TimeoutDurationChips), findsNothing);
-    });
+        expect(find.byType(TimeoutDurationChips), findsNothing);
+        expect(find.textContaining("This report names you"), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'the self-target caption stays quiet for a moderator with neither bit',
+      (tester) async {
+        await pumpReports(
+          tester,
+          reports: [
+            reportJson(id: 'r1', subjectKind: 'user', subjectId: 'mod-1'),
+          ],
+        );
+
+        expect(find.textContaining('This report names you'), findsNothing);
+      },
+    );
   });
 
   group('remove from Space', () {

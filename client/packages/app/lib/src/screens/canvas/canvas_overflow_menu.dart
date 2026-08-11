@@ -38,6 +38,7 @@ class CanvasOverflowMenu extends StatefulWidget {
   const CanvasOverflowMenu({
     super.key,
     required this.onPasteImage,
+    required this.canDraw,
     required this.onRecenter,
     required this.canManage,
     required this.objectCount,
@@ -59,6 +60,12 @@ class CanvasOverflowMenu extends StatefulWidget {
   });
 
   final VoidCallback onPasteImage;
+
+  /// False while the pane's own error banner is up - see
+  /// `canvas_tools_row.dart`'s `canDraw` for the full reasoning; this is the
+  /// same signal reaching the CTA's other named affordance, "paste an
+  /// image".
+  final bool canDraw;
 
   /// Jumps the camera back to the world origin - always available, gated on
   /// nothing, since it changes only where this viewer is looking rather than
@@ -249,11 +256,11 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
                   AppMenuItem(
                     label: 'Paste image',
                     leading: AppIcons.clipboardPaste,
-                    // Ctrl+V already works from anywhere in the pane (see canvas_pane.dart's CallbackShortcuts); nothing said so until this hint, and a touch layout drops it, the same "no finger can press it" rule the channel search field's own Ctrl+K hint already follows.
-                    trailing: AppTouchTargets.of(context)
+                    // Ctrl+V already works from anywhere in the pane (see canvas_pane.dart's CallbackShortcuts); nothing said so until this hint, and a touch layout drops it, the same "no finger can press it" rule the channel search field's own Ctrl+K hint already follows. Dropped entirely while canDraw is false: a shortcut hint for an action that would fail is not worth keeping.
+                    trailing: !widget.canDraw || AppTouchTargets.of(context)
                         ? null
                         : _shortcutHint(context),
-                    onTap: _paste,
+                    onTap: widget.canDraw ? _paste : null,
                   ),
                   AppMenuItem(
                     label: 'Recenter view',

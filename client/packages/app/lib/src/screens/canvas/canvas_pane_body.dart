@@ -289,6 +289,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
   CanvasDockData _dockData() => CanvasDockData(
     tool: widget.tool,
     onToolChanged: widget.onToolChanged,
+    // A banner already says a place would fail; pen/note/shape must not stay selectable underneath it.
+    canDraw: widget.error == null,
     canUndo: widget.canUndo,
     onUndo: widget.onUndo,
     canManage: widget.canManage,

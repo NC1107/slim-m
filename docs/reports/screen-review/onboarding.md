@@ -146,7 +146,8 @@ The three-notice stack orders and spaces with no overlap.
   Fix: an `AppCheckbox` component, or at minimum a `checkboxTheme` entry in `buildTheme`.
 
 - ~~**Two fixture strings don't match what the real server sends, and nothing guards them against drift.**~~
-  Fixed 2026-08-10, both (see each finding above for what changed). Not closed at the mechanism the finding's own doc comment names, though: nothing yet guards either string against drifting away from the server again the way `mention_charset_cases.json` guards the mention regex - that would need a new shared fixture, which is a larger change than a two-string fix and was not attempted here.
+  Fixed 2026-08-10, both (see each finding above for what changed). ~~Not closed at the mechanism the finding's own doc comment names, though: nothing yet guards either string against drifting away from the server again the way `mention_charset_cases.json` guards the mention regex - that would need a new shared fixture, which is a larger change than a two-string fix and was not attempted here.~~
+  The mechanism is closed too, 2026-08-11, with exactly that shared-fixture shape: `crates/slimm-server/tests/fixtures/onboarding_error_strings.json` holds both strings, a unit test in each of `http/error.rs` and `http/auth.rs` asserts the real constant used in the match arm/validator equals the fixture, and `client/packages/app/test/support/onboarding_error_strings.dart` reads the same file so both onboarding snapshot tests build their fixtures from it rather than a hand-typed literal. An edit to either wire string without updating the fixture fails the Rust side; an edit to the fixture without a matching wire-string change fails there too.
   Backend-only, spanning `submit-bad-request-desktop.png` and `invite-dialog-server-refused-desktop.png` (both detailed under their screens above).
 
 - **Every breakpoint the capture set deliberately brackets lands on the exact pixel the source predicts.**
