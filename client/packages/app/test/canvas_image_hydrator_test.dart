@@ -275,24 +275,30 @@ void main() {
     );
     addTearDown(hydrator.dispose);
 
-    hydrator.hydrate(_imageObject('a', attachment: 'sha-a'));
-    await pumpEventQueue();
-    hydrator.hydrate(_imageObject('b', attachment: 'sha-b'));
-    await pumpEventQueue();
+    CanvasStroke strokeById(String id) => document.paintOrder
+        .map(document.strokeAt)
+        .firstWhere((stroke) => stroke.id == id);
 
-    final slots = <String, CanvasStroke>{
-      for (final slot in document.paintOrder)
-        document.strokeAt(slot).id: document.strokeAt(slot),
-    };
+    hydrator.hydrate(_imageObject('a', attachment: 'sha-a'));
+    // A decode is engine work `pumpEventQueue` cannot wait out; see `_settleUntil`.
+    await _settleUntil(() => strokeById('a').image != null);
+
+    hydrator.hydrate(_imageObject('b', attachment: 'sha-b'));
+    await _settleUntil(
+      () => strokeById('b').image != null && strokeById('a').image == null,
+    );
+
     expect(
-      slots['a']!.image,
+      strokeById('a').image,
       isNull,
       reason: 'evicted to make room for the more recently hydrated one',
     );
-    expect(slots['b']!.image, isNotNull);
+    expect(strokeById('b').image, isNotNull);
 
     hydrator.hydrate(_imageObject('a', attachment: 'sha-a'));
-    await pumpEventQueue();
+    await _settleUntil(
+      () => fetchedIds.where((id) => id == 'sha-a').length == 2,
+    );
 
     expect(
       fetchedIds.where((id) => id == 'sha-a').length,
