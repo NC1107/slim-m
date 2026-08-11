@@ -30,6 +30,7 @@ import 'package:slimm_app/src/widgets/composer_clipboard_image.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
 
 import 'message_row_harness.dart' show harness, message, noActions;
+import 'support/mid_flight_capture.dart';
 import 'ui_snapshot_support.dart';
 
 const _viewport = Size(1400, 880);
@@ -59,6 +60,7 @@ class _FixedBlocks extends BlocksController {
 }
 
 Future<void> _finish(WidgetTester tester, String name) async {
+  await expectSettled(tester, name);
   await writeSnapshot(tester, name);
   expect(tester.takeException(), isNull);
 }

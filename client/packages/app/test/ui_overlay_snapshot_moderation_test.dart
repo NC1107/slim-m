@@ -36,6 +36,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'support/mid_flight_capture.dart';
 import 'ui_snapshot_support.dart';
 import 'voice_controller_harness.dart' show FakeSession, tokens;
 
@@ -116,6 +117,7 @@ Future<void> _pump(WidgetTester tester, Widget harness) async {
 }
 
 Future<void> _finish(WidgetTester tester, String name) async {
+  await expectSettled(tester, name);
   await writeSnapshot(tester, name);
   expect(tester.takeException(), isNull);
 }
@@ -125,6 +127,20 @@ Future<void> _finish(WidgetTester tester, String name) async {
 /// test.dart` uses for both the call section and the Eject row: both need
 /// `inCallTogether` to actually be true, which no permission override alone
 /// can fake.
+///
+/// The extra trailing pump is a mid-flight capture `expectSettled` found
+/// directly: `_other`'s avatar has no cached bytes, so `UserAvatar` asks
+/// `avatarBytesProvider`, whose fetch answers 204 under this test's own
+/// catch-all `MockClient` - `FetchedBytes` reads that as "found, zero
+/// bytes" rather than "no avatar", and `AppAvatar`'s `Image.errorBuilder`
+/// only reports the resulting decode failure a frame or two later. One
+/// pump captured the avatar mid-decode with no initials text yet; the
+/// second is what lets the fallback "MA" land before `_finish` reads the
+/// tree. Reverting this pump does not change the written PNG at all -
+/// `writeSnapshot`'s own real-shadow repaint gives the same pending decode
+/// enough turns to resolve before the pixels are rasterised, which is
+/// exactly why this needed the widget-tree gate rather than a screenshot
+/// diff: the bug was real and invisible to every prior look at the image.
 Future<({ProviderContainer container})> _pumpInCall(
   WidgetTester tester, {
   required int permissions,
@@ -206,6 +222,7 @@ Future<({ProviderContainer container})> _pumpInCall(
       isScreenSharing: false,
     ),
   ]);
+  await tester.pump();
   await tester.pump();
   return (container: container);
 }

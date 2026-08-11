@@ -30,6 +30,7 @@ import 'package:slimm_platform/platform.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'message_row_harness.dart';
+import 'support/mid_flight_capture.dart';
 import 'ui_snapshot_support.dart';
 
 const _spaceMenuTokens = api.TokenPair(
@@ -240,6 +241,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
+    await expectSettled(tester, 'message-context-menu-phone');
     await writeSnapshot(tester, 'message-context-menu-phone');
     expect(tester.takeException(), isNull);
   });
@@ -253,6 +255,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
+    await expectSettled(tester, 'message-context-menu-desktop');
     await writeSnapshot(tester, 'message-context-menu-desktop');
     expect(tester.takeException(), isNull);
   });
@@ -264,6 +267,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
+    await expectSettled(tester, 'canvas-object-context-menu');
     await writeSnapshot(tester, 'canvas-object-context-menu');
     expect(tester.takeException(), isNull);
   });
@@ -275,6 +279,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
+    await expectSettled(tester, 'space-menu');
     await writeSnapshot(tester, 'space-menu');
     expect(tester.takeException(), isNull);
   });
