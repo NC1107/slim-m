@@ -12,6 +12,34 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## The first deliberate sweep of this file, and what twenty-six stale claims had in common (2026-08-11)
+
+Five stale claims surfaced by accident in a single day - a flatpak manifest an agent was dispatched to build and found already there, a "the client cannot be analyzed locally" line that cost two red PRs, a contribution to `flutter-webrtc` this project never made, a `livekit_client` version two minors behind, and a missing camera pre-toggle on a screen deleted a week earlier.
+Nobody had ever swept this file on purpose.
+This is that sweep: every falsifiable claim in it checked against the tree, rather than waiting for somebody to trip over the next one.
+
+**About 90 prose claims checked one at a time, of which 26 were stale, plus 543 names resolved mechanically, of which one was.**
+The mechanical half: 480 backticked path-shaped tokens (one stale, `http/ws/view_cache.rs`, renamed to `permission_cache.rs` when its type was) and 63 named Rust and Dart symbols (none stale, which is worth knowing on its own - the code moves, the names do not).
+The hand-checked half: every "still open" / "does not exist" / "not yet built" line, every count and tally, every line count, every version number, the CI and workflow facts, and the external issue and PR references.
+Each correction is struck through and dated in place rather than rewritten, which is this file's own rule and the only reason a reader can tell a live claim from a corrected one.
+
+**The two worst were both an entry telling a reader to go and do something already done.**
+"Deploy the invite gate" said the owner's live deployment still accepted anonymous registration; it has not since server 0.9.0 and the instance runs 0.35.0.
+The CallKit entry said a UI-joined call is never reported to CallKit and named the missing bridge as needing work "that does not exist yet"; it exists, its own doc comment cites the issue number by which this file filed it, and that issue is closed.
+Both are the flatpak shape exactly: a note that survived its own fix and would have sent the next agent at a solved problem.
+
+**The shape worth keeping is that this file contradicted itself four times, and each contradiction was the tell.**
+A revoked session was described as "still open" three paragraphs below the same file recording it fixed.
+The per-connection permission cache was "still open and the remaining half" one section below the entry that built it.
+`ViewCache` was recorded as renamed to `PermissionCache` above a pointer still naming the old file.
+Two entries listed `e2e` as unconditionally cancelling while a third correctly described the queueing behaviour it has actually had since PR #187.
+A grep for a claim against this file's own later entries is cheaper than a grep against the tree, and would have caught four of the twenty-six on its own.
+
+**What could not be settled, said rather than smoothed.**
+Whether the `channel.created` workaround in `SyncController` can now actually be deleted: the event exists, which is all the note's own condition asked for, but whether it reaches the recipient of a DM opened by the other party is a real question about that event's permission gate and was not chased here.
+The backlog channel id and the live instance's own contents were not checked, since that needs a session against the owner's deployment for no benefit to this pass.
+And the numbers in the "Current state (2026-07-25)" snapshot below are deliberately left as history; only its status header, which names versions as current, was updated.
+
 ## The label guard's own bug generalised: eleven more source-reading gates a comment could fool (2026-08-11)
 
 PR #551 (see below) fixed one gate that went green while the thing it named was gone, because a doc comment describing the deletion still carried the string.
@@ -84,7 +112,9 @@ Likely specific to running the sandboxed `org.flatpak.Builder` rather than a nat
 
 ## e2e was red for two days, again, and the naive fix would have been the same mistake twice (2026-08-11)
 
-`scripts/e2e.sh` failed on every completed run for about two days: 57 runs since PR #495 landed (2026-08-09T00:24), 46 of them a genuine failure and 11 cancelled (this workflow keeps an unconditional `cancel-in-progress`, since it is not a required check).
+`scripts/e2e.sh` failed on every completed run for about two days: 57 runs since PR #495 landed (2026-08-09T00:24), 46 of them a genuine failure and 11 cancelled ~~(this workflow keeps an unconditional `cancel-in-progress`, since it is not a required check)~~.
+The parenthetical was wrong when written, corrected 2026-08-11: `e2e.yml` has carried `cancel-in-progress: false` since PR #187, with a comment saying "Queued, not cancelled: a merge burst would otherwise leave no verdict at all."
+The 11 cancellations are real, and the explanation for them is the *other* mechanism this file already documents: the group is keyed on `github.ref`, so a newer run queued behind an already-pending one cancels that pending run outright, which `cancel-in-progress` cannot reach.
 Client 0.36.0 and server 0.35.0 both shipped over the top of it, the same silent-loss shape the earlier "A gate nobody is watching says nothing: e2e was red for a day" entry below already names.
 Read that entry first; this is its second recurrence, not a new failure mode.
 
@@ -565,6 +595,8 @@ A test that draws locally or toggles the panel closed-then-open cannot catch thi
 `_panel()` now wraps in the identical `document.objectCount` `ValueListenableBuilder` the surface branch already uses.
 
 **Three touched files are now further over the 300-line soft budget than before, worth a look before adding more to any of them:** `canvas_pane.dart` (451, was 442), `canvas_sync.dart` (314, was 300), and `canvas_document.dart` in `voice_canvas` (444, was 423). None crossed the 500 hard ceiling and none were split further here, since each addition was small and proportionate to what was already there; the next contributor adding to any of them should budget for a split rather than a fourth small addition.
+Recounted 2026-08-11, since a line count in a knowledge base is a claim with a shelf life: 456, 396 and 484 respectively.
+Still none past 500, but `canvas_sync.dart` has taken another 82 lines with nobody taking the split this paragraph asked for, so the advice stands harder than it did.
 
 ## Space usage analytics: the metrics half of Phase 7, finally, and not the way the roadmap specified (2026-08-05)
 
@@ -744,10 +776,12 @@ A bare-string `extra-files` path ending in `.yaml` routes through a `CompositeUp
 The explicit `{"type": "generic", ...}` object form is a different code path and skips `GenericYaml` entirely, confirmed by reading `extraFileUpdates`'s `switch` in `strategies/base.js` and by running the real `Generic` updater against the actual file: all 9 comment lines came back byte-identical, only the `version:` line changed.
 The `+build` suffix is still swallowed whole by that marker-based replace - the original rejection's finding was correct and this does not undo it - so `client/packages/app/pubspec.yaml`'s version is bare `X.Y.Z` from here on, with no `+N` at all, rather than fighting for an increment nothing outside a local build ever reads: `release.yml` documents, in its own words, that both store builds pass `--build-name`/`--build-number` explicitly and "never from pubspec", so this was never load-bearing for a shipped artifact, only for `flutter build linux` (which passes neither flag) and an uninvoked local `flutter run`.
 Not verified: an actual release-please run against the live GitHub repo - watch the next client release the way the two-config-file split above had to be watched.
-PR #373 is release-please's own standing branch and will very likely need a rebase or a close-and-recreate once this config change reaches main, the same conflict shape the "release-PR conflict is now a pattern" entry below already documents for a shared manifest file; this is a larger config change than that entry saw, so do not assume it resolves itself without checking.
+~~PR #373 is release-please's own standing branch and will very likely need a rebase or a close-and-recreate once this config change reaches main~~, the same conflict shape the "release-PR conflict is now a pattern" entry below already documents for a shared manifest file; this is a larger config change than that entry saw, so do not assume it resolves itself without checking.
+Settled 2026-08-11: the prediction held and the second half of it is what happened.
+PR #373 was closed unmerged on 2026-08-04 and release-please recreated its standing branch from scratch; every client release since has cut cleanly, so this needs no further watching.
 
 **What tracing found about `whats_new_gate.dart`:** `WhatsNewController._check()` (`providers/whats_new_controller.dart`) reads `PackageInfo.fromPlatform()` directly, not `appInfoProvider`, but it is the same underlying platform call reading the same broken pubspec - so `currentVersion` was `'0.1.0'` on every real launch ever, and since every entry in `whatsNewEntries` is versioned `0.20.2` or later, `compareVersions(entry.version, currentVersion) <= 0` was false for all of them, always.
-The what's-new sheet has never shown on a real build, for any of the thirteen entries written for it.
+The what's-new sheet has never shown on a real build, for any of the ~~thirteen~~ entries written for it (thirteen at the time; 18 as of 2026-08-11, since `whatsNewEntries` is `whatsNewArchiveEntries` plus the literal list and the archive holds five of its own).
 Fixing the version source alone would have then flooded every existing install with the *entire* backlog in one sheet the first time it launched a build with the fix, since `lastSeenWhatsNewVersionKey` could only ever have been written as the same broken `'0.1.0'` constant (the only code path that ever wrote it is the fresh-install branch, because pending was always empty so `markSeen()` could never fire).
 That is different from - and must not be conflated with - the existing, deliberately-tested case of a `null` last-seen value (a device that predates the whole feature), which `pendingWhatsNewEntries`'s own doc comment and `whats_new_controller_test.dart` already establish must keep showing the backlog.
 `_check()` now re-baselines a device silently (adopts the current version, shows nothing) when, and only when, `lastSeen` equals the exact frozen constant `'0.1.0'` - narrower than treating it like `null`, which would have broken the already-passing "an upgrade with no prior what's-new record shows the entries" test.
@@ -877,7 +911,7 @@ Tapping it reuses `MessageActions.onOpenThread` exactly, the same call the conte
 
 **`messages.rs` crossed the 500-line hard ceiling a second time, the same way CLAUDE.md's own reconciliation entry already flagged it doing once.**
 The DTO itself - `MessageDto`, `AttachmentDto`, `ReactionDto`, and the two `impl` blocks - moved into a new `http/message_dto.rs`, re-exported from `messages.rs` (`pub(crate) use message_dto::{...}`) so every existing `super::messages::MessageDto` import elsewhere keeps working unchanged.
-`messages.rs` is 393 lines now; the split cost nothing beyond the new file.
+~~`messages.rs` is 393 lines now~~ (406 as of 2026-08-11); the split cost nothing beyond the new file.
 
 **A last-reply timestamp is carried because "3 replies" and "3 replies, last one yesterday" really are different signals**, and it was nearly free: the same `GROUP BY` that counts already has `MAX(m.created_at)` for a `null` cost.
 The client formats it with `formatMessageDay` when older than today and the exact `HH:mm` when today, reusing both existing formatters rather than adding a third time-formatting convention.
@@ -1019,7 +1053,8 @@ Client 0.32.1 shipped only because the third push's own release-please invocatio
 Distinct pushes are never in the same group, so neither can ever be left pending behind the other; each release run completes independently, which is what actually guarantees a queued run is never silently dropped, not a narrower `cancel-in-progress` condition, since that flag only ever governs a run already in progress.
 `schema-ci.yml` had the identical unconditional `cancel-in-progress: true` on its own workflow-level group, covering `breaking-change-gate-main`, a required check for both release gates, on every push to main - the exact bug this section already named, left unapplied on the one workflow added after the fix above landed.
 It carries the same `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` condition the other four now use.
-The other unconditionally-cancelling workflows (`compose-smoke`, `audio-ci`, `push-relay-contract`, `perf`, `e2e`) were checked too and are not required checks, so a cancellation there cannot block a release the way `schema-ci`'s could; `main-builds.yml`'s own unconditional cancellation is unrelated to this pipeline and stays, by its own design, since a newer commit's continuous build is meant to supersede an older one's.
+The other unconditionally-cancelling workflows (`compose-smoke`, `audio-ci`, `push-relay-contract`, `perf`, ~~`e2e`~~) were checked too and are not required checks, so a cancellation there cannot block a release the way `schema-ci`'s could; `main-builds.yml`'s own unconditional cancellation is unrelated to this pipeline and stays, by its own design, since a newer commit's continuous build is meant to supersede an older one's.
+Corrected 2026-08-11: `e2e` did not belong in that list and never did, since PR #187 gave it `cancel-in-progress: false` well before this entry was written; the other four still carry an unconditional cancel and are still not required checks.
 
 **A gate now watches for the state a silent loss like this produces, rather than trusting the mechanism fix alone.**
 `release-tag-watchdog.yml` runs `scripts/check-release-tag-lag.sh` on a 15-minute schedule: for each package, does the manifest's current version have a matching tag, and if not, how long has it been missing past a grace window a normal in-flight release comfortably clears.
@@ -1233,8 +1268,11 @@ Both paths leave the call first now, and `sign_out_leaves_call_test.dart` drives
 **On iOS, the fix the first pass reached for would have made things worse.**
 Adding `UIBackgroundModes: audio` to grant background execution for the call looked like the obvious complement to the heartbeat, and is exactly what `docs/research/appstore.md` and the adversarial review (`appstore-review.md`, finding M5) already ruled out: `audio` used to keep a call alive rather than for genuine continuous playback is a named App Store 2.5.4 rejection risk, and reviewers reject it as a generic keep-alive.
 The compliant path this project already picked is `voip` plus an actually-reported CallKit call, and CallKit itself is what grants background execution while it holds one.
-The gap is that a call joined from this app's own UI is never reported to CallKit at all - `VoipCallHandler.swift`'s `reportNewIncomingCall` only ever runs from an inbound VoIP push - so it currently gets none of that grant regardless of background mode.
-Filed as [#212](https://github.com/NC1107/slim-m/issues/212) rather than built here: it needs a Dart-to-native call lifecycle bridge that does not exist yet, and real-device verification this environment cannot do.
+~~The gap is that a call joined from this app's own UI is never reported to CallKit at all - `VoipCallHandler.swift`'s `reportNewIncomingCall` only ever runs from an inbound VoIP push - so it currently gets none of that grant regardless of background mode.~~
+~~Filed as [#212](https://github.com/NC1107/slim-m/issues/212) rather than built here: it needs a Dart-to-native call lifecycle bridge that does not exist yet, and real-device verification this environment cannot do.~~
+Built since, struck 2026-08-11: issue #212 is closed, and the bridge that "does not exist yet" is `client/packages/platform/lib/src/call_lifecycle_channel.dart` on the Dart side and `ios/Runner/VoiceCallReporter.swift` on the native side, with `providers/voice_call_lifecycle_report.dart` driving it and tests on both sides.
+The channel's own doc comment cites this issue by number and repeats this paragraph's reasoning, so the two were written against each other and only this one went unstruck.
+Still true, and the reason to keep the entry rather than delete it: none of it has been confirmed on a real iPhone, so the background-execution grant is reasoned from Apple's own semantics and covered by unit tests only.
 
 **Test fragility fixed along the way, and one review claim about it that did not survive checking.**
 `voice_call_heartbeat_test.dart` ran real `Timer.periodic`s at a few milliseconds against real wall-clock windows, schedulable flake on a loaded runner; it now drives everything through `fake_async`, which also let its loose bounds become exact counts.
@@ -1333,7 +1371,8 @@ It reads granted rather than effective permissions on purpose, so timing somebod
 
 **`Helper.setVolume` works on three of the six platforms, and the two failure modes are opposite.**
 This is the one worth not rediscovering.
-livekit_client 2.8.1 has no per-participant gain API; flutter_webrtc (already a direct dependency of the rtc package) does. But:
+~~livekit_client 2.8.1~~ has no per-participant gain API; flutter_webrtc (already a direct dependency of the rtc package) does. But:
+Re-checked 2026-08-11 against the version this client actually locks now, `livekit_client: ^2.10.0` resolving to 2.10.0 (`client/pubspec.lock`): still no `setVolume` or gain of any kind on a participant or track anywhere in that package, so the finding holds and only the version number needed correcting.
 - **Android, iOS, macOS work.** Their native track lookups fall back to scanning the peer connection's transceivers, so a remote track is found.
 - **Linux and Windows throw.** They share `common/cpp`, whose lookup scans only a `remote_streams_` map filled by the Plan B `OnAddStream` callback; LiveKit uses Unified Plan, where that never fires, so the map is always empty and the call returns "Unable to find provided track". flutter_webrtc's wrapper does not catch it, unlike every sibling in that file.
 - **Web silently does nothing.** It becomes `applyConstraints({'volume': ...})`, which no browser honours, and `applyConstraints` constrains a track's *source* - a remote track's source is the RTP receiver. LiveKit plays remote audio through an `HTMLAudioElement` it does not expose, so there is no other handle.
@@ -1416,7 +1455,9 @@ It has one now, and the validator is one function called from the report intake 
 ## Caching a permission on the socket, and why events are the wrong key (2026-07-30)
 
 The last half of the audit's fan-out finding, and the one place today's work got something wrong and had to be fixed before merging.
-Read this before touching `http/ws/view_cache.rs` or `Hub::publish`.
+~~Read this before touching `http/ws/view_cache.rs` or `Hub::publish`.~~
+Corrected 2026-08-11: that file was renamed with the type, and is `crates/slimm-server/src/http/ws/permission_cache.rs` now.
+The rename is already recorded at "`ViewCache` is `PermissionCache` now" below; only this pointer was left behind.
 
 **Invalidating a cached permission as the events arrive is wrong, and it looks right.**
 The first version of `ViewCache` ran `observe(&event)` ahead of `authorize`, dropping whatever each event could have changed.
@@ -1530,7 +1571,10 @@ Read that before the next audit pass so nothing is re-found.
 A fifth round implemented the error-states spec beside a component-usage audit: `AppErrorState` is the persistent inline failure that replaces vanishing toasts (27 sites carried a failure only as a SnackBar), `buildTheme` overrides `ColorScheme.error` with the danger token so the two reds that meant "danger" cannot diverge again, and danger is outlined everywhere - never a filled button.
 One spec item stays unimplemented on purpose: distinguishing an expired invite from an invalid one would undo the server's deliberate uniform answer that stops code mining.
 A fourth round implemented the design agent's motion spec; the durable constraints it surfaced: row height must never animate (density is layout), the hidden member pane must unmount (it fetches while built), a button-theme `textStyle` replaces inherited styles wholesale, and the hold-progress tint rides Flutter's own long-press timeout because `GestureDetector` is what publishes the semantic action.
-A second round the same day covered what the first under-covered: the snapshot harness's `_surfaces` map (`ui_snapshot_test.dart`) now renders all 12 routed screens, not just the two shell ones, so `scripts/ui-snapshots.sh` yields the whole app (60 renders) and the settings/admin screens sit under the CI overflow gate.
+A second round the same day covered what the first under-covered: the snapshot harness's `_surfaces` map (`ui_snapshot_test.dart`) now renders all ~~12~~ routed screens, not just the two shell ones, so `scripts/ui-snapshots.sh` yields the whole app (~~60 renders~~) and the settings/admin screens sit under the CI overflow gate.
+Recounted 2026-08-11: `_surfaces` holds 15 entries and the file has grown three more tables beside it (`_shellStateSurfaces`, `_canvasSurfaces`, `_voiceCallSurfaces`), so a run of that one file is 258 tests, not 60 renders.
+The router registers 16 routes and four of them (`debugLog`, `adminCategories`, `adminAnalytics`, `adminRemovedMembers`) are in no surface table at all, so "all routed screens" is no longer true either and is worth a look before the next screen-review pass leans on this harness for coverage.
+`scripts/ui-snapshots.sh` still exists and still drives exactly this file; `scripts/ui-capture.sh` is a separate, larger orchestrator over this plus the settings, overlay and canvas harnesses, not a rename of it.
 Two harness facts worth keeping: `fixtureContainer` must call `SharedPreferences.setMockInitialValues` (the voice settings screen reads it and the platform channel has no host in a test), and the fixture's fake HTTP catch-all answers `[]`, so any endpoint whose real answer is a map needs an explicit case or the screen renders its error state - which is exactly how it exposed 14 sites interpolating `$e` into visible copy.
 What to know before touching the affected code:
 
@@ -1549,7 +1593,10 @@ Closed 2026-07-31 across #235, #236, #237 and #238; see "Reconciling an edit nob
 The note was right that it needed a designed protocol answer rather than a patch, and the answer turned out to be the canvas op stream transplanted almost exactly.
 The per-socket WS fan-out permission cost is the other big recorded item: **five** queries per event per connection, not the four recorded here until 2026-07-30 - channel, two role queries, overwrites, timeout deny - and six on a typing frame, which also resolves presence.
 The safe fix is a per-connection visibility cache with real invalidation, and the events it would invalidate on now exist (2026-07-30): `roles.rs`, `overwrites.rs` and `channels.rs` published nothing at all until then, so a revoked channel view never reached a live client and there was nothing a cache could have listened to.
-The cache itself is still open and is the remaining half.
+~~The cache itself is still open and is the remaining half.~~
+Closed 2026-07-30, the next day, and this line was never struck: `PermissionCache` (`http/ws/permission_cache.rs`) is that cache, keyed on a `permissions_epoch` `Hub::publish` bumps rather than on the events themselves.
+See "Caching a permission on the socket, and why events are the wrong key" above for why event-keyed invalidation was the wrong answer.
+Noticed 2026-08-11 by a sweep, not by anybody tripping over it, which is the point.
 
 Smaller traps this pass hit: `Opacity` over a whole row silently destroys AA contrast (the muted `AppListRow` now dims leading/trailing only, and a design_system test pins that); `VoiceSession.join` serializes overlapping calls (both used to pass the room-null check and race one slot); and `SourceType.Window` must never be requested on Wayland from *any* call site - `media_capabilities.dart` had the segfault `desktop_sources.dart` already documented.
 
@@ -1663,6 +1710,8 @@ The UI was aligned to the Claude Design visual identity review, and the features
 Read this before touching the client or adding a server feature the UI needs.
 
 The design system is a real component library now: `client/packages/design_system/lib/src/components/` holds core (avatar, badge, button, icon button, kbd, status dot), forms (input, chip, toggle, segmented control, slider) and surfaces (card, callout, code block, list row, menu).
+Read that as the founding inventory rather than the current one, recounted 2026-08-11: nothing named above has gone, and nine more have arrived beside them - `brand_mark` and `speaking_ring` in core, `focus_ring`, `focusable_tap_target` and `slider_shapes` in forms, and `async_view`, `content_column`, `error_state` and `sheet` in surfaces.
+`error_state.dart` is the `AppErrorState` this same file discusses at length elsewhere, which is a fair sign of how long this list had been left.
 Tokens split into `app_tokens.dart` (colour), `app_typography.dart` (the six-step scale, three weights, stopping at 600) and `app_metrics.dart` (spacing, radii, control sizes, the two shadows, density).
 
 **Eight server features were built because the design needed them and nothing backed them**: presence (with appear-offline), typing indicators, pinned messages, polls, direct messages, attachments and avatars, a server identity fingerprint, and channel topics plus member roles on the member list.
@@ -1844,7 +1893,10 @@ Isolate both, always.
 Confirmed bugs from this pass, in the order found:
 
 - **Any admin sheet that lists roles or members via a synchronous `ref.read` on a cold `FutureProvider.autoDispose` renders permanently empty.** `channel_overwrites_screen.dart`'s role and member pickers did exactly this: no listener gets registered, so `autoDispose` tears the provider down before its fetch resolves, and the sheet's plain closure body never rebuilds anyway. Fixed by two `ConsumerWidget` sheets (`overwrite_target_picker_sheets.dart`) that `ref.watch` instead, matching the pattern `role_assign_sheet.dart` already used correctly. If a new admin picker needs a live list, watch it in a widget, never read it once in a callback.
-- **A DM's first message never reached the recipient live.** `MessageStore` has no channel foreign key, so a `MessageCreated` frame for a channel the client had never fetched landed silently and `_advanceCursor` no-opped. `SyncController._applyServerEvent` now checks `store.hasChannel` first and materialises the channel (`_refreshChannelsOnce`, debounced against a burst) before applying the message. The same gap silently hid any newly created channel until reconnect; there is still no `channel.created` event anywhere in the wire protocol, so a next contributor adding one should also delete this workaround.
+- **A DM's first message never reached the recipient live.** `MessageStore` has no channel foreign key, so a `MessageCreated` frame for a channel the client had never fetched landed silently and `_advanceCursor` no-opped. `SyncController._applyServerEvent` now checks `store.hasChannel` first and materialises the channel (`_refreshChannelsOnce`, debounced against a burst) before applying the message. The same gap silently hid any newly created channel until reconnect; ~~there is still no `channel.created` event anywhere in the wire protocol, so a next contributor adding one should also delete this workaround.~~
+  Stale, checked 2026-08-11: `Event::ChannelCreated` (`hub/event.rs`) has existed since PR #161 on 2026-07-30, published from `http/channels.rs` and delivered as `ServerFrame::ChannelCreated`.
+  So the condition this note set for deleting the workaround was met a fortnight ago and nobody came back to it.
+  Whether the workaround can actually go is not settled here and should not be assumed: it also materialises a channel for a DM's first message, and whether `ChannelCreated` reaches the recipient of a DM opened by the other party is a real question about that event's own permission gate, not a formality.
 - **Read state was a dead feature in both directions.** `SlimmApi.markRead` had no call site, so `lastReadSeq` never left 0 and the unread predicate (`cursor > lastReadSeq`) reduced to "has this channel ever had a message", permanently lit. `ChannelScreen` now marks read on render (`_markReadUpToLatest`, guarded per channel so a busy channel does not refire the same seq every rebuild) and `SyncController._refreshChannels` hydrates the marker from the server on every channel refresh, since `/sync`'s `ScopeDelta` carries no read state and `store.clear()` wipes the marker on sign-out.
 - **The member pane never learned about a member who joined mid-session.** There is no `MemberJoined` event in `hub.rs`; the fix infers a join from a `PresenceChanged` or a `MessageCreated` naming an id absent from the cached roster (`_memberRosterKeepAliveProvider` in `member_pane.dart`, debounced 500ms, gated on the roster being under the server's member-list page cap so a normal off-page id does not force a refetch). If a real join event is ever added server-side, prefer it and delete this inference.
 - **Deleting the currently open channel throws past every catch clause and strands the sheet.** `manage_channel_sheet.dart`'s delete path calls `selectedChannelId(context)` from the sheet's own context after the sheet's navigator already popped out from under `GoRouterState.of`, which finds no router above it and throws `GoError` uncaught. Confirmed in source; **not fixed in this pass** (read the context before the async gap, the way `command_palette.dart` already does, is the shape of the fix).
@@ -1859,7 +1911,9 @@ Confirmed but not fixed, still real:
   `ContextMenuKeyboardScope` is the other half: an opened menu moves focus into its own scope inside the overlay, so its items are tabbable and Escape closes it, and dismantling that scope hands focus back to the row with nothing having to restore it.
   Focus is moved in explicitly rather than by `autofocus`, which only fires when nothing else holds focus - and the row that opened the menu is exactly what does, so the obvious version silently does nothing.
   The original note, for the record: both regions opened on `onSecondaryTapDown` or `onLongPress` only. An earlier version of this note claimed that left them with no semantic action either; that was wrong, checked 2026-07-28: `GestureDetector` publishes `SemanticsAction.longPress` for its own `onLongPress`, so VoiceOver and TalkBack have always been able to open these, and `context_menu_reachability_test.dart` now guards that, since it is a side effect of one widget choice and a `Listener` or `excludeFromSemantics` would remove it silently. What is genuinely missing is the keyboard: the rows do not take focus and no key opens the menu, so report, block, edit, delete and pin have no keyboard route. The e2e harness cannot drive them either, for a different reason - it dispatches DOM events rather than semantic actions - so `scripts/lib/e2e_admin.py` covers report and block at the API and says so.
-- **A revoked session mid-app drops the user all the way to the bare onboarding root**, not sign-in, losing the remembered server address and showing no explanation, contradicting `router.dart`'s own doc comment. Still open.
+- ~~**A revoked session mid-app drops the user all the way to the bare onboarding root**, not sign-in, losing the remembered server address and showing no explanation, contradicting `router.dart`'s own doc comment. Still open.~~
+  Stale, struck 2026-08-11, and this file already knew: the "not yet fixed" closure a few paragraphs above says "the revoked-session redirect lands on sign-in with the server address intact", so the same document asserted both things at once.
+  Fixed by PR #67 on 2026-07-27. `routing/router.dart`'s `signedOutHome()` returns `Routes.signIn` whenever a server has ever been chosen, since the chosen server is persisted independently of the session, and only falls back to onboarding when there is genuinely no address to keep.
 
 Three touched files now exceed the 300-line review budget: `sync_controller.dart` (316, crossed it this pass), `member_pane.dart` (396, crossed it this pass), `channel_screen.dart` (583, already over before this pass). Split before opening a PR from this work rather than adding to them further.
 
@@ -1867,7 +1921,9 @@ Three touched files now exceed the 300-line review budget: `sync_controller.dart
 
 > **Status header, added in the 2026-07-30/31 documentation pass.** This section is a point-in-time snapshot from 2026-07-25, kept for its detail rather than rewritten.
 > Everything dated later in this file (every section above this one) supersedes it: Phase 4 finished, Phase 5's canvas spikes ran, a first canvas write slice shipped, the Phase 7 capability handshake landed, and part of Phase 8's polish pass is done.
-> The server is at 0.18.5 and the client at 0.13.3 (`.release-please-manifest.json`), not the 0.10.0 named a few lines below.
+> ~~The server is at 0.18.5 and the client at 0.13.3 (`.release-please-manifest.json`), not the 0.10.0 named a few lines below.~~
+> Server 0.35.0 and client 0.36.0 as of 2026-08-11, read from `.release-please-manifest.server.json` and `.release-please-manifest.client.json` (the single manifest that line named was split into those two on 2026-08-01).
+> A status header that names versions goes stale on every release, so treat the numbers as the date they carry rather than as current.
 > Read this for the PR #50 and phase 1-3 history, not for what phase the project is currently in.
 
 Phases 0 (foundations), 1 (server and protocol core), and 2 (client shell and text messaging) are complete.
@@ -1918,12 +1974,14 @@ Still open in Phase 4:
   `VoiceController.setCameraPreference` and `VoiceSession.join`'s `cameraEnabled` parameter (PR #231) were never deleted with the lobby, just left with no caller.
   Closed properly now: a persisted "Join calls with your camera on" toggle in Voice Settings (`providers/voice_settings_controller.dart`, `widgets/camera_on_join_section.dart`), applied live to the session and awaited once at bootstrap (`VoiceController.restoreCameraPreference`) so a fresh launch's first join honours it too - a genuine improvement over the microphone's own unpersisted default, not merely parity with it.
   See PR #546 for the full writeup, including a real semantics-merge bug the fix caught (a state-conditional label reading as contradictory once actually dumped) and why `MediaCapabilities.probeAll()` grew a camera probe alongside it.
-- Android ConnectionService with a CallStyle notification.
+- ~~Android ConnectionService with a CallStyle notification.~~
+  Half of this shipped and the bullet never said so, corrected 2026-08-11: `platform/android/.../IncomingCallNotifier.kt` has been a real `NotificationCompat.CallStyle` banner with answer and decline actions since PR #95 on 2026-07-28.
+  What is genuinely still open is only the `android.telecom` ConnectionService registration, which that file's own doc comment says it deliberately does not do, on the grounds that the notification alone already delivers the user-visible result.
 - ~~The runtime half of the RTC spike. `MediaCapabilities.probeAll()` exists but nothing calls it,~~ Fixed 2026-07-28: `media_capability_section.dart`'s `_run()` calls `probeAll()` (around line 43), it is the only call site and a real one, and the section is wired into `voice_settings_screen.dart`. The Wayland portal half is still open: it shows a picker, so it needs a human at the screen.
 - A real call on an iPhone through TestFlight, and an Android device for the heads-up path. Two web clients is not a phone, and the mobile call path is still untaken.
 - The aggregate egress budget, which needs several real clients at once. `scripts/e2e.sh` is the obvious thing to grow into that, since adding clients to it is now a loop rather than a person.
 
-**iOS work does not need a local Mac.** `release.yml` builds the ipa on `macos-latest`, `client-ci` runs XCTest there, `project.pbxproj` is a text file that can be edited directly, and a device build reaches a real iPhone through TestFlight. An earlier note here claimed otherwise; that was wrong, and it is why the phase 3 NSE sat parked longer than it needed to.
+**iOS work does not need a local Mac.** `release.yml` builds the ipa on `macos-latest`, ~~`client-ci` runs XCTest there~~ (corrected 2026-08-11: the XCTest job is `ios unit tests (callkit invariant)` in `client-ios-ci.yml`, and `client-ci.yml` has no macOS runner in it at all), `project.pbxproj` is a text file that can be edited directly, and a device build reaches a real iPhone through TestFlight. An earlier note here claimed otherwise; that was wrong, and it is why the phase 3 NSE sat parked longer than it needed to.
 
 ### The phase 3 audit (2026-07-25), and what it changed
 
@@ -2035,8 +2093,9 @@ The pubspec `+N` is now only a local-build default and does not need touching pe
 Known gaps left from Phase 2, deliberately, and worth picking up before Phase 3 leans on them:
 - **The UI has been driven by a human only lightly.** The live instance holds real messages from the owner, so the primary flow has been exercised, but there is no record of a full sign-up-to-send pass written down.
 - **Golden images are not committed.** The matrix asserts no overflow at any scale (machine-independent, runs everywhere); the pixel comparison is behind `SLIMM_GOLDENS` with no reference images, because images generated off-CI would never match the runner and would mean a permanently red build. Generate them once on the CI runner and enable the flag there.
-- The shared message context menu (edit, delete, pin/unpin) is now built; see "Cross-origin access, moderation UI, and channel administration" above. Reactions UI, the quick switcher, and haptics are not. The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event). ~~History pagination is not built either.~~ Built 2026-07-30: `providers/channel_history.dart` pages backwards on `listMessages(before:)` when the transcript's oldest end comes into view, and the same state is what finally lets `ChannelStartHeader` render - until then it announced the start of a conversation above history nothing had fetched.
-- The shortcut table exists but is not yet bound into the widget tree.
+- The shared message context menu (edit, delete, pin/unpin) is now built; see "Cross-origin access, moderation UI, and channel administration" above. ~~Reactions UI, the quick switcher, and haptics are not.~~ All three built, struck 2026-08-11: the reaction picker is `widgets/emoji_picker.dart` wired into `message_row.dart`, the quick switcher is `widgets/command_palette.dart` on Ctrl/Cmd+K from `home_shell.dart` (PR #61, 2026-07-27), and `AppHaptics` is `design_system/lib/src/app_haptics.dart` fired from `AppButton`, `AppIconButton` and `AppListRow` (PR #121, 2026-07-29). The server side of reactions exists (PUT/DELETE on `/messages/{id}/reactions/{emoji}`, summaries on list, a ReactionsChanged event). ~~History pagination is not built either.~~ Built 2026-07-30: `providers/channel_history.dart` pages backwards on `listMessages(before:)` when the transcript's oldest end comes into view, and the same state is what finally lets `ChannelStartHeader` render - until then it announced the start of a conversation above history nothing had fetched.
+- ~~The shortcut table exists but is not yet bound into the widget tree.~~
+  Bound by PR #213 on 2026-07-31, struck 2026-08-11: `home_shell.dart` reads `activatorFor` for `quickSwitch`, `focusComposer`, `openSettings`, `nextChannel` and `previousChannel` and binds them with `CallbackShortcuts` around the whole shell.
 
 ~~Open follow-up noted during reviews: malformed query and JSON bodies still return axum's default plain-text error rather than the uniform JSON error contract (low).~~ Fixed 2026-07-28.
 `http::extract` now defines `Json`, `Query` and `Bytes` wrappers that behave exactly like axum's own (including as a response type, for `Json`) but map a rejection to `ApiError` instead: a syntax error or a missing field is a 400 naming what was wrong, an oversized body is a 413, and both keep the `{"error": ...}` shape and `application/json` content type every other response already had.
@@ -2085,20 +2144,24 @@ Note that `livekit.npc-server.top` is proxied by Cloudflare, which rejects some 
 
 ```
 crates/slimm-server   Rust home server (Axum + embedded SQLite via sqlx). A lib (slimm_server) plus a thin bin.
-  src/                lib.rs, main.rs plus one file per concern (config, db, auth, cors, emoji, hub,
-                      identity, media, permissions, presence, push, ratelimit, typing) and the
-                      emoji/, http/, push/, store/, voice/ directories
-  migrations/         24 forward-only sqlx migrations (0001_init.sql through 0024_messages_rowid_alias.sql)
+  src/                lib.rs, main.rs plus one file per concern (config, db, auth, cors, identity,
+                      ids, notifications, permissions, presence, process_metrics, ratelimit,
+                      typing) and the emoji/, http/, hub/, media/, push/, store/, voice/
+                      directories, several of which also keep a same-named .rs beside them
+  migrations/         40 forward-only sqlx migrations (0001_init.sql through 0040_canvas_media_slots.sql)
   benches/            criterion hot-path benchmarks
   tests/              integration tests
 schema/               openapi.yaml, the single source of record for the wire protocol
 client/               Flutter client, a Dart native pub workspace (packages/api, design_system, data, platform, rtc, voice_canvas, app)
 docker/               server.Dockerfile (multi-stage musl + distroless)
-deploy/               docker-compose self-host example (server + Caddy + LiveKit + Litestream), Caddyfile, .env.example
+docker-compose.yml    the self-host example (server + Caddy + LiveKit + Litestream), at the repo root
+deploy/               Caddyfile, .env.example and the operator-facing README for that stack
 perf/                 performance baseline model
 .sqlx/                committed sqlx query cache (offline builds); regenerate after query changes
-docs/                 brief, strategy, roadmap, decisions, research, design
+docs/                 brief, strategy, roadmap, decisions, research, design, reports, ci, e2e, dependencies
 ```
+
+Corrected 2026-08-11, by counting rather than by reading: the migration count said 24 and is 40; `media` and `hub` are directories now, not single files, and `ids.rs`, `notifications.rs` and `process_metrics.rs` were missing entirely; and the self-host compose file is `docker-compose.yml` at the repo root, never inside `deploy/`, which holds only the Caddyfile, `.env.example` and a README.
 
 ## Architecture summary
 
@@ -2111,6 +2174,7 @@ docs/                 brief, strategy, roadmap, decisions, research, design
 - Push relay is a separate stateless Go forwarder: APNs plus FCM, content-free encrypted payloads, and each device token bound to the key that registered it.
 
 Decisions of record: [0001](docs/decisions/0001-owner-decisions.md) (owner product decisions), [0002](docs/decisions/0002-architecture-followups.md) (SQLite, same-deployment DMs, presence opt-out), [0003](docs/decisions/0003-library-decisions.md) (library choices, and a corrected Linux-media finding).
+Those are the three architectural ones; there are thirteen records as of 2026-08-11 (0001 through 0013), several of them load-bearing for day-to-day work rather than history, so read [docs/decisions/](docs/decisions/) rather than this line as the index.
 
 ## Owner decisions to honor
 
@@ -2239,7 +2303,9 @@ What guards it now is a test asserting the ceiling override keeps the temp guard
 
 ## CI and release, plus gotchas learned the hard way
 
-13 workflows now, not the original six: server-ci, client-ci, client-ios-ci, schema-ci, hygiene, perf, release, licenses, audio-ci, compose-smoke, e2e, push-relay-contract, verify-release-checks. See `docs/ci.md` for what each gates. All green on main.
+~~13 workflows now, not the original six: server-ci, client-ci, client-ios-ci, schema-ci, hygiene, perf, release, licenses, audio-ci, compose-smoke, e2e, push-relay-contract, verify-release-checks.~~
+16 as of 2026-08-11, counted rather than remembered: the thirteen above plus `main-builds.yml`, `copr-publish.yml` and `release-tag-watchdog.yml`, the last two of which this same file already discusses elsewhere while this line kept saying they were not there.
+See `docs/ci.md` for what each gates. All green on main.
 
 - Multi-arch images are built NATIVELY per architecture (ubuntu-latest for amd64, ubuntu-24.04-arm for arm64), pushed by digest, then merged into one manifest and cosign keyless-signed. No QEMU, no `cross`. The static binaries are built the same native-per-arch way. `cross` was dropped because its arm64 toolchain image hit a GLIBC mismatch.
 - The Dockerfile builds natively for whatever platform buildx targets; do not reintroduce `--platform=$BUILDPLATFORM` cross-copying (it silently ships a host-arch binary in the foreign-arch image).
@@ -2271,7 +2337,10 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
   The gapless part is true (nothing hard-deletes `messages`, `channels` or `users`, so no cascade reaches it) but it is not why it was latent: SQLite only takes the renumbering branch for a table with no indices at all, and `messages` carries four, so a plain VACUUM leaves its rowids alone regardless of gaps. `VACUUM INTO` never renumbers at all, which the earlier note had backwards.
   So this was never a repair, it was withdrawing a licence SQLite reserves and does not currently exercise, which is the same argument `0015_canvas_rtree.sql` made for the R-Tree.
 
-- **Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.
+- ~~**Deploy the invite gate.** The live instance at `https://slim.npc-server.top` still accepts anonymous registration and will until it runs a build containing the gate. Watchtower tracks `latest`, so cutting a release is what closes it; nothing else needs doing on the host.~~
+  Closed long ago, struck 2026-08-11, and this is the worst thing this sweep found: an entry telling every reader the owner's live deployment was open to anyone who knew its address, when it has not been since server 0.9.0.
+  `GET https://slim.npc-server.top/version` answers `"version":"0.35.0"` with `"invite_required":true`, and `Store::register_account` (`store/sessions.rs`) reads the join policy inside the account-insert transaction and returns `RegisterError::InviteRequired` for a claimed deployment with no code.
+  Nothing had to be done on the host; Watchtower did exactly what this entry said it would, twenty-six minor versions ago, and nobody came back to strike the line.
 - ~~**Watch the next release PR.** `release-please-config.json` gained the `cargo-workspace` plugin so a version bump also updates `Cargo.lock`, which the new `--locked` builds require. That is the one change in the audit pass that could not be verified locally, and its failure mode is a red release PR, not a bad release.~~ Stale: many server releases have shipped cleanly since, so this watched fine. The file it names is `release-please-config.server.json` now (split 2026-08-01, see the release-PR-conflict entry); the plugin itself is untouched.
 - **`bump-minor-pre-major` is why the server stays on 0.x.** PR #42 landed as `feat!` (registration genuinely changed behaviour for a claimed deployment), and release-please read the breaking marker on a 0.x project as "go to 1.0.0" and opened exactly that PR. It was closed unmerged. The flag makes a breaking change bump the minor while under 1.0, so that reads 0.9.0 instead. 1.0 is a Phase 9 deliverable and the product is not even named yet (owner decision 9), so nothing should reach it by accident.
 - **Adding Play internal testers needs the owner.** There is no Play Developer API credential anywhere: `~/.secrets/slim-m/` holds only the Firebase/FCM service account, which is scoped to messaging and cannot touch Play. Tester lists live in Play Console > Test and release > Testing > Internal testing > Testers, and each tester must then accept the opt-in link before the build appears for them.
@@ -2294,5 +2363,5 @@ The "Allow GitHub Actions to create and approve pull requests" repo setting was 
 - [docs/decisions/0004-visual-identity-review.md](docs/decisions/0004-visual-identity-review.md): the designer review that gated token lock. Read this before changing a token; it also closes the seven accent roles and settles the canvas `window` contradiction.
 - [docs/design/layout-explorations.md](docs/design/layout-explorations.md): the parked Spaces/Focus/Deck layout concepts (the sidebar layout was kept for v1, and the review confirms nothing needs reopening).
 - [docs/design/feature-exploration.md](docs/design/feature-exploration.md): the segment feature-gap analysis.
-- [docs/research/README.md](docs/research/README.md): an index over the 48-file, 11,000-line research corpus, added 2026-07-30/31 because nothing linked it and a reader could mistake a pre-implementation file for current state. Read that before `docs/research/` itself; it groups the corpus and says what each file is superseded by, if anything.
+- [docs/research/README.md](docs/research/README.md): an index over the ~~48-file, 11,000-line~~ (54-file, roughly 12,400-line, recounted 2026-08-11) research corpus, added 2026-07-30/31 because nothing linked it and a reader could mistake a pre-implementation file for current state. Read that before `docs/research/` itself; it groups the corpus and says what each file is superseded by, if anything.
 - Interactive design mockups were published as Claude artifacts (a design proposal and a layout-explorations page).
