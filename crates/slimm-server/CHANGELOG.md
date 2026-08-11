@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.37.0](https://github.com/NC1107/slim-m/compare/server-v0.36.0...server-v0.37.0) (2026-08-11)
+
+
+### Features
+
+* **client:** decrypt the sealed push preview on a locked iPhone ([#574](https://github.com/NC1107/slim-m/issues/574)) ([9a7ef9e](https://github.com/NC1107/slim-m/commit/9a7ef9e373e9f7854b62276f3a948f1013535229))
+
 ## [0.36.0](https://github.com/NC1107/slim-m/compare/server-v0.35.1...server-v0.36.0) (2026-08-11)
 
 
