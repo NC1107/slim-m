@@ -100,3 +100,17 @@ The Space usage analytics screen (`docs/decisions/0008-space-analytics.md`) need
 `fl_chart` and `syncfusion_flutter_charts` were the two real candidates, and both were rejected on the same grounds this project already used for the Voice Canvas and the speaking ring: a small, bespoke drawing is a `CustomPainter`, not a dependency, and this is three bar charts, not a dashboard toolkit.
 `fl_chart` alone would have pulled in real weight (its own gesture, tooltip, and legend machinery) for a screen with no gestures, no legend, and one visible series each.
 `AnalyticsBarChart` (`client/packages/app/lib/src/widgets/analytics_bar_chart.dart`) is under 100 lines and is reused for all three series rather than growing a chart type per series.
+
+### `window_manager`, `tray_manager` and `screen_retriever`, for the desktop window shell
+
+`docs/decisions/0012-desktop-window-shell.md` designs the startup animation, close-to-tray and the frameless title bar; these three are what it recommends and why, restated here since a manifest comment is capped at two lines.
+
+All three are published by `leanflutter.dev`, a verified pub.dev publisher, actively maintained, and none bundles a native capturer the way `flutter_soloud` did for the notification-sound slice - the shape this project's own screen-share segfault-on-Wayland trap came from and now checks for on every new native plugin.
+Each wraps system APIs already linked into the app rather than compiling anything new in: GTK/GDK on Linux (`window_manager`), Win32 (both, once Windows is scaffolded), AppKit (both, once macOS is scaffolded), and `libayatana-appindicator3` for the Linux tray icon, which is why the Linux build-dependency lists in `main-builds.yml`, `client-ci.yml` and `release.yml` all gained `libayatana-appindicator3-dev` alongside this change.
+
+`bitsdojo_window` was rejected: it solves the identical frameless/drag/resize problem `window_manager`'s own `setAsFrameless()`/`startDragging()` already solve, and this project already declines to carry two packages doing one job (one `AudioPlayer` instance rather than a pool, one bar-chart `CustomPainter` rather than a charting library, above).
+`system_tray` was rejected too: an older, separately-authored `tray_manager` alternative with no reason to prefer it once `tray_manager` already shares a publisher and an idiom family with the window package this pass already chose.
+
+Writing the window and tray plumbing from scratch was considered and rejected, on the inverse of the FFI-versus-system-library reasoning above: these three are not a bundled native capturer needing compiling, they are thin wrappers over real, already-linked system libraries, so reimplementing three platform-specific window backends plus a D-Bus tray protocol buys nothing a maintained package does not already give.
+One piece stayed hand-written anyway: the Linux tray-availability probe (`linux/runner/linux_tray_probe_channel.cc`), a single `org.kde.StatusNotifierWatcher` D-Bus property read.
+Pulling in a general-purpose Dart D-Bus package for one boolean is heavier than the job needs when GDBus is already linked into the app via GTK/GIO, and this project already has the identical precedent in this same directory: `clipboard_image_channel.cc`, a roughly-90-line hand-written channel bridging one narrow piece of GTK/glib functionality no package covers.

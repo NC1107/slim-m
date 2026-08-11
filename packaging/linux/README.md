@@ -12,14 +12,17 @@ The runner locates `data/` and `lib/` relative to its own path, so the directory
 ## What it needs from the system
 
 GTK 3, and the usual desktop graphics stack, come from your distribution.
-Four libraries are opened by name at runtime rather than linked, so a missing one fails only when you reach the feature rather than at startup:
+The first four libraries below are opened by name at runtime rather than linked, so a missing one fails only when you reach the feature rather than at startup.
+The tarball has no dependency mechanism of its own to declare any of the rest, unlike the rpm below, so the app simply refuses to start if one of those is missing:
 
 | Library | Missing means |
 |---|---|
 | `libGL.so.1`, `libEGL.so.1` | the window never renders |
 | `libpulse.so.0`, `libasound.so.2` | no microphone or speaker in a call |
 | `libpipewire-0.3.so.0` | no screen share |
-| `libsecret-1.so.0` | this one is linked, so the app will not start without it |
+| `libsecret-1.so.0` | linked, so the app will not start without it |
+| `libgstreamer-1.0.so.0`, `libgstapp-1.0.so.0` (GStreamer, the audio backend) | linked, so the app will not start without it |
+| `libayatana-appindicator3.so.1` (the tray icon) | linked, so the app will not start without it |
 
 Screen share also needs `xdg-desktop-portal` running, and a remembered sign-in needs a Secret Service provider (gnome-keyring, KWallet, KeePassXC).
 

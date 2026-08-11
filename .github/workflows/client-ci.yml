@@ -95,7 +95,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libayatana-appindicator3-dev
 
       - name: set up flutter (stable channel)
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -110,6 +111,46 @@ jobs:
       - name: linux compiles
         working-directory: client/packages/app
         run: flutter build linux --release
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: linux-desktop-shell-smoke-bundle
+          path: client/packages/app/build/linux/x64/release/bundle
+          if-no-files-found: error
+
+  # decision 0012's own substitute for "does the desktop window shell run at
+  # all": starts the real release binary under Xvfb (a virtual, off-screen X
+  # server on this runner, never a real display) and checks its own claims
+  # about default geometry, saved geometry, and close no longer terminating
+  # the process. What this can and cannot prove is in the decision record's
+  # own "the constraint that shapes everything else" section - it is not a
+  # substitute for the owner confirming the feature on his own desktop.
+  linux-desktop-shell-smoke:
+    name: linux desktop shell smoke (Xvfb)
+    needs: [linux-compiles]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: linux-desktop-shell-smoke-bundle
+          path: bundle
+
+      # linux-compiles builds with -dev packages on its own runner; this job only downloads the binary, so it needs the matching runtime libs named explicitly.
+      - name: xvfb, window-manipulation tools, and the binary's runtime libs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb fluxbox wmctrl xdotool libgl1-mesa-dri mesa-utils \
+            libgtk-3-0 libsecret-1-0 libgstreamer1.0-0 \
+            libgstreamer-plugins-base1.0-0 libayatana-appindicator3-1
+
+      - name: chmod the downloaded binary
+        run: chmod +x bundle/slimm_app
+
+      - name: run the smoke script
+        run: scripts/desktop-shell-smoke.sh "$(pwd)/bundle"
 
   # The iOS half lives in client-ios-ci.yml. It costs 14 minutes on a macOS
   # runner against 5 for everything here, so it is gated on the paths that can
