@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Push notification triggering: turns a new message into (at most) one
-//! content-free wake per idle recipient, without ever slowing down or failing
-//! the send that triggered it.
+//! Push notification triggering: turns a new message into (at most) one wake
+//! per idle recipient, without ever slowing down or failing the send that
+//! triggered it.
+//!
+//! What that wake carries is [`envelope`]'s subject, and the short version is
+//! that the relay can read none of it either way: a device that asked for
+//! message content gets a preview sealed to its own key, and every other
+//! device gets the same content-free envelope it always did.
 //!
 //! [`PushSender`] is deliberately a first-class two-state thing rather than an
 //! error path. `SLIMM_PUSH_RELAY_URL` and `SLIMM_PUSH_RELAY_KEY` are both
@@ -157,9 +162,14 @@ impl PushSender {
 }
 
 /// What [`PushSender::notify_message`] needs to know about a message that was
-/// just committed, bundled rather than five positional arguments: `content`
-/// is read only to resolve `@`-mentions for [`message_recipients`]'s thread
-/// narrowing, and is never itself put on the wire to a relay.
+/// just committed, bundled rather than five positional arguments.
+///
+/// `content` is read to resolve `@`-mentions for [`message_recipients`]'s
+/// thread narrowing, and, for a device that asked for it, to build the preview
+/// sealed inside that device's own envelope. It is never put on the wire in a
+/// form the relay can read: a preview only ever exists inside the sealed box,
+/// which is why this is a per-device choice at all rather than a deployment
+/// one. See [`envelope`]'s module docs.
 pub struct SentMessage {
     pub channel_id: ChannelId,
     pub author_id: UserId,
@@ -249,7 +259,15 @@ async fn deliver(enabled: Arc<Enabled>, debounce: Arc<Debounce>, store: Store, s
         return;
     }
 
-    let messages = envelope::seal_for_message(channel_id, message_id, seq, &targets);
+    // Only when a device actually asked, so nobody opting in costs nothing.
+    let preview = if targets.iter().any(|target| target.include_content) {
+        message_preview(&store, channel_id, author_id, &content).await
+    } else {
+        None
+    };
+
+    let messages =
+        envelope::seal_for_message(channel_id, message_id, seq, preview.as_ref(), &targets);
 
     // Nothing sealed means nothing was attempted, so release; see the note on
     // this function.
@@ -319,6 +337,48 @@ async fn deliver(enabled: Arc<Enabled>, debounce: Arc<Debounce>, store: Store, s
             }
         }
     }
+}
+
+/// The sender and channel names a content-carrying envelope needs, resolved
+/// once for the whole batch.
+///
+/// One preview serves every recipient because none of it is per-viewer:
+/// blocking is already settled further up ([`message_recipients`] drops a
+/// blocked author's recipients outright rather than filtering their
+/// notification afterwards), and a display name and channel name are the same
+/// for everybody who can see the message at all.
+///
+/// `None` on any failure, and on an author or channel that no longer resolves:
+/// the envelope simply goes out content-free, which is exactly what every
+/// device got before this existed. A preview is a nicety, and it must never be
+/// the reason somebody is not woken at all.
+async fn message_preview(
+    store: &Store,
+    channel_id: ChannelId,
+    author_id: UserId,
+    content: &str,
+) -> Option<envelope::MessagePreview> {
+    let author = match store.user_profile(author_id).await {
+        Ok(Some(author)) => author,
+        Ok(None) => return None,
+        Err(err) => {
+            tracing::warn!(error = %err, "push: failed to resolve the author for a preview");
+            return None;
+        }
+    };
+    // A DM's and a thread's channel row both carry an empty name by design.
+    let channel_name = match store.channel(channel_id).await {
+        Ok(channel) => channel.map(|c| c.name).unwrap_or_default(),
+        Err(err) => {
+            tracing::warn!(error = %err, "push: failed to resolve the channel for a preview");
+            return None;
+        }
+    };
+    Some(envelope::MessagePreview::new(
+        &author.display_name,
+        &channel_name,
+        content,
+    ))
 }
 
 /// True if a device's most recent lifecycle report says foreground and that

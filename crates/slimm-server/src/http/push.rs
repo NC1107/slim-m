@@ -26,6 +26,7 @@ use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
 use crate::notifications::NotificationPreference;
 use crate::ratelimit::Class;
+use crate::store::PushRegistration;
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -53,6 +54,17 @@ struct RegisterRequest {
     voip_push_token: Option<String>,
     /// The device's X25519 public key, base64-encoded (32 bytes decoded).
     push_public_key: String,
+    /// Whether this device wants a preview of the message sealed inside its
+    /// own envelope. Absent means no, so a client that predates this field
+    /// keeps getting exactly the content-free envelope it was built for.
+    ///
+    /// Device-scoped, unlike the account-wide notification preference below:
+    /// this decides what appears on one physical device's lock screen, so a
+    /// personal phone and a shared tablet on the same account can answer
+    /// differently. It never changes *whether* a device is woken, only what
+    /// its own envelope carries, and the relay can read neither answer.
+    #[serde(default)]
+    include_content: bool,
 }
 
 #[derive(Deserialize)]
@@ -100,10 +112,13 @@ async fn register(
         .register_push(
             ctx.user_id,
             ctx.device_id,
-            &req.platform,
-            push_token,
-            voip_push_token,
-            &public_key,
+            PushRegistration {
+                platform: &req.platform,
+                push_token,
+                voip_push_token,
+                push_public_key: &public_key,
+                include_content: req.include_content,
+            },
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)

@@ -41,6 +41,35 @@ pub struct PushTarget {
     pub push_public_key: Vec<u8>,
     pub lifecycle_state: Option<String>,
     pub lifecycle_reported_at: Option<i64>,
+    /// Whether this device asked for message content inside the sealed
+    /// envelope. Per device rather than per account, because the lock screen
+    /// it decides the contents of belongs to one physical device. Never
+    /// widens who is pushed at all: it only changes what a device that was
+    /// already going to be woken finds inside its own envelope.
+    pub include_content: bool,
+}
+
+/// What one device is registering: everything about the registration itself,
+/// as against the two ids that say whose it is.
+///
+/// A parameter object rather than five more positional arguments, which would
+/// put [`Store::register_push`] past this project's seven-parameter limit and,
+/// worse, leave two adjacent `&str`s (`platform` and `push_token`) and two
+/// adjacent booleans-or-options that a call site could silently transpose.
+/// Not `Debug`: `push_token` and `voip_push_token` must never be logged.
+pub struct PushRegistration<'a> {
+    /// "ios" or "android"; validated at the route, not here.
+    pub platform: &'a str,
+    pub push_token: &'a str,
+    pub voip_push_token: Option<&'a str>,
+    /// The device's X25519 public key, 32 bytes.
+    pub push_public_key: &'a [u8],
+    /// The device's own answer to whether the sealed envelope should carry a
+    /// preview of the message. Re-stated on every registration rather than
+    /// living behind a separate route, so a device can never end up with a
+    /// stale answer it did not mean: the registration it sends is the whole of
+    /// what it is asking for.
+    pub include_content: bool,
 }
 
 impl Store {
@@ -67,17 +96,21 @@ impl Store {
         &self,
         user_id: UserId,
         device_id: DeviceId,
-        platform: &str,
-        push_token: &str,
-        voip_push_token: Option<&str>,
-        push_public_key: &[u8],
+        registration: PushRegistration<'_>,
     ) -> Result<(), PushError> {
+        let PushRegistration {
+            platform,
+            push_token,
+            voip_push_token,
+            push_public_key,
+            include_content,
+        } = registration;
         let mut tx = self.pool.begin().await?;
 
         sqlx::query!(
             "UPDATE devices
              SET platform = NULL, push_token_ref = NULL, voip_push_token_ref = NULL,
-                 push_public_key = NULL
+                 push_public_key = NULL, push_include_content = 0
              WHERE id != ? AND push_token_ref = ?",
             device_id,
             push_token
@@ -87,12 +120,14 @@ impl Store {
 
         let affected = sqlx::query!(
             "UPDATE devices
-             SET platform = ?, push_token_ref = ?, voip_push_token_ref = ?, push_public_key = ?
+             SET platform = ?, push_token_ref = ?, voip_push_token_ref = ?, push_public_key = ?,
+                 push_include_content = ?
              WHERE id = ? AND user_id = ?",
             platform,
             push_token,
             voip_push_token,
             push_public_key,
+            include_content,
             device_id,
             user_id
         )
@@ -117,7 +152,7 @@ impl Store {
         let affected = sqlx::query!(
             "UPDATE devices
              SET platform = NULL, push_token_ref = NULL, voip_push_token_ref = NULL,
-                 push_public_key = NULL
+                 push_public_key = NULL, push_include_content = 0
              WHERE id = ? AND user_id = ?",
             device_id,
             user_id
@@ -181,7 +216,8 @@ impl Store {
         // One batched query, built (no array binding in SQLite), the same shape roles_for_users uses.
         let mut builder = sqlx::QueryBuilder::new(
             "SELECT id, user_id, platform, push_token_ref, voip_push_token_ref, \
-                    push_public_key, lifecycle_state, lifecycle_reported_at \
+                    push_public_key, lifecycle_state, lifecycle_reported_at, \
+                    push_include_content \
              FROM devices \
              WHERE push_token_ref IS NOT NULL \
                AND push_public_key IS NOT NULL AND platform IS NOT NULL \
@@ -215,6 +251,7 @@ impl Store {
                     push_public_key: r.try_get("push_public_key")?,
                     lifecycle_state: r.try_get("lifecycle_state")?,
                     lifecycle_reported_at: r.try_get("lifecycle_reported_at")?,
+                    include_content: r.try_get::<i64, _>("push_include_content")? != 0,
                 })
             })
             .collect()
@@ -274,7 +311,7 @@ impl Store {
         sqlx::query!(
             "UPDATE devices
              SET platform = NULL, push_token_ref = NULL, voip_push_token_ref = NULL,
-                 push_public_key = NULL
+                 push_public_key = NULL, push_include_content = 0
              WHERE id = ? AND user_id = ? AND push_token_ref = ?",
             device_id,
             user_id,

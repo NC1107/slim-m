@@ -18,7 +18,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::UserId;
-use slimm_server::store::Store;
+use slimm_server::store::{PushRegistration, Store};
 use sqlx::SqlitePool;
 
 mod support;
@@ -49,9 +49,19 @@ async fn a_device_is_listed_exactly_when_it_is_pushable() {
     let (s, pool, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let session = s.open_session(alice.id, "phone").await.unwrap();
-    s.register_push(alice.id, session.device_id, "ios", "token", None, &KEY)
-        .await
-        .unwrap();
+    s.register_push(
+        alice.id,
+        session.device_id,
+        PushRegistration {
+            platform: "ios",
+            push_token: "token",
+            voip_push_token: None,
+            push_public_key: &KEY,
+            include_content: false,
+        },
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         liveness(&s, alice.id, session.device_id).await,
@@ -79,9 +89,19 @@ async fn revoking_a_session_agrees_across_both_reads() {
     let (s, _pool, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let session = s.open_session(alice.id, "phone").await.unwrap();
-    s.register_push(alice.id, session.device_id, "ios", "token", None, &KEY)
-        .await
-        .unwrap();
+    s.register_push(
+        alice.id,
+        session.device_id,
+        PushRegistration {
+            platform: "ios",
+            push_token: "token",
+            voip_push_token: None,
+            push_public_key: &KEY,
+            include_content: false,
+        },
+    )
+    .await
+    .unwrap();
     assert_eq!(liveness(&s, alice.id, session.device_id).await, (1, 1));
 
     s.remove_device(alice.id, session.device_id).await.unwrap();
@@ -101,9 +121,19 @@ async fn a_user_whose_only_device_is_dead_is_not_a_push_candidate() {
     let (s, pool, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let session = s.open_session(alice.id, "phone").await.unwrap();
-    s.register_push(alice.id, session.device_id, "ios", "token", None, &KEY)
-        .await
-        .unwrap();
+    s.register_push(
+        alice.id,
+        session.device_id,
+        PushRegistration {
+            platform: "ios",
+            push_token: "token",
+            voip_push_token: None,
+            push_public_key: &KEY,
+            include_content: false,
+        },
+    )
+    .await
+    .unwrap();
     assert_eq!(s.users_with_push_devices().await.unwrap(), vec![alice.id]);
 
     sqlx::query("UPDATE refresh_tokens SET expires_at = 0")

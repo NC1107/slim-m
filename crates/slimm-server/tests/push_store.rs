@@ -4,7 +4,7 @@
 
 use slimm_server::config::Config;
 use slimm_server::db;
-use slimm_server::store::{PushError, Store};
+use slimm_server::store::{PushError, PushRegistration, Store};
 
 mod support;
 
@@ -37,10 +37,13 @@ async fn register_is_scoped_to_the_callers_own_device() {
         .register_push(
             bob.id,
             alice_session.device_id,
-            "ios",
-            "bob-tries-alices-device",
-            None,
-            &KEY_A,
+            PushRegistration {
+                platform: "ios",
+                push_token: "bob-tries-alices-device",
+                voip_push_token: None,
+                push_public_key: &KEY_A,
+                include_content: false,
+            },
         )
         .await;
     assert!(matches!(forged, Err(PushError::NotFound)));
@@ -52,10 +55,13 @@ async fn register_is_scoped_to_the_callers_own_device() {
     s.register_push(
         alice.id,
         alice_session.device_id,
-        "ios",
-        "alices-real-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "alices-real-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -69,10 +75,13 @@ async fn register_is_scoped_to_the_callers_own_device() {
         .register_push(
             bob.id,
             alice_session.device_id,
-            "android",
-            "bob-overwrite-attempt",
-            None,
-            &KEY_B,
+            PushRegistration {
+                platform: "android",
+                push_token: "bob-overwrite-attempt",
+                voip_push_token: None,
+                push_public_key: &KEY_B,
+                include_content: false,
+            },
         )
         .await;
     assert!(matches!(forged_again, Err(PushError::NotFound)));
@@ -92,10 +101,13 @@ async fn deregister_is_scoped_to_the_callers_own_device() {
     s.register_push(
         alice.id,
         alice_session.device_id,
-        "ios",
-        "alices-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "alices-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -121,10 +133,13 @@ async fn report_lifecycle_is_scoped_to_the_callers_own_device() {
     s.register_push(
         alice.id,
         alice_session.device_id,
-        "ios",
-        "alices-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "alices-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -156,10 +171,13 @@ async fn a_device_that_never_registered_is_never_a_push_target() {
     s.register_push(
         bob.id,
         bob_session.device_id,
-        "android",
-        "bobs-token",
-        None,
-        &KEY_B,
+        PushRegistration {
+            platform: "android",
+            push_token: "bobs-token",
+            voip_push_token: None,
+            push_public_key: &KEY_B,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -176,9 +194,19 @@ async fn clearing_a_dead_token_never_clobbers_a_fresher_registration() {
     let (s, _guard) = store().await;
     let alice = s.create_user("alice", "Alice").await.unwrap();
     let session = s.open_session(alice.id, "phone").await.unwrap();
-    s.register_push(alice.id, session.device_id, "ios", "token-v1", None, &KEY_A)
-        .await
-        .unwrap();
+    s.register_push(
+        alice.id,
+        session.device_id,
+        PushRegistration {
+            platform: "ios",
+            push_token: "token-v1",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
+    )
+    .await
+    .unwrap();
 
     // The relay eventually reports token-v1 unregistered and this clears it.
     s.clear_push_registration(alice.id, session.device_id, "token-v1")
@@ -187,9 +215,19 @@ async fn clearing_a_dead_token_never_clobbers_a_fresher_registration() {
     assert!(s.push_targets(&[alice.id]).await.unwrap().is_empty());
 
     // The device re-registers with a fresh token...
-    s.register_push(alice.id, session.device_id, "ios", "token-v2", None, &KEY_B)
-        .await
-        .unwrap();
+    s.register_push(
+        alice.id,
+        session.device_id,
+        PushRegistration {
+            platform: "ios",
+            push_token: "token-v2",
+            voip_push_token: None,
+            push_public_key: &KEY_B,
+            include_content: false,
+        },
+    )
+    .await
+    .unwrap();
     // ...and a stale report for the old token arriving late must not wipe it:
     // push_token_ref no longer matches token-v1, so this is a no-op.
     s.clear_push_registration(alice.id, session.device_id, "token-v1")
@@ -214,10 +252,13 @@ async fn clear_push_registration_is_scoped_to_the_owning_device_not_the_bare_tok
     s.register_push(
         alice.id,
         alice_session.device_id,
-        "ios",
-        "alices-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "alices-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -245,10 +286,13 @@ async fn a_logged_out_device_receives_nothing() {
     s.register_push(
         alice.id,
         session.device_id,
-        "ios",
-        "alices-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "alices-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -276,10 +320,13 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
     s.register_push(
         alice.id,
         first_login.device_id,
-        "ios",
-        "phones-real-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "phones-real-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -291,10 +338,13 @@ async fn repeated_logins_do_not_produce_duplicate_targets_for_one_physical_devic
     s.register_push(
         alice.id,
         second_login.device_id,
-        "ios",
-        "phones-real-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "phones-real-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -321,10 +371,13 @@ async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out
     s.register_push(
         alice.id,
         first_login.device_id,
-        "ios",
-        "phones-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "phones-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -333,10 +386,13 @@ async fn registering_a_token_on_a_new_login_reclaims_it_even_without_logging_out
     s.register_push(
         alice.id,
         second_login.device_id,
-        "ios",
-        "phones-token",
-        None,
-        &KEY_B,
+        PushRegistration {
+            platform: "ios",
+            push_token: "phones-token",
+            voip_push_token: None,
+            push_public_key: &KEY_B,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -359,10 +415,13 @@ async fn a_token_reassigned_to_a_different_account_stops_reaching_the_old_one() 
     s.register_push(
         alice.id,
         alice_session.device_id,
-        "ios",
-        "shared-token",
-        None,
-        &KEY_A,
+        PushRegistration {
+            platform: "ios",
+            push_token: "shared-token",
+            voip_push_token: None,
+            push_public_key: &KEY_A,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
@@ -372,10 +431,13 @@ async fn a_token_reassigned_to_a_different_account_stops_reaching_the_old_one() 
     s.register_push(
         bob.id,
         bob_session.device_id,
-        "ios",
-        "shared-token",
-        None,
-        &KEY_B,
+        PushRegistration {
+            platform: "ios",
+            push_token: "shared-token",
+            voip_push_token: None,
+            push_public_key: &KEY_B,
+            include_content: false,
+        },
     )
     .await
     .unwrap();
