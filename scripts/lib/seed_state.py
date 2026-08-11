@@ -106,7 +106,17 @@ class SeedState:
         """Drops a deleted message so it is never targeted again - by a
         later `random_own_message`/`random_top_message` draw, or by the
         settle pass reading its own fixed `newest_top_messages` snapshot,
-        which would otherwise 404 reacting to or replying on it."""
+        which would otherwise 404 reacting to or replying on it.
+
+        A poll is a message too (`handle_send_poll` records it as both a
+        top message and a poll under the same id), so a deleted poll needs
+        the identical treatment in `_polls`/`_poll_voters` or it stays
+        reachable to `random_unvoted_poll`/`newest_polls` after the message
+        behind it is gone - every vote against it then 404s, silently
+        burning the action budget `vote_poll` and the settle pass's own
+        guaranteed round both spend trying to reach a poll left standing
+        only in this state, never on the server.
+        """
         with self._lock:
             pool = self._own_messages.get(author)
             if pool:
@@ -114,6 +124,8 @@ class SeedState:
                     m for m in pool if m["id"] != message_id]
             self._top_messages = [
                 m for m in self._top_messages if m["id"] != message_id]
+            self._polls = [p for p in self._polls if p["id"] != message_id]
+            self._poll_voters.pop(message_id, None)
 
     def random_unvoted_poll(self, rng, username):
         """A poll `username` has not yet voted on, or `None`.
@@ -150,6 +162,19 @@ class SeedState:
     def has_poll(self):
         with self._lock:
             return bool(self._polls)
+
+    def has_unvoted_poll(self, username):
+        """Whether `username` still has a poll left to vote on.
+
+        Finer than `has_poll`: once every existing poll has this account's
+        vote, `has_poll` stays true forever while there is nothing left for
+        `vote_poll` to actually do for them - see `resolve_action`'s own
+        precondition, which needs this narrower answer rather than the
+        deployment-wide one.
+        """
+        with self._lock:
+            return any(username not in self._poll_voters.get(p["id"], ())
+                        for p in self._polls)
 
     def newest_top_messages(self, count):
         """A fixed snapshot of the newest `count` top-level messages.
