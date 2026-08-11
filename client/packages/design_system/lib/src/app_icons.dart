@@ -232,4 +232,8 @@ abstract final class AppIcons {
   static const IconData windowMaximize = LucideIcons.maximize2300;
   static const IconData windowRestore = LucideIcons.copy300;
   static const IconData windowClose = LucideIcons.x300;
+
+  /// The title bar's own quit item - a real exit reachable with no tray, see
+  /// `window_menu_button.dart`'s own doc comment for why it has to exist.
+  static const IconData windowQuit = LucideIcons.power300;
 }

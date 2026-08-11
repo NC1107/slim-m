@@ -3,12 +3,14 @@
 # server on a CI runner - never this developer's own display) and checks
 # decision 0012's own claims: the window appears, a fresh launch matches the
 # documented default size, a saved geometry changes the next launch's size,
-# a close request no longer terminates the process, and a second launch
-# hands off to the first rather than spawning its own window. See
-# docs/decisions/0012-desktop-window-shell.md for what this can and cannot
-# prove; the caller must run this under a real D-Bus session bus (see
-# client-ci.yml's dbus-run-session wrapper) or the last check below is
-# meaningless, since GApplication's own single-instance activation needs one.
+# a close request no longer terminates the process, a second launch hands
+# off to the first rather than spawning its own window, and - see below -
+# a real quit still exists and works even though this bus has no tray host
+# at all. See docs/decisions/0012-desktop-window-shell.md for what this can
+# and cannot prove; the caller must run this under a real D-Bus session bus
+# (see client-ci.yml's dbus-run-session wrapper) or the last two checks
+# below are meaningless, since GApplication's own single-instance activation
+# needs one.
 #
 # There is no org.kde.StatusNotifierWatcher on this bus - fluxbox is a plain
 # window manager, not a full desktop shell - so the close path here always
@@ -16,7 +18,14 @@
 # assertion checks the window is still listed by wmctrl after close, not only
 # that the process is still alive: both branches leave the process running,
 # so liveness alone cannot tell a correct fallback from a wrongly hidden,
-# unreachable window.
+# unreachable window. That also makes this the one job that structurally
+# takes the no-tray path on every run, which is exactly the path a real quit
+# had gone missing on: the only "Quit slim-m" anywhere used to live in the
+# tray menu, and that menu is never rendered with no host to display it. The
+# final group below drives Ctrl+Q - a real key event, not a semantics-tree
+# interaction this harness has no accessibility bridge to drive - and checks
+# the process actually exits, closing the loop this file's own close-request
+# group deliberately leaves open (the window staying reachable, not quit).
 set -euo pipefail
 
 BUNDLE="${1:?usage: desktop-shell-smoke.sh <bundle-dir>}"
@@ -142,4 +151,20 @@ if ! kill -0 "$APP_PID" 2>/dev/null; then
   exit 1
 fi
 echo "the second launch exited after handing off, exactly one window remains, and it is still the original process's"
+echo "::endgroup::"
+
+echo "::group::Ctrl+Q quits for real, with no tray host reachable on this bus at all"
+xdotool windowactivate "$(window_id)"
+sleep 1
+xdotool key --clearmodifiers ctrl+q
+waited=0
+while kill -0 "$APP_PID" 2>/dev/null; do
+  sleep 0.5
+  waited=$((waited + 1))
+  if [ "$waited" -ge 20 ]; then
+    echo "::error::the process is still running 10s after Ctrl+Q; there is still no way to quit with no tray"
+    exit 1
+  fi
+done
+echo "Ctrl+Q ended the process - a real quit path with no tray menu to hold the only one"
 echo "::endgroup::"
