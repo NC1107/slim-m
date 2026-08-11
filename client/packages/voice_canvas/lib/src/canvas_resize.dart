@@ -37,6 +37,15 @@ const double minObjectSize = 8.0;
 /// cursor can land on zoomed out.
 const double resizeHandleHitRadius = 14.0;
 
+/// [resizeHandleHitRadius]'s touch counterpart: a 28px-diameter hit circle
+/// is well under this product's own 44-48dp touch-target floor
+/// (`docs/design/design-language.md`), disproportionately hard to land on a
+/// specific corner at low zoom where the visual square shrinks toward the
+/// hit radius's own size. 22 gives a 44px target, matching the floor
+/// exactly; precision is cheap on a mouse or trackpad, so that input class
+/// keeps the tighter default.
+const double touchResizeHandleHitRadius = 22.0;
+
 /// The square handle's drawn side length, in logical pixels, painted at a
 /// fixed screen size regardless of zoom - the same reason
 /// [resizeHandleHitRadius] is a screen quantity.
@@ -80,15 +89,17 @@ Map<ResizeCorner, Offset> resizeHandleCorners(
         corner: _cornerOf(bounds, corner)
     };
 
-/// Which corner of [bounds], if any, [world] lands within
-/// [resizeHandleHitRadius] screen pixels of, given the camera's current
-/// [zoom].
+/// Which corner of [bounds], if any, [world] lands within [hitRadius]
+/// screen pixels of, given the camera's current [zoom]. [hitRadius]
+/// defaults to [resizeHandleHitRadius]; a caller on a touch surface should
+/// pass [touchResizeHandleHitRadius] instead.
 ResizeCorner? hitTestResizeHandle(
   ({double x, double y, double w, double h}) bounds,
   Offset world,
-  double zoom,
-) {
-  final worldRadius = resizeHandleHitRadius / zoom;
+  double zoom, {
+  double hitRadius = resizeHandleHitRadius,
+}) {
+  final worldRadius = hitRadius / zoom;
   for (final corner in ResizeCorner.values) {
     if ((world - _cornerOf(bounds, corner)).distance <= worldRadius) {
       return corner;

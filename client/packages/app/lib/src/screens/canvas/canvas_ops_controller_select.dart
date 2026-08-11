@@ -82,6 +82,7 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
     Offset world, {
     required bool manageCanvas,
     required String? selfId,
+    bool touch = false,
   }) {
     final selected = document.selectedObjectId.value;
     if (selected != null &&
@@ -89,7 +90,12 @@ extension CanvasOpsControllerSelect on CanvasOpsController {
       final owns = manageCanvas || document.authorIdOf(selected) == selfId;
       final bounds = document.objectBounds(selected);
       if (owns && bounds != null && !_isDeepInterior(bounds, world)) {
-        final corner = hitTestResizeHandle(bounds, world, document.camera.zoom);
+        final corner = hitTestResizeHandle(
+          bounds,
+          world,
+          document.camera.zoom,
+          hitRadius: touch ? touchResizeHandleHitRadius : resizeHandleHitRadius,
+        );
         if (corner != null) {
           _resize = _ResizeState(selected, corner, bounds);
           document.elevatedObjectId.value = selected;

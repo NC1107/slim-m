@@ -11,12 +11,12 @@ Copy was checked against its real call site and against server behaviour, not ju
 
 ## The short version
 
-- The background grid never paints in the real app, in any of the 39 assembled screenshots, though it paints correctly in every isolated painter fixture - a one-widget regression the isolation harness cannot see.
-- The clear-canvas confirmation says "This cannot be undone" while the same client arms a working local undo for that exact action, found independently by two different backend passes (this one and the overlays review) and read as fine by the UX pass on copy grounds alone.
-- The overflow menu truncates "Paste image" to "Paste i…" and "Hide my camera bubble" to "Hide my camera bu…", found independently by the frontend and UX lenses.
-- The canvas loading state shows a sighted user nothing at all - no spinner, no skeleton - identical to a blank or broken canvas, while a screen reader gets a label.
-- A resize handle's hit target is 28px across, well under this product's own 44-48dp floor, and never grows for touch.
-- Two forbidden-drawing error states (channel-wide refusal, timeout freeze) leave the empty-state hint and the pen tool inviting a repeat of a refusal the client already knows will fail again.
+- The background grid never paints in the real app, in any of the 39 assembled screenshots, though it paints correctly in every isolated painter fixture - a one-widget regression the isolation harness cannot see. **Still open** - not attempted in this pass.
+- ~~The clear-canvas confirmation says "This cannot be undone" while the same client arms a working local undo for that exact action, found independently by two different backend passes (this one and the overlays review) and read as fine by the UX pass on copy grounds alone.~~ Fixed 2026-08-10.
+- ~~The overflow menu truncates "Paste image" to "Paste i…" and "Hide my camera bubble" to "Hide my camera bu…", found independently by the frontend and UX lenses.~~ Fixed 2026-08-10.
+- ~~The canvas loading state shows a sighted user nothing at all - no spinner, no skeleton - identical to a blank or broken canvas, while a screen reader gets a label.~~ Fixed 2026-08-10.
+- ~~A resize handle's hit target is 28px across, well under this product's own 44-48dp floor, and never grows for touch.~~ Fixed 2026-08-10.
+- Two forbidden-drawing error states (channel-wide refusal, timeout freeze) leave the empty-state hint and the pen tool inviting a repeat of a refusal the client already knows will fail again. **Partially fixed 2026-08-10**: the empty-state hint is gated and the timeout wording no longer overstates the freeze as a generic outage; the pen tool itself is still not gated by `widget.error`, and the timeout wording still does not name the actual timeout time. See the sections below.
 
 ## Background grid lattice never paints in the assembled pane
 
@@ -39,6 +39,8 @@ Verdict: real, high-confidence, high severity, and the single most important fin
 
 ## Clear-canvas confirmation contradicts its own undo
 
+Fixed 2026-08-10, per the "Fix" line below: the dialog no longer claims permanence and now names Undo directly ("You can undo this with Undo until you close the canvas or take many more actions.").
+
 Verdict: high severity, source-confirmed contradiction, found twice from two different directions.
 
 - The confirm text, read verbatim from `canvas_overflow_menu.dart:152-153`: "This removes all N objects from the canvas for everyone in this channel. **This cannot be undone.**"
@@ -59,6 +61,8 @@ Verdict: high severity, source-confirmed contradiction, found twice from two dif
 - Severity: high.
 
 ## Canvas overflow menu truncates two of its own labels
+
+Fixed 2026-08-10, the widen-it option from the "Fix" line below: `width: 200` is now `width: 280`, wide enough to fit "Hide my camera bubble" without truncating; the shortcut hint was left in place rather than dropped.
 
 Verdict: real, easily reproduced, found independently by two lenses.
 
@@ -82,28 +86,31 @@ Verdict: both messages match a real server refusal, but in both cases the rest o
   So the pane simultaneously says "the canvas is not available in this channel" and invites the same person, in the same screen, to "Draw with the pen, drop a note or a shape, or paste an image" (`canvas_pane_body.dart:452-454`), pen tool shown active.
   Any attempt through that CTA hits the identical `VIEW_CHANNEL | USE_CANVAS` gate on the write route (`canvas_write.rs:132-133`) and fails the same way, since nothing about the permission state changed between the two calls.
   Evidence: `canvas-error-forbidden-desktop-1400-dark.png`.
-- `'You cannot draw on this canvas right now.'` is the shared `ForbiddenException` mapping in `canvas_commit_queue.dart:182`, `canvas_quick_placement.dart:122` and `canvas_image_paste.dart:166` - all three `place`-path callers, exactly the scope CLAUDE.md documents for the timeout freeze (`move`/`reorder` freeze the same way; `remove`/`clear`/`restore` never do).
+  Partially fixed 2026-08-10: the empty-state hint is now gated on `widget.error == null`, so it no longer invites drawing while this exact banner is up. The tool row and the dock are still not gated on `widget.error` - the pen tool remains selectable and would still hit the same refusal.
+- ~~`'You cannot draw on this canvas right now.'` is the shared `ForbiddenException` mapping in `canvas_commit_queue.dart:182`, `canvas_quick_placement.dart:122` and `canvas_image_paste.dart:166`~~ - all three `place`-path callers, exactly the scope CLAUDE.md documents for the timeout freeze (`move`/`reorder` freeze the same way; `remove`/`clear`/`restore` never do).
   The wording never overstates the freeze to cover erase or undo.
-- Finding (high, UX lens): the message gives no indication it is a timeout specifically.
+- ~~Finding (high, UX lens): the message gives no indication it is a timeout specifically.
   A person on a channel timeout has no way to distinguish "I'm timed out" from "this channel doesn't allow drawing" from "something's broken."
   The client already fetches `timedOutUntil` on a `UserProfile` and renders it elsewhere (`member_profile.dart`), so the data exists in the product even though this call site does not have it wired up.
-  Minimum fix without new plumbing: reword to read unambiguously as a permission state rather than a transient outage, e.g. "You don't have permission to draw here right now."
-  Better fix: when `timedOutUntil` is known and in the future, say so plainly - "You're on a timeout in this channel until \<time\>, so you can't draw."
-  This is the one error the review brief flagged by name as needing to not look like a defect, and today it can read as one.
+  Minimum fix without new plumbing: reword to read unambiguously as a permission state rather than a transient outage, e.g. "You don't have permission to draw here right now."~~
+  Minimum fix applied 2026-08-10, verbatim: all three call sites now read "You don't have permission to draw here right now."
+  The better fix - naming the actual timeout time - is not built; it needs new plumbing to fetch `timedOutUntil` at this call site, which the report itself flags as the harder half.
 - Finding (medium, same root cause as canvas-error-forbidden): this error is set via `CanvasCommitQueue.onFailed` (`canvas_pane_helpers.dart:33-38`), which calls `_document.kill(id)` before setting `_error`.
-  If the failed stroke was the only object drawn, `objectCount` returns to 0 and the empty-state hint reappears with the pen tool still selected, immediately after a banner saying the opposite.
-  A timed-out member who taps the still-live pen tool reaches the same 403 (`canvas_write.rs:135-137`) every time until the timeout expires; there is no server-side signal in the response that would let the client disable the tool proactively (`timed_out_until` is only ever asked at write time), so this specific gap can only be closed client-side - but the CTA should not be offered while the banner is up regardless.
+  ~~If the failed stroke was the only object drawn, `objectCount` returns to 0 and the empty-state hint reappears with the pen tool still selected, immediately after a banner saying the opposite.~~
+  The empty-state hint half is fixed 2026-08-10 (see Canvas loading state below: it is now gated on `widget.error == null`, alongside the loading-spinner fix).
+  The pen tool itself is not gated by `widget.error` and stays selectable; a timed-out member who taps it still reaches the same 403 every time until the timeout expires, since there is no server-side signal in the response that would let the client disable the tool proactively (`timed_out_until` is only ever asked at write time).
   Evidence: `canvas-error-draw-forbidden-timeout-freeze-desktop-1400-dark.png`.
 
 ## canvas-error-full-canvas / canvas-error-too-large
 
 Verdict: a genuine disagreement between lenses on the same sentence, plus one separate, smaller wording gap.
 
-- `'This canvas is full, or that id is taken.'` covers `ConflictException` from `PlaceError::ChannelFull` and `PlaceError::IdConflict` in one sentence (`canvas_write.rs:176-179`, `canvas_commit_queue.dart:182-183`).
+- ~~`'This canvas is full, or that id is taken.'` covers `ConflictException` from `PlaceError::ChannelFull` and `PlaceError::IdConflict` in one sentence (`canvas_write.rs:176-179`, `canvas_commit_queue.dart:182-183`).
   The backend lens calls this accurate and low severity: folding two distinct 409 reasons into one honest "or" sentence is correct to both, and the third `ConflictException` shape (`PlaceError::Removed`) is correctly split into a separate message rather than folded in here.
   The UX lens calls the same sentence a leaked internal detail and high severity: "that id is taken" names an implementation detail (an object-id collision) a viewer never typed and cannot act on, and it is the *only* one of three near-identical `ConflictException` handlers that says it this way - `canvas_quick_placement.dart:122` and `canvas_image_paste.dart:166` both already say the plain `'This canvas is full.'` for the same exception type.
   Recorded as a disagreement rather than resolved in this document: the sentence is technically accurate to two server states, and it is also the only one of three sibling call sites that exposes the id-collision half to the person reading it.
-  Given the shorter sentence is already proven copy two files over, the simplest fix - dropping the id-taken clause and matching the other two call sites - satisfies both readings, so it is worth doing regardless of which severity is credited.
+  Given the shorter sentence is already proven copy two files over, the simplest fix - dropping the id-taken clause and matching the other two call sites - satisfies both readings, so it is worth doing regardless of which severity is credited.~~
+  Fixed 2026-08-10, the simplest-fix reading: `canvas_commit_queue.dart` now says the plain `'This canvas is full.'`, matching the other two call sites.
   Severity: medium.
 - Finding (low, backend lens): `'That stroke was refused as too large.'` covers `BadRequestException` on the stroke path, which can only be `PlaceError::OutOfBounds` ("the object is outside the world or too large") or the `MAX_PROPS_BYTES` check ("canvas props are too large") - `canvas_write.rs:171-175` and `:146-148`.
   "Outside the world" is a materially different failure than "too large" (a correctly-sized stroke placed via a pan/zoom edge case could be rejected as out-of-bounds), and the message picks "too large" for both.
@@ -121,6 +128,8 @@ Verdict: text matches (an honest fallback for any non-forbidden `ApiException`),
 
 ## Canvas loading state
 
+Fixed 2026-08-10, per the "Fix" line below: a `CanvasLoadingHint` (split into `canvas_pane_hints.dart` alongside the empty-state hint once the body file crossed the 500-line hard ceiling) shows a small `CircularProgressIndicator` centred over the canvas while loading, gated the same `if (widget.loading) ... else if (count == 0 && widget.error == null) ...` way the empty hint already was. Under reduce motion it renders as a determinate, static ring (`value: 0.75`) rather than the usual spinning one - narrower than this project's general "leave platform spinners ticking" precedent, because this specific surface sits inside `HomeShell`'s wider canvas swap-in, which its own pre-existing test (`home_shell_canvas_test.dart`) already asserts settles to zero running animations under reduce motion.
+
 Verdict: real, and it lands on the signature feature's first impression.
 
 - `canvas-loading-desktop-1400-dark.png` is a flat, featureless rectangle with no spinner, skeleton, or any sighted-user indication the canvas is loading - pixel-identical, in the region that matters, to what a broken or blank canvas would look like.
@@ -136,9 +145,10 @@ Verdict: the overlap itself is a deliberate, documented tradeoff; two separate, 
 
 - `busy-desktop-1400-dark.png` (and every `busy-*` variant) shows Jordan's and Priya's avatar-only presence markers sitting directly on top of `note-callout`, blotting out roughly half of every line they cross.
   This is deliberate and already documented: `CanvasPresenceLayout` places call tiles in a fixed top-left row sorted by identity with no awareness of what is underneath, and the fixture's own doc comment says a real session has no way to know where bubbles will land before drawing - not a new finding, and not something a layout fix can safely undo.
-- Finding (medium, frontend lens): `_AvatarMarker`'s name caption (`canvas_presence_bubble.dart:59-126`) renders as plain text with only a drop shadow tuned for the plain canvas background, unlike the camera-tile `_NameBadge`, which sits on a translucent `surfaceBase` pill.
+- ~~Finding (medium, frontend lens): `_AvatarMarker`'s name caption (`canvas_presence_bubble.dart:59-126`) renders as plain text with only a drop shadow tuned for the plain canvas background, unlike the camera-tile `_NameBadge`, which sits on a translucent `surfaceBase` pill.
   Against a light note fill the shadow buys nothing and the label reads directly against the note's own text underneath it.
-  Since the overlap itself is accepted as unavoidable, the label should stay legible wherever it lands; fix by giving the caption the same translucent-pill background `_NameBadge` already uses.
+  Since the overlap itself is accepted as unavoidable, the label should stay legible wherever it lands; fix by giving the caption the same translucent-pill background `_NameBadge` already uses.~~
+  Fixed 2026-08-10, exactly that fix: the caption now sits on a `tokens.surfaceBase.withValues(alpha: 0.72)` pill, matching `_NameBadge`'s own treatment.
 - Finding (low-medium, UX lens): there is no way for a viewer to hide *other* participants' bubbles to read what is underneath one that is in the way.
   The overflow menu's "Hide my camera bubble" only affects the viewer's own bubble, and object z-order controls (send-to-back, confirmed working in `busy-desktop-1400-tile-sent-to-back-dark.png`) do not apply to presence bubbles at all.
   Workable today by asking the blocking person to move their own bubble; not self-serve for the person being blocked.
@@ -146,6 +156,8 @@ Verdict: the overlap itself is a deliberate, documented tradeoff; two separate, 
   Evidence: `busy-desktop-1400-dark.png`, `busy-desktop-1400-tiles-manipulated-dark.png`.
 
 ## Activity log (accessibility fallback)
+
+Fixed 2026-08-10, per the "Fix" line below: `CanvasActivityPanel` now renders "Activity from before you joined isn't shown here." when `objectCount > 0` and the log is empty.
 
 Verdict: the summary line and the log body contradict each other in the fixture, and the same shape can occur for a real user.
 
@@ -159,6 +171,8 @@ Verdict: the summary line and the log body contradict each other in the fixture,
 - Not independently checkable from this fixture: the actor-attribution asymmetry CLAUDE.md documents (catch-up discloses a moderator's identity to a `MANAGE_CANVAS` holder, live frames never carry one at all) has no populated entries in this screenshot to confirm against, so it is taken as read rather than re-verified here.
 
 ## Selection handles: resize hit target too small for touch
+
+Fixed 2026-08-10, per the "Fix" line below, verbatim: a new `touchResizeHandleHitRadius = 22.0` in `canvas_resize.dart`, and `canvas_pane_gestures.dart`'s `_onSelectStart` now passes `touch: AppTouchTargets.of(context)` through `beginSelect` to `hitTestResizeHandle`.
 
 Verdict: real, high severity, a core canvas manipulation rather than an edge case.
 

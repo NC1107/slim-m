@@ -22,43 +22,58 @@ String formatCallDuration(Duration d) {
   return '$seconds sec';
 }
 
+/// "Your last call" labels the card: without it, the card sat directly
+/// under the present-tense "Nobody is in this call yet." with nothing
+/// marking it as a summary of the call that just ended, not who is in it
+/// right now.
 class CallRecapCard extends StatelessWidget {
   const CallRecapCard({super.key, required this.recap});
 
   final CallRecap recap;
 
   @override
-  Widget build(BuildContext context) => AppCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _RecapStat(
-              icon: AppIcons.clock,
-              value: formatCallDuration(recap.duration),
-              label: 'in the call',
-            ),
-            const SizedBox(width: AppSpacing.s24),
-            _RecapStat(
-              icon: AppIcons.members,
-              value: '${recap.others.length}',
-              label: recap.others.length == 1 ? 'other person' : 'other people',
-            ),
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Your last call',
+            textAlign: TextAlign.center,
+            style: AppText.caption.copyWith(color: tokens.textDisabled),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _RecapStat(
+                icon: AppIcons.clock,
+                value: formatCallDuration(recap.duration),
+                label: 'in the call',
+              ),
+              const SizedBox(width: AppSpacing.s24),
+              _RecapStat(
+                icon: AppIcons.members,
+                value: '${recap.others.length}',
+                label: recap.others.length == 1
+                    ? 'other person'
+                    : 'other people',
+              ),
+            ],
+          ),
+          if (recap.sharedScreen || recap.usedCamera) ...[
+            const SizedBox(height: AppSpacing.s12),
+            _ActivityLine(recap: recap),
           ],
-        ),
-        if (recap.sharedScreen || recap.usedCamera) ...[
-          const SizedBox(height: AppSpacing.s12),
-          _ActivityLine(recap: recap),
+          if (recap.others.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s16),
+            _ParticipantList(others: recap.others),
+          ],
         ],
-        if (recap.others.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.s16),
-          _ParticipantList(others: recap.others),
-        ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _RecapStat extends StatelessWidget {

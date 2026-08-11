@@ -106,7 +106,7 @@ void main() {
       async.flushMicrotasks();
 
       expect(harness.failed, [
-        ('a', 'You cannot draw on this canvas right now.'),
+        ('a', "You don't have permission to draw here right now."),
       ]);
       expect(harness.placed, isEmpty);
     });
@@ -141,9 +141,11 @@ void main() {
       async.flushMicrotasks();
 
       expect(harness.removed, isEmpty);
-      expect(harness.failed, [
-        ('a', 'This canvas is full, or that id is taken.'),
-      ]);
+
+      /// Matches canvas_quick_placement.dart/canvas_image_paste.dart's own
+      /// ConflictException wording, dropping the id-collision detail nobody
+      /// typed and cannot act on.
+      expect(harness.failed, [('a', 'This canvas is full.')]);
     });
   });
 

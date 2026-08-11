@@ -46,29 +46,41 @@ void main() {
       await controller.leave();
     });
 
-    testWidgets('stays quiet for a share only requested, not live', (
-      tester,
-    ) async {
-      final session = FakeSession(
-        screenShareOutcome: ScreenShareOutcome.pendingBroadcast,
-      );
-      final controller = harness.controllerWith(session, voiceApi());
-      await controller.join('channel-1');
-      session.emitState(VoiceSessionState.connected);
+    /// canvas.md/voice.md: a real system picker the caller has to go
+    /// answer, with nothing on screen saying so beyond a bare spinner in
+    /// the control row and a hover/long-press tooltip.
+    testWidgets(
+      'stays quiet on the active-share banner for a share only requested, '
+      'not live, and shows the pending one instead',
+      (tester) async {
+        final session = FakeSession(
+          screenShareOutcome: ScreenShareOutcome.pendingBroadcast,
+        );
+        final controller = harness.controllerWith(session, voiceApi());
+        await controller.join('channel-1');
+        session.emitState(VoiceSessionState.connected);
 
-      await tester.pumpWidget(
-        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
-      );
-      await tester.pump();
-      await controller.setScreenShare(true);
-      await tester.pump();
+        await tester.pumpWidget(
+          _harness(
+            const VoiceScreen(channelId: 'channel-1'),
+            harness.container,
+          ),
+        );
+        await tester.pump();
+        await controller.setScreenShare(true);
+        await tester.pump();
 
-      expect(controller.state.awaitingBroadcast, isTrue);
-      expect(find.text('You are sharing your screen.'), findsNothing);
+        expect(controller.state.awaitingBroadcast, isTrue);
+        expect(find.text('You are sharing your screen.'), findsNothing);
+        expect(
+          find.textContaining('Waiting for you to start the broadcast'),
+          findsOneWidget,
+        );
 
-      // Clears the pending-broadcast deadline and heartbeat timers.
-      await controller.leave();
-    });
+        // Clears the pending-broadcast deadline and heartbeat timers.
+        await controller.leave();
+      },
+    );
 
     testWidgets('stays quiet with no share at all', (tester) async {
       final session = FakeSession();
@@ -216,7 +228,10 @@ void main() {
     );
   });
 
-  // The strip only ever mounts at compact width, so every test pins that viewport.
+  /// The strip only ever mounts at compact width, so every test pins that
+  /// viewport. Its share notice is said in words, not left to a small
+  /// glyph a tooltip has to explain: the collapsed strip is exactly where
+  /// a live share is easiest to miss.
   group('the collapsed strip', () {
     testWidgets('names the share in words for a live share', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
@@ -234,8 +249,6 @@ void main() {
       await controller.setScreenShare(true);
       await tester.pump();
 
-      // Said in words, not left to a small glyph a tooltip has to explain: the
-      // collapsed strip is exactly where a live share is easiest to miss.
       expect(find.textContaining('sharing'), findsOneWidget);
       await controller.leave();
     });

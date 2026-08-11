@@ -54,6 +54,22 @@ http.Response _emptyJsonList() => http.Response(
   headers: {'content-type': 'application/json'},
 );
 
+/// `GET /channels/c1/thread-parent`'s answer: all-null (not a thread, or
+/// unresolved) unless a test names a real parent.
+http.Response _threadParentJson({
+  String? parentChannelId,
+  String? parentChannelName,
+  String? parentMessageId,
+}) => http.Response(
+  jsonEncode({
+    'parent_channel_id': parentChannelId,
+    'parent_channel_name': parentChannelName,
+    'parent_message_id': parentMessageId,
+  }),
+  200,
+  headers: {'content-type': 'application/json'},
+);
+
 /// Pumps a [ThreadScreen] for channel `c1`, a thread (`parentMessageId` set),
 /// reached by pushing it over a marker screen so the back button has
 /// somewhere real to return to - the same shape a "Reply in thread" push
@@ -72,6 +88,7 @@ Future<ProviderContainer> _pumpThread(
   WidgetTester tester,
   Size size, {
   bool seedChannelRow = true,
+  http.Response? threadParentResponse,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -109,6 +126,10 @@ Future<ProviderContainer> _pumpThread(
                 200,
                 headers: {'content-type': 'application/json'},
               );
+            }
+            if (request.method == 'GET' &&
+                request.url.path == '/channels/c1/thread-parent') {
+              return threadParentResponse ?? _threadParentJson();
             }
             return _emptyJsonList();
           }),
@@ -362,6 +383,76 @@ void main() {
       expect(find.bySemanticsLabel('Open canvas'), findsNothing);
       expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
       expect(find.bySemanticsLabel('Toggle channel list'), findsNothing);
+
+      await _settle(tester);
+    },
+  );
+
+  /// docs/reports/screen-review/shell.md's biggest shell finding: a thread
+  /// panel gave no orientation once you were inside it.
+  testWidgets('the thread title names the parent channel once it resolves', (
+    tester,
+  ) async {
+    await _pumpThread(
+      tester,
+      const Size(1400, 900),
+      threadParentResponse: _threadParentJson(
+        parentChannelId: 'parent-channel',
+        parentChannelName: 'general',
+        parentMessageId: 'parent-1',
+      ),
+    );
+
+    expect(find.text('Thread in #general'), findsOneWidget);
+    expect(find.text('Thread'), findsNothing);
+
+    await _settle(tester);
+  });
+
+  /// The same shell.md report's other thread finding: a cold-opened thread
+  /// never got a local `channels` row, so `setReadMarker`'s plain `UPDATE`
+  /// silently no-op'd forever. Once `threadParentProvider` resolves, a real
+  /// row - carrying the real `parentMessageId`, not a placeholder - must
+  /// exist for the read marker to write into.
+  testWidgets(
+    'a cold-opened thread gets a real local row once its parent resolves',
+    (tester) async {
+      final container = await _pumpThread(
+        tester,
+        const Size(1400, 900),
+        seedChannelRow: false,
+        threadParentResponse: _threadParentJson(
+          parentChannelId: 'parent-channel',
+          parentChannelName: 'general',
+          parentMessageId: 'parent-1',
+        ),
+      );
+      final store = await container.read(storeProvider.future);
+
+      /// The upsert this proves is `unawaited` from `initState`, so it can
+      /// still be mid-write once the tap that started it has settled;
+      /// pumping between checks gives its own await chain room to finish.
+      /// `channelRow`, not `allChannels`: a thread is deliberately excluded
+      /// from the latter, mirroring the server's own `list_channels`.
+      Channel? row;
+      for (var i = 0; i < 10 && row == null; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+        row = await store.channelRow('c1');
+      }
+      expect(
+        row,
+        isNotNull,
+        reason: 'the read marker has nothing to write into without a row',
+      );
+      expect(
+        row!.parentMessageId,
+        'parent-1',
+        reason:
+            'must be the real id thread-parent resolved, not a placeholder '
+            "null - a null parentMessageId would make replaceChannels's own "
+            'pruning rule mistake this thread for one that dropped off the '
+            "server's list",
+      );
 
       await _settle(tester);
     },

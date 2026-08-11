@@ -245,6 +245,11 @@ Future<http.Response> fixtureResponse(http.Request request) async {
     // A list is the right empty answer for most reads; the read marker decodes a shape.
     _ when path.endsWith('/read') => const {'last_read_seq': 3, 'unread': 0},
     _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
+    _ when path.endsWith('/thread-parent') => const {
+      'parent_channel_id': null,
+      'parent_channel_name': null,
+      'parent_message_id': null,
+    },
     _ when path.endsWith('/canvas/objects') => const {
       'objects': <Object>[],
       'has_more': false,

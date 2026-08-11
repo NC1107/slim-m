@@ -9,7 +9,7 @@ The entry screen ("Where are you joining?") and its two breakpoint brackets, the
 
 - The single biggest issue in this area is server error text reaching the screen unedited for any status code the client has no specific handling for, and the codebase already has a helper (`describeApiFailure`) that avoids exactly this and isn't used here - see finding H1.
 - The invite dialog has no per-field error targeting, so a field-specific failure (a bad address, an unreachable server) shows nowhere near the field it's about - found independently by frontend and UX.
-- Two screenshots (`submit-bad-request-desktop`, `invite-dialog-server-refused-desktop`) show fixture text that doesn't match what the real server actually sends for that scenario, which risks the screenshots being read as documentation of real copy.
+- ~~Two screenshots (`submit-bad-request-desktop`, `invite-dialog-server-refused-desktop`) show fixture text that doesn't match what the real server actually sends for that scenario, which risks the screenshots being read as documentation of real copy.~~ Fixed 2026-08-10.
 - The TOFU fingerprint and identity-changed screens, and the four safety/capability notice screens, are the strongest work in this set: correct security framing, accurate against the server, and no notes beyond one low-severity design-tension observation.
 - Sign-in's form fields are raw Material widgets rather than `AppInput`/`AppButton`, a deliberate and documented trade-off rather than an oversight, but still a visible style break next to the dialogs in the same flow.
 - No dead ends anywhere in this area: every error and notice offers a way forward, and no state is asserted with colour as the only channel.
@@ -42,13 +42,11 @@ Verdict: good `AppInput`/`AppButton`/`AppErrorState` conformance and correct dis
   Severity: medium.
   Fix: give `_InviteDialogState`/`_ManualServerDialogState` the same `(_ErrorField, String)?` shape `sign_in_screen.dart` already uses.
 
-- **Fixture depicts a response the real endpoint cannot produce** (backend, `invite-dialog-server-refused-desktop.png`).
+- ~~**Fixture depicts a response the real endpoint cannot produce** (backend, `invite-dialog-server-refused-desktop.png`).
   The screenshot shows "The server refused that. invites are disabled here", sourced from a synthetic test fixture (`ui_overlay_snapshot_onboarding_test.dart:226`).
-  `GET /invites/check/{code}` (`http/invites.rs:214-239`) never consults `join_policy` at all - it only ever returns 200 with `{usable, community}` or a rate-limit/internal error - so there is no server code path that returns a 400 "invites are disabled here" for this route.
-  The client plumbing itself is correct (the generic `BadRequestException` fallback is legitimate for any 400 this route could someday send), but the specific scenario shown doesn't exist today, and a reader could mistake it for a real feature ("invites can be globally disabled independent of join policy").
-  UX separately flagged the same screenshot's rendering: the second clause is lowercase with no closing period next to a properly-punctuated sibling message, which is the client-side half of finding M4 below.
-  Severity: low (test-fixture realism, not a wire-contract mismatch a user would hit).
-  Fix: drop this scenario or relabel it against a real 400 for this route (there isn't a clean one today; the closest is the already-covered `INVITE_CHECK` 429).
+  `GET /invites/check/{code}` (`http/invites.rs:214-239`) never consults `join_policy` at all - it only ever returns 200 with `{usable, community}` or a rate-limit/internal error - so there is no server code path that returns a 400 "invites are disabled here" for this route.~~
+  Fixed 2026-08-10, the relabel option: the fixture now sends a real 500 with the exact fixed string `ApiError::Internal` always sends ("internal error"), a genuine response this route can produce, rather than an invented 400.
+  UX separately flagged the same screenshot's rendering: the second clause is lowercase with no closing period next to a properly-punctuated sibling message, which is the client-side half of finding M4 below - moot now that the fixture text is "internal error", which needs no sentence-case fix.
 
 Everything else checked out clean: the code-unusable message ("That code is not usable. It may have expired or already been used.") matches the server's deliberately uniform `InviteCheck::Unusable` answer exactly (`store/invites.rs:81-86`, `:207-239`) with nothing for the client to leak even if it wanted to; the unreachable, address-error, and scheme-refused copy all read well and match client-only validation with nothing server-specific to check.
 
@@ -84,11 +82,11 @@ Verdict: functionally correct at every tested width and theme, with real design-
   Severity: medium (visual inconsistency, not a functional bug, and a reviewed trade-off rather than an unnoticed regression).
   Fix, if ever revisited: extend `AppInput` with `labelText`/`helperText`/`autofillHints` (`design_system/lib/src/components/forms/input.dart:23-79` has none of these today) so this screen can adopt it without losing autofill.
 
-- **`submit-bad-request-desktop.png`'s fixture text doesn't match the real server message.**
+- ~~**`submit-bad-request-desktop.png`'s fixture text doesn't match the real server message.**
   The screenshot shows "password must be at least 8 characters" (lowercase, no period), sourced from a test fixture (`ui_overlay_snapshot_signin_test.dart:340`).
-  The real server message for this exact validation failure is "password must be 8 to 1024 characters" (`http/auth.rs:276-284`, `validate_password`) - close enough to look authoritative but not what a real client would receive.
-  The client's mapping itself (`BadRequestException(:final message) => (_ErrorField.form, message)`, `sign_in_screen.dart:276`) is correct regardless of the exact string; the risk is that the screenshot gets read as documentation of real copy, which it isn't.
-  This also happens to be the clearest instance of the sentence-case defect (finding M4 in Cross-cutting): "password must be..." breaks from every other message on this screen, all of which are hand-written and sentence-cased.
+  The real server message for this exact validation failure is "password must be 8 to 1024 characters" (`http/auth.rs:276-284`, `validate_password`) - close enough to look authoritative but not what a real client would receive.~~
+  Fixed 2026-08-10: the fixture now sends the real string verbatim.
+  This also happens to be the clearest instance of the sentence-case defect (finding M4 in Cross-cutting): "password must be..." breaks from every other message on this screen, all of which are hand-written and sentence-cased - that half is **still open**, since it's a property of the real server string the fixture now correctly reproduces, not of the fixture itself.
   Severity: medium (fixture/documentation accuracy on top of the client-side capitalization bug).
   Fix: change the fixture to the real server string, and apply the sentence-case fix from M4.
 
@@ -147,10 +145,9 @@ The three-notice stack orders and spaces with no overlap.
   Severity: low.
   Fix: an `AppCheckbox` component, or at minimum a `checkboxTheme` entry in `buildTheme`.
 
-- **Two fixture strings don't match what the real server sends, and nothing guards them against drift.**
+- ~~**Two fixture strings don't match what the real server sends, and nothing guards them against drift.**~~
+  Fixed 2026-08-10, both (see each finding above for what changed). Not closed at the mechanism the finding's own doc comment names, though: nothing yet guards either string against drifting away from the server again the way `mention_charset_cases.json` guards the mention regex - that would need a new shared fixture, which is a larger change than a two-string fix and was not attempted here.
   Backend-only, spanning `submit-bad-request-desktop.png` and `invite-dialog-server-refused-desktop.png` (both detailed under their screens above).
-  Neither is a wire-contract mismatch a user would hit - the client's generic mapping is correct regardless of the exact string - but both risk being read as documentation of real copy, and nothing in this codebase guards these specific strings against drift the way `mention_charset_cases.json` guards the mention regex, or the way `docs/e2e.md`'s scenarios assert against real server responses.
-  Severity: low to medium depending on the screen (see each finding above).
 
 - **Every breakpoint the capture set deliberately brackets lands on the exact pixel the source predicts.**
   The stepper's label-collapse (467 vs 468) and the branding rail's move into a persistent left column (899 vs 900) both flip exactly where `onboarding_shell.dart:22` and `:195` say they should, with no clipped text, overlap, or dead space on either side.

@@ -11,6 +11,7 @@ library;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_pane_harness.dart';
@@ -122,4 +123,62 @@ void main() {
     expect(fixture.postedOps, isEmpty);
     expect(surfaceDocument(tester).objectCount.value, 1);
   });
+
+  /// docs/decisions/0011-per-channel-permissions.md, site 5's fourth call
+  /// site, missed by that PR: `_onSelectStart`'s own local gate, not just
+  /// the erase gate and the context menu.
+  testWidgets(
+    'the select tool cannot pick up another member\'s object when only the '
+    'deployment-wide bit grants MANAGE_CANVAS, not the per-channel answer',
+    (tester) async {
+      final fixture = CanvasPaneFixture(
+        mePermissions: Perm.manageCanvas,
+        channelPermissions: 0,
+      )..objects = [canvasNoteJson('foreign', authorId: 'someone-else')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.pump();
+      final gesture = await tester.startGesture(
+        screenFor(tester, const Offset(15, 15)),
+      );
+      await gesture.moveTo(screenFor(tester, const Offset(60, 60)));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(surfaceDocument(tester).selectedObjectId.value, isNull);
+      expect(fixture.postedOps, isEmpty);
+    },
+  );
+
+  /// canvas.md/overlays.md: the confirmation claimed clearing "cannot be
+  /// undone" while the same dock's Undo control reverses it, server-backed.
+  testWidgets(
+    "the clear confirmation names the real Undo path, never claims it "
+    "cannot be undone",
+    (tester) async {
+      final fixture = CanvasPaneFixture(mePermissions: Perm.manageCanvas)
+        ..objects = [canvasObjectJson('a')];
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+      await pumpCanvasPane(tester, container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('More canvas actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Clear canvas'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('cannot be undone'), findsNothing);
+      expect(
+        find.textContaining('You can undo this with Undo'),
+        findsOneWidget,
+      );
+    },
+  );
 }

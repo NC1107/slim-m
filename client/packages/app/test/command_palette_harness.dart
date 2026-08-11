@@ -165,8 +165,9 @@ Future<void> pump(
   WidgetTester tester,
   ProviderContainer container, {
   String initial = '/channels',
+  Size size = const Size(1400, 900),
 }) async {
-  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 

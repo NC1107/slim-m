@@ -102,7 +102,11 @@ void main() {
     await _pump(
       tester,
       container,
-      CanvasActivityPanel(activityLog: log, summary: '2 objects: 2 strokes'),
+      CanvasActivityPanel(
+        activityLog: log,
+        summary: '2 objects: 2 strokes',
+        objectCount: 2,
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -142,11 +146,51 @@ void main() {
     await _pump(
       tester,
       container,
-      CanvasActivityPanel(activityLog: log, summary: 'no objects'),
+      CanvasActivityPanel(
+        activityLog: log,
+        summary: 'no objects',
+        objectCount: 0,
+      ),
     );
 
     expect(find.text('No canvas activity yet.'), findsOneWidget);
+    expect(
+      find.textContaining("before you joined"),
+      findsNothing,
+      reason: 'a genuinely empty canvas has nothing to explain away',
+    );
   });
+
+  /// canvas.md: the summary above ("N objects") and an empty log below used
+  /// to contradict each other with nothing explaining why - content can
+  /// predate this viewer's own activity-log session (a catch-up gap, or ops
+  /// aged past retention), which is exactly this state for a real user.
+  testWidgets(
+    'a nonzero object count above an empty log explains the gap rather '
+    'than contradicting it',
+    (tester) async {
+      final container = _container();
+      addTearDown(container.dispose);
+      final log = CanvasActivityLog(isBlocked: (_) => false);
+      addTearDown(log.dispose);
+
+      await _pump(
+        tester,
+        container,
+        CanvasActivityPanel(
+          activityLog: log,
+          summary: '11 objects: 2 strokes, 2 images, 3 notes, 4 shapes',
+          objectCount: 11,
+        ),
+      );
+
+      expect(find.text('No canvas activity yet.'), findsOneWidget);
+      expect(
+        find.text("Activity from before you joined isn't shown here."),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'the announcer is silent until a batch actually flushes, then carries '

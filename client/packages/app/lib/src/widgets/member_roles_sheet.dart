@@ -22,6 +22,12 @@
 ///   invite picker hides them, which is right for choosing one; here, hiding
 ///   a role the member actually holds would make the sheet under-report
 ///   somebody's privileges to the moderator reading it.
+///
+/// The role list grows to fit its rows, up to a ceiling, rather than always
+/// claiming a fixed fraction of the window regardless of row count - the
+/// same "too tall for too little content" bug
+/// `overwrite_target_picker_sheets.dart` had, the inverse of avatar-crop-
+/// sheet's own previously-shipped "too tall for the window" bug.
 library;
 
 import 'package:flutter/material.dart';
@@ -78,78 +84,80 @@ class _MemberRolesSheetState extends ConsumerState<MemberRolesSheet>
         ?.where((m) => m.id == widget.userId)
         .firstOrNull;
 
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.7,
-      child: Column(
-        children: [
+    // See the library doc above for why this is a ceiling, not a fixed size.
+    final listCeiling = MediaQuery.sizeOf(context).height * 0.7;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.s16,
+            AppSpacing.s8,
+            AppSpacing.s16,
+            AppSpacing.s8,
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              member == null ? 'Roles' : 'Roles for ${member.displayName}',
+              style: AppText.heading.copyWith(
+                color: tokens.textPrimary,
+                fontWeight: AppWeights.semi,
+              ),
+            ),
+          ),
+        ),
+        if (actionError != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s16,
-              AppSpacing.s8,
-              AppSpacing.s16,
-              AppSpacing.s8,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                member == null ? 'Roles' : 'Roles for ${member.displayName}',
-                style: AppText.heading.copyWith(
-                  color: tokens.textPrimary,
-                  fontWeight: AppWeights.semi,
-                ),
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+            child: AppErrorState(
+              message: actionError!,
+              onDismiss: clearActionError,
             ),
           ),
-          if (actionError != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-              child: AppErrorState(
-                message: actionError!,
-                onDismiss: clearActionError,
-              ),
-            ),
-          Expanded(
-            child: AppAsyncView<List<api.Role>>(
-              value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
-              errorMessage: 'Could not load the roles.',
-              onRetry: () => ref.invalidate(rolesProvider),
-              emptyMessage: 'This Space has no roles beyond @everyone.',
-              isEmpty: (list) => list.every((r) => r.isEveryone),
-              data: (context, list) {
-                final assignable = list
-                    .where((r) => !r.isEveryone)
-                    .toList(growable: false);
-                return ListView.builder(
-                  itemCount: assignable.length,
-                  itemBuilder: (context, i) {
-                    final role = assignable[i];
-                    // By id, never name: two roles can share one and both light up.
-                    final held = member?.roleIds.contains(role.id) ?? false;
-                    // Mirrors the server's refusal, so the toggle cannot spring back.
-                    final grantable = mine.hasPermission(role.permissions);
-                    return AppListRow(
-                      leading: const Icon(AppIcons.shield),
-                      label: role.name,
-                      meta: grantable
-                          ? null
-                          : 'Needs permissions you do not hold',
-                      trailing: AppToggle(
-                        value: held,
-                        onChanged: grantable && member != null
-                            ? (v) => _toggle(role, v)
-                            : null,
-                        semanticLabel:
-                            '${role.name} for '
-                            '${member?.displayName ?? 'this member'}',
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: listCeiling),
+          child: AppAsyncView<List<api.Role>>(
+            value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
+            errorMessage: 'Could not load the roles.',
+            onRetry: () => ref.invalidate(rolesProvider),
+            emptyMessage: 'This Space has no roles beyond @everyone.',
+            isEmpty: (list) => list.every((r) => r.isEveryone),
+            data: (context, list) {
+              final assignable = list
+                  .where((r) => !r.isEveryone)
+                  .toList(growable: false);
+              return ListView.builder(
+                shrinkWrap: true,
+                itemCount: assignable.length,
+                itemBuilder: (context, i) {
+                  final role = assignable[i];
+                  // By id, never name: two roles can share one and both light up.
+                  final held = member?.roleIds.contains(role.id) ?? false;
+                  // Mirrors the server's refusal, so the toggle cannot spring back.
+                  final grantable = mine.hasPermission(role.permissions);
+                  return AppListRow(
+                    leading: const Icon(AppIcons.shield),
+                    label: role.name,
+                    meta: grantable
+                        ? null
+                        : 'Needs permissions you do not hold',
+                    trailing: AppToggle(
+                      value: held,
+                      onChanged: grantable && member != null
+                          ? (v) => _toggle(role, v)
+                          : null,
+                      semanticLabel:
+                          '${role.name} for '
+                          '${member?.displayName ?? 'this member'}',
+                    ),
+                  );
+                },
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

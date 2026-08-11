@@ -191,6 +191,28 @@ void main() {
     },
   );
 
+  /// shell.md: the collapsed icon is the sole way back once the rail is
+  /// gone, and it used to rest at `borderSubtle`, roughly 1.3:1 against the
+  /// surface in both themes - well under WCAG 1.4.11's 3:1 floor for a UI
+  /// component. `textSecondary` is already gated at the stricter 4.5:1 AA
+  /// text floor by `design_system/test/contrast_test.dart`, so pinning the
+  /// icon to that token, not the hairline border, is what this asserts.
+  testWidgets('the collapsed icon does not rest at the hairline border color', (
+    tester,
+  ) async {
+    final s = setup();
+    await pumpAtWidth(tester, s.container, 1400);
+    s.container.read(channelRailVisibleProvider.notifier).state = false;
+    await tester.pumpAndSettle();
+
+    final icon = tester.widget<Icon>(find.byIcon(AppIcons.sidebar));
+    final tokens = AppTokens.light;
+    expect(icon.color, tokens.textSecondary);
+    expect(icon.color, isNot(tokens.borderSubtle));
+
+    await teardown(tester, s.container, s.db);
+  });
+
   testWidgets('collapsing survives a channel switch, the same session-only '
       'persistence the provider already had', (tester) async {
     final s = setup();

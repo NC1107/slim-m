@@ -23,3 +23,24 @@ class LocalScreenShareBanner extends StatelessWidget {
     child: Text('You are sharing your screen.'),
   );
 }
+
+/// The `awaitingBroadcast` half [LocalScreenShareBanner]'s own doc
+/// deliberately declines to cover: a real system picker the caller has to
+/// go answer, with nothing on screen saying so beyond a bare spinner
+/// swapped into the share button, reachable only by a desktop hover or a
+/// mobile long-press tooltip. `info`, never [AppCalloutTone.accent] - a
+/// share is not yet happening, and the two states must stay visually
+/// distinguishable from each other, not just from their own copy.
+class LocalScreenSharePendingBanner extends StatelessWidget {
+  const LocalScreenSharePendingBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) => const AppCallout(
+    tone: AppCalloutTone.info,
+    icon: AppIcons.screenShare,
+    child: Text(
+      'Waiting for you to start the broadcast. Tap the share button to '
+      'cancel.',
+    ),
+  );
+}

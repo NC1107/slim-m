@@ -172,4 +172,40 @@ void main() {
 
     expect(find.textContaining('no roles beyond @everyone'), findsOneWidget);
   });
+
+  /// overlays.md: this sheet forced a fixed `height * 0.7` regardless of row
+  /// count, leaving most of the card empty for two roles. It must now size
+  /// to its content, which a `shrinkWrap` `ListView` inside a `maxHeight`
+  /// ceiling is what makes possible.
+  testWidgets('a short role list does not force the sheet to a fixed height', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        roles: [_role('role-mod', 'mod', Perm.manageMessages)],
+        member: _member(const ['role-mod'], const ['mod']),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(
+      list.shrinkWrap,
+      isTrue,
+      reason:
+          'without this the list always claims its full maxHeight '
+          'ceiling regardless of how few rows it holds',
+    );
+
+    final sheetHeight = tester.getSize(find.byType(MemberRolesSheet)).height;
+    final windowHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(
+      sheetHeight,
+      lessThan(windowHeight * 0.3),
+      reason:
+          'one role row plus a heading must read as itself, not as a '
+          'card mostly empty below it',
+    );
+  });
 }

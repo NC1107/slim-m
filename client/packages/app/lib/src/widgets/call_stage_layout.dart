@@ -81,6 +81,11 @@ class CallStageLayout extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(top: AppSpacing.s12),
               child: LocalScreenShareBanner(),
+            )
+          else if (voice.awaitingBroadcast)
+            const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.s12),
+              child: LocalScreenSharePendingBanner(),
             ),
           if (voice.error != null)
             Padding(

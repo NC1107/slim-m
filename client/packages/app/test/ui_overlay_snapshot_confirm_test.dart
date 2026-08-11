@@ -11,6 +11,12 @@
 /// table for exactly which file each one lives in. Same split as every
 /// sibling: the overflow assertion runs everywhere, the PNGs are written
 /// only under SLIMM_UI_SNAPSHOTS=1.
+///
+/// The clear-canvas entries' copy is count-aware (singular and plural read
+/// differently at a glance) and never says "cannot be undone" - see
+/// canvas_overflow_menu.dart's own doc: a clear genuinely arms Undo,
+/// server-backed, and this dialog must not say otherwise to the same
+/// audience whose own dock proves it wrong.
 library;
 
 import 'dart:async';
@@ -66,13 +72,14 @@ final _confirms = <String, FutureOr<void> Function(BuildContext)>{
         'immediately. This cannot be undone.',
     confirmLabel: 'Delete',
   ),
-  // Count-aware copy: singular and plural read differently at a glance.
+  // See this file's own doc comment for why this copy is what it is.
   'confirm-clear-canvas-one': (context) => confirmDangerousAction(
     context,
     title: 'Clear this canvas?',
     message:
         'This removes the one object on the canvas for everyone in '
-        'this channel. This cannot be undone.',
+        'this channel. You can undo this with Undo until you close the '
+        'canvas or take many more actions.',
     confirmLabel: 'Clear canvas',
     cancelLabel: 'Keep canvas',
   ),
@@ -81,7 +88,8 @@ final _confirms = <String, FutureOr<void> Function(BuildContext)>{
     title: 'Clear this canvas?',
     message:
         'This removes all 214 objects from the canvas for everyone '
-        'in this channel. This cannot be undone.',
+        'in this channel. You can undo this with Undo until you close the '
+        'canvas or take many more actions.',
     confirmLabel: 'Clear canvas',
     cancelLabel: 'Keep canvas',
   ),

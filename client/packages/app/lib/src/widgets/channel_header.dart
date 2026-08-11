@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The centre column's channel header: name, topic, pin pill, and the two
 /// toggles that live beside it.
+///
+/// The name outweighs the topic when both compete for space (`Flexible`
+/// flex 2 against the topic's implicit 1): the name carries this pane's own
+/// identity and the topic is secondary, which flex alone did not enforce
+/// while the topic outweighed the name.
 library;
 
 import 'package:flutter/material.dart';
@@ -69,14 +74,20 @@ class ChannelHeader extends ConsumerWidget {
             child: Row(
               children: [
                 Icon(
-                  isVoice ? AppIcons.voice : AppIcons.hash,
+                  // A DM is a person, not a public channel named after one; distinct from the hash a text channel gets.
+                  isVoice
+                      ? AppIcons.voice
+                      : (isDm ? AppIcons.account : AppIcons.hash),
                   size: AppSizes.icon16,
                   color: tokens.textSecondary,
                 ),
                 const SizedBox(width: AppSpacing.s8),
+                // See the library doc comment above for why flex is 2 here.
                 Flexible(
+                  flex: 2,
                   child: Text(
                     name,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     // The design's 17px header left the scale
                     // (app_typography.dart): it differed from body only in
@@ -92,7 +103,6 @@ class ChannelHeader extends ConsumerWidget {
                   Container(width: 1, height: 20, color: tokens.borderSubtle),
                   const SizedBox(width: AppSpacing.s12),
                   Flexible(
-                    flex: 2,
                     child: Text(
                       topic!,
                       maxLines: 1,

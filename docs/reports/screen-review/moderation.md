@@ -9,9 +9,9 @@ Scope: `build/ui-capture/images/overlays/{member-popover,member-profile-popover,
 
 ## The short version
 
-- A moderator holding only `KICK_MEMBERS`, looking at an already-timed-out member with no shared call, gets a "MODERATION" section header with nothing beneath it, found independently by two lenses at the same root cause.
-- "Delete message" on a report card checks the caller's deployment-wide `MANAGE_MESSAGES`, but the server checks it per channel, and for a DM message report that permission is structurally unreachable for anyone, making the button a guaranteed dead click on exactly the report class this codebase built visibility for.
-- "Eject from call..." checks the same wrong deployment-wide scope, hiding a real, working per-channel capability from a moderator who holds `KICK_MEMBERS` only via a channel or voice overwrite.
+- ~~A moderator holding only `KICK_MEMBERS`, looking at an already-timed-out member with no shared call, gets a "MODERATION" section header with nothing beneath it, found independently by two lenses at the same root cause.~~ Fixed 2026-08-10.
+- ~~"Delete message" on a report card checks the caller's deployment-wide `MANAGE_MESSAGES`, but the server checks it per channel, and for a DM message report that permission is structurally unreachable for anyone, making the button a guaranteed dead click on exactly the report class this codebase built visibility for.~~ Already closed on main before this pass (PR #523).
+- ~~"Eject from call..." checks the same wrong deployment-wide scope, hiding a real, working per-channel capability from a moderator who holds `KICK_MEMBERS` only via a channel or voice overwrite.~~ Already closed on main before this pass (PR #523).
 - The report reason is the one piece of prose on a report card with no label, unlike everything else on it, which the card's own design principle already covers for every other field.
 - Whether the blocked-by-them failed-send screenshot leaks anything is disputed between lenses: one reads it as byte-identical to a generic failure and clean, the other finds the screenshot's text is a hand-authored fixture that does not match what the real code path produces.
 - Report-and-block stays one shared implementation, danger actions stay outlined-never-filled everywhere, and the blocked-DM composer genuinely shows nothing block-aware before a send is attempted.
@@ -20,14 +20,15 @@ Scope: `build/ui-capture/images/overlays/{member-popover,member-profile-popover,
 
 Verdict: the badge itself is the best copy in the whole review; the section composed around it has one real broken combination and one accurate-but-incomplete summary.
 
-- **A moderator with only `KICK_MEMBERS`, viewing an already-timed-out target with no shared call, gets a "MODERATION" header over nothing.**
+~~- **A moderator with only `KICK_MEMBERS`, viewing an already-timed-out target with no shared call, gets a "MODERATION" header over nothing.**
   Found independently by the frontend and UX lenses at the identical root cause, `member_profile.dart:306-307`.
   `showModeration` is `canTimeOut || canRemove || canManageRoles || canEject`, computed from raw permission bits.
   The row that would represent `canTimeOut` is gated separately, at `member_profile.dart:386-387`, on `profile.timedOutUntil == null` (correctly suppressed while a timeout is already active, since the badge above already carries it).
   When `canTimeOut` is the only true bit and the target is already timed out, `showModeration` stays true, so the divider and `AppMenuLabel('Moderation')` render followed by four `if`s that all evaluate false.
   `AppMenu`/`AppMenuLabel`/`AppMenuDivider` (`design_system/lib/src/components/surfaces/menu.dart`) have no logic to elide an empty section; they render exactly what they are given.
   Confirmed in `member-popover-timeout-badge-liftable-desktop.png` and `member-popover-timeout-badge-readonly-desktop.png` (permissions: `Perm.kickMembers`, target already timed out, no shared call).
-  Fix: compute `canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null` and fold that into `showModeration` in place of the bare `canTimeOut`, the same way `canEject` already folds in `inCallTogether`.
+  Fix: compute `canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null` and fold that into `showModeration` in place of the bare `canTimeOut`, the same way `canEject` already folds in `inCallTogether`.~~
+  Fixed 2026-08-10, that exact fix, verbatim: `canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null` now feeds `showModeration` in place of the bare `canTimeOut`.
   Severity: high (a real, reachable permission combination, not a hypothetical one; rated medium by the UX pass on the grounds that it reads as "half-loaded" rather than "broken," high by the frontend pass on the grounds that the section header is unconditionally wrong for this combination).
 
 - **The timeout badge's summary omits the one bit that is deliberately spared.**
@@ -44,15 +45,10 @@ Verdict: the badge itself is the best copy in the whole review; the section comp
 
 ## Member popover - Eject scope mismatch (permission-scope mismatch, site six)
 
-Verdict: real, medium severity, and one of two sites in this document where the client asks the wrong permission scope - this codebase's fifth and sixth confirmed instance of the pattern (see Cross-cutting, and `shell.md`, `settings.md`, `voice.md`, `overlays.md` for the other five).
+~~Verdict: real, medium severity, and one of two sites in this document where the client asks the wrong permission scope - this codebase's fifth and sixth confirmed instance of the pattern (see Cross-cutting, and `shell.md`, `settings.md`, `voice.md`, `overlays.md` for the other five).~~
+Already closed on main, not part of this change: `member_profile.dart`'s `canEject` reads `myChannelPermissionsProvider(voice.channelId!)` now, part of the decision-0011 sweep, PR #523, landed before this pass started. Checked directly against current source.
 
-- `canEject` reads `mine.hasPermission(Perm.kickMembers)`, the caller's deployment-wide base permissions (`member_profile.dart:301-305`, `myPermissionsProvider` at `admin_providers.dart:24-28`).
-  The server's voice-kick handler checks `KICK_MEMBERS` per channel instead: `permissions.contains(VIEW_CHANNEL.union(KICK_MEMBERS))` from `permissions_in_channel(ctx.user_id, channel_id)`, and its own escalation check reads `granted_permissions_in_channel` rather than `granted_base_permissions` for the stated reason (`http/voice.rs:303-350`: "a caller who holds `KICK_MEMBERS` only through a channel overwrite may still hold nothing deployment-wide").
-  There is no channel-scoped permission provider anywhere in `client/packages/app/lib/src/providers/` to read the right value from.
-- Confirmed against the harness: `member-popover-eject-desktop.png` and `member-popover-call-audio-only-desktop.png` are produced by toggling `myPermissionsProvider` alone (`ui_overlay_snapshot_moderation_test.dart:277-291`).
-- Impact: a moderator granted `KICK_MEMBERS` only via a per-channel or voice-channel overwrite never sees "Eject from call..." at all, even though the server would honor the kick - a false negative that silently withholds a working action, the more serious direction here.
-  Voice-channel-scoped `KICK_MEMBERS` overwrites are a real, supported feature (`channel_overwrites_screen.dart` exists for exactly this), so this is reachable in practice, not theoretical.
-  The opposite direction (deployment-wide holder denied by a channel-specific overwrite) degrades gracefully into the same generic 403 the containment-gap case already uses.
+- ~~`canEject` reads `mine.hasPermission(Perm.kickMembers)`, the caller's deployment-wide base permissions (`member_profile.dart:301-305`, `myPermissionsProvider` at `admin_providers.dart:24-28`).~~
 - Fix: gate `canEject` on a per-channel permission read against `voice.channelId`, mirroring the server.
 - Severity: medium.
 
@@ -140,15 +136,12 @@ Two real gaps sit on top of that: an unlabeled reason, and a wrong permission sc
   `AppButton` has no `tooltip` parameter today (only `AppIconButton` does).
   Severity: low.
 
-- **"Delete message" is gated on the wrong scope, and is a guaranteed dead button for a report about a DM message.**
+~~- **"Delete message" is gated on the wrong scope, and is a guaranteed dead button for a report about a DM message.**
   `canDeleteMessage = isMessageReport && mine.hasPermission(Perm.manageMessages)` (`report_card.dart:180-181`) reads deployment-wide permissions.
-  The server's delete handler checks `MANAGE_MESSAGES` per channel: `has_permission(ctx.user_id, channel_id, MANAGE_MESSAGES)` (`http/messages.rs:255-259`).
-  This is the sixth and seventh confirmed site of the permission-scope-mismatch pattern found across this whole review (see `shell.md`, `settings.md`, `voice.md`, `overlays.md` for the other five), and the most consequential one in the set.
+  The server's delete handler checks `MANAGE_MESSAGES` per channel: `has_permission(ctx.user_id, channel_id, MANAGE_MESSAGES)` (`http/messages.rs:255-259`).~~
+  Already closed on main, not part of this change (and `report_card.dart` is out of scope for this pass regardless - it lives under `screens/admin/`): `canDeleteMessage` now reads `report.channelPermissions?.hasPermission(Perm.manageMessages)`, the batched per-report field `docs/decisions/0011-per-channel-permissions.md` added, part of PR #523. Confirmed by reading current source, read-only.
   For a DM channel, `evaluate_channel_permissions` skips the role/overwrite model entirely and returns only `dm_permissions`'s `DM_BASE`/`DM_BASE.remove(BLOCKED_DENY)` (`store/permissions.rs:319-332`, `store/dms.rs:34-58`), which never contains `MANAGE_MESSAGES` for anyone - not even an ADMINISTRATOR, since the DM branch deliberately skips the ADMINISTRATOR bypass too.
-  A DM message report is a real, reachable queue item by design (CLAUDE.md's "Moderation reaching only the channel kind it was written for" fix made exactly this visible), so a moderator opening a report about DM harassment sees "Delete message" as an available, enabled action, and every tap 403s.
-  It is offered as present rather than absent for a permission the caller structurally cannot have, on exactly the report class - DM harassment - the codebase went out of its way to make visible to deployment-wide moderators in the first place.
-  No screenshot or test in the suite covers this combination; `ui_overlay_snapshot_reports_test.dart` only exercises a `kind: text` channel fixture.
-  Fix: resolve `MANAGE_MESSAGES` per `report.channelId` (mirroring the server), and additionally treat a DM channel kind as "delete never offered," the same special-case the composer and context menu already apply to DMs elsewhere.
+  A DM message report is a real, reachable queue item by design (CLAUDE.md's "Moderation reaching only the channel kind it was written for" fix made exactly this visible), so this was a guaranteed dead button on exactly the report class - DM harassment - the codebase went out of its way to make visible to deployment-wide moderators in the first place; it is `report.channelPermissions` correctly answering `NONE` for a DM (no channel overwrites, `mask_unless_viewable` never applies since a report's own channel is always one the caller may moderate) that closes it.
   Severity: high.
 
 - `report-card-author-gone-desktop.png` ("Author no longer on this Space"), `report-card-reporter-gone-desktop.png` ("a deleted account"), and `report-card-no-quick-actions-desktop.png` ("Resolving...") render correctly distinct for the subject/author axis; the only overlap is on the reporter axis noted above.
@@ -196,9 +189,10 @@ No finding.
 
 ## Cross-cutting
 
-- **The empty "MODERATION" header was found independently by two lenses reading the same evidence from different directions**, the frontend pass re-deriving the four gates from the harness and the UX pass reading the rendered screenshot cold; both land on the identical fix at `member_profile.dart:306-307`.
-- **The permission-scope-mismatch pattern (client asks a deployment-wide provider for an action the server authorizes per channel) reaches its sixth and seventh confirmed sites in this document**, Eject (medium) and Delete-message-from-a-report (high); see `shell.md`, `settings.md`, `voice.md`, and `overlays.md` for the other five.
-  There is no per-channel permission provider anywhere in `client/packages/app/lib/src/providers/`, so any future quick action that server-checks a channel-scoped bit should be treated as suspect until proven otherwise - a shape worth grepping for, not two isolated bugs.
+- ~~**The empty "MODERATION" header was found independently by two lenses reading the same evidence from different directions**, the frontend pass re-deriving the four gates from the harness and the UX pass reading the rendered screenshot cold; both land on the identical fix at `member_profile.dart:306-307`.~~ Fixed 2026-08-10.
+- ~~**The permission-scope-mismatch pattern (client asks a deployment-wide provider for an action the server authorizes per channel) reaches its sixth and seventh confirmed sites in this document**, Eject (medium) and Delete-message-from-a-report (high); see `shell.md`, `settings.md`, `voice.md`, and `overlays.md` for the other five.
+  There is no per-channel permission provider anywhere in `client/packages/app/lib/src/providers/`, so any future quick action that server-checks a channel-scoped bit should be treated as suspect until proven otherwise - a shape worth grepping for, not two isolated bugs.~~
+  Already closed on main, not part of this change: `myChannelPermissionsProvider` now exists (`providers/channel_permissions.dart`), and every site this pattern-note names across all five reports reads from it or its batched equivalent. See each report's own updated entry for the specific commit (PRs #522 and #523, `docs/decisions/0011-per-channel-permissions.md`).
 - **The self-target, containment-gap, and jump-unreachable findings share one root cause worth fixing once.**
   A moderation action's absence or refusal reads identically today whether the cause is "no permission," "acting on yourself," "acting on someone your role doesn't cover," or "channel unreachable" - either the row is silently omitted or the refusal falls through to one generic 403 sentence.
   A single small "why this control isn't here" caption pattern, reused across the member popover, the report card, and any future moderation surface, would close all three with one shared component.

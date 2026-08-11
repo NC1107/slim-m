@@ -179,8 +179,11 @@ class CanvasCommitQueue {
   static const _removedMessage = 'that object was removed';
 
   static String _explain(api.ApiException error) => switch (error) {
-    api.ForbiddenException() => 'You cannot draw on this canvas right now.',
-    api.ConflictException() => 'This canvas is full, or that id is taken.',
+    // Covers a channel-wide refusal and a timeout freeze alike; worded as a permission state, never as an outage that invites a retry.
+    api.ForbiddenException() =>
+      "You don't have permission to draw here right now.",
+    // Matches canvas_quick_placement.dart and canvas_image_paste.dart's identical ConflictException wording: the id-collision half is an implementation detail nobody typed and cannot act on.
+    api.ConflictException() => 'This canvas is full.',
     api.BadRequestException() => 'That stroke was refused as too large.',
     _ => 'That stroke could not be saved.',
   };

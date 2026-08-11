@@ -220,10 +220,13 @@ void main() {
       await _finish(tester, 'invite-dialog-unreachable-desktop');
     });
 
+    /// http/error.rs's ApiError::Internal is always this exact fixed
+    /// string, never a route-specific message - the real answer the
+    /// catch-all branch this exercises would actually receive for a 500.
     testWidgets('server refused with its own message', (tester) async {
       await _pumpOnboarding(
         tester,
-        checkBody: const {'error': 'invites are disabled here'},
+        checkBody: const {'error': 'internal error'},
         checkStatus: 500,
       );
       await _openInviteDialog(tester);
@@ -236,7 +239,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('invites are disabled here'), findsOneWidget);
+      expect(find.textContaining('internal error'), findsOneWidget);
       await _finish(tester, 'invite-dialog-server-refused-desktop');
     });
   });

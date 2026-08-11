@@ -117,6 +117,48 @@ void main() {
     },
   );
 
+  /// canvas.md: a marker can land on top of anything on the canvas, ink
+  /// included, and a plain drop shadow tuned for the empty background loses
+  /// to a light note fill directly underneath it. The caption needs the
+  /// same translucent-pill background `_NameBadge` already carries.
+  testWidgets('the avatar marker caption sits on the same translucent pill '
+      'the camera-tile name badge does', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    document.setViewport(const Size(1000, 800));
+    final overrides = CanvasPresenceTileOverrides();
+
+    await tester.pumpWidget(
+      _wrap(
+        _layer(
+          document,
+          const [_cameraOff],
+          overrides,
+          cameraViewFor: (_) => const SizedBox(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final nameText = tester.widget<Text>(find.text('Noor'));
+    final pill = tester.widget<Container>(
+      find
+          .ancestor(of: find.text('Noor'), matching: find.byType(Container))
+          .first,
+    );
+    final decoration = pill.decoration! as BoxDecoration;
+    expect(
+      decoration.color,
+      isNotNull,
+      reason: 'a filled pill, not a bare shadow behind the text',
+    );
+    expect(
+      nameText.style?.shadows,
+      anyOf(isNull, isEmpty),
+      reason: 'the pill carries legibility now, not a drop shadow',
+    );
+  });
+
   testWidgets(
     'a live camera bubble carries the float shadow and the window radius, '
     'the tokens reserved for an object that is always above the plane',

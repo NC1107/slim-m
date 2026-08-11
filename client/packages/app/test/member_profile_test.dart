@@ -225,23 +225,34 @@ void main() {
       expect(find.text('Lift'), findsOneWidget);
     });
 
-    testWidgets('replaces the duration chips rather than sitting beside them', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _harness(_body(_timedOut), permissions: Perm.kickMembers),
-      );
-      await tester.pump();
+    testWidgets(
+      'replaces the duration chips rather than sitting beside them, and '
+      'the section itself is absent once that is the only row it would '
+      'have carried',
+      (tester) async {
+        await tester.pumpWidget(
+          _harness(_body(_timedOut), permissions: Perm.kickMembers),
+        );
+        await tester.pump();
 
-      expect(
-        find.text('Time out for...'),
-        findsNothing,
-        reason:
-            'the badge carries the countdown and its own undo; a second '
-            'control would be two places to look for one fact',
-      );
-      expect(find.text('MODERATION'), findsOneWidget);
-    });
+        expect(
+          find.text('Time out for...'),
+          findsNothing,
+          reason:
+              'the badge carries the countdown and its own undo; a second '
+              'control would be two places to look for one fact',
+        );
+        expect(
+          find.text('MODERATION'),
+          findsNothing,
+          reason:
+              'KICK_MEMBERS alone offers only the now-suppressed chips row, '
+              'so the section has nothing left to introduce - a bare '
+              'header here was the bug shell.md and moderation.md both '
+              'found independently',
+        );
+      },
+    );
 
     testWidgets('is absent for a member who is not timed out', (tester) async {
       await tester.pumpWidget(

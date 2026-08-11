@@ -97,6 +97,7 @@ class CanvasActivityPanel extends StatelessWidget {
     super.key,
     required this.activityLog,
     required this.summary,
+    required this.objectCount,
   });
 
   final CanvasActivityLog activityLog;
@@ -105,6 +106,15 @@ class CanvasActivityPanel extends StatelessWidget {
   /// caller from the live document, since this log only ever tracks changes,
   /// never the canvas's total current contents.
   final String summary;
+
+  /// [summary]'s own headline number, passed separately rather than parsed
+  /// back out of it: what decides whether an empty log gets its own
+  /// clarifying line below, since a nonzero count above an apparently-empty
+  /// history otherwise reads as a contradiction - the canvas has content,
+  /// but the log that tracks how it got there shows nothing, when what is
+  /// really true is that the content predates this session's own log (a
+  /// catch-up gap, or ops aged past retention).
+  final int objectCount;
 
   @override
   Widget build(BuildContext context) {
@@ -130,10 +140,32 @@ class CanvasActivityPanel extends StatelessWidget {
             Expanded(
               child: entries.isEmpty
                   ? Center(
-                      child: Text(
-                        'No canvas activity yet.',
-                        style: AppText.body.copyWith(
-                          color: tokens.textSecondary,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s24,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'No canvas activity yet.',
+                              style: AppText.body.copyWith(
+                                color: tokens.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (objectCount > 0) ...[
+                              const SizedBox(height: AppSpacing.s4),
+                              Text(
+                                "Activity from before you joined isn't "
+                                'shown here.',
+                                style: AppText.caption.copyWith(
+                                  color: tokens.textDisabled,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     )

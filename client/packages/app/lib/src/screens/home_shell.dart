@@ -416,6 +416,11 @@ class _ChannelTitle extends ConsumerWidget {
   }
 }
 
+/// The first thing a fresh desktop sign-in lands on, so it carries the same
+/// visual weight `ChannelStartHeader` gives the functionally identical
+/// "nothing here yet" case, rather than a single small line of grey text.
+/// The Ctrl+K hint drops on a touch layout, the same rule the rail's own
+/// search field hint already follows - no finger can press it.
 class _NothingSelected extends StatelessWidget {
   const _NothingSelected();
 
@@ -423,9 +428,37 @@ class _NothingSelected extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Center(
-      child: Text(
-        'Pick a channel to start reading.',
-        style: TextStyle(color: tokens.textSecondary),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: tokens.surfaceRaised,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(AppIcons.hash, size: 26, color: tokens.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              'Pick a channel to start reading.',
+              style: AppText.title.copyWith(color: tokens.textPrimary),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              AppTouchTargets.of(context)
+                  ? "Choose one from the list."
+                  : 'Choose one from the list, or press Ctrl+K to jump to '
+                        'one.',
+              textAlign: TextAlign.center,
+              style: AppText.body.copyWith(color: tokens.textSecondary),
+            ),
+          ],
+        ),
       ),
     );
   }

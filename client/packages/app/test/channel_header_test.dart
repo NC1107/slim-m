@@ -205,4 +205,85 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
   });
+
+  /// shell.md: a DM reused the text-channel "#" glyph even though the code
+  /// already branches on `isDm` two lines away for the member toggle.
+  testWidgets('a DM carries a person glyph, not the channel hash', (
+    tester,
+  ) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'c1',
+              name: 'Alice',
+              isVoice: false,
+              isDm: true,
+              searchOpen: false,
+              onToggleSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(AppIcons.hash), findsNothing);
+    expect(find.byIcon(AppIcons.account), findsOneWidget);
+  });
+
+  /// shell.md: at the one width where the name and the topic compete for
+  /// space with a member pane also on screen, the topic used to outweigh
+  /// the name and take the room first.
+  testWidgets('the channel name outweighs the topic when both are truncating', (
+    tester,
+  ) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'c1',
+              name: 'general',
+              topic: 'Anything and everything about the project',
+              isVoice: false,
+              searchOpen: false,
+              onToggleSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final nameFlexible = tester.widget<Flexible>(
+      find
+          .ancestor(of: find.text('general'), matching: find.byType(Flexible))
+          .first,
+    );
+    final topicFlexible = tester.widget<Flexible>(
+      find
+          .ancestor(
+            of: find.textContaining('Anything'),
+            matching: find.byType(Flexible),
+          )
+          .first,
+    );
+    expect(
+      nameFlexible.flex,
+      greaterThan(topicFlexible.flex),
+      reason: 'the name must give up space last, not the topic',
+    );
+  });
 }

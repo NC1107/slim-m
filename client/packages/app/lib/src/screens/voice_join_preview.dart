@@ -212,10 +212,10 @@ class VoiceRejoinScreen extends StatelessWidget {
 /// Who is already in the call, above the rejoin button.
 ///
 /// The three answers the roster can give are rendered as three different
-/// things, because collapsing them lies. Not known yet draws nothing rather
-/// than an empty room, since a deployment with no SFU configured stays in
-/// that state forever and "nobody is here" would be a claim this client
-/// never checked.
+/// things, because collapsing them lies. Not known yet gets its own honest
+/// sentence rather than an empty room ("nobody is here" would be a claim
+/// this client never checked) and rather than nothing at all, which read as
+/// a stalled load or a missing widget and was indistinguishable from either.
 class _WhoIsHere extends ConsumerWidget {
   const _WhoIsHere({required this.channelId});
 
@@ -225,7 +225,13 @@ class _WhoIsHere extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final roster = ref.watch(voiceRosterProvider(channelId)).valueOrNull;
-    if (roster == null) return const SizedBox.shrink();
+    if (roster == null) {
+      return Text(
+        "Can't tell who else is here right now.",
+        textAlign: TextAlign.center,
+        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      );
+    }
 
     if (roster.isEmpty) {
       return Text(

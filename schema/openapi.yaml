@@ -1079,6 +1079,37 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /channels/{channelId}/thread-parent:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: getThreadParent
+      tags: [channels]
+      summary: Whether this channel is a thread, and if so, what it hangs off.
+      description: >
+        A thread panel opened cold - a deep link, a reload, or a
+        notification - never appears in `listChannels`/`listDirectMessages`
+        and so never learns its own parent channel or the message it hangs
+        off any other way. This is that lookup, keyed only on the thread's
+        own channel id. All three fields answer together: either all three
+        are set, or all three are null, whenever `channelId` does not
+        exist, is not a thread, or the caller lacks VIEW_CHANNEL there
+        (which already resolves through the thread-to-parent rule) - the
+        same masking `getChannelPermissions` uses, so this cannot become a
+        second channel-existence oracle. There is accordingly no 403 or 404
+        here.
+      responses:
+        "200":
+          description: The thread's parent, or all-null if this is not one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadParent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /channels/order:
     put:
       operationId: reorderChannels
@@ -5230,6 +5261,25 @@ components:
             timeout subtracted - see `getChannelPermissions`. Zero whenever
             the caller lacks VIEW_CHANNEL here, including for a channel that
             does not exist at all.
+
+    ThreadParent:
+      type: object
+      required: [parent_channel_id, parent_channel_name, parent_message_id]
+      properties:
+        parent_channel_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The channel the thread's parent message lives in.
+        parent_channel_name:
+          type: string
+          nullable: true
+          description: That channel's current name, resolved server-side.
+        parent_message_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The message this thread hangs off.
 
     ReadState:
       type: object

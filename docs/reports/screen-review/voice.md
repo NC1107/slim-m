@@ -10,10 +10,10 @@ Screens: `voice` (plain join-arrival), `voice-connecting`, `voice-in-call` and i
 ## The short version
 
 - The floating call dock's shadow paints as a flat opaque grey bar in these captures; this is a known rasteriser limitation, not a UI bug, and it has now fooled two separate review passes.
-- `who-is-here-unknown` renders nothing at all for a state the code deliberately defines as ambiguous between "no voice configured" and "SFU unreachable" - the ambiguity is a documented, reasoned trade, but rendering it as a blank gap is not.
-- The recap card on `voice-rejoin-recap` sits directly under a present-tense "Nobody is in this call yet." sentence with nothing marking it as a summary of the call that just ended.
-- The eject-from-call button is gated on deployment-wide permissions client-side while the server enforces it per-channel - the third instance of this exact mismatch shape found across this review.
-- `voice-in-call-share-pending` explains itself only through a hover/long-press tooltip, with no on-screen text for a touch user watching the button change.
+- ~~`who-is-here-unknown` renders nothing at all for a state the code deliberately defines as ambiguous between "no voice configured" and "SFU unreachable" - the ambiguity is a documented, reasoned trade, but rendering it as a blank gap is not.~~ Fixed 2026-08-10.
+- ~~The recap card on `voice-rejoin-recap` sits directly under a present-tense "Nobody is in this call yet." sentence with nothing marking it as a summary of the call that just ended.~~ Fixed 2026-08-10.
+- ~~The eject-from-call button is gated on deployment-wide permissions client-side while the server enforces it per-channel - the third instance of this exact mismatch shape found across this review.~~ Already closed on main before this pass (PR #523); see Cross-cutting below.
+- ~~`voice-in-call-share-pending` explains itself only through a hover/long-press tooltip, with no on-screen text for a touch user watching the button change.~~ Fixed 2026-08-10.
 - Everything else in this set - icon-vs-colour state carrying, error copy, the three rejoin states, the switch-prompt, DM call framing - reads correctly and was checked against source, not just eyeballed.
 
 ## voice (plain join-arrival)
@@ -54,6 +54,8 @@ Verdict: each correct, both viewports/themes, no findings beyond what is already
 
 ## voice-in-call-share-pending
 
+Fixed 2026-08-10, per the "Fix" line below: a new `LocalScreenSharePendingBanner` (a distinct `AppCalloutTone.info`, never the active-share accent tone) renders in `call_stage_layout.dart`'s `awaitingBroadcast` branch, in the same slot `LocalScreenShareBanner` already occupies for a live share.
+
 Verdict: functionally correct, but the only on-screen signal that a system picker is waiting for a response is a bare spinner glyph swapped into the share button, with no visible text anywhere on screen.
 
 - What's wrong: `_ControlButton`'s `pending` state (`voice_call_controls.dart:262-272`) replaces the share icon with a `CircularProgressIndicator`, and the only explanation is the button's `Tooltip` ("Waiting for you to start the broadcast. Tap to cancel.", `voice_call_controls.dart:128-131`), reachable only by desktop hover or a mobile long-press.
@@ -75,11 +77,13 @@ Verdict: correct, both viewports/themes.
 
 ## voice-rejoin-recap
 
+Fixed 2026-08-10, the first suggested fix: `CallRecapCard` now carries its own "Your last call" label above the stats row.
+
 Verdict: the stats themselves are correct and match a purely local, no-server-round-trip computation, but the card visually contradicts the sentence sitting directly above it.
 
-- What's wrong: the screen reads "Nobody is in this call yet." (present tense, correctly describing the now-empty call) immediately followed by a card showing "18 min / in the call," "1 / other person," and an avatar row naming "Ada," with nothing on the card marking it as a summary of the call that just ended.
+- ~~What's wrong: the screen reads "Nobody is in this call yet." (present tense, correctly describing the now-empty call) immediately followed by a card showing "18 min / in the call," "1 / other person," and an avatar row naming "Ada," with nothing on the card marking it as a summary of the call that just ended.
   `call_recap_card.dart` has an optional "left early" caption for a participant who departed before the caller did, but when nobody left early (as in this fixture) the participant row renders with no caption at all, so nothing distinguishes "this describes the call that just ended" from "this is who is currently in the call."
-  A first reading is very likely "wait, is Ada still in there or not?" (UX).
+  A first reading is very likely "wait, is Ada still in there or not?" (UX).~~
 - Confirmed against source as correctly local: `CallRecap`/`CallActivityTracker` (`providers/call_recap.dart`) is built "entirely from the roster a live call already reports - no new server state" (file header) and never asks the server for anything, so the numbers themselves are trustworthy - the finding is presentation, not data (backend).
 - Evidence: `voice-rejoin-recap-desktop-light.png`, `voice-rejoin-recap-phone-portrait-light.png`.
 - Fix: give the card its own label, e.g. "Your last call" or "How it went," above the stats row, or restore the "You left this call." line (present on `voice-rejoin-plain` but dropped here) directly above the card so the sequence reads empty-now, you-left, here's-the-recap.
@@ -135,11 +139,12 @@ Verdict: fails the "each of the three roster answers must say something true and
 
 - The collapse itself is reasoned, not accidental: the roster route gives three distinct server answers (501 not-configured, 503 unreachable, 200 empty), and `voiceRosterProvider`'s own doc comment (`voice_roster.dart:44-50`) is explicit that "not known yet" is deliberately what both "no SFU configured, ever" and a persistently-unreachable SFU render as - `tick()` only special-cases `NotConfiguredException`, and every other `ApiException`, including a 503 that never recovers, falls into "try again next tick" with the stream never emitting a value.
   This half is not a bug (backend).
-- What is a finding: `_WhoIsHere` implements that "don't know yet" case as `if (roster == null) return const SizedBox.shrink();` - rendering literally nothing, indistinguishable from a missing widget, a stalled load, or a layout bug.
+- ~~What is a finding: `_WhoIsHere` implements that "don't know yet" case as `if (roster == null) return const SizedBox.shrink();` - rendering literally nothing, indistinguishable from a missing widget, a stalled load, or a layout bug.
   Confirmed by direct comparison: where "empty" says "Nobody is in this call yet." and "populated" names who's there, "unknown" leaves a gap where the roster sentence would be, jumping straight from the heading to "You left this call." (UX).
-- Evidence: `who-is-here-unknown-phone-portrait-light.png`, compared against `who-is-here-empty-phone-portrait-light.png` and `who-is-here-populated-phone-portrait-light.png`.
-- Fix: give this case its own true statement, e.g. "Can't tell who else is here right now," matching this project's plain, hedged register - this fixes the rendering without touching the reasoned collapse of the two server causes into one client state.
-  If the collapse itself is ever revisited: surface a distinct "could not check who's here" state after N consecutive non-`NotConfigured` failures, rather than staying silent forever (backend).
+  Evidence: `who-is-here-unknown-phone-portrait-light.png`, compared against `who-is-here-empty-phone-portrait-light.png` and `who-is-here-populated-phone-portrait-light.png`.
+  Fix: give this case its own true statement, e.g. "Can't tell who else is here right now," matching this project's plain, hedged register - this fixes the rendering without touching the reasoned collapse of the two server causes into one client state.~~
+  Fixed 2026-08-10, that exact suggested copy: `_WhoIsHere` now returns `Text("Can't tell who else is here right now.")` instead of `SizedBox.shrink()`.
+  If the collapse itself is ever revisited: surface a distinct "could not check who's here" state after N consecutive non-`NotConfigured` failures, rather than staying silent forever (backend). **Still open** - not attempted here.
 - Severity: high for the blank-render half (confirmed against source, not inferred from the image alone); the collapse-of-two-causes half stays low/documented-intent and is not part of the severity rating.
 
 ## dm-call
@@ -165,12 +170,13 @@ It has been confirmed this is not a reachable failure mode: `VoiceController.joi
 Fix (tooling, not product): give the `voice` entry a pinned controller override or the same settle handling `voice-rejoin-*` already uses.
 Severity: low, harness only - it removed three screen-state groups from what this review could verify at those specific breakpoints, but the equivalent real states (connecting, in-call, rejoin) are covered and correct elsewhere in this matrix.
 
-**The eject-button permission-scope mismatch is the third instance of one root cause found across this review.**
+~~**The eject-button permission-scope mismatch is the third instance of one root cause found across this review.**
 `member_profile.dart:297,301-305` computes `canEject` from the caller's deployment-wide base permission bitmask (`myPermissionsProvider`, explicitly "base (deployment-level)" per `admin_providers.dart:25-29`), while the server's `POST .../voice/participants/{user_id}/kick` route is deliberately channel-scoped - its own doc comment says "Gated on `KICK_MEMBERS` in that channel, evaluated per channel rather than deployment-wide" (`voice.rs:303-305`), checking `permissions_in_channel` and `granted_permissions_in_channel`, never the base bitmask.
 Concretely, in both directions: a moderator granted `KICK_MEMBERS` only via a channel overwrite on that one voice channel never sees the Eject button at all, even though the server would honour the kick; a member holding `KICK_MEMBERS` deployment-wide but denied it via an overwrite on that specific channel sees the button, taps Eject, and gets a 403 the confirmation dialog gave no reason to expect.
 Neither is a security hole - the server is the real authority and enforces correctly either way - but it is a real affordance/action contract mismatch, not visible in any single captured screenshot since no member-profile popover is among the captured voice screens.
 Fix: read a channel-scoped permission for `canEject` specifically, the way `canTimeOut` and `canRemove` are already correctly matched to their own deployment-wide-checked routes.
-This is the same root-cause shape (a UI-side permission check scoped differently from the server route it gates) as findings recorded in `shell.md` and `settings.md`; see those reports for the other two instances.
+This is the same root-cause shape (a UI-side permission check scoped differently from the server route it gates) as findings recorded in `shell.md` and `settings.md`; see those reports for the other two instances.~~
+Already closed on main, not part of this change: `member_profile.dart`'s `canEject` now reads `myChannelPermissionsProvider(voice.channelId!)`, part of the decision-0011 per-channel-permissions sweep (PR #523, see CLAUDE.md's "The client asked one permission question and the server answered a different one, in eight places," 2026-08-10) that landed before this pass started. Checked directly against current source rather than assumed stale.
 
 **Icon-vs-colour state carrying is consistently strong across this entire surface.**
 Mic, camera, share, and pending state all change glyph shape, not merely tint, everywhere checked: call controls, participant-tile badges, the account-row mic glyph, and the collapsed call strip.

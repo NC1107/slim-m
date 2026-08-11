@@ -177,6 +177,37 @@ void main() {
       find.text('The canvas is not available in this channel.'),
       findsOneWidget,
     );
+    expect(
+      tester.widget<AppErrorState>(find.byType(AppErrorState)).onRetry,
+      isNull,
+      reason: 'a permission denial would just fail the same way again',
+    );
+  });
+
+  /// canvas.md: an almost-certainly-transient failure left closing and
+  /// reopening the pane as the only way forward, with nothing on screen
+  /// saying so.
+  testWidgets('a generic load failure offers Retry, which re-fetches', (
+    tester,
+  ) async {
+    final fixture = CanvasPaneFixture(viewportStatus: 500);
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+
+    expect(find.text('The canvas could not be loaded.'), findsOneWidget);
+    final before = fixture.viewportGets;
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(
+      fixture.viewportGets,
+      greaterThan(before),
+      reason: 'Retry must re-run the same fetch, not just clear the banner',
+    );
   });
 
   /// Silently dropping objects is what the strategy forbids: a truncated page

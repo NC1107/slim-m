@@ -62,7 +62,11 @@ class CanvasPresenceBubble extends StatelessWidget {
 /// rather than a second badge bar, and their name in plain text underneath.
 /// The one thing this still needs from the tile chrome it replaces is a
 /// name - unlike a member-list row, a canvas can hold several of these at
-/// once with nothing else on screen saying whose avatar is whose.
+/// once with nothing else on screen saying whose avatar is whose. That name
+/// sits on a translucent pill, matching `_NameBadge`'s own background: a
+/// marker can land over anything on the canvas, ink included, and a plain
+/// drop shadow tuned for the empty background loses to a light note fill
+/// directly underneath it.
 class _AvatarMarker extends StatelessWidget {
   const _AvatarMarker({required this.participant});
 
@@ -107,16 +111,24 @@ class _AvatarMarker extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.s4),
-          Text(
-            participant.isLocal
-                ? '${participant.name} (you)'
-                : participant.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: AppText.caption.copyWith(
-              color: tokens.textPrimary,
-              shadows: [Shadow(color: tokens.surfaceBase, blurRadius: 4)],
+          // See the class doc above for why this is a pill, not a shadow.
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s8,
+              vertical: 2,
+            ),
+            decoration: BoxDecoration(
+              color: tokens.surfaceBase.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadii.full),
+            ),
+            child: Text(
+              participant.isLocal
+                  ? '${participant.name} (you)'
+                  : participant.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppText.caption.copyWith(color: tokens.textPrimary),
             ),
           ),
         ],

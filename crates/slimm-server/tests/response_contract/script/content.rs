@@ -380,6 +380,12 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
             root,
         )
         .await;
+    c.get(
+        "getThreadParent",
+        &format!("/channels/{}/thread-parent", text(&thread, "id")),
+        root,
+    )
+    .await;
     // A reply, so thread_reply_count/thread_last_reply_at below exercise a real value.
     c.json(
         "sendMessage",
