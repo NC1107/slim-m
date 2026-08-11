@@ -137,11 +137,14 @@ jobs:
           name: linux-desktop-shell-smoke-bundle
           path: bundle
 
-      - name: xvfb and window-manipulation tools
+      # linux-compiles builds with -dev packages on its own runner; this job only downloads the binary, so it needs the matching runtime libs named explicitly.
+      - name: xvfb, window-manipulation tools, and the binary's runtime libs
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            xvfb fluxbox wmctrl xdotool libgl1-mesa-dri mesa-utils
+            xvfb fluxbox wmctrl xdotool libgl1-mesa-dri mesa-utils \
+            libgtk-3-0 libsecret-1-0 libgstreamer1.0-0 \
+            libgstreamer-plugins-base1.0-0 libayatana-appindicator3-1
 
       - name: chmod the downloaded binary
         run: chmod +x bundle/slimm_app

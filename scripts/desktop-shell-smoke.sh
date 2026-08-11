@@ -5,6 +5,13 @@
 # documented default size, a saved geometry changes the next launch's size,
 # and a close request no longer terminates the process. See docs/decisions/
 # 0012-desktop-window-shell.md for what this can and cannot prove.
+#
+# There is no org.kde.StatusNotifierWatcher on this bus - fluxbox is a plain
+# window manager, not a full desktop shell - so the close path here always
+# takes the minimizeToTaskbar fallback, never hideToTray. The final assertion
+# checks the window is still listed by wmctrl after close, not only that the
+# process is still alive: both branches leave the process running, so liveness
+# alone cannot tell a correct fallback from a wrongly hidden, unreachable window.
 set -euo pipefail
 
 BUNDLE="${1:?usage: desktop-shell-smoke.sh <bundle-dir>}"
@@ -18,7 +25,20 @@ mkdir -p "$HOME" "$XDG_CONFIG_HOME"
 
 Xvfb "$DISPLAY" -screen 0 1920x1080x24 &
 XVFB_PID=$!
-sleep 1
+
+wait_for_x_socket() {
+  local timeout_s="$1" waited=0
+  while [ ! -S "/tmp/.X11-unix/X${DISPLAY#:}" ]; do
+    sleep 0.2
+    waited=$((waited + 1))
+    if [ "$waited" -ge "$((timeout_s * 5))" ]; then
+      echo "::error::Xvfb never opened its socket within ${timeout_s}s"
+      exit 1
+    fi
+  done
+}
+wait_for_x_socket 10
+
 fluxbox &
 FLUXBOX_PID=$!
 sleep 1
@@ -26,6 +46,8 @@ sleep 1
 cleanup() {
   kill "${APP_PID:-0}" 2>/dev/null || true
   kill "$FLUXBOX_PID" 2>/dev/null || true
+  # Letting fluxbox actually exit before Xvfb goes quiets its own XIOError.
+  wait "$FLUXBOX_PID" 2>/dev/null || true
   kill "$XVFB_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -75,7 +97,7 @@ wait_for_window 30
 assert_geometry 900 650
 echo "::endgroup::"
 
-echo "::group::a close request no longer terminates the process"
+echo "::group::a close request no longer terminates the process, and the window stays reachable"
 sleep 3
 wmctrl -c "slim-m"
 sleep 3
@@ -83,5 +105,9 @@ if ! kill -0 "$APP_PID" 2>/dev/null; then
   echo "::error::the process exited after a close request; setPreventClose did not intercept it"
   exit 1
 fi
-echo "process still running after close, as decision 0012's close-to-tray/minimise expects"
+if ! wmctrl -l | grep -q "slim-m"; then
+  echo "::error::the window is unreachable after close; that is hideToTray with no tray, not minimizeToTaskbar"
+  exit 1
+fi
+echo "process still running and its window still reachable after close, as decision 0012's fallback expects"
 echo "::endgroup::"
