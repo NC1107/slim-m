@@ -7,7 +7,9 @@
 /// report card identifies nobody".
 ///
 /// The quick actions (jump, delete, time out, remove) are in
-/// `report_card_actions_test.dart`, split out for the line budget.
+/// `report_card_actions_test.dart`, split out for the line budget; geometry
+/// (does a long value actually fit, rather than merely render) is in
+/// `report_card_layout_test.dart`, split out for the same reason.
 library;
 
 import 'dart:io' show SocketException;

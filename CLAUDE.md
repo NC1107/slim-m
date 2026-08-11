@@ -38,10 +38,39 @@ Today's reviewer had to hand-write a throwaway widget test reading `DockHeightRe
 `floating_dock_edge_gap_test.dart` reruns exactly the case that prompted this - the canvas dock's 12dp gap and `voice_screen.dart`'s `SafeArea(minimum: EdgeInsets.all(AppSpacing.s12))` - through the shared helper, and both pass against the real widget tree.
 Mutation-tested: reverting either `edgeGap`'s bottom-edge arithmetic or `withRealShadows`'s repaint-then-restore sequence by hand fails exactly the tests written for that line and nothing else, restored by hand afterward (never `git checkout --`, which would have destroyed the surrounding uncommitted work).
 
-**One real, previously-invisible product bug surfaced as a side effect, named here rather than fixed: the reported-message quote box in `report_card.dart` overflows its card at phone width once real content actually loads.**
+~~**One real, previously-invisible product bug surfaced as a side effect, named here rather than fixed: the reported-message quote box in `report_card.dart` overflows its card at phone width once real content actually loads.**~~
+Fixed 2026-08-11; see "The report card overflow, and how far the mid-flight-capture problem actually spreads" below.
 `admin-reports at phone-portrait` now fails `scripts/ui-capture.sh`'s own overflow assertion, and it is real: the harness's fixed settle-pump count previously never gave the report fetch enough frames to resolve before capturing, so every prior run of this scenario - in the writing path and in `client-ci`'s own gating "no overflow" check alike - was silently checking a not-yet-loaded screen.
 Confirmed by isolating the cause: a single bare extra `tester.pump()` with nothing to do with shadows reproduces the identical overflow, and the written PNG shows the real Flutter overflow hazard stripe cutting into the quoted message text.
 Left to the screen-review pass working through `docs/reports/screen-review/`; the fix here does not touch `report_card.dart`, `renderSurface`'s settle-pump count, or `ui_snapshot_test.dart`'s admin-reports scenario, since widening the pump count generally would newly fail `client-ci` itself rather than only this capture run.
+
+## The report card overflow, and how far the mid-flight-capture problem actually spreads (2026-08-11)
+
+Follows directly from PR #543 above: it turned real shadows on and, as a side effect, found a genuine overflow in `report_card.dart`'s Reporter row at phone width, deliberately left unfixed pending a wider look at whether other captured surfaces were in the same state.
+Read this before touching `report_card.dart`'s Reporter row, `report_card_labels.dart`, or `renderSurface`'s pump count in `ui_snapshot_support.dart`.
+
+**The overflow was never really about shadows, or even about the report list itself - it was a second, nested async hop.**
+`ReportsController.refresh()` resolves within the harness's ordinary two pumps every time; what does not is `ReportCard._requestProfiles()`, fired from `initState` once a card actually mounts, which asks `batchProfilesControllerProvider` to resolve the reporter's real name over a second HTTP round trip.
+Until that resolves, `reporterLabel` deliberately answers `'Loading...'` - short, harmless, and what every prior capture of this screen actually showed, which is why `client-ci`'s plain `flutter test` (no `SLIMM_UI_SNAPSHOTS`, so `withRealShadows`'s extra pump never runs at all) still cannot see this defect today: its fixed two-pump budget never reaches past the placeholder into the real, long display name that overflows.
+Only `scripts/ui-capture.sh`'s path gets there, and only by accident - `withRealShadows`'s repaint-then-restore pump was written for pixel realism, not settling, and happened to be the one extra turn of the event loop this particular resolve needed.
+
+**The fix matches what `attachment_view.dart` already does for a long filename beside a fixed trailing label: `Expanded` with `maxLines: 1` and `TextOverflow.ellipsis`, not a new pattern.**
+The Reporter row was a bare `Text` beside a `Spacer()`; a `Spacer` only pushes its neighbours apart; nothing capped the name's own width, so it painted past the card's edge instead of truncating.
+`report_card_layout_test.dart` (split out of `report_card_test.dart` for the line budget, the same split that file's own doc comment already draws for the quick actions) drives a real 44-character display name through the real widget tree at a real 390px viewport and reads `tester.getRect`'s answer through `support/geometry.dart`'s `expectClearOfEdge`, rather than only asserting the label is present - `find.text` would keep finding it even mid-overflow, which is exactly the vacuous shape this project's own audits have found before.
+Mutation-tested: reverting the `Expanded`/`Spacer` swap by hand fails exactly that test and nothing else.
+
+**Every other surface `scripts/ui-capture.sh` writes was checked for the same class of bug, by rendering each one twice - once at the harness's ordinary budget, once with one bare extra `tester.pump()` - and diffing every `Text` in the tree between the two runs.**
+Every admin/settings screen driven by a plain `FutureProvider` (roles, invites, custom emoji, overwrites, removed members, categories, analytics) rendered byte-identical text both times, including `invites_screen.dart`'s own long role-grant name (`_roleGrantLabel`), which resolves within the ordinary budget because it is one flat `ref.watch`, never a second hop triggered by a child's own `initState`.
+The core shell surfaces (`channel`, `no-channel-selected`, `channel-offline-empty`, `dm-normal-transcript`, `onboarding`, `sign-in`, `settings`, `space-settings`) were identical too.
+`author_label.dart`'s `authorLabel` - the function every other `batchProfilesControllerProvider` consumer in this client actually calls (`channel_search.dart`, `pinned_messages_sheet.dart`, `reply_banner.dart`, `reply_quote.dart`, `command_palette_items.dart`, `canvas_activity_panel.dart`, `message_row_identity.dart`) - is why none of them share this bug: it falls back to a message's own cached `authorDisplayName` while the batch resolve is still in flight, so it never has a bare, unresolved id to show in the first place.
+`report_card_labels.dart`'s three functions are the one place in this client that resolves an id through this provider with no such fallback, because a `Report` carries only ids on the wire - there is nothing cached to fall back to.
+That asymmetry, not the shadow fix, is the actual reason this was the only surface affected.
+
+**One surface did differ between the two renders, and it is not a defect - naming it rather than letting it look like a second finding for a future reader.**
+`thread` showed an unread badge and a placeholder "There is more history above." line at the ordinary budget, and neither at one extra pump, where the start header instead read "Replies to the original message appear here." - `channel_screen.dart`'s own read-marking and history-pagination probes, both real async calls, simply had not resolved yet at the earlier point.
+No overflow, no exception, no empty frame at either point; both are real, valid product states along the same loading sequence, so this is recorded rather than fixed.
+
+**`renderSurface`'s own pump count is unchanged.** Widening it unconditionally would have meant re-verifying all ~2,300 tests across every surface this harness renders - voice, canvas, DM calls, every overlay - for a class of bug this pass found in exactly one place; the prior author's own reasoning for leaving it alone (a wider budget could newly fail `client-ci` on some surface nobody has checked yet) still holds, and the check above is real evidence for the answer rather than a guess: report card was the only surface with an actual defect, so a broad rewrite was not worth the risk it would have reintroduced.
 
 ## A screen share outliving its call, and how far the platform's own stop mechanism actually reaches (2026-08-10)
 
