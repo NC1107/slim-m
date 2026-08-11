@@ -151,6 +151,14 @@ impl Store {
 
     /// A channel's pinned messages, newest pin first, joined against the
     /// message and author in one query rather than one round trip per pin.
+    ///
+    /// The join re-asserts `m.channel_id = p.channel_id` rather than trusting
+    /// the pin row's own channel. `pin_message` is the only writer today and
+    /// it checks, so this changes no answer now; what it buys is that a future
+    /// second writer cannot turn this read into a cross-channel content leak,
+    /// which is a cheap guarantee to hold on a path that returns whole message
+    /// bodies. This codebase's recurring shape is a second path appearing
+    /// later and nothing revisiting the first one's assumptions.
     pub async fn list_pinned_messages(
         &self,
         channel_id: ChannelId,
@@ -164,7 +172,7 @@ impl Store {
                       m.created_at AS "created_at!", m.edited_at,
                       m.reply_to_id AS "reply_to_id: MessageId"
                FROM pinned_messages p
-               JOIN messages m ON m.id = p.message_id
+               JOIN messages m ON m.id = p.message_id AND m.channel_id = p.channel_id
                LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
                WHERE p.channel_id = ? AND m.deleted_at IS NULL
                ORDER BY p.pinned_at DESC"#,

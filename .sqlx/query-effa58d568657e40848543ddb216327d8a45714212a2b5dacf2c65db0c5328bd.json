@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"one!: i64\" FROM channels\n                       WHERE id = ? AND deleted_at IS NULL AND kind != 'dm'\n                         AND parent_message_id IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "one!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "effa58d568657e40848543ddb216327d8a45714212a2b5dacf2c65db0c5328bd"
+}
