@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Push notification triggering: turns a new message into (at most) one
-//! content-free wake per idle recipient, without ever slowing down or failing
-//! the send that triggered it.
+//! Push notification triggering: turns a new message into (at most) one wake
+//! per idle recipient, without ever slowing down or failing the send that
+//! triggered it.
+//!
+//! What that wake carries is [`envelope`]'s subject, and the short version is
+//! that the relay can read none of it either way: a device that asked for
+//! message content gets a preview sealed to its own key, and every other
+//! device gets the same content-free envelope it always did.
 //!
 //! [`PushSender`] is deliberately a first-class two-state thing rather than an
 //! error path. `SLIMM_PUSH_RELAY_URL` and `SLIMM_PUSH_RELAY_KEY` are both
@@ -32,12 +37,13 @@
 //! nothing here can turn a successful send into an error, and nothing here can
 //! make it slower.
 
+mod debounce;
 mod envelope;
 mod recipients;
 mod relay;
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::Context;
 use url::{Host, Url};
@@ -45,6 +51,8 @@ use url::{Host, Url};
 use crate::config::Config;
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 use crate::store::{Store, now_ms};
+
+use debounce::Debounce;
 
 pub use recipients::message_recipients;
 
@@ -157,9 +165,14 @@ impl PushSender {
 }
 
 /// What [`PushSender::notify_message`] needs to know about a message that was
-/// just committed, bundled rather than five positional arguments: `content`
-/// is read only to resolve `@`-mentions for [`message_recipients`]'s thread
-/// narrowing, and is never itself put on the wire to a relay.
+/// just committed, bundled rather than five positional arguments.
+///
+/// `content` is read to resolve `@`-mentions for [`message_recipients`]'s
+/// thread narrowing, and, for a device that asked for it, to build the preview
+/// sealed inside that device's own envelope. It is never put on the wire in a
+/// form the relay can read: a preview only ever exists inside the sealed box,
+/// which is why this is a per-device choice at all rather than a deployment
+/// one. See [`envelope`]'s module docs.
 pub struct SentMessage {
     pub channel_id: ChannelId,
     pub author_id: UserId,
@@ -249,7 +262,15 @@ async fn deliver(enabled: Arc<Enabled>, debounce: Arc<Debounce>, store: Store, s
         return;
     }
 
-    let messages = envelope::seal_for_message(channel_id, message_id, seq, &targets);
+    // Only when a device actually asked, so nobody opting in costs nothing.
+    let preview = if targets.iter().any(|target| target.include_content) {
+        message_preview(&store, channel_id, author_id, &content).await
+    } else {
+        None
+    };
+
+    let messages =
+        envelope::seal_for_message(channel_id, message_id, seq, preview.as_ref(), &targets);
 
     // Nothing sealed means nothing was attempted, so release; see the note on
     // this function.
@@ -321,6 +342,48 @@ async fn deliver(enabled: Arc<Enabled>, debounce: Arc<Debounce>, store: Store, s
     }
 }
 
+/// The sender and channel names a content-carrying envelope needs, resolved
+/// once for the whole batch.
+///
+/// One preview serves every recipient because none of it is per-viewer:
+/// blocking is already settled further up ([`message_recipients`] drops a
+/// blocked author's recipients outright rather than filtering their
+/// notification afterwards), and a display name and channel name are the same
+/// for everybody who can see the message at all.
+///
+/// `None` on any failure, and on an author or channel that no longer resolves:
+/// the envelope simply goes out content-free, which is exactly what every
+/// device got before this existed. A preview is a nicety, and it must never be
+/// the reason somebody is not woken at all.
+async fn message_preview(
+    store: &Store,
+    channel_id: ChannelId,
+    author_id: UserId,
+    content: &str,
+) -> Option<envelope::MessagePreview> {
+    let author = match store.user_profile(author_id).await {
+        Ok(Some(author)) => author,
+        Ok(None) => return None,
+        Err(err) => {
+            tracing::warn!(error = %err, "push: failed to resolve the author for a preview");
+            return None;
+        }
+    };
+    // A DM's and a thread's channel row both carry an empty name by design.
+    let channel_name = match store.channel(channel_id).await {
+        Ok(channel) => channel.map(|c| c.name).unwrap_or_default(),
+        Err(err) => {
+            tracing::warn!(error = %err, "push: failed to resolve the channel for a preview");
+            return None;
+        }
+    };
+    Some(envelope::MessagePreview::new(
+        &author.display_name,
+        &channel_name,
+        content,
+    ))
+}
+
 /// True if a device's most recent lifecycle report says foreground and that
 /// report is still fresh. WebSocket presence is deliberately not consulted
 /// here: iOS suspends a socket without closing it, so a connected socket is
@@ -333,74 +396,6 @@ fn is_foreground_and_recent(target: &crate::store::PushTarget, now: i64) -> bool
         return false;
     };
     state == "foreground" && now - reported_at < FOREGROUND_FRESHNESS_MS
-}
-
-/// Collapses a burst of triggers into one per `(channel, recipient)`.
-/// Leading-edge: the first trigger after a window last elapsed, or was
-/// released (see [`Self::release_if_undelivered`]), opens the window and
-/// records `now`; every other trigger for that same pair inside the window is
-/// suppressed.
-///
-/// Keyed on the pair, not the channel alone: one recipient's suppressed
-/// window must never silence a different recipient's wake. Debouncing exists
-/// to collapse a burst of messages for one person, not to let one recipient's
-/// state (or bad luck) silence somebody else's notification.
-struct Debounce {
-    window_ms: i64,
-    last_fired: Mutex<HashMap<(ChannelId, UserId), i64>>,
-}
-
-impl Debounce {
-    fn new(window_ms: i64) -> Self {
-        Self {
-            window_ms,
-            last_fired: Mutex::new(HashMap::new()),
-        }
-    }
-
-    /// Attempts to open a window for `(channel_id, user_id)`. `Some(fired_at)`
-    /// means this trigger is not suppressed and the caller now owns the
-    /// window: if it turns out nobody was actually notified, it must call
-    /// [`Self::release_if_undelivered`] with the same `fired_at`, or the next
-    /// genuine trigger for this recipient would be wrongly suppressed too.
-    /// `None` means a burst is already collapsed into an open window.
-    fn try_fire(&self, channel_id: ChannelId, user_id: UserId) -> Option<i64> {
-        self.try_fire_at(channel_id, user_id, now_ms())
-    }
-
-    /// [`Self::try_fire`] with an explicit clock, for deterministic tests.
-    fn try_fire_at(&self, channel_id: ChannelId, user_id: UserId, now: i64) -> Option<i64> {
-        let mut last_fired = self.lock();
-        let key = (channel_id, user_id);
-        match last_fired.get(&key) {
-            Some(&last) if now - last < self.window_ms => None,
-            _ => {
-                last_fired.insert(key, now);
-                Some(now)
-            }
-        }
-    }
-
-    /// Releases a window that turned out to deliver nobody anything, so the
-    /// next trigger for this recipient is not suppressed by a burst whose
-    /// leading edge failed. A no-op if the window has already moved on (it
-    /// elapsed naturally and was re-opened by a later, successful trigger)
-    /// since `fired_at`, so a late release from a slow delivery task can never
-    /// claw back a newer window.
-    fn release_if_undelivered(&self, channel_id: ChannelId, user_id: UserId, fired_at: i64) {
-        let mut last_fired = self.lock();
-        let key = (channel_id, user_id);
-        if last_fired.get(&key) == Some(&fired_at) {
-            last_fired.remove(&key);
-        }
-    }
-
-    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<(ChannelId, UserId), i64>> {
-        match self.last_fired.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
 }
 
 /// Refuses a push relay URL that would send every recipient's APNs/FCM token
@@ -444,101 +439,6 @@ fn is_local_relay_host(host: Option<Host<&str>>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn user() -> UserId {
-        UserId::generate()
-    }
-
-    #[test]
-    fn debounce_collapses_a_burst_then_reopens() {
-        let debounce = Debounce::new(1_000);
-        let channel = ChannelId::generate();
-        let bob = user();
-        assert!(
-            debounce.try_fire_at(channel, bob, 0).is_some(),
-            "first trigger fires"
-        );
-        assert!(
-            debounce.try_fire_at(channel, bob, 500).is_none(),
-            "inside the window is suppressed"
-        );
-        assert!(
-            debounce.try_fire_at(channel, bob, 999).is_none(),
-            "still inside the window"
-        );
-        assert!(
-            debounce.try_fire_at(channel, bob, 1_000).is_some(),
-            "the window has fully elapsed"
-        );
-    }
-
-    #[test]
-    fn debounce_is_independent_per_channel() {
-        let debounce = Debounce::new(1_000);
-        let a = ChannelId::generate();
-        let b = ChannelId::generate();
-        let bob = user();
-        assert!(debounce.try_fire_at(a, bob, 0).is_some());
-        // A burst in channel a does not suppress channel b.
-        assert!(debounce.try_fire_at(b, bob, 0).is_some());
-        assert!(debounce.try_fire_at(a, bob, 100).is_none());
-    }
-
-    /// Regression: the debounce used to be keyed on channel alone, so a window
-    /// opened by one recipient's message silenced every other recipient in the
-    /// same channel for the rest of that window.
-    #[test]
-    fn debounce_is_independent_per_recipient() {
-        let debounce = Debounce::new(1_000);
-        let channel = ChannelId::generate();
-        let bob = user();
-        let carol = user();
-        assert!(debounce.try_fire_at(channel, bob, 0).is_some());
-        assert!(
-            debounce.try_fire_at(channel, carol, 50).is_some(),
-            "bob's open window must not suppress carol's wake"
-        );
-        assert!(
-            debounce.try_fire_at(channel, bob, 100).is_none(),
-            "bob's own burst is still collapsed"
-        );
-    }
-
-    /// Regression: a leading trigger that ends up delivering nobody anything
-    /// (a relay error, or every device filtered out) used to spend the window
-    /// regardless, dropping the next message's wake outright instead of merely
-    /// collapsing it.
-    #[test]
-    fn release_if_undelivered_reopens_the_window_immediately() {
-        let debounce = Debounce::new(1_000);
-        let channel = ChannelId::generate();
-        let bob = user();
-        let fired_at = debounce
-            .try_fire_at(channel, bob, 0)
-            .expect("first trigger fires");
-        debounce.release_if_undelivered(channel, bob, fired_at);
-        assert!(
-            debounce.try_fire_at(channel, bob, 1).is_some(),
-            "a window that delivered nothing must not suppress the very next trigger"
-        );
-    }
-
-    #[test]
-    fn release_if_undelivered_does_not_clobber_a_newer_window() {
-        let debounce = Debounce::new(1_000);
-        let channel = ChannelId::generate();
-        let bob = user();
-        let stale_fired_at = debounce.try_fire_at(channel, bob, 0).unwrap();
-        // The window elapses naturally and opens again for a later message.
-        assert!(debounce.try_fire_at(channel, bob, 1_000).is_some());
-        // A late release from the first (long-finished) delivery task must
-        // not tear down the second, newer window.
-        debounce.release_if_undelivered(channel, bob, stale_fired_at);
-        assert!(
-            debounce.try_fire_at(channel, bob, 1_500).is_none(),
-            "the newer window must still be in effect"
-        );
-    }
 
     #[test]
     fn disabled_sender_reports_disabled() {

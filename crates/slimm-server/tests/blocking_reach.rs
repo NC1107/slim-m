@@ -15,7 +15,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
-use slimm_server::store::Store;
+use slimm_server::store::{PushRegistration, Store};
 
 mod support;
 
@@ -179,7 +179,17 @@ async fn a_blocker_is_not_a_push_recipient_for_the_author_they_blocked() {
         (carol, carol_device, "carol-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }

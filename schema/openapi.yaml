@@ -5220,6 +5220,22 @@ components:
             The device's X25519 public key, base64-encoded (32 bytes decoded).
             Push content is sealed to this key with an anonymous sealed box; a
             device without one registered cannot receive push.
+        include_content:
+          type: boolean
+          default: false
+          description: >
+            Whether this device wants a preview of the message (sender, channel
+            name, and a truncated body) sealed inside its own push envelope.
+            Absent means no, so a client predating this field keeps receiving
+            the content-free envelope it was built for.
+
+
+            Device-scoped, unlike the account-wide notification preference: it
+            decides what can reach one physical device's lock screen, and never
+            whether that device is woken at all. The preview rides inside the
+            sealed box, so the relay and the APNs and FCM infrastructure it
+            forwards through cannot read it - that needs the device's own
+            private key, which never leaves the device.
 
     ReportLifecycleRequest:
       type: object

@@ -18,7 +18,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
-use slimm_server::store::Store;
+use slimm_server::store::{PushRegistration, Store};
 
 mod support;
 
@@ -65,7 +65,17 @@ async fn a_reply_wakes_only_the_parent_author_and_actual_repliers() {
         (carol, carol_device, "carol-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }
@@ -138,11 +148,31 @@ async fn the_first_reply_in_an_empty_thread_still_wakes_the_parent_author() {
     let channel = store.list_channels().await.unwrap()[0].id;
 
     store
-        .register_push(alice, alice_device, "ios", "alice-token", None, &KEY)
+        .register_push(
+            alice,
+            alice_device,
+            PushRegistration {
+                platform: "ios",
+                push_token: "alice-token",
+                voip_push_token: None,
+                push_public_key: &KEY,
+                include_content: false,
+            },
+        )
         .await
         .unwrap();
     store
-        .register_push(bob, bob_device, "ios", "bob-token", None, &KEY)
+        .register_push(
+            bob,
+            bob_device,
+            PushRegistration {
+                platform: "ios",
+                push_token: "bob-token",
+                voip_push_token: None,
+                push_public_key: &KEY,
+                include_content: false,
+            },
+        )
         .await
         .unwrap();
 
@@ -182,7 +212,17 @@ async fn a_mention_wakes_a_bystander_the_thread_would_otherwise_exclude() {
         (carol, carol_device, "carol-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }
@@ -246,7 +286,17 @@ async fn a_mention_never_reaches_somebody_without_view_permission() {
         (carol, carol_device, "carol-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }
@@ -298,7 +348,17 @@ async fn blocking_still_holds_inside_a_thread() {
         (carol, carol_device, "carol-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }
@@ -362,11 +422,31 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
     let channel = store.list_channels().await.unwrap()[0].id;
 
     store
-        .register_push(alice, alice_device, "ios", "alice-token", None, &KEY)
+        .register_push(
+            alice,
+            alice_device,
+            PushRegistration {
+                platform: "ios",
+                push_token: "alice-token",
+                voip_push_token: None,
+                push_public_key: &KEY,
+                include_content: false,
+            },
+        )
         .await
         .unwrap();
     store
-        .register_push(bob, bob_device, "ios", "bob-token", None, &KEY)
+        .register_push(
+            bob,
+            bob_device,
+            PushRegistration {
+                platform: "ios",
+                push_token: "bob-token",
+                voip_push_token: None,
+                push_public_key: &KEY,
+                include_content: false,
+            },
+        )
         .await
         .unwrap();
 

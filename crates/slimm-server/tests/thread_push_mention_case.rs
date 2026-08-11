@@ -14,7 +14,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
-use slimm_server::store::Store;
+use slimm_server::store::{PushRegistration, Store};
 
 mod support;
 
@@ -63,7 +63,17 @@ async fn a_mention_wakes_its_target_regardless_of_letter_case() {
         (nick, nick_device, "nick-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }
@@ -124,7 +134,17 @@ async fn a_case_insensitive_mention_can_resolve_to_two_differently_cased_account
         (upper_nick, upper_device, "upper-nick-token"),
     ] {
         store
-            .register_push(user, device, "ios", token, None, &KEY)
+            .register_push(
+                user,
+                device,
+                PushRegistration {
+                    platform: "ios",
+                    push_token: token,
+                    voip_push_token: None,
+                    push_public_key: &KEY,
+                    include_content: false,
+                },
+            )
             .await
             .unwrap();
     }

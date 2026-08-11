@@ -149,7 +149,13 @@ async fn register_user(store: &Store, username: &str) -> String {
 /// "ios" or "android" - [`http::push`](slimm_server)'s `RegisterRequest`
 /// accepts nothing else - so the caller picks which of the relay's two
 /// platforms this device's real, later-captured entry will exercise.
-async fn register_push(app: &Router, token: &str, platform: &str, push_token: &str) -> SecretKey {
+async fn register_push(
+    app: &Router,
+    token: &str,
+    platform: &str,
+    push_token: &str,
+    include_content: bool,
+) -> SecretKey {
     let secret = SecretKey::generate(&mut OsRng.unwrap_err());
     let public = secret.public_key();
     let response = app
@@ -162,6 +168,7 @@ async fn register_push(app: &Router, token: &str, platform: &str, push_token: &s
                 "platform": platform,
                 "push_token": push_token,
                 "push_public_key": BASE64.encode(public.as_bytes()),
+                "include_content": include_content,
             })),
         ))
         .await
@@ -247,20 +254,41 @@ fn find_entry(messages: &[Value], token: &str) -> Value {
 /// unseals with the device's own key, and nothing else - a field rename or
 /// an extra field fails right here, in server CI, before it ever reaches the
 /// relay.
+///
+/// `want_content` is what this device asked for at registration, checked
+/// against the *unsealed* envelope. That the outer key set is identical
+/// either way is the point: opting into content changes what is inside the
+/// sealed box and nothing the relay can see, so a change that ever hoisted a
+/// preview field outside the seal fails the key-set assertion below.
 fn assert_real_entry_shape(
     entry: &Value,
     want_platform: &str,
     want_token: &str,
     secret: &SecretKey,
+    want_content: bool,
 ) {
     assert_eq!(entry["platform"], want_platform);
     assert_eq!(entry["token"], want_token);
     assert_eq!(entry["kind"], "message");
     let payload = entry["payload"].as_str().expect("payload is a JSON string");
+    assert!(
+        payload.len() <= RELAY_MAX_PAYLOAD_BYTES,
+        "a real payload must fit the relay's own limit, was {}",
+        payload.len()
+    );
     let sealed = BASE64.decode(payload).expect("payload is valid base64");
-    secret
+    let plaintext = secret
         .unseal(&sealed)
         .expect("payload unseals with the device's own key");
+    let envelope: Value = serde_json::from_slice(&plaintext).expect("the sealed envelope is JSON");
+    for field in ["sender", "body"] {
+        assert_eq!(
+            envelope.get(field).is_some(),
+            want_content,
+            "{field} should be {} in this device's envelope: {envelope}",
+            if want_content { "present" } else { "absent" }
+        );
+    }
     let keys: BTreeSet<_> = entry
         .as_object()
         .expect("entry is a JSON object")
@@ -323,8 +351,16 @@ async fn push_relay_contract_fixture() {
     let alice_token = register_user(&store, "alice").await;
     let bob_token = register_user(&store, "bob").await;
     let carol_token = register_user(&store, "carol").await;
-    let bob_secret = register_push(&app, &bob_token, "ios", REAL_CASE_TOKEN_IOS).await;
-    let carol_secret = register_push(&app, &carol_token, "android", REAL_CASE_TOKEN_ANDROID).await;
+    // One device of each shape; see this test's own module doc for why.
+    let bob_secret = register_push(&app, &bob_token, "ios", REAL_CASE_TOKEN_IOS, true).await;
+    let carol_secret = register_push(
+        &app,
+        &carol_token,
+        "android",
+        REAL_CASE_TOKEN_ANDROID,
+        false,
+    )
+    .await;
 
     let sent = app
         .clone()
@@ -352,12 +388,13 @@ async fn push_relay_contract_fixture() {
 
     // Self-check: the part of the contract slim-m alone can verify. A rename, a
     // dropped field or a changed kind/platform fails here, in server CI.
-    assert_real_entry_shape(&ios_entry, "ios", REAL_CASE_TOKEN_IOS, &bob_secret);
+    assert_real_entry_shape(&ios_entry, "ios", REAL_CASE_TOKEN_IOS, &bob_secret, true);
     assert_real_entry_shape(
         &android_entry,
         "android",
         REAL_CASE_TOKEN_ANDROID,
         &carol_secret,
+        false,
     );
 
     // Synthetic edge cases, cloned from a real entry and overridden only where

@@ -86,7 +86,7 @@ pub use polls::{
     CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,
     PollOption, PollTally, VoteError,
 };
-pub use push::{PushError, PushTarget};
+pub use push::{PushError, PushRegistration, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use removals::{RemoveMemberError, SpaceRemoval};

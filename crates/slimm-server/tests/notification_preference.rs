@@ -13,7 +13,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
 use slimm_server::notifications::NotificationPreference;
-use slimm_server::store::Store;
+use slimm_server::store::{PushRegistration, Store};
 
 mod support;
 
@@ -43,7 +43,17 @@ async fn account(store: &Store, username: &str) -> (UserId, DeviceId) {
 
 async fn register(store: &Store, user: UserId, device: DeviceId, token: &str) {
     store
-        .register_push(user, device, "ios", token, None, &KEY)
+        .register_push(
+            user,
+            device,
+            PushRegistration {
+                platform: "ios",
+                push_token: token,
+                voip_push_token: None,
+                push_public_key: &KEY,
+                include_content: false,
+            },
+        )
         .await
         .unwrap();
 }

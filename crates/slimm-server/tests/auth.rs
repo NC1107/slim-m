@@ -16,7 +16,7 @@ use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{RefreshOutcome, RegisterError, Store};
+use slimm_server::store::{PushRegistration, RefreshOutcome, RegisterError, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -145,10 +145,13 @@ async fn removing_a_device_kills_its_session_and_push_registration() {
         .register_push(
             user_id,
             tokens.device_id,
-            "ios",
-            "a-push-token",
-            None,
-            &[7u8; 32],
+            PushRegistration {
+                platform: "ios",
+                push_token: "a-push-token",
+                voip_push_token: None,
+                push_public_key: &[7u8; 32],
+                include_content: false,
+            },
         )
         .await
         .unwrap();
