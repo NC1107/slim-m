@@ -239,12 +239,25 @@ async fn sync(
 
 /// Collapses repeated channels, keeping the cursor that asks for the most (the
 /// smallest `after_seq`), so the request cannot be padded to inflate work.
+///
+/// The op cursor reconciles the same way: two `Some`s keep the smaller, and a
+/// `Some` beats an absent one, since delivering ops is asking for more than
+/// adopting a head. This used to silently keep whichever duplicate came
+/// first, which for a `None`-then-`Some` pair dropped the op cursor
+/// entirely - latent, since the real client never sends duplicates, but a
+/// dedupe that quietly discards half a cursor is wrong on its own terms.
 fn dedupe_scopes(scopes: Vec<ScopeCursor>) -> Vec<ScopeCursor> {
     let mut deduped: Vec<ScopeCursor> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
     for cursor in scopes {
         match index.get(&cursor.channel_id) {
-            Some(&at) => deduped[at].after_seq = deduped[at].after_seq.min(cursor.after_seq),
+            Some(&at) => {
+                deduped[at].after_seq = deduped[at].after_seq.min(cursor.after_seq);
+                deduped[at].after_op_seq = match (deduped[at].after_op_seq, cursor.after_op_seq) {
+                    (Some(kept), Some(dup)) => Some(kept.min(dup)),
+                    (kept, dup) => kept.or(dup),
+                };
+            }
             None => {
                 index.insert(cursor.channel_id.clone(), deduped.len());
                 deduped.push(cursor);

@@ -385,6 +385,48 @@ async fn sync_collapses_duplicate_scopes() {
     assert_eq!(scopes[0]["messages"].as_array().unwrap().len(), 5);
 }
 
+/// A duplicate scope's op cursor must survive the collapse: this used to
+/// keep whichever duplicate came first whole, so a None-then-Some pair
+/// silently dropped the op cursor and the caller got no ops at all.
+#[tokio::test]
+async fn sync_keeps_a_duplicate_scopes_op_cursor() {
+    let f = setup(Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES)).await;
+    let channel = f.store.create_channel("general", "text").await.unwrap();
+    let id = MessageId::generate();
+    f.store
+        .send_message(channel.id, f.user_id, id, "hi", &[], None)
+        .await
+        .unwrap();
+    f.store
+        .edit_message(id, "hi, revised", f.user_id)
+        .await
+        .unwrap();
+
+    let body = json_body(
+        f.app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/sync",
+                &f.token,
+                Some(json!({ "scopes": [
+                    { "channel_id": channel.id.to_string(), "after_seq": 0 },
+                    { "channel_id": channel.id.to_string(), "after_seq": 0, "after_op_seq": 0 }
+                ] })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let scopes = body["scopes"].as_array().unwrap();
+    assert_eq!(scopes.len(), 1);
+    assert_eq!(
+        scopes[0]["ops"].as_array().unwrap().len(),
+        1,
+        "the Some op cursor must win over the absent one"
+    );
+}
+
 #[tokio::test]
 async fn sync_far_behind_cursor_asks_for_reset() {
     let f = setup(Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES)).await;

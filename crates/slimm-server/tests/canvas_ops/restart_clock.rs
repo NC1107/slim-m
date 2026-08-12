@@ -80,17 +80,41 @@ async fn a_fresh_store_seeds_its_clock_past_a_pre_restart_high_water_mark() {
     );
 }
 
-/// The seed only has to run once per `Store`: a second op on the same
-/// (already-seeded) instance must not re-read `canvas_ops` on every call,
-/// and must keep advancing rather than re-adopting a lower seed.
+/// The seed only has to run once per `Store`: after the first op, a
+/// future-dated row planted straight into `canvas_ops` must be invisible to
+/// later ops on the same instance. Monotonicity alone cannot prove that - a
+/// reseed-on-every-call implementation is also monotonic (the 2026-08-11
+/// review's test-quality finding), but it would adopt the planted timestamp
+/// and jump ten minutes ahead, which the ceiling here refuses.
 #[tokio::test]
 async fn seeding_runs_once_and_later_calls_still_advance_monotonically() {
-    let (store, _pool, _guard) = new_store_and_pool().await;
+    let (store, pool, _guard) = new_store_and_pool().await;
     let (_token, actor) = register(&store, "root").await;
     let channel = general(&store).await;
 
-    let mut previous = 0;
-    for _ in 0..5 {
+    let object = place(&store, channel, actor, 0).await;
+    let first_op = CanvasOpId::generate();
+    let first = store
+        .submit_canvas_op(
+            channel,
+            actor,
+            first_op,
+            true,
+            CanvasOpRequest::Remove(vec![object]),
+        )
+        .await
+        .expect("authorized");
+
+    let planted = first.created_at + 10 * 60 * 1000;
+    sqlx::query("UPDATE canvas_ops SET created_at = ? WHERE id = ?")
+        .bind(planted)
+        .bind(first_op)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let mut previous = first.created_at;
+    for _ in 0..4 {
         let object = place(&store, channel, actor, 0).await;
         let op_id = CanvasOpId::generate();
         let outcome = store
@@ -106,6 +130,11 @@ async fn seeding_runs_once_and_later_calls_still_advance_monotonically() {
         assert!(
             outcome.created_at > previous,
             "{} did not advance past {previous}",
+            outcome.created_at
+        );
+        assert!(
+            outcome.created_at < planted,
+            "{} adopted the planted future row - the seed re-ran on a call              after the first",
             outcome.created_at
         );
         previous = outcome.created_at;
