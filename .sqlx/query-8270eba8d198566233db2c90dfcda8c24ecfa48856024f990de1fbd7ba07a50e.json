@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH RECURSIVE days(day) AS (\n                   SELECT date(?1 / 1000, 'unixepoch')\n                   UNION ALL\n                   SELECT date(day, '+1 day') FROM days WHERE day < date(?2 / 1000, 'unixepoch')\n               ),\n               counts(day, c) AS (\n                   SELECT date(created_at / 1000, 'unixepoch'), COUNT(*)\n                   FROM messages\n                   WHERE deleted_at IS NULL AND created_at >= ?1\n                   GROUP BY 1\n               )\n               SELECT days.day AS \"day!: String\", COALESCE(counts.c, 0) AS \"c!: i64\"\n               FROM days\n               LEFT JOIN counts ON counts.day = days.day\n               ORDER BY days.day",
+  "describe": {
+    "columns": [
+      {
+        "name": "day!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "c!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "8270eba8d198566233db2c90dfcda8c24ecfa48856024f990de1fbd7ba07a50e"
+}

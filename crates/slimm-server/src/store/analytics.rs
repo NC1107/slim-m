@@ -162,19 +162,29 @@ impl Store {
     /// One row per calendar day in `[window_start, now]`, zero-filled by the
     /// recursive CTE rather than in Rust, so a chart's x-axis is stable even
     /// for a Space that went quiet for a stretch.
+    ///
+    /// The counts come from one pass over the window's live messages, grouped
+    /// by day, with the CTE joined against that aggregate - never the other
+    /// way around: joining messages to the CTE on a function-wrapped
+    /// `created_at` re-scanned every live message once per day row, thirty
+    /// full scans per open of the analytics screen (the 2026-08-11 review's
+    /// H5). One bounded pass is the same cost `active_hours` already pays.
     async fn messages_by_day(&self, window_start: i64, now: i64) -> anyhow::Result<Vec<DayCount>> {
         let rows = sqlx::query!(
             r#"WITH RECURSIVE days(day) AS (
                    SELECT date(?1 / 1000, 'unixepoch')
                    UNION ALL
                    SELECT date(day, '+1 day') FROM days WHERE day < date(?2 / 1000, 'unixepoch')
+               ),
+               counts(day, c) AS (
+                   SELECT date(created_at / 1000, 'unixepoch'), COUNT(*)
+                   FROM messages
+                   WHERE deleted_at IS NULL AND created_at >= ?1
+                   GROUP BY 1
                )
-               SELECT days.day AS "day!: String", COUNT(m.id) AS "c!: i64"
+               SELECT days.day AS "day!: String", COALESCE(counts.c, 0) AS "c!: i64"
                FROM days
-               LEFT JOIN messages m
-                   ON date(m.created_at / 1000, 'unixepoch') = days.day
-                   AND m.deleted_at IS NULL
-               GROUP BY days.day
+               LEFT JOIN counts ON counts.day = days.day
                ORDER BY days.day"#,
             window_start,
             now,
