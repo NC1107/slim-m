@@ -196,6 +196,15 @@ impl Store {
     /// The caller's DM conversations, most recently active first. A
     /// conversation whose other participant has been deleted is omitted
     /// rather than shown with nothing to render for them.
+    ///
+    /// Activity is the newest live message's `created_at`, found by seeking
+    /// `ORDER BY seq DESC LIMIT 1` rather than `MAX(created_at)`: both are
+    /// allocated in the same transaction so the answers are identical, but
+    /// only the seq form can use `messages_channel_live` as a single-row
+    /// seek - the MAX form scanned every live message in the channel, per
+    /// conversation, on a table nothing ever sweeps (measured at ~7,700x
+    /// slower by the 2026-08-11 review at 200k rows). `tests/dm_activity.rs`
+    /// pins both the plan and the equivalence.
     pub async fn list_dm_conversations(
         &self,
         user_id: UserId,
@@ -205,8 +214,9 @@ impl Store {
                       CASE WHEN d.user_a = ? THEN d.user_b ELSE d.user_a END AS "other_id!: UserId",
                       c.created_at AS "created_at!",
                       COALESCE(
-                          (SELECT MAX(m.created_at) FROM messages m
-                           WHERE m.channel_id = d.channel_id AND m.deleted_at IS NULL),
+                          (SELECT m.created_at FROM messages m
+                           WHERE m.channel_id = d.channel_id AND m.deleted_at IS NULL
+                           ORDER BY m.seq DESC LIMIT 1),
                           c.created_at
                       ) AS "activity_at!: i64"
                FROM dm_channels d
