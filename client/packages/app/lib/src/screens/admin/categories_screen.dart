@@ -35,8 +35,24 @@ import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 import 'category_reorder.dart';
 
-class CategoriesScreen extends ConsumerWidget {
+class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      // No padding override: the frame's own default is the inset here, matching every other admin screen.
+      const SettingsScreenScaffold(
+        title: 'Channel categories',
+        backTooltip: 'Back to Space settings',
+        backFallback: Routes.spaceSettings,
+        child: CategoriesPane(),
+      );
+}
+
+/// The category list and create card, embeddable as a Space settings pane as
+/// well as routed.
+class CategoriesPane extends ConsumerWidget {
+  const CategoriesPane({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,64 +60,57 @@ class CategoriesScreen extends ConsumerWidget {
     final orderState = ref.watch(categoryOrderControllerProvider);
     final orderController = ref.read(categoryOrderControllerProvider.notifier);
 
-    // No padding override: the frame's own default is the inset here, matching every other admin screen.
-    return SettingsScreenScaffold(
-      title: 'Channel categories',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      child: storeAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) =>
-            const Center(child: Text('Could not load categories.')),
-        data: (store) => StreamBuilder<List<ChannelCategoryRow>>(
-          stream: store.watchCategories(),
-          builder: (context, snapshot) {
-            final categories = withPendingCategoryOrder(
-              snapshot.data ?? const <ChannelCategoryRow>[],
-              orderState.pendingOrder,
-            );
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _CreateCategoryCard(),
+    return storeAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => const Center(child: Text('Could not load categories.')),
+      data: (store) => StreamBuilder<List<ChannelCategoryRow>>(
+        stream: store.watchCategories(),
+        builder: (context, snapshot) {
+          final categories = withPendingCategoryOrder(
+            snapshot.data ?? const <ChannelCategoryRow>[],
+            orderState.pendingOrder,
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _CreateCategoryCard(),
+              const SizedBox(height: AppSpacing.s16),
+              if (orderState.error != null) ...[
+                AppErrorState(
+                  message: orderState.error!,
+                  onRetry: () => unawaited(orderController.retry()),
+                  onDismiss: orderController.dismiss,
+                ),
                 const SizedBox(height: AppSpacing.s16),
-                if (orderState.error != null) ...[
-                  AppErrorState(
-                    message: orderState.error!,
-                    onRetry: () => unawaited(orderController.retry()),
-                    onDismiss: orderController.dismiss,
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                ],
-                if (categories.isEmpty)
-                  Text(
-                    'No categories yet. A channel with none sits in the '
-                    'rail\'s implicit uncategorised section.',
-                    style: AppText.caption.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).extension<AppTokens>()!.textSecondary,
-                    ),
-                  )
-                else
-                  SettingsSectionCard(
-                    title: 'Categories',
-                    children: [
-                      CategoryList(
-                        categories: categories,
-                        onReorder: (ids) =>
-                            unawaited(orderController.reorder(ids)),
-                        rowBuilder: (category, dragIndex) => _CategoryRow(
-                          category: category,
-                          dragIndex: dragIndex,
-                        ),
-                      ),
-                    ],
-                  ),
               ],
-            );
-          },
-        ),
+              if (categories.isEmpty)
+                Text(
+                  'No categories yet. A channel with none sits in the '
+                  'rail\'s implicit uncategorised section.',
+                  style: AppText.caption.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).extension<AppTokens>()!.textSecondary,
+                  ),
+                )
+              else
+                SettingsSectionCard(
+                  title: 'Categories',
+                  children: [
+                    CategoryList(
+                      categories: categories,
+                      onReorder: (ids) =>
+                          unawaited(orderController.reorder(ids)),
+                      rowBuilder: (category, dragIndex) => _CategoryRow(
+                        category: category,
+                        dragIndex: dragIndex,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          );
+        },
       ),
     );
   }

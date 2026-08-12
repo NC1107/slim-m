@@ -92,7 +92,7 @@ final _overrideSurfaces =
         viewports: phoneAndDesktop,
         overrides: () => [myPermissionsProvider.overrideWithValue(0)],
       ),
-      // One bit only: just the Invites row, so the section really is partial.
+      // One bit only: just the Invites pane, so the nav really is partial.
       'space-settings-partial': (
         route: '/settings/space',
         viewports: phoneAndDesktop,
@@ -186,6 +186,8 @@ void main() {
               theme,
               '${surface.key}-$viewportName-$theme',
               overrides: surface.value.overrides(),
+              // The embedded first pane's fetch resolves past the budget.
+              settleNestedResolve: surface.key.startsWith('space-settings'),
             );
           },
         );

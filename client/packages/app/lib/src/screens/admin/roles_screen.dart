@@ -20,38 +20,49 @@ import '../../widgets/settings_section_header.dart';
 import 'role_assign_sheet.dart';
 import 'role_editor_sheet.dart';
 
-class RolesScreen extends ConsumerWidget {
+class RolesScreen extends StatelessWidget {
   const RolesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => SettingsScreenScaffold(
+    title: 'Roles',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    // Stays a scaffold action: the card only renders once loaded, and creating a role must stay reachable meanwhile.
+    actions: [rolesPaneCreateAction(context)],
+    child: const RolesPane(),
+  );
+}
+
+/// The "New role" affordance, shared with the Space settings pane's own app
+/// bar so both mountings of [RolesPane] keep creation reachable.
+Widget rolesPaneCreateAction(BuildContext context) => IconButton(
+  icon: const Icon(AppIcons.add),
+  tooltip: 'New role',
+  onPressed: () => showRoleEditorSheet(context),
+);
+
+/// The role list itself, embeddable as a Space settings pane as well as
+/// routed.
+class RolesPane extends ConsumerWidget {
+  const RolesPane({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(roleChangeWatcherProvider);
     final roles = ref.watch(rolesProvider);
 
-    return SettingsScreenScaffold(
-      title: 'Roles',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      // Stays a scaffold action: the card only renders once loaded, and creating a role must stay reachable meanwhile.
-      actions: [
-        IconButton(
-          icon: const Icon(AppIcons.add),
-          tooltip: 'New role',
-          onPressed: () => showRoleEditorSheet(context),
-        ),
-      ],
-      child: AppAsyncView<List<api.Role>>(
-        value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
-        center: false,
-        errorMessage: 'Could not load roles.',
-        onRetry: () => ref.invalidate(rolesProvider),
-        isEmpty: (list) => list.isEmpty,
-        emptyMessage: 'No roles yet. Create one with the + above.',
-        // No section title: this screen is one group, so a header here would
-        // only restate the app bar above it.
-        data: (context, list) => SettingsSectionCard(
-          children: [for (final role in list) _RoleRow(role: role)],
-        ),
+    return AppAsyncView<List<api.Role>>(
+      value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
+      center: false,
+      errorMessage: 'Could not load roles.',
+      onRetry: () => ref.invalidate(rolesProvider),
+      isEmpty: (list) => list.isEmpty,
+      emptyMessage: 'No roles yet. Create one with the + above.',
+      // No section title: this screen is one group, so a header here would
+      // only restate the app bar above it.
+      data: (context, list) => SettingsSectionCard(
+        children: [for (final role in list) _RoleRow(role: role)],
       ),
     );
   }

@@ -82,6 +82,10 @@ void main() {
   /// can change what the deployment is cannot thereby read the report queue.
   testWidgets('MANAGE_SERVER alone unlocks only the emoji and who-can-join '
       'rows', (tester) async {
+    // Compact, or the embedded join-policy pane double-counts its own label.
+    tester.view.physicalSize = const Size(500, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     await pumpSpaceSettings(tester, Perm.manageServer);
 
     expect(find.text('Emoji'), findsOneWidget);
@@ -120,14 +124,20 @@ void main() {
   /// The screen used to zero out its own padding, which sat its bare rows
   /// flush against the edges of the content column - a tighter margin than
   /// any personal settings pane, whose `ListView` keeps the scaffold's
-  /// default `s16` on every side. Pinned here since nothing about the
-  /// grouped-card layout above would fail if the padding regressed back to
-  /// zero.
-  testWidgets('the screen keeps the same outer padding a personal settings '
-      'pane uses, not zero', (tester) async {
+  /// default `s16` on every side. An embedded pane inherits that default
+  /// through `SettingsPane.padding`; pinned on one that does not override it,
+  /// since nothing else here would fail if the default regressed to zero.
+  testWidgets('an embedded pane keeps the same outer padding a personal '
+      'settings pane uses, not zero', (tester) async {
     await pumpSpaceSettings(tester, allPermissionBits);
+    await tester.tap(find.text('Removed members'));
+    await tester.pumpAndSettle();
 
-    final listView = tester.widget<ListView>(find.byType(ListView));
+    final paneList = find.descendant(
+      of: find.byType(AppFadeIn),
+      matching: find.byType(ListView),
+    );
+    final listView = tester.widget<ListView>(paneList);
     expect(listView.padding, const EdgeInsets.all(AppSpacing.s16));
   });
 }

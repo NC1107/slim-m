@@ -26,15 +26,29 @@ import '../../widgets/success_flash.dart';
 import '../settings_screen_scaffold.dart';
 import 'analytics_charts.dart';
 
-class AnalyticsScreen extends ConsumerStatefulWidget {
+class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
+  Widget build(BuildContext context) => const SettingsScreenScaffold(
+    title: 'Analytics',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    child: AnalyticsPane(),
+  );
 }
 
-class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
-    with GuardedActionState<AnalyticsScreen> {
+/// The toggle and stats themselves, embeddable as a Space settings pane as
+/// well as routed.
+class AnalyticsPane extends ConsumerStatefulWidget {
+  const AnalyticsPane({super.key});
+
+  @override
+  ConsumerState<AnalyticsPane> createState() => _AnalyticsPaneState();
+}
+
+class _AnalyticsPaneState extends ConsumerState<AnalyticsPane>
+    with GuardedActionState<AnalyticsPane> {
   bool _toggling = false;
 
   /// The value the toggle shows the instant it is tapped, ahead of the
@@ -69,39 +83,34 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
       }
     });
 
-    return SettingsScreenScaffold(
-      title: 'Analytics',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _ToggleCard(
-            enabled: _optimistic ?? analytics.valueOrNull?.enabled ?? false,
-            busy: _toggling || analytics.isLoading,
-            onChanged: _setEnabled,
-          ),
-          SuccessFlash(tick: successTick),
-          if (actionError != null) ...[
-            const SizedBox(height: AppSpacing.s8),
-            AppErrorState(message: actionError!, onDismiss: clearActionError),
-          ],
-          const SizedBox(height: AppSpacing.s16),
-          AppAsyncView<api.SpaceAnalytics>(
-            // A failed retry keeps the stats on screen; see AppAsyncView's own doc.
-            value: AppAsyncState(
-              data: analytics.valueOrNull,
-              error: analytics.error,
-            ),
-            center: false,
-            errorMessage: 'Could not load analytics.',
-            onRetry: () => ref.invalidate(spaceAnalyticsProvider),
-            data: (context, value) => value.stats == null
-                ? const _OffNotice()
-                : _StatsView(stats: value.stats!),
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ToggleCard(
+          enabled: _optimistic ?? analytics.valueOrNull?.enabled ?? false,
+          busy: _toggling || analytics.isLoading,
+          onChanged: _setEnabled,
+        ),
+        SuccessFlash(tick: successTick),
+        if (actionError != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppErrorState(message: actionError!, onDismiss: clearActionError),
         ],
-      ),
+        const SizedBox(height: AppSpacing.s16),
+        AppAsyncView<api.SpaceAnalytics>(
+          // A failed retry keeps the stats on screen; see AppAsyncView's own doc.
+          value: AppAsyncState(
+            data: analytics.valueOrNull,
+            error: analytics.error,
+          ),
+          center: false,
+          errorMessage: 'Could not load analytics.',
+          onRetry: () => ref.invalidate(spaceAnalyticsProvider),
+          data: (context, value) => value.stats == null
+              ? const _OffNotice()
+              : _StatsView(stats: value.stats!),
+        ),
+      ],
     );
   }
 }

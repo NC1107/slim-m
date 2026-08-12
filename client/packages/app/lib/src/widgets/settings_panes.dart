@@ -18,6 +18,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/close_screen.dart';
@@ -30,6 +31,10 @@ class SettingsPane {
     required this.builder,
     this.icon,
     this.badge,
+    this.scrollable = true,
+    this.padding = const EdgeInsets.all(AppSpacing.s16),
+    this.compactRoute,
+    this.actions,
   });
 
   /// Stable across rebuilds, so the selection survives a pane's own setState.
@@ -48,6 +53,22 @@ class SettingsPane {
   /// A count shown at the trailing edge, for a pane whose interest is how
   /// many things are in it.
   final String? badge;
+
+  /// Mirrors [SettingsScreenScaffold]'s own pair: a pane that scrolls itself
+  /// (a paged list) sets false, and the padding is the pane's to override.
+  final bool scrollable;
+  final EdgeInsets padding;
+
+  /// A route to push instead of drilling in place on compact layouts.
+  ///
+  /// Space settings sets this so a phone keeps the real, deep-linkable admin
+  /// screens (and their routes stay reachable); wide layouts always embed
+  /// [builder]'s pane beside the nav regardless.
+  final String? compactRoute;
+
+  /// App-bar actions shown while this pane is the one on screen, standing in
+  /// for the standalone screen's own (roles' "New role", say).
+  final List<Widget>? actions;
 }
 
 /// A labelled run of panes: `YOU`, `CALLS`, `SAFETY`.
@@ -118,6 +139,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
             tooltip: 'Back to ${widget.title.toLowerCase()}',
             onPressed: () => setState(() => _selectedId = null),
           ),
+          actions: selected.actions,
         ),
         body: SafeArea(top: false, child: _PaneBody(pane: selected)),
       );
@@ -129,7 +151,15 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
       // Wide only: on compact no lit row is ever visible beside its pane.
       showSelection: wide,
       footer: widget.footer,
-      onSelect: (id) => setState(() => _selectedId = id),
+      onSelect: (id) {
+        final pane = panes.where((p) => p.id == id).firstOrNull;
+        final route = pane?.compactRoute;
+        if (!wide && route != null) {
+          context.push(route);
+          return;
+        }
+        setState(() => _selectedId = id);
+      },
     );
 
     if (!wide) {
@@ -152,6 +182,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
           tooltip: widget.backTooltip,
           fallback: widget.backFallback,
         ),
+        actions: selected?.actions,
       ),
       body: SafeArea(
         top: false,
@@ -180,7 +211,9 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
 }
 
 /// A pane's own content, keyed by its id so switching panes does not carry the
-/// previous one's scroll offset or form state across.
+/// previous one's scroll offset or form state across - and faded in on that
+/// same key, so choosing a pane hands the eye the new content rather than
+/// teleporting it.
 ///
 /// Capped at [AppContentColumn]'s own width and centred, or a pane's rows
 /// stretch across whatever the window happens to be - the owner's own "very
@@ -192,13 +225,20 @@ class _PaneBody extends StatelessWidget {
   final SettingsPane pane;
 
   @override
-  Widget build(BuildContext context) => KeyedSubtree(
+  Widget build(BuildContext context) => AppFadeIn(
     key: ValueKey(pane.id),
+    duration: AppMotion.fast,
+    offset: 0,
     child: AppContentColumn(
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        children: [Builder(builder: pane.builder)],
-      ),
+      child: pane.scrollable
+          ? ListView(
+              padding: pane.padding,
+              children: [Builder(builder: pane.builder)],
+            )
+          : Padding(
+              padding: pane.padding,
+              child: Builder(builder: pane.builder),
+            ),
     ),
   );
 }

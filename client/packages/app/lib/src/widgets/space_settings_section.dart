@@ -1,34 +1,40 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Everything that changes the Space rather than the person: the reports
 /// queue, invites, roles, channel permission overwrites, who can join, and
-/// the Space's custom emoji.
+/// the Space's custom emoji - as the pane groups [SpaceSettingsScreen]'s
+/// nav-and-pane scaffold renders.
 ///
-/// This is [SpaceSettingsScreen]'s whole body. Grouped into bordered
-/// [SettingsSectionCard]s the same way a personal settings pane is, rather
-/// than one bare column of rows under the app bar: every row here is a link
-/// to a screen of its own instead of inline content, which is why this
-/// screen is a single scroll rather than the nav-and-pane split personal
-/// settings uses, but that navigation difference is not licence for the two
-/// to read as different apps.
+/// This used to be a single scroll of chevron rows, each pushing a separate
+/// admin route, which read as a different app from personal settings'
+/// nav-and-pane split and cost a full navigation to glance at any one area.
+/// The panes embed the same admin surfaces beside the nav on a wide window;
+/// each still names its route as [SettingsPane.compactRoute], so a phone
+/// keeps the real, deep-linkable screens and the routes stay reachable.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../providers/channel_permissions.dart';
 import '../routing/routes.dart';
+import '../screens/admin/analytics_screen.dart';
+import '../screens/admin/categories_screen.dart';
+import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/emoji_screen.dart';
+import '../screens/admin/invites_screen.dart';
+import '../screens/admin/removed_members_screen.dart';
+import '../screens/admin/reports_screen.dart';
+import '../screens/admin/roles_screen.dart';
 import 'join_policy_row.dart';
-import 'settings_notice.dart';
+import 'settings_panes.dart';
 import 'settings_section_header.dart';
 
-/// Whether [permissions] carries any of the four bits that gate a row on
-/// [SpaceSettingsSection]. Shared with the rail's Space menu, which must hide
-/// its own entry point on exactly this condition rather than open onto a
-/// screen with nothing on it.
+/// Whether [permissions] carries any of the bits that gate a pane here.
+/// Shared with the rail's Space menu, which must hide its own entry point on
+/// exactly this condition rather than open onto a screen with nothing on it.
 bool spaceSettingsReachable(int permissions) =>
     permissions.hasPermission(Perm.manageMessages) ||
     permissions.hasPermission(Perm.createInvite) ||
@@ -37,139 +43,127 @@ bool spaceSettingsReachable(int permissions) =>
     permissions.hasPermission(Perm.manageChannels) ||
     permissions.hasPermission(Perm.banMembers);
 
-/// Each row is gated on the server bit its screen requires, per `GET /me`'s
+/// Each pane is gated on the server bit its surface requires, per `GET /me`'s
 /// base permissions, rather than shown and left to answer 403: a member
 /// without MANAGE_ROLES should not see role editing exists at all.
-///
-/// A caller holding none of the gating bits gets a stated reason rather than
-/// nothing. This used to return `SizedBox.shrink()`, and since this widget is
-/// [SpaceSettingsScreen]'s entire body that rendered a bare app bar over a
-/// blank page. The old doc comment defended it on the grounds that the rail
-/// hides its own entry point on the same condition, so the state was
-/// "reachable only by a direct navigation" - but that misses the path that
-/// actually matters: this reads [myPermissionsProvider], so a member whose
-/// last gating permission is revoked *while the screen is open* (a live role
-/// edit, an overwrite change, a demotion) watches it collapse to that blank
-/// page with nothing saying why.
-class SpaceSettingsSection extends ConsumerWidget {
-  const SpaceSettingsSection({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final permissions = ref.watch(myPermissionsProvider);
-    if (!spaceSettingsReachable(permissions)) {
-      return const SettingsNotice(
-        message: 'None of your roles grant access to anything here.',
-        detail:
-            'Space settings covers moderation, invites, roles and how this '
-            'Space is configured. An administrator can grant you one of those.',
+/// A group with none of its panes visible is dropped whole.
+List<SettingsPaneGroup> spaceSettingsPaneGroups(
+  BuildContext context,
+  WidgetRef ref,
+) {
+  final permissions = ref.watch(myPermissionsProvider);
+  final canModerate = permissions.hasPermission(Perm.manageMessages);
+  final canInvite = permissions.hasPermission(Perm.createInvite);
+  final canManageRoles = permissions.hasPermission(Perm.manageRoles);
+  final canManageServer = permissions.hasPermission(Perm.manageServer);
+  final canManageChannels = permissions.hasPermission(Perm.manageChannels);
+  final canBan = permissions.hasPermission(Perm.banMembers);
+  // Unlike Roles (deployment-wide), this pane also opens via one overwrite.
+  final visibleChannels =
+      ref.watch(myVisibleChannelsProvider).valueOrNull ?? const [];
+  final canManageRolesAnywhere =
+      canManageRoles ||
+      visibleChannels.any(
+        (c) => (c.permissions ?? 0).hasPermission(Perm.manageRoles),
       );
-    }
-    final canModerate = permissions.hasPermission(Perm.manageMessages);
-    final canInvite = permissions.hasPermission(Perm.createInvite);
-    final canManageRoles = permissions.hasPermission(Perm.manageRoles);
-    final canManageServer = permissions.hasPermission(Perm.manageServer);
-    final canManageChannels = permissions.hasPermission(Perm.manageChannels);
-    final canBan = permissions.hasPermission(Perm.banMembers);
-    // Unlike Roles (deployment-wide), this row also opens via one overwrite.
-    final visibleChannels =
-        ref.watch(myVisibleChannelsProvider).valueOrNull ?? const [];
-    final canManageRolesAnywhere =
-        canManageRoles ||
-        visibleChannels.any(
-          (c) => (c.permissions ?? 0).hasPermission(Perm.manageRoles),
-        );
 
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    Widget chevron() => Icon(
-      AppIcons.chevronRight,
-      size: AppSizes.icon16,
-      color: tokens.textSecondary,
-    );
-
-    // A group renders only when at least one of its rows does.
-    final groups = <(String, List<Widget>)>[
-      (
-        'Moderation',
-        [
-          if (canModerate)
-            AppListRow(
-              label: 'Reports',
-              leading: const Icon(AppIcons.report),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminReports),
-            ),
-          if (canBan)
-            AppListRow(
-              label: 'Removed members',
-              leading: const Icon(AppIcons.signOut),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminRemovedMembers),
-            ),
-        ],
-      ),
-      (
-        'Access',
-        [
-          if (canInvite)
-            AppListRow(
-              label: 'Invites',
-              leading: const Icon(AppIcons.invite),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminInvites),
-            ),
-          if (canManageServer) const JoinPolicyRow(),
-        ],
-      ),
-      (
-        'Configuration',
-        [
-          if (canManageRoles)
-            AppListRow(
-              label: 'Roles',
-              leading: const Icon(AppIcons.shield),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminRoles),
-            ),
-          if (canManageRolesAnywhere)
-            AppListRow(
-              label: 'Channel permissions',
-              leading: const Icon(AppIcons.permissions),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminOverwrites),
-            ),
-          if (canManageChannels)
-            AppListRow(
-              label: 'Channel categories',
-              leading: const Icon(AppIcons.hash),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminCategories),
-            ),
-          if (canManageServer)
-            AppListRow(
-              label: 'Emoji',
-              leading: const Icon(AppIcons.smile),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminEmoji),
-            ),
-          if (canManageServer)
-            AppListRow(
-              label: 'Analytics',
-              leading: const Icon(AppIcons.analytics),
-              trailing: chevron(),
-              onTap: () => context.push(Routes.adminAnalytics),
-            ),
-        ],
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final (title, rows) in groups)
-          if (rows.isNotEmpty)
-            SettingsSectionCard(title: title, children: rows),
+  final groups = [
+    SettingsPaneGroup(
+      label: 'Moderation',
+      panes: [
+        if (canModerate)
+          SettingsPane(
+            id: 'reports',
+            label: 'Reports',
+            icon: AppIcons.report,
+            compactRoute: Routes.adminReports,
+            // The queue pages its own list; see ReportsScreen's same pair.
+            scrollable: false,
+            padding: EdgeInsets.zero,
+            builder: (_) => const ReportsPane(),
+          ),
+        if (canBan)
+          SettingsPane(
+            id: 'removed-members',
+            label: 'Removed members',
+            icon: AppIcons.signOut,
+            compactRoute: Routes.adminRemovedMembers,
+            builder: (_) => const RemovedMembersPane(),
+          ),
       ],
-    );
-  }
+    ),
+    SettingsPaneGroup(
+      label: 'Access',
+      panes: [
+        if (canInvite)
+          SettingsPane(
+            id: 'invites',
+            label: 'Invites',
+            icon: AppIcons.invite,
+            compactRoute: Routes.adminInvites,
+            builder: (_) => const InvitesPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'join-policy',
+            label: 'Who can join',
+            icon: AppIcons.members,
+            builder: (_) => const SettingsSectionCard(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [JoinPolicyRow()],
+            ),
+          ),
+      ],
+    ),
+    SettingsPaneGroup(
+      label: 'Configuration',
+      panes: [
+        if (canManageRoles)
+          SettingsPane(
+            id: 'roles',
+            label: 'Roles',
+            icon: AppIcons.shield,
+            compactRoute: Routes.adminRoles,
+            actions: [rolesPaneCreateAction(context)],
+            builder: (_) => const RolesPane(),
+          ),
+        if (canManageRolesAnywhere)
+          SettingsPane(
+            id: 'channel-permissions',
+            label: 'Channel permissions',
+            icon: AppIcons.permissions,
+            compactRoute: Routes.adminOverwrites,
+            builder: (_) => const ChannelOverwritesPane(),
+          ),
+        if (canManageChannels)
+          SettingsPane(
+            id: 'categories',
+            label: 'Channel categories',
+            icon: AppIcons.hash,
+            compactRoute: Routes.adminCategories,
+            builder: (_) => const CategoriesPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'emoji',
+            label: 'Emoji',
+            icon: AppIcons.smile,
+            compactRoute: Routes.adminEmoji,
+            builder: (_) => const EmojiPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'analytics',
+            label: 'Analytics',
+            icon: AppIcons.analytics,
+            compactRoute: Routes.adminAnalytics,
+            builder: (_) => const AnalyticsPane(),
+          ),
+      ],
+    ),
+  ];
+  return [
+    for (final group in groups)
+      if (group.panes.isNotEmpty) group,
+  ];
 }
