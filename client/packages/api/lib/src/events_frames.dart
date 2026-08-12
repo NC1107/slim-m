@@ -177,6 +177,14 @@ class MemberRemoved extends ServerEvent {
   final String userId;
 }
 
+/// The mirror of [MemberRemoved]: a removed member was let back in, so a
+/// roster that dropped them should refetch rather than stay stale.
+class MemberRestored extends ServerEvent {
+  const MemberRestored({required this.userId});
+
+  final String userId;
+}
+
 /// A user changed their display name. Carries only the id, never the new
 /// name: the value lives in exactly one place, a user's own profile, and a
 /// receiver re-asks for it (`SlimmApiUsers.getUser`/`listUsers`) rather than

@@ -5534,6 +5534,7 @@ components:
         - $ref: "#/components/schemas/PresenceChanged"
         - $ref: "#/components/schemas/MemberTimeout"
         - $ref: "#/components/schemas/MemberRemoved"
+        - $ref: "#/components/schemas/MemberRestored"
         - $ref: "#/components/schemas/ProfileChanged"
         - $ref: "#/components/schemas/TypingStarted"
         - $ref: "#/components/schemas/TypingStopped"
@@ -6101,6 +6102,22 @@ components:
         type:
           type: string
           enum: [member.removed]
+        user_id:
+          type: string
+          format: uuid
+
+    MemberRestored:
+      type: object
+      required: [type, user_id]
+      description: >
+        A removed member was let back in. The mirror of MemberRemoved: a
+        client that dropped them from its member list on that event puts
+        them back by refetching, rather than staying stale until an
+        unrelated refresh.
+      properties:
+        type:
+          type: string
+          enum: [member.restored]
         user_id:
           type: string
           format: uuid

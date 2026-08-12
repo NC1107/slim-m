@@ -77,6 +77,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::MemberRoleChanged { .. }
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
+        | Event::MemberRestored(_)
         | Event::OverwriteChanged { .. }
         | Event::ChannelCreated(_)
         | Event::ChannelUpdated(_)

@@ -78,6 +78,8 @@ pub(super) enum ServerFrame {
     MemberTimeoutChanged { user_id: String, until: Option<i64> },
     #[serde(rename = "member.removed")]
     MemberRemoved { user_id: String },
+    #[serde(rename = "member.restored")]
+    MemberRestored { user_id: String },
     #[serde(rename = "profile.changed")]
     ProfileChanged { user_id: String },
     #[serde(rename = "typing.started")]

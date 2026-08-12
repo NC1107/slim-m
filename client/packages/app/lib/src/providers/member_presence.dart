@@ -109,7 +109,8 @@ final memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
 
 /// Refetches the roster when a moderation event says one of its rows is now
 /// wrong: somebody was timed out (their badge belongs on screen), had a
-/// timeout lifted, was removed (they belong off it), or had a role granted
+/// timeout lifted, was removed (they belong off it), was restored (they
+/// belong back on it), or had a role granted
 /// or revoked (their role badges are wrong until refetched).
 ///
 /// Its own provider rather than another branch in
@@ -121,6 +122,7 @@ final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
   final sub = ref.read(liveEventsProvider).listen((event) {
     if (event is api.MemberTimeoutChanged ||
         event is api.MemberRemoved ||
+        event is api.MemberRestored ||
         event is api.MemberRoleChanged) {
       ref.invalidate(membersProvider);
     }
