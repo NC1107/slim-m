@@ -293,6 +293,7 @@ jobs:
       IOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.IOS_SIGNING_CERTIFICATE_PASSWORD }}
       IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
       IOS_BROADCAST_PROVISIONING_PROFILE: ${{ secrets.IOS_BROADCAST_PROVISIONING_PROFILE }}
+      IOS_NSE_PROVISIONING_PROFILE: ${{ secrets.IOS_NSE_PROVISIONING_PROFILE }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -302,11 +303,12 @@ jobs:
           if [ -n "$APP_STORE_CONNECT_KEY_ID" ] && [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] \
              && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ] && [ -n "$IOS_SIGNING_CERTIFICATE_P12" ] \
              && [ -n "$IOS_SIGNING_CERTIFICATE_PASSWORD" ] && [ -n "$IOS_PROVISIONING_PROFILE" ] \
-             && [ -n "$IOS_BROADCAST_PROVISIONING_PROFILE" ]; then
+             && [ -n "$IOS_BROADCAST_PROVISIONING_PROFILE" ] \
+             && [ -n "$IOS_NSE_PROVISIONING_PROFILE" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::iOS TestFlight secrets are not configured. Add the App Store Connect API key, signing certificate, and both provisioning profile secrets (the app's and the broadcast extension's) to enable the build and upload. Skipping."
+            echo "::warning::iOS TestFlight secrets are not configured. Add the App Store Connect API key, signing certificate, and all three provisioning profile secrets (the app's, the broadcast extension's and the notification service extension's) to enable the build and upload. Skipping."
           fi
 
       - name: resolve version
@@ -335,6 +337,8 @@ jobs:
           BROADCAST_PROFILE_PATH="${RUNNER_TEMP}/build_pp_broadcast.mobileprovision"
           printf '%s' "$IOS_BROADCAST_PROVISIONING_PROFILE" \
             | base64 --decode > "$BROADCAST_PROFILE_PATH"
+          NSE_PROFILE_PATH="${RUNNER_TEMP}/build_pp_nse.mobileprovision"
+          printf '%s' "$IOS_NSE_PROVISIONING_PROFILE" | base64 --decode > "$NSE_PROFILE_PATH"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -348,7 +352,7 @@ jobs:
           PROFILE_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
           INSTALLED=""
-          for pp in "$PROFILE_PATH" "$BROADCAST_PROFILE_PATH"; do
+          for pp in "$PROFILE_PATH" "$BROADCAST_PROFILE_PATH" "$NSE_PROFILE_PATH"; do
             UUID="$(security cms -D -i "$pp" | plutil -extract UUID raw -o - -)"
             NAME="$(security cms -D -i "$pp" | plutil -extract Name raw -o - -)"
             cp "$pp" "${PROFILE_DIR}/${UUID}.mobileprovision"
