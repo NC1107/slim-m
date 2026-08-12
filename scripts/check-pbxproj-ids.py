@@ -17,14 +17,21 @@ find out, and every job needing the project fails at once with the same
 uninformative message.
 
 This is a text check with no Xcode in it, which is why it can run on ubuntu
-ahead of the macOS jobs and answer in a second.
+ahead of the macOS jobs and answer in a second. It reads an object definition
+as an id at the head of a line followed by an opening brace, deliberately
+without matching the /* comment */ many of them carry: that buys nothing here
+and costs a lazy quantifier over attacker-irrelevant but needlessly
+backtracking input.
 """
 
 import re
 import sys
 
-# Necessary but not sufficient on its own; see [opens_an_object].
-OPENING = re.compile(r"^\s*([0-9A-F]{24})\s*(?:/\*.*?\*/\s*)?=\s*\{")
+# Only at the head of a line; a reference to an id always sits after a key.
+OPENING = re.compile(r"^[ \t]*([0-9A-F]{24})\b")
+
+# What follows the id when it introduces an object rather than naming one.
+OPENS = "= {"
 
 # What every real object carries and nothing else does.
 ISA = "isa = "
@@ -51,7 +58,7 @@ def duplicate_ids(text):
     seen = {}
     for index, line in enumerate(lines):
         match = OPENING.match(line)
-        if match and opens_an_object(lines, index):
+        if match and OPENS in line and opens_an_object(lines, index):
             seen.setdefault(match.group(1), []).append((index + 1, line.strip()))
     return {key: found for key, found in seen.items() if len(found) > 1}
 
