@@ -34,6 +34,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import 'call_participant_tiles.dart';
+import 'call_roster_motion.dart';
 import 'fullscreen_video_overlay.dart';
 import 'local_screen_share_banner.dart';
 import 'screen_share_stage.dart';
@@ -198,6 +199,9 @@ class _StageWithFilmstrip extends StatelessWidget {
   );
 }
 
+/// Enter-only motion: a joiner's tile pops in, while a leaver here reflows
+/// at once, since a separated horizontal strip has no in-place slot for an
+/// exit the way [AnimatedRosterWrap]'s grid does.
 class _Filmstrip extends StatelessWidget {
   const _Filmstrip({
     required this.participants,
@@ -214,14 +218,21 @@ class _Filmstrip extends StatelessWidget {
     scrollDirection: Axis.horizontal,
     itemCount: participants.length,
     separatorBuilder: (context, index) => const SizedBox(width: AppSpacing.s12),
-    itemBuilder: (context, index) => Center(
-      child: participantTile(
-        context,
-        participants[index],
-        controller,
-        onOpenProfile,
-      ),
-    ),
+    itemBuilder: (context, index) {
+      final participant = participants[index];
+      return Center(
+        // Keyed at the item root so a roster shift never replays the pop.
+        key: ValueKey('film-${participant.identity}'),
+        child: CallTilePop(
+          child: participantTile(
+            context,
+            participant,
+            controller,
+            onOpenProfile,
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -245,14 +256,12 @@ class _ParticipantGrid extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: constraints.maxHeight),
         child: Center(
-          child: Wrap(
-            alignment: WrapAlignment.center,
+          child: AnimatedRosterWrap(
+            participants: participants,
             spacing: AppSpacing.s16,
             runSpacing: AppSpacing.s16,
-            children: [
-              for (final p in participants)
+            tileFor: (context, p) =>
                 participantTile(context, p, controller, onOpenProfile),
-            ],
           ),
         ),
       ),

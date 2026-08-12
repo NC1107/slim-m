@@ -189,8 +189,13 @@ class _InCall extends ConsumerWidget {
           child: SafeArea(
             top: false,
             minimum: const EdgeInsets.all(AppSpacing.s12),
-            child: FloatingDockCard(
-              rows: [CallControls(controller: controller, voice: voice)],
+            // Keyed per call so joining another channel replays the rise.
+            child: AppFadeIn(
+              key: ValueKey('call-dock-$channelId'),
+              offset: 12,
+              child: FloatingDockCard(
+                rows: [CallControls(controller: controller, voice: voice)],
+              ),
             ),
           ),
         ),
