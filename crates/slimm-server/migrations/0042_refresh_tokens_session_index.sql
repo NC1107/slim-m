@@ -1,0 +1,11 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- Every join from sessions to refresh_tokens (r.session_id = s.id) and the
+-- revocation UPDATE in revoke_session_rows filter on a column no index
+-- reached: only family_id (0002) and expires_at (0019) were ever indexed.
+-- The reads (push_targets, users_with_push_devices - the latter on every
+-- message send once push is configured) made SQLite build a throwaway
+-- automatic index per call, a full table scan in disguise; the UPDATE ran
+-- as a plain scan, per session, in a loop, inside begin_write's exclusive
+-- transaction. refresh_tokens grows with every rotation for the lifetime
+-- of the deployment, so both costs only ever went up.
+CREATE INDEX refresh_tokens_session ON refresh_tokens(session_id);
