@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE polls SET created_by = NULL WHERE created_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e8b56ccdf97d93a1f2ce495faf4e8b30a03a21eff2f01343b623a4175d436c20"
+}

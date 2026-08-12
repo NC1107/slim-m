@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE space_removals SET removed_by = NULL WHERE removed_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9e7e9b7ab12c3a83b949ad301242ea16094e718e4f0a2623159cf41e7bdd3f5b"
+}
