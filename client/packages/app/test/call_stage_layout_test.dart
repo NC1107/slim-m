@@ -19,6 +19,7 @@ import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_app/src/widgets/call_participant_tiles.dart';
+import 'package:slimm_app/src/widgets/call_roster_motion.dart';
 import 'package:slimm_app/src/widgets/screen_share_stage.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -406,6 +407,22 @@ void main() {
       addTearDown(harness.dispose);
 
       expect(tester.takeException(), isNull);
+
+      await _leave(harness);
+    },
+  );
+
+  testWidgets(
+    'a small call sits in a bounded room rather than a full-bleed void',
+    (tester) async {
+      final harness = await _connected(tester, const [
+        _me,
+        _aliceOnCameraOnly,
+      ], size: const Size(1400, 900));
+      addTearDown(harness.dispose);
+
+      final wrap = tester.getRect(find.byType(AnimatedRosterWrap));
+      expect(wrap.width, lessThanOrEqualTo(kContentColumnMax));
 
       await _leave(harness);
     },

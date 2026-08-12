@@ -60,15 +60,29 @@ String formatByteSize(int bytes) {
   return '${value.toStringAsFixed(digits)} ${units[unit]}';
 }
 
-class AttachmentView extends ConsumerWidget {
+class AttachmentView extends ConsumerStatefulWidget {
   const AttachmentView({super.key, required this.attachment});
 
   final api.Attachment attachment;
 
+  @override
+  ConsumerState<AttachmentView> createState() => _AttachmentViewState();
+}
+
+/// Stateful only for [_heroTag]: an attachment is content-addressed, so one
+/// id legitimately rides on more than one message, and two rows showing the
+/// same image with one shared tag would throw the moment a flight starts.
+/// An identity object held by this element is unique per mounted view and
+/// stable across rebuilds, which is exactly what a hero tag needs.
+class _AttachmentViewState extends ConsumerState<AttachmentView> {
+  final Object _heroTag = Object();
+
+  api.Attachment get attachment => widget.attachment;
+
   bool get _isImage => isInlineImage(attachment.contentType);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     if (!_isImage) {
@@ -123,6 +137,7 @@ class AttachmentView extends ConsumerWidget {
           context,
           filename: attachment.filename,
           bytes: bytes,
+          heroTag: _heroTag,
         ),
         // Bordered like the chip and error states beside it (border-first
         // elevation), and captioned: a bare rectangle with no name or size
@@ -131,30 +146,33 @@ class AttachmentView extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: tokens.borderSubtle),
-                borderRadius: BorderRadius.circular(AppRadii.control),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.control),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: kInlineImageMax,
-                    maxHeight: kInlineImageMax,
-                  ),
-                  // Never decodes wider than the transcript can draw it.
-                  child: Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                    semanticLabel: attachment.filename,
-                    cacheWidth: decodeEdge(context, kInlineImageMax),
-                    // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
-                    errorBuilder: (context, error, stackTrace) => _FailureBox(
-                      tokens: tokens,
-                      message: 'Could not open ${attachment.filename}.',
-                      width: kInlineImageMax,
-                      height: 168,
+            Hero(
+              tag: _heroTag,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: tokens.borderSubtle),
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: kInlineImageMax,
+                      maxHeight: kInlineImageMax,
+                    ),
+                    // Never decodes wider than the transcript can draw it.
+                    child: Image.memory(
+                      bytes,
+                      fit: BoxFit.contain,
+                      semanticLabel: attachment.filename,
+                      cacheWidth: decodeEdge(context, kInlineImageMax),
+                      // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
+                      errorBuilder: (context, error, stackTrace) => _FailureBox(
+                        tokens: tokens,
+                        message: 'Could not open ${attachment.filename}.',
+                        width: kInlineImageMax,
+                        height: 168,
+                      ),
                     ),
                   ),
                 ),
