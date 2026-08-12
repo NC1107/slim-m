@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.38.0](https://github.com/NC1107/slim-m/compare/server-v0.37.0...server-v0.38.0) (2026-08-12)
+
+
+### Features
+
+* **server:** a restored member reaches connected clients ([#602](https://github.com/NC1107/slim-m/issues/602)) ([0068eec](https://github.com/NC1107/slim-m/commit/0068eec4c9eeca02d26c21853ed02a23c20d9fc8))
+
+
+### Bug Fixes
+
+* an empty push preview, and two report columns deletion never cleared ([#584](https://github.com/NC1107/slim-m/issues/584)) ([550d9b0](https://github.com/NC1107/slim-m/commit/550d9b028d5c21a88256907e66ba5a0d11bc621c))
+* **server:** a thread could be renamed, and could not be deleted ([#589](https://github.com/NC1107/slim-m/issues/589)) ([06de9d3](https://github.com/NC1107/slim-m/commit/06de9d3f6b9ea5926af8615206ea08c6fde33f5e))
+* **server:** anonymize the three authorship columns deletion missed ([#598](https://github.com/NC1107/slim-m/issues/598)) ([2683152](https://github.com/NC1107/slim-m/commit/2683152b57abe30e968bf635fe543452b5e97470))
+* **server:** charge a rate limit on every authenticated read ([#583](https://github.com/NC1107/slim-m/issues/583)) ([ae60108](https://github.com/NC1107/slim-m/commit/ae6010875749fd34da9bbb44604da1be444ca29e))
+* **server:** end a deleted channel's call, rather than leaving it running ([#581](https://github.com/NC1107/slim-m/issues/581)) ([66dfbbb](https://github.com/NC1107/slim-m/commit/66dfbbb117af032f321aff7fbaafcf48d0110304))
+* **server:** keep a duplicate sync scope's op cursor, and harden two review-flagged tests ([#604](https://github.com/NC1107/slim-m/issues/604)) ([641202e](https://github.com/NC1107/slim-m/commit/641202ec50b8bef04d6123b5efa49f41414be51a))
+* **server:** the report queue leaked a channel a moderator could not see ([#582](https://github.com/NC1107/slim-m/issues/582)) ([2fce7b0](https://github.com/NC1107/slim-m/commit/2fce7b0af104d44c33bc1daf0c3e6739a7ea5bdd))
+
+
+### Performance Improvements
+
+* **server:** fix the review's two critical query findings ([#597](https://github.com/NC1107/slim-m/issues/597)) ([6b96605](https://github.com/NC1107/slim-m/commit/6b9660521975111948cc69566212a2b6b34e7fab))
+* **server:** single-pass analytics buckets, batched canvas ops and attachment checks, thread-parent index ([#601](https://github.com/NC1107/slim-m/issues/601)) ([d7b6fd5](https://github.com/NC1107/slim-m/commit/d7b6fd51fd15ea42d5c018c8eb7c084b5c688172))
+
 ## [0.37.0](https://github.com/NC1107/slim-m/compare/server-v0.36.0...server-v0.37.0) (2026-08-11)
 
 
