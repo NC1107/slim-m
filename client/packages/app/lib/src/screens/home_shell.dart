@@ -15,6 +15,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/composer_focus.dart';
 import '../providers/notification_sound_controller.dart';
@@ -55,6 +56,8 @@ class HomeShell extends ConsumerWidget {
     final selected = selectedChannelId(context);
     // With the shell, or the first surface to consult it filters against none.
     ref.watch(blocksProvider);
+    // Session-lifetime, or permission invalidation only ran with RolesScreen open.
+    ref.watch(roleChangeWatcherProvider);
     // Forces creation for the session; nothing here reads its own state.
     ref.watch(notificationSoundControllerProvider);
     // CanvasBar is the only header while open (ConversationPane's doc); the compact app bar below would otherwise stack a second one above it.
