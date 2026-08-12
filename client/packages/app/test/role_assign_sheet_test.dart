@@ -34,12 +34,15 @@ Future<void> _pumpSheet(
   WidgetTester tester, {
   required api.Role role,
   required int permissions,
+  Future<List<api.UserProfile>> Function(Ref ref)? members,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         myPermissionsProvider.overrideWithValue(permissions),
-        membersProvider.overrideWith((ref) async => [_member('u1', 'maya')]),
+        membersProvider.overrideWith(
+          members ?? (ref) async => [_member('u1', 'maya')],
+        ),
       ],
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
@@ -94,4 +97,28 @@ void main() {
     final toggle = tester.widget<AppToggle>(find.byType(AppToggle));
     expect(toggle.onChanged, isNotNull);
   });
+
+  testWidgets(
+    'a failed member fetch offers a retry, which refetches - this sheet was '
+    'the one AppAsyncView holdout whose failure had no way back',
+    (tester) async {
+      var fetches = 0;
+      await _pumpSheet(
+        tester,
+        role: _role('role-mod', 'mod', Perm.manageMessages),
+        permissions: Perm.manageRoles | Perm.manageMessages,
+        members: (ref) async {
+          fetches++;
+          if (fetches == 1) throw Exception('boom');
+          return [_member('u1', 'maya')];
+        },
+      );
+
+      expect(find.text('Could not load members.'), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(fetches, 2);
+      expect(find.byType(AppToggle), findsOneWidget);
+    },
+  );
 }

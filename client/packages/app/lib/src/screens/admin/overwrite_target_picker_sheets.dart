@@ -91,24 +91,22 @@ class RolePickerSheet extends ConsumerWidget {
             padding: _headingPadding,
             child: Text('Choose a role', style: AppText.heading),
           ),
-          roles.when(
-            loading: () => const _PickerLoading(),
-            error: (e, _) => _PickerError(
-              message: 'Could not load roles.',
-              onRetry: () => ref.invalidate(rolesProvider),
-            ),
-            data: (list) => list.isEmpty
-                ? const _PickerEmpty(message: 'No roles yet.')
-                : _PickerList(
-                    children: [
-                      for (final role in list)
-                        AppListRow(
-                          leading: const Icon(AppIcons.shield),
-                          label: role.name,
-                          onTap: () => Navigator.of(context).pop(role),
-                        ),
-                    ],
+          AppAsyncView(
+            value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
+            errorMessage: 'Could not load roles.',
+            onRetry: () => ref.invalidate(rolesProvider),
+            emptyMessage: 'No roles yet.',
+            isEmpty: (list) => list.isEmpty,
+            data: (context, list) => _PickerList(
+              children: [
+                for (final role in list)
+                  AppListRow(
+                    leading: const Icon(AppIcons.shield),
+                    label: role.name,
+                    onTap: () => Navigator.of(context).pop(role),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -131,25 +129,26 @@ class MemberPickerSheet extends ConsumerWidget {
             padding: _headingPadding,
             child: Text('Choose a member', style: AppText.heading),
           ),
-          members.when(
-            loading: () => const _PickerLoading(),
-            error: (e, _) => _PickerError(
-              message: 'Could not load members.',
-              onRetry: () => ref.invalidate(membersProvider),
+          AppAsyncView(
+            value: AppAsyncState(
+              data: members.valueOrNull,
+              error: members.error,
             ),
-            data: (list) => list.isEmpty
-                ? const _PickerEmpty(message: 'No members yet.')
-                : _PickerList(
-                    children: [
-                      for (final member in list)
-                        AppListRow(
-                          leading: const Icon(AppIcons.account),
-                          label: member.displayName,
-                          meta: '@${member.username}',
-                          onTap: () => Navigator.of(context).pop(member),
-                        ),
-                    ],
+            errorMessage: 'Could not load members.',
+            onRetry: () => ref.invalidate(membersProvider),
+            emptyMessage: 'No members yet.',
+            isEmpty: (list) => list.isEmpty,
+            data: (context, list) => _PickerList(
+              children: [
+                for (final member in list)
+                  AppListRow(
+                    leading: const Icon(AppIcons.account),
+                    label: member.displayName,
+                    meta: '@${member.username}',
+                    onTap: () => Navigator.of(context).pop(member),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -178,49 +177,4 @@ class _PickerList extends StatelessWidget {
     ),
     child: ListView(shrinkWrap: true, children: children),
   );
-}
-
-class _PickerLoading extends StatelessWidget {
-  const _PickerLoading();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.all(AppSpacing.s24),
-    child: Center(child: CircularProgressIndicator()),
-  );
-}
-
-/// The shared [AppErrorState], padded to match [_PickerLoading] now that the
-/// sheet sizes to its content rather than to a fixed fraction of the window.
-class _PickerError extends StatelessWidget {
-  const _PickerError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(AppSpacing.s16),
-    child: AppErrorState(message: message, onRetry: onRetry),
-  );
-}
-
-class _PickerEmpty extends StatelessWidget {
-  const _PickerEmpty({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s24),
-      child: Center(
-        child: Text(
-          message,
-          style: AppText.body.copyWith(color: tokens.textSecondary),
-        ),
-      ),
-    );
-  }
 }

@@ -328,9 +328,8 @@ class ServerIdentityChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final initials = spaceName.trim().isEmpty
-        ? '?'
-        : spaceName.trim().substring(0, spaceName.trim().length >= 2 ? 2 : 1);
+    final stripped = initialsFor(spaceName);
+    final initials = stripped.isEmpty ? '?' : stripped;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s16),
@@ -346,7 +345,7 @@ class ServerIdentityChip extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadii.control),
             ),
             child: Text(
-              initials.toUpperCase(),
+              initials,
               style: AppText.code.copyWith(
                 fontSize: 11,
                 color: tokens.textSecondary,

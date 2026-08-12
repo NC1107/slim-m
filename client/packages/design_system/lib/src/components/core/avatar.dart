@@ -47,7 +47,12 @@ Color _tintFor(String name) {
 /// design actually does, and porting a friendlier-looking guess instead would
 /// mean the same person's initials differ between this port and the rest of
 /// the product.
-String _initialsFor(String name) {
+///
+/// Public because it is the one initials rule: `onboarding_shell.dart` used
+/// to carry its own copy without the symbol-stripping, so the same name
+/// rendered different initials in the server chip than everywhere else (the
+/// 2026-08-11 review's second-initials finding).
+String initialsFor(String name) {
   final stripped = name.replaceAll(RegExp('[^a-zA-Z0-9]'), '');
   final take = stripped.length < 2 ? stripped.length : 2;
   return stripped.substring(0, take).toUpperCase();
@@ -116,7 +121,7 @@ class AppAvatar extends StatelessWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final round = shape == AppAvatarShape.circle;
     final radius = round ? size / 2 : AppRadii.control;
-    final initials = round ? _initialsFor(name) : '';
+    final initials = round ? initialsFor(name) : '';
 
     Widget content = image == null
         ? _Face(
