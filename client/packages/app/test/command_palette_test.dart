@@ -77,6 +77,33 @@ void main() {
     await teardown(tester, setup.container, setup.db);
   });
 
+  testWidgets('typing crossfades the results rather than hard-cutting them', (
+    tester,
+  ) async {
+    final setup = setupPalette();
+    await MessageStore(setup.db).upsertChannels(const [
+      api.Channel(id: 'ch1', name: 'general', kind: 'text', createdAt: 0),
+    ]);
+    await pump(tester, setup.container);
+    await pressCtrlK(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('command-palette-input')),
+      'zzz-no-match',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    // Mid-crossfade: the old rows and the new empty state coexist.
+    expect(inPalette('general'), findsOneWidget);
+    expect(find.text('No matches.'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+    expect(inPalette('general'), findsNothing);
+    expect(find.text('No matches.'), findsOneWidget);
+
+    await teardown(tester, setup.container, setup.db);
+  });
+
   testWidgets('selecting a channel result navigates to it and closes', (
     tester,
   ) async {

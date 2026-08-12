@@ -19,6 +19,7 @@ class AppFadeIn extends StatefulWidget {
     required this.child,
     this.duration,
     this.offset = 6,
+    this.delay = Duration.zero,
   });
 
   final Widget child;
@@ -30,6 +31,12 @@ class AppFadeIn extends StatefulWidget {
   /// Logical pixels the content rises from. Zero for a pure fade.
   final double offset;
 
+  /// Held invisible before the fade begins, for staggering siblings.
+  /// Implemented as an interval inside the one controller rather than a
+  /// timer, so nothing is left pending when a test settles. Ignored under
+  /// reduce motion, where the content lands settled on frame one.
+  final Duration delay;
+
   @override
   State<AppFadeIn> createState() => _AppFadeInState();
 }
@@ -38,7 +45,7 @@ class _AppFadeInState extends State<AppFadeIn>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: widget.duration ?? AppMotion.base,
+    duration: (widget.duration ?? AppMotion.base) + widget.delay,
   );
   bool _started = false;
 
@@ -65,7 +72,13 @@ class _AppFadeInState extends State<AppFadeIn>
         animation: _controller,
         child: widget.child,
         builder: (context, child) {
-          final t = AppMotion.entrance.transform(_controller.value);
+          final total = _controller.duration!.inMicroseconds;
+          final start = total == 0 ? 0.0 : widget.delay.inMicroseconds / total;
+          final t = Interval(
+            start,
+            1,
+            curve: AppMotion.entrance,
+          ).transform(_controller.value);
           return Opacity(
             opacity: t,
             child: Transform.translate(

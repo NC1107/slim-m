@@ -52,9 +52,15 @@ typedef Guard =
 /// these screens already extend.
 mixin GuardedActionState<T extends StatefulWidget> on State<T> {
   String? _actionError;
+  int _successTick = 0;
 
   /// The last failure, or null. Render it where the action is.
   String? get actionError => _actionError;
+
+  /// Bumps on every [guard] success. Feed it to a `SuccessFlash` so a write
+  /// that worked is visibly acknowledged rather than silently done - failure
+  /// always had a shape here ([actionError]) and success had none.
+  int get successTick => _successTick;
 
   /// Clears it, for a dismiss control.
   void clearActionError() {
@@ -76,7 +82,10 @@ mixin GuardedActionState<T extends StatefulWidget> on State<T> {
   }) async {
     final failure = await runGuarded(whatFailed: whatFailed, action: action);
     if (!mounted) return failure == null;
-    setState(() => _actionError = failure);
+    setState(() {
+      _actionError = failure;
+      if (failure == null) _successTick++;
+    });
     return failure == null;
   }
 }

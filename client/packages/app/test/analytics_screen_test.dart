@@ -3,6 +3,7 @@
 /// headline numbers are visible text rather than only pixels in a chart.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -127,6 +128,105 @@ void main() {
     ]);
     expect(find.textContaining('Analytics is off'), findsNothing);
     expect(find.text('42'), findsOneWidget);
+  });
+
+  testWidgets(
+    'the toggle flips the instant it is tapped, ahead of the server',
+    (tester) async {
+      final gate = Completer<void>();
+      var enabled = false;
+      final client = MockClient((request) async {
+        if (request.method == 'PATCH') {
+          await gate.future;
+          enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
+          return http.Response(
+            jsonEncode({'enabled': enabled}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          jsonEncode(enabled ? _enabledBody : {'enabled': false}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+      expect(tester.widget<AppToggle>(find.byType(AppToggle)).value, isFalse);
+
+      await tester.tap(find.byType(AppToggle));
+      await tester.pump();
+      // The request has not answered yet, and the toggle already shows it.
+      expect(tester.widget<AppToggle>(find.byType(AppToggle)).value, isTrue);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(tester.widget<AppToggle>(find.byType(AppToggle)).value, isTrue);
+    },
+  );
+
+  testWidgets('a refused toggle reverts instead of lying', (tester) async {
+    // Gated so the refusal cannot land inside the tap's own microtasks.
+    final gate = Completer<void>();
+    final client = MockClient((request) async {
+      if (request.method == 'PATCH') {
+        await gate.future;
+        return http.Response('', 500);
+      }
+      return http.Response(
+        jsonEncode({'enabled': false}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+    final container = _containerFor(client);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_app(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(AppToggle));
+    await tester.pump();
+    expect(tester.widget<AppToggle>(find.byType(AppToggle)).value, isTrue);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(tester.widget<AppToggle>(find.byType(AppToggle)).value, isFalse);
+    expect(find.textContaining('Could not'), findsOneWidget);
+    expect(find.text('Saved'), findsNothing);
+  });
+
+  testWidgets('a successful write flashes a transient Saved', (tester) async {
+    var enabled = false;
+    final client = MockClient((request) async {
+      if (request.method == 'PATCH') {
+        enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
+      }
+      return http.Response(
+        jsonEncode(enabled ? _enabledBody : {'enabled': false}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+    final container = _containerFor(client);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_app(container));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved'), findsNothing);
+
+    await tester.tap(find.byType(AppToggle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Saved'), findsOneWidget);
+
+    // The acknowledgement is transient: nothing lingers once it has played.
+    await tester.pumpAndSettle();
+    expect(find.text('Saved'), findsNothing);
   });
 
   testWidgets(

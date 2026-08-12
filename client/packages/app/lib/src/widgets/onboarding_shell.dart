@@ -78,10 +78,17 @@ class OnboardingShell extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (step != null) ...[
-                      OnboardingStepper(current: step!),
-                      const SizedBox(height: AppSpacing.s32),
-                    ],
+                    // A band, not a hard cut: sign-in grows this in place when "create account" opens.
+                    AppRevealBand(
+                      child: step == null
+                          ? null
+                          : Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.s32,
+                              ),
+                              child: OnboardingStepper(current: step!),
+                            ),
+                    ),
                     child,
                   ],
                 ),

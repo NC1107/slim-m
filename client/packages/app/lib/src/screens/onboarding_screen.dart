@@ -47,25 +47,34 @@ class OnboardingScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.s24),
-          _Entry(
-            icon: AppIcons.invite,
-            title: 'I have an invite',
-            description: 'Someone sent you a code for their Space.',
-            onTap: () => _redeemFlow(context, ref),
+          // Staggered a beat apart so the three ways in arrive as a sequence.
+          AppFadeIn(
+            child: _Entry(
+              icon: AppIcons.invite,
+              title: 'I have an invite',
+              description: 'Someone sent you a code for their Space.',
+              onTap: () => _redeemFlow(context, ref),
+            ),
           ),
           const SizedBox(height: AppSpacing.s12),
-          _Entry(
-            icon: AppIcons.settings,
-            title: 'Connect to a Space',
-            description: 'You run your own, or you have its address.',
-            onTap: () => _manualFlow(context, ref),
+          AppFadeIn(
+            delay: const Duration(milliseconds: 45),
+            child: _Entry(
+              icon: AppIcons.settings,
+              title: 'Connect to a Space',
+              description: 'You run your own, or you have its address.',
+              onTap: () => _manualFlow(context, ref),
+            ),
           ),
           const SizedBox(height: AppSpacing.s12),
-          _Entry(
-            icon: AppIcons.members,
-            title: 'Join the official Space',
-            description: officialServer,
-            onTap: () => _officialFlow(context, ref),
+          AppFadeIn(
+            delay: const Duration(milliseconds: 90),
+            child: _Entry(
+              icon: AppIcons.members,
+              title: 'Join the official Space',
+              description: officialServer,
+              onTap: () => _officialFlow(context, ref),
+            ),
           ),
         ],
       ),
