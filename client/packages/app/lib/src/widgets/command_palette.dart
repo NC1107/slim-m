@@ -47,8 +47,25 @@ Future<void> openCommandPalette(BuildContext context) async {
     transitionDuration: AppMotion.reduced(context, AppMotion.fast),
     pageBuilder: (context, animation, secondaryAnimation) =>
         _CommandPaletteContent(currentChannelId: channelId),
-    transitionBuilder: (context, animation, secondaryAnimation, child) =>
-        FadeTransition(opacity: animation, child: child),
+    // member_profile.dart's authored entrance: a curved fade with an 8px rise.
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: AppMotion.entrance,
+        reverseCurve: AppMotion.exit,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: AnimatedBuilder(
+          animation: curved,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, (1 - curved.value) * 8),
+            child: child,
+          ),
+          child: child,
+        ),
+      );
+    },
   );
 
   // The dialog may have outlived whatever held focus before it opened, so only

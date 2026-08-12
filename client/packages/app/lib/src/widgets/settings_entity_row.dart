@@ -32,7 +32,13 @@ import 'package:slimm_design_system/design_system.dart';
 /// keeps an even rhythm. An invite carries a code, a badge, a uses-and-expiry
 /// line and a role grant - four pieces over three lines - so it needs a row
 /// that grows. The two are siblings rather than variants.
-class SettingsEntityRow extends StatelessWidget {
+///
+/// The row carries [AppListRow]'s hover tint even though the row itself takes
+/// no tap: its actions do, and a pointer sweeping a list of these otherwise
+/// reads the whole card as one inert slab. `surfaceSunken`, not
+/// `surfaceRaised`, because these rows sit inside a card already painted
+/// raised - the same choice [AppMenuItem] makes inside a floating menu.
+class SettingsEntityRow extends StatefulWidget {
   const SettingsEntityRow({
     super.key,
     required this.headline,
@@ -84,10 +90,17 @@ class SettingsEntityRow extends StatelessWidget {
   final VoidCallback? onErrorDismiss;
 
   @override
+  State<SettingsEntityRow> createState() => _SettingsEntityRowState();
+}
+
+class _SettingsEntityRowState extends State<SettingsEntityRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
-    return Padding(
+    final body = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s8,
         vertical: AppSpacing.s8,
@@ -99,8 +112,8 @@ class SettingsEntityRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (leading != null) ...[
-                leading!,
+              if (widget.leading != null) ...[
+                widget.leading!,
                 const SizedBox(width: AppSpacing.s12),
               ],
               Expanded(
@@ -112,39 +125,55 @@ class SettingsEntityRow extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            headline,
+                            widget.headline,
                             overflow: TextOverflow.ellipsis,
-                            style: (headlineStyle ?? AppText.body).copyWith(
-                              color: tokens.textPrimary,
-                              fontWeight: AppWeights.medium,
-                            ),
+                            style: (widget.headlineStyle ?? AppText.body)
+                                .copyWith(
+                                  color: tokens.textPrimary,
+                                  fontWeight: AppWeights.medium,
+                                ),
                           ),
                         ),
-                        if (badge != null) ...[
+                        if (widget.badge != null) ...[
                           const SizedBox(width: AppSpacing.s8),
-                          badge!,
+                          widget.badge!,
                         ],
                       ],
                     ),
-                    for (final detail in details) ...[
+                    for (final detail in widget.details) ...[
                       const SizedBox(height: AppSpacing.s4),
                       detail,
                     ],
                   ],
                 ),
               ),
-              if (actions.isNotEmpty) _SettingsEntityActions(children: actions),
+              if (widget.actions.isNotEmpty)
+                _SettingsEntityActions(children: widget.actions),
             ],
           ),
-          if (error != null) ...[
+          if (widget.error != null) ...[
             const SizedBox(height: AppSpacing.s8),
             AppErrorState(
-              message: error!,
-              onRetry: onErrorRetry,
-              onDismiss: onErrorDismiss,
+              message: widget.error!,
+              onRetry: widget.onErrorRetry,
+              onDismiss: widget.onErrorDismiss,
             ),
           ],
         ],
+      ),
+    );
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: AppMotion.reduced(context, AppMotion.fast),
+        curve: AppMotion.entrance,
+        decoration: BoxDecoration(
+          color: _hovered ? tokens.surfaceSunken : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        child: body,
       ),
     );
   }

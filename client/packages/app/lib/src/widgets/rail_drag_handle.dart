@@ -102,9 +102,6 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
     final visible = ref.watch(channelRailVisibleProvider);
     final touch = AppTouchTargets.of(context);
     final hitWidth = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
-    final lineColor = _hovered ? tokens.accentFill : tokens.borderSubtle;
-    // See this class's own doc for why this is textSecondary, not borderSubtle.
-    final iconColor = _hovered ? tokens.accentFill : tokens.textSecondary;
 
     // See this class's own doc for why Semantics sits where it does below.
     final gestureChain = Semantics(
@@ -124,24 +121,43 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
           // The real pointer tap; the outer Semantics covers accessibility, see its own doc.
           excludeFromSemantics: true,
           onTap: _toggle,
-          child: visible
-              ? Row(
-                  children: [
-                    // The rail's own Container already paints this margin.
-                    const Expanded(child: SizedBox()),
-                    VerticalDivider(width: 1, color: lineColor),
-                  ],
-                )
-              : SizedBox(
-                  width: hitWidth,
-                  child: Center(
-                    child: Icon(
-                      AppIcons.sidebar,
-                      size: AppSizes.icon16,
-                      color: iconColor,
-                    ),
-                  ),
-                ),
+          // One hover clock lerps both colours; begin==end at mount, no play.
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: _hovered ? 1.0 : 0.0),
+            duration: AppMotion.reduced(context, AppMotion.fast),
+            curve: AppMotion.entrance,
+            builder: (context, t, _) {
+              final lineColor = Color.lerp(
+                tokens.borderSubtle,
+                tokens.accentFill,
+                t,
+              )!;
+              // textSecondary, not borderSubtle: see this class's own doc.
+              final iconColor = Color.lerp(
+                tokens.textSecondary,
+                tokens.accentFill,
+                t,
+              )!;
+              return visible
+                  ? Row(
+                      children: [
+                        // The rail's own Container already paints this margin.
+                        const Expanded(child: SizedBox()),
+                        VerticalDivider(width: 1, color: lineColor),
+                      ],
+                    )
+                  : SizedBox(
+                      width: hitWidth,
+                      child: Center(
+                        child: Icon(
+                          AppIcons.sidebar,
+                          size: AppSizes.icon16,
+                          color: iconColor,
+                        ),
+                      ),
+                    );
+            },
+          ),
         ),
       ),
     );

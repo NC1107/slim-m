@@ -123,7 +123,10 @@ class _AppIconButtonState extends State<AppIconButton> {
       border = tokens.accentFill;
     }
 
-    final button = Container(
+    // Hover and active arrive on AppListRow's own fast clock, never snapping.
+    final button = AnimatedContainer(
+      duration: AppMotion.reduced(context, AppMotion.fast),
+      curve: AppMotion.entrance,
       width: visualSize,
       height: visualSize,
       alignment: Alignment.center,
