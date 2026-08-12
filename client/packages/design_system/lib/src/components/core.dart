@@ -12,3 +12,4 @@ export 'core/icon_button.dart';
 export 'core/kbd.dart';
 export 'core/speaking_ring.dart';
 export 'core/status_dot.dart';
+export 'core/typing_dots.dart';

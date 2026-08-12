@@ -96,13 +96,13 @@ class MessageTimeMark extends ConsumerWidget {
       fontFamily: AppFonts.mono,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
+    final Widget mark;
     if (message.failed) {
-      return compact
+      mark = compact
           ? Icon(AppIcons.failed, size: 11, color: tokens.dangerText)
           : Text('not sent', style: mono.copyWith(color: tokens.dangerText));
-    }
-    if (message.pending) {
-      return compact
+    } else if (message.pending) {
+      mark = compact
           ? Icon(AppIcons.clock, size: 11, color: tokens.textSecondary)
           : Row(
               mainAxisSize: MainAxisSize.min,
@@ -112,11 +112,22 @@ class MessageTimeMark extends ConsumerWidget {
                 Text('sending', style: mono),
               ],
             );
+    } else {
+      final use24Hour = watchUse24Hour(ref, context);
+      mark = Text(
+        formatMessageTime(message.createdAt, use24Hour: use24Hour),
+        style: mono,
+      );
     }
-    final use24Hour = watchUse24Hour(ref, context);
-    return Text(
-      formatMessageTime(message.createdAt, use24Hour: use24Hour),
-      style: mono,
+    // Keyed on the state, never the text, so a minute tick never replays.
+    final state = message.failed
+        ? 'failed'
+        : message.pending
+        ? 'pending'
+        : 'sent';
+    return AnimatedSwitcher(
+      duration: AppMotion.reduced(context, AppMotion.base),
+      child: KeyedSubtree(key: ValueKey(state), child: mark),
     );
   }
 }

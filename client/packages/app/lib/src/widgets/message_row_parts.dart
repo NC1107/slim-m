@@ -1,44 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The smaller pieces a message row can carry beneath its body: the edited
-/// marker, the reactions row, an attachment placeholder, the failed-send
-/// row, and the "New" divider between read and unread messages.
+/// marker, an attachment placeholder, the failed-send row, and the "New"
+/// divider between read and unread messages. The reactions row lives in its
+/// own sibling, `reactions_row.dart`, since gaining its exit animation.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/display_preferences.dart';
 import '../routing/breakpoints.dart';
 
-import 'custom_emoji_image.dart';
-import 'emoji_picker.dart';
 import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
-
-/// 16, not the 13 the chip's text glyph uses: 13 is a font size, and an emoji
-/// face draws well inside its em box while an image fills whatever box it gets.
-const double _reactionEmojiSize = 16;
-
-/// Every chip in [ReactionsRow]'s [Wrap] is a [FocusableTapTarget], which
-/// reserves [focusRingGap] plus [focusRingWidth] of invisible margin on
-/// every side for its own focus ring - present whether or not the ring is
-/// ever drawn. A plain [AppSpacing.s4] step between two such chips therefore
-/// painted as three stacked reservations (one chip's margin, the spacing,
-/// the next chip's margin), not the one step it names.
-///
-/// This cancels only the spacing itself - the one value anyone actually
-/// chose - leaving the two chips' own ring margins as the entire visible
-/// gap. It deliberately stops at zero rather than going negative: a
-/// negative value would pull adjacent chips' invisible hit boxes into
-/// overlapping, and since each box is opaque to a tap regardless of what is
-/// painted under it, that would erase the dead zone that currently exists
-/// between two chips - every point in the visible gap would then resolve
-/// to reacting on one chip or the other, where today it does nothing.
-/// Zero keeps the boxes exactly abutting rather than overlapping, so that
-/// dead zone shrinks to nothing rather than being eliminated.
-const double _reactionChipSpacing =
-    AppSpacing.s4 - (focusRingGap + focusRingWidth);
 
 class EditedMarker extends StatelessWidget {
   const EditedMarker({super.key});
@@ -56,96 +30,6 @@ class EditedMarker extends StatelessWidget {
           decorationStyle: TextDecorationStyle.dotted,
           decorationColor: tokens.textSecondary,
         ),
-      ),
-    );
-  }
-}
-
-/// One chip per distinct emoji already on the message (real counts, and
-/// [api.ReactionSummary.reacted] driving the active state), plus the
-/// add-reaction glyph, which opens [EmojiPickerButton]'s floating picker.
-/// Tapping an existing chip calls [onReactionTap] with that summary; the
-/// caller decides whether that means adding or removing based on whether it
-/// was already active.
-///
-/// A reaction key is not always a codepoint. The server keys a reaction on
-/// whatever short string it is given, so one of the deployment's own emoji
-/// rides there as its `:shortcode:` and is drawn here through [customEmoji],
-/// the same index a message body resolves against.
-class ReactionsRow extends StatelessWidget {
-  const ReactionsRow({
-    super.key,
-    required this.reactions,
-    required this.onReactionTap,
-    required this.onPickReaction,
-    this.customEmoji = const {},
-  });
-
-  final List<api.ReactionSummary> reactions;
-  final ValueChanged<api.ReactionSummary> onReactionTap;
-
-  /// Called with the emoji character the picker chose.
-  final ValueChanged<String> onPickReaction;
-
-  /// The deployment's custom emoji, lower-cased name to id. Empty while the
-  /// set is loading or unfetchable, which leaves a shortcode reaction as the
-  /// literal text it already was, exactly as a message body degrades.
-  final Map<String, String> customEmoji;
-
-  /// Renders existing reactions and nothing else.
-  ///
-  /// The add-a-reaction control used to live here, revealed on hover, and
-  /// that is what made rows jump: an unreacted message rendered nothing, so
-  /// hovering swapped absent for present and grew the row, moving the whole
-  /// log under the pointer. It lives in [MessageRow]'s hover overlay now,
-  /// outside layout entirely.
-  ///
-  /// The reasoning that put it here was sound and still holds - a permanent
-  /// add-button under every message costs a row of vertical space each and
-  /// turns a quiet list into a grid of identical glyphs. That is why the fix
-  /// is an overlay rather than reserving the space: reserving it would buy
-  /// back exactly the cost this avoided.
-  ///
-  /// Pulled tight against the body above by [AppSpacing.s4] - the closest
-  /// step to the few pixels of line-height leftover a real device still
-  /// showed at a flush 0 - as a [Transform.translate] rather than a negative
-  /// [Padding], which asserts its insets are non-negative. That is safe here
-  /// specifically because [FailedRow] is this row's only possible sibling
-  /// below it in [MessageRow]'s column, and the two never render together:
-  /// both key off `_unsent`, and this row only ever shows once that is false.
-  @override
-  Widget build(BuildContext context) {
-    if (reactions.isEmpty) return const SizedBox.shrink();
-
-    // See the negative-inset note on this class's own doc comment above.
-    return Transform.translate(
-      offset: const Offset(0, -AppSpacing.s4),
-      child: Wrap(
-        spacing: _reactionChipSpacing,
-        runSpacing: _reactionChipSpacing,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          // Keyed by emoji and wrapped in a one-shot pop (scale .85 to 1 with
-          // fade): a chip that just appeared confirms the tap landed, and an
-          // existing chip keeps its state so it never replays.
-          for (final reaction in reactions)
-            _ChipPop(
-              key: ValueKey('reaction-${reaction.emoji}'),
-              child: AppChip.reaction(
-                emoji: reaction.emoji,
-                count: reaction.count,
-                active: reaction.reacted,
-                glyph: switch (customEmojiIdFor(reaction.emoji, customEmoji)) {
-                  final String id => CustomEmojiImage(
-                    emojiId: id,
-                    size: _reactionEmojiSize,
-                  ),
-                  null => null,
-                },
-                onTap: () => onReactionTap(reaction),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -415,25 +299,4 @@ class DayDivider extends StatelessWidget {
       ),
     );
   }
-}
-
-/// A one-shot pop for a chip that just appeared: scale .85 to 1 with a fade,
-/// the motion spec's confirmation entrance. Mount-only, so a rebuild of an
-/// existing chip never replays it.
-class _ChipPop extends StatelessWidget {
-  const _ChipPop({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-    tween: Tween(begin: 0, end: 1),
-    duration: AppMotion.reduced(context, AppMotion.pop),
-    curve: AppMotion.entrance,
-    builder: (context, t, child) => Opacity(
-      opacity: t,
-      child: Transform.scale(scale: 0.85 + 0.15 * t, child: child),
-    ),
-    child: child,
-  );
 }
