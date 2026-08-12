@@ -53,36 +53,26 @@ pub(super) async fn apply_remove(
     object_ids: &[CanvasObjectId],
     now: i64,
 ) -> Result<(&'static str, i64, Vec<CanvasObjectId>, Option<i64>), SubmitOpError> {
-    let mut already_dead = Vec::with_capacity(object_ids.len());
+    let found_by_id = fetch_objects_for_op(tx, channel_id, object_ids).await?;
+    let mut to_remove = Vec::with_capacity(object_ids.len());
     for object_id in object_ids {
-        let Some(found) = fetch_object_for_op(tx, channel_id, *object_id).await? else {
+        let Some(found) = found_by_id.get(object_id) else {
             return Err(SubmitOpError::NotFound);
         };
         if !may_moderate && found.author_id != Some(actor_id) {
             return Err(SubmitOpError::NotAuthorized);
         }
-        already_dead.push(found.is_dead);
+        if !found.is_dead {
+            to_remove.push(*object_id);
+        }
     }
 
-    let mut touched = Vec::new();
-    for (object_id, was_dead) in object_ids.iter().zip(already_dead) {
-        if was_dead {
-            continue;
-        }
-        let rows = sqlx::query!(
-            "UPDATE canvas_objects SET deleted_at = ?
-             WHERE id = ? AND channel_id = ? AND deleted_at IS NULL",
-            now,
-            object_id,
-            channel_id
-        )
-        .execute(&mut **tx)
-        .await?
-        .rows_affected();
-        if rows > 0 {
-            touched.push(*object_id);
-        }
-    }
+    let flipped = delete_batch(tx, channel_id, &to_remove, now).await?;
+    // Request order, not RETURNING order: the audit trail reads as written.
+    let touched: Vec<CanvasObjectId> = to_remove
+        .into_iter()
+        .filter(|id| flipped.contains(id))
+        .collect();
 
     let affected = touched.len() as i64;
     Ok(("remove", affected, touched, None))
@@ -232,11 +222,12 @@ pub(super) async fn apply_restore(
     let dead = if target.kind == "clear" {
         candidates
     } else {
+        let found_by_id = fetch_objects_for_op(tx, channel_id, &candidates).await?;
         let mut dead = Vec::with_capacity(candidates.len());
         for object_id in &candidates {
-            let found = fetch_object_for_op(tx, channel_id, *object_id).await?;
+            let found = found_by_id.get(object_id);
             if !may_moderate {
-                let Some(found) = &found else {
+                let Some(found) = found else {
                     return Err(SubmitOpError::NotAuthorized);
                 };
                 if found.author_id != Some(actor_id) {
@@ -266,6 +257,37 @@ pub(super) async fn apply_restore(
 
     let affected = touched.len() as i64;
     Ok(("restore", affected, touched, None))
+}
+
+/// [`undelete_batch`]'s mirror for `remove`: soft-deletes every id in
+/// `live`, chunked the same way, returning the set of ids actually flipped.
+/// The `deleted_at IS NULL` guard keeps a concurrent state change from
+/// double-stamping, exactly as the per-row form it replaces did.
+async fn delete_batch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    channel_id: ChannelId,
+    live: &[CanvasObjectId],
+    now: i64,
+) -> Result<std::collections::HashSet<CanvasObjectId>, sqlx::Error> {
+    let mut flipped = std::collections::HashSet::with_capacity(live.len());
+    for chunk in live.chunks(RESTORE_UNDELETE_BATCH) {
+        let mut builder = QueryBuilder::new("UPDATE canvas_objects SET deleted_at = ");
+        builder.push_bind(now);
+        builder.push(" WHERE channel_id = ");
+        builder.push_bind(channel_id);
+        builder.push(" AND deleted_at IS NULL AND id IN (");
+        let mut separated = builder.separated(", ");
+        for id in chunk {
+            separated.push_bind(*id);
+        }
+        builder.push(") RETURNING id");
+        let rows = builder.build().fetch_all(&mut **tx).await?;
+        for row in rows {
+            use sqlx::Row;
+            flipped.insert(row.try_get::<CanvasObjectId, _>("id")?);
+        }
+    }
+    Ok(flipped)
 }
 
 /// Un-deletes every id in `dead`, `RESTORE_UNDELETE_BATCH` at a time rather
@@ -343,6 +365,48 @@ pub(super) async fn fetch_op(
     )
     .fetch_optional(&mut **tx)
     .await
+}
+
+/// One `IN (...)` read for a whole batch's worth of [`fetch_object_for_op`]
+/// answers, keyed by id: `apply_remove` and `apply_restore` used to run the
+/// single-row form once per object inside the deployment's exclusive write
+/// transaction, up to the batch ceiling of sequential round trips per op
+/// (the 2026-08-11 review's M7). Chunked like [`undelete_batch`], its own
+/// precedent for the shape.
+async fn fetch_objects_for_op(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    channel_id: ChannelId,
+    ids: &[CanvasObjectId],
+) -> Result<std::collections::HashMap<CanvasObjectId, ObjectAuth>, sqlx::Error> {
+    let mut found = std::collections::HashMap::with_capacity(ids.len());
+    for chunk in ids.chunks(RESTORE_UNDELETE_BATCH) {
+        let mut builder = QueryBuilder::new(
+            "SELECT id, author_id, deleted_at FROM canvas_objects WHERE channel_id = ",
+        );
+        builder.push_bind(channel_id);
+        builder.push(" AND id IN (");
+        let mut separated = builder.separated(", ");
+        for id in chunk {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+        let rows = builder.build().fetch_all(&mut **tx).await?;
+        for row in rows {
+            use sqlx::Row;
+            let id: CanvasObjectId = row.try_get("id")?;
+            let author_id: Option<UserId> = row.try_get("author_id")?;
+            let deleted_at: Option<i64> = row.try_get("deleted_at")?;
+            found.insert(
+                id,
+                ObjectAuth {
+                    author_id,
+                    is_dead: deleted_at.is_some(),
+                    deleted_at,
+                },
+            );
+        }
+    }
+    Ok(found)
 }
 
 async fn fetch_object_for_op(

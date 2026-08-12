@@ -380,15 +380,11 @@ pub(super) async fn may_link(
     if uploaded {
         return Ok(true);
     }
-    for channel_id in store.channels_referencing_attachment(sha256).await? {
-        if store
-            .has_permission(author_id, channel_id, Permissions::VIEW_CHANNEL)
-            .await?
-        {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+    let channels = store.channels_referencing_attachment(sha256).await?;
+    let perms = store.permissions_in_channels(author_id, &channels).await?;
+    Ok(perms
+        .values()
+        .any(|p| p.contains(Permissions::VIEW_CHANNEL)))
 }
 
 /// Removes a message's attachment links, returning the hex ids of any
