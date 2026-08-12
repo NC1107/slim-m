@@ -19,6 +19,7 @@ import '../providers/dms.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import 'channel_rail_frame.dart';
+import 'channel_rail_selection_marker.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
 
@@ -162,7 +163,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                       final nonDm = channels
                           .where((c) => c.kind != dmChannelKind)
                           .toList(growable: false);
-                      return ListView(
+                      // A scroll view over one column, not a ListView: the selection marker layer has to span both sections to slide between them.
+                      return SingleChildScrollView(
                         // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.s8,
@@ -170,22 +172,27 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                           AppSpacing.s8,
                           0,
                         ),
-                        children: [
-                          DirectMessagesSection(
-                            channels: channels
-                                .where((c) => c.kind == dmChannelKind)
-                                .toList(),
-                            selectedId: selected,
+                        child: SelectionMarkerLayer(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              DirectMessagesSection(
+                                channels: channels
+                                    .where((c) => c.kind == dmChannelKind)
+                                    .toList(),
+                                selectedId: selected,
+                              ),
+                              ChannelCategorySections(
+                                channels: nonDm,
+                                categories: categories,
+                                selectedId: selected,
+                                canManage: canManageChannels,
+                                onReorder: (groups) =>
+                                    unawaited(orderController.reorder(groups)),
+                              ),
+                            ],
                           ),
-                          ChannelCategorySections(
-                            channels: nonDm,
-                            categories: categories,
-                            selectedId: selected,
-                            canManage: canManageChannels,
-                            onReorder: (groups) =>
-                                unawaited(orderController.reorder(groups)),
-                          ),
-                        ],
+                        ),
                       );
                     },
                   );

@@ -15,6 +15,7 @@ import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
+import 'channel_rail_selection_marker.dart';
 import 'dm_row.dart';
 import 'personal_space_row.dart';
 
@@ -83,9 +84,12 @@ class DirectMessagesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionLabel('Direct messages'),
-        PersonalSpaceRow(
-          channel: personal,
+        SelectionMarkerTarget(
           selected: personal != null && personal.id == selectedId,
+          child: PersonalSpaceRow(
+            channel: personal,
+            selected: personal != null && personal.id == selectedId,
+          ),
         ),
         if (others.isEmpty)
           Padding(
@@ -100,7 +104,10 @@ class DirectMessagesSection extends StatelessWidget {
           )
         else
           for (final channel in others)
-            DmRow(channel: channel, selected: channel.id == selectedId),
+            SelectionMarkerTarget(
+              selected: channel.id == selectedId,
+              child: DmRow(channel: channel, selected: channel.id == selectedId),
+            ),
       ],
     );
   }
@@ -150,21 +157,24 @@ class ChannelCategorySections extends ConsumerWidget {
         if (canManage || section.$2.isNotEmpty) section,
     ];
 
-    Widget row(Channel channel, bool reorderable) => ManagedChannelRow(
-      canManage: canManage,
-      reorderable: reorderable,
-      channel: channel,
-      row: (kebab) => channel.kind == 'voice'
-          ? VoiceChannelRow(
-              channel: channel,
-              selected: channel.id == selectedId,
-              trailingExtra: kebab,
-            )
-          : _TextChannelRow(
-              channel: channel,
-              selected: channel.id == selectedId,
-              trailingExtra: kebab,
-            ),
+    Widget row(Channel channel, bool reorderable) => SelectionMarkerTarget(
+      selected: channel.id == selectedId,
+      child: ManagedChannelRow(
+        canManage: canManage,
+        reorderable: reorderable,
+        channel: channel,
+        row: (kebab) => channel.kind == 'voice'
+            ? VoiceChannelRow(
+                channel: channel,
+                selected: channel.id == selectedId,
+                trailingExtra: kebab,
+              )
+            : _TextChannelRow(
+                channel: channel,
+                selected: channel.id == selectedId,
+                trailingExtra: kebab,
+              ),
+      ),
     );
 
     Widget header(ChannelCategoryRow? category) =>
