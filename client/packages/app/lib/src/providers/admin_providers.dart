@@ -50,28 +50,46 @@ final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
 /// Refetches [rolesProvider] and [meProvider] when a role's own definition
 /// changes or a member's assignment does: either can change what a role
 /// means for whoever is looking at this screen right now, and the caller's
-/// own permissions besides. Watched by [RolesScreen] to stay live while open.
+/// own permissions besides. Watched by `HomeShell` for the whole session -
+/// its only watch site used to be [RolesScreen], a MANAGE_ROLES-gated modal
+/// never co-mounted with any consumer of what this invalidates, so for an
+/// ordinary user none of it ever ran and a permission revoked mid-session
+/// stayed visibly offered until renavigation. [RolesScreen] keeps its own
+/// watch as documentation of the dependency, not as the thing keeping this
+/// alive.
 ///
-/// Also the one place [channelPermissionsProvider] is invalidated - see
+/// Also the one place [channelPermissionsProvider] and
+/// [myVisibleChannelsProvider] are invalidated - see
 /// docs/decisions/0011-per-channel-permissions.md. A role or role-assignment
-/// change invalidates the whole family bare, since either can change what
-/// the caller can do in every channel at once; a self [api.MemberTimeoutChanged]
+/// change invalidates both bare, since either can change what the caller can
+/// do (and see) in every channel at once; a self [api.MemberTimeoutChanged]
 /// does the same and additionally refreshes [meProvider], closing the gap
 /// where a moderator timed out mid-session kept a stale reading until some
 /// unrelated refetch; an [api.OverwriteChanged] invalidates only the one
-/// channel it names.
+/// channel's permissions it names, plus the visible list, since an overwrite
+/// can grant or revoke VIEW_CHANNEL and so change the list's membership.
 final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
   final selfId = ref.read(sessionProvider).tokens?.userId;
+  // ref.invalidate on a never-watched provider mounts and fetches it.
+  void refreshVisibleChannels() {
+    if (ref.exists(myVisibleChannelsProvider)) {
+      ref.invalidate(myVisibleChannelsProvider);
+    }
+  }
+
   final sub = ref.read(liveEventsProvider).listen((event) {
     if (event is api.RoleChanged || event is api.MemberRoleChanged) {
       ref.invalidate(rolesProvider);
       ref.invalidate(meProvider);
       ref.invalidate(channelPermissionsProvider);
+      refreshVisibleChannels();
     } else if (event is api.MemberTimeoutChanged && event.userId == selfId) {
       ref.invalidate(meProvider);
       ref.invalidate(channelPermissionsProvider);
+      refreshVisibleChannels();
     } else if (event is api.OverwriteChanged) {
       ref.invalidate(channelPermissionsProvider(event.channelId));
+      refreshVisibleChannels();
     }
   });
   ref.onDispose(() => unawaited(sub.cancel()));
