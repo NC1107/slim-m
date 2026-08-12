@@ -1,0 +1,180 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Account deletion is a tombstone `UPDATE`, never a `DELETE FROM users`, so
+//! every `ON DELETE SET NULL` authorship column in the schema is a promise
+//! only `delete_account`'s own explicit anonymization statements can keep.
+//! These tests pin that promise per column family; split out of `account.rs`
+//! in the change that pushed it over the 500-line ceiling.
+
+mod support;
+
+use slimm_server::ids::MessageId;
+use slimm_server::store::Store;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-anon");
+    let config = slimm_server::config::Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..slimm_server::config::Config::default()
+    };
+    let pool = slimm_server::db::connect(&config)
+        .await
+        .expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+/// `Report.reporter_id`'s own doc comment promises it is "null once the
+/// reporter's account has been anonymized", and until this was fixed no code
+/// path ever made that true.
+///
+/// The column carries `ON DELETE SET NULL`, which never fires: deleting an
+/// account here is a tombstone `UPDATE`, never a `DELETE FROM users`, so the
+/// constraint has nothing to trigger on. Every other authorship column is
+/// cleared explicitly; this pair was simply missed.
+#[tokio::test]
+async fn delete_account_anonymizes_a_report_the_deleted_user_filed() {
+    let (store, _guard) = new_store().await;
+    let admin = store
+        .create_account("root", "Root", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(admin.id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+
+    let reporter = store
+        .create_account("bob", "Bob", "not-a-real-hash")
+        .await
+        .unwrap();
+    let subject = store
+        .send_message(channel, admin.id, MessageId::generate(), "hi", &[], None)
+        .await
+        .unwrap()
+        .message
+        .id;
+    store
+        .file_report(
+            reporter.id,
+            slimm_server::store::ReportSubject::Message(subject),
+            "not ok",
+        )
+        .await
+        .unwrap();
+
+    let before = store.list_open_reports(None, &[], 50).await.unwrap();
+    assert_eq!(
+        before.first().expect("one open report").reporter_id,
+        Some(reporter.id),
+        "the report must name its reporter before the account is deleted, or \
+         this test proves nothing"
+    );
+
+    store.delete_account(reporter.id).await.unwrap();
+
+    let after = store.list_open_reports(None, &[], 50).await.unwrap();
+    assert_eq!(
+        after
+            .first()
+            .expect("the report itself survives")
+            .reporter_id,
+        None,
+        "the deleted account must not still be named as the reporter"
+    );
+}
+
+/// The same promise `delete_account_anonymizes_a_report_the_deleted_user_filed`
+/// pins, on the three sibling columns the 2026-08-11 review found still open:
+/// `member_timeouts.issued_by`, `space_removals.removed_by` and
+/// `polls.created_by` all carry an `ON DELETE SET NULL` that can never fire
+/// (deletion is a tombstone `UPDATE`), and `removed_by` is served live on the
+/// wire via `RemovalDto`, so a deleted moderator's id persisted forever.
+#[tokio::test]
+async fn delete_account_anonymizes_moderation_and_poll_authorship() {
+    let (store, _guard) = new_store().await;
+    let admin = store
+        .create_account("root", "Root", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(admin.id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+
+    let moderator = store
+        .create_account("mod", "Mod", "not-a-real-hash")
+        .await
+        .unwrap();
+    let bob = store
+        .create_account("bob", "Bob", "not-a-real-hash")
+        .await
+        .unwrap();
+    let carol = store
+        .create_account("carol", "Carol", "not-a-real-hash")
+        .await
+        .unwrap();
+
+    store
+        .set_member_timeout(bob.id, i64::MAX, None, moderator.id)
+        .await
+        .unwrap();
+    store
+        .remove_from_space(carol.id, moderator.id, Some("spam"))
+        .await
+        .unwrap();
+    let poll_message = MessageId::generate();
+    store
+        .send_poll_message(
+            channel,
+            moderator.id,
+            poll_message,
+            "vote",
+            "lunch?",
+            &["yes".into(), "no".into()],
+            None,
+        )
+        .await
+        .unwrap();
+
+    let timeout = store.member_timeout(bob.id).await.unwrap().unwrap();
+    let removal = &store.list_removals().await.unwrap()[0];
+    let poll = store
+        .poll_for_message(poll_message, admin.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        timeout.issued_by,
+        Some(moderator.id),
+        "fixture must name the issuer"
+    );
+    assert_eq!(
+        removal.removed_by,
+        Some(moderator.id),
+        "fixture must name the remover"
+    );
+    assert_eq!(
+        poll.created_by,
+        Some(moderator.id),
+        "fixture must name the creator"
+    );
+
+    store.delete_account(moderator.id).await.unwrap();
+
+    let timeout = store.member_timeout(bob.id).await.unwrap().unwrap();
+    let removal = &store.list_removals().await.unwrap()[0];
+    let poll = store
+        .poll_for_message(poll_message, admin.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        timeout.issued_by, None,
+        "a deleted issuer must be anonymized"
+    );
+    assert_eq!(
+        removal.removed_by, None,
+        "a deleted remover must be anonymized"
+    );
+    assert_eq!(
+        poll.created_by, None,
+        "a deleted poll creator must be anonymized"
+    );
+}

@@ -150,6 +150,24 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        sqlx::query!(
+            "UPDATE member_timeouts SET issued_by = NULL WHERE issued_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE space_removals SET removed_by = NULL WHERE removed_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE polls SET created_by = NULL WHERE created_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
 
         // Purge personal data. Deleting devices cascades sessions and their tokens.
         sqlx::query!("DELETE FROM devices WHERE user_id = ?", user_id)

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE member_timeouts SET issued_by = NULL WHERE issued_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e570d2bc7a08e68b75c5b4dfe3b010ff3cdc6877af8c7c1ed0f60c3f4b755d31"
+}
