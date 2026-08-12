@@ -34,13 +34,8 @@ class TypingIndicator extends ConsumerWidget {
         .toSet();
 
     // The band reveals and retracts; dots mount only while somebody types.
-    return AnimatedSize(
-      duration: AppMotion.reduced(context, AppMotion.base),
-      curve: AppMotion.entrance,
-      alignment: Alignment.topLeft,
-      child: typingIds.isEmpty
-          ? const SizedBox.shrink()
-          : AppFadeIn(child: _line(context, ref, typingIds)),
+    return AppRevealBand(
+      child: typingIds.isEmpty ? null : _line(context, ref, typingIds),
     );
   }
 

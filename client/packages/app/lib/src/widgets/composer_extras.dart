@@ -306,34 +306,44 @@ class ComposerBanners extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (error != null)
-          ComposerInlineError(
-            message: error,
-            onDismiss: onDismissAttachmentError,
-          ),
-        if (overBy != null)
-          ComposerInlineError(
-            message:
-                'Message is $overBy characters over the '
-                '$kMessageMaxChars-character limit.',
-          ),
-        if (stagedAttachments.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-            child: Wrap(
-              spacing: AppSpacing.s8,
-              runSpacing: AppSpacing.s8,
-              children: [
-                for (final attachment in stagedAttachments)
-                  StagedAttachmentTile(
-                    key: ValueKey(attachment.localId),
-                    attachment: attachment,
-                    onRemove: () => onRemoveAttachment(attachment.localId),
-                    onRetry: () => onRetryAttachment(attachment.localId),
+        AppRevealBand(
+          child: error == null
+              ? null
+              : ComposerInlineError(
+                  message: error,
+                  onDismiss: onDismissAttachmentError,
+                ),
+        ),
+        AppRevealBand(
+          child: overBy == null
+              ? null
+              : ComposerInlineError(
+                  message:
+                      'Message is $overBy characters over the '
+                      '$kMessageMaxChars-character limit.',
+                ),
+        ),
+        AppRevealBand(
+          child: stagedAttachments.isEmpty
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                  child: Wrap(
+                    spacing: AppSpacing.s8,
+                    runSpacing: AppSpacing.s8,
+                    children: [
+                      for (final attachment in stagedAttachments)
+                        StagedAttachmentTile(
+                          key: ValueKey(attachment.localId),
+                          attachment: attachment,
+                          onRemove: () =>
+                              onRemoveAttachment(attachment.localId),
+                          onRetry: () => onRetryAttachment(attachment.localId),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ),
+                ),
+        ),
       ],
     );
   }
