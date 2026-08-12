@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
+import 'animated_menu_portal.dart';
 import 'context_menu_focus.dart';
 import 'create_channel_sheet.dart';
 import 'space_settings_section.dart';
@@ -35,7 +36,7 @@ class SpaceMenuButton extends ConsumerStatefulWidget {
 }
 
 class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
-  final _controller = OverlayPortalController();
+  final _controller = AnimatedMenuController();
   final _link = LayerLink();
 
   @override
@@ -47,7 +48,7 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
     return CompositedTransformTarget(
       link: _link,
       child: OverlayPortal(
-        controller: _controller,
+        controller: _controller.portal,
         // Positioned so the follower sizes to its content, not the whole screen a Column would otherwise fill it against.
         overlayChildBuilder: (context) => Positioned(
           left: 0,
@@ -58,41 +59,48 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
             targetAnchor: Alignment.bottomRight,
             followerAnchor: Alignment.topRight,
             offset: const Offset(0, 4),
-            child: TapRegion(
-              onTapOutside: (_) => _controller.hide(),
-              // Escape closes it and Tab reaches every item once open.
-              child: ContextMenuKeyboardScope(
-                onDismiss: _controller.hide,
-                child: AppMenu(
-                  width: 200,
-                  children: [
-                    if (canManageChannels) ...[
+            child: AnimatedMenuSurface(
+              controller: _controller,
+              alignment: Alignment.topRight,
+              child: TapRegion(
+                onTapOutside: (_) => _controller.hide(),
+                // Escape closes it and Tab reaches every item once open.
+                child: ContextMenuKeyboardScope(
+                  onDismiss: _controller.hide,
+                  child: AppMenu(
+                    width: 200,
+                    children: [
+                      if (canManageChannels) ...[
+                        AppMenuItem(
+                          label: 'Add channel',
+                          leading: AppIcons.add,
+                          onTap: () {
+                            _controller.hide();
+                            showCreateChannelSheet(
+                              context,
+                              initialKind: 'text',
+                            );
+                          },
+                        ),
+                        AppMenuItem(
+                          label: 'Add category',
+                          leading: AppIcons.add,
+                          onTap: () {
+                            _controller.hide();
+                            context.push(Routes.adminCategories);
+                          },
+                        ),
+                      ],
                       AppMenuItem(
-                        label: 'Add channel',
-                        leading: AppIcons.add,
+                        label: 'Space settings',
+                        leading: AppIcons.settings,
                         onTap: () {
                           _controller.hide();
-                          showCreateChannelSheet(context, initialKind: 'text');
-                        },
-                      ),
-                      AppMenuItem(
-                        label: 'Add category',
-                        leading: AppIcons.add,
-                        onTap: () {
-                          _controller.hide();
-                          context.push(Routes.adminCategories);
+                          context.push(Routes.spaceSettings);
                         },
                       ),
                     ],
-                    AppMenuItem(
-                      label: 'Space settings',
-                      leading: AppIcons.settings,
-                      onTap: () {
-                        _controller.hide();
-                        context.push(Routes.spaceSettings);
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

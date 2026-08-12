@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'animated_menu_portal.dart';
 import 'emoji_picker_panel.dart';
 import 'hover_reveal.dart';
 import 'message_context_menu_layout.dart';
@@ -46,7 +47,7 @@ class EmojiPickerButton extends StatefulWidget {
 }
 
 class _EmojiPickerButtonState extends State<EmojiPickerButton> {
-  final _controller = OverlayPortalController();
+  final _controller = AnimatedMenuController();
   Offset _anchor = Offset.zero;
   ScrollPosition? _watched;
 
@@ -98,7 +99,7 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
   @override
   Widget build(BuildContext context) {
     return OverlayPortal(
-      controller: _controller,
+      controller: _controller.portal,
       overlayChildBuilder: (context) => Positioned.fill(
         child: CustomSingleChildLayout(
           delegate: MessageMenuLayout(
@@ -107,11 +108,14 @@ class _EmojiPickerButtonState extends State<EmojiPickerButton> {
                 MediaQuery.paddingOf(context) +
                 const EdgeInsets.all(menuScreenMargin),
           ),
-          child: TapRegion(
-            onTapOutside: (_) => _setOpen(false),
-            child: EmojiPickerPanel(
-              onSelect: _select,
-              onClose: () => _setOpen(false),
+          child: AnimatedMenuSurface(
+            controller: _controller,
+            child: TapRegion(
+              onTapOutside: (_) => _setOpen(false),
+              child: EmojiPickerPanel(
+                onSelect: _select,
+                onClose: () => _setOpen(false),
+              ),
             ),
           ),
         ),
