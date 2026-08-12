@@ -87,6 +87,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../../widgets/call_roster_motion.dart';
 import '../../widgets/fullscreen_video_overlay.dart';
 import 'canvas_presence_bubble.dart';
 import 'canvas_presence_geometry.dart';
@@ -356,16 +357,19 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       // Real content moves to CanvasPresenceBackdrop when sent to back; .expand, not .shrink, or the wrapping GestureDetector's own opaque hit box shrinks with it.
       child: sentToBack
           ? const SizedBox.expand()
-          : isScreen
-          ? CanvasScreenShareBubble(
-              participant: participant,
-              view: widget.screenShareViewFor(identity),
-            )
-          : CanvasPresenceBubble(
-              participant: participant,
-              cameraView: participant.isCameraOn
-                  ? widget.cameraViewFor(identity)
-                  : null,
+          // The pop plays once per tile mount (a participant arriving), never on pan or zoom, which only move the tile's slot.
+          : CallTilePop(
+              child: isScreen
+                  ? CanvasScreenShareBubble(
+                      participant: participant,
+                      view: widget.screenShareViewFor(identity),
+                    )
+                  : CanvasPresenceBubble(
+                      participant: participant,
+                      cameraView: participant.isCameraOn
+                          ? widget.cameraViewFor(identity)
+                          : null,
+                    ),
             ),
     );
   }

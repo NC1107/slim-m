@@ -15,6 +15,7 @@
 library;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -85,6 +86,7 @@ class CanvasSurface extends StatefulWidget {
     this.cursors,
     this.cursorColors = const [],
     this.cursorLabelFontFamily,
+    this.cursorGlide = Duration.zero,
     this.onPointerMoved,
     this.placeholderFill = const Color(0xFFB9C0C8),
     this.placeholderIcon = const Color(0xFF6C757E),
@@ -135,6 +137,13 @@ class CanvasSurface extends StatefulWidget {
   /// no cursor layer at all, so a caller that has not wired remote cursors up
   /// yet (or a test that has no opinion about them) pays nothing for it.
   final CanvasCursors? cursors;
+
+  /// How long a remote cursor glides to a newly-reported position, already
+  /// passed through the caller's own reduce-motion gate (this package has no
+  /// notion of one). Zero, the default, keeps the stepped behaviour; see
+  /// [cursorGlideDuration] for the value the app passes and why. Read once
+  /// when the surface first builds, like every other painter input here.
+  final Duration cursorGlide;
 
   /// The closed colour set [cursors] indexes into. Meaningless without
   /// [cursors], and ignored when it is null.
@@ -225,7 +234,46 @@ class CanvasSurface extends StatefulWidget {
   State<CanvasSurface> createState() => _CanvasSurfaceState();
 }
 
-class _CanvasSurfaceState extends State<CanvasSurface> {
+class _CanvasSurfaceState extends State<CanvasSurface>
+    with SingleTickerProviderStateMixin {
+  /// Bumped per frame while any cursor glide is in flight, so the cursor
+  /// layer repaints between the roughly 80ms-apart frames the wire delivers.
+  /// The ticker runs only from a cursor update until every glide lands -
+  /// never while pointers are idle - and a zero [CanvasSurface.cursorGlide]
+  /// (reduce motion, or a caller that never opted in) never starts it.
+  final ValueNotifier<int> _cursorGlideTick = ValueNotifier<int>(0);
+
+  /// Created in [initState], never lazily: a `late final` first touched in
+  /// [dispose] (the zero-glide case, where nothing ever starts it) would run
+  /// `createTicker`'s ancestor lookup after deactivation, which throws.
+  late final Ticker _glideTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _glideTicker = createTicker(_onGlideFrame);
+    widget.cursors?.addListener(_onCursorsChanged);
+  }
+
+  /// Starts the glide ticker on a cursor update. The zero-glide early
+  /// return is efficiency rather than correctness - without it the first
+  /// tick's own stop check ends the ticker anyway, at the cost of one
+  /// wasted frame per cursor update under reduce motion - which is why no
+  /// behavioural test can see it and none pretends to.
+  void _onCursorsChanged() {
+    if (widget.cursorGlide <= Duration.zero) return;
+    if (!_glideTicker.isActive) _glideTicker.start();
+  }
+
+  void _onGlideFrame(Duration elapsed) {
+    _cursorGlideTick.value++;
+    final cursors = widget.cursors;
+    if (cursors == null ||
+        !cursors.glidingAt(DateTime.now(), widget.cursorGlide)) {
+      _glideTicker.stop();
+    }
+  }
+
   final DraftStroke _draft = DraftStroke();
   late final StrokePainter _strokes = StrokePainter(
     document: widget.document,
@@ -259,6 +307,8 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
           document: widget.document,
           colors: widget.cursorColors,
           labelFontFamily: widget.cursorLabelFontFamily,
+          glide: widget.cursorGlide,
+          glideTick: _cursorGlideTick,
         );
   late final SelectionPainter? _selectionPainter = widget.selectionOutline ==
           null
@@ -308,6 +358,10 @@ class _CanvasSurfaceState extends State<CanvasSurface> {
 
   @override
   void dispose() {
+    widget.cursors?.removeListener(_onCursorsChanged);
+    // Before super: the ticker mixin asserts nothing is still ticking.
+    _glideTicker.dispose();
+    _cursorGlideTick.dispose();
     _draft.dispose();
     _panning.dispose();
     super.dispose();
