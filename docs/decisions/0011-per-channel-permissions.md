@@ -1,7 +1,7 @@
 # 0011 - Per-channel permissions
 
 Date: 2026-08-09.
-Status: designed, not built.
+Status: ~~designed, not built~~ built 2026-08-09 (PRs #517, #518, #522); status line corrected 2026-08-11 by the full-stack review, which found it still claiming design-only a fortnight after the code shipped.
 
 `docs/reports/screen-review/README.md`'s systemic finding names one missing abstraction behind seven independent bugs: the client gates actions on the caller's deployment-wide base permissions (`GET /me`, `myPermissionsProvider`), while the server authorizes the same actions per channel (`Store::permissions_in_channel`).
 There is no per-channel effective-permission route on the server, and no such provider anywhere in the client.
