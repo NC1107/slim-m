@@ -203,7 +203,10 @@ class HomeShell extends ConsumerWidget {
         },
         // CallbackShortcuts only fires for a focused descendant, so this
         // default makes the shortcut work the instant the app opens.
-        child: Focus(autofocus: true, child: scaffold),
+        child: Focus(
+          autofocus: true,
+          child: _LayoutBridge(layout: layout, child: scaffold),
+        ),
       ),
     );
   }
@@ -229,6 +232,28 @@ class HomeShell extends ConsumerWidget {
         : ordered[(index + direction) % ordered.length];
     context.go(Routes.channel(target.id));
   }
+}
+
+/// Bridges the 599/600 chrome swap with a short fade, so a resize across
+/// the breakpoint reads as reflow rather than a one-frame interface swap.
+///
+/// Deliberately [AppFadeIn] keyed on the layout class rather than an
+/// `AnimatedSwitcher`: a switcher keeps the outgoing scaffold mounted
+/// through the crossfade, and both copies would then hold the shell's one
+/// routed child - a Navigator whose GlobalKeys cannot exist twice.
+class _LayoutBridge extends StatelessWidget {
+  const _LayoutBridge({required this.layout, required this.child});
+
+  final LayoutClass layout;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AppFadeIn(
+    key: ValueKey('shell-${layout.name}'),
+    duration: AppMotion.fast,
+    offset: 0,
+    child: child,
+  );
 }
 
 /// The wide-layout member pane's slot: width-animated, and withheld for a

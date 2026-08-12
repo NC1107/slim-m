@@ -14,11 +14,15 @@
 /// here rather than assuming they will now succeed - [_DecodeFailure] is
 /// what stops that retry from surfacing as an uncaught exception.
 ///
-/// No `Hero`. An attachment is content-addressed, so one id legitimately
-/// rides on more than one message (`models_attachments.dart`), and two rows
-/// showing the same image would put two identical hero tags in one subtree,
-/// which throws. `AttachmentView` is given no message id to disambiguate a
-/// tag with, so the flight is traded for a fade.
+/// A `Hero` flight now carries the image from its thumbnail into this
+/// viewer, and the tag choice is the whole trick: an attachment is
+/// content-addressed, so one id legitimately rides on more than one message
+/// (`models_attachments.dart`), and two rows showing the same image with one
+/// shared id-based tag would throw the moment a flight starts. Each
+/// `AttachmentView` therefore mints its own identity `Object` as the tag and
+/// hands the same object here, so tags are unique per mounted thumbnail by
+/// construction. Callers with no thumbnail to fly from pass no tag and keep
+/// the plain fade.
 ///
 /// The backdrop is black in both themes: a surface token would tint the
 /// letterbox around a photo, and the controls are themed dark to match rather
@@ -48,6 +52,7 @@ Future<void> showFullscreenImage(
   BuildContext context, {
   required String filename,
   required Uint8List bytes,
+  Object? heroTag,
 }) {
   return Navigator.of(context, rootNavigator: true).push<void>(
     PageRouteBuilder<void>(
@@ -62,7 +67,11 @@ Future<void> showFullscreenImage(
       ),
       pageBuilder: (_, animation, _) => FadeTransition(
         opacity: animation,
-        child: FullscreenImageViewer(filename: filename, bytes: bytes),
+        child: FullscreenImageViewer(
+          filename: filename,
+          bytes: bytes,
+          heroTag: heroTag,
+        ),
       ),
     ),
   );
@@ -73,10 +82,15 @@ class FullscreenImageViewer extends StatefulWidget {
     super.key,
     required this.filename,
     required this.bytes,
+    this.heroTag,
   });
 
   final String filename;
   final Uint8List bytes;
+
+  /// The thumbnail's own identity tag, or null for a caller with no
+  /// thumbnail to fly from; see the library doc for why never a shared id.
+  final Object? heroTag;
 
   @override
   State<FullscreenImageViewer> createState() => _FullscreenImageViewerState();
@@ -127,6 +141,9 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
     Navigator.of(context).maybePop();
   }
 
+  Widget _maybeHero(Widget child) =>
+      widget.heroTag == null ? child : Hero(tag: widget.heroTag!, child: child);
+
   @override
   Widget build(BuildContext context) {
     // Zoomed, every drag belongs to the viewer's own pan; the dismiss
@@ -158,13 +175,15 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                       child: InteractiveViewer(
                         transformationController: _transform,
                         maxScale: _maxScale,
-                        child: Image.memory(
-                          widget.bytes,
-                          fit: BoxFit.contain,
-                          semanticLabel: widget.filename,
-                          // The inline thumbnail already tried and failed to decode these same bytes; see this widget's own doc comment.
-                          errorBuilder: (context, error, stackTrace) =>
-                              _DecodeFailure(filename: widget.filename),
+                        child: _maybeHero(
+                          Image.memory(
+                            widget.bytes,
+                            fit: BoxFit.contain,
+                            semanticLabel: widget.filename,
+                            // The inline thumbnail already tried and failed to decode these same bytes; see this widget's own doc comment.
+                            errorBuilder: (context, error, stackTrace) =>
+                                _DecodeFailure(filename: widget.filename),
+                          ),
                         ),
                       ),
                     ),

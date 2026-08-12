@@ -256,12 +256,16 @@ class _ParticipantGrid extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: constraints.maxHeight),
         child: Center(
-          child: AnimatedRosterWrap(
-            participants: participants,
-            spacing: AppSpacing.s16,
-            runSpacing: AppSpacing.s16,
-            tileFor: (context, p) =>
-                participantTile(context, p, controller, onOpenProfile),
+          // Capped like a settings column: a 1:1 call was two small tiles adrift in a full-bleed void, and a bounded room reads as designed.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: kContentColumnMax),
+            child: AnimatedRosterWrap(
+              participants: participants,
+              spacing: AppSpacing.s16,
+              runSpacing: AppSpacing.s16,
+              tileFor: (context, p) =>
+                  participantTile(context, p, controller, onOpenProfile),
+            ),
           ),
         ),
       ),
