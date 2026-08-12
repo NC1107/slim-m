@@ -106,7 +106,10 @@ class DirectMessagesSection extends StatelessWidget {
           for (final channel in others)
             SelectionMarkerTarget(
               selected: channel.id == selectedId,
-              child: DmRow(channel: channel, selected: channel.id == selectedId),
+              child: DmRow(
+                channel: channel,
+                selected: channel.id == selectedId,
+              ),
             ),
       ],
     );
