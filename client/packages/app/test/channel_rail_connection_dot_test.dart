@@ -95,7 +95,8 @@ void main() {
       final shapes = <SyncStatus, AppStatusShape>{};
       for (final status in SyncStatus.values) {
         controller.state = status;
-        await tester.pump();
+        // Settled, not one pump: a flip cross-fades, so both paints coexist.
+        await tester.pumpAndSettle();
         shapes[status] = _shapeIn(tester);
       }
 
@@ -108,6 +109,31 @@ void main() {
       );
     },
   );
+
+  testWidgets('a connection flip cross-fades rather than repainting', (
+    tester,
+  ) async {
+    final setup = _setup(SyncStatus.live);
+    addTearDown(setup.dispose);
+    final controller = setup.read(syncControllerProvider.notifier);
+    await _pumpHeader(tester, setup);
+    await tester.pumpAndSettle();
+
+    controller.state = SyncStatus.offline;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    final midFlip = find.descendant(
+      of: find.byType(SpaceConnectionDot),
+      matching: find.byType(CustomPaint),
+    );
+    expect(
+      midFlip,
+      findsNWidgets(2),
+      reason: 'mid-flip both states paint, cross-fading on AppMotion.fast',
+    );
+    await tester.pumpAndSettle();
+    expect(midFlip, findsOneWidget);
+  });
 
   testWidgets('names the connection, never a person\'s presence', (
     tester,

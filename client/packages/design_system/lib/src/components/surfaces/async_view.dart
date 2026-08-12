@@ -15,6 +15,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../app_fade_in.dart';
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
@@ -137,19 +138,22 @@ class AppAsyncView<T> extends StatelessWidget {
     }
 
     if (emptyMessage != null && (isEmpty?.call(resolved) ?? false)) {
-      return _wrap(
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          child: Text(
-            emptyMessage!,
-            textAlign: center ? TextAlign.center : TextAlign.start,
-            style: AppText.body.copyWith(color: tokens.textSecondary),
+      return AppFadeIn(
+        child: _wrap(
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            child: Text(
+              emptyMessage!,
+              textAlign: center ? TextAlign.center : TextAlign.start,
+              style: AppText.body.copyWith(color: tokens.textSecondary),
+            ),
           ),
         ),
       );
     }
 
-    return data(context, resolved);
+    // A resolve settles in once on mount; later data rebuilds swap in place.
+    return AppFadeIn(child: data(context, resolved));
   }
 }
 

@@ -20,8 +20,10 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../app_haptics.dart';
 import '../../app_icons.dart';
 import '../../app_metrics.dart';
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import '../../touch_targets.dart';
@@ -196,6 +198,10 @@ class _AppMenuItemState extends State<AppMenuItem> {
   bool _hovered = false;
   bool _focused = false;
 
+  /// A finger has no hover, so on a phone this is the only sign a tap landed
+  /// before its action runs - [AppListRow]'s own reasoning, applied here.
+  bool _pressed = false;
+
   Color _toneColor(AppTokens tokens) => switch (widget.tone) {
         AppMenuItemTone.normal => tokens.textPrimary,
         AppMenuItemTone.warn => tokens.warnText,
@@ -217,13 +223,18 @@ class _AppMenuItemState extends State<AppMenuItem> {
         ? tokens.warnSoft
         : tokens.accentSoft;
 
-    final content = Container(
+    // The tint rides AppListRow's fast hover clock; density is still layout.
+    final content = AnimatedContainer(
+      duration: AppMotion.reduced(context, AppMotion.fast),
+      curve: AppMotion.entrance,
       height: touch ? 48 : AppSizes.controlMd,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: widget.selected
             ? selectedFill
-            : (_hovered ? tokens.surfaceSunken : Colors.transparent),
+            : (_hovered || _pressed
+                ? tokens.surfaceSunken
+                : Colors.transparent),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
       foregroundDecoration: _focused
@@ -281,7 +292,17 @@ class _AppMenuItemState extends State<AppMenuItem> {
                 ),
               },
         child: GestureDetector(
-            onTap: active ? widget.onTap : null, child: content),
+          onTapDown: active ? (_) => setState(() => _pressed = true) : null,
+          onTapUp: active ? (_) => setState(() => _pressed = false) : null,
+          onTapCancel: active ? () => setState(() => _pressed = false) : null,
+          onTap: active
+              ? () {
+                  AppHaptics.selection();
+                  widget.onTap!();
+                }
+              : null,
+          child: content,
+        ),
       ),
     );
   }

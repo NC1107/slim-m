@@ -12,6 +12,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../app_motion.dart';
 import '../../app_tokens.dart';
 
 /// [hidden] is "appearing offline": a deliberate privacy choice, not a real
@@ -88,12 +89,17 @@ class AppStatusDot extends StatelessWidget {
 
     return Semantics(
       label: _labelOf[status],
-      child: CustomPaint(
-        size: Size.square(size),
-        painter: AppStatusDotPainter(
-          shape: shapeOf[status]!,
-          color: _colorOf(tokens.status),
-          backgroundColor: backgroundColor ?? tokens.surfaceBase,
+      // A presence flip cross-fades; the state key means rebuilds swap nothing.
+      child: AnimatedSwitcher(
+        duration: AppMotion.reduced(context, AppMotion.fast),
+        child: CustomPaint(
+          key: ValueKey(status),
+          size: Size.square(size),
+          painter: AppStatusDotPainter(
+            shape: shapeOf[status]!,
+            color: _colorOf(tokens.status),
+            backgroundColor: backgroundColor ?? tokens.surfaceBase,
+          ),
         ),
       ),
     );

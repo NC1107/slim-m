@@ -165,12 +165,18 @@ class SpaceConnectionDot extends StatelessWidget {
       message: label,
       child: Semantics(
         label: label,
-        child: CustomPaint(
-          size: const Size.square(_size),
-          painter: AppStatusDotPainter(
-            shape: _shapeOf[status]!,
-            color: color,
-            backgroundColor: tokens.surfaceSunken,
+        // A connection flip cross-fades on [AppStatusDot]'s own clock rather
+        // than repainting in one frame; the key scopes the swap to the state.
+        child: AnimatedSwitcher(
+          duration: AppMotion.reduced(context, AppMotion.fast),
+          child: CustomPaint(
+            key: ValueKey(status),
+            size: const Size.square(_size),
+            painter: AppStatusDotPainter(
+              shape: _shapeOf[status]!,
+              color: color,
+              backgroundColor: tokens.surfaceSunken,
+            ),
           ),
         ),
       ),

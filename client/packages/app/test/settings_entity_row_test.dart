@@ -18,6 +18,7 @@
 /// shape until it was caught. `actions` is `List<Widget?>` now, passed flat.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/settings_entity_row.dart';
@@ -157,5 +158,43 @@ void main() {
           'also offers delete - roles_screen had to hand-roll this and every '
           'other list simply did not have it',
     );
+  });
+
+  testWidgets('a pointer over the row tints it, animated rather than snapped', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(const SettingsEntityRow(headline: 'weekend-invite')),
+    );
+    await tester.pumpAndSettle();
+
+    Color? fill() {
+      final container = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byType(SettingsEntityRow),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      return (container.decoration as BoxDecoration?)?.color;
+    }
+
+    expect(fill(), Colors.transparent);
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(find.byType(SettingsEntityRow)));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final target = AppTokens.light.surfaceSunken;
+    final mid = fill();
+    expect(mid, isNot(Colors.transparent), reason: 'the tint has set off');
+    expect(mid, isNot(target), reason: 'and has not already arrived');
+    await tester.pumpAndSettle();
+    expect(fill(), target);
   });
 }
