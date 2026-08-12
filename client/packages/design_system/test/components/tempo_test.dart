@@ -144,4 +144,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Opacity>(veil).opacity, 1);
   });
+
+  List<double> dotOpacities(WidgetTester tester) => [
+        for (final e in find
+            .descendant(
+              of: find.byType(AppTypingDots),
+              matching: find.byType(Opacity),
+            )
+            .evaluate())
+          (e.widget as Opacity).opacity,
+      ];
+
+  testWidgets('AppTypingDots pulse as a staggered wave', (tester) async {
+    await _pump(tester, const AppTypingDots());
+    await tester.pump(const Duration(milliseconds: 137));
+
+    final first = dotOpacities(tester);
+    expect(first, hasLength(3));
+    expect(
+      first.toSet(),
+      hasLength(3),
+      reason: 'the stagger keeps the three dots out of phase',
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(dotOpacities(tester), isNot(first), reason: 'and the wave moves');
+  });
+
+  testWidgets('AppTypingDots hold still under reduce motion', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: Scaffold(body: Center(child: AppTypingDots())),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(dotOpacities(tester), everyElement(1.0));
+    expect(tester.hasRunningAnimations, isFalse);
+  });
 }

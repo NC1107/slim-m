@@ -32,8 +32,19 @@ class TypingIndicator extends ConsumerWidget {
         .watch(typingControllerProvider(channelId))
         .where((id) => id != selfId)
         .toSet();
-    if (typingIds.isEmpty) return const SizedBox.shrink();
 
+    // The band reveals and retracts; dots mount only while somebody types.
+    return AnimatedSize(
+      duration: AppMotion.reduced(context, AppMotion.base),
+      curve: AppMotion.entrance,
+      alignment: Alignment.topLeft,
+      child: typingIds.isEmpty
+          ? const SizedBox.shrink()
+          : AppFadeIn(child: _line(context, ref, typingIds)),
+    );
+  }
+
+  Widget _line(BuildContext context, WidgetRef ref, Set<String> typingIds) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final members =
         ref.watch(membersProvider).valueOrNull ?? const <api.UserProfile>[];
@@ -54,9 +65,18 @@ class TypingIndicator extends ConsumerWidget {
         ? '${names.first} is typing…'
         : '${names.join(', ')} are typing…';
 
-    return Text(
-      label,
-      style: AppText.code.copyWith(color: tokens.textSecondary),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: AppSpacing.s8,
+      children: [
+        const AppTypingDots(),
+        Flexible(
+          child: Text(
+            label,
+            style: AppText.code.copyWith(color: tokens.textSecondary),
+          ),
+        ),
+      ],
     );
   }
 }

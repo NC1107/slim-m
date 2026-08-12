@@ -29,6 +29,7 @@ import 'message_context_menu.dart';
 import 'message_edit_field.dart';
 import 'message_row_identity.dart';
 import 'message_row_parts.dart';
+import 'reactions_row.dart';
 import 'message_text.dart';
 import 'poll_view.dart';
 import 'reply_quote.dart';

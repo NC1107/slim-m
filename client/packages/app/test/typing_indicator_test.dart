@@ -91,8 +91,11 @@ void main() {
     );
 
     events.add(const api.TypingStarted(channelId: 'c1', userId: 'other'));
-    await tester.pumpAndSettle();
+    // Bounded pumps, never pumpAndSettle: the dots deliberately loop.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Priya is typing…'), findsOneWidget);
+    expect(find.byType(AppTypingDots), findsOneWidget);
   });
 }

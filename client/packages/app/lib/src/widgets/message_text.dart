@@ -63,40 +63,53 @@ class MessageBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final baseColor = dim ? tokens.textSecondary : tokens.textPrimary;
 
-    final widgets = <Widget>[];
-    for (final block in splitMessageBlocks(content)) {
-      switch (block) {
-        case TextBlock(:final text):
-          for (final md in splitMarkdownBlocks(text)) {
-            widgets.add(
-              _buildMarkdownBlock(
-                md,
-                knownUsernames: knownUsernames,
-                customEmoji: customEmoji,
-                color: baseColor,
-              ),
-            );
+    // Provisional-to-delivered ink lerps rather than snapping on confirm.
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: dim ? 1.0 : 0.0),
+      duration: AppMotion.reduced(context, AppMotion.base),
+      curve: AppMotion.entrance,
+      builder: (context, t, _) {
+        final baseColor = Color.lerp(
+          tokens.textPrimary,
+          tokens.textSecondary,
+          t,
+        )!;
+
+        final widgets = <Widget>[];
+        for (final block in splitMessageBlocks(content)) {
+          switch (block) {
+            case TextBlock(:final text):
+              for (final md in splitMarkdownBlocks(text)) {
+                widgets.add(
+                  _buildMarkdownBlock(
+                    md,
+                    knownUsernames: knownUsernames,
+                    customEmoji: customEmoji,
+                    color: baseColor,
+                  ),
+                );
+              }
+            case CodeBlock(:final language, :final code):
+              widgets.add(
+                AppCodeBlock(
+                  language: language,
+                  lines: lexCodeBlock(code, language),
+                ),
+              );
           }
-        case CodeBlock(:final language, :final code):
-          widgets.add(
-            AppCodeBlock(
-              language: language,
-              lines: lexCodeBlock(code, language),
-            ),
-          );
-      }
-    }
+        }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < widgets.length; i++) ...[
-          if (i > 0) const SizedBox(height: AppSpacing.s4),
-          widgets[i],
-        ],
-      ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < widgets.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.s4),
+              widgets[i],
+            ],
+          ],
+        );
+      },
     );
   }
 }
