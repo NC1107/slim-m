@@ -170,7 +170,7 @@ void main() {
     // A label with no action behind it is a sentence a screen reader reads out and cannot act on.
     expect(
       tester.getSemantics(find.bySemanticsLabel('Exit fullscreen')),
-      containsSemantics(label: 'Exit fullscreen', hasTapAction: true),
+      isSemantics(label: 'Exit fullscreen', hasTapAction: true),
     );
     handle.dispose();
   });
