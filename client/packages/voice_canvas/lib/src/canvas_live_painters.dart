@@ -174,10 +174,31 @@ class CursorPainter extends CustomPainter {
     required this.document,
     required this.colors,
     this.labelFontFamily,
-  }) : super(repaint: Listenable.merge([cursors, document]));
+    this.glide = Duration.zero,
+    this.now = DateTime.now,
+    Listenable? glideTick,
+  }) : super(
+          repaint: Listenable.merge([
+            cursors,
+            document,
+            if (glideTick != null) glideTick,
+          ]),
+        );
 
   final CanvasCursors cursors;
   final CanvasDocument document;
+
+  /// How long a cursor glides to a newly-reported position. Zero (the
+  /// default, and what a reduce-motion caller passes) draws each frame at
+  /// its target exactly as before; anything longer needs [glideTick] wired
+  /// to something that fires while a glide is in flight, since neither
+  /// [cursors] nor [document] notifies between frames.
+  final Duration glide;
+
+  /// The clock a glide is read against, injectable for a test the same
+  /// plain-value way [colors] and [labelFontFamily] already are - this
+  /// package deliberately depends on Flutter alone, so no `clock` package.
+  final DateTime Function() now;
 
   /// The caller's closed cursor-colour set, indexed by
   /// [CanvasCursor.colorIndex]. This package carries no palette of its own,
@@ -198,10 +219,12 @@ class CursorPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (colors.isEmpty) return;
     final camera = document.camera;
+    final paintedAt = now();
     for (final cursor in cursors.all) {
+      final world = cursor.positionAt(paintedAt, glide);
       final at = Offset(
-        (cursor.x - camera.x) * camera.zoom,
-        (cursor.y - camera.y) * camera.zoom,
+        (world.dx - camera.x) * camera.zoom,
+        (world.dy - camera.y) * camera.zoom,
       );
       if (at.dx < -_cullMargin ||
           at.dy < -_cullMargin ||

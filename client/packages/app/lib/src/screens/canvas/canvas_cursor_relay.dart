@@ -90,6 +90,8 @@ class CanvasCursorRelay {
       label: resolveLabel(userId),
       colorIndex: canvasParticipantColorIndex(userId, paletteSize),
       now: clock.now(),
+      // Seeds the glide's start from the in-flight position; harmless when a painter is given a zero (reduce-motion) glide, since it then draws the target regardless.
+      glide: cursorGlideDuration,
     );
   }
 

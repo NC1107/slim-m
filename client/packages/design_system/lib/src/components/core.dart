@@ -7,6 +7,7 @@ library;
 export 'core/avatar.dart';
 export 'core/badge.dart';
 export 'core/brand_mark.dart';
+export 'core/breathing_halo.dart';
 export 'core/button.dart';
 export 'core/icon_button.dart';
 export 'core/kbd.dart';

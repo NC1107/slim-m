@@ -403,6 +403,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           cursors: widget.cursors,
           cursorColors: widget.cursorColors,
           cursorLabelFontFamily: AppFonts.sans,
+          // Zero under reduce motion, which keeps the stepped positions.
+          cursorGlide: AppMotion.reduced(context, cursorGlideDuration),
           onPointerMoved: widget.onPointerMoved,
           remoteDrafts: widget.remoteDrafts,
           onDraftPoint: widget.onDraftPoint,

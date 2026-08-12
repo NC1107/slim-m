@@ -29,10 +29,13 @@ class VoiceConnecting extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          const AppBreathingHalo(
+            size: 56,
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
           const SizedBox(height: AppSpacing.s16),
           Text('Connecting', style: TextStyle(color: tokens.textSecondary)),
@@ -63,10 +66,12 @@ class VoiceSwitchPrompt extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                AppIcons.voice,
-                size: AppSizes.icon32,
-                color: tokens.textSecondary,
+              AppBreathingHalo(
+                child: Icon(
+                  AppIcons.voice,
+                  size: AppSizes.icon32,
+                  color: tokens.textSecondary,
+                ),
               ),
               const SizedBox(height: AppSpacing.s16),
               Text(
@@ -145,10 +150,12 @@ class VoiceRejoinScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      isDm ? AppIcons.startCall : AppIcons.voice,
-                      size: AppSizes.icon32,
-                      color: tokens.textSecondary,
+                    AppBreathingHalo(
+                      child: Icon(
+                        isDm ? AppIcons.startCall : AppIcons.voice,
+                        size: AppSizes.icon32,
+                        color: tokens.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.s16),
                     Text(
