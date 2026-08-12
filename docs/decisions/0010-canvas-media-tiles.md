@@ -1,7 +1,7 @@
 # 0010 - Canvas media tiles: camera and screen share as movable AR objects
 
 Date: 2026-08-06.
-Status: accepted.
+Status: accepted; built 2026-08-08 (PRs #471, #476 - `http/canvas_media_slots.rs`, the two media-slot routes, and the lock-enforcement fix). Built annotation added 2026-08-11 by the full-stack review.
 
 ## The owner's own words, verbatim
 
