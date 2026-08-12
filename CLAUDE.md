@@ -12,6 +12,41 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## A notification tap went nowhere, and two native traps on the way to fixing it (2026-08-11)
+
+Reported from real device use: "clicking on a notification takes me to the channel page but I have no idea where that message came from."
+It never took anyone anywhere - there is no tap handler anywhere in this client, so the app resumed to whatever route it was last on, which is the right channel only by coincidence.
+Read this before touching `NotificationTapObserver.swift`, `notification_tap_channel.dart`, or before adding anything to `Runner.xcodeproj/project.pbxproj` by hand.
+
+**The routing data was already on the device and was being thrown away.**
+The sealed envelope carries `channel_id` and `message_id` beside the preview fields, and the notification service extension already opens it to build the content preview - it decoded `sender`/`channel`/`body` and dropped the routing fields on the floor.
+So this needed no wire change and no server change: the NSE copies both ids into the delivered notification's `userInfo`, which is local-only (the mutation happens on-device after delivery, so the relay and APNs still only ever saw the sealed blob).
+Routing is attached whether or not there is a preview, and that split is the point: `channel_id` is in every envelope while a preview is a per-device opt-in, so a device showing the generic placeholder still opens the right channel.
+
+**The first trap: `FlutterAppDelegate` implements the tap callback and declares it in no public header, so the obvious `override` cannot compile and shadowing it would be worse.**
+`FlutterAppDelegate.mm` implements `userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:`, but its `@interface` conformance list is `<UIApplicationDelegate, FlutterPluginRegistry, FlutterAppLifeCycleProvider>` and the selector appears in no header - not `FlutterAppDelegate.h`, not `FlutterPlugin.h`.
+Swift only sees headers, so it can neither override the method nor reach `super` to forward it, and `lifeCycleDelegate` is not public either, so there is no seam to forward through by hand.
+A subclass method with the same selector would therefore compile as a plain Objective-C override that silently drops the engine's fan-out to plugins - which is exactly what `firebase_messaging`'s own notification handling rides on.
+`NotificationTapObserver` conforms to `UNUserNotificationCenterDelegate` directly instead (ordinary public API, no invisible members), chains in front of whoever already held the delegate, and forwards every callback.
+Ordering matters: it installs after `GeneratedPluginRegistrant.register`, so it captures firebase rather than being replaced by it - and firebase's own delegate-claiming block explicitly declines to replace a delegate conforming to `FlutterAppLifeCycleProvider`, which is worth reading before assuming a chain here is fragile.
+Both references are strong on purpose, and both look like ordinary delegate mistakes: `UNUserNotificationCenter.delegate` is weak, so the app delegate must hold the observer or it deallocates on install, and the observer must hold the previous delegate or taking that slot deallocates firebase's plugin and its whole push path with it.
+
+**The second trap cost a full macOS runner, and is the more generally useful one: a pbxproj id must be unique across the whole file, and reusing one reports as the project being "damaged" with nothing naming the file.**
+The first version of this change reused `7A11C0DE0006000000000041` and `...0042` for a file reference and a build file.
+Both were already taken - `0041` is the NotificationService *target* and `0042` is its build configuration list - because a pbxproj is a flat id-to-object map whose sections are presentation only, so reusing an id does not shadow it or fail to resolve, it makes one id mean two things.
+`xcodebuild` answers that with `The project 'Runner' is damaged and cannot be opened` plus `-[PBXNativeTarget group]: unrecognized selector`, naming the two types that got confused and never the id, the section or the file.
+The existing `ios sources are registered in project.pbxproj` gate passed on the damaged project the whole time, because it is a text search for `<name> in Sources`.
+`scripts/check-pbxproj-ids.py` closes that, in the same ubuntu job so it answers in a second rather than after the 14-minute macOS one.
+It has one real subtlety: the project's own `TargetAttributes` block is a dictionary keyed by target id and is byte-identical in shape to a definition, so the check requires `isa` (which every real object carries and nothing else does) - without that it reports four false positives on untouched main.
+Validated against three real states rather than a synthetic fixture: passes on main, passes on the fix, and fails on the exact commit CI rejected, naming both colliding ids and the objects they collided with.
+
+**What is tested and what cannot be.**
+Eleven tests cover every decision on the Dart side of the channel, including the control that an ordinary launch routes nowhere - without which the two positive tests would pass with the provider navigating blindly.
+The launch tap is consumed on read, so one tap cannot drag somebody back to the same channel on every later launch.
+Android answers neither path, because the envelope there is still sealed to a key nothing on the device opens; that is a limitation rather than a choice, and it means a caller needs no platform check of its own.
+Nothing here has been run on a real iPhone: `client-ios-ci` compiling it is the whole of the evidence, the same bar every other untested-on-device iOS surface in this client carries.
+Also not done: the tap opens the channel, not the specific message - usually the same thing, since the transcript is bottom-anchored and the push is for the newest message, but a notification reached late lands at the bottom of the right channel rather than on the message itself.
+
 ## A five-lens security review, and the two findings that were recurrences of shapes this file already names (2026-08-11)
 
 Asked, after the decrypted push preview was confirmed working on a real iPhone: "validate the content is secure and no leaks anywhere and it's safe for others to use."

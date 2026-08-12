@@ -11,5 +11,6 @@ export 'src/fcm_token_channel.dart';
 export 'src/host_platform.dart';
 export 'src/key_store.dart';
 export 'src/local_notifications.dart';
+export 'src/notification_tap_channel.dart';
 export 'src/persistent_key_store.dart';
 export 'src/shortcuts.dart';

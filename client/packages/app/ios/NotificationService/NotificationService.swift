@@ -55,17 +55,21 @@ final class NotificationService: UNNotificationServiceExtension {
     handler(content)
   }
 
-  /// Nil for anything at all that stops this being a preview worth showing:
-  /// no payload, no key on this device yet, a locked keychain, ciphertext
-  /// sealed to some other key, an envelope from a version this build does
-  /// not know, or one that carried no content in the first place.
+  /// Nil for anything at all that stops this envelope being readable: no
+  /// payload, no key on this device yet, a locked keychain, ciphertext
+  /// sealed to some other key, or an envelope from a version this build does
+  /// not know.
+  ///
+  /// An envelope that opens but carries no preview is deliberately not nil:
+  /// it still names the channel the push came from, and attaching that is
+  /// what lets a tap on the generic placeholder open the right channel. See
+  /// `PushEnvelope.applied(to:)`.
   private func decorated(_ content: UNNotificationContent) -> UNNotificationContent? {
     guard let encoded = content.userInfo[Self.payloadKey] as? String,
       let sealed = Data(base64Encoded: encoded),
       let privateKey = PushKeychain.privateKey(),
       let plaintext = PushSealedBox.open([UInt8](sealed), privateKey: privateKey),
       let envelope = PushEnvelope.decode(plaintext),
-      envelope.hasPreview,
       let mutable = content.mutableCopy() as? UNMutableNotificationContent
     else { return nil }
 
