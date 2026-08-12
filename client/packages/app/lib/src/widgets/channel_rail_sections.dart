@@ -138,10 +138,16 @@ class ChannelCategorySections extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final byCategory = channelsByCategory(channels);
+    // An empty category is a drop target for a manager and a dead header for
+    // anyone else; migration 0031's unconditional Text/Voice seed gives every
+    // fresh deployment two of them (the 2026-08-11 review's M8).
     final sections = <ChannelSection>[
-      (null, byCategory[null] ?? const []),
-      for (final category in categories)
-        (category, byCategory[category.id] ?? const []),
+      for (final section in <ChannelSection>[
+        (null, byCategory[null] ?? const []),
+        for (final category in categories)
+          (category, byCategory[category.id] ?? const []),
+      ])
+        if (canManage || section.$2.isNotEmpty) section,
     ];
 
     Widget row(Channel channel, bool reorderable) => ManagedChannelRow(

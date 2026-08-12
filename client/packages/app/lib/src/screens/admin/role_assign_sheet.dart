@@ -89,15 +89,14 @@ class _RoleAssignSheetState extends ConsumerState<_RoleAssignSheet>
               child: AppErrorState(message: error, onDismiss: clearActionError),
             ),
           Expanded(
-            child: members.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Text(
-                  'Could not load members.',
-                  style: AppText.body.copyWith(color: tokens.textSecondary),
-                ),
+            child: AppAsyncView(
+              value: AppAsyncState(
+                data: members.valueOrNull,
+                error: members.error,
               ),
-              data: (list) => ListView.builder(
+              errorMessage: 'Could not load members.',
+              onRetry: () => ref.invalidate(membersProvider),
+              data: (context, list) => ListView.builder(
                 itemCount: list.length,
                 itemBuilder: (context, i) {
                   final member = list[i];

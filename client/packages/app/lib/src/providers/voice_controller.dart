@@ -118,15 +118,9 @@ class VoiceController extends StateNotifier<VoiceState> {
   /// exists.
   int _callGeneration = 0;
 
-  /// Sets the microphone preference before joining. Has no effect on a live
-  /// call; use [toggleMicrophone] for that.
-  void setMicrophonePreference(bool enabled) {
-    state = state.copyWith(microphoneEnabled: enabled);
-  }
-
-  /// Sets the camera preference before joining, applied once on the next
-  /// [join] exactly the way [setMicrophonePreference] is; use [toggleCamera]
-  /// for the live in-call control.
+  /// Sets the camera preference before joining; use [toggleCamera] for the
+  /// live in-call control. Its microphone sibling died with the join lobby
+  /// (d190a711) and was deleted rather than left as an uncalled method.
   void setCameraPreference(bool enabled) {
     state = state.copyWith(cameraEnabled: enabled);
   }

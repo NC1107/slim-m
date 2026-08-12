@@ -35,6 +35,7 @@ Channel _channel(
   String name, {
   String kind = 'text',
   String? topic,
+  String? categoryId,
 }) => Channel(
   id: id,
   name: name,
@@ -42,6 +43,7 @@ Channel _channel(
   createdAt: 0,
   position: 0,
   topic: topic,
+  categoryId: categoryId,
   cursor: 0,
   lastReadSeq: 0,
   isPersonalSpace: false,
@@ -139,7 +141,7 @@ void main() {
       await tester.pumpWidget(
         _harness(
           ChannelCategorySections(
-            channels: [_channel('c1', 'general')],
+            channels: [_channel('c1', 'general', categoryId: 'cat-1')],
             categories: const [
               ChannelCategoryRow(id: 'cat-1', name: 'Text', position: 0),
             ],
@@ -150,7 +152,50 @@ void main() {
         ),
       );
 
+      expect(find.text('TEXT'), findsOneWidget);
+    });
+
+    testWidgets('an empty category is hidden from a member: migration 0031 '
+        'seeds Text and Voice unconditionally, so every fresh deployment '
+        'rendered two dead headers under the populated one', (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'Text', position: 0),
+              ChannelCategoryRow(id: 'cat-2', name: 'Voice', position: 1),
+            ],
+            selectedId: null,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
       expect(find.text('CHANNELS'), findsOneWidget);
+      expect(find.text('TEXT'), findsNothing);
+      expect(find.text('VOICE'), findsNothing);
+    });
+
+    testWidgets('a manager keeps the empty category, as a drop target', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'Text', position: 0),
+            ],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
       expect(find.text('TEXT'), findsOneWidget);
     });
   });

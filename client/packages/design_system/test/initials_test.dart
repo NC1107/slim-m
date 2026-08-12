@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+/// [initialsFor] is the one initials rule, made public when the 2026-08-11
+/// review found a second implementation in `onboarding_shell.dart` without
+/// the symbol-stripping - the same name rendered different initials in the
+/// server chip than everywhere else.
+library;
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+void main() {
+  test('strips symbols before taking the first two characters', () {
+    expect(initialsFor("N'ick"), 'NI');
+    expect(initialsFor('  slim-m  '), 'SL');
+    expect(initialsFor('#general'), 'GE');
+  });
+
+  test('short and empty names degrade rather than throw', () {
+    expect(initialsFor('a'), 'A');
+    expect(initialsFor('!!!'), '');
+    expect(initialsFor(''), '');
+  });
+}
