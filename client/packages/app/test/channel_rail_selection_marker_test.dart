@@ -10,10 +10,9 @@ import 'package:slimm_app/src/widgets/channel_rail_selection_marker.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 class _Rows extends StatefulWidget {
-  const _Rows({required this.initial, this.rows = 3, super.key});
+  const _Rows({required this.initial, super.key});
 
   final int? initial;
-  final int rows;
 
   @override
   State<_Rows> createState() => _RowsState();
@@ -21,7 +20,11 @@ class _Rows extends StatefulWidget {
 
 class _RowsState extends State<_Rows> {
   late int? selected = widget.initial;
-  late int rows = widget.rows;
+  int rows = 3;
+
+  void select(int? index) => setState(() => selected = index);
+
+  void shrinkTo(int count) => setState(() => rows = count);
 
   @override
   Widget build(BuildContext context) => SelectionMarkerLayer(
@@ -50,7 +53,9 @@ Future<void> _pump(
       data: MediaQueryData(disableAnimations: reduceMotion),
       child: MaterialApp(
         theme: buildTheme(Brightness.dark, AppTokens.dark),
-        home: Scaffold(body: _Rows(key: _rowsKey, initial: initial)),
+        home: Scaffold(
+          body: _Rows(key: _rowsKey, initial: initial),
+        ),
       ),
     ),
   );
@@ -86,7 +91,7 @@ void main() {
     await _pump(tester, initial: 0);
     final from = _barTop(tester);
 
-    _rowsKey.currentState!.setState(() => _rowsKey.currentState!.selected = 2);
+    _rowsKey.currentState!.select(2);
     await tester.pump();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 90));
@@ -102,7 +107,7 @@ void main() {
   testWidgets('reduce motion jumps the bar with no travel', (tester) async {
     await _pump(tester, initial: 0, reduceMotion: true);
 
-    _rowsKey.currentState!.setState(() => _rowsKey.currentState!.selected = 2);
+    _rowsKey.currentState!.select(2);
     await tester.pump();
     await tester.pump();
     final to = tester.getTopLeft(find.text('row-2')).dy + 6;
@@ -113,9 +118,7 @@ void main() {
     await _pump(tester, initial: 1);
     expect(_bar, findsOneWidget);
 
-    _rowsKey.currentState!.setState(
-      () => _rowsKey.currentState!.selected = null,
-    );
+    _rowsKey.currentState!.select(null);
     await tester.pumpAndSettle();
     expect(_bar, findsNothing);
   });
@@ -124,7 +127,7 @@ void main() {
     await _pump(tester, initial: 2);
     expect(_bar, findsOneWidget);
 
-    _rowsKey.currentState!.setState(() => _rowsKey.currentState!.rows = 2);
+    _rowsKey.currentState!.shrinkTo(2);
     await tester.pumpAndSettle();
     expect(_bar, findsNothing);
   });
