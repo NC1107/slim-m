@@ -233,13 +233,27 @@ class _CommandPaletteContentState
                   stream: store.watchChannels(),
                   builder: (context, snapshot) {
                     final channels = snapshot.data ?? const <Channel>[];
-                    return _buildResults(
-                      tokens,
-                      channels,
-                      members,
-                      me,
-                      permissions,
-                      personalSpaceHidden,
+                    // Keyed on the query alone: arrow keys and late-arriving message hits update in place, only typing crossfades.
+                    return MaybeAnimatedSize(
+                      duration: AppMotion.fast,
+                      curve: AppMotion.entrance,
+                      alignment: Alignment.topCenter,
+                      child: AnimatedSwitcher(
+                        duration: AppMotion.reduced(context, AppMotion.fast),
+                        switchInCurve: AppMotion.entrance,
+                        switchOutCurve: AppMotion.exit,
+                        child: KeyedSubtree(
+                          key: ValueKey(_query),
+                          child: _buildResults(
+                            tokens,
+                            channels,
+                            members,
+                            me,
+                            permissions,
+                            personalSpaceHidden,
+                          ),
+                        ),
+                      ),
                     );
                   },
                 ),

@@ -22,6 +22,7 @@ import '../../widgets/attachment_view.dart' show formatByteSize;
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
+import '../../widgets/success_flash.dart';
 import '../settings_screen_scaffold.dart';
 import 'analytics_charts.dart';
 
@@ -36,20 +37,37 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
     with GuardedActionState<AnalyticsScreen> {
   bool _toggling = false;
 
+  /// The value the toggle shows the instant it is tapped, ahead of the
+  /// server's answer: flipped optimistically, reverted on failure, and
+  /// retired once the provider delivers a fresh answer of its own.
+  bool? _optimistic;
+
   Future<void> _setEnabled(bool value) async {
-    setState(() => _toggling = true);
+    setState(() {
+      _toggling = true;
+      _optimistic = value;
+    });
     final ok = await guard(
       whatFailed: value ? 'turn analytics on' : 'turn analytics off',
       action: () => ref.read(apiProvider).setSpaceAnalyticsEnabled(value),
     );
     if (!mounted) return;
-    setState(() => _toggling = false);
+    setState(() {
+      _toggling = false;
+      if (!ok) _optimistic = null;
+    });
     if (ok) ref.invalidate(spaceAnalyticsProvider);
   }
 
   @override
   Widget build(BuildContext context) {
     final analytics = ref.watch(spaceAnalyticsProvider);
+    // Once a fresh fetch lands, the server's own answer takes back over.
+    ref.listen(spaceAnalyticsProvider, (previous, next) {
+      if (next.hasValue && !next.isLoading && _optimistic != null) {
+        setState(() => _optimistic = null);
+      }
+    });
 
     return SettingsScreenScaffold(
       title: 'Analytics',
@@ -59,10 +77,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ToggleCard(
-            enabled: analytics.valueOrNull?.enabled ?? false,
+            enabled: _optimistic ?? analytics.valueOrNull?.enabled ?? false,
             busy: _toggling || analytics.isLoading,
             onChanged: _setEnabled,
           ),
+          SuccessFlash(tick: successTick),
           if (actionError != null) ...[
             const SizedBox(height: AppSpacing.s8),
             AppErrorState(message: actionError!, onDismiss: clearActionError),

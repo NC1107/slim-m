@@ -69,19 +69,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // The join flow fades through like the shell's own pages, so signing in hands off into the app as one motion.
       GoRoute(
         path: Routes.onboarding,
-        builder: (context, state) => OnboardingScreen(
-          onServerChosen: (server, invite) {
-            ref.read(chosenServerProvider.notifier).choose(server);
-            ref.read(pendingInviteProvider.notifier).state = invite;
-            context.go(Routes.signIn);
-          },
+        pageBuilder: (context, state) => fadeThroughPage(
+          context,
+          OnboardingScreen(
+            onServerChosen: (server, invite) {
+              ref.read(chosenServerProvider.notifier).choose(server);
+              ref.read(pendingInviteProvider.notifier).state = invite;
+              context.go(Routes.signIn);
+            },
+          ),
+          key: const ValueKey('onboarding'),
         ),
       ),
       GoRoute(
         path: Routes.signIn,
-        builder: (context, state) => const SignInScreen(),
+        pageBuilder: (context, state) => fadeThroughPage(
+          context,
+          const SignInScreen(),
+          key: const ValueKey('sign-in'),
+        ),
       ),
       GoRoute(
         path: Routes.personalSettings,
