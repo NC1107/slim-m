@@ -68,8 +68,7 @@ pub(super) async fn apply_remove(
     }
 
     let flipped = delete_batch(tx, channel_id, &to_remove, now).await?;
-    // Request order, not the batch's RETURNING order, so the audit trail and
-    // the DTO's object list keep reading the way the caller wrote them.
+    // Request order, not RETURNING order: the audit trail reads as written.
     let touched: Vec<CanvasObjectId> = to_remove
         .into_iter()
         .filter(|id| flipped.contains(id))
