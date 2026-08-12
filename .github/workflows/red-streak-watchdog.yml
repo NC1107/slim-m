@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: Apache-2.0
+name: red-streak-watchdog
+
+# Two workflows here fail without anything else noticing, for two different
+# reasons, and both have done so for real.
+#
+# e2e.yml is deliberately advisory: it does not gate a PR or a release, so a
+# red run there produces no failure anyone else would see. Twice now that
+# silence let a genuine multi-day regression ship underneath two releases
+# with nothing anywhere saying so (CLAUDE.md's two "e2e was red" entries).
+#
+# main-builds.yml is what puts a build on a phone between releases. When it
+# is red no build is being produced, and nothing downstream says so: it
+# gates nothing, and a release cutting its own build later hides it. It sat
+# red for five hours on 2026-08-11 with a missing signing profile, found by
+# sweeping every workflow's latest run by hand rather than by any signal.
+#
+# Neither is promoted to a required check and nothing here changes what
+# gates a release; this only makes a sustained streak impossible to not
+# notice, by opening a GitHub issue rather than by this workflow's own
+# colour - see scripts/check-workflow-red-streak.sh's own header for why a
+# second red workflow would not have fixed the actual problem.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# No concurrency group, on the same reasoning release-tag-watchdog.yml
+# already gives for having none: this runs hourly against workflows that
+# themselves run far less often, so two overlapping checks are
+# not a realistic case, and the job is read-mostly and idempotent (issue
+# dedup is by label, not by "did I already run this hour") so two of it
+# racing costs nothing worth guarding against.
+
+jobs:
+  e2e:
+    name: e2e has not been red for several runs in a row
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: check the streak and manage the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/check-workflow-red-streak.sh
+
+  # Its own job rather than a second step, so one watched workflow being red
+  # never stops the other from being checked: the script exits non-zero on a
+  # real streak by design.
+  main-builds:
+    name: main-builds has not been red for several runs in a row
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: check the streak and manage the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          WATCHDOG_WORKFLOW: main-builds.yml
+          WATCHDOG_SUBJECT: main-builds
+          WATCHDOG_LABEL: main-builds-red-streak
+          WATCHDOG_WHY: |
+            main-builds.yml is what produces a build between releases, so while
+            it is red no artifact is reaching a phone or the container registry
+            and nothing downstream reports it: it gates no PR and no release.
+            See docs/ci.md's continuous-build section.
+        run: bash scripts/check-workflow-red-streak.sh

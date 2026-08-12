@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Unit coverage for scripts/check-e2e-red-streak.sh.
+"""Unit coverage for scripts/check-workflow-red-streak.sh.
 
 e2e.yml is advisory and does not gate a PR or a release, so a red run there
 produced no signal anyone else would see - twice, for two days each time
@@ -31,7 +31,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent.parent / "check-e2e-red-streak.sh"
+SCRIPT = Path(__file__).resolve().parent.parent / "check-workflow-red-streak.sh"
 
 FAKE_GH = r'''#!/usr/bin/env python3
 import json
@@ -173,6 +173,48 @@ class CheckE2eRedStreakTest(unittest.TestCase):
         self.assertIn("commit aaa", result.stdout)
         calls = self._log()
         self.assertTrue(any(c[:2] == ["issue", "create"] for c in calls))
+
+    def test_a_second_watched_workflow_gets_its_own_issue_and_wording(self):
+        """The knobs a second caller sets must reach the issue it opens.
+
+        Without this the parameters would be untested and a second watched
+        workflow could quietly open an issue titled for e2e, labelled for
+        e2e, and deduplicated against e2e's own - which would mean one of
+        the two never gets reported at all.
+        """
+        rows = [
+            _run_row("2026-08-01T03:00:00Z", "failure", "ccc", n=3),
+            _run_row("2026-08-01T02:00:00Z", "failure", "bbb", n=2),
+            _run_row("2026-08-01T01:00:00Z", "failure", "aaa", n=1),
+            _run_row("2026-08-01T00:00:00Z", "success", "zzz", n=0),
+        ]
+        result = self._run(rows, threshold=3, extra_env={
+            "FAKE_ISSUE_LIST_JSON": "[]",
+            "WATCHDOG_LABEL": "main-builds-red-streak",
+            "WATCHDOG_SUBJECT": "main-builds",
+            "WATCHDOG_WHY": "no build is reaching a phone while this is red.",
+        })
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("main-builds has failed", result.stdout)
+
+        create = [c for c in self._log() if c[:2] == ["issue", "create"]]
+        self.assertEqual(len(create), 1)
+        flat = " ".join(create[0])
+        self.assertIn("main-builds is stuck red on main", flat)
+        self.assertIn("main-builds-red-streak", flat)
+        self.assertIn("no build is reaching a phone", flat)
+        self.assertNotIn("scripts/e2e.sh", flat)
+
+    def test_a_second_watched_workflow_reads_its_own_run_history(self):
+        """Each caller must ask about its own workflow, not e2e's.
+
+        The fixture path short-circuits the API, so this asserts on the URL
+        the script would have built instead - the one thing that decides
+        which history is read.
+        """
+        script = SCRIPT.read_text()
+        self.assertIn("actions/workflows/${WORKFLOW}/runs", script)
+        self.assertNotIn("actions/workflows/e2e.yml/runs", script)
 
     def test_cancelled_runs_neither_count_nor_break_the_streak(self):
         rows = [

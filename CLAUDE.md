@@ -99,7 +99,9 @@ The archive's own doc comment says the next person moving entries down should st
 
 Two entries above already record `e2e` red for a day, then red for two days a second time, both times with a release shipping over the top of it and nothing anywhere saying so.
 `e2e` is deliberately advisory and does not run on `pull_request`; neither of those changes here.
-Read this before touching `scripts/check-e2e-red-streak.sh` or `.github/workflows/e2e-red-streak-watchdog.yml`, and read `release-tag-watchdog.yml`'s own header before assuming its shape is the whole answer.
+Read this before touching `scripts/check-workflow-red-streak.sh` or `.github/workflows/red-streak-watchdog.yml`, and read `release-tag-watchdog.yml`'s own header before assuming its shape is the whole answer.
+Both were named for `e2e` alone until 2026-08-11, when `main-builds` turned out to need the same treatment for a different reason - it produces the build that reaches a phone between releases, so a red run there means no artifact is being made and nothing downstream says so.
+It sat red for five hours before a by-hand sweep of every workflow's latest run found it; the script takes the workflow, the subject and the why as parameters now, and a second watched workflow costs a job rather than a second script.
 
 **The precedent's shape is right and its reporting is not, and copying only the first half would have reproduced the exact bug this closes.**
 `release-tag-watchdog.yml` asks a plain question of history on a schedule rather than depending on the push that broke a thing to also be the one that reports it, and this reuses that shape: a script pulled out of the workflow so it can be tested against a fixture, no `cancel-in-progress: true` over a cron interval (see below), read-only and idempotent so nothing is lost if two runs overlap.
