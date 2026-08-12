@@ -23,6 +23,7 @@ import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
+import '../widgets/app_panel_reveal.dart';
 import '../widgets/channel_grouping.dart';
 import '../widgets/channel_rail.dart';
 import '../widgets/channel_rail_drawer.dart';
@@ -99,7 +100,10 @@ class HomeShell extends ConsumerWidget {
                         minWidth: railWidth,
                         maxWidth: railWidth,
                         alignment: Alignment.centerRight,
-                        child: const ChannelRail(),
+                        child: const AppPanelReveal(
+                          fromLeft: true,
+                          child: ChannelRail(),
+                        ),
                       )
                     : const SizedBox.shrink(),
               ),
@@ -266,18 +270,9 @@ class _MemberPaneSlot extends ConsumerWidget {
               minWidth: AppMemberPane.width,
               maxWidth: AppMemberPane.width,
               alignment: Alignment.centerLeft,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: AppMotion.reduced(context, AppMotion.base),
-                curve: AppMotion.entrance,
-                builder: (context, t, child) => Opacity(
-                  opacity: t,
-                  child: Transform.translate(
-                    offset: Offset(16 * (1 - t), 0),
-                    child: child,
-                  ),
-                ),
-                child: const AppMemberPane(),
+              child: const AppPanelReveal(
+                fromLeft: false,
+                child: AppMemberPane(),
               ),
             )
           : const SizedBox.shrink(),
