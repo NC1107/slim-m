@@ -12,6 +12,7 @@ library;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/widgets/animated_menu_portal.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
@@ -342,6 +343,18 @@ void main() {
 
     final outside = await tester.startGesture(const Offset(700, 550));
     await tester.pump();
+    // The press-down starts the exit; the fading remains must not eat input.
+    final surface = tester.widget<IgnorePointer>(
+      find
+          .descendant(
+            of: find.byType(AnimatedMenuSurface),
+            matching: find.byType(IgnorePointer),
+          )
+          .first,
+    );
+    expect(surface.ignoring, isTrue);
+    // Gone before the finger ever lifts, so the close rode the down event.
+    await tester.pumpAndSettle();
     expect(find.byType(AppMenu), findsNothing);
     await outside.up();
   });

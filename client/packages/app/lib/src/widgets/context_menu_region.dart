@@ -24,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/breakpoints.dart';
+import 'animated_menu_portal.dart';
 import 'context_menu_focus.dart';
 import 'message_context_menu_layout.dart';
 
@@ -98,7 +99,7 @@ class ContextMenuRegion extends StatefulWidget {
 }
 
 class _ContextMenuRegionState extends State<ContextMenuRegion> {
-  final _controller = OverlayPortalController();
+  final _controller = AnimatedMenuController();
   Offset _anchor = Offset.zero;
   bool _sheetOpen = false;
 
@@ -188,7 +189,7 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
   @override
   Widget build(BuildContext context) {
     return OverlayPortal(
-      controller: _controller,
+      controller: _controller.portal,
       overlayChildBuilder: (context) => Positioned.fill(
         child: CustomSingleChildLayout(
           delegate: MessageMenuLayout(
@@ -197,14 +198,20 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
                 MediaQuery.paddingOf(context) +
                 const EdgeInsets.all(menuScreenMargin),
           ),
-          child: TapRegion(
-            onTapOutside: (_) => _setOpen(false),
-            child: ContextMenuKeyboardScope(
-              onDismiss: () => _setOpen(false),
-              child: SingleChildScrollView(
-                child: AppMenu(
-                  width: 200,
-                  children: widget.itemsBuilder(context, () => _setOpen(false)),
+          child: AnimatedMenuSurface(
+            controller: _controller,
+            child: TapRegion(
+              onTapOutside: (_) => _setOpen(false),
+              child: ContextMenuKeyboardScope(
+                onDismiss: () => _setOpen(false),
+                child: SingleChildScrollView(
+                  child: AppMenu(
+                    width: 200,
+                    children: widget.itemsBuilder(
+                      context,
+                      () => _setOpen(false),
+                    ),
+                  ),
                 ),
               ),
             ),
