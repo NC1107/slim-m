@@ -19,7 +19,8 @@ permissions:
 # Never on main: a release gate reads these very check runs, so cancelling one
 # blocks a publish that had nothing wrong with it.
 concurrency:
-  group: client-ci-${{ github.ref }}
+# On main, keyed per commit: a group shared across pushes lets GitHub cancel an older still-queued run outright, which cancel-in-progress cannot prevent; see docs/ci.md.
+  group: client-ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:

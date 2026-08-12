@@ -42,7 +42,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: client-ios-ci-${{ github.ref }}
+# On main, keyed per commit: a group shared across pushes lets GitHub cancel an older still-queued run outright, which cancel-in-progress cannot prevent; see docs/ci.md.
+  group: client-ios-ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
