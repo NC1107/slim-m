@@ -87,16 +87,15 @@ class ReleaseRequiredChecksSchemaGateTest(unittest.TestCase):
             )
 
     def test_the_push_gate_job_exists_and_runs_on_push(self):
+        # Block-anchored, since a comment naming the job satisfies a raw search.
         job = _block_after(
-            self.schema_text, rf"^  \S+:\s*$|^    name: {re.escape(PUSH_GATE_NAME)}\s*$", 4
+            self.schema_text, rf"^    name: {re.escape(PUSH_GATE_NAME)}\s*$", 4
         )
-        self.assertIn(
-            f"name: {PUSH_GATE_NAME}",
-            self.schema_text,
+        self.assertIsNotNone(
+            job,
             f"expected a job named {PUSH_GATE_NAME!r} in schema-ci.yml",
         )
-        after_name = self.schema_text.split(f"name: {PUSH_GATE_NAME}", 1)[1]
-        condition = after_name.split("runs-on", 1)[0]
+        condition = job.split("runs-on", 1)[0]
         self.assertIn(
             "github.event_name == 'push'",
             condition,
