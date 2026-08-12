@@ -87,10 +87,7 @@ class ReleaseRequiredChecksSchemaGateTest(unittest.TestCase):
             )
 
     def test_the_push_gate_job_exists_and_runs_on_push(self):
-        # Anchored to the real job block, not the raw file: a comment naming
-        # the job would satisfy a bare substring search (the 2026-08-11
-        # review's test-quality finding - the block was computed and then
-        # never used).
+        # Block-anchored, since a comment naming the job satisfies a raw search.
         job = _block_after(
             self.schema_text, rf"^    name: {re.escape(PUSH_GATE_NAME)}\s*$", 4
         )
