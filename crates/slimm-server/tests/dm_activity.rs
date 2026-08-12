@@ -130,6 +130,10 @@ async fn conversations_order_by_newest_live_message_and_fall_back_to_creation() 
     assert_eq!(order, vec![with_carol, with_bob]);
 }
 
+/// Bob's only message is dead, so his conversation falls back to channel
+/// creation time and carol's live message wins. The old MAX form and the
+/// seek form agree here only because both filter `deleted_at`; this is the
+/// case that would catch a seek that forgot the liveness predicate.
 #[tokio::test]
 async fn a_deleted_newest_message_does_not_carry_the_ordering() {
     let (store, pool, _guard) = new_store("slimm-dm-activity-del").await;
@@ -151,10 +155,6 @@ async fn a_deleted_newest_message_does_not_carry_the_ordering() {
         .expect("send");
     store.delete_message(id, bob).await.expect("delete");
 
-    // Bob's only message is dead, so his conversation falls back to channel
-    // creation time and carol's live message wins. The old MAX form and the
-    // seek form agree here only because both filter deleted_at; this is the
-    // case that would catch a seek that forgot the liveness predicate.
     let order: Vec<_> = store
         .list_dm_conversations(alice)
         .await
