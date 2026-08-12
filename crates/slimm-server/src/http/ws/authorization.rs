@@ -210,7 +210,6 @@ pub(super) async fn authorize(
             | Event::MemberTimeoutChanged { .. }
             | Event::MemberRemoved(_)
             | Event::MemberRestored(_)
-            | Event::MemberRestored(_)
             | Event::ProfileChanged(_)
             | Event::RoleChanged { .. }
             | Event::MemberRoleChanged { .. }
