@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.41.1](https://github.com/NC1107/slim-m/compare/client-v0.41.0...client-v0.41.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **client:** clear four of the analyzer's info-level findings in tests ([#619](https://github.com/NC1107/slim-m/issues/619)) ([9d8323b](https://github.com/NC1107/slim-m/commit/9d8323bff544931bf365df8698b17576778ba7dc))
+
 ## [0.41.0](https://github.com/NC1107/slim-m/compare/client-v0.40.0...client-v0.41.0) (2026-08-12)
 
 
