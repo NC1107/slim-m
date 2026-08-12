@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.41.0](https://github.com/NC1107/slim-m/compare/client-v0.40.0...client-v0.41.0) (2026-08-12)
+
+
+### Features
+
+* **client:** a whats-new entry for the motion overhaul ([#614](https://github.com/NC1107/slim-m/issues/614)) ([7fa7eff](https://github.com/NC1107/slim-m/commit/7fa7effb3170f7ade2005254ba15cab6e4b720a9))
+* **client:** breakpoint bridge, a bounded call room, and the lightbox hero ([#615](https://github.com/NC1107/slim-m/issues/615)) ([fbbe679](https://github.com/NC1107/slim-m/commit/fbbe6794e83d238f55f2e8ff9196697decae08c9))
+* **client:** call arrivals, pane reveal parity, and the dock's rise ([#611](https://github.com/NC1107/slim-m/issues/611)) ([e4622a5](https://github.com/NC1107/slim-m/commit/e4622a5cd61cab4a583e9e7d9a862e7cd7168c6c))
+* **client:** first-run entrances, settings feedback, and a palette that breathes ([#612](https://github.com/NC1107/slim-m/issues/612)) ([5520f89](https://github.com/NC1107/slim-m/commit/5520f893bc2377111703cd853d3bb92c8b7ad6d1))
+* **client:** give every bare OverlayPortal menu a real entrance and exit ([#608](https://github.com/NC1107/slim-m/issues/608)) ([6412694](https://github.com/NC1107/slim-m/commit/6412694b7bc3f8c4ee6f1ec5883958b92338bc1f))
+* **client:** gliding cursors, breathing waiting states, and canvas arrivals ([#613](https://github.com/NC1107/slim-m/issues/613)) ([e48938f](https://github.com/NC1107/slim-m/commit/e48938f854798078bbc33e3d0a86c6aae504e1d7))
+* **client:** one tempo for the design system: animate the states that snapped ([#606](https://github.com/NC1107/slim-m/issues/606)) ([b2d566e](https://github.com/NC1107/slim-m/commit/b2d566ec2cb0814f34e6fc93f81ef586c3a0c0f7))
+* **client:** reveal bands and a composer that grows over a beat ([#610](https://github.com/NC1107/slim-m/issues/610)) ([8c746e2](https://github.com/NC1107/slim-m/commit/8c746e222c2b0074141db3897724a8c67accde50))
+* **client:** selection that travels in the channel rail ([#616](https://github.com/NC1107/slim-m/issues/616)) ([b520fa4](https://github.com/NC1107/slim-m/commit/b520fa4a8334e5924c4bfe48b9c9bdb67c66c3c1))
+* **client:** space settings gets the same nav-and-pane shape as personal settings ([#617](https://github.com/NC1107/slim-m/issues/617)) ([3aec03a](https://github.com/NC1107/slim-m/commit/3aec03a3586b4f57be7978e5df16c56c095e31ed))
+* **client:** the transcript's hand-on moments travel instead of hard-cutting ([#609](https://github.com/NC1107/slim-m/issues/609)) ([a910484](https://github.com/NC1107/slim-m/commit/a910484cef3e1ffb296eda7f92af9b88ba447ed8))
+
 ## [0.40.0](https://github.com/NC1107/slim-m/compare/client-v0.39.0...client-v0.40.0) (2026-08-12)
 
 
