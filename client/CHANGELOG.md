@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.40.0](https://github.com/NC1107/slim-m/compare/client-v0.39.0...client-v0.40.0) (2026-08-12)
+
+
+### Features
+
+* **client:** open the channel a tapped notification came from ([#591](https://github.com/NC1107/slim-m/issues/591)) ([10a1814](https://github.com/NC1107/slim-m/commit/10a181436f8aa0e8bf659fff67d320b217901c74))
+* **server:** a restored member reaches connected clients ([#602](https://github.com/NC1107/slim-m/issues/602)) ([0068eec](https://github.com/NC1107/slim-m/commit/0068eec4c9eeca02d26c21853ed02a23c20d9fc8))
+
+
+### Bug Fixes
+
+* an empty push preview, and two report columns deletion never cleared ([#584](https://github.com/NC1107/slim-m/issues/584)) ([550d9b0](https://github.com/NC1107/slim-m/commit/550d9b028d5c21a88256907e66ba5a0d11bc621c))
+* **client:** keep permission invalidation alive for the whole session ([#600](https://github.com/NC1107/slim-m/issues/600)) ([5e987e6](https://github.com/NC1107/slim-m/commit/5e987e6df89a468b38bf4781de5b5d282656eda4))
+
 ## [0.39.0](https://github.com/NC1107/slim-m/compare/client-v0.38.0...client-v0.39.0) (2026-08-11)
 
 
