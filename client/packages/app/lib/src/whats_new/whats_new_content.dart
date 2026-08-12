@@ -249,6 +249,27 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.41.0',
+    headline: 'The app moves now',
+    points: [
+      WhatsNewPoint(
+        'Menus, pickers, hover states and status dots animate in and out '
+        'instead of teleporting - and every one of them still collapses '
+        'to an instant swap under reduce motion.',
+      ),
+      WhatsNewPoint(
+        'People joining or leaving a call arrive and depart in place, the '
+        'typing indicator has real dots, reactions pop, and a sent message '
+        'hands off to its timestamp instead of snapping.',
+      ),
+      WhatsNewPoint(
+        'Remote canvas cursors glide instead of stepping, settings flash a '
+        'small Saved when a change lands, and the first screens you ever '
+        'see finally arrive with some motion of their own.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
