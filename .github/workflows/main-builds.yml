@@ -101,6 +101,7 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
+          flutter-version: 3.44.9
 
       - name: build linux release
         run: |
@@ -220,6 +221,7 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         with:
           channel: stable
+          flutter-version: 3.44.9
 
       # Build number from the run number, build name from pubspec's tracked version; never from local pubspec defaults.
       - name: build android release
@@ -381,6 +383,7 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         with:
           channel: stable
+          flutter-version: 3.44.9
 
       # Build number from the run number, build name from pubspec's tracked version; both stores reject a reuse.
       - name: build ipa
