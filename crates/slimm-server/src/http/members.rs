@@ -225,6 +225,7 @@ async fn restore_member(
     require(&state, ctx.user_id, Permissions::BAN_MEMBERS).await?;
 
     if state.store.restore_to_space(target).await? {
+        state.hub.publish(Event::MemberRestored(target));
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ApiError::NotFound("that member is not removed"))

@@ -84,6 +84,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
+        | Event::MemberRestored(_)
         | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
@@ -127,6 +128,11 @@ pub(super) async fn authorize(
         }
         Event::MemberRemoved(user_id) => {
             return Authorization::Deliver(Box::new(ServerFrame::MemberRemoved {
+                user_id: user_id.to_string(),
+            }));
+        }
+        Event::MemberRestored(user_id) => {
+            return Authorization::Deliver(Box::new(ServerFrame::MemberRestored {
                 user_id: user_id.to_string(),
             }));
         }
@@ -203,6 +209,7 @@ pub(super) async fn authorize(
             | Event::PresenceChanged(_)
             | Event::MemberTimeoutChanged { .. }
             | Event::MemberRemoved(_)
+            | Event::MemberRestored(_)
             | Event::ProfileChanged(_)
             | Event::RoleChanged { .. }
             | Event::MemberRoleChanged { .. }
@@ -404,6 +411,7 @@ pub(super) async fn authorize(
         | Event::PresenceChanged(_)
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
+        | Event::MemberRestored(_)
         | Event::ProfileChanged(_)
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }

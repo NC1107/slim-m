@@ -115,6 +115,8 @@ sealed class ServerEvent {
         ),
       'member.removed' when decoded['user_id'] is String =>
         MemberRemoved(userId: decoded['user_id'] as String),
+      'member.restored' when decoded['user_id'] is String =>
+        MemberRestored(userId: decoded['user_id'] as String),
       'profile.changed' when decoded['user_id'] is String =>
         ProfileChanged(userId: decoded['user_id'] as String),
       'typing.started'

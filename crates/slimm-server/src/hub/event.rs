@@ -117,6 +117,11 @@ pub enum Event {
     /// `SessionRevoked` events that accompany this; everyone else's member
     /// list uses this to drop them without waiting for a refetch.
     MemberRemoved(UserId),
+    /// A removed member was let back in. The mirror of
+    /// [`Event::MemberRemoved`], for the session that watched them vanish:
+    /// without it a remove-then-restore leaves the member invisible in every
+    /// already-open client until an unrelated refetch.
+    MemberRestored(UserId),
     /// A user changed their display name. Carries only the id, the shape
     /// [`Event::MemberRemoved`] already uses: the name itself lives in
     /// exactly one place, `users.display_name`, and a receiving connection

@@ -59,6 +59,7 @@ export 'src/events.dart'
         ErrorEvent,
         HelloEvent,
         MemberRemoved,
+        MemberRestored,
         MemberRoleChanged,
         MemberTimeoutChanged,
         MessageCreated,
