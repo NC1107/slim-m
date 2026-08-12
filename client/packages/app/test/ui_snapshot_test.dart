@@ -16,6 +16,9 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/admin_providers.dart'
+    show spaceAnalyticsProvider;
 import 'package:slimm_app/src/providers/sync_controller.dart'
     show SyncStatus, initialSyncCompleteProvider, syncControllerProvider;
 import 'package:slimm_app/src/providers/voice_controller.dart';
@@ -131,6 +134,22 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/emoji',
     viewports: [...phoneAndDesktop, ...compactBracket],
   ),
+  'admin-categories': (
+    route: '/settings/categories',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
+  'admin-removed-members': (
+    route: '/settings/removed-members',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
+  'admin-analytics': (
+    route: '/settings/analytics',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
+  'debug-log': (
+    route: '/settings/debug-log',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
   // The stacked-header bug only ever showed past kCompactWidth; the compact bracket proves it stays clean there too.
   'thread': (
     route: '/thread/c-thread',
@@ -155,6 +174,36 @@ const _nestedResolveSurfaces = {'admin-reports'};
 /// comment for why `thread` is the one surface this is true of today.
 const _knownTransientSurfaces = {'thread'};
 
+/// Enabled analytics with a full month of days and a real 24-hour histogram,
+/// so every chart on that screen actually draws rather than collapsing to an
+/// empty state. The numbers are deliberately wide (a five-figure total, an
+/// uneven histogram) because a narrow chart with tidy values would not
+/// exercise the label widths this is here to catch.
+final _analyticsFixture = api.SpaceAnalytics(
+  enabled: true,
+  stats: api.AnalyticsStats(
+    totalMessages: 48213,
+    memberCount: 12,
+    channelCount: 7,
+    attachmentBytes: 734003200,
+    messagesByDay: [
+      for (var day = 1; day <= 30; day++)
+        api.AnalyticsDayCount(
+          date: '2026-07-${day.toString().padLeft(2, '0')}',
+          count: 40 + (day * 37) % 900,
+        ),
+    ],
+    activeHours: [for (var hour = 0; hour < 24; hour++) 20 + (hour * 53) % 400],
+    memorySamples: [
+      for (var sample = 0; sample < 24; sample++)
+        api.AnalyticsMemorySample(
+          sampledAt: 1785000000000 + sample * 3600000,
+          rssBytes: 9000000 + (sample * 811) % 4000000,
+        ),
+    ],
+  ),
+);
+
 /// Shell states reachable only by overriding a provider the plain [_surfaces]
 /// table has no way to reach: a collapsed rail, a day divider forced to show,
 /// the transcript's connecting/genuinely-empty states (which the default
@@ -170,6 +219,17 @@ final _shellStateSurfaces =
         List<Override> Function() overrides,
       })
     >{
+      // The plain admin-analytics surface renders the toggle off, which is
+      // the default and covers the empty screen; every chart sits behind it,
+      // and a bar chart at phone width is the part of that screen most likely
+      // to overflow, so the enabled state needs a surface of its own.
+      'admin-analytics-enabled': (
+        route: '/settings/analytics',
+        viewports: const [...phoneAndDesktop, ...compactBracket],
+        overrides: () => [
+          spaceAnalyticsProvider.overrideWith((ref) => _analyticsFixture),
+        ],
+      ),
       'rail-collapsed': (
         route: '/channels/c-general',
         viewports: const ['desktop-narrow', 'desktop'],
