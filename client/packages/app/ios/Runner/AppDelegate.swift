@@ -97,6 +97,8 @@ import UserNotifications
     let observer = NotificationTapObserver(next: center.delegate) { [weak self] channelId in
       self?.deliverTap(channelId)
     }
+    // The delegate property is weak, so this reference is what keeps the
+    // observer alive.
     notificationTapObserver = observer
     center.delegate = observer
   }

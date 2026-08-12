@@ -26,6 +26,14 @@ final class NotificationTapObserver: NSObject, UNUserNotificationCenterDelegate 
     self.onTap = onTap
   }
 
+  /// Held strongly, which looks wrong for a delegate and is not.
+  ///
+  /// `UNUserNotificationCenter.delegate` is itself weak, so the moment this
+  /// class takes that slot the previous delegate has lost the one reference
+  /// keeping it alive. A weak reference here would let firebase_messaging's
+  /// plugin deallocate and take its whole push path with it; a strong one is
+  /// what keeps the chain intact. Both ends are app-lifetime singletons, so
+  /// there is nothing here to reclaim later anyway.
   private let next: UNUserNotificationCenterDelegate?
   private let onTap: (String) -> Void
 
