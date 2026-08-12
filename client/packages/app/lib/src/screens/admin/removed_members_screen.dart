@@ -22,28 +22,37 @@ import '../../widgets/settings_notice.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 
-class RemovedMembersScreen extends ConsumerWidget {
+class RemovedMembersScreen extends StatelessWidget {
   const RemovedMembersScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SettingsScreenScaffold(
+    title: 'Removed members',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    child: RemovedMembersPane(),
+  );
+}
+
+/// The removals list itself, embeddable as a Space settings pane as well as
+/// routed.
+class RemovedMembersPane extends ConsumerWidget {
+  const RemovedMembersPane({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final removals = ref.watch(removedMembersProvider);
 
-    return SettingsScreenScaffold(
-      title: 'Removed members',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      child: AppAsyncView<List<api.SpaceRemoval>>(
-        value: AppAsyncState(data: removals.valueOrNull, error: removals.error),
-        center: false,
-        errorMessage: 'Could not load the removals.',
-        onRetry: () => ref.invalidate(removedMembersProvider),
-        isEmpty: (list) => list.isEmpty,
-        emptyMessage: 'Nobody has been removed from this Space.',
-        // One group, so a section header would only restate the app bar.
-        data: (context, list) => SettingsSectionCard(
-          children: [for (final removal in list) _RemovalRow(removal: removal)],
-        ),
+    return AppAsyncView<List<api.SpaceRemoval>>(
+      value: AppAsyncState(data: removals.valueOrNull, error: removals.error),
+      center: false,
+      errorMessage: 'Could not load the removals.',
+      onRetry: () => ref.invalidate(removedMembersProvider),
+      isEmpty: (list) => list.isEmpty,
+      emptyMessage: 'Nobody has been removed from this Space.',
+      // One group, so a section header would only restate the app bar.
+      data: (context, list) => SettingsSectionCard(
+        children: [for (final removal in list) _RemovalRow(removal: removal)],
       ),
     );
   }

@@ -27,17 +27,30 @@ import '../../widgets/settings_section_header.dart';
 import 'overwrite_target_picker_sheets.dart';
 import 'permission_overwrite_row.dart';
 
-class ChannelOverwritesScreen extends ConsumerStatefulWidget {
+class ChannelOverwritesScreen extends StatelessWidget {
   const ChannelOverwritesScreen({super.key});
 
   @override
-  ConsumerState<ChannelOverwritesScreen> createState() =>
-      _ChannelOverwritesScreenState();
+  Widget build(BuildContext context) => const SettingsScreenScaffold(
+    title: 'Channel permissions',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    child: ChannelOverwritesPane(),
+  );
 }
 
-class _ChannelOverwritesScreenState
-    extends ConsumerState<ChannelOverwritesScreen>
-    with GuardedActionState<ChannelOverwritesScreen> {
+/// The overwrite editor itself, embeddable as a Space settings pane as well
+/// as routed.
+class ChannelOverwritesPane extends ConsumerStatefulWidget {
+  const ChannelOverwritesPane({super.key});
+
+  @override
+  ConsumerState<ChannelOverwritesPane> createState() =>
+      _ChannelOverwritesPaneState();
+}
+
+class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
+    with GuardedActionState<ChannelOverwritesPane> {
   Channel? _channel;
   api.OverwriteTarget _kind = api.OverwriteTarget.role;
   String? _targetId;
@@ -205,131 +218,126 @@ class _ChannelOverwritesScreenState
         ? ref.watch(myChannelPermissionsProvider(_channel!.id))
         : 0;
 
-    return SettingsScreenScaffold(
-      title: 'Channel permissions',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AppCallout(
-            tone: AppCalloutTone.info,
-            child: Text(
-              'There is no way to read an existing overwrite back, so this '
-              'always starts from "inherit". Setting one replaces whatever '
-              'was there for every permission at once, and asks you to '
-              'confirm before it does. Administrator is not listed here: it '
-              'bypasses channel overwrites entirely, so one would do nothing.',
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AppCallout(
+          tone: AppCalloutTone.info,
+          child: Text(
+            'There is no way to read an existing overwrite back, so this '
+            'always starts from "inherit". Setting one replaces whatever '
+            'was there for every permission at once, and asks you to '
+            'confirm before it does. Administrator is not listed here: it '
+            'bypasses channel overwrites entirely, so one would do nothing.',
           ),
-          const SizedBox(height: AppSpacing.s8),
-          // Inherit and Clear read as always-safe and are not; see _set's doc.
-          const AppCallout(
-            tone: AppCalloutTone.warn,
-            child: Text(
-              'Leaving a permission at "Inherit", or using Clear, can still '
-              'be refused. Un-denying a permission counts as granting it, so '
-              'if this role or member was already denied something you do '
-              'not hold yourself, the whole change comes back refused. This '
-              'screen cannot show which permissions that applies to.',
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        // Inherit and Clear read as always-safe and are not; see _set's doc.
+        const AppCallout(
+          tone: AppCalloutTone.warn,
+          child: Text(
+            'Leaving a permission at "Inherit", or using Clear, can still '
+            'be refused. Un-denying a permission counts as granting it, so '
+            'if this role or member was already denied something you do '
+            'not hold yourself, the whole change comes back refused. This '
+            'screen cannot show which permissions that applies to.',
+          ),
+        ),
+        SettingsSectionCard(
+          title: 'Channel',
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppListRow(
+              label: _channel?.name ?? 'Choose a channel',
+              trailing: const Icon(
+                AppIcons.chevronRight,
+                size: AppSizes.icon16,
+              ),
+              onTap: _pickChannel,
             ),
+          ],
+        ),
+        if (_channel != null) ...[
+          const SizedBox(height: AppSpacing.s12),
+          AppSegmentedControl.inline(
+            semanticLabel: 'Overwrite target kind',
+            options: const [
+              AppSegmentedOption(label: 'Role'),
+              AppSegmentedOption(label: 'Member'),
+            ],
+            selectedIndex: _kind == api.OverwriteTarget.role ? 0 : 1,
+            onSegmentSelected: (i) => setState(() {
+              _kind = i == 0
+                  ? api.OverwriteTarget.role
+                  : api.OverwriteTarget.member;
+              _resetTarget();
+            }),
           ),
           SettingsSectionCard(
-            title: 'Channel',
+            title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppListRow(
-                label: _channel?.name ?? 'Choose a channel',
+                label:
+                    _targetLabel ??
+                    'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
                 trailing: const Icon(
                   AppIcons.chevronRight,
                   size: AppSizes.icon16,
                 ),
-                onTap: _pickChannel,
+                onTap: _pickTarget,
               ),
             ],
           ),
-          if (_channel != null) ...[
-            const SizedBox(height: AppSpacing.s12),
-            AppSegmentedControl.inline(
-              semanticLabel: 'Overwrite target kind',
-              options: const [
-                AppSegmentedOption(label: 'Role'),
-                AppSegmentedOption(label: 'Member'),
-              ],
-              selectedIndex: _kind == api.OverwriteTarget.role ? 0 : 1,
-              onSegmentSelected: (i) => setState(() {
-                _kind = i == 0
-                    ? api.OverwriteTarget.role
-                    : api.OverwriteTarget.member;
-                _resetTarget();
-              }),
-            ),
-            SettingsSectionCard(
-              title: _kind == api.OverwriteTarget.role ? 'Role' : 'Member',
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppListRow(
-                  label:
-                      _targetLabel ??
-                      'Choose a ${_kind == api.OverwriteTarget.role ? 'role' : 'member'}',
-                  trailing: const Icon(
-                    AppIcons.chevronRight,
-                    size: AppSizes.icon16,
-                  ),
-                  onTap: _pickTarget,
-                ),
-              ],
-            ),
-          ],
-          if (_targetId != null) ...[
-            SettingsSectionCard(
-              title: 'Permissions',
-              description:
-                  'Each one starts at Inherit because this screen cannot '
-                  'read back what is already set.',
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (bit, label) in Perm.channelOverwriteEditable)
-                  PermissionOverwriteRow(
-                    label: label,
-                    value: _state[bit]!,
-                    allowEnabled: myPermissions.hasPermission(bit),
-                    onChanged: (v) => setState(() => _state[bit] = v),
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s12),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    label: 'Clear',
-                    variant: AppButtonVariant.danger,
-                    full: true,
-                    disabled: _busy,
-                    onPressed: _clear,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Expanded(
-                  child: AppButton(
-                    label: 'Set overwrite',
-                    variant: AppButtonVariant.primary,
-                    full: true,
-                    disabled: _busy,
-                    onPressed: _set,
-                  ),
-                ),
-              ],
-            ),
-            if (actionError != null) ...[
-              const SizedBox(height: AppSpacing.s8),
-              AppErrorState(message: actionError!, onDismiss: clearActionError),
-            ],
-          ],
-          const SizedBox(height: AppSpacing.s16),
         ],
-      ),
+        if (_targetId != null) ...[
+          SettingsSectionCard(
+            title: 'Permissions',
+            description:
+                'Each one starts at Inherit because this screen cannot '
+                'read back what is already set.',
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (bit, label) in Perm.channelOverwriteEditable)
+                PermissionOverwriteRow(
+                  label: label,
+                  value: _state[bit]!,
+                  allowEnabled: myPermissions.hasPermission(bit),
+                  onChanged: (v) => setState(() => _state[bit] = v),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Clear',
+                  variant: AppButtonVariant.danger,
+                  full: true,
+                  disabled: _busy,
+                  onPressed: _clear,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: AppButton(
+                  label: 'Set overwrite',
+                  variant: AppButtonVariant.primary,
+                  full: true,
+                  disabled: _busy,
+                  onPressed: _set,
+                ),
+              ),
+            ],
+          ),
+          if (actionError != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppErrorState(message: actionError!, onDismiss: clearActionError),
+          ],
+        ],
+        const SizedBox(height: AppSpacing.s16),
+      ],
     );
   }
 }

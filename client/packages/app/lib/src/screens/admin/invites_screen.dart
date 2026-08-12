@@ -30,39 +30,45 @@ const _expiryOptions = <(String, Duration?)>[
   ('30 days', Duration(days: 30)),
 ];
 
-class InvitesScreen extends ConsumerWidget {
+class InvitesScreen extends StatelessWidget {
   const InvitesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SettingsScreenScaffold(
+    title: 'Invites',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    child: InvitesPane(),
+  );
+}
+
+/// The invite list and create card, embeddable as a Space settings pane as
+/// well as routed.
+class InvitesPane extends ConsumerWidget {
+  const InvitesPane({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final invites = ref.watch(invitesProvider);
 
-    return SettingsScreenScaffold(
-      title: 'Invites',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _CreateInviteCard(),
-          const SizedBox(height: AppSpacing.s16),
-          AppAsyncView<List<api.Invite>>(
-            value: AppAsyncState(
-              data: invites.valueOrNull,
-              error: invites.error,
-            ),
-            center: false,
-            errorMessage: 'Could not load invites.',
-            onRetry: () => ref.invalidate(invitesProvider),
-            isEmpty: (list) => list.isEmpty,
-            emptyMessage: 'No invites yet.',
-            data: (context, list) => SettingsSectionCard(
-              title: 'Invites',
-              children: [for (final invite in list) _InviteRow(invite: invite)],
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _CreateInviteCard(),
+        const SizedBox(height: AppSpacing.s16),
+        AppAsyncView<List<api.Invite>>(
+          value: AppAsyncState(data: invites.valueOrNull, error: invites.error),
+          center: false,
+          errorMessage: 'Could not load invites.',
+          onRetry: () => ref.invalidate(invitesProvider),
+          isEmpty: (list) => list.isEmpty,
+          emptyMessage: 'No invites yet.',
+          data: (context, list) => SettingsSectionCard(
+            title: 'Invites',
+            children: [for (final invite in list) _InviteRow(invite: invite)],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

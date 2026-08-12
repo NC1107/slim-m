@@ -26,36 +26,45 @@ import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
 import 'emoji_upload_card.dart';
 
-class EmojiScreen extends ConsumerWidget {
+class EmojiScreen extends StatelessWidget {
   const EmojiScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SettingsScreenScaffold(
+    title: 'Emoji',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    child: EmojiPane(),
+  );
+}
+
+/// The emoji catalog and upload card, embeddable as a Space settings pane as
+/// well as routed.
+class EmojiPane extends ConsumerWidget {
+  const EmojiPane({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final emoji = ref.watch(customEmojiProvider);
 
-    return SettingsScreenScaffold(
-      title: 'Emoji',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const EmojiUploadCard(),
-          const SizedBox(height: AppSpacing.s16),
-          AppAsyncView<List<api.CustomEmoji>>(
-            value: AppAsyncState(data: emoji.valueOrNull, error: emoji.error),
-            center: false,
-            errorMessage: 'Could not load emoji.',
-            onRetry: () => ref.invalidate(customEmojiProvider),
-            isEmpty: (list) => list.isEmpty,
-            emptyMessage: 'No emoji yet.',
-            data: (context, list) => SettingsSectionCard(
-              title: 'Emoji',
-              children: [for (final item in list) _EmojiRow(emoji: item)],
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const EmojiUploadCard(),
+        const SizedBox(height: AppSpacing.s16),
+        AppAsyncView<List<api.CustomEmoji>>(
+          value: AppAsyncState(data: emoji.valueOrNull, error: emoji.error),
+          center: false,
+          errorMessage: 'Could not load emoji.',
+          onRetry: () => ref.invalidate(customEmojiProvider),
+          isEmpty: (list) => list.isEmpty,
+          emptyMessage: 'No emoji yet.',
+          data: (context, list) => SettingsSectionCard(
+            title: 'Emoji',
+            children: [for (final item in list) _EmojiRow(emoji: item)],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

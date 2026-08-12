@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// `SpaceSettingsSection` and `JoinPolicyRow` used to render bare `ListTile`s,
-/// whose type does not match the rest of the app (#39's reported defect).
-/// Both are `AppListRow` now; this pins the row type rather than the label
-/// text, since that alone would also pass against a `ListTile`.
-///
-/// The rows also used to sit in one flat column with no header or border,
-/// which read as a different app from personal settings' bordered
-/// `SettingsSectionCard` groups (#63's reported defect). The tests below pin
-/// that grouping rather than the row type, since a flat column of the same
-/// `AppListRow`s would still pass every test above.
+/// Space settings as a nav beside embedded panes, matching personal
+/// settings' shape, with each pane gated on the server bit its surface
+/// requires. On a wide window choosing a pane embeds it beside the nav; on a
+/// compact one the same row pushes the standalone admin route, so a phone
+/// keeps the real, deep-linkable screens.
 library;
 
 import 'dart:convert';
@@ -16,6 +11,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -23,8 +19,12 @@ import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/channel_permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/screens/admin/invites_screen.dart';
+import 'package:slimm_app/src/screens/admin/reports_screen.dart';
+import 'package:slimm_app/src/screens/admin/roles_screen.dart';
+import 'package:slimm_app/src/screens/space_settings_screen.dart';
 import 'package:slimm_app/src/widgets/settings_notice.dart';
-import 'package:slimm_app/src/widgets/space_settings_section.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -35,37 +35,65 @@ const _tokens = api.TokenPair(
   accessExpiresAt: 0,
 );
 
-ProviderContainer _container(int permissions) => ProviderContainer(
-  overrides: [
-    keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-    myPermissionsProvider.overrideWithValue(permissions),
-    apiProvider.overrideWith((ref) {
-      final client = api.SlimmApi(
-        baseUrl: Uri.parse('http://localhost:8080'),
-        session: ref.watch(sessionProvider),
-        httpClient: MockClient(
-          (request) async => http.Response(
-            jsonEncode({'join_policy': 'invite'}),
-            200,
-            headers: {'content-type': 'application/json'},
-          ),
-        ),
-      );
-      ref.onDispose(client.close);
-      return client;
-    }),
-  ],
-);
+/// Answers the join-policy read with its map shape and every list endpoint
+/// (reports, roles, invites, channels) with an empty list.
+http.Response _respond(http.Request request) =>
+    request.url.path.endsWith('/space/settings')
+    ? http.Response(
+        jsonEncode({'join_policy': 'invite'}),
+        200,
+        headers: {'content-type': 'application/json'},
+      )
+    : http.Response('[]', 200, headers: {'content-type': 'application/json'});
 
-Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
+List<Override> _overrides(int permissions) => [
+  keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+  sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+  myPermissionsProvider.overrideWithValue(permissions),
+  myVisibleChannelsProvider.overrideWith((ref) async => const []),
+  apiProvider.overrideWith((ref) {
+    final client = api.SlimmApi(
+      baseUrl: Uri.parse('http://localhost:8080'),
+      session: ref.watch(sessionProvider),
+      httpClient: MockClient((request) async => _respond(request)),
+    );
+    ref.onDispose(client.close);
+    return client;
+  }),
+];
+
+Future<void> _pump(
+  WidgetTester tester, {
+  required int permissions,
+  double width = 1100,
+  List<Override> extraOverrides = const [],
+}) async {
+  tester.view.physicalSize = Size(width, 800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  final container = ProviderContainer(
+    overrides: [..._overrides(permissions), ...extraOverrides],
+  );
   addTearDown(container.dispose);
+  final router = GoRouter(
+    initialLocation: Routes.spaceSettings,
+    routes: [
+      GoRoute(
+        path: Routes.spaceSettings,
+        builder: (_, __) => const SpaceSettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.adminInvites,
+        builder: (_, __) => const Scaffold(body: Text('invites-route')),
+      ),
+    ],
+  );
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: MaterialApp.router(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(body: SpaceSettingsSection()),
+        routerConfig: router,
       ),
     ),
   );
@@ -73,72 +101,85 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
 }
 
 void main() {
-  testWidgets('every row on Space settings is an AppListRow, never a bare '
-      'ListTile', (tester) async {
-    // Every gating bit, so every row (join policy included) renders.
-    await _pump(tester, _container(-1));
+  testWidgets('wide: the nav lists every gated area and embeds the first '
+      'pane beside it', (tester) async {
+    // Every gating bit, so every pane (join policy included) renders.
+    await _pump(tester, permissions: -1);
 
-    expect(
-      find.byType(ListTile),
-      findsNothing,
-      reason: 'a bare ListTile is the font mismatch the owner reported',
-    );
-    expect(find.text('Reports'), findsOneWidget);
-    expect(find.text('Invites'), findsOneWidget);
-    expect(find.text('Roles'), findsOneWidget);
-    expect(find.text('Channel permissions'), findsOneWidget);
-    expect(find.text('Removed members'), findsOneWidget);
-    expect(find.text('Emoji'), findsOneWidget);
-    expect(find.byType(AppListRow), findsWidgets);
+    expect(find.text('MODERATION'), findsOneWidget);
+    expect(find.text('ACCESS'), findsOneWidget);
+    expect(find.text('CONFIGURATION'), findsOneWidget);
+    for (final label in [
+      'Reports',
+      'Removed members',
+      'Invites',
+      'Who can join',
+      'Roles',
+      'Channel permissions',
+      'Channel categories',
+      'Emoji',
+      'Analytics',
+    ]) {
+      expect(find.text(label), findsWidgets, reason: '$label missing');
+    }
+    expect(find.byType(ListTile), findsNothing);
+    // Wide always shows something: the first pane is embedded, not routed.
+    expect(find.byType(ReportsPane), findsOneWidget);
+    expect(find.text('The queue is empty.'), findsOneWidget);
   });
 
-  testWidgets(
-    'rows sit in bordered SettingsSectionCard groups, matching personal '
-    'settings, not a flat column under the app bar',
-    (tester) async {
-      await _pump(tester, _container(-1));
+  testWidgets('wide: choosing another pane swaps it in place, with the New '
+      'role action surfacing in the app bar', (tester) async {
+    await _pump(tester, permissions: -1);
 
-      // One AppCard per non-empty group (Moderation, Access, Configuration).
-      expect(find.byType(AppCard), findsNWidgets(3));
-      expect(find.text('Moderation'), findsOneWidget);
-      expect(find.text('Access'), findsOneWidget);
-      expect(find.text('Configuration'), findsOneWidget);
-    },
-  );
+    await tester.tap(find.text('Roles'));
+    await tester.pumpAndSettle();
 
-  testWidgets(
-    'a group with none of its rows visible renders no header at all, rather '
-    'than an empty card',
-    (tester) async {
-      // CREATE_INVITE alone: only the Access group has anything in it.
-      await _pump(tester, _container(Perm.createInvite));
+    expect(find.byType(RolesPane), findsOneWidget);
+    expect(find.byType(ReportsPane), findsNothing);
+    expect(find.byTooltip('New role'), findsOneWidget);
+  });
 
-      expect(find.text('Access'), findsOneWidget);
-      expect(find.text('Invites'), findsOneWidget);
-      expect(
-        find.text('Moderation'),
-        findsNothing,
-        reason: 'Reports and Removed members are both hidden here',
-      );
-      expect(
-        find.text('Configuration'),
-        findsNothing,
-        reason: 'Roles, permissions, categories and emoji are all hidden',
-      );
-      expect(find.byType(AppCard), findsOneWidget);
-    },
-  );
+  testWidgets('compact: a pane naming a route pushes the standalone screen '
+      'rather than drilling in place', (tester) async {
+    await _pump(tester, permissions: -1, width: 500);
+
+    expect(find.byType(ReportsPane), findsNothing);
+    await tester.tap(find.text('Invites'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('invites-route'), findsOneWidget);
+    expect(find.byType(InvitesPane), findsNothing);
+  });
+
+  testWidgets('a group with none of its panes visible renders no header at '
+      'all', (tester) async {
+    // CREATE_INVITE alone: only the Access group has anything in it.
+    await _pump(tester, permissions: Perm.createInvite);
+
+    expect(find.text('ACCESS'), findsOneWidget);
+    expect(find.text('Invites'), findsWidgets);
+    expect(
+      find.text('MODERATION'),
+      findsNothing,
+      reason: 'Reports and Removed members are both hidden here',
+    );
+    expect(
+      find.text('CONFIGURATION'),
+      findsNothing,
+      reason: 'Roles, permissions, categories and emoji are all hidden',
+    );
+  });
 
   testWidgets(
     'Channel permissions alone opens for MANAGE_ROLES held only through one '
     "visible channel's overwrite, with Roles itself staying hidden",
     (tester) async {
-      // Base is CREATE_INVITE alone, so only the channel can explain the row.
-      final container = ProviderContainer(
-        overrides: [
-          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-          sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-          myPermissionsProvider.overrideWithValue(Perm.createInvite),
+      // Base is CREATE_INVITE alone, so only the channel can explain the pane.
+      await _pump(
+        tester,
+        permissions: Perm.createInvite,
+        extraOverrides: [
           myVisibleChannelsProvider.overrideWith(
             (ref) async => const [
               api.Channel(
@@ -150,24 +191,8 @@ void main() {
               ),
             ],
           ),
-          apiProvider.overrideWith((ref) {
-            final client = api.SlimmApi(
-              baseUrl: Uri.parse('http://localhost:8080'),
-              session: ref.watch(sessionProvider),
-              httpClient: MockClient(
-                (request) async => http.Response(
-                  jsonEncode({'join_policy': 'invite'}),
-                  200,
-                  headers: {'content-type': 'application/json'},
-                ),
-              ),
-            );
-            ref.onDispose(client.close);
-            return client;
-          }),
         ],
       );
-      await _pump(tester, container);
 
       expect(find.text('Channel permissions'), findsOneWidget);
       expect(
@@ -182,34 +207,13 @@ void main() {
 
   testWidgets('a caller holding none of the gating bits gets a stated reason, '
       'not a blank page', (tester) async {
-    await _pump(tester, _container(0));
+    await _pump(tester, permissions: 0);
 
-    expect(
-      find.byType(SettingsNotice),
-      findsOneWidget,
-      reason:
-          'this widget is SpaceSettingsScreen\'s entire body, so returning '
-          'SizedBox.shrink() rendered a bare app bar over blank white. The '
-          'path that matters is not a stray URL: this watches '
-          'myPermissionsProvider, so a member demoted while the screen is '
-          'open watches it collapse to that blank page.',
-    );
+    expect(find.byType(SettingsNotice), findsOneWidget);
     expect(
       find.textContaining('None of your roles grant access'),
       findsOneWidget,
     );
-    expect(
-      find.byType(AppCard),
-      findsNothing,
-      reason: 'nothing is reachable, so no group should render',
-    );
-  });
-
-  testWidgets('the notice states what would put something here', (
-    tester,
-  ) async {
-    await _pump(tester, _container(0));
-
     expect(
       find.textContaining('An administrator can grant you one of those'),
       findsOneWidget,

@@ -17,47 +17,55 @@ import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
 import 'report_card.dart';
 
-class ReportsScreen extends ConsumerWidget {
+class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SettingsScreenScaffold(
+    title: 'Reports',
+    backTooltip: 'Back to Space settings',
+    backFallback: Routes.spaceSettings,
+    scrollable: false,
+    padding: EdgeInsets.zero,
+    child: ReportsPane(),
+  );
+}
+
+/// The queue itself, embeddable as a Space settings pane as well as routed.
+class ReportsPane extends ConsumerWidget {
+  const ReportsPane({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reports = ref.watch(reportsControllerProvider);
     final controller = ref.read(reportsControllerProvider.notifier);
-    return SettingsScreenScaffold(
-      title: 'Reports',
-      backTooltip: 'Back to Space settings',
-      backFallback: Routes.spaceSettings,
-      scrollable: false,
-      padding: EdgeInsets.zero,
-      child: AppAsyncView<List<api.Report>>(
-        // Only when there is nothing to show instead; see _LoadMoreRow.
-        value: AppAsyncState(
-          data: reports.loading && reports.reports.isEmpty
-              ? null
-              : reports.reports,
-          error: reports.reports.isEmpty ? reports.error : null,
-        ),
-        errorMessage: 'Could not load reports.',
-        onRetry: controller.refresh,
-        isEmpty: (list) => list.isEmpty,
-        emptyMessage: 'The queue is empty.',
-        data: (context, list) => ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          // One trailing row when the last page came back full; see the controller.
-          itemCount: reports.more || reports.error != null
-              ? list.length + 1
-              : list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
-          itemBuilder: (context, i) => i == list.length
-              ? _LoadMoreRow(
-                  loading: reports.loading,
-                  error: reports.error,
-                  onTap: controller.loadMore,
-                )
-              // Keyed by id, or a shortened page hands the next report the previous card's busy state.
-              : ReportCard(key: ValueKey(list[i].id), report: list[i]),
-        ),
+    return AppAsyncView<List<api.Report>>(
+      // Only when there is nothing to show instead; see _LoadMoreRow.
+      value: AppAsyncState(
+        data: reports.loading && reports.reports.isEmpty
+            ? null
+            : reports.reports,
+        error: reports.reports.isEmpty ? reports.error : null,
+      ),
+      errorMessage: 'Could not load reports.',
+      onRetry: controller.refresh,
+      isEmpty: (list) => list.isEmpty,
+      emptyMessage: 'The queue is empty.',
+      data: (context, list) => ListView.separated(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        // One trailing row when the last page came back full; see the controller.
+        itemCount: reports.more || reports.error != null
+            ? list.length + 1
+            : list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
+        itemBuilder: (context, i) => i == list.length
+            ? _LoadMoreRow(
+                loading: reports.loading,
+                error: reports.error,
+                onTap: controller.loadMore,
+              )
+            // Keyed by id, or a shortened page hands the next report the previous card's busy state.
+            : ReportCard(key: ValueKey(list[i].id), report: list[i]),
       ),
     );
   }
