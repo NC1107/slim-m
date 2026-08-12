@@ -170,6 +170,37 @@ void main() {
     expect(dotOpacities(tester), isNot(first), reason: 'and the wave moves');
   });
 
+  testWidgets('AppRevealBand unfolds its band and retracts it again', (
+    tester,
+  ) async {
+    Widget? band = const SizedBox(height: 40, width: 40);
+    late StateSetter setBand;
+    await _pump(
+      tester,
+      SizedBox(
+        width: 200,
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            setBand = setState;
+            return AppRevealBand(child: band);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final open = tester.getSize(find.byType(AppRevealBand)).height;
+    expect(open, 40);
+
+    setBand(() => band = null);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    final mid = tester.getSize(find.byType(AppRevealBand)).height;
+    expect(mid, greaterThan(0), reason: 'the band retracts over a beat');
+    expect(mid, lessThan(open), reason: 'rather than holding then popping');
+    await tester.pumpAndSettle();
+    expect(tester.getSize(find.byType(AppRevealBand)).height, 0);
+  });
+
   testWidgets('AppTypingDots hold still under reduce motion', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

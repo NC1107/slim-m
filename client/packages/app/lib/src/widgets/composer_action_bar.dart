@@ -53,65 +53,71 @@ class ComposerActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      key: const Key('composer-action-bar'),
-      padding: const EdgeInsets.fromLTRB(12, 5, 10, 5),
-      decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
-        border: Border.all(color: tokens.borderSubtle),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-      ),
-      child: Row(
-        // Top, not centred: a centred icon drifts as the field grows.
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppIconButton(
-            icon: AppIcons.add,
-            semanticLabel: touch ? 'More actions' : 'Attach a file',
-            tooltip: touch ? 'More actions' : 'Attach a file',
-            onPressed: touch ? onOpenActions : onPickFile,
-          ),
-          const SizedBox(width: AppSpacing.s8),
-          Expanded(
-            child: ComposerField(
-              controller: controller,
-              focusNode: focusNode,
-              channelName: channelName,
-              hasText: hasText,
-              onSend: onSend,
-              onTyping: onTyping,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s8),
-          // Behind the add button at touch density; see `showComposerActionsSheet`.
-          if (!touch) ...[
+    // A line break grows the bar over a beat, earlier lines holding still.
+    return MaybeAnimatedSize(
+      duration: AppMotion.fast,
+      curve: AppMotion.entrance,
+      alignment: Alignment.topCenter,
+      child: Container(
+        key: const Key('composer-action-bar'),
+        padding: const EdgeInsets.fromLTRB(12, 5, 10, 5),
+        decoration: BoxDecoration(
+          color: tokens.surfaceRaised,
+          border: Border.all(color: tokens.borderSubtle),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        child: Row(
+          // Top, not centred: a centred icon drifts as the field grows.
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             AppIconButton(
-              icon: AppIcons.poll,
-              semanticLabel: 'Create a poll',
-              tooltip: 'Create a poll',
-              onPressed: () => showPollComposerSheet(context, channelId),
+              icon: AppIcons.add,
+              semanticLabel: touch ? 'More actions' : 'Attach a file',
+              tooltip: touch ? 'More actions' : 'Attach a file',
+              onPressed: touch ? onOpenActions : onPickFile,
             ),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: ComposerField(
+                controller: controller,
+                focusNode: focusNode,
+                channelName: channelName,
+                hasText: hasText,
+                onSend: onSend,
+                onTyping: onTyping,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            // Behind the add button at touch density; see `showComposerActionsSheet`.
+            if (!touch) ...[
+              AppIconButton(
+                icon: AppIcons.poll,
+                semanticLabel: 'Create a poll',
+                tooltip: 'Create a poll',
+                onPressed: () => showPollComposerSheet(context, channelId),
+              ),
+              AppIconButton(
+                icon: AppIcons.code,
+                semanticLabel: 'Insert code',
+                tooltip: 'Insert code',
+                onPressed: onInsertCode,
+              ),
+            ],
             AppIconButton(
-              icon: AppIcons.code,
-              semanticLabel: 'Insert code',
-              tooltip: 'Insert code',
-              onPressed: onInsertCode,
+              icon: AppIcons.smile,
+              semanticLabel: 'Insert emoji',
+              tooltip: 'Insert emoji',
+              onPressed: onPickEmoji,
+            ),
+            // Always rendered, only disabled when empty or over the limit.
+            AppIconButton(
+              icon: AppIcons.send,
+              semanticLabel: 'Send message',
+              tooltip: 'Send message',
+              onPressed: canSend ? onSendPressed : null,
             ),
           ],
-          AppIconButton(
-            icon: AppIcons.smile,
-            semanticLabel: 'Insert emoji',
-            tooltip: 'Insert emoji',
-            onPressed: onPickEmoji,
-          ),
-          // Always rendered, only disabled when empty or over the limit.
-          AppIconButton(
-            icon: AppIcons.send,
-            semanticLabel: 'Send message',
-            tooltip: 'Send message',
-            onPressed: canSend ? onSendPressed : null,
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -318,11 +318,14 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   searchOpen: search.open,
                   onToggleSearch: _toggleSearch,
                 ),
-              if (search.open)
-                ChannelSearchBar(
-                  controller: _searchController,
-                  onChanged: _search,
-                ),
+              AppRevealBand(
+                child: search.open
+                    ? ChannelSearchBar(
+                        controller: _searchController,
+                        onChanged: _search,
+                      )
+                    : null,
+              ),
               // Tapping the transcript dismisses the keyboard, which on a phone
               // is otherwise covering most of what the tap was aiming at.
               Expanded(
@@ -470,8 +473,14 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               if (blockedDm)
                 BlockedDmNotice(userId: dmPartnerId, name: channelName)
               else ...[
-                if (_replyingTo != null)
-                  ReplyBanner(message: _replyingTo!, onCancel: _cancelReply),
+                AppRevealBand(
+                  child: _replyingTo == null
+                      ? null
+                      : ReplyBanner(
+                          message: _replyingTo!,
+                          onCancel: _cancelReply,
+                        ),
+                ),
                 Composer(
                   controller: _composer,
                   channelId: widget.channelId,

@@ -11,4 +11,5 @@ export 'surfaces/content_column.dart';
 export 'surfaces/error_state.dart';
 export 'surfaces/list_row.dart';
 export 'surfaces/menu.dart';
+export 'surfaces/reveal_band.dart';
 export 'surfaces/sheet.dart';
