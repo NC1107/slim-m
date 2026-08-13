@@ -125,9 +125,7 @@ void main() {
         reason: 'a genuine RenderFlex overflow throws during the pump above',
       );
 
-      // Every control, including the ones that stayed on the first row, is
-      // still a bare tap away - folding the toggle must not have clipped or
-      // stolen the hit area of anything beside it.
+      // Folding the toggle must not have clipped or stolen a neighbor's hit area.
       await tester.tap(find.bySemanticsLabel('Mute'));
       await tester.tap(find.bySemanticsLabel('Switch camera'));
       await tester.tap(find.bySemanticsLabel('Open canvas'));
@@ -140,10 +138,7 @@ void main() {
     'the fold threshold is exact: one pixel narrower than what the camera-off '
     'row needs folds it, one pixel is not enough to avoid needing to',
     (tester) async {
-      // 5 controls (mic, camera, share, leave, toggle), each 44dp plus the
-      // 8dp AppFocusRing reserves on every edge (52dp total), 4 gaps of
-      // 8dp, plus the card's own 12dp padding on both sides and its own
-      // border's extra 1dp on each: 260+32+24+2.
+      // 5 controls at 52dp (44dp plus AppFocusRing's 8dp), 4 gaps of 8dp, plus the card's 24dp padding and 2dp border: 260+32+24+2.
       const exact = 318.0;
       await pumpVoiceCallDock(
         tester,

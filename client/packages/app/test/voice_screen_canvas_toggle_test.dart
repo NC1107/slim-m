@@ -207,8 +207,7 @@ void main() {
 
       expect(find.bySemanticsLabel('Open canvas'), findsOneWidget);
 
-      // Stops the heartbeat timer `connected` started - the pending-timer
-      // check runs before `addTearDown`, so this has to happen in the body.
+      // Stops the heartbeat timer `connected` started, before the pending-timer check that runs ahead of `addTearDown`.
       await container.read(voiceControllerProvider.notifier).leave();
     },
   );
