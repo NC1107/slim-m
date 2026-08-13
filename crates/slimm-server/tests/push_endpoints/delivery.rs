@@ -306,8 +306,7 @@ async fn a_relay_failure_does_not_swallow_the_next_messages_wake() {
     );
     assert_eq!(mock.call_count(), 0, "it did not actually deliver anything");
 
-    // A second message, well inside what would have been the debounce
-    // window, must still reach the relay.
+    // A second message, well inside the debounce window, must still reach the relay.
     let sent = app.clone().oneshot(send("second")).await.unwrap();
     assert_eq!(sent.status(), axum::http::StatusCode::OK);
     assert!(
@@ -363,8 +362,7 @@ async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient
         )
     };
 
-    // Bob is foreground, so the first message reaches only carol; her debounce
-    // window opens, and is waited out fully before anything else happens.
+    // Bob is foreground, so the first message reaches only carol; her debounce window is waited out fully first.
     let reported = app.clone().oneshot(report_bob("foreground")).await.unwrap();
     assert_eq!(reported.status(), axum::http::StatusCode::NO_CONTENT);
     app.clone().oneshot(send("m1")).await.unwrap();
@@ -375,14 +373,12 @@ async fn one_recipients_open_debounce_window_does_not_suppress_another_recipient
     assert_eq!(mock.all_messages().len(), 1);
     assert_eq!(mock.all_messages()[0]["token"], "carols-token");
 
-    // Bob's phone wakes up, still well inside what would be carol's open
-    // window, and alice sends a second message.
+    // Bob's phone wakes up, still inside carol's open window, and alice sends a second message.
     let reported = app.clone().oneshot(report_bob("background")).await.unwrap();
     assert_eq!(reported.status(), axum::http::StatusCode::NO_CONTENT);
     app.clone().oneshot(send("m2")).await.unwrap();
 
-    // Bob's first wake must not be swallowed by carol's open, unrelated window:
-    // debouncing collapses one recipient's burst, it does not silence another.
+    // Bob's first wake must not be swallowed by carol's window: debouncing collapses a burst, not another recipient.
     assert!(
         wait_until(
             || mock

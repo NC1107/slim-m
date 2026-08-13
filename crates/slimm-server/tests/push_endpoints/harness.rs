@@ -92,8 +92,7 @@ pub(crate) async fn register_user(store: &Store, username: &str) -> (String, Str
         .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    // The first account through here claims the deployment, exactly as the
-    // first real registration does; later ones find it already set up.
+    // The first account through here claims the deployment, exactly as the first real registration does.
     store.bootstrap_deployment(account.id).await.unwrap();
     let tokens = store.open_session(account.id, "cli").await.unwrap();
     (tokens.access_token, account.id.to_string())

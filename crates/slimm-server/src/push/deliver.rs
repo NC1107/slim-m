@@ -125,8 +125,7 @@ pub(super) async fn deliver(
         &targets,
     );
 
-    // Nothing sealed means nothing was attempted, so release; see the note on
-    // this function.
+    // Nothing sealed means nothing was attempted, so release; see this function's own doc.
     for (&user_id, &fired_at) in &opened {
         if !messages.iter().any(|m| m.user_id == user_id) {
             debounce.release_if_undelivered(channel_id, user_id, fired_at);
@@ -138,12 +137,10 @@ pub(super) async fn deliver(
 
     match relay::send(&enabled.http, &enabled.send_url, &enabled.key, &messages).await {
         Ok(results) => {
-            // Only a Delivered device counts as a wake; see the note on this
-            // function.
+            // Only a Delivered device counts as a wake; see this function's own doc.
             let mut delivered: HashSet<UserId> = HashSet::new();
             for result in results {
-                // The relay echoes back a bare token, so resolve it to the
-                // device this batch really sent it to before acting on it.
+                // The relay echoes back a bare token; resolve it to the device this batch actually sent it to.
                 let Some(target) = messages.iter().find(|m| m.token == result.token) else {
                     continue;
                 };
@@ -169,8 +166,7 @@ pub(super) async fn deliver(
                         | relay::RelayStatus::NotAttempted,
                     ) => {}
                     None => {
-                        // Inactionable, never misrouted, and logged because it
-                        // should never happen; see the note on this function.
+                        // Inactionable and logged since it should never happen; see this function's own doc.
                         tracing::warn!(
                             status = %result.status,
                             "push: relay reported a status this server does not recognize"
@@ -186,8 +182,7 @@ pub(super) async fn deliver(
         }
         Err(err) => {
             tracing::warn!(error = %err, %channel_id, "push: relay send failed");
-            // Transport failure notified nobody, so no window may stick; see
-            // the note on this function.
+            // Transport failure notified nobody, so no window may stick; see this function's own doc.
             for (&user_id, &fired_at) in &opened {
                 debounce.release_if_undelivered(channel_id, user_id, fired_at);
             }
