@@ -192,6 +192,24 @@ impl VoiceService {
         self.inner.is_some()
     }
 
+    /// Whether the configured SFU answers right now, for the `/metrics`
+    /// reachability gauge - the check `compose-smoke` already runs by hand
+    /// against the room service, made ongoing so an operator learns of a
+    /// crashlooping LiveKit without a healthy-looking server hiding it.
+    ///
+    /// `None` when no SFU is configured, since there is nothing to ask.
+    /// Otherwise a plain, unauthenticated HTTP round trip to the room
+    /// service's own base address: any response at all, of any status,
+    /// means the process behind it is up and answering, which is the
+    /// question this asks - "is it there", not "was this request valid".
+    /// Bounded by the same 5-second client timeout every other call to the
+    /// room service already uses, so a hung SFU cannot stall a scrape
+    /// indefinitely.
+    pub async fn probe_reachable(&self) -> Option<bool> {
+        let enabled = self.inner.as_ref()?;
+        Some(enabled.http.get(&enabled.service_url).send().await.is_ok())
+    }
+
     /// Mints a join token for `user_id` in `channel_id`.
     ///
     /// The caller is responsible for having checked that the user may connect;

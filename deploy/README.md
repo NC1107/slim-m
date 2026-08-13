@@ -32,7 +32,7 @@ Check it:
 
 ```bash
 curl https://<SLIMM_API_DOMAIN>/healthz   # -> ok
-docker compose ps                         # server and caddy should show healthy
+docker compose ps                         # server, caddy and livekit should all show healthy
 ```
 
 ## Backups (optional)
@@ -141,8 +141,8 @@ Move any of these if something on the host already holds the port.
 A UniFi controller publishes 3478 for its own STUN, and a second SFU on the same box already holds 7881.
 Both sides of each mapping follow the variable, so changing it in `.env` is enough.
 
-The `livekit` service carries no Docker `HEALTHCHECK`, unlike the server and Caddy.
-The image ships no verified shell or HTTP client to probe with, so it relies on `restart: unless-stopped` plus ordinary log monitoring instead.
+The `livekit` service carries a Docker `HEALTHCHECK` too, same as the server and Caddy: a plain `GET /` against its own signaling port, which LiveKit answers `OK` to with no auth needed.
+`docker compose ps` reports its real state, so a LiveKit that starts and then crashloops shows `unhealthy` there rather than looking identical to a working one - see "Monitoring" below for the incident this closes.
 
 ### TURN/TLS, and why it is not on 443
 
@@ -169,6 +169,21 @@ If LiveKit exits at startup with `could not resolve external IP`, that is your h
 Ubuntu and Fedora run systemd-resolved, whose `/etc/resolv.conf` names a `127.0.0.53` stub that does not exist inside a container, and LiveKit needs one hostname resolved to discover the address peers must reach it on.
 The `dns:` block on the livekit service is there for this; point it at whichever resolvers you prefer.
 Nothing else in the container uses them: that one STUN lookup is all they serve, and its target is a public Google host either way.
+
+## Monitoring
+
+`docker compose ps` is the first line of defense: server, Caddy and LiveKit all carry a real `HEALTHCHECK` now, so a crashlooping service shows `unhealthy` there rather than sitting behind a container that merely started.
+This closes a real incident: LiveKit crashlooped for half an hour on this project's own deployment while the server's `voice enabled` log line stayed exactly as healthy-looking as ever, because that line is only the server's opinion of its own configuration, never a check that the SFU it names is actually answering.
+
+`GET /metrics` is the deeper answer, for anything that scrapes.
+It is gated on an authenticated session holding `MANAGE_SERVER`, the same bit `/space/analytics` already gates on - there is no separate service-account or API-key concept in this server, so point Prometheus (or a plain `curl -H "Authorization: Bearer <token>"`) at it with an admin account's own access token.
+It answers Prometheus text exposition format with:
+
+- `slimm_process_resident_memory_bytes` - this process's own resident memory.
+- `slimm_requests_total{class="..."}` / `slimm_requests_refused_total{class="..."}` - requests admitted and refused per rate-limit class since the process started (`write`, `read`, `upload`, `canvas`, and so on - see `Class` in `crates/slimm-server/src/ratelimit/class.rs` for the full list and what each covers).
+- `slimm_websocket_connections` - currently open WebSocket connections.
+- `slimm_livekit_configured` - whether this deployment has an SFU configured at all.
+- `slimm_livekit_reachable` - whether the configured SFU answered the server's own last reachability probe. Present only when `slimm_livekit_configured` is `1`; a text-only deployment has nothing to be unreachable, so this line is absent rather than a misleading `0`. This is the same class of gap the `livekit` `HEALTHCHECK` above closes, from the server's point of view rather than Docker's - useful when the server and the SFU are not on the same host, or the SFU is not something this compose file runs at all.
 
 ## Custom emoji, and importing them in bulk
 

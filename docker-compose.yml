@@ -84,8 +84,13 @@ services:
     # Pin to an exact release; check github.com/livekit/livekit/releases for newer patches.
     image: livekit/livekit-server:v1.10.1
     restart: unless-stopped
-    # No healthcheck: the image ships no verified shell or HTTP client to probe
-    # with, so this relies on `restart: unless-stopped`. See deploy/README.md.
+    healthcheck:
+      # Alpine's busybox wget against LiveKit's own unauthenticated "OK" liveness route; see deploy/README.md.
+      test: ["CMD", "wget", "--quiet", "--spider", "-T", "3", "http://127.0.0.1:7880/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
     # LiveKit exits if its STUN hostname will not resolve, and systemd-resolved's
     # 127.0.0.53 stub does not exist in a container. See deploy/README.md.

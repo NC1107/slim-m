@@ -20,127 +20,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-/// A traffic class and its budget: a sustained refill rate and a burst size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Class {
-    /// Password endpoints (register, login). Deliberately tight: each request
-    /// can cost an Argon2id hash.
-    Password,
-    /// Token refresh. Cheap, but a leaked token should not be grindable.
-    Refresh,
-    /// Minting a WebSocket connect ticket.
-    Ticket,
-    /// Ordinary authenticated writes (send, edit, mark read).
-    Write,
-    /// Typing refresh frames over the WebSocket. A refresh every few seconds
-    /// is normal client behavior, so the budget only needs to absorb a short
-    /// burst (switching between channels while typing) while still refusing
-    /// a tight loop; the tracker's own dedup already stops a well-behaved
-    /// refresh from re-fanning-out, so this exists to bound the cost of a
-    /// misbehaving one.
-    Typing,
-    /// Unauthenticated metadata reads that disclose nothing worth guessing at:
-    /// `/version` and its capability list.
-    ///
-    /// Loose on purpose. The sign-in screen probes `/version` as somebody types
-    /// a server address, so a tight budget here would refuse a legitimate user
-    /// mid-keystroke; what this bounds is a flood, not a guess. `InviteCheck`
-    /// stays tight because a hit there discloses real deployment metadata and
-    /// this does not.
-    Read,
-    /// Checking an invite code before signup. Unauthenticated, and a valid
-    /// code now discloses real deployment metadata rather than a bare
-    /// boolean, which raises what a successful guess is worth; tight for the
-    /// same reason `Password` is.
-    InviteCheck,
-    /// Uploading an attachment or avatar. Far tighter than `Write`: each
-    /// request can cost real megabytes of disk, so the budget that is fine
-    /// for a burst of short text messages would let one account fill the
-    /// volume as fast as it could open connections. Sized for a normal
-    /// compose flow (a handful of files with one message, occasionally) while
-    /// still bounding a sustained flood to a trickle.
-    Upload,
-    /// Canvas reads and writes.
-    ///
-    /// Its own class because both halves are gesture-driven at a rate `Write`
-    /// and `Read` were never sized for: a short dash commits an object, and a
-    /// pan re-reads the region as soon as the camera settles. A 429 on either
-    /// is ink that was already on the drawer's own screen going missing, or a
-    /// canvas that stops updating, so the budget is looser than `Write`'s
-    /// while still refusing a tight loop. What bounds the *cost* rather than
-    /// the rate is elsewhere: the per-object props ceiling, the per-channel
-    /// object ceiling, and the viewport limit.
-    Canvas,
-    /// Canvas pointer-position frames over the WebSocket. Sent far more often
-    /// than a typing refresh (a client throttles to roughly 12/second while
-    /// the pointer is moving over the canvas), so the budget is sized around
-    /// that sustained rate with headroom for a burst, rather than reused from
-    /// [`Class::Typing`]'s much sparser one.
-    CanvasCursor,
-    /// In-flight stroke preview frames over the WebSocket - ephemeral,
-    /// relayed but never persisted (see `Event::CanvasStrokePreview`).
-    ///
-    /// Unlike every other class, this one is denominated in *bytes*, not
-    /// requests: a caller charges it through [`RateLimiter::check_weighted`]
-    /// with the frame's own wire size as the cost, because a preview frame's
-    /// size grows with how many points it carries while [`Class::CanvasCursor`]'s
-    /// two-number frame never does - a per-request budget sized for a small
-    /// frame would starve a legitimately larger one and a budget sized for a
-    /// large one would let a flood of tiny frames spend far more bandwidth
-    /// than a cursor ever could. This is the byte-rate half of the roadmap's
-    /// split canvas rate limits; [`Class::Canvas`] (the persisted-op half) is
-    /// unchanged.
-    ///
-    /// Sized so a capped 24-point frame (under 1.5 KiB) can be sent roughly
-    /// eight times back to back before the burst runs out, and sustained
-    /// drawing at the client's own throttle interval (90ms) stays inside the
-    /// refill with headroom to spare.
-    CanvasStrokePreview,
-    /// Serving stored bytes back: an attachment, an avatar, a custom emoji
-    /// image.
-    ///
-    /// Its own class because these are the one read shape a single screen
-    /// legitimately fires dozens of at once - a member page resolves an
-    /// avatar per member, and a transcript of image posts resolves one per
-    /// message - so [`Class::Read`]'s budget, sized for a handful of
-    /// page-level fetches, would stall a member list on any deployment past
-    /// about twenty people. Sized instead for the largest honest burst a
-    /// screen produces, with a refill that still refuses a sustained loop.
-    ///
-    /// What this bounds is the request *rate*, not the bytes behind it: an
-    /// attachment may be megabytes where an avatar is kilobytes, and this
-    /// charges them the same. Byte cost is bounded elsewhere, by the
-    /// per-upload ceiling and the deployment-wide storage ceiling. If
-    /// large-attachment flooding ever becomes real rather than theoretical,
-    /// the answer is a byte-weighted charge through
-    /// [`RateLimiter::check_weighted`], the way
-    /// [`Class::CanvasStrokePreview`] already works - not a smaller budget
-    /// here, which would break the avatar case this exists to serve.
-    Asset,
-}
-
-impl Class {
-    /// (burst, refill per second). For [`Class::CanvasStrokePreview`] the
-    /// unit is bytes, not requests; see its own doc.
-    const fn budget(self) -> (f64, f64) {
-        match self {
-            Class::Password => (5.0, 1.0 / 6.0),
-            Class::Refresh => (10.0, 1.0 / 2.0),
-            Class::Ticket => (10.0, 1.0),
-            Class::Write => (30.0, 5.0),
-            Class::Typing => (10.0, 2.0),
-            Class::Read => (20.0, 2.0),
-            Class::InviteCheck => (10.0, 1.0 / 10.0),
-            Class::Upload => (10.0, 1.0 / 20.0),
-            Class::Canvas => (60.0, 10.0),
-            Class::CanvasCursor => (30.0, 15.0),
-            // See this variant's own doc comment for how these were sized.
-            Class::CanvasStrokePreview => (12_288.0, 6_144.0),
-            // A full member page plus a transcript's own avatars, at once.
-            Class::Asset => (150.0, 25.0),
-        }
-    }
-}
+mod class;
+pub use class::Class;
 
 /// Most distinct keys tracked at once, across all classes.
 const MAX_BUCKETS: usize = 20_000;
@@ -155,9 +36,20 @@ struct Bucket {
     last: Instant,
 }
 
+/// How many requests a class has admitted and refused since the process
+/// started, for the `/metrics` counters. Lives beside the buckets rather
+/// than as its own `Mutex`, since every increment already happens under the
+/// same lock a check takes anyway.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ClassCounts {
+    pub admitted: u64,
+    pub refused: u64,
+}
+
 struct State {
     buckets: HashMap<(Class, String), Bucket>,
     last_sweep: Instant,
+    counts: HashMap<Class, ClassCounts>,
 }
 
 /// A cloneable handle to the shared limiter.
@@ -186,6 +78,7 @@ impl RateLimiter {
             state: Arc::new(Mutex::new(State {
                 buckets: HashMap::new(),
                 last_sweep: Instant::now(),
+                counts: HashMap::new(),
             })),
             trusted_hops,
         }
@@ -250,7 +143,7 @@ impl RateLimiter {
         }
 
         let map_key = (class, key.to_owned());
-        match state.buckets.get_mut(&map_key) {
+        let admitted = match state.buckets.get_mut(&map_key) {
             Some(bucket) => {
                 let elapsed = now.duration_since(bucket.last).as_secs_f64();
                 bucket.tokens = (bucket.tokens + elapsed * refill).min(burst);
@@ -266,18 +159,26 @@ impl RateLimiter {
                 // Refuse rather than admit once the map is full, so a flood of
                 // fresh keys cannot both grow memory and bypass the limit.
                 if state.buckets.len() >= MAX_BUCKETS {
-                    return false;
+                    false
+                } else {
+                    state.buckets.insert(
+                        map_key,
+                        Bucket {
+                            tokens: burst - cost,
+                            last: now,
+                        },
+                    );
+                    true
                 }
-                state.buckets.insert(
-                    map_key,
-                    Bucket {
-                        tokens: burst - cost,
-                        last: now,
-                    },
-                );
-                true
             }
+        };
+        let entry = state.counts.entry(class).or_default();
+        if admitted {
+            entry.admitted += 1;
+        } else {
+            entry.refused += 1;
         }
+        admitted
     }
 
     /// How many buckets are currently tracked. For tests and diagnostics.
@@ -286,6 +187,25 @@ impl RateLimiter {
             Ok(state) => state.buckets.len(),
             Err(poisoned) => poisoned.into_inner().buckets.len(),
         }
+    }
+
+    /// Admitted and refused counts for every class, in [`Class::ALL`] order,
+    /// for the `/metrics` counters. A class nothing has asked about yet
+    /// answers zero rather than being absent, so the exposed series is
+    /// stable from the first scrape. One case this cannot see: a
+    /// [`Self::check_weighted`] call whose `cost` exceeds the class's own
+    /// burst is refused before the lock these counts live behind is ever
+    /// taken, since that answer needs no state at all - see
+    /// [`Self::check_weighted_at`]'s own early return.
+    pub fn counts(&self) -> Vec<(Class, ClassCounts)> {
+        let state = match self.state.lock() {
+            Ok(state) => state,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        Class::ALL
+            .iter()
+            .map(|&class| (class, state.counts.get(&class).copied().unwrap_or_default()))
+            .collect()
     }
 }
 
@@ -308,6 +228,39 @@ mod tests {
             !limiter.check_at(Class::Password, "1.2.3.4", now),
             "the request past the burst is refused"
         );
+    }
+
+    /// The `/metrics` counters: admitted and refused are counted separately,
+    /// not the same event read twice. Mutation-tested: always incrementing
+    /// `admitted` regardless of outcome leaves every other test in this
+    /// module green and fails only this one, on the `refused` assertion.
+    #[test]
+    fn counts_separates_admitted_from_refused() {
+        let limiter = RateLimiter::new();
+        let now = Instant::now();
+        let (burst, _) = Class::Password.budget();
+        for _ in 0..burst as usize {
+            assert!(limiter.check_at(Class::Password, "counted", now));
+        }
+        assert!(!limiter.check_at(Class::Password, "counted", now));
+
+        let counts = limiter.counts();
+        let password = counts
+            .iter()
+            .find(|(class, _)| *class == Class::Password)
+            .map(|(_, count)| *count)
+            .expect("Password is in Class::ALL");
+        assert_eq!(password.admitted, burst as u64);
+        assert_eq!(password.refused, 1);
+
+        // A class nothing has touched answers zero, not absent.
+        let untouched = counts
+            .iter()
+            .find(|(class, _)| *class == Class::Upload)
+            .map(|(_, count)| *count)
+            .expect("Upload is in Class::ALL");
+        assert_eq!(untouched.admitted, 0);
+        assert_eq!(untouched.refused, 0);
     }
 
     #[test]
