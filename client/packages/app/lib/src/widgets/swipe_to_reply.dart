@@ -104,12 +104,12 @@ class _SwipeToReplyState extends State<SwipeToReply>
     _fromTouch = details.kind == PointerDeviceKind.touch;
   }
 
+  /// Rubber-banded rather than free: clamped at 0 so a leftward flick never
+  /// reads as an incomplete rightward one, and at the ceiling so an overshot
+  /// or very fast swipe cannot move the row any further than a deliberate
+  /// one already would have.
   void _onUpdate(DragUpdateDetails details) {
     if (!_fromTouch) return;
-    // Rubber-banded rather than free: clamped at 0 so a leftward flick never
-    // reads as an incomplete rightward one, and at the ceiling so an
-    // overshot or very fast swipe cannot move the row any further than a
-    // deliberate one already would have.
     _controller.value = (_controller.value + details.delta.dx).clamp(
       0.0,
       _maxDrag,
@@ -131,14 +131,14 @@ class _SwipeToReplyState extends State<SwipeToReply>
     _snapBack();
   }
 
+  /// An explicit `Duration.zero` (what [AppMotion.reduced] answers under
+  /// reduce-motion) takes [AnimationController]'s own instant branch and
+  /// sets the value synchronously rather than animating a single frame at
+  /// 5% of some implicit duration - that scar is `animateTo`'s *inferred*
+  /// duration only, verified by reading `animation_controller.dart` before
+  /// relying on it here.
   void _snapBack() {
     _fromTouch = false;
-    // An explicit Duration.zero (what AppMotion.reduced answers under
-    // reduce-motion) takes AnimationController's own instant branch and
-    // sets the value synchronously rather than animating a single frame at
-    // 5% of some implicit duration - that scar is `animateTo`'s *inferred*
-    // duration only, verified by reading animation_controller.dart before
-    // relying on it here.
     _controller.animateTo(
       0,
       duration: AppMotion.reduced(context, AppMotion.fast),
@@ -173,8 +173,7 @@ class _SwipeToReplyState extends State<SwipeToReply>
                     alignment: Alignment.centerLeft,
                     child: Padding(
                       padding: const EdgeInsets.only(left: AppSpacing.s16),
-                      // Decorative only: the reply banner appearing is the
-                      // real, announced state change, not this icon.
+                      // Decorative: the reply banner appearing is the real, announced state change, not this icon.
                       child: ExcludeSemantics(
                         child: Opacity(
                           opacity: progress,

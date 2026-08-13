@@ -226,8 +226,7 @@ void main() {
       touchSlopY: 0,
       kind: PointerDeviceKind.touch,
     );
-    // One bare pump - enough to reflect a synchronous jump to rest, not
-    // enough to let a real multi-frame animation finish on its own.
+    // One bare pump: enough for a synchronous jump, not a multi-frame animation.
     await tester.pump();
 
     expect(tester.getTopLeft(find.byKey(_rowKey)).dx, restingLeft);
