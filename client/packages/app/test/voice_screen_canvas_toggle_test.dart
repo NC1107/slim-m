@@ -36,6 +36,9 @@ class _ConnectedSession implements VoiceSession {
   bool get supportsParticipantVolume => true;
 
   @override
+  void setSpeakingSensitivity(double sensitivity) {}
+
+  @override
   double volumeFor(String identity) => 1.0;
 
   @override
