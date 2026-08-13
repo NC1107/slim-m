@@ -21,10 +21,10 @@ final class NotificationSoundTests: XCTestCase {
       version: PushEnvelope.expectedVersion,
       channelId: "c1",
       messageId: "m1",
+      sentAt: nil,
       sender: sender,
       channel: channel,
-      body: body,
-      sentAt: nil
+      body: body
     )
   }
 
