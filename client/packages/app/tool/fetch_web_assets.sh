@@ -45,7 +45,10 @@ fetch() {
     echo "ok $out (cached)"
     return
   fi
-  curl -sSfL --max-time 120 "$url" -o "$out"
+  # Retries cover the transient release-CDN 503 that killed three whole e2e
+  # runs in a row on 2026-08-12 (issue #621) before a single scenario ran.
+  curl -sSfL --max-time 120 --retry 5 --retry-delay 5 --retry-all-errors \
+    "$url" -o "$out"
   local got
   got=$(sha256sum "$out" | cut -d' ' -f1)
   if [[ "$got" != "$want" ]]; then
