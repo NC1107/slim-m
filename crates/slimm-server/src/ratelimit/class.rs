@@ -142,7 +142,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 12] = [
+    pub const ALL: [Class; 13] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -174,6 +174,7 @@ impl Class {
             Class::CanvasCursor => "canvas_cursor",
             Class::CanvasStrokePreview => "canvas_stroke_preview",
             Class::Asset => "asset",
+            Class::Gif => "gif",
         }
     }
 }
