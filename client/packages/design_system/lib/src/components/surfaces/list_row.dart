@@ -119,12 +119,24 @@ class AppListRow extends StatefulWidget {
 
   /// The height a row built here takes, for a sibling that must line up with
   /// one rather than centre against the taller column it sits in.
+  ///
+  /// Grows past the design's own fixed row height once Dynamic Type scales
+  /// the label past what that height can hold, rather than clipping it
+  /// harder into the ellipsis - "row height must never animate" is about
+  /// motion, never about staying fixed at every text scale, and this is
+  /// still a plain, non-animated value read fresh on every build. Never
+  /// shrinks below the fixed height, which stays the floor at the
+  /// platform's default text size.
   static double heightFor(BuildContext context, {bool? touch, double? min}) {
     final density = touch ?? AppTouchTargets.of(context);
-    return math.max(
+    final base = math.max(
       density ? AppSizes.rowTouch : AppSizes.rowPointer,
       min ?? 0,
     );
+    final scaledLabelHeight =
+        MediaQuery.textScalerOf(context).scale(AppText.ui.fontSize!) *
+            AppText.ui.height!;
+    return math.max(base, scaledLabelHeight + AppSpacing.s8);
   }
 
   @override

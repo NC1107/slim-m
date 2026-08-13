@@ -190,6 +190,38 @@ void main() {
     });
 
     testWidgets(
+        'grows past rowPointer once Dynamic Type scales the label past what '
+        'the fixed height can hold', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2.0)),
+              child: const Scaffold(
+                body: Center(
+                  child:
+                      SizedBox(width: 240, child: AppListRow(label: 'general')),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(
+        tester.getSize(find.byType(AppListRow)).height,
+        greaterThan(AppSizes.rowPointer),
+        reason: 'the label at 2x Dynamic Type no longer fits rowPointer',
+      );
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'a row that clips instead of growing overflows silently',
+      );
+    });
+
+    testWidgets(
         'selected, unread and focused combine without any pair becoming ambiguous',
         (
       tester,

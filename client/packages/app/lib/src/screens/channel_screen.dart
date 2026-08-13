@@ -166,7 +166,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     setState(() => _replyingTo = null);
 
     await sendOptimistically(
-      ref,
+      ref.read,
       id: newMessageId(),
       channelId: widget.channelId,
       authorId: ref.read(sessionProvider).tokens?.userId ?? '',
@@ -416,15 +416,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                     channelIsThread: isThread,
                                   ),
                                   onRetry: (m) =>
-                                      unawaited(retryMessage(ref, m)),
+                                      unawaited(retryMessage(ref.read, m)),
                                   onDiscard: (m) =>
-                                      unawaited(discardMessage(ref, m)),
+                                      unawaited(discardMessage(ref.read, m)),
                                   // Failed text lands back in the composer to fix
                                   // and resend; the failed row is then discarded,
                                   // so nothing the user wrote is ever lost.
                                   onEditFailed: (m) {
                                     _composer.text = m.content;
-                                    unawaited(discardMessage(ref, m));
+                                    unawaited(discardMessage(ref.read, m));
                                   },
                                   onPickReaction: (m, emoji) =>
                                       unawaited(_pickReaction(m, emoji)),

@@ -5,14 +5,22 @@
 /// delete let the request fail up to the caller, which has a user-visible
 /// error to show. The `can*` gates decide what a caller may even offer,
 /// mirroring the server's own author-or-permission checks.
+///
+/// A send (and its retry) is the third shape: it applies its optimistic row
+/// immediately and marks it failed on refusal, with nothing thrown up to a
+/// caller at all - that is what lets `SyncController` retry a failed send on
+/// reconnect with nobody to report a failure to.
 library;
 
+import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
+import '../api_failure.dart';
 import '../permissions.dart';
 import 'message_extras.dart';
+import 'message_search.dart' show ProviderReader;
 import 'providers.dart';
 
 /// Toggles a reaction: off if [wasActive], on otherwise. Applied
@@ -156,3 +164,71 @@ Future<void> deleteMessageAction(WidgetRef ref, Message message) async {
   final store = await ref.read(storeProvider.future);
   await store.discard(message.id);
 }
+
+/// Puts a message on screen before the network has answered, then reconciles
+/// with the server's copy.
+///
+/// The id is the caller's and is reused on retry, so a retry after an
+/// uncertain failure can never post twice - the server's own send route is
+/// idempotent by (channel, author, id), and this is the one place that
+/// invariant is spent. Takes a [ProviderReader] rather than either ref type
+/// directly (see that typedef's own doc comment): a screen's manual retry
+/// holds a `WidgetRef`, and `SyncController`'s reconnect retry holds a plain
+/// `Ref`, and the two share no common supertype in this Riverpod version.
+///
+/// [onQueued] fires once the local row exists and before the request goes
+/// out, which is when a sender wants the transcript scrolled.
+Future<void> sendOptimistically(
+  ProviderReader read, {
+  required String id,
+  required String channelId,
+  required String authorId,
+  required String content,
+  List<String> attachmentIds = const [],
+  String? replyToId,
+  VoidCallback? onQueued,
+}) async {
+  final store = await read(storeProvider.future);
+  await store.addPending(
+    id: id,
+    channelId: channelId,
+    authorId: authorId,
+    content: content,
+    replyToId: replyToId,
+  );
+  onQueued?.call();
+  try {
+    final sent = await read(apiProvider).sendMessage(
+      channelId: channelId,
+      id: id,
+      content: content,
+      attachmentIds: attachmentIds,
+      replyToId: replyToId,
+    );
+    // Lands on the same row, because it carries the same id.
+    await store.applyMessage(sent);
+    read(messageExtrasProvider.notifier).applyMessage(sent);
+  } on api.ApiException catch (e) {
+    await store.markFailed(
+      id,
+      reason: describeApiFailure('send the message', e),
+    );
+  }
+}
+
+/// Re-sends a message whose first attempt failed, under its original id.
+/// Called both from a message row's own manual retry button and from
+/// `SyncController`'s automatic retry on reconnect.
+Future<void> retryMessage(ProviderReader read, Message message) =>
+    sendOptimistically(
+      read,
+      id: message.id,
+      channelId: message.channelId,
+      authorId: message.authorId ?? '',
+      content: message.content,
+      replyToId: message.replyToId,
+    );
+
+/// Discards a failed send. Nothing reached the server, so nothing to undo.
+Future<void> discardMessage(ProviderReader read, Message message) async =>
+    (await read(storeProvider.future)).discard(message.id);

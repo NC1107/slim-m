@@ -4,6 +4,12 @@
 /// connected, and a DM call becoming active while this device is not
 /// already on it.
 ///
+/// A message (or mention, or DM) and a call ring also fire a matching
+/// [AppHaptics] cue on mobile - the platform's own real-time notification
+/// moments, per the owner's own list - gated by the identical conditions the
+/// sound itself already reads, since they ride the same call site rather
+/// than a second copy of the rule.
+///
 /// Wired at `HomeShell` (`ref.watch`, the same forced-instantiation shape
 /// [blocksProvider] already uses) so it is created once for the signed-in
 /// session rather than only while some particular screen happens to be
@@ -14,6 +20,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_design_system/design_system.dart' show AppHaptics;
 import 'package:slimm_rtc/rtc.dart';
 
 import '../audio/notification_sound.dart';
@@ -27,9 +34,20 @@ import 'providers.dart';
 import 'voice_controller.dart';
 import 'voice_settings_controller.dart' show voiceSettingsControllerProvider;
 
+/// One of [AppHaptics]'s own static cues, injectable so a test can record a
+/// call without a real haptic engine or platform channel - the same seam
+/// [SoundPlayer] already gives this controller for the audio half.
+typedef HapticsCue = void Function();
+
 class NotificationSoundController {
-  NotificationSoundController(this._ref, {SoundPlayer? player})
-    : _player = player ?? AudioPlayersSoundPlayer() {
+  NotificationSoundController(
+    this._ref, {
+    SoundPlayer? player,
+    HapticsCue? messageHaptic,
+    HapticsCue? callRingHaptic,
+  }) : _player = player ?? AudioPlayersSoundPlayer(),
+       _messageHaptic = messageHaptic ?? AppHaptics.selection,
+       _callRingHaptic = callRingHaptic ?? AppHaptics.impact {
     _messages = _ref.read(liveEventsProvider).listen(_onServerEvent);
     _voiceSub = _ref.listen<VoiceState>(
       voiceControllerProvider,
@@ -43,6 +61,8 @@ class NotificationSoundController {
 
   final Ref _ref;
   final SoundPlayer _player;
+  final HapticsCue _messageHaptic;
+  final HapticsCue _callRingHaptic;
   late final StreamSubscription<api.ServerEvent> _messages;
   late final ProviderSubscription<VoiceState> _voiceSub;
   late final ProviderSubscription<Map<String, bool>> _dmCallSub;
@@ -96,6 +116,7 @@ class NotificationSoundController {
     await _player.play(
       messageSoundKind(isDm: isDm, mentionsSelf: mentionsSelf),
     );
+    _messageHaptic();
   }
 
   /// Best-effort: a lookup failure just leaves a group message read as an
@@ -178,6 +199,7 @@ class NotificationSoundController {
       final wasActive = previous[entry.key] ?? false;
       if (entry.value && !wasActive && entry.key != myCallChannel) {
         unawaited(_player.play(NotificationSound.callRing));
+        _callRingHaptic();
       }
     }
   }
