@@ -29,9 +29,26 @@ void main() {
 
   group('channel constants', () {
     test('the messages channel id carries an explicit version', () {
-      // A version in the id is what makes a later importance change safe:
-      // Android forbids editing an existing channel's, so the fix is a new id.
+      // A version bump means a new id: Android forbids editing an existing one.
       expect(messagesChannelId, 'messages_v1');
+    });
+
+    test('the mentions channel id carries its own, independent version', () {
+      expect(mentionsChannelId, 'mentions_v1');
+    });
+
+    test('messages and mentions are two channels, not one shared id', () {
+      // Sharing an id would make "buzz for one, not the other" unreachable.
+      expect(
+          LocalAlertChannel.messages.id, isNot(LocalAlertChannel.mentions.id));
+    });
+
+    test('messages and mentions post to two distinct notification ids', () {
+      // Otherwise whichever of the two arrived first would be silently dropped.
+      expect(
+        LocalAlertChannel.messages.notificationId,
+        isNot(LocalAlertChannel.mentions.notificationId),
+      );
     });
   });
 
@@ -41,7 +58,10 @@ void main() {
       // MissingPluginException; completing proves the platform gate ran first.
       final notifications = LocalNotifications(isAndroid: false);
 
-      await expectLater(notifications.show('New message'), completes);
+      await expectLater(
+        notifications.show('New message', channel: LocalAlertChannel.messages),
+        completes,
+      );
     });
 
     test(
@@ -57,7 +77,8 @@ void main() {
       addTearDown(() => _mockPlugin(null));
 
       final notifications = LocalNotifications(isAndroid: true);
-      await notifications.show('New message');
+      await notifications.show('New message',
+          channel: LocalAlertChannel.messages);
 
       expect(
         calledMethods,
@@ -66,6 +87,51 @@ void main() {
             'isolate with no Activity, silently dropping every '
             'backgrounded notification - the entire point of push',
       );
+    });
+
+    test('creates every channel, not only the one it is about to post to',
+        () async {
+      final createdChannelIds = <String>[];
+      _mockPlugin((call) async {
+        if (call.method == 'createNotificationChannel') {
+          final args = call.arguments as Map<Object?, Object?>;
+          createdChannelIds.add(args['id'] as String);
+        }
+        return true;
+      });
+      addTearDown(() => _mockPlugin(null));
+
+      final notifications = LocalNotifications(isAndroid: true);
+      await notifications.show('You were mentioned',
+          channel: LocalAlertChannel.mentions);
+
+      expect(
+        createdChannelIds,
+        containsAll([messagesChannelId, mentionsChannelId]),
+        reason: 'idempotent readiness creates the whole channel set up '
+            'front rather than lazily per kind, so a first-ever mention '
+            'never races a channel that has not been created yet',
+      );
+    });
+
+    test('posts a mention on its own channel and notification id', () async {
+      final shows = <MethodCall>[];
+      _mockPlugin((call) async {
+        if (call.method == 'show') shows.add(call);
+        return true;
+      });
+      addTearDown(() => _mockPlugin(null));
+
+      final notifications = LocalNotifications(isAndroid: true);
+      await notifications.show('You were mentioned',
+          channel: LocalAlertChannel.mentions);
+
+      expect(shows, hasLength(1));
+      final args = shows.single.arguments as Map<Object?, Object?>;
+      expect(args['id'], LocalAlertChannel.mentions.notificationId);
+      final platformSpecifics =
+          args['platformSpecifics'] as Map<Object?, Object?>;
+      expect(platformSpecifics['channelId'], mentionsChannelId);
     });
   });
 

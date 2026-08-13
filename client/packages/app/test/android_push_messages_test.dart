@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/push/android_push_messages.dart';
+import 'package:slimm_platform/platform.dart';
 
 void main() {
   group('genericAlertTextFor', () {
@@ -32,6 +33,21 @@ void main() {
 
     test('a missing kind stays silent rather than throwing', () {
       expect(genericAlertTextFor(null), isNull);
+    });
+  });
+
+  group('genericAlertChannelFor', () {
+    test('message posts through the messages channel', () {
+      expect(genericAlertChannelFor('message'), LocalAlertChannel.messages);
+    });
+
+    test('mention posts through its own, separate channel', () {
+      expect(genericAlertChannelFor('mention'), LocalAlertChannel.mentions);
+    });
+
+    test('a kind with no text has no channel either', () {
+      expect(genericAlertChannelFor('wake'), isNull);
+      expect(genericAlertChannelFor(null), isNull);
     });
   });
 
@@ -82,6 +98,16 @@ void main() {
       final action = actionFor({'kind': 'message'});
       expect(action, isA<PushActionGenericAlert>());
       expect((action as PushActionGenericAlert).text, 'New message');
+      expect(action.channel, LocalAlertChannel.messages);
+    });
+
+    test('mention becomes a generic alert on its own channel', () {
+      final action = actionFor({'kind': 'mention'});
+      expect(action, isA<PushActionGenericAlert>());
+      expect(
+        (action as PushActionGenericAlert).channel,
+        LocalAlertChannel.mentions,
+      );
     });
 
     test('call becomes an incoming-call action, not a generic alert', () {
