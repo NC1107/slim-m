@@ -2,10 +2,11 @@
 /// One row in the message list: the avatar or continuation gutter, the
 /// header line, the body, and everything that can follow it.
 ///
-/// The avatar/gutter and header live in `message_row_identity.dart`, and the
+/// The avatar/gutter and header live in `message_row_identity.dart`, the
 /// hover-reveal mechanism (shared with the emoji picker and the context
-/// menu) lives in `hover_reveal.dart`; both were split out to keep this file
-/// to the row's own composition.
+/// menu) lives in `hover_reveal.dart`, and the touch-only swipe that starts
+/// a reply lives in `swipe_to_reply.dart` - all three split out to keep this
+/// file to the row's own composition.
 ///
 /// The background fill answers `hovered || menuOpen` rather than `hovered`
 /// alone: `menuOpen` is `HoverReveal`'s own signal that this row's context
@@ -33,6 +34,7 @@ import 'reactions_row.dart';
 import 'message_text.dart';
 import 'poll_view.dart';
 import 'reply_quote.dart';
+import 'swipe_to_reply.dart';
 
 /// One message, and optionally the "New" divider directly above it.
 ///
@@ -184,160 +186,164 @@ class MessageRow extends StatelessWidget {
         children: [
           if (dayLabel != null) DayDivider(label: dayLabel!),
           if (showNewDivider) const NewMessagesDivider(),
-          MessageContextMenuRegion(
-            content: message.content,
-            actions: actions,
-            onAddReaction: () =>
-                showEmojiPickerSheet(context, onSelect: onPickReaction),
-            // A failed row is marked by a red hairline down its left edge
-            // (error grammar 01) - the row itself stays at full strength,
-            // because its content is still the author's to act on.
-            child: Stack(
-              children: [
-                // Full-bleed, edge to edge; see this file's own doc comment.
-                Positioned.fill(
-                  child: AnimatedContainer(
-                    key: MessageRow.hoverFillKey,
-                    duration: AppMotion.reduced(context, AppMotion.fast),
-                    curve: AppMotion.entrance,
-                    color: hovered || menuOpen
-                        ? tokens.surfaceRaised
-                        : Colors.transparent,
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: message.failed
-                        ? Border(
-                            left: BorderSide(
-                              color: tokens.dangerBorder,
-                              width: 2,
-                            ),
-                          )
-                        : const Border(),
-                  ),
-                  child: Padding(
-                    // Top-only: a bottom inset here doubled the next row's top inset.
-                    padding: EdgeInsets.fromLTRB(
-                      compact
-                          ? AppSizes.paneGutterCompact
-                          : AppSizes.paneGutter,
-                      grouped
-                          ? AppDensity.normal.groupedRowGap
-                          : AppDensity.normal.rowGap,
-                      compact
-                          ? AppSizes.paneGutterCompact
-                          : AppSizes.paneGutter,
-                      0,
+          SwipeToReply(
+            enabled: actions.canReply,
+            onCommit: actions.onReply,
+            child: MessageContextMenuRegion(
+              content: message.content,
+              actions: actions,
+              onAddReaction: () =>
+                  showEmojiPickerSheet(context, onSelect: onPickReaction),
+              // A failed row is marked by a red hairline down its left edge
+              // (error grammar 01) - the row itself stays at full strength,
+              // because its content is still the author's to act on.
+              child: Stack(
+                children: [
+                  // Full-bleed, edge to edge; see this file's own doc comment.
+                  Positioned.fill(
+                    child: AnimatedContainer(
+                      key: MessageRow.hoverFillKey,
+                      duration: AppMotion.reduced(context, AppMotion.fast),
+                      curve: AppMotion.entrance,
+                      color: hovered || menuOpen
+                          ? tokens.surfaceRaised
+                          : Colors.transparent,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        MessageRowLeading(
-                          grouped: grouped,
-                          isWebhook: isWebhook,
-                          message: message,
-                        ),
-                        const SizedBox(width: AppSpacing.s12),
-                        Expanded(
-                          // Align loosens Expanded's tight width so the cap can
-                          // bite: without it the max was silently a no-op and body
-                          // text ran the full pane on any monitor.
-                          child: Align(
-                            alignment: Alignment.topLeft,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                maxWidth: kMessageColumnMax,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: message.failed
+                          ? Border(
+                              left: BorderSide(
+                                color: tokens.dangerBorder,
+                                width: 2,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (!grouped)
-                                    MessageRowHeader(
-                                      message: message,
-                                      isWebhook: isWebhook,
-                                    ),
-                                  if (message.replyToId != null)
-                                    ReplyQuote(
-                                      resolved: replyTo,
-                                      onTap: onReplyTap ?? () {},
-                                    ),
-                                  if (editing)
-                                    MessageEditField(
-                                      initialContent: message.content,
-                                      onSubmit: onSubmitEdit,
-                                      onCancel: onCancelEdit,
-                                    )
-                                  // An attachment-only message has no body; an empty one still adds a blank line above the image.
-                                  else if (message.content.isNotEmpty)
-                                    MessageBody(
-                                      content: message.content,
-                                      knownUsernames: knownUsernames,
-                                      customEmoji: customEmoji,
-                                      dim: message.pending,
-                                    ),
-                                  if (message.editedAt != null && !editing)
-                                    const EditedMarker(),
-                                  if (poll != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4,
+                            )
+                          : const Border(),
+                    ),
+                    child: Padding(
+                      // Top-only: a bottom inset here doubled the next row's top inset.
+                      padding: EdgeInsets.fromLTRB(
+                        compact
+                            ? AppSizes.paneGutterCompact
+                            : AppSizes.paneGutter,
+                        grouped
+                            ? AppDensity.normal.groupedRowGap
+                            : AppDensity.normal.rowGap,
+                        compact
+                            ? AppSizes.paneGutterCompact
+                            : AppSizes.paneGutter,
+                        0,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          MessageRowLeading(
+                            grouped: grouped,
+                            isWebhook: isWebhook,
+                            message: message,
+                          ),
+                          const SizedBox(width: AppSpacing.s12),
+                          Expanded(
+                            // Align loosens Expanded's tight width so the cap can
+                            // bite: without it the max was silently a no-op and body
+                            // text ran the full pane on any monitor.
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: kMessageColumnMax,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!grouped)
+                                      MessageRowHeader(
+                                        message: message,
+                                        isWebhook: isWebhook,
                                       ),
-                                      child: PollView(
-                                        poll: poll!,
-                                        onVote: onVote,
+                                    if (message.replyToId != null)
+                                      ReplyQuote(
+                                        resolved: replyTo,
+                                        onTap: onReplyTap ?? () {},
                                       ),
-                                    ),
-                                  for (final attachment in attachments)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4,
+                                    if (editing)
+                                      MessageEditField(
+                                        initialContent: message.content,
+                                        onSubmit: onSubmitEdit,
+                                        onCancel: onCancelEdit,
+                                      )
+                                    // An attachment-only message has no body; an empty one still adds a blank line above the image.
+                                    else if (message.content.isNotEmpty)
+                                      MessageBody(
+                                        content: message.content,
+                                        knownUsernames: knownUsernames,
+                                        customEmoji: customEmoji,
+                                        dim: message.pending,
                                       ),
-                                      child: AttachmentView(
-                                        attachment: attachment,
+                                    if (message.editedAt != null && !editing)
+                                      const EditedMarker(),
+                                    if (poll != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: PollView(
+                                          poll: poll!,
+                                          onVote: onVote,
+                                        ),
                                       ),
-                                    ),
-                                  if (!_unsent)
-                                    ReactionsRow(
-                                      reactions: reactions,
-                                      onReactionTap: onReactionTap,
-                                      onPickReaction: onPickReaction,
-                                      customEmoji: customEmoji,
-                                    ),
-                                  if ((threadReplyCount ?? 0) > 0)
-                                    ThreadReplySummary(
-                                      replyCount: threadReplyCount!,
-                                      lastReplyAt: threadLastReplyAt,
-                                      onTap: actions.canOpenThread
-                                          ? actions.onOpenThread
-                                          : null,
-                                    ),
-                                  if (message.failed)
-                                    FailedRow(
-                                      onRetry: onRetry,
-                                      onEdit: onEditFailed,
-                                      onDiscard: onDiscard,
-                                      reason: message.failureReason,
-                                    ),
-                                ],
+                                    for (final attachment in attachments)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: AttachmentView(
+                                          attachment: attachment,
+                                        ),
+                                      ),
+                                    if (!_unsent)
+                                      ReactionsRow(
+                                        reactions: reactions,
+                                        onReactionTap: onReactionTap,
+                                        onPickReaction: onPickReaction,
+                                        customEmoji: customEmoji,
+                                      ),
+                                    if ((threadReplyCount ?? 0) > 0)
+                                      ThreadReplySummary(
+                                        replyCount: threadReplyCount!,
+                                        lastReplyAt: threadLastReplyAt,
+                                        onTap: actions.canOpenThread
+                                            ? actions.onOpenThread
+                                            : null,
+                                      ),
+                                    if (message.failed)
+                                      FailedRow(
+                                        onRetry: onRetry,
+                                        onEdit: onEditFailed,
+                                        onDiscard: onDiscard,
+                                        reason: message.failureReason,
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                // Outside layout: revealing it must not resize the row.
-                if (hovered && !_unsent)
-                  Positioned(
-                    top: 0,
-                    right: compact
-                        ? AppSizes.paneGutterCompact
-                        : AppSizes.paneGutter,
-                    child: _HoverActions(onPickReaction: onPickReaction),
-                  ),
-              ],
+                  // Outside layout: revealing it must not resize the row.
+                  if (hovered && !_unsent)
+                    Positioned(
+                      top: 0,
+                      right: compact
+                          ? AppSizes.paneGutterCompact
+                          : AppSizes.paneGutter,
+                      child: _HoverActions(onPickReaction: onPickReaction),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
