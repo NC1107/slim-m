@@ -218,6 +218,7 @@ async fn create(
                 message_id: sent.message.id,
                 seq: sent.message.seq,
                 content: sent.message.content.clone(),
+                presence: state.hub.presence(),
             },
         );
     }

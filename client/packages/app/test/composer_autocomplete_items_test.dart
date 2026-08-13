@@ -43,11 +43,13 @@ List<AutocompleteSuggestion> _for(
   String term, {
   String? selfId,
   List<api.CustomEmoji> custom = const [],
+  bool canMentionEveryone = false,
 }) => autocompleteSuggestions(
   query: _q(kind, term),
   custom: custom,
   members: members,
   selfId: selfId,
+  canMentionEveryone: canMentionEveryone,
 );
 
 void main() {
@@ -94,6 +96,49 @@ void main() {
 
     test('carries the id, so the row can show a real avatar', () {
       expect(_for(AutocompleteKind.mention, 'dor').first.userId, 'u-dorian');
+    });
+  });
+
+  group('mass mentions', () {
+    test('absent when the caller was not granted MENTION_EVERYONE', () {
+      final rows = _for(AutocompleteKind.mention, '');
+      expect(
+        rows.map((r) => r.label),
+        isNot(anyOf(contains('@everyone'), contains('@here'))),
+      );
+    });
+
+    test('both offered ahead of real members once granted', () {
+      final rows = _for(AutocompleteKind.mention, '', canMentionEveryone: true);
+      expect(rows.take(2).map((r) => r.label), ['@everyone', '@here']);
+      expect(rows.map((r) => r.isMassMention).take(2), [true, true]);
+    });
+
+    test('a prefix narrows to the one reserved word it matches', () {
+      final rows = _for(
+        AutocompleteKind.mention,
+        'eve',
+        canMentionEveryone: true,
+      );
+      expect(rows.map((r) => r.label), ['@everyone']);
+    });
+
+    test('inserts with a trailing space, matching an ordinary mention', () {
+      final row = _for(
+        AutocompleteKind.mention,
+        'here',
+        canMentionEveryone: true,
+      ).first;
+      expect(row.insert, '@here ');
+    });
+
+    test('a real member is never flagged as a mass mention', () {
+      final rows = _for(
+        AutocompleteKind.mention,
+        'dor',
+        canMentionEveryone: true,
+      );
+      expect(rows.every((r) => !r.isMassMention), isTrue);
     });
   });
 

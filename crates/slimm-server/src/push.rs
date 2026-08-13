@@ -50,6 +50,7 @@ use url::{Host, Url};
 
 use crate::config::Config;
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
+use crate::presence::PresenceTracker;
 use crate::store::Store;
 
 use debounce::Debounce;
@@ -178,6 +179,7 @@ pub struct SentMessage {
     pub message_id: MessageId,
     pub seq: Seq,
     pub content: String,
+    pub presence: PresenceTracker,
 }
 
 /// Refuses a push relay URL that would send every recipient's APNs/FCM token

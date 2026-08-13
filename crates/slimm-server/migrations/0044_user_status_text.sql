@@ -1,0 +1,14 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- A free-text status line, set from personal settings and shown in the
+-- member pane under a name - "in a meeting", "afk", the same kind of thing
+-- presence_visibility (migration 0008) already lets someone say by
+-- appearance. NULL rather than an empty string for "no status", the same
+-- optional-column convention `channels.topic` (migration 0002) uses: a
+-- status with nothing visible in it is not meaningfully different from
+-- having none, and `http/users.rs::validate_status_text` folds a blank edit
+-- into NULL before it ever reaches this column.
+--
+-- Length (80 characters) is enforced in the application layer, the same
+-- convention every other free-text column here uses rather than a CHECK
+-- constraint SQLite would apply byte-for-byte on possibly multi-byte UTF-8.
+ALTER TABLE users ADD COLUMN status_text TEXT;

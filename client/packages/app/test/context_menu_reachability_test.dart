@@ -49,6 +49,8 @@ MessageActions _reportAndBlockOnly() => MessageActions(
   onBlockAuthor: () {},
   canOpenThread: false,
   onOpenThread: () {},
+  canForward: false,
+  onForward: () {},
 );
 
 Future<SemanticsHandle> _pump(WidgetTester tester) async {
@@ -95,6 +97,8 @@ MessageActions _editOnly(VoidCallback onEdit) => MessageActions(
   onBlockAuthor: () {},
   canOpenThread: false,
   onOpenThread: () {},
+  canForward: false,
+  onForward: () {},
 );
 
 Future<void> _pumpMessage(

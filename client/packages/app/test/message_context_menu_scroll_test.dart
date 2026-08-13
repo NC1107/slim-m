@@ -35,6 +35,8 @@ const _noActions = MessageActions(
   onBlockAuthor: _noop,
   canOpenThread: false,
   onOpenThread: _noop,
+  canForward: false,
+  onForward: _noop,
 );
 
 Message _message(int index) => Message(

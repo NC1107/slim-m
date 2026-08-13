@@ -21,6 +21,7 @@ use slimm_server::ids::{DeviceId, MessageId, UserId};
 use slimm_server::store::{PushRegistration, Store};
 
 mod support;
+use support::wake_recipients;
 
 const KEY: [u8; 32] = [7u8; 32];
 
@@ -103,7 +104,7 @@ async fn a_reply_wakes_only_the_parent_author_and_actual_repliers() {
         .unwrap();
 
     // A second reply from bob: alice (the parent author) must be woken, carol must not.
-    let recipients = slimm_server::push::message_recipients(&store, thread.id, bob, "again")
+    let recipients = wake_recipients(&store, thread.id, bob, "again")
         .await
         .unwrap();
     assert!(
@@ -127,7 +128,7 @@ async fn a_reply_wakes_only_the_parent_author_and_actual_repliers() {
         )
         .await
         .unwrap();
-    let recipients = slimm_server::push::message_recipients(&store, thread.id, alice, "reply")
+    let recipients = wake_recipients(&store, thread.id, alice, "reply")
         .await
         .unwrap();
     assert!(
@@ -186,7 +187,7 @@ async fn the_first_reply_in_an_empty_thread_still_wakes_the_parent_author() {
         .unwrap()
         .channel;
 
-    let recipients = slimm_server::push::message_recipients(&store, thread.id, bob, "first")
+    let recipients = wake_recipients(&store, thread.id, bob, "first")
         .await
         .unwrap();
     assert!(
@@ -248,19 +249,17 @@ async fn a_mention_wakes_a_bystander_the_thread_would_otherwise_exclude() {
         .await
         .unwrap();
 
-    let without_mention =
-        slimm_server::push::message_recipients(&store, thread.id, bob, "no mention here")
-            .await
-            .unwrap();
+    let without_mention = wake_recipients(&store, thread.id, bob, "no mention here")
+        .await
+        .unwrap();
     assert!(
         !without_mention.contains(&carol),
         "carol is a bystander with no mention and must not be woken, got {without_mention:?}"
     );
 
-    let with_mention =
-        slimm_server::push::message_recipients(&store, thread.id, bob, "hey @carol take a look")
-            .await
-            .unwrap();
+    let with_mention = wake_recipients(&store, thread.id, bob, "hey @carol take a look")
+        .await
+        .unwrap();
     assert!(
         with_mention.contains(&carol),
         "a direct mention must cut through the narrowing, got {with_mention:?}"
@@ -316,10 +315,9 @@ async fn a_mention_never_reaches_somebody_without_view_permission() {
         .unwrap()
         .channel;
 
-    let recipients =
-        slimm_server::push::message_recipients(&store, thread.id, bob, "hey @carol take a look")
-            .await
-            .unwrap();
+    let recipients = wake_recipients(&store, thread.id, bob, "hey @carol take a look")
+        .await
+        .unwrap();
     assert!(
         !recipients.contains(&carol),
         "carol cannot view the parent channel, so a mention must not reach her, got {recipients:?}"
@@ -381,7 +379,7 @@ async fn blocking_still_holds_inside_a_thread() {
         .await
         .unwrap();
 
-    let before = slimm_server::push::message_recipients(&store, thread.id, bob, "reply")
+    let before = wake_recipients(&store, thread.id, bob, "reply")
         .await
         .unwrap();
     assert!(
@@ -391,7 +389,7 @@ async fn blocking_still_holds_inside_a_thread() {
 
     store.block_user(alice, bob).await.unwrap();
 
-    let after = slimm_server::push::message_recipients(&store, thread.id, bob, "reply")
+    let after = wake_recipients(&store, thread.id, bob, "reply")
         .await
         .unwrap();
     assert!(
@@ -464,7 +462,7 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
         .await
         .unwrap();
 
-    let before = slimm_server::push::message_recipients(&store, thread.id, alice, "reply")
+    let before = wake_recipients(&store, thread.id, alice, "reply")
         .await
         .unwrap();
     assert!(
@@ -477,7 +475,7 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
         .await
         .unwrap();
 
-    let after = slimm_server::push::message_recipients(&store, thread.id, alice, "reply")
+    let after = wake_recipients(&store, thread.id, alice, "reply")
         .await
         .unwrap();
     assert!(

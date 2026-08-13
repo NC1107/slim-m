@@ -391,7 +391,7 @@ paths:
     patch:
       operationId: updateMe
       tags: [users]
-      summary: Update the caller's own display name.
+      summary: Update the caller's own display name and/or status line.
       description: >
         Username is not editable here: it backs the live per-account
         uniqueness index, so changing it needs a dedicated flow that can
@@ -4019,6 +4019,14 @@ components:
             if they are not timed out. An elapsed timeout reads as null
             rather than as a past deadline, so a client never has to do the
             comparison to know whether the badge belongs on screen.
+        status_text:
+          type: [string, "null"]
+          maxLength: 80
+          description: >
+            A short free-text status line this member set for themselves, or
+            null for none. Shown in the member pane under the name. Absent
+            on servers older than this field, which a client must treat as
+            unknown rather than "no status".
 
     SpaceRemoval:
       type: object
@@ -4080,10 +4088,18 @@ components:
             When the caller's own timeout lifts, or null. Present so a client
             can name what happened rather than leaving somebody with a
             disabled composer and no explanation.
+        status_text:
+          type: [string, "null"]
+          maxLength: 80
+          description: The caller's own status line; see `UserProfile.status_text`.
 
     UpdateMeRequest:
       type: object
-      required: [display_name]
+      description: >
+        Both fields are optional, absence meaning "leave it as it is" - the
+        same "at least one, absent means untouched" convention
+        `UpdateChannelRequest` uses for its own name and topic. A request
+        naming neither is a 400.
       properties:
         display_name:
           type: string
@@ -4092,6 +4108,13 @@ components:
           description: >
             Must not contain control characters or text-direction overrides,
             the same rule registration enforces.
+        status_text:
+          type: string
+          maxLength: 80
+          description: >
+            A blank or whitespace-only value clears the status back to null
+            rather than storing an empty string, the same convention
+            `UpdateChannelRequest.topic` uses.
 
     SpaceSettings:
       type: object

@@ -59,14 +59,16 @@ pub(super) async fn deliver(
         message_id,
         seq,
         content,
+        presence,
     } = sent;
-    let recipients = match message_recipients(&store, channel_id, author_id, &content).await {
-        Ok(recipients) => recipients,
-        Err(err) => {
-            tracing::warn!(error = %err, %channel_id, "push: failed to resolve recipients");
-            return;
-        }
-    };
+    let recipients =
+        match message_recipients(&store, channel_id, author_id, &content, &presence).await {
+            Ok(recipients) => recipients,
+            Err(err) => {
+                tracing::warn!(error = %err, %channel_id, "push: failed to resolve recipients");
+                return;
+            }
+        };
     if recipients.is_empty() {
         return;
     }

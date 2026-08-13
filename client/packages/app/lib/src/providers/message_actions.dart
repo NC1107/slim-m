@@ -125,6 +125,13 @@ bool canManageMessagePin(Message message, int myPermissions) =>
 bool canReportMessage(Message message, String? myUserId) =>
     !message.pending && !message.failed && !_isAuthor(message, myUserId);
 
+/// Any live message, own included: forwarding reads [Message.content], it
+/// never re-sends the exact stored row, and the destination picker only
+/// ever offers a channel or DM the caller can already send to - so unlike
+/// [canReplyToMessage] this needs no permission check against the *current*
+/// channel at all.
+bool canForwardMessage(Message message) => !message.pending && !message.failed;
+
 /// Blocking is keyed by author id, so a message with no live author (its
 /// account was deleted and the content anonymized) has nobody left to block.
 bool canBlockMessageAuthor(Message message, String? myUserId) =>

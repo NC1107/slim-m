@@ -23,6 +23,7 @@ import 'run_guarded.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
 import 'settings_toggle_row.dart';
+import 'status_text_row.dart';
 
 /// Sets the caller's own visibility preference via `PATCH /presence`. See
 /// [presenceVisibilityDisplayProvider] for why the selected segment is a
@@ -58,6 +59,7 @@ class _PresenceSectionState extends ConsumerState<PresenceSection>
           ],
           onChanged: _set,
         ),
+        const StatusTextRow(),
         if (actionError != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(

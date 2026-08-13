@@ -12,7 +12,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../permissions.dart';
 import '../providers/admin_providers.dart';
+import '../providers/channel_permissions.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
@@ -235,6 +237,9 @@ class _ComposerState extends ConsumerState<Composer> {
       custom: ref.watch(customEmojiProvider).valueOrNull ?? const [],
       members: ref.watch(membersProvider).valueOrNull ?? const [],
       selfId: ref.watch(meProvider).valueOrNull?.id,
+      canMentionEveryone: ref
+          .watch(myChannelPermissionsProvider(widget.channelId))
+          .hasPermission(Perm.mentionEveryone),
     );
   }
 

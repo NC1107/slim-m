@@ -25,6 +25,11 @@ abstract final class Perm {
   static const int manageCanvas = 1 << 14;
   static const int manageServer = 1 << 15;
 
+  /// Whether `@everyone`/`@here` actually wake anyone the caller mentions
+  /// with them, rather than sitting as plain text; see
+  /// `crates/slimm-server/src/permissions.rs`'s own doc on this bit.
+  static const int mentionEveryone = 1 << 16;
+
   /// Every bit that has a name, in the fixed order the editor lists them.
   static const List<(int bit, String label)> editable = [
     (administrator, 'Administrator'),
@@ -43,6 +48,7 @@ abstract final class Perm {
     (useCanvas, 'Use the voice canvas'),
     (manageCanvas, 'Manage the voice canvas'),
     (manageServer, 'Manage Space settings'),
+    (mentionEveryone, 'Mention @everyone and @here'),
   ];
 
   /// [editable] minus [administrator]: the server's evaluator returns every

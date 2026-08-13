@@ -255,6 +255,13 @@ async fn delete_account(
 
 // --- Validation ---
 
+/// `everyone` and `here` are reserved, case-insensitively, so `@everyone` and
+/// `@here` (`push::recipients::resolved_mentions`) can never collide with a
+/// real account - a plain username-shaped word would otherwise be
+/// ambiguous between "the reserved mention" and "the person who registered
+/// it first".
+const RESERVED_USERNAMES: [&str; 2] = ["everyone", "here"];
+
 fn validate_username(username: &str) -> Result<(), ApiError> {
     let len = username.chars().count();
     if !(1..=32).contains(&len) {
@@ -266,6 +273,11 @@ fn validate_username(username: &str) -> Result<(), ApiError> {
     if !allowed {
         return Err(ApiError::BadRequest(
             "username may contain only letters, digits, and _ . -",
+        ));
+    }
+    if RESERVED_USERNAMES.contains(&username.to_ascii_lowercase().as_str()) {
+        return Err(ApiError::BadRequest(
+            "that username is reserved for @everyone/@here mentions",
         ));
     }
     Ok(())
@@ -307,8 +319,10 @@ pub(crate) fn validate_label(value: &str, message: &'static str) -> Result<(), A
 }
 
 /// Rejects control (Cc) characters and the bidi and zero-width format characters
-/// used to spoof how a name renders to other members.
-fn is_disallowed_label_char(c: char) -> bool {
+/// used to spoof how a name renders to other members. `pub(crate)`: `http::users`
+/// reuses this exact blocklist for a status line's own validation, rather than
+/// keeping a second copy of the same spoofing-character set to drift from.
+pub(crate) fn is_disallowed_label_char(c: char) -> bool {
     c.is_control()
         || matches!(c,
             '\u{200B}'..='\u{200F}'   // zero-width space and joiners, LRM, RLM
@@ -321,6 +335,18 @@ fn is_disallowed_label_char(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// `everyone`/`here` are refused case-insensitively, and a name that
+    /// merely contains one as a substring is untouched - only the reserved
+    /// word itself is off limits.
+    #[test]
+    fn reserved_mention_words_are_refused_as_usernames_case_insensitively() {
+        assert!(super::validate_username("everyone").is_err());
+        assert!(super::validate_username("Everyone").is_err());
+        assert!(super::validate_username("HERE").is_err());
+        assert!(super::validate_username("everyone1").is_ok());
+        assert!(super::validate_username("not-here").is_ok());
+    }
+
     /// Cross-checked against the same string in `client/packages/app/test/
     /// support/onboarding_error_strings.dart`, both read from `tests/
     /// fixtures/onboarding_error_strings.json` - editing the length rule's
