@@ -34,6 +34,8 @@ jobs:
     env:
       # firebase_cpp_sdk_windows vendors a pre-3.5 cmake_minimum_required CMake 4.x (windows-latest's default) refuses outright; this is CMake's own documented escape hatch, not a slim-m bug.
       CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      # flutter_local_notifications_windows 1.0.3's <experimental/coroutine> use is a hard C2338 on this runner's newer MSVC; CL is MSVC's own env var for a define applied to every compile, the same shape as the policy floor above.
+      CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
