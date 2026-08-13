@@ -7,6 +7,8 @@
 /// these own one row each.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +17,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
@@ -23,33 +26,77 @@ import 'manage_channel_sheet.dart';
 import 'user_avatar.dart';
 import 'voice_channel_tap.dart';
 
-/// The right-click/long-press menu every channel row gets: opening it always,
-/// managing it (rename, topic, delete) only for the caller [canManage] already
-/// lets use the row's own kebab - the same gate, reused rather than repeated.
+/// The right-click/long-press menu every channel row gets: opening it
+/// always, muting it or narrowing it to mentions only (the same two toggles
+/// `ChannelNotificationMenuButton` offers from the channel header, tapping
+/// the active one clears back to the account default), and managing it
+/// (rename, topic, delete) only for the caller [canManage] already lets use
+/// the row's own kebab - that gate, reused rather than repeated.
+///
+/// Read fresh every time the menu opens rather than watched, the same choice
+/// `DmRow._menuItems`'s own doc comment makes: the row itself already
+/// rebuilds on a live mute change (see [_TextChannelRow]), and a menu that
+/// is already open does not need to react to one landing mid-look.
 List<Widget> _channelMenuItems(
   BuildContext context,
   VoidCallback close,
   Channel channel,
   bool canManage,
-) => [
-  AppMenuItem(
-    label: 'Open channel',
-    leading: AppIcons.hash,
-    onTap: () {
-      close();
-      context.go(Routes.channel(channel.id));
-    },
-  ),
-  if (canManage)
+) {
+  final container = ProviderScope.containerOf(context, listen: false);
+  final current = container
+      .read(channelNotificationOverridesProvider)
+      .overrideFor(channel.id);
+
+  void toggle(api.NotificationPreference preference) {
+    close();
+    final notifier = container.read(
+      channelNotificationOverridesProvider.notifier,
+    );
+    unawaited(
+      current == preference
+          ? notifier.clear(channel.id)
+          : preference == api.NotificationPreference.nothing
+          ? notifier.mute(channel.id)
+          : notifier.mentionsOnly(channel.id),
+    );
+  }
+
+  return [
     AppMenuItem(
-      label: 'Manage channel...',
-      leading: AppIcons.settings,
+      label: 'Open channel',
+      leading: AppIcons.hash,
       onTap: () {
         close();
-        showManageChannelSheet(context, channel);
+        context.go(Routes.channel(channel.id));
       },
     ),
-];
+    const AppMenuDivider(),
+    AppMenuItem(
+      label: 'Mute channel',
+      leading: AppIcons.notificationsOff,
+      selected: current == api.NotificationPreference.nothing,
+      onTap: () => toggle(api.NotificationPreference.nothing),
+    ),
+    AppMenuItem(
+      label: 'Mentions only',
+      leading: AppIcons.mentions,
+      selected: current == api.NotificationPreference.mentions,
+      onTap: () => toggle(api.NotificationPreference.mentions),
+    ),
+    if (canManage) ...[
+      const AppMenuDivider(),
+      AppMenuItem(
+        label: 'Manage channel...',
+        leading: AppIcons.settings,
+        onTap: () {
+          close();
+          showManageChannelSheet(context, channel);
+        },
+      ),
+    ],
+  ];
+}
 
 /// Pairs a channel row with its manage-sheet trigger, handed to
 /// [AppListRow.trailingExtra] (via [row]'s own builder) rather than composed

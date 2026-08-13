@@ -20,6 +20,7 @@ import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
+import 'channel_notification_menu_button.dart';
 import 'pinned_messages_sheet.dart';
 
 /// The compact conversation app bar: back, the channel's name and topic, and
@@ -92,6 +93,7 @@ class CompactChannelAppBar extends ConsumerWidget
         if (!isVoice) _PinsAction(channelId: channelId),
         DmCallButton(channelId: channelId),
         CanvasOpenButton(channelId: channelId),
+        ChannelNotificationMenuButton(channelId: channelId),
         if (!isDm) const _MembersAction(),
         const SizedBox(width: AppSpacing.s8),
       ],

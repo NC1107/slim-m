@@ -4,10 +4,90 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/audio/notification_sound.dart';
 import 'package:slimm_app/src/providers/notification_sound_rules.dart';
 
 void main() {
+  group('channelEarnsASound', () {
+    test('no override at all earns a sound, the pre-feature default', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: null,
+          isDm: false,
+          mentionsSelf: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a mute override silences a plain message', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: api.NotificationPreference.nothing,
+          isDm: false,
+          mentionsSelf: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a mute override silences even a real mention', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: api.NotificationPreference.nothing,
+          isDm: false,
+          mentionsSelf: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a mute override silences even a DM', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: api.NotificationPreference.nothing,
+          isDm: true,
+          mentionsSelf: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a mentions-only override skips a plain message', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: api.NotificationPreference.mentions,
+          isDm: false,
+          mentionsSelf: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a mentions-only override still catches a real mention', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: api.NotificationPreference.mentions,
+          isDm: false,
+          mentionsSelf: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a mentions-only override still wakes for a plain DM', () {
+      expect(
+        channelEarnsASound(
+          channelOverride: api.NotificationPreference.mentions,
+          isDm: true,
+          mentionsSelf: false,
+        ),
+        isTrue,
+      );
+    });
+  });
+
   group('messageEarnsASound', () {
     test('a message from someone else earns a sound', () {
       expect(

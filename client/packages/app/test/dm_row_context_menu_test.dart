@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The DM row's right-click/long-press menu: open, report, and block/unblock
-/// the other participant - nothing more, since nothing else about a DM has a
-/// real route behind it (see `dm_row.dart`'s own doc comment on why there is
-/// no "close" or "hide" item).
+/// The DM row's right-click/long-press menu: open, mute or narrow to
+/// mentions only, and report/block the other participant - nothing more,
+/// since nothing else about a DM has a real route behind it (see
+/// `dm_row.dart`'s own doc comment on why there is no "close" or "hide"
+/// item).
 library;
 
 import 'dart:convert';
@@ -17,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/blocks_controller.dart';
+import 'package:slimm_app/src/providers/channel_notification_overrides_controller.dart';
 import 'package:slimm_app/src/providers/dms.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/providers.dart';
@@ -76,6 +78,17 @@ ProviderContainer _container({
             if (request.url.path.endsWith('/voice/roster')) {
               return _json({'participants': <Object>[]});
             }
+            if (request.url.path.startsWith(
+                  '/notification-preferences/channels/',
+                ) &&
+                request.method == 'PUT') {
+              final channelId = request.url.pathSegments.last;
+              final body = jsonDecode(request.body) as Map<String, dynamic>;
+              return _json({
+                'channel_id': channelId,
+                'preference': body['preference'],
+              });
+            }
             return http.Response('', 204);
           }),
         );
@@ -118,7 +131,30 @@ Future<void> _openMenu(WidgetTester tester) => tester.tapAt(
 );
 
 void main() {
-  testWidgets('a right-click offers Open, Report user and Block', (
+  testWidgets(
+    'a right-click offers Open, Mute, Mentions only, Report user and Block',
+    (tester) async {
+      final channel = _dm('dm-1', 'Priya', 'user-priya');
+      final container = _container();
+
+      await tester.pumpWidget(_harness(container, _router(channel)));
+      await tester.pump();
+
+      await _openMenu(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open'), findsOneWidget);
+      expect(find.text('Mute'), findsOneWidget);
+      expect(find.text('Mentions only'), findsOneWidget);
+      expect(find.text('Report user'), findsOneWidget);
+      expect(find.text('Block'), findsOneWidget);
+      expect(find.text('Unblock'), findsNothing);
+      // Explicit: addTearDown runs after flutter_test's own pending-timer check.
+      container.dispose();
+    },
+  );
+
+  testWidgets('tapping Mute sets the channel override to nothing', (
     tester,
   ) async {
     final channel = _dm('dm-1', 'Priya', 'user-priya');
@@ -129,12 +165,38 @@ void main() {
 
     await _openMenu(tester);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Mute'));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Open'), findsOneWidget);
-    expect(find.text('Report user'), findsOneWidget);
-    expect(find.text('Block'), findsOneWidget);
-    expect(find.text('Unblock'), findsNothing);
-    // Explicit: addTearDown runs after flutter_test's own pending-timer check.
+    expect(
+      container.read(channelNotificationOverridesProvider).overrideFor('dm-1'),
+      api.NotificationPreference.nothing,
+    );
+    container.dispose();
+  });
+
+  testWidgets('tapping the already-selected Mute again clears the override', (
+    tester,
+  ) async {
+    final channel = _dm('dm-1', 'Priya', 'user-priya');
+    final container = _container();
+    await container
+        .read(channelNotificationOverridesProvider.notifier)
+        .mute('dm-1');
+
+    await tester.pumpWidget(_harness(container, _router(channel)));
+    await tester.pump();
+
+    await _openMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mute'));
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(channelNotificationOverridesProvider).overrideFor('dm-1'),
+      isNull,
+      reason: 'tapping an already-active toggle is this menu\'s undo',
+    );
     container.dispose();
   });
 

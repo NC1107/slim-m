@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// One direct-message row in the rail: open on tap, and a right-click or
-/// long-press menu to report or block the person on the other end of it.
+/// long-press menu to mute it, narrow it to mentions only, or report or
+/// block the person on the other end of it.
 ///
 /// Also the in-app half of `docs/IMPLIED-GAPS.md` #2: a call already
 /// happening in this DM shows as an icon, and tapping the row while it is
@@ -32,6 +33,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/blocks_controller.dart';
+import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/dm_call_activity.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
@@ -58,10 +60,24 @@ class DmRow extends ConsumerWidget {
     final peerId = channel.dmParticipantId;
     final blocked = peerId != null && ref.read(blocksProvider).contains(peerId);
     final container = ProviderScope.containerOf(context, listen: false);
+    final currentPreference = ref
+        .read(channelNotificationOverridesProvider)
+        .overrideFor(channel.id);
 
     void run(Future<void> Function() action) {
       close();
       unawaited(action());
+    }
+
+    void toggleNotifications(api.NotificationPreference preference) {
+      final notifier = ref.read(channelNotificationOverridesProvider.notifier);
+      run(
+        () => currentPreference == preference
+            ? notifier.clear(channel.id)
+            : preference == api.NotificationPreference.nothing
+            ? notifier.mute(channel.id)
+            : notifier.mentionsOnly(channel.id),
+      );
     }
 
     return [
@@ -72,6 +88,19 @@ class DmRow extends ConsumerWidget {
           close();
           context.go(Routes.channel(channel.id));
         },
+      ),
+      const AppMenuDivider(),
+      AppMenuItem(
+        label: 'Mute',
+        leading: AppIcons.notificationsOff,
+        selected: currentPreference == api.NotificationPreference.nothing,
+        onTap: () => toggleNotifications(api.NotificationPreference.nothing),
+      ),
+      AppMenuItem(
+        label: 'Mentions only',
+        leading: AppIcons.mentions,
+        selected: currentPreference == api.NotificationPreference.mentions,
+        onTap: () => toggleNotifications(api.NotificationPreference.mentions),
       ),
       if (peerId != null) ...[
         const AppMenuDivider(),
@@ -113,6 +142,10 @@ class DmRow extends ConsumerWidget {
     final inCall = ref.watch(
       dmCallActivityProvider.select((m) => m[channel.id] ?? false),
     );
+    // A live call outranks the mute glyph in this one slot; unread still counts either way.
+    final muted = ref.watch(
+      channelNotificationOverridesProvider.select((s) => s.isMuted(channel.id)),
+    );
     return ContextMenuRegion(
       itemsBuilder: (menuContext, close) => _menuItems(menuContext, ref, close),
       // AppListRow is already its own tab stop; see ContextMenuFocus.ownsFocusNode.
@@ -121,12 +154,19 @@ class DmRow extends ConsumerWidget {
         label: channel.name,
         selected: selected,
         unread: channel.cursor > channel.lastReadSeq,
+        muted: muted,
         leading: AppAvatar(name: channel.name, size: 20),
         trailing: inCall
             ? Icon(
                 AppIcons.startCall,
                 size: AppSizes.icon16,
                 color: tokens.accent,
+              )
+            : muted
+            ? Icon(
+                AppIcons.notificationsOff,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
               )
             : null,
         stateDescription: inCall ? 'call in progress' : null,

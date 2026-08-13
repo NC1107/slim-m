@@ -20,6 +20,7 @@ export 'models_moderation.dart';
 export 'models_canvas.dart';
 export 'models_canvas_ops.dart';
 export 'models_channel.dart';
+export 'models_channel_notification_override.dart';
 export 'models_message_ops.dart';
 export 'models_notification_preference.dart';
 export 'models_pins.dart';

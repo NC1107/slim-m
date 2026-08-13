@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
+import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
 import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
@@ -58,6 +59,8 @@ class HomeShell extends ConsumerWidget {
     final selected = selectedChannelId(context);
     // With the shell, or the first surface to consult it filters against none.
     ref.watch(blocksProvider);
+    // Same reasoning: the rail glyph, header menu and sound gate all need this loaded first.
+    ref.watch(channelNotificationOverridesProvider);
     // Session-lifetime, or permission invalidation only ran with RolesScreen open.
     ref.watch(roleChangeWatcherProvider);
     // Forces creation for the session; nothing here reads its own state.

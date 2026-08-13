@@ -5,6 +5,8 @@
 /// container, fake stream, or widget at all.
 library;
 
+import 'package:slimm_api/api.dart' as api;
+
 import '../audio/notification_sound.dart';
 
 /// Whether an incoming message is even a candidate for a sound: not this
@@ -28,6 +30,25 @@ NotificationSound messageSoundKind({
   if (mentionsSelf) return NotificationSound.mention;
   return NotificationSound.groupMessage;
 }
+
+/// Whether this channel's own mute-or-mentions-only override
+/// (`channel_notification_overrides_controller.dart`) still allows a message
+/// through to a chime, mirroring the server's own
+/// `push::recipients::narrow_for_notification_preference` gate so a muted
+/// channel neither chimes nor pushes. `channelOverride` is `null` for every
+/// channel that has never been overridden - unaffected, the same behaviour
+/// every channel already had before this preference existed - and never
+/// [api.NotificationPreference.everything] in practice, since the server
+/// refuses to store that value as an override.
+bool channelEarnsASound({
+  required api.NotificationPreference? channelOverride,
+  required bool isDm,
+  required bool mentionsSelf,
+}) => switch (channelOverride) {
+  null || api.NotificationPreference.everything => true,
+  api.NotificationPreference.nothing => false,
+  api.NotificationPreference.mentions => isDm || mentionsSelf,
+};
 
 /// Above this many participants (self included), join/leave chimes stop -
 /// the owner's own decision, "roughly 8", recorded in CLAUDE.md and already
