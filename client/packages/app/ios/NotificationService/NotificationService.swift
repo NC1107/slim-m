@@ -2,7 +2,8 @@
 //
 // The Notification Service Extension: given a push before iOS shows it, it
 // opens the sealed envelope and replaces the relay's generic "New message"
-// with the real sender and text.
+// with the real sender and text, and decides what - if anything - should
+// sound. See NotificationSound.swift for that decision.
 //
 // The relay never sees any of that. It forwards a base64 blob it cannot read
 // (crates/slimm-server/src/push/envelope.rs) and sets `mutable-content` so
@@ -12,7 +13,9 @@
 // Every failure path here shows that placeholder instead. A notification is
 // worth showing without its content and is worth nothing at all if it never
 // arrives, and this process has a hard time budget and a small memory one, so
-// nothing here waits on anything, retries, or reaches the network.
+// nothing here waits on anything, retries, or reaches the network - including
+// the sound decision, which reads CXCallObserver's already-known state
+// rather than waiting on a delegate callback.
 
 import UserNotifications
 
@@ -25,6 +28,18 @@ final class NotificationService: UNNotificationServiceExtension {
   private var contentHandler: ((UNNotificationContent) -> Void)?
   private var placeholder: UNNotificationContent?
 
+  /// Not injected: this class is never compiled into `RunnerTests` (only
+  /// `NotificationSound.swift`, `PushEnvelope.swift` and the crypto sources
+  /// are, the same way `PushSealedBoxTests.swift`'s own doc comment already
+  /// explains for those), so there is no test host for a seam here to serve.
+  /// `NotificationSound.decide` is what carries the tested logic; this is
+  /// one concrete reader of its answer.
+  private let callActivity: CallActivityChecking = CallKitActivityChecker()
+
+  /// Set by `decorated`, so `withSound` can reuse the one envelope
+  /// `decode` already opened rather than opening the sealed box again.
+  private var decodedEnvelope: PushEnvelope?
+
   override func didReceive(
     _ request: UNNotificationRequest,
     withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void
@@ -32,18 +47,21 @@ final class NotificationService: UNNotificationServiceExtension {
     self.contentHandler = contentHandler
     placeholder = request.content
 
-    // Answered on this call rather than asynchronously: a keychain read
-    // and one sealed box are the whole of the work, so there is nothing
-    // to wait for and no reason to spend any of the budget waiting.
-    deliver(decorated(request.content) ?? request.content)
+    // Answered on this call rather than asynchronously: a keychain read,
+    // one sealed box and one CXCallObserver read are the whole of the
+    // work, so there is nothing to wait for and no reason to spend any of
+    // the budget waiting.
+    deliver(withSound(decorated(request.content) ?? request.content))
   }
 
   /// iOS calls this when the budget runs out, and whatever it is handed is
   /// what the user sees. Reaching it at all would mean `didReceive` never
-  /// answered, so the placeholder is the only honest thing left.
+  /// answered, so the placeholder is the only honest thing left - sound
+  /// decided fresh even here, since a call in progress is worth silencing
+  /// on any path out of this extension, not only the ordinary one.
   override func serviceExtensionTimeWillExpire() {
     guard let content = placeholder else { return }
-    deliver(content)
+    deliver(withSound(content))
   }
 
   /// The handler must be called exactly once; clearing it is what makes a
@@ -73,6 +91,18 @@ final class NotificationService: UNNotificationServiceExtension {
       let mutable = content.mutableCopy() as? UNMutableNotificationContent
     else { return nil }
 
+    decodedEnvelope = envelope
     return envelope.applied(to: mutable)
+  }
+
+  /// Chooses and attaches a sound, after `decorated` has had its chance to
+  /// decode an envelope - applied whether or not that succeeded, since a
+  /// live call must silence a push this extension could not even read, not
+  /// only the ones it could.
+  private func withSound(_ content: UNNotificationContent) -> UNNotificationContent {
+    guard let mutable = content.mutableCopy() as? UNMutableNotificationContent else { return content }
+    let decision = NotificationSound.decide(for: decodedEnvelope, callActivity: callActivity)
+    NotificationSound.apply(decision, to: mutable)
+    return mutable
   }
 }

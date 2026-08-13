@@ -21,24 +21,30 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "notifications"))
 
 import synth  # noqa: E402
-from sounds import SOUNDS  # noqa: E402
+from sounds import CALLKIT_RINGTONE, SOUNDS  # noqa: E402
 
 OUT = HERE / "notifications"
+
+
+def _render_one(name: str, notes: list[synth.Note]) -> None:
+    rendered = synth.render(notes)
+    levelled = synth.normalise(rendered)
+    size = synth.write_wav(OUT / f"{name}.wav", levelled)
+
+    seconds = levelled.size / synth.SAMPLE_RATE
+    measured = synth.loudness(levelled)
+    peak = float(abs(levelled).max())
+    peak_db = 20.0 * (peak and __import__("math").log10(peak) or -99)
+    print(f"{name:16} {seconds:8.3f} {measured:8.2f} {peak_db:10.2f} "
+          f"{size:8d}")
 
 
 def main() -> int:
     print(f"{'sound':16} {'seconds':>8} {'LUFS':>8} {'peak dBFS':>10} {'bytes':>8}")
     for name, (notes, _) in sorted(SOUNDS.items()):
-        rendered = synth.render(notes)
-        levelled = synth.normalise(rendered)
-        size = synth.write_wav(OUT / f"{name}.wav", levelled)
-
-        seconds = levelled.size / synth.SAMPLE_RATE
-        measured = synth.loudness(levelled)
-        peak = float(abs(levelled).max())
-        peak_db = 20.0 * (peak and __import__("math").log10(peak) or -99)
-        print(f"{name:16} {seconds:8.3f} {measured:8.2f} {peak_db:10.2f} "
-              f"{size:8d}")
+        _render_one(name, notes)
+    # Same renderer and diff gate, but not one of the seven; see sounds.py.
+    _render_one("callkit_ringtone", CALLKIT_RINGTONE[0])
     return 0
 
 

@@ -3,6 +3,12 @@ import CallKit
 import Foundation
 import PushKit
 
+/// The bundled CallKit ringtone, generated deterministically by
+/// `assets/audio/generate.py` from `sounds.py`'s `CALLKIT_RINGTONE` and
+/// copied into the Runner target's own bundle by `project.pbxproj`'s Audio
+/// group - never hand-dropped, so `audio-ci` catches any drift from source.
+let callKitRingtoneFileName = "callkit_ringtone.wav"
+
 /// The one rule this file exists to keep.
 ///
 /// Since iOS 13, an app that receives a VoIP push and does not report an
@@ -113,6 +119,8 @@ final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDeleg
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.generic]
+    // The one provider that reports an incoming call, so the one that rings.
+    configuration.ringtoneSound = callKitRingtoneFileName
     provider = CXProvider(configuration: configuration)
 
     handler = VoipCallHandler(provider: provider)

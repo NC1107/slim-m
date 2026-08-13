@@ -47,6 +47,12 @@
 		7A11C0DE0006000000000025 /* Salsa20.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000006 /* Salsa20.swift */; };
 		7A11C0DE0006000000000026 /* Poly1305.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0006000000000007 /* Poly1305.swift */; };
 		7A11C0DE0006000000000027 /* push_envelope_cases.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000C /* push_envelope_cases.json */; };
+		7A11C0DE0006000000000019 /* NotificationSound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000D /* NotificationSound.swift */; };
+		7A11C0DE0006000000000028 /* NotificationSound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000D /* NotificationSound.swift */; };
+		7A11C0DE0006000000000029 /* NotificationSoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000600000000000E /* NotificationSoundTests.swift */; };
+		7A11C0DE0008000000000005 /* callkit_ringtone.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0008000000000002 /* callkit_ringtone.wav */; };
+		7A11C0DE0008000000000006 /* direct_message.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0008000000000003 /* direct_message.wav */; };
+		7A11C0DE0008000000000007 /* group_message.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0008000000000004 /* group_message.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -147,6 +153,11 @@
 		7A11C0DE000600000000000A /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A11C0DE000600000000000B /* PushSealedBoxTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PushSealedBoxTests.swift; sourceTree = "<group>"; };
 		7A11C0DE000600000000000C /* push_envelope_cases.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = push_envelope_cases.json; sourceTree = "<group>"; };
+		7A11C0DE000600000000000D /* NotificationSound.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationSound.swift; sourceTree = "<group>"; };
+		7A11C0DE000600000000000E /* NotificationSoundTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationSoundTests.swift; sourceTree = "<group>"; };
+		7A11C0DE0008000000000002 /* callkit_ringtone.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "../../../../assets/audio/notifications/callkit_ringtone.wav"; sourceTree = "<group>"; };
+		7A11C0DE0008000000000003 /* direct_message.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "../../../../assets/audio/notifications/direct_message.wav"; sourceTree = "<group>"; };
+		7A11C0DE0008000000000004 /* group_message.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "../../../../assets/audio/notifications/group_message.wav"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -183,8 +194,19 @@
 				7A11C0DE0003000000000003 /* VoiceCallReporterTests.swift */,
 				7A11C0DE000600000000000B /* PushSealedBoxTests.swift */,
 				7A11C0DE000600000000000C /* push_envelope_cases.json */,
+				7A11C0DE000600000000000E /* NotificationSoundTests.swift */,
 			);
 			path = RunnerTests;
+			sourceTree = "<group>";
+		};
+		7A11C0DE0008000000000001 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				7A11C0DE0008000000000002 /* callkit_ringtone.wav */,
+				7A11C0DE0008000000000003 /* direct_message.wav */,
+				7A11C0DE0008000000000004 /* group_message.wav */,
+			);
+			name = Audio;
 			sourceTree = "<group>";
 		};
 		7A11C0DE0002000000000021 /* BroadcastExtension */ = {
@@ -212,6 +234,7 @@
 				7A11C0DE0006000000000005 /* Blake2b.swift */,
 				7A11C0DE0006000000000006 /* Salsa20.swift */,
 				7A11C0DE0006000000000007 /* Poly1305.swift */,
+				7A11C0DE000600000000000D /* NotificationSound.swift */,
 				7A11C0DE0006000000000008 /* Info.plist */,
 				7A11C0DE0006000000000009 /* NotificationService.entitlements */,
 			);
@@ -239,6 +262,7 @@
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				7A11C0DE0002000000000021 /* BroadcastExtension */,
 				7A11C0DE0006000000000031 /* NotificationService */,
+				7A11C0DE0008000000000001 /* Audio */,
 			);
 			sourceTree = "<group>";
 		};
@@ -424,6 +448,9 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				7A11C0DE0008000000000005 /* callkit_ringtone.wav in Resources */,
+				7A11C0DE0008000000000006 /* direct_message.wav in Resources */,
+				7A11C0DE0008000000000007 /* group_message.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -491,6 +518,8 @@
 				7A11C0DE0006000000000024 /* Blake2b.swift in Sources */,
 				7A11C0DE0006000000000025 /* Salsa20.swift in Sources */,
 				7A11C0DE0006000000000026 /* Poly1305.swift in Sources */,
+				7A11C0DE0006000000000028 /* NotificationSound.swift in Sources */,
+				7A11C0DE0006000000000029 /* NotificationSoundTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -535,6 +564,7 @@
 				7A11C0DE0006000000000015 /* Blake2b.swift in Sources */,
 				7A11C0DE0006000000000016 /* Salsa20.swift in Sources */,
 				7A11C0DE0006000000000017 /* Poly1305.swift in Sources */,
+				7A11C0DE0006000000000019 /* NotificationSound.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
