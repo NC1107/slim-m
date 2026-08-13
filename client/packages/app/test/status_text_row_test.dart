@@ -168,8 +168,9 @@ void main() {
     await tester.tap(find.widgetWithText(AppButton, 'Save'));
     await tester.pumpAndSettle();
 
+    // Sentence-cased at the display seam since #636; the wire stays lowercase.
     expect(
-      find.textContaining('status must not contain control characters'),
+      find.textContaining('Status must not contain control characters'),
       findsOneWidget,
     );
     expect(find.text('a new status'), findsOneWidget);
