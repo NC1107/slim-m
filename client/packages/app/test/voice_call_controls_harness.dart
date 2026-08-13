@@ -2,6 +2,9 @@
 /// Shared fixtures for the suites that pump [CallControls]: its own
 /// screen-share and camera behaviour, and its focus-ring reachability.
 ///
+/// Also [pumpVoiceCallDock], for the sibling suite that pumps the dock the
+/// canvas toggle actually lives in - `voice_call_dock_test.dart`.
+///
 /// Not a `_test.dart` file, so `flutter test` does not try to run it. See
 /// `message_row_harness.dart` for the same split, done for the same reason.
 library;
@@ -14,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_call_controls.dart';
+import 'package:slimm_app/src/screens/voice_call_dock.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -235,6 +239,55 @@ Future<ProviderContainer> pumpControls(
     ),
   );
   // pump, not pumpAndSettle: the pending state's progress spinner never settles.
+  await tester.pump();
+  return container;
+}
+
+/// Pumps [VoiceCallDock] at [width], bottom-aligned the way `_InCall`
+/// actually places it - the same shape `canvas_call_dock_fixtures.dart`'s
+/// `pumpCanvasCallDock` already uses, so the two dock suites read alike.
+Future<ProviderContainer> pumpVoiceCallDock(
+  WidgetTester tester,
+  VoiceState voice, {
+  String? canvasChannelId,
+  double width = 800,
+  bool touch = false,
+  InertSession? session,
+}) async {
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      voiceControllerProvider.overrideWith(
+        (ref) => VoiceController(ref, session: session ?? InertSession()),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              width: width,
+              child: AppTouchTargets(
+                enabled: touch,
+                child: VoiceCallDock(
+                  controller: container.read(voiceControllerProvider.notifier),
+                  voice: voice,
+                  canvasChannelId: canvasChannelId,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
   await tester.pump();
   return container;
 }
