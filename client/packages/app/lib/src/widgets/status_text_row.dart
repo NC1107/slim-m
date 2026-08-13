@@ -13,8 +13,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// Unprefixed: `updateMe` is an extension method, only visible where the
-// library declaring it is imported - see api.dart's own `show` list comment.
+// Unprefixed extension methods need the declaring library imported - see api.dart's own `show` list comment.
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -84,9 +83,7 @@ class _StatusTextFieldState extends ConsumerState<_StatusTextField>
         ref.invalidate(meProvider);
       },
     );
-    // A failure leaves the field exactly as typed, for another try; a
-    // success is followed by [meProvider] resolving to the same text this
-    // already shows, so there is nothing further to reconcile here.
+    // A failure leaves the field as typed; a success gets its reconciliation from [meProvider] resolving, not from here.
     if (mounted) setState(() => _saving = false);
     if (!ok) return;
   }

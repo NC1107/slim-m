@@ -14,9 +14,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// Unprefixed: `listChannels`/`listDirectMessages` are extension methods, only
-// visible where the library declaring them is imported - see api.dart's own
-// `show` list comment.
+// Unprefixed extension methods need the declaring library imported - see api.dart's own `show` list comment.
 import 'package:slimm_api/api.dart';
 
 import '../permissions.dart';
@@ -68,9 +66,7 @@ final forwardTargetsProvider = FutureProvider.autoDispose
               isDm: false,
             ),
         for (final dm in dms)
-          // A blocked party's DM is frozen server-side in both directions
-          // (`store/dms.rs`'s `BLOCKED_DENY`), so offering it here would be a
-          // row that looks reachable and would just come back a 403.
+          // A blocked party's DM is frozen server-side both ways (`store/dms.rs`'s `BLOCKED_DENY`), so offering it here would just 403.
           if (dm.channelId != excludeChannelId && !blocked.contains(dm.user.id))
             ForwardTarget(
               channelId: dm.channelId,

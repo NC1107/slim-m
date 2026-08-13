@@ -130,10 +130,7 @@ async fn at_everyone_wakes_every_mentions_only_viewer_once_the_author_is_granted
 #[tokio::test]
 async fn at_everyone_from_an_ungranted_author_wakes_nobody_extra() {
     let (store, _guard) = new_store("slimm-mention-everyone-ungranted").await;
-    // Bootstraps the deployment so alice, created next, is an ordinary
-    // `@everyone` member rather than the administrator the *first* account
-    // always becomes - the exact bypass `grant_mention_everyone`'s own doc
-    // comment warns a naive test could accidentally lean on.
+    // Bootstraps the deployment so alice is an ordinary member, not the administrator the first account always becomes.
     account(&store, "founder").await;
     let (alice, alice_device) = account(&store, "alice").await;
     let (bob, bob_device) = account(&store, "bob").await;
@@ -208,8 +205,7 @@ async fn at_everyone_never_reaches_the_ordinary_username_lookup() {
     let channel = store.list_channels().await.unwrap()[0].id;
     register(&store, alice, alice_device, "alice-token").await;
 
-    // No grant at all, and nobody else registered for push: this must not
-    // error trying to resolve "everyone" as a real username.
+    // No grant, nobody else registered for push: must not error resolving "everyone" as a real username.
     let recipients = slimm_server::push::message_recipients(
         &store,
         channel,

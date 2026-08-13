@@ -100,7 +100,6 @@ void main() {
     await _pump(tester, [_profile('1', 'Kess')]);
 
     expect(find.text('Kess'), findsOneWidget);
-    // Nothing else to assert on directly - the absence itself is the point:
-    // no stray caption widget for a member who never set one.
+    // The absence itself is the point - no stray caption widget for a member who never set one.
   });
 }

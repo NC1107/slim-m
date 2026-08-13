@@ -20,10 +20,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// Unprefixed (for `sendMessage`, an extension method only visible where its
-// library is imported - see api.dart's own `show` list comment), `Message`
-// hidden: `slimm_data` has its own local-store `Message`, the one this file
-// actually renders and forwards, and the two names collide.
+// Unprefixed for the `sendMessage` extension method; `Message` hidden since `slimm_data` has its own, the one this file renders.
 import 'package:slimm_api/api.dart' hide Message;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';

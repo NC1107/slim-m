@@ -141,11 +141,7 @@ void main() {
       dms: [_dmJson(channelId: 'dm1', userId: 'u-priya', displayName: 'Priya')],
       blocked: ['u-priya'],
     );
-    // The real app has this settled well before a forward sheet can open -
-    // `blocksProvider`'s own doc comment: "watched at the shell so it loads
-    // with the app". Forced here, the same way the shell forces it in
-    // production, so this test does not depend on beating an unrelated
-    // fetch in a race.
+    // Forced here the way the shell forces it in production (`blocksProvider`'s own doc comment), so this is not a race.
     await container.read(blocksProvider.notifier).refresh();
 
     final targets = await container.read(
