@@ -113,14 +113,20 @@ pub struct GifSearch {
 
 impl GifSearch {
     /// Builds from the process config. Disabled, quietly, unless both
-    /// `gif_provider` and `gif_api_key` are set; fails at startup - never
-    /// silently disables - when a provider name is set but not recognized,
-    /// the same treatment an unsafe push relay URL scheme gets, since a typo
-    /// here should be caught before the process ever answers a request
-    /// rather than discovered as "the GIF button just does nothing".
+    /// `gif_provider` and `gif_api_key` are set to something non-empty -
+    /// an empty string reads the same as unset, the same treatment
+    /// `SLIMM_CORS_ALLOWED_ORIGINS` already gives itself, because Compose's
+    /// `${VAR:-}` interpolation hands the container an empty string rather
+    /// than omitting the variable when an operator leaves it blank. Fails at
+    /// startup - never silently disables - when a provider name is set but
+    /// not recognized, the same treatment an unsafe push relay URL scheme
+    /// gets, since a typo here should be caught before the process ever
+    /// answers a request rather than discovered as "the GIF button just
+    /// does nothing".
     pub fn new(config: &Config) -> anyhow::Result<Self> {
-        let (Some(provider_raw), Some(api_key)) = (&config.gif_provider, &config.gif_api_key)
-        else {
+        let provider_raw = config.gif_provider.as_deref().filter(|s| !s.is_empty());
+        let api_key = config.gif_api_key.as_deref().filter(|s| !s.is_empty());
+        let (Some(provider_raw), Some(api_key)) = (provider_raw, api_key) else {
             return Ok(Self { inner: None });
         };
         let provider = Provider::parse(provider_raw).ok_or_else(|| {
@@ -136,7 +142,7 @@ impl GifSearch {
                 http,
                 provider,
                 base_url: None,
-                api_key: api_key.clone(),
+                api_key: api_key.to_owned(),
                 cache: Cache::new(),
             })),
         })

@@ -61,6 +61,46 @@ fn new_fails_at_startup_on_an_unrecognized_provider_name() {
     assert!(result.is_err());
 }
 
+/// Reproduces the real failure this once shipped as: `docker-compose.yml`
+/// wires `SLIMM_GIF_PROVIDER: ${SLIMM_GIF_PROVIDER:-}`, so an operator who
+/// never set it gets an empty string in the container's environment, not an
+/// absent variable - `Config::gif_provider` deserializes that as
+/// `Some(String::new())`, never `None`. Before this was fixed the server
+/// crashed at startup with `SLIMM_GIF_PROVIDER must be "tenor" or "klipy",
+/// got ""` on every deployment that had never touched this setting at all.
+#[test]
+fn new_stays_disabled_when_both_settings_are_the_empty_string() {
+    let gifs = GifSearch::new(&Config {
+        gif_provider: Some(String::new()),
+        gif_api_key: Some(String::new()),
+        ..Config::default()
+    })
+    .expect("an empty string reads the same as unset, not a bad provider name");
+    assert!(!gifs.is_enabled());
+}
+
+/// The same empty-reads-as-unset rule applies per field, not only when both
+/// are empty together - a key set beside an empty provider name must not
+/// try to parse `""` as a provider.
+#[test]
+fn new_stays_disabled_when_only_one_setting_is_the_empty_string() {
+    let empty_provider = GifSearch::new(&Config {
+        gif_provider: Some(String::new()),
+        gif_api_key: Some("k".to_owned()),
+        ..Config::default()
+    })
+    .expect("an empty provider name is unset, not invalid");
+    assert!(!empty_provider.is_enabled());
+
+    let empty_key = GifSearch::new(&Config {
+        gif_provider: Some("tenor".to_owned()),
+        gif_api_key: Some(String::new()),
+        ..Config::default()
+    })
+    .expect("an empty api key is unset, not invalid");
+    assert!(!empty_key.is_enabled());
+}
+
 #[test]
 fn new_is_case_insensitive_and_enables_on_either_recognized_name() {
     for name in ["tenor", "TENOR", "Klipy"] {

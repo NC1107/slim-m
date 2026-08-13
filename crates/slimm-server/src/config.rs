@@ -81,9 +81,13 @@ pub struct Config {
     pub max_total_attachment_bytes: Option<u64>,
 
     /// Which third-party GIF search provider this deployment proxies to:
-    /// `tenor` or `klipy`, case-insensitively. Unset means no GIF search at
-    /// all, and unrecognized text is a startup error rather than a silent
-    /// fallback, the same treatment an unsafe relay URL scheme gets.
+    /// `tenor` or `klipy`, case-insensitively. Unset or empty means no GIF
+    /// search at all - empty is read the same as unset because Compose's
+    /// `${VAR:-}` interpolation hands the container an empty string rather
+    /// than omitting the variable, the same reason `cors_allowed_origins`
+    /// treats the two alike - and unrecognized text is a startup error
+    /// rather than a silent fallback, the same treatment an unsafe relay
+    /// URL scheme gets.
     ///
     /// Both this and `gif_api_key` must be set together, the same two-state
     /// shape push and LiveKit above already use: a self-host with no key for
