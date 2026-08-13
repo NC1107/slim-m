@@ -186,7 +186,7 @@ void main() {
 
       expect(
         find.textContaining(
-          'name must not contain control or text-direction characters',
+          'Name must not contain control or text-direction characters',
         ),
         findsOneWidget,
       );

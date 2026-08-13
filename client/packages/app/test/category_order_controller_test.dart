@@ -158,7 +158,7 @@ void main() {
           'every request has settled, even though not every one '
           'succeeded',
     );
-    expect(state.error, contains('nope'));
+    expect(state.error, contains('Nope'));
 
     final store = await container.read(storeProvider.future);
     final rows = await store.allCategories();
