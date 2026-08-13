@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Who gets woken for a message, and why each exclusion is there.
 //!
-//! Its own module rather than three steps inside [`super::deliver`]'s
+//! Its own module rather than three steps inside [`super::deliver::deliver`]'s
 //! fire-and-forget task: this is the whole authorization decision on the push
 //! path, and a task that reports to nothing but the process log cannot be
 //! tested. `tests/blocking_reach.rs` drives it directly.

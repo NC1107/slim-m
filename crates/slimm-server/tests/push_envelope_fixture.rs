@@ -70,6 +70,7 @@ fn plaintexts() -> Vec<(&'static str, String)> {
         "channel_id": "019fbd32-f633-7a63-a6a8-497513c44e6b",
         "message_id": "019fbd41-2c8a-7d10-9f31-6b1e4a2f80c7",
         "seq": 4291,
+        "sent_at": 1_754_985_600_000_i64,
         "sender": "Ada Lovelace",
         "channel": "general",
         "body": "the analytical engine has no pretensions to originate anything",
@@ -81,6 +82,7 @@ fn plaintexts() -> Vec<(&'static str, String)> {
         "channel_id": "019fbd32-f633-7a63-a6a8-497513c44e6b",
         "message_id": "019fbd41-2c8a-7d10-9f31-6b1e4a2f80c7",
         "seq": 4291,
+        "sent_at": 1_754_985_600_000_i64,
     });
     let dm = json!({
         "domain": "slim-m.push.v1",
@@ -89,8 +91,20 @@ fn plaintexts() -> Vec<(&'static str, String)> {
         "channel_id": "019fbd32-f633-7a63-a6a8-497513c44e6b",
         "message_id": "019fbd41-2c8a-7d10-9f31-6b1e4a2f80c7",
         "seq": 7,
+        "sent_at": 1_754_985_600_000_i64,
         "sender": "\u{30a2}\u{30c0}\u{30fb}\u{30e9}\u{30d6}\u{30ec}\u{30b9}",
         "body": "\u{3053}\u{3093}\u{3070}\u{3093}\u{306f}\u{3001}\u{5143}\u{6c17}\u{3067}\u{3059}\u{304b}",
+    });
+    // No `sent_at`: a server built before that field existed; see PushEnvelope.swift.
+    let pre_sent_at = json!({
+        "domain": "slim-m.push.v1",
+        "version": 1,
+        "kind": "message",
+        "channel_id": "019fbd32-f633-7a63-a6a8-497513c44e6b",
+        "message_id": "019fbd41-2c8a-7d10-9f31-6b1e4a2f80c7",
+        "seq": 12,
+        "sender": "Grace Hopper",
+        "body": "sealed before sent_at existed on the wire",
     });
 
     vec![
@@ -107,6 +121,10 @@ fn plaintexts() -> Vec<(&'static str, String)> {
         ("a message envelope with a preview", envelope.to_string()),
         ("a content-free envelope", content_free.to_string()),
         ("a dm envelope, multi-byte throughout", dm.to_string()),
+        (
+            "a pre-sent_at envelope from an older server",
+            pre_sent_at.to_string(),
+        ),
     ]
 }
 

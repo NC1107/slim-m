@@ -7,6 +7,21 @@
 // Everything past the routing fields is optional there: a device that did not
 // ask for content, or one whose preview would not fit the envelope budget,
 // gets the same envelope with `sender`, `channel` and `body` simply absent.
+//
+// `sentAt` is the defense against a hostile relay retaining a sealed payload
+// and re-delivering it later: without it, a preview carrying real message
+// text would resurface on a lock screen at an arbitrary later time with
+// nothing here able to tell a fresh push from a replayed one. `isStale`
+// refuses to render a preview once `sentAt` is old enough, falling back to
+// whatever the relay's own generic placeholder already said - never to no
+// notification at all, matching every other failure path in this extension.
+// Routing is unaffected either way: a stale replay still opens the right
+// channel when tapped, the same as a device that opted out of content ever
+// did.
+//
+// `sentAt` is optional because it is additive on the wire: an envelope sealed
+// by a server built before this field existed carries none, and that must
+// read as "not stale", never as a reason to refuse an otherwise-good preview.
 
 import Foundation
 import UserNotifications
@@ -27,6 +42,7 @@ struct PushEnvelope: Decodable {
   let version: Int
   let channelId: String?
   let messageId: String?
+  let sentAt: Int64?
   let sender: String?
   let channel: String?
   let body: String?
@@ -39,6 +55,7 @@ struct PushEnvelope: Decodable {
     case version
     case channelId = "channel_id"
     case messageId = "message_id"
+    case sentAt = "sent_at"
     case sender
     case channel
     case body
@@ -75,6 +92,22 @@ struct PushEnvelope: Decodable {
     return true
   }
 
+  /// Generous headroom over ordinary delivery latency - seconds, even under
+  /// APNs backpressure - while still refusing a payload a hostile relay held
+  /// back and replayed well after the fact.
+  static let staleAfterMs: Int64 = 10 * 60 * 1000
+
+  /// True only when `sentAt` is present and old enough that a replayed
+  /// payload should not be trusted with real text on a lock screen. Absent
+  /// is never stale - there is nothing to compare against, and this file's
+  /// own module doc states the wire-compatibility rule that must hold here:
+  /// an old envelope with no `sentAt` still renders.
+  func isStale(now: Date = Date()) -> Bool {
+    guard let sentAt else { return false }
+    let nowMs = Int64(now.timeIntervalSince1970 * 1000)
+    return nowMs - sentAt > Self.staleAfterMs
+  }
+
   /// Rewrites the placeholder in place, leaving everything the relay set -
   /// sound, badge, thread - alone.
   ///
@@ -87,10 +120,17 @@ struct PushEnvelope: Decodable {
   /// Routing is attached whether or not there is a preview, and that split
   /// is deliberate: `channel_id` rides in every envelope, while a preview is
   /// a per-device opt-in, so a device that shows the generic placeholder must
-  /// still open the right channel when somebody taps it.
-  func applied(to content: UNMutableNotificationContent) -> UNMutableNotificationContent {
+  /// still open the right channel when somebody taps it. A stale envelope
+  /// gets the identical treatment: routing is real regardless of age, only
+  /// the preview text is what a replay could be lying about.
+  func applied(
+    to content: UNMutableNotificationContent,
+    now: Date = Date()
+  ) -> UNMutableNotificationContent {
     attachRouting(to: content)
-    guard let sender = sender, let body = body else { return content }
+    guard hasPreview, !isStale(now: now), let sender = sender, let body = body else {
+      return content
+    }
     content.title = sender
     if let channel, !channel.isEmpty {
       content.subtitle = "#\(channel)"

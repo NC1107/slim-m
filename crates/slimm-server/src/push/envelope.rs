@@ -29,6 +29,17 @@
 //! bytes rather than trusting the character caps is what makes that safe for
 //! any display name or body, however many bytes its characters happen to
 //! encode to once JSON-escaped.
+//!
+//! Every envelope, content-free ones included, also carries `sent_at`: the
+//! millisecond this server sealed it. The relay is trusted to forward a
+//! payload once, not to forget it, so a payload it retained and replayed
+//! later would otherwise let a real preview resurface on a lock screen at an
+//! arbitrary later time. The NSE
+//! (`ios/NotificationService/PushEnvelope.swift`) is what actually refuses a
+//! stale preview - this field only stamps the envelope so it can. `sent_at`
+//! is additive: an older client reading a new envelope ignores a field it
+//! does not know, and an NSE reading an envelope sealed before this field
+//! existed treats absence as "not stale", never as a reason to refuse.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -154,6 +165,10 @@ struct PushEnvelope<'a> {
     channel_id: String,
     message_id: String,
     seq: i64,
+    /// Epoch milliseconds this server sealed the box, present unconditionally.
+    /// See this module's own doc for why replay is not limited to the
+    /// preview-carrying case.
+    sent_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     sender: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -167,6 +182,7 @@ impl<'a> PushEnvelope<'a> {
         channel_id: ChannelId,
         message_id: MessageId,
         seq: Seq,
+        sent_at: i64,
         preview: Option<&'a MessagePreview>,
     ) -> Self {
         Self {
@@ -176,6 +192,7 @@ impl<'a> PushEnvelope<'a> {
             channel_id: channel_id.to_string(),
             message_id: message_id.to_string(),
             seq: seq.0,
+            sent_at,
             sender: preview.map(|p| p.sender.as_str()),
             channel: preview.and_then(|p| p.channel.as_deref()),
             body: preview.map(|p| p.body.as_str()),
@@ -203,6 +220,10 @@ pub(super) struct SealedMessage {
 
 /// Seals a new-message notification to every target's public key.
 ///
+/// `sent_at` is the epoch millisecond this call is sealing at, stamped into
+/// every resulting plaintext; see [`PushEnvelope`]'s own field doc for what
+/// it is for.
+///
 /// `preview` is what a device that asked for content is told; a target whose
 /// [`PushTarget::include_content`] is false is sealed the content-free
 /// envelope regardless, so one device's choice can never reach another's. A
@@ -223,15 +244,16 @@ pub(super) fn seal_for_message(
     channel_id: ChannelId,
     message_id: MessageId,
     seq: Seq,
+    sent_at: i64,
     preview: Option<&MessagePreview>,
     targets: &[PushTarget],
 ) -> Vec<SealedMessage> {
-    let Some(bare) = encode(channel_id, message_id, seq, None) else {
+    let Some(bare) = encode(channel_id, message_id, seq, sent_at, None) else {
         return Vec::new();
     };
     // Past the ceiling falls back to content-free; see the module docs.
     let with_content = preview
-        .and_then(|preview| encode(channel_id, message_id, seq, Some(preview)))
+        .and_then(|preview| encode(channel_id, message_id, seq, sent_at, Some(preview)))
         .filter(|plaintext| plaintext.len() <= MAX_ENVELOPE_PLAINTEXT_BYTES);
 
     let mut sealed = Vec::with_capacity(targets.len());
@@ -277,9 +299,10 @@ fn encode(
     channel_id: ChannelId,
     message_id: MessageId,
     seq: Seq,
+    sent_at: i64,
     preview: Option<&MessagePreview>,
 ) -> Option<Vec<u8>> {
-    let envelope = PushEnvelope::for_message(channel_id, message_id, seq, preview);
+    let envelope = PushEnvelope::for_message(channel_id, message_id, seq, sent_at, preview);
     match serde_json::to_vec(&envelope) {
         Ok(bytes) => Some(bytes),
         Err(err) => {
@@ -336,12 +359,19 @@ mod tests {
     /// The fallback [`seal_for_message`] degrades to has to fit
     /// unconditionally, or a preview over the ceiling would degrade to
     /// something equally unsendable and the push would be lost either way.
-    /// Nothing in it is variable-length except two uuids and a seq, so this is
-    /// really a guard against a future field being added outside a preview.
+    /// Nothing in it is variable-length except two uuids, a seq and a
+    /// `sent_at`, so this is really a guard against a future field being
+    /// added outside a preview.
     #[test]
     fn the_content_free_envelope_always_fits_the_budget() {
-        let bare = encode(ChannelId::generate(), MessageId::generate(), Seq(1), None)
-            .expect("the content-free envelope always encodes");
+        let bare = encode(
+            ChannelId::generate(),
+            MessageId::generate(),
+            Seq(1),
+            i64::MAX,
+            None,
+        )
+        .expect("the content-free envelope always encodes");
         assert!(
             bare.len() <= MAX_ENVELOPE_PLAINTEXT_BYTES,
             "the content-free envelope must always fit, or nothing could ever be sent"
@@ -377,6 +407,7 @@ mod tests {
             ChannelId::generate(),
             MessageId::generate(),
             Seq(i64::MAX),
+            i64::MAX,
             Some(&preview),
         )
         .expect("a full-size preview encodes");
@@ -388,5 +419,41 @@ mod tests {
              is APNs' whole-notification ceiling and has to hold the aps dictionary too.",
             encoded.len()
         );
+    }
+
+    /// `sent_at` rides on a content-free envelope too, not only a preview -
+    /// replay is a property of the envelope, not of what it happens to carry.
+    #[test]
+    fn sent_at_is_present_on_a_content_free_envelope() {
+        let encoded = encode(
+            ChannelId::generate(),
+            MessageId::generate(),
+            Seq(1),
+            1_700_000_000_000,
+            None,
+        )
+        .expect("encodes");
+        let value: serde_json::Value = serde_json::from_slice(&encoded).expect("valid json");
+        assert_eq!(value["sent_at"], 1_700_000_000_000_i64);
+    }
+
+    /// And it rides alongside a preview, at the same value passed in - this is
+    /// the plaintext-level half of the replay defense; the sealed-round-trip
+    /// half lives in `tests/push_content_envelope.rs`, which actually unseals
+    /// real ciphertext rather than inspecting the plaintext before sealing.
+    #[test]
+    fn sent_at_is_present_alongside_a_preview_at_the_value_passed_in() {
+        let preview = MessagePreview::new("Ada", "general", "hi");
+        let encoded = encode(
+            ChannelId::generate(),
+            MessageId::generate(),
+            Seq(1),
+            1_700_000_000_000,
+            Some(&preview),
+        )
+        .expect("encodes");
+        let value: serde_json::Value = serde_json::from_slice(&encoded).expect("valid json");
+        assert_eq!(value["sent_at"], 1_700_000_000_000_i64);
+        assert_eq!(value["body"], "hi");
     }
 }

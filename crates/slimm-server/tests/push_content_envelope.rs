@@ -211,6 +211,15 @@ async fn spawn_capturing_relay() -> (std::sync::Arc<Mutex<Option<Value>>>, Strin
     (captured, format!("http://{addr}"))
 }
 
+/// This crate cannot reach `slimm_server::store::now_ms`, which is
+/// `pub(crate)`, so the same clock read is duplicated here for one assertion.
+fn epoch_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("after the epoch")
+        .as_millis() as i64
+}
+
 async fn wait_for_capture(captured: &Mutex<Option<Value>>) -> Value {
     let start = std::time::Instant::now();
     loop {
@@ -303,6 +312,51 @@ async fn an_opted_in_device_can_unseal_the_sender_channel_and_body() {
     // Untouched routing fields, so catching up over /sync works as before.
     assert_eq!(envelope["channel_id"], world.channel_id.to_string());
     assert_eq!(envelope["kind"], "message");
+}
+
+/// The whole defense against a hostile relay retaining and replaying a push:
+/// `sent_at` is inside the sealed plaintext, not a routing field the relay
+/// could see or hold constant, and it names when the server actually sealed
+/// this envelope. Unsealing the real relay-bound payload with the device's
+/// own key, the way [`unseal`] does, is what proves it is genuinely inside
+/// the sealed box rather than only in the plaintext before it was sealed.
+#[tokio::test]
+async fn sent_at_is_inside_the_sealed_plaintext_and_recent() {
+    let world = world().await;
+    let recipient = account(&world.store, "reader", "Reader").await;
+    let secret = register_push(&world.app, &recipient, "reader-token", true).await;
+
+    let before = epoch_ms();
+    send(&world, SENTINEL_BODY).await;
+    let body = wait_for_capture(&world.captured).await;
+    let after = epoch_ms();
+
+    let envelope = unseal(entry_for(&body, "reader-token"), &secret);
+    let sent_at = envelope["sent_at"]
+        .as_i64()
+        .expect("sent_at is present and a number");
+    assert!(
+        (before..=after).contains(&sent_at),
+        "sent_at {sent_at} must fall within [{before}, {after}]"
+    );
+}
+
+/// `sent_at` rides even when a device declined content, since a
+/// content-free envelope is exactly as replayable as a preview-carrying one.
+#[tokio::test]
+async fn sent_at_is_present_even_when_a_device_declined_content() {
+    let world = world().await;
+    let recipient = account(&world.store, "reader", "Reader").await;
+    let secret = register_push(&world.app, &recipient, "reader-token", false).await;
+
+    send(&world, SENTINEL_BODY).await;
+    let body = wait_for_capture(&world.captured).await;
+    let envelope = unseal(entry_for(&body, "reader-token"), &secret);
+
+    assert!(
+        envelope["sent_at"].as_i64().is_some(),
+        "a content-free envelope must still carry sent_at: {envelope}"
+    );
 }
 
 /// A device that did not ask gets what it always got: no content field at
