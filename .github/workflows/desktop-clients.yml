@@ -1,0 +1,129 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Windows and macOS tester builds, attached to the client's GitHub release.
+#
+# These are the two desktop platforms release.yml does not package: iOS goes
+# through TestFlight, Android attaches an apk and aab, and linux-client ships
+# a tarball, an rpm and a flatpak, all from release.yml itself. This workflow
+# fills the gap with unsigned archives good enough to hand a tester, without
+# touching release.yml's carefully gated publish jobs.
+#
+# Unsigned is a stated trade, not an oversight. Windows has no signing
+# certificate anywhere in this project, so SmartScreen shows "unrecognized
+# app" and the tester clicks through. The macOS app is ad-hoc signed by the
+# build itself (the same "Sign to Run Locally" the debug CI build relies on);
+# Gatekeeper quarantines a downloaded copy, so a tester opens it with
+# right-click Open, or `xattr -d com.apple.quarantine` on the .app.
+#
+# Runs on every client-v* tag push, and by hand via workflow_dispatch with a
+# tag input so an already-cut release can be backfilled.
+
+name: desktop-clients
+
+on:
+  push:
+    tags:
+      - "client-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing client tag to build and attach to (e.g. client-v0.42.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-clients-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-client:
+    name: windows tester build
+    runs-on: windows-latest
+    env:
+      # firebase_cpp_sdk_windows vendors a pre-3.5 cmake_minimum_required CMake 4.x refuses; CMake's own documented escape hatch, mirrored from client-windows-ci.yml.
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      # flutter_local_notifications_windows 1.0.3's <experimental/coroutine> is a hard C2338 on newer MSVC; same mirror as above.
+      CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: flutter build windows --release
+        working-directory: client/packages/app
+        run: flutter build windows --release
+
+      - name: archive the release bundle
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}"
+          $version = $tag -replace "^client-v", ""
+          Compress-Archive -Path client/packages/app/build/windows/x64/runner/Release/* -DestinationPath "slim-m-client-$version-windows-x64.zip"
+
+      - name: attach to the github release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        # Retried because a tag-push run can start before release-please's release object exists.
+        run: |
+          for i in 1 2 3 4 5; do
+            gh release upload "$TAG" slim-m-client-*-windows-x64.zip --clobber && exit 0
+            sleep 60
+          done
+          exit 1
+
+  macos-client:
+    name: macos tester build (ad-hoc signed)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: flutter build macos --release
+        working-directory: client/packages/app
+        run: flutter build macos --release
+
+      - name: archive the app bundle
+        # ditto rather than zip: it preserves the bundle's resource forks and symlinks, which a plain zip of a .app can mangle.
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#client-v}"
+          ditto -c -k --keepParent "client/packages/app/build/macos/Build/Products/Release/slimm_app.app" "slim-m-client-$VERSION-macos.zip"
+
+      - name: attach to the github release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          for i in 1 2 3 4 5; do
+            gh release upload "$TAG" slim-m-client-*-macos.zip --clobber && exit 0
+            sleep 60
+          done
+          exit 1
