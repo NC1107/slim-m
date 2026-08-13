@@ -25,6 +25,12 @@ import PushKit
 /// reports one to `CXProvider` on the outgoing side of the API. See that
 /// file's doc comment and https://github.com/NC1107/slim-m/issues/212; it
 /// still needs a real device to confirm end to end.
+/// The bundled CallKit ringtone, generated deterministically by
+/// `assets/audio/generate.py` from `sounds.py`'s `CALLKIT_RINGTONE` and
+/// copied into the Runner target's own bundle by `project.pbxproj`'s Audio
+/// group - never hand-dropped, so `audio-ci` catches any drift from source.
+let callKitRingtoneFileName = "callkit_ringtone.wav"
+
 protocol CallReporting {
   func reportNewIncomingCall(
     with UUID: UUID,
@@ -113,6 +119,8 @@ final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDeleg
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.generic]
+    // The one provider that reports an incoming call, so the one that rings.
+    configuration.ringtoneSound = callKitRingtoneFileName
     provider = CXProvider(configuration: configuration)
 
     handler = VoipCallHandler(provider: provider)

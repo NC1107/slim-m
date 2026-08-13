@@ -24,9 +24,12 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "notifications"))
 
 import synth  # noqa: E402
-from sounds import SOUNDS  # noqa: E402
+from sounds import CALLKIT_RINGTONE, SOUNDS  # noqa: E402
 
 OUT = HERE / "notifications"
+
+# Apple's own ceiling; past this CallKit silently plays the default ringtone.
+CALLKIT_RINGTONE_MAX_SECONDS = 30.0
 
 
 def read(path: Path) -> np.ndarray:
@@ -157,6 +160,59 @@ class SoundFamily(unittest.TestCase):
             sorted(before), sorted(after), "a sound appeared or vanished")
         drifted = [n for n in before if before[n] != after[n]]
         self.assertEqual(drifted, [], f"regenerating changed {drifted}")
+
+
+class CallKitRingtone(unittest.TestCase):
+    """The CallKit ringtone, checked against Apple's own constraints.
+
+    Not a SoundFamily member and not compared against the seven on purpose:
+    it is a system asset for CXProviderConfiguration.ringtoneSound rather
+    than an in-app chime, so the family's cross-sound loudness invariants do
+    not apply to it, and it is exempt from `test_every_sound_exists`'s count.
+    """
+
+    def setUp(self) -> None:
+        self.clip = read(OUT / "callkit_ringtone.wav")
+
+    def test_is_not_one_of_the_seven(self) -> None:
+        self.assertNotIn("callkit_ringtone", SOUNDS)
+
+    def test_within_callkits_own_length_ceiling(self) -> None:
+        seconds = self.clip.size / synth.SAMPLE_RATE
+        self.assertLess(
+            seconds, CALLKIT_RINGTONE_MAX_SECONDS,
+            "past this, CallKit silently plays the default ringtone instead")
+
+    def test_matches_its_own_declared_notes(self) -> None:
+        notes, _ = CALLKIT_RINGTONE
+        rendered = synth.normalise(synth.render(notes))
+        expected = np.round(np.clip(rendered, -1.0, 1.0) * 32767.0) / 32767.0
+        actual = np.round(self.clip * 32767.0) / 32767.0
+        self.assertTrue(
+            np.array_equal(expected, actual),
+            "the committed wav does not match sounds.py's own CALLKIT_RINGTONE")
+
+    def test_nothing_clips(self) -> None:
+        self.assertLess(float(np.abs(self.clip).max()), 1.0)
+
+    def test_ring_and_pause_alternate(self) -> None:
+        """A real cadence, not one continuous tone.
+
+        Checked as energy over time rather than by re-reading the note list,
+        which would only prove this test can read the same file the
+        generator wrote.
+        """
+        window = int(0.05 * synth.SAMPLE_RATE)
+        energy = np.array([
+            float(np.mean(self.clip[i:i + window] ** 2))
+            for i in range(0, self.clip.size - window, window)
+        ])
+        loud = energy > (energy.max() * 0.05)
+        # A silent window between two loud ones is what a cadence needs.
+        transitions = np.diff(loud.astype(int))
+        self.assertGreaterEqual(
+            int(np.sum(transitions == -1)), 2,
+            "expected the ring to fall silent between repeats at least twice")
 
 
 if __name__ == "__main__":

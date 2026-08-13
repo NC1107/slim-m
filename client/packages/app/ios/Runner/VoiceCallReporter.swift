@@ -156,11 +156,16 @@ final class VoiceCallChannel: NSObject, CXProviderDelegate {
     }
   }
 
+  /// `ringtoneSound` is set here too though never actually played - this
+  /// provider only ever reports an outgoing call, and CallKit's ringtone is
+  /// for an incoming one - so the two configurations stay in sync in case
+  /// the providers are ever consolidated, per this file's own doc comment.
   private static func makeProvider() -> CXProvider {
     let configuration = CXProviderConfiguration(localizedName: "slim-m")
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.generic]
+    configuration.ringtoneSound = callKitRingtoneFileName
     return CXProvider(configuration: configuration)
   }
 

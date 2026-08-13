@@ -65,3 +65,22 @@ SOUNDS: dict[str, tuple[list[Note], str]] = {
         "on purpose.",
     ),
 }
+
+# A system asset for CXProviderConfiguration.ringtoneSound, not one of SOUNDS.
+CALLKIT_RINGTONE: tuple[list[Note], str] = (
+    [
+        Note(0.00, C5, 0.34), Note(0.16, G5, 0.40),
+        Note(0.62, C5, 0.34), Note(0.78, G5, 0.46),
+        Note(2.30, C5, 0.34), Note(2.46, G5, 0.40),
+        Note(2.92, C5, 0.34), Note(3.08, G5, 0.46),
+        Note(4.60, C5, 0.34), Note(4.76, G5, 0.40),
+        Note(5.22, C5, 0.34), Note(5.38, G5, 0.46),
+    ],
+    "call_ring's own two-note figure, repeated three times with a real "
+    "pause between each. CallKit loops a ringtone file on its own for the "
+    "life of the incoming-call screen, so this is a standalone ring cadence "
+    "rather than the one-shot in-app chime call_ring already is, and it is "
+    "deliberately absent from SOUNDS above: it carries no in-app trigger of "
+    "its own and so is exempt from the family's cross-sound loudness "
+    "invariants and its exactly-seven count.",
+)
