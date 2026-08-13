@@ -28,9 +28,10 @@ import 'voice_state.dart';
 export 'voice_state.dart' show VoiceState;
 
 part 'voice_controller_input.dart';
+part 'voice_controller_share.dart';
 
 class VoiceController extends StateNotifier<VoiceState>
-    with VoiceControllerInputMixin {
+    with VoiceControllerInputMixin, VoiceControllerShareMixin {
   VoiceController(
     this._ref, {
     VoiceSession? session,
@@ -121,7 +122,6 @@ class VoiceController extends StateNotifier<VoiceState>
   late final StreamSubscription<VoiceSessionState> _states;
   late final StreamSubscription<List<VoiceParticipant>> _participants;
   late final StreamSubscription<void> _endCallRequests;
-  Timer? _broadcastDeadline;
 
   /// Bumped by every [join] and [leave], so a stale call's continuation can
   /// tell it has been superseded; see [join]'s own comment on why this
@@ -324,6 +324,7 @@ class VoiceController extends StateNotifier<VoiceState>
   /// Whether this host can publish a screen share's own audio. True on web
   /// and Linux; see `screen_share_audio.dart` in the rtc package for why the
   /// rest cannot, or in Linux's case can only conditionally.
+  @override
   bool get supportsScreenShareAudio => _session.supportsScreenShareAudio;
 
   /// [identity]'s playback gain for this listener, 1.0 being unchanged.
@@ -408,82 +409,13 @@ class VoiceController extends StateNotifier<VoiceState>
     return ok;
   }
 
-  Future<void> setScreenShare(
-    bool enabled, {
-    ScreenShareQuality quality = ScreenShareQuality.balanced,
-    String? sourceId,
-    bool includeAudio = false,
-  }) async {
-    _cancelBroadcastDeadline();
-    final outcome = await _session.setScreenShareEnabled(
-      enabled,
-      quality: quality,
-      sourceId: sourceId,
-      // Defended here too, not only in the UI: a settings value can outlive a platform switch.
-      includeAudio: includeAudio && supportsScreenShareAudio,
-    );
-    switch (outcome) {
-      case ScreenShareOutcome.started:
-        state = state.copyWith(screenSharing: true, clearError: true);
-      case ScreenShareOutcome.stopped:
-        state = state.copyWith(screenSharing: false, clearError: true);
-      case ScreenShareOutcome.pendingBroadcast:
-        state = state.copyWith(awaitingBroadcast: true, clearError: true);
-        _broadcastDeadline = Timer(
-          broadcastStartTimeout,
-          _reportBroadcastNeverStarted,
-        );
-      case ScreenShareOutcome.unsupported:
-        state = state.copyWith(
-          screenSharing: false,
-          awaitingBroadcast: false,
-          error:
-              'This build cannot share a screen: its screen recording '
-              'extension is missing or not set up.',
-          retryable: false,
-        );
-      case ScreenShareOutcome.failed:
-        final cause = _session.lastError;
-        _log(
-          'Screen share ${enabled ? 'start' : 'stop'} failed',
-          detail: cause,
-        );
-        state = state.copyWith(
-          screenSharing: false,
-          awaitingBroadcast: false,
-          // The cause is included rather than dropped: "the system refused the
-          // capture" alone sent a real Linux failure to a log nobody reads.
-          error: enabled
-              ? 'Could not start sharing. ${cause ?? 'The system refused the capture.'}'
-              : 'Could not stop sharing. ${cause ?? ''}'.trim(),
-        );
-    }
-  }
+  @override
+  VoiceSession get _shareSession => _session;
 
+  @override
   void _log(String message, {Object? detail}) => _ref
       .read(debugLogProvider.notifier)
       .record('voice', message, detail: detail);
-
-  /// The user was shown a broadcast picker and nothing came of it: they
-  /// dismissed it, or there was nothing in it to pick. Either way the share
-  /// is not happening, and saying nothing would leave the button pretending.
-  void _reportBroadcastNeverStarted() {
-    _broadcastDeadline = null;
-    if (!state.awaitingBroadcast) return;
-    state = state.copyWith(
-      awaitingBroadcast: false,
-      screenSharing: false,
-      error:
-          'Screen sharing never started. Tap share again and choose Start '
-          'Broadcast. If nothing appeared to choose, this build has no screen '
-          'recording extension.',
-    );
-  }
-
-  void _cancelBroadcastDeadline() {
-    _broadcastDeadline?.cancel();
-    _broadcastDeadline = null;
-  }
 
   @override
   void dispose() {
