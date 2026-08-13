@@ -2268,17 +2268,25 @@ paths:
     get:
       operationId: searchMessages
       tags: [messages]
-      summary: Full-text search a channel's live messages.
+      summary: Full-text search a channel's live messages, with Slack-style operators.
       description: >
         Backed by FTS5; `q` reaches it close to as-is, so its mini query
         language (`AND`/`OR`/`NOT`, `"phrase"`, a trailing `*` prefix) is
-        available. Results are permission-filtered exactly like listing and
-        keyset paginated on `seq` the same way. A `q` that is not valid FTS5
-        syntax is a 400, never a 500.
+        available. `q` is optional: a search made entirely of `from`/`in`/
+        `has`/`after_date`/`before_date` needs no free text at all, though at
+        least one of `q` and those filters is required. Results are
+        permission-filtered exactly like listing and keyset paginated on
+        `seq` the same way. A `q` that is not valid FTS5 syntax is a 400,
+        never a 500. `in` is the one filter with an oracle-safety rule of its
+        own: a channel name that does not exist, or that exists but the
+        caller cannot view, answers with an empty array rather than a 403 or
+        404, so it cannot be used to learn a hidden channel exists.
       parameters:
         - name: q
           in: query
-          required: true
+          description: >
+            Free-text FTS5 query. Optional when at least one other filter is
+            given; when present, still must be non-blank.
           schema:
             type: string
             minLength: 1
@@ -2297,6 +2305,47 @@ paths:
             minimum: 1
             maximum: 100
             default: 50
+        - name: from
+          in: query
+          description: >
+            Only messages authored by this exact username (`from:username`).
+            A username matching no live account answers with no results,
+            never an error - the same oracle-safety rule `in` states above,
+            applied to an account instead of a channel.
+          schema:
+            type: string
+        - name: in
+          in: query
+          description: >
+            Search this channel by name instead of the one in the path
+            (`in:channel-name`). See this operation's own description for
+            what an unviewable or nonexistent name answers with.
+          schema:
+            type: string
+        - name: has
+          in: query
+          description: >
+            `has:attachment` and/or `has:link` (`has=attachment,link` for
+            both). `link` is a plain, case-sensitive substring match for
+            `http://`/`https://` in the content, not a real URL parse.
+          schema:
+            type: string
+        - name: after_date
+          in: query
+          description: >
+            `after:YYYY-MM-DD`. Inclusive: messages created on or after this
+            UTC calendar date.
+          schema:
+            type: string
+            format: date
+        - name: before_date
+          in: query
+          description: >
+            `before:YYYY-MM-DD`. Exclusive: messages created strictly before
+            this UTC calendar date, so the named date itself is excluded.
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Matching messages, newest first.

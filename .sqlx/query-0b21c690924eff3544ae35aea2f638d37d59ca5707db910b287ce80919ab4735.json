@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: ChannelId\" FROM channels\n               WHERE name = ? AND kind != 'dm' AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0b21c690924eff3544ae35aea2f638d37d59ca5707db910b287ce80919ab4735"
+}

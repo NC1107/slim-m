@@ -23,6 +23,13 @@ class ChannelSearchBar extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
+  /// The operators `parseSearchQuery` (`providers/message_search_query.dart`)
+  /// recognises, named here rather than left for someone to discover by
+  /// trial or by reading this feature's own PR.
+  static const operatorHint =
+      'Try from:name, in:channel, has:attachment, has:link, '
+      'before:YYYY-MM-DD, after:YYYY-MM-DD';
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -34,16 +41,27 @@ class ChannelSearchBar extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
-      child: AppInput(
-        controller: controller,
-        placeholder: 'Search this channel',
-        icon: Icon(
-          AppIcons.search,
-          size: AppSizes.icon16,
-          color: tokens.textSecondary,
-        ),
-        autofocus: true,
-        onChanged: onChanged,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppInput(
+            controller: controller,
+            placeholder: 'Search this channel',
+            icon: Icon(
+              AppIcons.search,
+              size: AppSizes.icon16,
+              color: tokens.textSecondary,
+            ),
+            autofocus: true,
+            onChanged: onChanged,
+          ),
+          const SizedBox(height: AppSpacing.s4),
+          Text(
+            operatorHint,
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+        ],
       ),
     );
   }

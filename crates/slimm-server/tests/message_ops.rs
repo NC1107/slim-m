@@ -10,7 +10,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{ChannelId, MessageId, UserId};
-use slimm_server::store::{Edited, MessageOpKind, Store};
+use slimm_server::store::{Edited, MessageOpKind, MessageSearchFilters, Store};
 
 mod support;
 
@@ -255,13 +255,25 @@ async fn an_edited_message_is_findable_under_its_new_content() {
     s.edit_message(id, "pangolin", author.id).await.unwrap();
 
     let hits = s
-        .search_messages(channel, "pangolin", None, 10)
+        .search_messages(
+            &[channel],
+            Some("pangolin"),
+            &MessageSearchFilters::default(),
+            None,
+            10,
+        )
         .await
         .unwrap();
     assert_eq!(hits.len(), 1, "the new content must be indexed");
     assert_eq!(hits[0].id, id);
     let stale = s
-        .search_messages(channel, "aardvark", None, 10)
+        .search_messages(
+            &[channel],
+            Some("aardvark"),
+            &MessageSearchFilters::default(),
+            None,
+            10,
+        )
         .await
         .unwrap();
     assert!(stale.is_empty(), "and the old content must not be");

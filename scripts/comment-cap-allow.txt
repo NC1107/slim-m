@@ -229,7 +229,6 @@ crates/slimm-server/tests/me.rs 2
 crates/slimm-server/tests/member_roles.rs 2
 crates/slimm-server/tests/message_delete.rs 1
 crates/slimm-server/tests/message_endpoints.rs 3
-crates/slimm-server/tests/message_search.rs 1
 crates/slimm-server/tests/openapi_contract.rs 1
 crates/slimm-server/tests/overwrites.rs 2
 crates/slimm-server/tests/permissions.rs 2
