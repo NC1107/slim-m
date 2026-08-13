@@ -11,7 +11,7 @@
 
 use super::AppState;
 use super::messages::{AttachmentDto, MessageDto, ReactionDto};
-use crate::ids::{MessageId, UserId};
+use crate::ids::{ChannelId, MessageId, UserId};
 use crate::store::Message;
 
 /// Batch-attaches each message's reaction summary and, if it carries one,
@@ -28,6 +28,15 @@ pub(crate) async fn with_reactions(
     let mut by_message = state.store.reactions_for_messages(&ids, viewer).await?;
     let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
     let mut threads_by_message = state.store.thread_summaries_for_messages(&ids).await?;
+    // One more batched query; empty when no message on this page has a thread, which is the common case.
+    let thread_channel_ids: Vec<ChannelId> = threads_by_message
+        .iter()
+        .map(|(_, s)| s.channel_id)
+        .collect();
+    let unread_by_channel = state
+        .store
+        .thread_unread_counts(&thread_channel_ids, viewer)
+        .await?;
 
     let mut dtos: Vec<MessageDto> = Vec::with_capacity(messages.len());
     for message in messages {
@@ -53,6 +62,13 @@ pub(crate) async fn with_reactions(
         }
         if let Some(pos) = threads_by_message.iter().position(|(mid, _)| *mid == id) {
             let (_, summary) = threads_by_message.swap_remove(pos);
+            dto.thread_unread_count = Some(
+                unread_by_channel
+                    .iter()
+                    .find(|(cid, _)| *cid == summary.channel_id)
+                    .map(|(_, count)| *count)
+                    .unwrap_or(0),
+            );
             dto.thread_channel_id = Some(summary.channel_id.to_string());
             dto.thread_reply_count = Some(summary.reply_count);
             dto.thread_last_reply_at = summary.last_reply_at;

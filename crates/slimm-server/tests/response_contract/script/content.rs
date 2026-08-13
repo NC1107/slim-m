@@ -372,29 +372,7 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         root,
     )
     .await;
-    let thread = c
-        .bare(
-            "openThread",
-            "POST",
-            &format!("{messages}/{message}/thread"),
-            root,
-        )
-        .await;
-    c.get(
-        "getThreadParent",
-        &format!("/channels/{}/thread-parent", text(&thread, "id")),
-        root,
-    )
-    .await;
-    // A reply, so thread_reply_count/thread_last_reply_at below exercise a real value.
-    c.json(
-        "sendMessage",
-        "POST",
-        &format!("/channels/{}/messages", text(&thread, "id")),
-        root,
-        json!({ "id": Uuid::now_v7().to_string(), "content": "first reply" }),
-    )
-    .await;
+    // Thread calls (openThread, getThreadParent, listThreads) moved to threads.rs; see script.rs.
     c.get(
         "listPinnedMessages",
         &format!("/channels/{channel}/pins"),

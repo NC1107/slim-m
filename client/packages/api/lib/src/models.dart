@@ -107,6 +107,7 @@ class Message {
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
+    this.threadUnreadCount,
     // Empty is the honest default and the common case; requiring these at
     // every construction site bought no safety and broke every caller.
     this.reactions = const [],
@@ -151,6 +152,12 @@ class Message {
   /// or null when [threadReplyCount] is null or zero.
   final int? threadLastReplyAt;
 
+  /// How many of the thread's live messages the caller has not yet read, or
+  /// null exactly when [threadChannelId] is null - same convention as the
+  /// other two thread fields. Genuinely 0 for a thread the caller has fully
+  /// read, never omitted the way an unstarted thread's fields are.
+  final int? threadUnreadCount;
+
   /// Reaction summaries, one entry per distinct emoji, with `reacted` set
   /// from the calling user's point of view. Always present: an empty list
   /// means no reactions, never that the server omitted them.
@@ -184,6 +191,7 @@ class Message {
         threadChannelId: json['thread_channel_id'] as String?,
         threadReplyCount: json['thread_reply_count'] as int?,
         threadLastReplyAt: json['thread_last_reply_at'] as int?,
+        threadUnreadCount: json['thread_unread_count'] as int?,
         // Not in the schema's `required` list despite its description promising
         // it is always sent; empty beats crashing on a conformant response.
         reactions: (json['reactions'] as List<dynamic>?)

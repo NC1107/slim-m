@@ -154,6 +154,91 @@ void main() {
     expect(find.text('Reply in thread'), findsNothing);
   });
 
+  testWidgets(
+    'Reply hints that a thread already exists rather than silently forking '
+    'the conversation, and stays a real reply action either way',
+    (tester) async {
+      var replied = false;
+      await tester.pumpWidget(
+        rowWith(
+          MessageActions(
+            canReply: true,
+            onReply: () => replied = true,
+            canEdit: false,
+            onEdit: noop,
+            canDelete: false,
+            onDelete: noop,
+            canManagePins: false,
+            pinned: false,
+            onTogglePin: noop,
+            canReport: false,
+            onReport: noop,
+            canBlockAuthor: false,
+            onBlockAuthor: noop,
+            canOpenThread: false,
+            onOpenThread: noop,
+            hasExistingThread: true,
+          ),
+        ),
+      );
+
+      final handle = tester.ensureSemantics();
+      await tester.longPressAt(pressPoint(tester));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reply'), findsOneWidget);
+      final replyItem = find.ancestor(
+        of: find.text('Reply'),
+        matching: find.byType(AppMenuItem),
+      );
+      final semantics = tester.getSemantics(replyItem);
+      expect(semantics.label, contains('A thread already exists'));
+      handle.dispose();
+
+      await tester.tap(find.text('Reply'));
+      expect(replied, isTrue, reason: 'the hint must not disable the action');
+    },
+  );
+
+  testWidgets('no thread-exists hint when the message has no thread yet', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      rowWith(
+        const MessageActions(
+          canReply: true,
+          onReply: noop,
+          canEdit: false,
+          onEdit: noop,
+          canDelete: false,
+          onDelete: noop,
+          canManagePins: false,
+          pinned: false,
+          onTogglePin: noop,
+          canReport: false,
+          onReport: noop,
+          canBlockAuthor: false,
+          onBlockAuthor: noop,
+          canOpenThread: false,
+          onOpenThread: noop,
+        ),
+      ),
+    );
+
+    final handle = tester.ensureSemantics();
+    await tester.longPressAt(pressPoint(tester));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reply'), findsOneWidget);
+    final replyItem = find.ancestor(
+      of: find.text('Reply'),
+      matching: find.byType(AppMenuItem),
+    );
+    final semantics = tester.getSemantics(replyItem);
+    expect(semantics.label, isNot(contains('A thread already exists')));
+    handle.dispose();
+  });
+
   testWidgets('the pin item reads "Unpin" once already pinned', (tester) async {
     await tester.pumpWidget(
       rowWith(

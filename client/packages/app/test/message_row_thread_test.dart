@@ -25,6 +25,7 @@ import 'message_row_harness.dart';
 Widget _rowWith({
   int? threadReplyCount,
   int? threadLastReplyAt,
+  int? threadUnreadCount,
   MessageActions actions = noActions,
 }) => harness(
   MessageRow(
@@ -43,6 +44,7 @@ Widget _rowWith({
     onCancelEdit: () {},
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
+    threadUnreadCount: threadUnreadCount,
   ),
 );
 
@@ -149,6 +151,25 @@ void main() {
       expect(find.byType(InkWell), findsNothing);
       final node = tester.getSemantics(find.byType(ThreadReplySummary));
       expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isFalse);
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    'a thread with unread replies announces so and is fully read once it is 0',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _rowWith(threadReplyCount: 2, threadUnreadCount: 1),
+      );
+      var node = tester.getSemantics(find.byType(ThreadReplySummary));
+      expect(node.label, contains('unread'));
+
+      await tester.pumpWidget(
+        _rowWith(threadReplyCount: 2, threadUnreadCount: 0),
+      );
+      node = tester.getSemantics(find.byType(ThreadReplySummary));
+      expect(node.label, isNot(contains('unread')));
       handle.dispose();
     },
   );

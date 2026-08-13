@@ -142,6 +142,62 @@ class ThreadParent {
       );
 }
 
+/// One row of [SlimmApiThreads.listThreads]: a thread's own channel id, the
+/// parent message it hangs off (flattened rather than referenced, so a
+/// listing needs no per-row follow-up fetch), and how busy and how read it
+/// is.
+class ThreadListItem {
+  const ThreadListItem({
+    required this.id,
+    required this.parentMessageId,
+    required this.parentContent,
+    required this.parentAuthorId,
+    required this.parentAuthorDisplayName,
+    required this.createdAt,
+    required this.replyCount,
+    required this.lastReplyAt,
+    required this.unreadCount,
+  });
+
+  /// The thread's own channel id. Open (or reuse) it with
+  /// [SlimmApiThreads.openThread].
+  final String id;
+  final String parentMessageId;
+
+  /// The parent message's current text, joined server-side at read time -
+  /// not a snapshot frozen at whenever the thread opened.
+  final String parentContent;
+
+  /// Null once the parent's author account is anonymized.
+  final String? parentAuthorId;
+  final String? parentAuthorDisplayName;
+  final int createdAt;
+
+  /// Undeleted replies in this thread. Can be 0.
+  final int replyCount;
+
+  /// When the newest undeleted reply was sent, or null when [replyCount] is 0.
+  final int? lastReplyAt;
+
+  /// How many of this thread's live messages the caller has not yet read -
+  /// the same read-tracking every channel already carries, surfaced here.
+  final int unreadCount;
+
+  bool get isUnread => unreadCount > 0;
+
+  factory ThreadListItem.fromJson(Map<String, dynamic> json) => ThreadListItem(
+        id: json['id'] as String,
+        parentMessageId: json['parent_message_id'] as String,
+        parentContent: json['parent_content'] as String,
+        parentAuthorId: json['parent_author_id'] as String?,
+        parentAuthorDisplayName: json['parent_author_display_name'] as String?,
+        createdAt: json['created_at'] as int,
+        replyCount: json['reply_count'] as int,
+        lastReplyAt: json['last_reply_at'] as int?,
+        unreadCount: json['unread_count'] as int,
+      );
+}
+
 /// One rail section's ordered contents, as a drag produces: the category it
 /// names (null for the implicit uncategorised section) and every channel now
 /// filed under it, in display order. The request shape

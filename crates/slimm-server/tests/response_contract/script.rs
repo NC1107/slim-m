@@ -19,10 +19,12 @@ use super::world::{Contract, Payload};
 mod content;
 mod content_media_slots;
 mod people;
+mod threads;
 
 use content::{channel_calls, emoji_calls, message_calls};
 use content_media_slots::media_slot_calls;
 use people::{moderation_calls, profile_calls, safety_calls};
+use threads::thread_calls;
 
 const PASSWORD: &str = "a-long-enough-password";
 /// A PNG header is all the server's content sniffing looks at.
@@ -164,6 +166,7 @@ pub async fn run(c: &mut Contract) {
 
     let channel = channel_calls(c, root, &bob_id).await;
     let message = message_calls(c, root, &channel).await;
+    thread_calls(c, root, &channel, &message).await;
     emoji_calls(c, root).await;
     moderation_calls(c, root, bob_token, &message).await;
 

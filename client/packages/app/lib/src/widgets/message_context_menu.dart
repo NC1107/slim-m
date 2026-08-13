@@ -32,6 +32,7 @@ class MessageActions {
     required this.onBlockAuthor,
     required this.canOpenThread,
     required this.onOpenThread,
+    this.hasExistingThread = false,
   });
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
@@ -68,6 +69,15 @@ class MessageActions {
   /// message already has, or starts one.
   final bool canOpenThread;
   final VoidCallback onOpenThread;
+
+  /// Whether this message already has a live thread - the cross-link
+  /// docs/IMPLIED-GAPS.md asked for between the plain "Reply" action and
+  /// "Reply in thread": both stay offered (an inline reply is still an
+  /// honest, lighter-weight action than opening a side conversation), but
+  /// "Reply" carries a hint here so choosing it is informed rather than a
+  /// silent fork away from a conversation that already exists. See
+  /// [MessageContextMenuRegion]'s own `_items` for how it renders.
+  final bool hasExistingThread;
 }
 
 /// Wraps [child] so a right-click or long-press over it opens a menu for
@@ -119,10 +129,14 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
   /// for one, popping the sheet's own route for the other.
   List<Widget> _items(BuildContext context, VoidCallback close) {
     final actions = widget.actions;
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     void run(VoidCallback action) {
       close();
       action();
     }
+
+    // See MessageActions.hasExistingThread's own doc comment for why "Reply" stays offered here.
+    final showThreadHint = actions.canReply && actions.hasExistingThread;
 
     return [
       AppMenuItem(
@@ -134,6 +148,17 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
         AppMenuItem(
           label: 'Reply',
           leading: AppIcons.reply,
+          // A glyph, not text: this row is only 250px wide, with no room for a second string.
+          trailing: showThreadHint
+              ? Icon(
+                  AppIcons.thread,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                )
+              : null,
+          semanticLabel: showThreadHint
+              ? 'Reply. A thread already exists on this message.'
+              : null,
           onTap: () => run(actions.onReply),
         ),
       if (actions.canOpenThread)

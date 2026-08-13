@@ -21,7 +21,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::OpenThreadError;
+use crate::store::{OpenThreadError, ThreadListItem};
 
 /// The thread routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -31,6 +31,7 @@ pub fn routes() -> Router<AppState> {
             post(open),
         )
         .route("/channels/{channel_id}/thread-parent", get(thread_parent))
+        .route("/channels/{channel_id}/threads", get(list))
 }
 
 /// Opens (or reuses) the thread hanging off a message.
@@ -67,6 +68,11 @@ async fn open(
         Err(OpenThreadError::NestedThread) => {
             return Err(ApiError::BadRequest(
                 "cannot open a thread on a message that is itself inside a thread",
+            ));
+        }
+        Err(OpenThreadError::TooMany) => {
+            return Err(ApiError::BadRequest(
+                "this channel already has as many open threads as it can hold",
             ));
         }
         Err(OpenThreadError::Internal(e)) => return Err(e.into()),
@@ -137,6 +143,68 @@ async fn thread_parent(
         parent_channel_name: name,
         parent_message_id: Some(parent.parent_message_id.to_string()),
     }))
+}
+
+/// One row of `GET /channels/{channel_id}/threads`.
+#[derive(Serialize)]
+struct ThreadListItemDto {
+    id: String,
+    parent_message_id: String,
+    /// The parent message's current text - a snippet for the client to
+    /// truncate for display, not a copy frozen at open time; see
+    /// [`crate::store::ThreadListItem::parent_content`].
+    parent_content: String,
+    parent_author_id: Option<String>,
+    parent_author_display_name: Option<String>,
+    created_at: i64,
+    reply_count: i64,
+    last_reply_at: Option<i64>,
+    /// How many of this thread's live messages the caller has not yet read.
+    unread_count: i64,
+}
+
+impl From<ThreadListItem> for ThreadListItemDto {
+    fn from(item: ThreadListItem) -> Self {
+        Self {
+            id: item.thread_channel_id.to_string(),
+            parent_message_id: item.parent_message_id.to_string(),
+            parent_content: item.parent_content,
+            parent_author_id: item.parent_author_id.map(|id| id.to_string()),
+            parent_author_display_name: item.parent_author_display_name,
+            created_at: item.created_at,
+            reply_count: item.reply_count,
+            last_reply_at: item.last_reply_at,
+            unread_count: item.unread_count,
+        }
+    }
+}
+
+/// `GET /channels/{channel_id}/threads`: every live thread hanging off a
+/// message in this channel, newest activity first.
+///
+/// One check, on `channel_id` alone: a thread's own visibility always
+/// resolves to its parent's (see this module's own doc comment), so a
+/// caller who can view `channel_id` can see every thread it lists, and one
+/// who cannot gets the same `403` `listMessages` would give them for the
+/// same channel - never a filtered or masked answer, since there is nothing
+/// left to filter once the one check has already refused.
+async fn list(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ThreadListItemDto>>, ApiError> {
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    if !state
+        .store
+        .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
+        .await?
+    {
+        return Err(ApiError::Forbidden);
+    }
+    let items = state.store.list_threads(channel_id, ctx.user_id).await?;
+    Ok(Json(
+        items.into_iter().map(ThreadListItemDto::from).collect(),
+    ))
 }
 
 /// Publishes a `ThreadUpdated` frame when `channel_id` is a thread's own

@@ -49,6 +49,15 @@ pub(crate) struct MessageDto {
     /// or `null` when `thread_reply_count` is `null` or `0`. Lets a client
     /// show "3 replies, last one yesterday" rather than just a count.
     pub(crate) thread_last_reply_at: Option<i64>,
+    /// How many of the thread's live messages the caller has not yet read,
+    /// or `null` when `thread_channel_id` is `null` - same convention as the
+    /// other three thread fields. Genuinely `0` for a thread the caller has
+    /// fully read, never omitted the way an unstarted thread's fields are.
+    /// Batch-loaded alongside `thread_channel_id` by
+    /// [`super::message_enrich::with_reactions`], from
+    /// [`crate::store::Store::thread_unread_counts`] - the read-tracking
+    /// every channel already has, surfaced here for the first time.
+    pub(crate) thread_unread_count: Option<i64>,
     /// Empty unless the caller asked for a list, which is the only path that
     /// batch-loads them; a single echoed message carries none because it
     /// cannot have any yet.
@@ -124,6 +133,7 @@ impl From<Message> for MessageDto {
             thread_channel_id: None,
             thread_reply_count: None,
             thread_last_reply_at: None,
+            thread_unread_count: None,
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),

@@ -41,6 +41,22 @@ final threadParentProvider = FutureProvider.autoDispose
       (ref, channelId) => ref.watch(apiProvider).getThreadParent(channelId),
     );
 
+/// Every live thread hanging off a message in [channelId], newest activity
+/// first - the listing docs/IMPLIED-GAPS.md named as missing entirely:
+/// before this, the only way to find a thread was from the message it hangs
+/// off.
+///
+/// `autoDispose`, fetched fresh whenever the threads sheet opens. No live
+/// event wires into this, deliberately: unlike the message transcript this
+/// is a low-traffic, occasionally-opened surface, so a plain re-fetch on
+/// reopen (or `ref.invalidate` from a Retry button) is simpler than
+/// teaching `ThreadUpdated` to also patch a list nobody is usually looking
+/// at while it fires.
+final threadsListProvider = FutureProvider.autoDispose
+    .family<List<api.ThreadListItem>, String>(
+      (ref, channelId) => ref.watch(apiProvider).listThreads(channelId),
+    );
+
 /// Opens (or reuses) the thread hanging off [messageId] in [channelId], and
 /// gets it into the local store with an initial page of whatever it already
 /// holds.

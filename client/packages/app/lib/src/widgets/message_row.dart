@@ -66,6 +66,7 @@ class MessageRow extends StatelessWidget {
     this.poll,
     this.threadReplyCount,
     this.threadLastReplyAt,
+    this.threadUnreadCount,
     this.replyTo,
     this.onReplyTap,
   });
@@ -155,6 +156,11 @@ class MessageRow extends StatelessWidget {
   /// entirely, since a message with no thread must never read as a
   /// zero-reply one. See `ThreadReplySummary`.
   final int? threadReplyCount;
+
+  /// How many of the thread's live messages this viewer has not yet read,
+  /// from `MessageExtras.threadUnreadCount`. Null exactly when
+  /// [threadReplyCount] is null; can be a genuine 0.
+  final int? threadUnreadCount;
 
   /// When the thread's newest reply was sent, unix milliseconds. Null
   /// whenever [threadReplyCount] is null or zero.
@@ -313,6 +319,7 @@ class MessageRow extends StatelessWidget {
                                       ThreadReplySummary(
                                         replyCount: threadReplyCount!,
                                         lastReplyAt: threadLastReplyAt,
+                                        unread: (threadUnreadCount ?? 0) > 0,
                                         onTap: actions.canOpenThread
                                             ? actions.onOpenThread
                                             : null,

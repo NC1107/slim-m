@@ -55,6 +55,7 @@ mod roles;
 mod safety;
 mod sessions;
 mod space;
+mod thread_listing;
 mod threads;
 mod timeouts;
 mod users;
@@ -101,7 +102,10 @@ pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };
 pub use space::JoinPolicy;
-pub use threads::{OpenThreadError, OpenedThread, ThreadParent, ThreadSummary};
+pub use thread_listing::ThreadListItem;
+pub use threads::{
+    MAX_THREADS_PER_CHANNEL, OpenThreadError, OpenedThread, ThreadParent, ThreadSummary,
+};
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
 
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this

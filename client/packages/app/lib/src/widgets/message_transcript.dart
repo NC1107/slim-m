@@ -26,8 +26,13 @@ import 'message_row_identity.dart';
 import 'message_transcript_widgets.dart';
 
 /// What a viewer may do to one message, decided by the screen because it is
-/// the screen that knows who is looking and what they hold.
-typedef MessageActionsFor = MessageActions Function(Message message);
+/// the screen that knows who is looking and what they hold. The bool is
+/// whether [message] already has a live thread - known to the transcript
+/// alone, from `MessageExtras.threadChannelId`, so it is threaded through
+/// as a parameter rather than the caller having to ask `MessageExtras`
+/// again for something already in hand.
+typedef MessageActionsFor =
+    MessageActions Function(Message message, bool hasExistingThread);
 
 class MessageTranscript extends StatefulWidget {
   const MessageTranscript({
@@ -379,6 +384,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                 poll: extras.poll,
                 threadReplyCount: extras.threadReplyCount,
                 threadLastReplyAt: extras.threadLastReplyAt,
+                threadUnreadCount: extras.threadUnreadCount,
                 replyTo: switch (message.replyToId) {
                   final String id => byId[id],
                   null => null,
@@ -391,7 +397,10 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                 onSubmitEdit: (content) =>
                     widget.onSubmitEdit(message, content),
                 onCancelEdit: widget.onCancelEdit,
-                actions: widget.actionsFor(message),
+                actions: widget.actionsFor(
+                  message,
+                  extras.threadChannelId != null,
+                ),
               ),
             );
             final content = message.id == widget.jumpTargetId

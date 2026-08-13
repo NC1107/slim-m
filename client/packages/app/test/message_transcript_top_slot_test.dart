@@ -73,7 +73,7 @@ MessageTranscript _transcript({required String? channelName}) =>
       history: const ChannelHistory(atStart: true),
       onLoadOlder: () {},
       onRetryOlder: () {},
-      actionsFor: (_) => noActions,
+      actionsFor: (_, _) => noActions,
       onRetry: (_) {},
       onDiscard: (_) {},
       onPickReaction: (_, _) {},

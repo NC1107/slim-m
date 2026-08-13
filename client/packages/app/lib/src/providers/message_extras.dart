@@ -59,6 +59,7 @@ class MessageExtras {
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
+    this.threadUnreadCount,
   });
 
   final List<api.ReactionSummary> reactions;
@@ -66,10 +67,17 @@ class MessageExtras {
   final api.Poll? poll;
 
   /// The thread opened from this message, or null if none is known yet -
-  /// same three fields, same merge rule, as [api.Message] carries them.
+  /// same four fields, same merge rule, as [api.Message] carries them.
   final String? threadChannelId;
   final int? threadReplyCount;
   final int? threadLastReplyAt;
+
+  /// How many of the thread's live messages this viewer has not yet read,
+  /// or null exactly when [threadChannelId] is null. Only ever set from a
+  /// REST fetch: a live `ThreadUpdated` frame carries no per-viewer answer
+  /// (see [_applyThreadUpdated]), so this is left as whatever the last
+  /// fetch established until the next one corrects it.
+  final int? threadUnreadCount;
 
   MessageExtras copyWith({
     List<api.ReactionSummary>? reactions,
@@ -82,6 +90,7 @@ class MessageExtras {
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
+    threadUnreadCount: threadUnreadCount,
   );
 
   static const empty = MessageExtras();
@@ -167,6 +176,7 @@ class MessageExtrasController
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
     threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,
+    threadUnreadCount: message.threadUnreadCount ?? existing?.threadUnreadCount,
   );
 
   /// Replaces the cached tallies from a broadcast, carrying `reacted` over from
@@ -213,6 +223,8 @@ class MessageExtrasController
         threadChannelId: threadChannelId,
         threadReplyCount: replyCount,
         threadLastReplyAt: lastReplyAt,
+        // No per-viewer answer rides this frame; see threadUnreadCount's own doc comment.
+        threadUnreadCount: existing.threadUnreadCount,
       ),
     );
   }

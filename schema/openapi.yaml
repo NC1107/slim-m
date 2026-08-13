@@ -1141,6 +1141,50 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /channels/{channelId}/threads:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listThreads
+      tags: [channels]
+      summary: Every live thread hanging off a message in this channel.
+      description: >
+        Before this, the only way to find a thread was from the message it
+        hangs off (`Message.thread_channel_id`). Newest activity first: a
+        thread with a reply sorts on that reply, one with none yet sorts on
+        when it was opened. Each row carries the parent message's own
+        content and author, so a listing can show what a thread is about
+        without a second fetch, and how many of the thread's own messages
+        the caller has not yet read.
+
+
+        Requires only VIEW_CHANNEL on `channelId`, checked once: a thread's
+        visibility always resolves to its parent's, the same rule
+        `getChannelPermissions` and every other channel-scoped check in this
+        API already applies, so a caller who can view the parent can see
+        every thread it lists and one who cannot gets the same 403
+        `listMessages` would give for the same channel.
+
+
+        A channel holds at most 500 live threads, refused at `openThread`
+        rather than paged at this read, the same shape `listPinnedMessages`
+        already uses for its own 200-pin ceiling.
+      responses:
+        "200":
+          description: The channel's live threads, newest activity first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ThreadListItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /channels/order:
     put:
       operationId: reorderChannels
@@ -2138,7 +2182,10 @@ paths:
         SEND_MESSAGES in `channelId`, the same bits `sendMessage` itself
         needs there, since starting a thread is a way of sending rather than
         a way of managing the channel. Refused if the named message is
-        itself inside a thread: nesting is not supported.
+        itself inside a thread: nesting is not supported. Also refused,
+        with a 400, once `channelId` already holds 500 live threads -
+        reopening one that already exists never counts against that
+        ceiling.
       responses:
         "200":
           description: The thread channel, created on first use.
@@ -5026,6 +5073,14 @@ components:
           description: >-
             When the thread's newest undeleted reply was sent, unix
             milliseconds, or null when thread_reply_count is null or 0.
+        thread_unread_count:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            How many of the thread's live messages the caller has not yet
+            read, or null exactly when thread_channel_id is null. Genuinely
+            0 for a thread the caller has fully read - never omitted the way
+            an unstarted thread's fields are.
         reactions:
           type: array
           description: >-
@@ -5416,6 +5471,64 @@ components:
           format: uuid
           nullable: true
           description: The message this thread hangs off.
+
+    ThreadListItem:
+      description: >-
+        One row of `listThreads`: a thread's own channel id, the parent
+        message it hangs off (flattened, not just referenced, so a list
+        needs no per-row follow-up fetch), and how busy and how read it is.
+      type: object
+      required:
+        [
+          id,
+          parent_message_id,
+          parent_content,
+          parent_author_id,
+          parent_author_display_name,
+          created_at,
+          reply_count,
+          last_reply_at,
+          unread_count,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The thread's own channel id. Open (or reuse) it with `openThread`.
+        parent_message_id:
+          type: string
+          format: uuid
+        parent_content:
+          type: string
+          description: >-
+            The parent message's current text, joined at read time - not a
+            snapshot frozen at whenever the thread opened, so an edit to the
+            parent is reflected the next time this listing is fetched.
+        parent_author_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the parent's author account is anonymized.
+        parent_author_display_name:
+          type: [string, "null"]
+        created_at:
+          type: integer
+          format: int64
+          description: When the thread was opened, unix milliseconds.
+        reply_count:
+          type: integer
+          format: int64
+          description: Undeleted replies in this thread. Can be 0.
+        last_reply_at:
+          type: [integer, "null"]
+          format: int64
+          description: When the newest undeleted reply was sent, or null when reply_count is 0.
+        unread_count:
+          type: integer
+          format: int64
+          description: >-
+            How many of this thread's live messages the caller has not yet
+            read - the same read-tracking every channel already carries,
+            surfaced here for the first time.
 
     ReadState:
       type: object
