@@ -45,6 +45,7 @@ async fn world() -> (Store, axum::Router, support::TestDbGuard) {
         push: PushSender::disabled(),
         voice: VoiceService::disabled(),
         media: Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
     (store, app, guard)
 }

@@ -50,6 +50,7 @@ fn app_with_hops(store: Store, hops: usize) -> Router {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     })
 }
 

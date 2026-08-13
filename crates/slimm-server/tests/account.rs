@@ -220,6 +220,7 @@ async fn http_delete_account_rejects_the_token_afterward() {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
 
     // Register and grab the access token.
@@ -294,6 +295,7 @@ async fn the_last_administrator_cannot_strand_a_populated_deployment() {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
 
     let signup = |username: &'static str, invite: Option<String>| {

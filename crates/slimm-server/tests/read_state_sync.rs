@@ -51,6 +51,7 @@ async fn setup(everyone: Permissions) -> Fixture {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
     let user = store.create_user("alice", "Alice").await.unwrap();
     let tokens = store.open_session(user.id, "dev").await.unwrap();

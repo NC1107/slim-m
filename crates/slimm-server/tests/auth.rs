@@ -228,6 +228,7 @@ async fn http_register_ticket_and_logout() {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
 
     // Register.
@@ -314,6 +315,7 @@ async fn http_login_rejects_bad_credentials() {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
 
     let wrong_password = app
@@ -371,6 +373,7 @@ async fn http_register_rejects_spoofing_display_name() {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
 
     let response = app

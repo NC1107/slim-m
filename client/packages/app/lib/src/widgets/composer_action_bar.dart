@@ -30,6 +30,8 @@ class ComposerActionBar extends StatelessWidget {
     required this.onSendPressed,
     required this.onInsertCode,
     required this.onPickEmoji,
+    required this.gifSearchEnabled,
+    required this.onPickGif,
   });
 
   final bool touch;
@@ -38,6 +40,12 @@ class ComposerActionBar extends StatelessWidget {
   final String channelId;
   final String channelName;
   final bool hasText;
+
+  /// Whether this deployment offers GIF search at all
+  /// (`Version.gifSearchEnabled`); the desktop icon button is absent, not
+  /// disabled, when it does not.
+  final bool gifSearchEnabled;
+  final VoidCallback onPickGif;
 
   /// Whether [onSendPressed] is offered at all right now; see
   /// `composer.dart`'s own `_canSend` for everything that feeds it.
@@ -102,6 +110,13 @@ class ComposerActionBar extends StatelessWidget {
                 tooltip: 'Insert code',
                 onPressed: onInsertCode,
               ),
+              if (gifSearchEnabled)
+                AppIconButton(
+                  icon: AppIcons.gif,
+                  semanticLabel: 'Insert a GIF',
+                  tooltip: 'Insert a GIF',
+                  onPressed: onPickGif,
+                ),
             ],
             AppIconButton(
               icon: AppIcons.smile,

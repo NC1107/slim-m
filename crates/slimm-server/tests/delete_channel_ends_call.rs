@@ -83,6 +83,7 @@ fn app(store: Store, voice: VoiceService) -> Router {
         push: PushSender::disabled(),
         voice,
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     })
 }
 

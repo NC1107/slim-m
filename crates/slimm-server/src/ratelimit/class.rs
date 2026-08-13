@@ -101,6 +101,17 @@ pub enum Class {
     /// [`Class::CanvasStrokePreview`] already works - not a smaller budget
     /// here, which would break the avatar case this exists to serve.
     Asset,
+    /// Searching a third-party GIF provider, and picking a result to attach.
+    ///
+    /// Tighter than [`Class::Read`] on purpose: unlike every other read this
+    /// server serves, each request here is a real outbound call to a
+    /// provider this deployment has its own, possibly-metered API key with -
+    /// a client bug or a tight retype loop should not be able to spend that
+    /// budget as fast as it can open connections. Sized for a person typing
+    /// a query, pausing, then picking a result, not for a per-keystroke
+    /// search; see `http::gifs` for the debounce that keeps it that shape in
+    /// practice.
+    Gif,
 }
 
 impl Class {
@@ -122,6 +133,7 @@ impl Class {
             Class::CanvasStrokePreview => (12_288.0, 6_144.0),
             // A full member page plus a transcript's own avatars, at once.
             Class::Asset => (150.0, 25.0),
+            Class::Gif => (10.0, 1.0),
         }
     }
 
@@ -143,6 +155,7 @@ impl Class {
         Class::CanvasCursor,
         Class::CanvasStrokePreview,
         Class::Asset,
+        Class::Gif,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and

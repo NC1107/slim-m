@@ -25,6 +25,7 @@ class Version {
     required this.protocol,
     this.pushEnabled,
     this.inviteRequired,
+    this.gifSearchEnabled,
     this.capabilities,
     this.identity,
   });
@@ -43,6 +44,12 @@ class Version {
   /// older than 0.14.2, which is "unknown": the sign-up screen stays quiet
   /// rather than promising either way.
   final bool? inviteRequired;
+
+  /// Whether this deployment can search and attach GIFs at all. Null on a
+  /// server too old to report it, and a client treats that the same as
+  /// `false`: unlike push or invites there is nothing to warn anyone about
+  /// either way, so the picker is simply absent - no button, no request.
+  final bool? gifSearchEnabled;
 
   /// The optional features the server serves, by name. Null on servers older
   /// than 0.17.0, which is "unknown", not "none".
@@ -76,6 +83,7 @@ class Version {
         protocol: json['protocol'] as int,
         pushEnabled: json['push_enabled'] as bool?,
         inviteRequired: json['invite_required'] as bool?,
+        gifSearchEnabled: json['gif_search_enabled'] as bool?,
         // A non-list here is a foreign or broken server, which is unknown
         // rather than a reason to crash sign-in.
         capabilities: switch (json['capabilities']) {

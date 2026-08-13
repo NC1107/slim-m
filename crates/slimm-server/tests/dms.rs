@@ -47,6 +47,7 @@ fn app(store: Store) -> Router {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     })
 }
 
@@ -541,8 +542,7 @@ async fn channel_management_routes_cannot_touch_a_dm() {
         "a DM must not be deletable through the channel routes"
     );
 
-    // The real point: the conversation still opens afterwards. Before the fix
-    // this returned 500 for this pair forever.
+    // The real point: the conversation still opens afterwards (used to 500 forever).
     let (reopened, again) = open_dm(&app, &admin_token, &bob_id).await;
     assert_eq!(reopened, StatusCode::OK);
     assert_eq!(again["channel_id"].as_str().unwrap(), dm_id);

@@ -376,6 +376,7 @@ Future<void> showComposerActionsSheet(
   required VoidCallback onPasteImage,
   required VoidCallback onPoll,
   required VoidCallback onCode,
+  VoidCallback? onGif,
 }) {
   return showAppSheet<void>(
     context,
@@ -390,6 +391,7 @@ Future<void> showComposerActionsSheet(
             (AppIcons.clipboardPaste, 'Paste image', onPasteImage),
           (AppIcons.poll, 'Create a poll', onPoll),
           (AppIcons.code, 'Insert code', onCode),
+          if (onGif != null) (AppIcons.gif, 'GIF', onGif),
         ];
         return SafeArea(
           child: Padding(

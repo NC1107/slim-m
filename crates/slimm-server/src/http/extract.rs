@@ -134,6 +134,7 @@ pub(crate) const READ: u8 = 4;
 pub(crate) const UPLOAD: u8 = 5;
 pub(crate) const CANVAS: u8 = 6;
 pub(crate) const ASSET: u8 = 7;
+pub(crate) const GIF: u8 = 8;
 
 /// Panics on an unknown code rather than falling back.
 ///
@@ -152,6 +153,7 @@ fn class_of(code: u8) -> Class {
         UPLOAD => Class::Upload,
         CANVAS => Class::Canvas,
         ASSET => Class::Asset,
+        GIF => Class::Gif,
         other => unreachable!("no rate-limit class for code {other}"),
     }
 }

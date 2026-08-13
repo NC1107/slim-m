@@ -38,6 +38,8 @@ void main() {
               onSendPressed: () {},
               onInsertCode: () {},
               onPickEmoji: () {},
+              gifSearchEnabled: false,
+              onPickGif: () {},
             ),
           ),
         ),

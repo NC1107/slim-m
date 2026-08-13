@@ -44,6 +44,7 @@ fn app_with_hub(store: Store, hub: Hub) -> Router {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     })
 }
 

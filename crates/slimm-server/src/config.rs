@@ -80,6 +80,22 @@ pub struct Config {
     #[serde(default)]
     pub max_total_attachment_bytes: Option<u64>,
 
+    /// Which third-party GIF search provider this deployment proxies to:
+    /// `tenor` or `klipy`, case-insensitively. Unset means no GIF search at
+    /// all, and unrecognized text is a startup error rather than a silent
+    /// fallback, the same treatment an unsafe relay URL scheme gets.
+    ///
+    /// Both this and `gif_api_key` must be set together, the same two-state
+    /// shape push and LiveKit above already use: a self-host with no key for
+    /// either provider simply has no GIF search, a fully supported
+    /// deployment. The proxy exists so a client's search and every thumbnail
+    /// it renders reach the provider through this server rather than
+    /// directly, keeping members' own IP addresses away from Tenor or Klipy;
+    /// see [`crate::http::gifs`].
+    pub gif_provider: Option<String>,
+    /// The operator's API key for whichever provider `gif_provider` names.
+    pub gif_api_key: Option<String>,
+
     /// Browser origins allowed to call this deployment cross-origin, comma
     /// separated, for example `https://app.example.com,http://localhost:8099`.
     ///
@@ -144,6 +160,8 @@ impl Default for Config {
             attachments_dir: default_attachments_dir(),
             attachment_max_bytes: default_attachment_max_bytes(),
             max_total_attachment_bytes: None,
+            gif_provider: None,
+            gif_api_key: None,
             cors_allowed_origins: None,
             trust_proxy_hops: 0,
         }
@@ -191,6 +209,8 @@ mod tests {
             from_empty_env.attachment_max_bytes,
             defaulted.attachment_max_bytes
         );
+        assert_eq!(from_empty_env.gif_provider, defaulted.gif_provider);
+        assert_eq!(from_empty_env.gif_api_key, defaulted.gif_api_key);
         assert_eq!(
             from_empty_env.cors_allowed_origins,
             defaulted.cors_allowed_origins

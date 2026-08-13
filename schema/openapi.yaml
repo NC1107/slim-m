@@ -2064,6 +2064,169 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /gifs/search:
+    get:
+      operationId: searchGifs
+      tags: [gifs]
+      summary: Search the deployment's configured GIF provider.
+      description: >
+        Requires deployment-wide ATTACH_FILES, the same bit an ordinary
+        `uploadAttachment` needs - this feature exists to end in an
+        attachment, so someone who could not attach one anyway gets nothing
+        to browse either. Proxied end to end: this server calls the
+        configured provider (Tenor or Klipy) on the caller's behalf, so a
+        member's own IP address and search terms never reach it directly.
+
+
+        Each result's `id` is an opaque token minted by this request, never
+        the provider's own id or CDN URL. It is redeemable at
+        `getGifPreview` and `selectGif` for a short time and then expires;
+        an expired or unknown token answers 503 rather than 404, the same
+        "try again" a provider hiccup gets, since a client's only remedy
+        either way is to search again.
+
+
+        A 501 means this deployment has no GIF provider configured at all
+        (see `/version`'s `gif_search_enabled`), which a client is expected
+        to check before ever showing a GIF picker.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: The search query. Refused with 400 if empty or all whitespace.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Most results to return. Defaults to 20, capped at 50.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Search results, newest-relevance-first as the provider ordered them.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GifResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no GIF provider configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /gifs/preview/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        description: An opaque id from a searchGifs result.
+        schema:
+          type: string
+    get:
+      operationId: getGifPreview
+      tags: [gifs]
+      summary: Fetch a search result's thumbnail, proxied through this server.
+      description: >
+        Streams a small preview image for a token `searchGifs` minted, so a
+        result grid never asks a client to load an image straight from the
+        provider's own CDN. Requires the same ATTACH_FILES bit `searchGifs`
+        does.
+      responses:
+        "200":
+          description: The thumbnail's raw bytes, sniffed the same way a stored attachment's are.
+          content:
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no GIF provider configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /gifs/select:
+    post:
+      operationId: selectGif
+      tags: [gifs]
+      summary: Pick a search result and store it as an ordinary attachment.
+      description: >
+        Downloads the full-resolution image through this server for a token
+        `searchGifs` minted, and stores it exactly the way `uploadAttachment`
+        stores a client-supplied body: content-addressed, sniffed rather than
+        trusted, checked against both the per-upload and deployment-wide size
+        ceilings. The response is the same `Attachment` shape
+        `uploadAttachment` answers with, and its `id` may be referenced in
+        `attachment_ids` on `sendMessage` exactly like one from an upload -
+        nothing about sending it later depends on the provider or the token
+        again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                  description: An opaque id from a searchGifs result.
+      responses:
+        "201":
+          description: The stored attachment's metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attachment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no GIF provider configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
+
   /channels/{channelId}/messages/polls:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -3831,6 +3994,14 @@ components:
             0.14.2, which a client must treat as unknown rather than false.
             Unauthenticated for the same reason `push_enabled` is: the
             sign-up screen has to say so before an account exists.
+        gif_search_enabled:
+          type: boolean
+          description: >
+            Whether this deployment can search and attach GIFs at all (both
+            SLIMM_GIF_PROVIDER and SLIMM_GIF_API_KEY are set). A client is
+            expected to check this before ever showing a GIF picker button,
+            so a disabled deployment costs it nothing: no button, no
+            request.
         capabilities:
           type: array
           items:
@@ -5256,6 +5427,28 @@ components:
         size:
           type: integer
           format: int64
+
+    GifResult:
+      type: object
+      required: [id, title, width, height]
+      properties:
+        id:
+          type: string
+          description: >
+            An opaque token minted by this search, never the provider's own
+            id or CDN URL. Redeemable at getGifPreview and selectGif for a
+            short time, then expires.
+        title:
+          type: string
+          description: The provider's own description of the result, which may be empty.
+        width:
+          type: integer
+          description: >
+            The full-resolution image's width, or 0 when the provider's
+            response does not carry dimensions.
+        height:
+          type: integer
+          description: Paired with width; see that field's own description.
 
     PinnedMessage:
       description: >-

@@ -42,6 +42,7 @@ mod emoji;
 mod error;
 mod escalation;
 mod extract;
+pub mod gifs;
 mod invites;
 mod members;
 mod message_dto;
@@ -109,6 +110,7 @@ pub struct AppState {
     pub push: PushSender,
     pub voice: VoiceService,
     pub media: Media,
+    pub gifs: gifs::GifSearch,
 }
 
 /// Builds the router over the shared application state.
@@ -147,6 +149,7 @@ pub fn router(state: AppState) -> Router {
         .merge(voice::routes())
         .merge(polls::routes())
         .merge(users::routes())
+        .merge(gifs::routes())
         .merge(attachments::routes(state.media.max_attachment_bytes()))
         // Bounded, and the socket is deliberately outside this: see below.
         .layer(ConcurrencyLimitLayer::new(MAX_INFLIGHT_REQUESTS))
@@ -182,6 +185,12 @@ struct Version {
     /// Whether creating an account here needs an invite code. Onboarding
     /// needs this before an account exists, so it rides on /version.
     invite_required: bool,
+    /// Whether this deployment can search and attach GIFs at all (both
+    /// `SLIMM_GIF_PROVIDER` and `SLIMM_GIF_API_KEY` are set). The same
+    /// two-state shape as `push_enabled`: absent is meaningless here since
+    /// this field always exists, so a client reads `false` as "no GIF picker
+    /// on this deployment" rather than needing a third "unknown" state.
+    gif_search_enabled: bool,
     /// The optional features this build serves, read off the router itself.
     /// See [`capability`] for why it is not a list kept by hand.
     capabilities: Vec<&'static str>,
@@ -261,6 +270,7 @@ async fn version(
         protocol: PROTOCOL_VERSION,
         push_enabled: state.push.is_enabled(),
         invite_required: state.store.join_policy().await? == JoinPolicy::Invite,
+        gif_search_enabled: state.gifs.is_enabled(),
         capabilities: capabilities(state).await,
         identity: ServerIdentityDto {
             public_key: BASE64.encode(identity.public_key()),

@@ -9,6 +9,7 @@ use serde_json::Value;
 use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
+use slimm_server::http::gifs::GifSearch;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::push::PushSender;
@@ -30,7 +31,7 @@ async fn new_store() -> (Store, support::TestDbGuard) {
     (Store::new(pool), guard)
 }
 
-fn app(store: Store, push: PushSender) -> Router {
+fn app(store: Store, push: PushSender, gifs: GifSearch) -> Router {
     http::router(AppState {
         store,
         auth: Auth::new(2).unwrap(),
@@ -39,6 +40,7 @@ fn app(store: Store, push: PushSender) -> Router {
         push,
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs,
     })
 }
 
@@ -63,7 +65,7 @@ async fn get_version(app: Router) -> Value {
 #[tokio::test]
 async fn version_reports_push_disabled_without_a_relay() {
     let (store, _guard) = new_store().await;
-    let body = get_version(app(store, PushSender::disabled())).await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
 
     assert_eq!(body["name"], "slim-m");
     assert_eq!(body["protocol"], 1);
@@ -84,6 +86,30 @@ async fn version_reports_push_enabled_with_a_relay() {
     let push = PushSender::new(&config).expect("relay config is valid");
 
     let (store, _guard) = new_store().await;
-    let body = get_version(app(store, push)).await;
+    let body = get_version(app(store, push, GifSearch::disabled())).await;
     assert_eq!(body["push_enabled"], true);
+}
+
+#[tokio::test]
+async fn version_reports_gif_search_disabled_without_a_provider() {
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
+    assert_eq!(body["gif_search_enabled"], false);
+}
+
+#[tokio::test]
+async fn version_reports_gif_search_enabled_with_a_provider() {
+    let config = Config {
+        port: 0,
+        database_path: String::new(),
+        hash_concurrency: 2,
+        gif_provider: Some("tenor".into()),
+        gif_api_key: Some("test-key".into()),
+        ..Config::default()
+    };
+    let gifs = GifSearch::new(&config).expect("provider config is valid");
+
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), gifs)).await;
+    assert_eq!(body["gif_search_enabled"], true);
 }

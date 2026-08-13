@@ -68,6 +68,7 @@ fn state_for(store: &Store) -> AppState {
         push: PushSender::disabled(),
         voice: enabled_voice(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     }
 }
 

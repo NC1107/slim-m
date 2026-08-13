@@ -5,12 +5,16 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use axum::Router;
 use axum::body::Body;
+use axum::extract::State;
 use axum::http::Request;
-use serde_json::Value;
+use axum::routing::get;
+use serde_json::{Value, json};
 use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
+use slimm_server::http::gifs::GifSearch;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::media::Media;
@@ -18,6 +22,7 @@ use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use slimm_server::voice::VoiceService;
+use tokio::net::TcpListener;
 use tower::ServiceExt;
 
 use super::openapi::Api;
@@ -54,6 +59,8 @@ impl Contract {
             .and_then(Path::parent)
             .expect("crates/slimm-server sits two directories below the repo root");
 
+        let tenor_base = spawn_fake_tenor().await;
+
         Contract {
             state: AppState {
                 store: Store::new(pool),
@@ -65,6 +72,8 @@ impl Contract {
                 // its documented 200, and its body gets checked, not a 501.
                 voice: VoiceService::for_test("wss://sfu.invalid", "devkey", "devsecret"),
                 media: Media::for_tests(),
+                // Also configured, against a fake local provider, for the same reason.
+                gifs: GifSearch::for_test("tenor", &format!("{tenor_base}/v2/search"), "test-key"),
             },
             api: Api::load(repo_root),
             covered: BTreeSet::new(),
@@ -166,4 +175,43 @@ impl Contract {
         self.problems.extend(problems);
         value
     }
+}
+
+/// A search-shaped like a real Tenor `/v2/search` response, embedding
+/// `preview.gif`/`full.gif` URLs pointing back at itself, so `searchGifs`,
+/// `getGifPreview` and `selectGif` each reach a genuine 2xx here rather than
+/// the 501 a disabled `GifSearch` would answer with - the same reason
+/// `mintVoiceToken` above is configured rather than disabled.
+async fn spawn_fake_tenor() -> String {
+    async fn search(State(base): State<String>) -> axum::Json<Value> {
+        axum::Json(json!({
+            "next": "",
+            "results": [{
+                "id": "fake-1",
+                "content_description": "a cat waving",
+                "media_formats": {
+                    "tinygif": {"url": format!("{base}/preview.gif"), "dims": [220, 165], "size": 1},
+                    "gif": {"url": format!("{base}/full.gif"), "dims": [498, 373], "size": 2}
+                }
+            }]
+        }))
+    }
+    async fn image() -> Vec<u8> {
+        let mut bytes = b"GIF89a".to_vec();
+        bytes.extend(std::iter::repeat_n(0u8, 8));
+        bytes
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base = format!("http://{addr}");
+    let router = Router::new()
+        .route("/v2/search", get(search))
+        .route("/preview.gif", get(image))
+        .route("/full.gif", get(image))
+        .with_state(base.clone());
+    tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+    base
 }

@@ -120,6 +120,23 @@ class AttachmentStagingController extends ChangeNotifier {
 
   int _nextLocalId = 0;
 
+  /// Stages [attachment] as already uploaded, with [bytes] purely for the
+  /// tile's own local preview - the picker (`gif_picker.dart`'s own selectGif
+  /// call) already stored it server-side, so there is no upload to run here,
+  /// unlike [stage].
+  void addResolved(api.Attachment attachment, Uint8List bytes) {
+    final localId = 'staged-${_nextLocalId++}';
+    _items.add(
+      UploadedAttachment(
+        localId: localId,
+        filename: attachment.filename,
+        bytes: bytes,
+        attachment: attachment,
+      ),
+    );
+    notifyListeners();
+  }
+
   /// Stages [bytes] and returns once it is in [items], before the upload
   /// this starts has any chance to resolve - a caller awaiting this sees the
   /// pending entry, never a gap where nothing is staged at all.
