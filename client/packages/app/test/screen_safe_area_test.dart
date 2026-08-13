@@ -83,6 +83,9 @@ class _FakeSession implements VoiceSession {
   @override
   bool get supportsParticipantVolume => true;
 
+  @override
+  bool get supportsScreenShareAudio => true;
+
   final Map<String, double> _volumes = {};
 
   @override
@@ -194,6 +197,7 @@ class _FakeSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async => enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
 
   @override

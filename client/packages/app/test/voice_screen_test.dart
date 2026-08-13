@@ -42,6 +42,9 @@ class _NoopSession implements VoiceSession {
   @override
   bool get supportsParticipantVolume => true;
 
+  @override
+  bool get supportsScreenShareAudio => true;
+
   final Map<String, double> _volumes = {};
 
   @override
@@ -150,6 +153,7 @@ class _NoopSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async => ScreenShareOutcome.started;
 
   @override

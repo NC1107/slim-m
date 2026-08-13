@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The in-call controls: mute, camera, screen share and leave.
 ///
-/// Sharing has no quality dialog of its own: the ceiling is whatever Voice
-/// settings already has saved (`voice_settings_screen.dart`'s
-/// `voiceSettingsControllerProvider`), applied directly rather than asked
-/// again on every share, which is what the owner reported as the setting
-/// "not mattering".
+/// Sharing has no quality dialog of its own: the ceiling, and whether to
+/// include this device's own audio, are whatever Voice settings already has
+/// saved (`voice_settings_screen.dart`'s `voiceSettingsControllerProvider`),
+/// applied directly rather than asked again on every share, which is what
+/// the owner reported as the quality setting "not mattering".
 ///
 /// The camera button is the same row as hang up, which is where the owner
 /// asked for it: no separate toggle lived anywhere in a call before this.
@@ -151,10 +151,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
     }
     setState(() => _shareRequestInFlight = true);
     try {
-      // The saved ceiling, applied directly rather than asked again.
-      final quality = ref
-          .read(voiceSettingsControllerProvider)
-          .screenShareQuality;
+      // The saved ceiling and audio choice, applied directly rather than asked again.
+      final settings = ref.read(voiceSettingsControllerProvider);
+      final quality = settings.screenShareQuality;
 
       String? sourceId;
       if (controller.screenShareNeedsSource) {
@@ -175,6 +174,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
         true,
         quality: quality,
         sourceId: sourceId,
+        includeAudio: settings.screenShareIncludeAudio,
       );
     } finally {
       if (mounted) setState(() => _shareRequestInFlight = false);

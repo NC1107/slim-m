@@ -90,13 +90,14 @@ jobs:
           version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
+      # libpulse-dev is flutter_webrtc's own build-time switch for Linux screen-share audio; absent, it silently ships without it.
       - name: linux build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libayatana-appindicator3-dev
+            libayatana-appindicator3-dev libpulse-dev
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:

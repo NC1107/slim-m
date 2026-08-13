@@ -50,6 +50,10 @@ Building it would be "genuinely buildable today with no new third-party dependen
 The frame-budget analysis in that document is measured only for Android (a Pixel 9, via a primary-sourced GitHub issue), not for any Apple platform.
 This does not contradict the confirmed entry above that macOS/iOS have the best available *seam*; it means "the seam exists and is fast per Apple's own claim" is one step short of "measured fast enough on this project's own target hardware."
 
+**Screen-share audio (2026-08-13) has no path on macOS through this app's capture seam, confirmed by reading the code that runs there rather than assumed.**
+`common/darwin/Classes/FlutterRTCDesktopCapturer.m`'s `getDisplayMedia` - the file macOS shares with iOS's own desktop-capture path, distinct from the Windows/Linux `common/cpp` implementation - hardcodes `'audio': false` in the stream info it returns and always answers an empty `audioTracks` list; nothing in that file inspects the `audio` constraint at all.
+`client/packages/rtc/lib/src/screen_share_audio.dart`'s `supportsScreenShareAudio` correctly excludes macOS (confirmed by reading the file: only web and Linux), so once a macOS target exists the toggle this feature added stays absent there rather than present-and-silently-inert, the same "absent, never disabled" rule `supportsParticipantVolume` already established for call volume on this platform.
+
 **Screen share is entirely unverified on macOS, in either direction.**
 The confirmed, tested screen-share findings in this project (the Fedora Wayland segfault-on-window-enumeration bug and its fix, the iOS `BroadcastManager` double-capture collision and its fix) are both platform-specific and neither transfers to macOS by inference.
 `client/packages/rtc/lib/src/desktop_sources.dart`'s doc comment notes, read from source rather than observed running, that "macOS and Windows have no such native picker of their own, so this app's sheet stays their only one" - the same point made in the Windows file, meaning the app's own source-picker sheet is expected to be macOS's only chooser, unlike Linux's Wayland portal.

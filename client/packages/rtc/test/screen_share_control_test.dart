@@ -14,7 +14,11 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:slimm_rtc/rtc.dart';
 
 /// One call this fake's `publish` closure recorded.
-typedef _PublishCall = (bool enabled, lk.ScreenShareCaptureOptions? options);
+typedef _PublishCall = (
+  bool enabled,
+  lk.ScreenShareCaptureOptions? options,
+  bool includeAudio,
+);
 
 /// Stands in for the iOS host, with a controllable broadcast-state stream a
 /// test can push through by hand.
@@ -70,8 +74,12 @@ void main() {
 
     tearDown(() => bridge.dispose());
 
-    Future<void> publish(bool enabled, lk.ScreenShareCaptureOptions? o) async {
-      calls.add((enabled, o));
+    Future<void> publish(
+      bool enabled,
+      lk.ScreenShareCaptureOptions? o,
+      bool audio,
+    ) async {
+      calls.add((enabled, o, audio));
     }
 
     Future<ScreenShareOutcome> start() => control.setEnabled(
@@ -123,6 +131,23 @@ void main() {
           reason: 'must be this call\'s quality, not a default');
     });
 
+    test('the deferred publish also carries this call\'s own audio choice',
+        () async {
+      // Never true on iOS today, but the hand-off's plumbing must not drop it if it were.
+      await control.setEnabled(
+        true,
+        quality: ScreenShareQuality.crisp,
+        includeAudio: true,
+        publish: publish,
+        isSharing: () => sharing,
+        onSettled: (e) {},
+      );
+      bridge.startBroadcasting();
+      await pumpEventQueue();
+
+      expect(calls.last.$3, isTrue);
+    });
+
     test('reports success through onSettled once the deferred publish lands',
         () async {
       await start();
@@ -156,7 +181,7 @@ void main() {
       final outcome = await failing.setEnabled(
         true,
         quality: ScreenShareQuality.balanced,
-        publish: (enabled, o) async {
+        publish: (enabled, o, audio) async {
           attempt++;
           if (attempt == 2) throw StateError('capture refused');
         },
@@ -184,8 +209,8 @@ void main() {
       final outcome = await direct.setEnabled(
         true,
         quality: ScreenShareQuality.balanced,
-        publish: (enabled, o) async {
-          calls.add((enabled, o));
+        publish: (enabled, o, audio) async {
+          calls.add((enabled, o, audio));
           sharing = true;
         },
         isSharing: () => sharing,
@@ -296,7 +321,7 @@ void main() {
         true,
         quality: ScreenShareQuality.balanced,
         sourceId: 'screen-1',
-        publish: (enabled, o) async => calls.add((enabled, o)),
+        publish: (enabled, o, audio) async => calls.add((enabled, o, audio)),
         isSharing: () => true,
         onSettled: (e) {},
       );
@@ -304,9 +329,31 @@ void main() {
       expect(outcome, ScreenShareOutcome.started);
       expect(calls.single.$2!.useiOSBroadcastExtension, isFalse);
       expect(calls.single.$2!.deviceId, 'screen-1');
+      expect(calls.single.$3, isFalse,
+          reason: 'nobody asked for audio, so nothing is requested');
       expect(bridge.autoPublishWrites, isEmpty,
           reason: 'a platform with no broadcast extension has nothing to '
               'disarm');
+      await bridge.dispose();
+    });
+
+    test('a request for audio reaches the publish closure unchanged', () async {
+      final bridge = _FakeBridge(usesBroadcastExtension: false);
+      final control = ScreenShareControl(bridge);
+      final calls = <_PublishCall>[];
+
+      await control.setEnabled(
+        true,
+        quality: ScreenShareQuality.balanced,
+        includeAudio: true,
+        publish: (enabled, o, audio) async => calls.add((enabled, o, audio)),
+        isSharing: () => true,
+        onSettled: (e) {},
+      );
+
+      expect(calls.single.$3, isTrue,
+          reason: 'this is what the caller asked for; a fake session '
+              'dropping it here would drop it on web and Linux too');
       await bridge.dispose();
     });
 
@@ -318,7 +365,7 @@ void main() {
       final outcome = await control.setEnabled(
         true,
         quality: ScreenShareQuality.balanced,
-        publish: (enabled, o) async => throw StateError('refused'),
+        publish: (enabled, o, audio) async => throw StateError('refused'),
         isSharing: () => false,
         onSettled: (e) => reported = e,
       );

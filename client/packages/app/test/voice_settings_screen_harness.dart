@@ -52,8 +52,18 @@ http.Client voiceTokenClient() => MockClient((request) async {
 /// Implemented rather than subclassed so a new member on the real session is
 /// a compile error here, matching `voice_controller_test.dart`'s own fake.
 class FakeSession implements VoiceSession {
+  FakeSession({this.supportsScreenShareAudio = true});
+
   @override
   bool get supportsParticipantVolume => true;
+
+  @override
+  final bool supportsScreenShareAudio;
+
+  /// Every `includeAudio` a call to [setScreenShareEnabled] received, in
+  /// order, so a test can assert the saved preference actually reached the
+  /// session rather than only that the toggle rendered.
+  final List<bool> screenShareAudioCalls = [];
 
   final Map<String, double> _volumes = {};
 
@@ -177,7 +187,11 @@ class FakeSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
-  }) async => enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
+    bool includeAudio = false,
+  }) async {
+    screenShareAudioCalls.add(includeAudio);
+    return enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
+  }
 
   @override
   Future<bool> setDeafened(bool value) async => true;

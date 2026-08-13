@@ -55,6 +55,8 @@ class _DeadSession implements VoiceSession {
   @override
   bool get supportsParticipantVolume => false;
   @override
+  bool get supportsScreenShareAudio => false;
+  @override
   double volumeFor(String identity) => 1.0;
   @override
   Future<void> setVolumeFor(String identity, double volume) async {}
@@ -104,6 +106,7 @@ class _DeadSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async => ScreenShareOutcome.stopped;
   @override
   Future<bool> setDeafened(bool value) async => true;

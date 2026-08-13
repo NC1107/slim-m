@@ -20,6 +20,7 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'audio_gain.dart' as rtc_gain;
 import 'local_audio.dart';
+import 'screen_share_audio.dart' as rtc_share_audio;
 
 import 'broadcast_bridge.dart';
 import 'camera_devices.dart';
@@ -117,6 +118,11 @@ class VoiceSession {
   /// [supportsParticipantVolume]: on the platforms that answer false the call
   /// would either throw or quietly do nothing, so the control is not offered.
   bool get supportsParticipantVolume => rtc_gain.supportsParticipantVolume;
+
+  /// Whether this host can add a real audio track to a screen share; see
+  /// [rtc_share_audio.supportsScreenShareAudio] for the per-platform trace.
+  bool get supportsScreenShareAudio =>
+      rtc_share_audio.supportsScreenShareAudio();
 
   /// [identity]'s playback gain for this listener, 1.0 being unchanged.
   double volumeFor(String identity) => _audio.volumeFor(identity);
@@ -322,6 +328,7 @@ class VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async {
     final room = _room;
     if (room == null) return ScreenShareOutcome.failed;
@@ -329,9 +336,12 @@ class VoiceSession {
       enabled,
       quality: quality,
       sourceId: sourceId,
-      publish: (enabled, options) async {
+      includeAudio: includeAudio,
+      publish: (enabled, options, audio) async {
+        // `captureScreenAudio` here, not on `options`, is the flag that actually publishes audio.
         await room.localParticipant?.setScreenShareEnabled(
           enabled,
+          captureScreenAudio: audio,
           screenShareCaptureOptions: options,
         );
       },

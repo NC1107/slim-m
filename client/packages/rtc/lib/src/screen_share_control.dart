@@ -24,10 +24,15 @@ import 'broadcast_bridge.dart';
 import 'screen_share.dart';
 
 /// Publishes or unpublishes a screen share track with the given options.
-/// `options` is null when disabling.
+/// `options` is null when disabling. `includeAudio` is [setEnabled]'s own
+/// parameter of the same name, carried through so a caller can pass it on to
+/// LiveKit's own top-level `captureScreenAudio` publish flag - see
+/// `screen_share_audio.dart` for why that is the parameter that matters, not
+/// a field on `options`.
 typedef ScreenSharePublish = Future<void> Function(
   bool enabled,
   lk.ScreenShareCaptureOptions? options,
+  bool includeAudio,
 );
 
 /// Runs one [VoiceSession]'s screen share: the ceiling checks, the platform
@@ -79,6 +84,7 @@ class ScreenShareControl {
     bool enabled, {
     required ScreenShareQuality quality,
     String? sourceId,
+    bool includeAudio = false,
     required ScreenSharePublish publish,
     required bool Function() isSharing,
     required void Function(Object? error) onSettled,
@@ -93,6 +99,7 @@ class ScreenShareControl {
         return await _startOnIOS(
           quality: quality,
           sourceId: sourceId,
+          includeAudio: includeAudio,
           publish: publish,
           isSharing: isSharing,
           onSettled: onSettled,
@@ -101,6 +108,7 @@ class ScreenShareControl {
       await publish(
         enabled,
         enabled ? captureOptionsFor(quality, sourceId, isIOS: onIOS) : null,
+        includeAudio,
       );
       if (!enabled) await _broadcast.requestStop();
       if (!enabled) return ScreenShareOutcome.stopped;
@@ -119,6 +127,7 @@ class ScreenShareControl {
   Future<ScreenShareOutcome> _startOnIOS({
     required ScreenShareQuality quality,
     required String? sourceId,
+    required bool includeAudio,
     required ScreenSharePublish publish,
     required bool Function() isSharing,
     required void Function(Object? error) onSettled,
@@ -126,7 +135,7 @@ class ScreenShareControl {
     _broadcast.autoPublishEnabled = false;
     final options = captureOptionsFor(quality, sourceId, isIOS: true);
     try {
-      await publish(true, options);
+      await publish(true, options, includeAudio);
     } catch (e) {
       _broadcast.autoPublishEnabled = true;
       onSettled(e);
@@ -137,7 +146,7 @@ class ScreenShareControl {
       _broadcast.autoPublishEnabled = true;
       return ScreenShareOutcome.started;
     }
-    _armHandoff(options, publish, onSettled);
+    _armHandoff(options, includeAudio, publish, onSettled);
     return ScreenShareOutcome.pendingBroadcast;
   }
 
@@ -147,6 +156,7 @@ class ScreenShareControl {
   /// reported as a failure.
   void _armHandoff(
     lk.ScreenShareCaptureOptions options,
+    bool includeAudio,
     ScreenSharePublish publish,
     void Function(Object? error) onSettled,
   ) {
@@ -157,18 +167,21 @@ class ScreenShareControl {
       // Stale: `_cancelHandoff` already moved on, so this subscription is no longer wanted.
       if (!identical(_handoff, sub)) return;
       _handoff = null;
-      unawaited(_publishAfterActivation(options, publish, onSettled));
+      unawaited(
+        _publishAfterActivation(options, includeAudio, publish, onSettled),
+      );
     });
     _handoff = sub;
   }
 
   Future<void> _publishAfterActivation(
     lk.ScreenShareCaptureOptions options,
+    bool includeAudio,
     ScreenSharePublish publish,
     void Function(Object? error) onSettled,
   ) async {
     try {
-      await publish(true, options);
+      await publish(true, options, includeAudio);
       onSettled(null);
     } catch (e) {
       onSettled(e);

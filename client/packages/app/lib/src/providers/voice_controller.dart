@@ -321,6 +321,11 @@ class VoiceController extends StateNotifier<VoiceState>
   /// nothing; see `audio_gain.dart` in the rtc package for why.
   bool get supportsParticipantVolume => _session.supportsParticipantVolume;
 
+  /// Whether this host can publish a screen share's own audio. True on web
+  /// and Linux; see `screen_share_audio.dart` in the rtc package for why the
+  /// rest cannot, or in Linux's case can only conditionally.
+  bool get supportsScreenShareAudio => _session.supportsScreenShareAudio;
+
   /// [identity]'s playback gain for this listener, 1.0 being unchanged.
   double volumeFor(String identity) => _session.volumeFor(identity);
 
@@ -407,12 +412,15 @@ class VoiceController extends StateNotifier<VoiceState>
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async {
     _cancelBroadcastDeadline();
     final outcome = await _session.setScreenShareEnabled(
       enabled,
       quality: quality,
       sourceId: sourceId,
+      // Defended here too, not only in the UI: a settings value can outlive a platform switch.
+      includeAudio: includeAudio && supportsScreenShareAudio,
     );
     switch (outcome) {
       case ScreenShareOutcome.started:
