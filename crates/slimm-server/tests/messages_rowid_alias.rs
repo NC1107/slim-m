@@ -16,7 +16,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use slimm_server::ids::ChannelId;
-use slimm_server::store::Store;
+use slimm_server::store::{MessageSearchFilters, Store};
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{Row, SqlitePool};
@@ -401,7 +401,13 @@ async fn the_store_still_searches_over_the_rebuilt_index() {
 
     let store = Store::new(pool.clone());
     let hits = store
-        .search_messages(GENERAL, "alpha", None, 20)
+        .search_messages(
+            &[GENERAL],
+            Some("alpha"),
+            &MessageSearchFilters::default(),
+            None,
+            20,
+        )
         .await
         .expect("search");
     assert_eq!(hits.len(), 1);
@@ -409,7 +415,13 @@ async fn the_store_still_searches_over_the_rebuilt_index() {
 
     assert!(
         store
-            .search_messages(GENERAL, "removed", None, 20)
+            .search_messages(
+                &[GENERAL],
+                Some("removed"),
+                &MessageSearchFilters::default(),
+                None,
+                20,
+            )
             .await
             .expect("search")
             .is_empty(),

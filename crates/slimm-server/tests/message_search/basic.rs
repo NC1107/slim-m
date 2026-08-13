@@ -1,105 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Full-text message search: matching, permission scoping, deleted-message
-//! exclusion, and malformed FTS5 syntax answering 400 rather than 500.
+//! Plain `q`-only search: matching, permission scoping, deleted-message
+//! exclusion, malformed FTS5 syntax, and channel scoping. The operator
+//! layer's own tests are in the `operators_*` siblings.
 
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use serde_json::{Value, json};
-use slimm_server::auth::Auth;
-use slimm_server::config::Config;
-use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use axum::http::StatusCode;
 use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
 use tower::ServiceExt;
-use uuid::Uuid;
 
-mod support;
-
-async fn new_store() -> (Store, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-message-search");
-    let config = Config {
-        port: 0,
-        database_path: path,
-        hash_concurrency: 2,
-        ..Config::default()
-    };
-    let pool = db::connect(&config).await.expect("connect + migrate");
-    (Store::new(pool), guard)
-}
-
-fn app(store: Store) -> Router {
-    http::router(AppState {
-        store,
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: slimm_server::voice::VoiceService::disabled(),
-        media: slimm_server::media::Media::for_tests(),
-    })
-}
-
-fn request(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
-    let mut builder = Request::builder().method(method).uri(uri);
-    if let Some(token) = token {
-        builder = builder.header("authorization", format!("Bearer {token}"));
-    }
-    match body {
-        Some(value) => builder
-            .header("content-type", "application/json")
-            .body(Body::from(value.to_string()))
-            .unwrap(),
-        None => builder.body(Body::empty()).unwrap(),
-    }
-}
-
-async fn json_body(response: axum::response::Response) -> Value {
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    serde_json::from_slice(&bytes).unwrap()
-}
-
-/// A member with a session, built straight through the store.
-///
-/// Deliberately not the `/auth/register` route: joining a claimed deployment
-/// is an invite-gated policy decision, and it is pinned by its own tests in
-/// `registration_gate.rs`. These tests only need somebody signed in, so going
-/// through the store keeps them independent of that policy.
-async fn register(store: &Store, username: &str) -> String {
-    let account = store
-        .create_account(username, username, "not-a-real-hash")
-        .await
-        .unwrap();
-    // The first account through here claims the deployment, exactly as the
-    // first real registration does; later ones find it already set up.
-    store.bootstrap_deployment(account.id).await.unwrap();
-    store
-        .open_session(account.id, "cli")
-        .await
-        .unwrap()
-        .access_token
-}
-
-async fn send(app: &Router, channel_id: &str, token: &str, content: &str) -> Value {
-    json_body(
-        app.clone()
-            .oneshot(request(
-                "POST",
-                &format!("/channels/{channel_id}/messages"),
-                Some(token),
-                Some(json!({ "id": Uuid::now_v7().to_string(), "content": content })),
-            ))
-            .await
-            .unwrap(),
-    )
-    .await
-}
+use crate::fixtures::*;
 
 /// A search returns only the messages whose content matches, not everything
 /// in the channel.

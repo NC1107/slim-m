@@ -81,18 +81,40 @@ extension SlimmApiMessages on SlimmApi {
 
   /// Full-text searches a channel's live messages. [q] reaches FTS5 close to
   /// as-is, so its mini query language (`AND`/`OR`/`NOT`, `"phrase"`, a
-  /// trailing `*` prefix) is available. Results are permission-filtered and
+  /// trailing `*` prefix) is available; it is optional now, since the
+  /// Slack-style operators below can carry a search on their own, but the
+  /// server refuses a request with none of [q], [from], [inChannel], [has],
+  /// [afterDate] or [beforeDate] set. Results are permission-filtered and
   /// keyset paginated on `seq` exactly like [SlimmApi.listMessages].
+  ///
+  /// [from] narrows to one author's exact username. [inChannel] searches a
+  /// named channel instead of [channelId]; a name that does not exist, or
+  /// resolves only to channels this caller cannot view, answers with an
+  /// empty list rather than an error, so it is never a way to learn a
+  /// hidden channel exists. [has] is `attachment`, `link`, or both
+  /// comma-separated (`attachment,link`). [afterDate]/[beforeDate] are
+  /// `YYYY-MM-DD`: `afterDate` is inclusive of the named day, `beforeDate`
+  /// excludes it.
   Future<List<Message>> searchMessages(
     String channelId, {
-    required String q,
+    String? q,
     int? before,
     int? limit,
+    String? from,
+    String? inChannel,
+    String? has,
+    String? afterDate,
+    String? beforeDate,
   }) async {
     final query = <String, String>{
-      'q': q,
+      if (q != null) 'q': q,
       if (before != null) 'before': '$before',
       if (limit != null) 'limit': '$limit',
+      if (from != null) 'from': from,
+      if (inChannel != null) 'in': inChannel,
+      if (has != null) 'has': has,
+      if (afterDate != null) 'after_date': afterDate,
+      if (beforeDate != null) 'before_date': beforeDate,
     };
     final json = await _send(
       'GET',

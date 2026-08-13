@@ -7,12 +7,18 @@
 /// apart from any other failure. Centralising the call is what stops that
 /// happening again: a caller gets both the filtering and the error
 /// distinction for free, rather than having to remember to copy them.
+///
+/// This is also the one place a raw search-bar string turns into the
+/// Slack-style operators `http::search` accepts
+/// ([parseSearchQuery]), so both callers get the same operator support
+/// automatically rather than each having to parse it themselves.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import 'blocks_controller.dart';
+import 'message_search_query.dart';
 import 'providers.dart';
 
 /// What running a message search came back with.
@@ -47,18 +53,36 @@ class MessageSearchFailed extends MessageSearchResult {
 /// this Riverpod version, but their `read` methods have identical signatures.
 typedef ProviderReader = T Function<T>(ProviderListenable<T> provider);
 
-/// Searches [channelId] for [query] and drops any hit from a blocked author,
-/// the same filtering the transcript, pins and typing already apply.
+/// Parses [query] for the operators [ParsedSearchQuery] documents, searches
+/// [channelId] (or the `in:`-named channel) for whatever remains, and drops
+/// any hit from a blocked author - the same filtering the transcript, pins
+/// and typing already apply.
+///
+/// A [query] made entirely of whitespace parses to
+/// [ParsedSearchQuery.isEmpty], which this refuses locally with
+/// [MessageSearchFailed] rather than sending a request the server would
+/// refuse anyway with the same 400 a hand-typed empty query already gets.
 Future<MessageSearchResult> searchChannelMessages(
   ProviderReader read,
   String channelId,
   String query, {
   int? limit,
 }) async {
+  final parsed = parseSearchQuery(query);
+  if (parsed.isEmpty) {
+    return const MessageSearchFailed();
+  }
   try {
-    final hits = await read(
-      apiProvider,
-    ).searchMessages(channelId, q: query, limit: limit);
+    final hits = await read(apiProvider).searchMessages(
+      channelId,
+      q: parsed.text.isEmpty ? null : parsed.text,
+      limit: limit,
+      from: parsed.from,
+      inChannel: parsed.inChannel,
+      has: parsed.has,
+      afterDate: parsed.afterDate,
+      beforeDate: parsed.beforeDate,
+    );
     final blocks = read(blocksProvider);
     return MessageSearchHits(
       hits

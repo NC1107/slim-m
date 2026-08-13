@@ -85,7 +85,7 @@ pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
 pub use message_ops::{MessageOpEntry, MessageOpKind, MessageOpsPage};
 pub use message_retention::{MAX_MESSAGE_RETENTION_DAYS, PrunedMessage, SweptMessageRetention};
-pub use message_search::SearchError;
+pub use message_search::{MessageSearchFilters, SearchError};
 pub use messages::{Edited, MessageDeletion, SendError, Sent};
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
