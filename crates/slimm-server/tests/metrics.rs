@@ -142,8 +142,7 @@ async fn a_manage_server_caller_gets_valid_prometheus_text_with_every_series() {
     assert!(text.contains("slimm_requests_total{class=\"read\"} "));
     assert!(text.contains("slimm_requests_refused_total{class=\"password\"} "));
     assert!(text.contains("slimm_websocket_connections "));
-    // No SFU configured in this test: the configured gauge answers 0, and the
-    // reachable gauge is absent rather than a misleading 0.
+    // No SFU here: the configured gauge is 0 and the reachable gauge is absent, not a misleading 0.
     assert!(text.contains("slimm_livekit_configured 0"));
     assert!(!text.contains("slimm_livekit_reachable"));
 }

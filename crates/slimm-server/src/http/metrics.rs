@@ -78,9 +78,8 @@ fn write_memory(out: &mut String) {
     );
     out.push_str("# TYPE slimm_process_resident_memory_bytes gauge\n");
     match current_rss_bytes() {
-        // Not `NaN`: a Prometheus counter/gauge value must be a real float, and
-        // this platform genuinely cannot answer rather than reporting zero.
         Some(bytes) => out.push_str(&format!("slimm_process_resident_memory_bytes {bytes}\n")),
+        // `NaN` is a legal Prometheus float: this platform genuinely cannot answer, not a zero.
         None => out.push_str("slimm_process_resident_memory_bytes NaN\n"),
     }
 }
