@@ -9,12 +9,11 @@
 //! [`crate::push::recipients::message_recipients`]'s own doc comment already
 //! uses for blocking.
 //!
-//! Per-account rather than per-channel, deliberately, and a smaller surface
-//! for it than the per-channel override mature chat apps end up with: that
-//! is real product value left for later, not ruled out. A future per-channel
-//! table would still resolve through this same enum at the same one choke
-//! point in `push::recipients`, the way a channel overwrite narrows a role's
-//! base permission today rather than needing a second evaluator.
+//! This is the account-wide default; `store/channel_notification_prefs.rs`
+//! is a per-channel override of it, resolving through this same enum at the
+//! same one choke point in `push::recipients` this doc comment predicted -
+//! the way a channel overwrite narrows a role's base permission today rather
+//! than needing a second evaluator.
 
 /// What a message has to be, for this account, before it is worth a push.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

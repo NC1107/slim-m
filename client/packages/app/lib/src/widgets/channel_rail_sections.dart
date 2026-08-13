@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/channel_notification_overrides_controller.dart';
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'channel_rail_channel_rows.dart';
@@ -193,7 +194,7 @@ class ChannelCategorySections extends ConsumerWidget {
   }
 }
 
-class _TextChannelRow extends StatelessWidget {
+class _TextChannelRow extends ConsumerWidget {
   const _TextChannelRow({
     required this.channel,
     required this.selected,
@@ -205,17 +206,29 @@ class _TextChannelRow extends StatelessWidget {
   final Widget? trailingExtra;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // Read state (`unread` below) is untouched by this; only the glyph replaces the dot.
+    final muted = ref.watch(
+      channelNotificationOverridesProvider.select((s) => s.isMuted(channel.id)),
+    );
     return AppListRow(
       label: channel.name,
       selected: selected,
       unread: channel.cursor > channel.lastReadSeq,
+      muted: muted,
       leading: Icon(
         AppIcons.hash,
         size: AppSizes.icon16,
         color: selected ? tokens.accent : tokens.textSecondary,
       ),
+      trailing: muted
+          ? Icon(
+              AppIcons.notificationsOff,
+              size: AppSizes.icon16,
+              color: tokens.textSecondary,
+            )
+          : null,
       trailingExtra: trailingExtra,
       onTap: () => context.go(Routes.channel(channel.id)),
     );

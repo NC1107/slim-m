@@ -52,10 +52,25 @@ Channel _channel(
   isPersonalSpace: false,
 );
 
-/// [ChannelCategorySections] and [ManagedChannelRow] read no provider at all
-/// (only the kebab's own `onPressed`, never invoked here, eventually would),
-/// so a bare scope is enough for the first two tests below.
+/// [ChannelCategorySections] and [ManagedChannelRow] read one provider now,
+/// [channelNotificationOverridesProvider] (the muted glyph a text row
+/// carries), so this needs the same minimal session/api overrides
+/// [_voiceHarness] below already carries for the identical reason - a bare
+/// scope would construct the real controller against an unconfigured
+/// session and a real network client.
 Widget _harness(Widget child) => ProviderScope(
+  overrides: [
+    sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+    apiProvider.overrideWith((ref) {
+      final client = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: ref.watch(sessionProvider),
+        httpClient: MockClient((_) async => http.Response('', 404)),
+      );
+      ref.onDispose(client.close);
+      return client;
+    }),
+  ],
   child: MaterialApp(
     theme: buildTheme(Brightness.light, AppTokens.light),
     home: Scaffold(body: child),

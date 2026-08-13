@@ -102,6 +102,25 @@ void main() {
   );
 
   testWidgets(
+    'every caller, manager or not, sees Mute channel and Mentions only',
+    (tester) async {
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(_harness(_router(channel, canManage: false)));
+      await tester.pump();
+
+      await _openMenu(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Mute channel'),
+        findsOneWidget,
+        reason: 'muting is a personal preference, not a MANAGE_CHANNELS action',
+      );
+      expect(find.text('Mentions only'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'a plain member sees only Open channel, the same gate the kebab uses',
     (tester) async {
       final channel = _channel('c1', 'general');

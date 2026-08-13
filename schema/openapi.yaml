@@ -2534,6 +2534,81 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /notification-preferences/channels:
+    get:
+      operationId: listChannelNotificationOverrides
+      tags: [push]
+      summary: List the caller's own per-channel notification overrides.
+      description: >
+        Only channels the caller has actually overridden appear here - one
+        following the account default (`getNotificationPreference`) carries
+        no entry, never one listed at `everything`.
+      responses:
+        "200":
+          description: The caller's channel-scoped overrides.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelNotificationOverrideEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /notification-preferences/channels/{channelId}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    put:
+      operationId: setChannelNotificationOverride
+      tags: [push]
+      summary: Mute this channel, or narrow it to mentions only.
+      description: >
+        Enforced where push recipients are computed
+        (`push::recipients::narrow_for_notification_preference`), the same
+        choke point `setNotificationPreference` already goes through - never
+        filtered client-side after a push has already landed. Requires
+        VIEW_CHANNEL, the same bar reading the channel already sets; a
+        channel the caller cannot view answers 403, identically whether or
+        not it exists. `everything` is refused: having no override already
+        means that, so `DELETE` is the way back to it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChannelNotificationOverrideRequest"
+      responses:
+        "200":
+          description: The override now in effect for this channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelNotificationOverrideEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: clearChannelNotificationOverride
+      tags: [push]
+      summary: Clear this channel's override, reverting it to the account default.
+      description: >
+        Idempotent, and needs no VIEW_CHANNEL: this only ever touches the
+        caller's own row, keyed on their own id, so the one way back to the
+        account default must still work after losing view access to the
+        channel.
+      responses:
+        "204":
+          description: The channel now follows the account default.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/read:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -5438,6 +5513,29 @@ components:
             preference existed. `mentions` is a direct `@`-mention plus every
             message in a DM. `nothing` is no push at all, ever, including a
             DM.
+
+    ChannelNotificationOverrideRequest:
+      type: object
+      required: [preference]
+      properties:
+        preference:
+          type: string
+          enum: [mentions, nothing]
+          description: >
+            Never `everything`: having no override already means that, so
+            `DELETE /notification-preferences/channels/{channelId}` is the
+            way back to it rather than a third spelling of the same answer.
+
+    ChannelNotificationOverrideEntry:
+      type: object
+      required: [channel_id, preference]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+        preference:
+          type: string
+          enum: [mentions, nothing]
 
     ChannelPermissions:
       type: object

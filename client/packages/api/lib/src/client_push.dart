@@ -79,4 +79,43 @@ extension SlimmApiPush on SlimmApi {
       (json as Map<String, dynamic>)['preference'] as String,
     );
   }
+
+  /// The caller's own per-channel overrides - only channels actually
+  /// overridden, never one listed at [NotificationPreference.everything]:
+  /// having no entry there already means that.
+  Future<List<ChannelNotificationOverride>>
+      listChannelNotificationOverrides() async {
+    final json = await _send('GET', '/notification-preferences/channels');
+    return (json as List<dynamic>)
+        .map(
+          (e) => ChannelNotificationOverride.fromJson(
+            e as Map<String, dynamic>,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// Mutes [channelId], or narrows it to mentions only. [preference] must be
+  /// [NotificationPreference.mentions] or [NotificationPreference.nothing];
+  /// the server refuses [NotificationPreference.everything], since having no
+  /// override already means that - clear it with
+  /// [clearChannelNotificationOverride] instead.
+  Future<ChannelNotificationOverride> setChannelNotificationOverride(
+    String channelId,
+    NotificationPreference preference,
+  ) async {
+    final json = await _send(
+      'PUT',
+      '/notification-preferences/channels/$channelId',
+      body: {'preference': preference.wire},
+    );
+    return ChannelNotificationOverride.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Clears [channelId]'s override, reverting it to the account default.
+  Future<void> clearChannelNotificationOverride(String channelId) => _send(
+        'DELETE',
+        '/notification-preferences/channels/$channelId',
+        expectNoContent: true,
+      );
 }

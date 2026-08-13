@@ -181,6 +181,7 @@ abstract final class AppIcons {
   // Notifications.
   static const IconData notificationsOn = LucideIcons.bell300;
   static const IconData notificationsOff = LucideIcons.bellOff300;
+  static const IconData mentions = LucideIcons.atSign300;
 
   /// Severity and surfaces (callouts, menus, code blocks). Distinct shapes
   /// (circle, triangle, sparkle, octagon) so a tone survives greyscale rather

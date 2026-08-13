@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT preference FROM channel_notification_prefs\n             WHERE user_id = ? AND channel_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "preference",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3e3c3c3a3f51ad41a211f1aa0846c222c36bac915ea2929e60d98506ba781645"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT channel_id AS \"channel_id: ChannelId\", preference\n               FROM channel_notification_prefs WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "preference",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "206422ee65fdd8e9414931d44ca1942a25b0a3b9a0eeae609867324552b8a366"
+}

@@ -26,6 +26,7 @@ import 'package:slimm_rtc/rtc.dart';
 import '../audio/notification_sound.dart';
 import '../widgets/message_mentions.dart' show messageMentionsUsername;
 import 'blocks_controller.dart';
+import 'channel_notification_overrides_controller.dart';
 import 'dm_call_activity.dart';
 import 'live_events.dart';
 import 'notification_sound_rules.dart';
@@ -111,6 +112,17 @@ class NotificationSoundController {
       if (username != null) {
         mentionsSelf = messageMentionsUsername(message.content, username);
       }
+    }
+
+    final channelOverride = _ref
+        .read(channelNotificationOverridesProvider)
+        .overrideFor(message.channelId);
+    if (!channelEarnsASound(
+      channelOverride: channelOverride,
+      isDm: isDm,
+      mentionsSelf: mentionsSelf,
+    )) {
+      return;
     }
 
     await _player.play(

@@ -105,15 +105,21 @@ async fn narrow_for_thread(
         .collect())
 }
 
-/// Narrows `viewers` by each recipient's own [`NotificationPreference`]:
-/// [`NotificationPreference::Nothing`] drops them unconditionally, including
-/// from a DM; [`NotificationPreference::Mentions`] keeps them only if
-/// `mentioned` names them or `channel_id` resolves to a DM (see
-/// [`Store::channel_notifies_as_dm`] for why a DM counts - somebody messaging
-/// this account there is addressing them directly, the same as a mention);
-/// and [`NotificationPreference::Everything`], the default, passes everyone
-/// through unfiltered, which is what every account already got before this
-/// preference existed.
+/// Narrows `viewers` by each recipient's own *effective* [`NotificationPreference`]
+/// for `channel_id`: that recipient's own per-channel override
+/// (`store/channel_notification_prefs.rs`) if they have set one for this
+/// channel, else their account-wide default. [`NotificationPreference::Nothing`]
+/// drops them unconditionally, including from a DM; [`NotificationPreference::Mentions`]
+/// keeps them only if `mentioned` names them or `channel_id` resolves to a DM
+/// (see [`Store::channel_notifies_as_dm`] for why a DM counts - somebody
+/// messaging this account there is addressing them directly, the same as a
+/// mention); and [`NotificationPreference::Everything`] passes everyone
+/// through unfiltered, which is what every account already got before either
+/// preference existed. A channel override always wins over the account
+/// default, in both directions: a `nothing`/`mentions` override silences a
+/// channel an `everything` default would have let through, and a `mentions`
+/// override still wakes a mentioned recipient whose account default is
+/// `nothing`.
 async fn narrow_for_notification_preference(
     store: &Store,
     channel_id: ChannelId,
@@ -123,7 +129,9 @@ async fn narrow_for_notification_preference(
     if viewers.is_empty() {
         return Ok(viewers);
     }
-    let preferences = store.notification_preferences(&viewers).await?;
+    let preferences = store
+        .channel_notification_preferences(channel_id, &viewers)
+        .await?;
     let is_dm = store.channel_notifies_as_dm(channel_id).await?;
     Ok(viewers
         .into_iter()

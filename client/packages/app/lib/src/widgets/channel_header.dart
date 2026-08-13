@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
 import '../routing/breakpoints.dart';
+import 'channel_notification_menu_button.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
@@ -140,6 +141,8 @@ class ChannelHeader extends ConsumerWidget {
             active: searchOpen,
             onPressed: onToggleSearch,
           ),
+          const SizedBox(width: AppSpacing.s4),
+          ChannelNotificationMenuButton(channelId: channelId),
           if (canToggleMembers) ...[
             const SizedBox(width: AppSpacing.s4),
             AppIconButton(

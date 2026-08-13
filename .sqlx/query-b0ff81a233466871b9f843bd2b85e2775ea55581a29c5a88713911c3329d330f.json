@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO channel_notification_prefs (user_id, channel_id, preference, updated_at)\n             VALUES (?, ?, ?, ?)\n             ON CONFLICT (user_id, channel_id)\n             DO UPDATE SET preference = excluded.preference, updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "b0ff81a233466871b9f843bd2b85e2775ea55581a29c5a88713911c3329d330f"
+}
