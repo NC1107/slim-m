@@ -75,7 +75,7 @@ The spike's own recommendation, worth carrying forward verbatim: ship blur where
 
 ~~**The notification-sound symlink will very likely check out as a broken plain-text file on a native Windows clone, once a Windows target exists.**~~
 Closed 2026-08-12 as a structural fix rather than confirmed-then-patched: the symlink is gone (see the confirmed entry above), so there is nothing left for a Windows checkout to materialise wrong.
-Proven on Linux by reproducing the trap directly rather than only reasoning about it: a `git -C <scratch clone> -c core.symlinks=false checkout` of the pre-fix commit lands `client/packages/app/assets/audio/notifications` as a 46-byte text file naming its own symlink target, exactly the failure this entry predicted; the same clone of the post-fix commit lands seven real WAV files of the expected sizes regardless of the `core.symlinks` setting, since there is no symlink for that setting to affect any more.
+Proven on Linux by reproducing the trap directly rather than only reasoning about it: `git clone -c core.symlinks=false` of `main` (pre-fix) lands `client/packages/app/assets/audio/notifications` as a 41-byte ASCII text file reading `../../../../../assets/audio/notifications`, exactly the failure this entry predicted; the identical clone of this branch (post-fix) lands seven real WAV files, byte-identical to the canonical source, regardless of the `core.symlinks` setting, since there is no symlink left for that setting to affect.
 `notification_sound_bundle_test.dart` (cited in `CLAUDE.md`) still cannot exercise a real Windows checkout by itself, unchanged from what this entry originally said - what changed is that the mechanism it would have needed to catch no longer exists to be caught.
 
 ## Suspected
