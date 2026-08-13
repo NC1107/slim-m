@@ -112,3 +112,9 @@ final customEmojiProvider = FutureProvider.autoDispose<List<api.CustomEmoji>>(
 final spaceAnalyticsProvider = FutureProvider.autoDispose<api.SpaceAnalytics>(
   (ref) => ref.watch(apiProvider).spaceAnalytics(),
 );
+
+/// The message retention window in days, `0` meaning keep forever - the
+/// default, and what every deployment keeps until an admin sets one.
+final spaceRetentionProvider = FutureProvider.autoDispose<int>(
+  (ref) => ref.watch(apiProvider).spaceMessageRetentionDays(),
+);

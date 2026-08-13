@@ -3246,7 +3246,9 @@ paths:
         client has to special-case apart from a real permission failure.
         `stats.messages_by_day` and `active_hours` cover a trailing 30-day
         window; `active_hours` is a 24-bucket histogram summed across every
-        author, never broken out per member.
+        author, never broken out per member. `member_storage` is the one
+        exception to that rule: per-member attachment bytes, for storage
+        stewardship, kept out of `stats` on purpose.
       responses:
         "200":
           description: The current toggle state, and stats if it is on.
@@ -3285,6 +3287,59 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SpaceAnalytics"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /space/retention:
+    get:
+      operationId: getSpaceRetention
+      tags: [space]
+      summary: Read the message retention window.
+      description: >
+        Gated on MANAGE_SERVER, the same bit as `/space/analytics`. `0` means
+        disabled - keep every message forever - and is the default every
+        deployment keeps on upgrade.
+      responses:
+        "200":
+          description: The current window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceRetention"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    patch:
+      operationId: updateSpaceRetention
+      tags: [space]
+      summary: Change the message retention window.
+      description: >
+        A background sweep prunes messages older than `retention_days` on a
+        periodic tick, not immediately on this call. Pruning is a soft
+        delete, the same shape a manual message delete already produces, so
+        a client that missed it while offline recovers the same way it
+        recovers from any other message-op gap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpaceRetention"
+      responses:
+        "200":
+          description: The window after the change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceRetention"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -3998,6 +4053,19 @@ components:
           description: Unix milliseconds.
         rss_bytes:
           type: integer
+    SpaceAnalyticsMemberStorage:
+      type: object
+      required: [user_id, attachment_bytes]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        attachment_bytes:
+          type: integer
+          description: >
+            Every attachment this member has personally uploaded, by content
+            hash. Two members who each uploaded identical bytes are each
+            charged the full size.
     SpaceAnalytics:
       type: object
       required: [enabled]
@@ -4009,6 +4077,27 @@ components:
           anyOf:
             - $ref: "#/components/schemas/SpaceAnalyticsStats"
             - type: "null"
+        member_storage:
+          description: >
+            Present only when `enabled` is true. Sibling of `stats`, never
+            nested in it: `stats` never names a member and this is the one
+            field on this response that does, on purpose, for storage
+            stewardship rather than usage surveillance. Heaviest member
+            first.
+          anyOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/SpaceAnalyticsMemberStorage"
+            - type: "null"
+    SpaceRetention:
+      type: object
+      required: [retention_days]
+      properties:
+        retention_days:
+          type: integer
+          description: >
+            Days a message is kept before the sweep prunes it. `0` means
+            disabled - keep forever - and is the default.
     PresenceStatus:
       type: object
       required: [user_id, status]

@@ -76,12 +76,18 @@ impl MessageOpKind {
 /// is deliberately not the `UPDATE ... RETURNING` shape `send_message` uses:
 /// that one relies on a counter row channel creation inserted, and copying it
 /// here would have forced the backfill.
+///
+/// `actor_id` is `None` for a system-initiated act (the retention sweep, in
+/// `message_retention.rs`) rather than a real caller's own edit or delete.
+/// The wire already withholds this field on every kind, so a client cannot
+/// tell the two apart, and that is the point: an automated prune reads no
+/// differently from a moderator whose account has since been anonymised.
 pub(super) async fn insert_message_op(
     tx: &mut Transaction<'_, Sqlite>,
     channel_id: ChannelId,
     message_id: MessageId,
     kind: &str,
-    actor_id: UserId,
+    actor_id: Option<UserId>,
     created_at: i64,
 ) -> Result<i64, sqlx::Error> {
     // `2` so the first op takes seq 1, the same arithmetic the update branch gives.

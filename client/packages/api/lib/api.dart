@@ -20,6 +20,7 @@ export 'src/client.dart'
         AnalyticsDayCount,
         AnalyticsMemorySample,
         AnalyticsStats,
+        MemberAttachmentUsage,
         SpaceAnalytics,
         SlimmApiAdmin,
         SlimmApiAttachments,

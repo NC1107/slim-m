@@ -66,6 +66,16 @@ ProviderContainer _containerFor(MockClient client) {
   return container;
 }
 
+/// [_RetentionSection] fires its own `GET /space/retention` alongside every
+/// analytics fetch, so every mock client below has to answer it too, or the
+/// analytics-shaped body it would otherwise fall through to has no
+/// `retention_days` key and the parse throws.
+http.Response _retentionResponse() => http.Response(
+  jsonEncode({'retention_days': 0}),
+  200,
+  headers: {'content-type': 'application/json'},
+);
+
 Widget _app(ProviderContainer container) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp(
@@ -79,6 +89,7 @@ void main() {
     tester,
   ) async {
     final client = MockClient((request) async {
+      if (request.url.path == '/space/retention') return _retentionResponse();
       return http.Response(
         jsonEncode({'enabled': false}),
         200,
@@ -103,6 +114,7 @@ void main() {
     final patchedBodies = <Map<String, dynamic>>[];
 
     final client = MockClient((request) async {
+      if (request.url.path == '/space/retention') return _retentionResponse();
       if (request.method == 'PATCH') {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         patchedBodies.add(body);
@@ -136,6 +148,9 @@ void main() {
       final gate = Completer<void>();
       var enabled = false;
       final client = MockClient((request) async {
+        if (request.url.path == '/space/retention') {
+          return _retentionResponse();
+        }
         if (request.method == 'PATCH') {
           await gate.future;
           enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
@@ -173,6 +188,7 @@ void main() {
     // Gated so the refusal cannot land inside the tap's own microtasks.
     final gate = Completer<void>();
     final client = MockClient((request) async {
+      if (request.url.path == '/space/retention') return _retentionResponse();
       if (request.method == 'PATCH') {
         await gate.future;
         return http.Response('', 500);
@@ -203,6 +219,7 @@ void main() {
   testWidgets('a successful write flashes a transient Saved', (tester) async {
     var enabled = false;
     final client = MockClient((request) async {
+      if (request.url.path == '/space/retention') return _retentionResponse();
       if (request.method == 'PATCH') {
         enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
       }
@@ -233,6 +250,9 @@ void main() {
     'an enabled deployment shows the numbers as text, not only a chart',
     (tester) async {
       final client = MockClient((request) async {
+        if (request.url.path == '/space/retention') {
+          return _retentionResponse();
+        }
         return http.Response(
           jsonEncode(_enabledBody),
           200,
@@ -266,6 +286,9 @@ void main() {
     (tester) async {
       var requests = 0;
       final client = MockClient((request) async {
+        if (request.url.path == '/space/retention') {
+          return _retentionResponse();
+        }
         requests++;
         // First answer succeeds; the retry (second GET) fails.
         if (requests > 1) return http.Response('', 500);
@@ -288,6 +311,121 @@ void main() {
       expect(find.text('Could not load analytics.'), findsOneWidget);
       // The stats already on screen stay there rather than being replaced.
       expect(find.text('42'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'member_storage renders as a sibling section naming a real member, '
+    'never inside the aggregate stats',
+    (tester) async {
+      final client = MockClient((request) async {
+        if (request.url.path == '/space/retention') {
+          return _retentionResponse();
+        }
+        if (request.url.path == '/users') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 'nia',
+                'username': 'nia',
+                'display_name': 'Nia',
+                'created_at': 0,
+                'role_ids': <String>[],
+                'roles': <String>[],
+              },
+            ]),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            ..._enabledBody,
+            'member_storage': [
+              {'user_id': 'nia', 'attachment_bytes': 5000},
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Attachment storage by member'), findsOneWidget);
+      expect(find.text('Nia'), findsOneWidget);
+      expect(find.text('4.9 KB'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'no attachment uploader shows the empty notice, not a blank card',
+    (tester) async {
+      final client = MockClient((request) async {
+        if (request.url.path == '/space/retention') {
+          return _retentionResponse();
+        }
+        return http.Response(
+          jsonEncode(_enabledBody),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Attachment storage by member'), findsOneWidget);
+      expect(
+        find.text('Nobody has uploaded an attachment yet.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'the retention section stays visible while analytics itself is off, '
+    'and tapping an option patches the window',
+    (tester) async {
+      var retentionDays = 0;
+      final patchedRetention = <int>[];
+      final client = MockClient((request) async {
+        if (request.url.path == '/space/retention') {
+          if (request.method == 'PATCH') {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            retentionDays = body['retention_days'] as int;
+            patchedRetention.add(retentionDays);
+          }
+          return http.Response(
+            jsonEncode({'retention_days': retentionDays}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          jsonEncode({'enabled': false}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Message retention'), findsOneWidget);
+      expect(find.textContaining('Analytics is off'), findsOneWidget);
+
+      await tester.tap(find.text('30 days'));
+      await tester.pumpAndSettle();
+
+      expect(patchedRetention, [30]);
     },
   );
 }

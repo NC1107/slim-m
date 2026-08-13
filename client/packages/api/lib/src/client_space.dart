@@ -50,6 +50,20 @@ extension SlimmApiSpace on SlimmApi {
     );
     return SpaceAnalytics._fromJson(json as Map<String, dynamic>);
   }
+
+  Future<int> spaceMessageRetentionDays() async {
+    final json = await _send('GET', '/space/retention');
+    return (json as Map<String, dynamic>)['retention_days'] as int;
+  }
+
+  Future<int> setSpaceMessageRetentionDays(int days) async {
+    final json = await _send(
+      'PATCH',
+      '/space/retention',
+      body: {'retention_days': days},
+    );
+    return (json as Map<String, dynamic>)['retention_days'] as int;
+  }
 }
 
 /// One calendar day's Space-wide message count, UTC, zero-filled for a day
@@ -127,18 +141,54 @@ class AnalyticsStats {
       );
 }
 
-/// `stats` is null whenever [enabled] is false: recording never ran, so
-/// there is nothing to derive or report, not even retroactively.
+/// One member's own attachment byte total, from [SpaceAnalytics.memberStorage].
+///
+/// Deliberately not part of [AnalyticsStats]: that class's own doc promises
+/// never to name a member, and this is the one field on the response that
+/// does, on purpose, for storage stewardship rather than usage surveillance.
+/// See `docs/decisions/0008-space-analytics.md`.
+class MemberAttachmentUsage {
+  const MemberAttachmentUsage({
+    required this.userId,
+    required this.attachmentBytes,
+  });
+
+  final String userId;
+
+  /// Every attachment this member has personally uploaded, by content hash.
+  /// Two members who each uploaded identical bytes are each charged the
+  /// full size: this is what a member contributed, not a share of
+  /// deduplicated disk use.
+  final int attachmentBytes;
+
+  factory MemberAttachmentUsage._fromJson(Map<String, dynamic> json) =>
+      MemberAttachmentUsage(
+        userId: json['user_id'] as String,
+        attachmentBytes: json['attachment_bytes'] as int,
+      );
+}
+
+/// `stats` and `memberStorage` are both null whenever [enabled] is false:
+/// recording never ran, so there is nothing to derive or report, not even
+/// retroactively. The two are siblings, never nested, on purpose: see
+/// [MemberAttachmentUsage]'s own doc for the privacy line between them.
 class SpaceAnalytics {
-  const SpaceAnalytics({required this.enabled, this.stats});
+  const SpaceAnalytics({required this.enabled, this.stats, this.memberStorage});
 
   final bool enabled;
   final AnalyticsStats? stats;
+  final List<MemberAttachmentUsage>? memberStorage;
 
   factory SpaceAnalytics._fromJson(Map<String, dynamic> json) => SpaceAnalytics(
         enabled: json['enabled'] as bool,
         stats: json['stats'] == null
             ? null
             : AnalyticsStats._fromJson(json['stats'] as Map<String, dynamic>),
+        memberStorage: json['member_storage'] == null
+            ? null
+            : (json['member_storage'] as List<dynamic>)
+                .map((e) =>
+                    MemberAttachmentUsage._fromJson(e as Map<String, dynamic>))
+                .toList(),
       );
 }

@@ -139,6 +139,26 @@ pub async fn run(c: &mut Contract) {
     c.bare("getSpaceAnalytics", "GET", "/space/analytics", root)
         .await;
 
+    c.bare("getSpaceRetention", "GET", "/space/retention", root)
+        .await;
+    // Set back to disabled, so the rest of the pass keeps its own history.
+    c.json(
+        "updateSpaceRetention",
+        "PATCH",
+        "/space/retention",
+        root,
+        json!({"retention_days": 30}),
+    )
+    .await;
+    c.json(
+        "updateSpaceRetention",
+        "PATCH",
+        "/space/retention",
+        root,
+        json!({"retention_days": 0}),
+    )
+    .await;
+
     profile_calls(c, root, &admin_id, &bob_id).await;
     safety_calls(c, root, bob_token, &bob_id).await;
 

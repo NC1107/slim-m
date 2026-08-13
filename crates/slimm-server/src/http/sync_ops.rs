@@ -84,10 +84,10 @@ pub(super) async fn ops_for_scope(
     };
 
     let floor = state.store.earliest_message_op_seq(channel_id).await?;
+    let floor = effective_floor(floor, latest);
     // `after > latest` is what a Litestream restore produces; see the reset doc.
-    let reset = after > latest
-        || latest.saturating_sub(after) > OP_SNAPSHOT_GAP
-        || floor.is_some_and(|floor| after < floor - 1);
+    let reset =
+        after > latest || latest.saturating_sub(after) > OP_SNAPSHOT_GAP || after < floor - 1;
     if reset {
         return Ok(OpsHalf {
             ops: Vec::new(),
@@ -117,6 +117,23 @@ pub(super) async fn ops_for_scope(
         ops_has_more,
         reset: false,
     })
+}
+
+/// The floor to compare a cursor against, standing in for `None`.
+///
+/// `None` from [`crate::store::Store::earliest_message_op_seq`] used to mean
+/// only one thing: this channel has never had an op, in which case `latest`
+/// is always `0` too and no cursor a real client sends is ever below it. The
+/// message-retention sweep's own op-log reclaim (`store/message_retention.rs`)
+/// can now produce a second `None` case - every op row for a channel with a
+/// nonzero `latest` has been reclaimed - and the two must not be conflated:
+/// the second means nothing between any earlier cursor and `latest` can be
+/// delivered any more, so every such cursor must reset. Standing in
+/// `latest + 1` does exactly that (`after < latest + 1 - 1` is `after <
+/// latest`), while leaving the true "never had an op" case at `latest == 0`
+/// unaffected, since no legitimate cursor is ever negative.
+fn effective_floor(floor: Option<i64>, latest: i64) -> i64 {
+    floor.unwrap_or(latest + 1)
 }
 
 fn dto_from(entry: MessageOpEntry) -> MessageOpDto {

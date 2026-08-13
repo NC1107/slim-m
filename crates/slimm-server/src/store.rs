@@ -36,6 +36,7 @@ mod dms;
 mod emoji;
 mod invites;
 mod message_ops;
+mod message_retention;
 mod message_search;
 mod messages;
 mod notifications;
@@ -59,7 +60,9 @@ mod timeouts;
 mod users;
 
 pub use account_deletion::DeleteAccountError;
-pub use analytics::{ANALYTICS_WINDOW_DAYS, AnalyticsStats, DayCount, MetricSample};
+pub use analytics::{
+    ANALYTICS_WINDOW_DAYS, AnalyticsStats, DayCount, MemberAttachmentUsage, MetricSample,
+};
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use canvas::{
@@ -79,6 +82,7 @@ pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
 pub use message_ops::{MessageOpEntry, MessageOpKind, MessageOpsPage};
+pub use message_retention::{MAX_MESSAGE_RETENTION_DAYS, PrunedMessage, SweptMessageRetention};
 pub use message_search::SearchError;
 pub use messages::{Edited, MessageDeletion, SendError, Sent};
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};

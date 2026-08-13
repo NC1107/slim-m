@@ -5,11 +5,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../providers/user_profiles.dart';
 import '../../widgets/analytics_bar_chart.dart';
 import '../../widgets/attachment_view.dart' show formatByteSize;
+import '../../widgets/author_label.dart';
 import '../../widgets/settings_section_header.dart';
 
 class MessagesByDayCard extends StatelessWidget {
@@ -127,6 +130,79 @@ class MemoryCard extends StatelessWidget {
           style: AppText.caption.copyWith(color: tokens.textSecondary),
         ),
       ],
+    );
+  }
+}
+
+/// Attachment bytes per member, heaviest first - never part of [_StatTiles]
+/// or the aggregate charts above: `member_storage` is the one place this
+/// screen names a member, for storage stewardship rather than usage
+/// surveillance. See `docs/decisions/0008-space-analytics.md`.
+class MemberStorageCard extends ConsumerWidget {
+  const MemberStorageCard({super.key, required this.usage});
+
+  final List<api.MemberAttachmentUsage> usage;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    resolveAuthorProfiles(ref, usage.map((u) => u.userId));
+    final profiles = ref.watch(batchProfilesControllerProvider);
+
+    if (usage.isEmpty) {
+      return SettingsSectionCard(
+        title: 'Attachment storage by member',
+        children: [
+          Text(
+            'Nobody has uploaded an attachment yet.',
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+        ],
+      );
+    }
+
+    return SettingsSectionCard(
+      title: 'Attachment storage by member',
+      children: [
+        for (final member in usage)
+          _MemberStorageRow(usage: member, profiles: profiles),
+      ],
+    );
+  }
+}
+
+class _MemberStorageRow extends StatelessWidget {
+  const _MemberStorageRow({required this.usage, required this.profiles});
+
+  final api.MemberAttachmentUsage usage;
+  final Map<String, api.UserProfile?> profiles;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final name = authorLabel(
+      authorId: usage.userId,
+      cachedDisplayName: null,
+      profiles: profiles,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.body.copyWith(color: tokens.textPrimary),
+            ),
+          ),
+          Text(
+            formatByteSize(usage.attachmentBytes),
+            style: AppText.body.copyWith(color: tokens.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }

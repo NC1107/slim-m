@@ -281,8 +281,15 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
-        let op_seq =
-            insert_message_op(&mut tx, existing.channel_id, id, "edit", actor_id, now).await?;
+        let op_seq = insert_message_op(
+            &mut tx,
+            existing.channel_id,
+            id,
+            "edit",
+            Some(actor_id),
+            now,
+        )
+        .await?;
         tx.commit().await?;
 
         let message = fetch_message(&self.pool, id)
@@ -322,7 +329,8 @@ impl Store {
             return Ok(MessageDeletion::default());
         };
 
-        let op_seq = insert_message_op(&mut tx, channel_id, id, "delete", actor_id, now).await?;
+        let op_seq =
+            insert_message_op(&mut tx, channel_id, id, "delete", Some(actor_id), now).await?;
         let freed_attachments = release_message_attachments(&mut tx, id).await?;
         tx.commit().await?;
         Ok(MessageDeletion {
