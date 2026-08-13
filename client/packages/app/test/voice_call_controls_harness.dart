@@ -125,6 +125,9 @@ class InertSession implements VoiceSession {
   @override
   void setVideoInterest(Set<String>? tileKeys) {}
 
+  @override
+  void setSpeakingSensitivity(double sensitivity) {}
+
   /// Every camera-switching call this session received, in order, so a test
   /// can assert on how the control chose between flipping and picking.
   final List<String> cameraSwitchCalls = [];

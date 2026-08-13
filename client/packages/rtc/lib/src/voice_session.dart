@@ -93,6 +93,10 @@ class VoiceSession {
   VoiceDisconnect? _lastDisconnect;
   bool _disposed = false;
 
+  /// See [setSpeakingSensitivity]; 1.0 matches this session's behaviour
+  /// before that setting existed.
+  double _speakingSensitivity = 1.0;
+
   /// Deafen, per-participant mute and per-participant gain, which are one
   /// listener's own business and never reach the room; see [LocalAudioState].
   final LocalAudioState _audio = LocalAudioState();
@@ -140,6 +144,17 @@ class VoiceSession {
     _audio.setMuted(identity, muted);
     final room = _room;
     if (room != null) await _applyLocalAudioState(room);
+    _refreshParticipants();
+  }
+
+  /// How readily [VoiceParticipant.isSpeaking] reports true; see
+  /// [passesActivationThreshold] for what this can and cannot do.
+  ///
+  /// Safe before a room exists (only stored, for the first [_refreshParticipants]
+  /// to pick up) and live mid-call: it re-evaluates the current roster
+  /// immediately, the same shape [setLocallyMuted] already uses.
+  void setSpeakingSensitivity(double sensitivity) {
+    _speakingSensitivity = sensitivity.clamp(0.0, 1.0);
     _refreshParticipants();
   }
 
@@ -439,7 +454,10 @@ class VoiceSession {
     // Ahead of the unchanged-roster early return below: a subscription can change with no visible roster change at all.
     _applyVideoInterest();
 
-    final next = snapshotParticipants(room);
+    final next = snapshotParticipants(
+      room,
+      speakingSensitivity: _speakingSensitivity,
+    );
     // Only emit on a real change: the events stream is chatty (audio levels
     // arrive constantly) and rebuilding the roster each time is how it janks.
     if (listEquals(next, _participants)) return;

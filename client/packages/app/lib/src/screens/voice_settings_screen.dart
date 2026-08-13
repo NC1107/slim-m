@@ -17,8 +17,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart' show isDesktopHost;
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
@@ -41,6 +43,8 @@ class VoiceSettingsBody extends StatelessWidget {
   Widget build(BuildContext context) => const Column(
     children: [
       _MicrophoneSection(),
+      _SensitivitySection(),
+      _PushToTalkSection(),
       CameraOnJoinSection(),
       MediaCapabilitySection(),
       _DeviceSection(),
@@ -48,6 +52,89 @@ class VoiceSettingsBody extends StatelessWidget {
       _SoundsSection(),
     ],
   );
+}
+
+/// How readily the speaking indicator lights, over and above whatever the
+/// SFU itself already decided; see `passesActivationThreshold` in the rtc
+/// package for the exact floor. Not wired to the microphone's own capture -
+/// checked against the pinned `livekit_client` 2.10.0 source before adding
+/// this screen, and it exposes no adjustable noise-gate threshold at all,
+/// only on/off capture toggles this client already leaves at their defaults.
+class _SensitivitySection extends ConsumerWidget {
+  const _SensitivitySection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(voiceSettingsControllerProvider);
+
+    return SettingsSectionCard(
+      title: 'Voice activity sensitivity',
+      description:
+          'How much reported volume is needed before the speaking ring '
+          'lights up. Lower requires a louder voice; higher lights up on '
+          'quieter sound.',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppSlider(
+          value: settings.voiceActivitySensitivity,
+          ticks: const ['Strict', 'Moderate', 'Loose'],
+          semanticLabel: 'Voice activity sensitivity',
+          onChanged: (value) => ref
+              .read(voiceSettingsControllerProvider.notifier)
+              .setVoiceActivitySensitivity(value),
+        ),
+      ],
+    );
+  }
+}
+
+/// Desktop only: holding a physical key means nothing without one, and this
+/// stays out of the tree entirely on a phone rather than offering a control
+/// that could never do anything there.
+class _PushToTalkSection extends ConsumerWidget {
+  const _PushToTalkSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!isDesktopHost) return const SizedBox.shrink();
+    final settings = ref.watch(voiceSettingsControllerProvider);
+    final index = pushToTalkKeyOptions.indexOf(settings.pushToTalkKey);
+
+    return SettingsSectionCard(
+      title: 'Push-to-talk',
+      description:
+          'Hold the key below to unmute for as long as you hold it, and '
+          'mute again the moment you let go. Held while the message box has '
+          'focus types normally instead - it never opens your microphone.',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SettingsToggleRow(
+          label: 'Hold a key to talk, instead of toggling the microphone',
+          value: settings.pushToTalkEnabled,
+          semanticLabel: 'Push-to-talk',
+          onChanged: (value) => ref
+              .read(voiceSettingsControllerProvider.notifier)
+              .setPushToTalkEnabled(value),
+        ),
+        if (settings.pushToTalkEnabled) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppSegmentedControl.inline(
+            semanticLabel: 'Push-to-talk key',
+            options: [
+              for (final key in pushToTalkKeyOptions)
+                AppSegmentedOption(label: _keyLabel(key)),
+            ],
+            selectedIndex: index < 0 ? 0 : index,
+            onSegmentSelected: (i) => ref
+                .read(voiceSettingsControllerProvider.notifier)
+                .setPushToTalkKey(pushToTalkKeyOptions[i]),
+          ),
+        ],
+      ],
+    );
+  }
+
+  static String _keyLabel(LogicalKeyboardKey key) => key.keyLabel;
 }
 
 /// A live level for the local microphone, sourced from the one real signal

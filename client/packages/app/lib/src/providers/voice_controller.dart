@@ -27,7 +27,10 @@ import 'voice_state.dart';
 
 export 'voice_state.dart' show VoiceState;
 
-class VoiceController extends StateNotifier<VoiceState> {
+part 'voice_controller_input.dart';
+
+class VoiceController extends StateNotifier<VoiceState>
+    with VoiceControllerInputMixin {
   VoiceController(
     this._ref, {
     VoiceSession? session,
@@ -104,6 +107,13 @@ class VoiceController extends StateNotifier<VoiceState> {
 
   final Ref _ref;
   final VoiceSession _session;
+
+  /// [VoiceControllerInputMixin]'s own required bridge to the fields above.
+  @override
+  VoiceSession get _inputSession => _session;
+  @override
+  Ref get _inputRef => _ref;
+
   final CallLifecycleChannel _callLifecycle;
   final VoiceCallHeartbeat _heartbeat;
   final DateTime Function() _now;

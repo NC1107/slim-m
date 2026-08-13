@@ -64,6 +64,8 @@ class _FakeSession implements VoiceSession {
   @override
   void setVideoInterest(Set<String>? tileKeys) {}
   @override
+  void setSpeakingSensitivity(double sensitivity) {}
+  @override
   bool get canFlipCamera => false;
   @override
   bool get cameraNeedsSelection => false;

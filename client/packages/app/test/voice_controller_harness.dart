@@ -185,6 +185,14 @@ class FakeSession implements VoiceSession {
   @override
   void setVideoInterest(Set<String>? tileKeys) => videoInterests.add(tileKeys);
 
+  /// The last sensitivity this session was handed, so a test can assert it
+  /// reached the session rather than only the controller's own copy.
+  double? lastSpeakingSensitivity;
+
+  @override
+  void setSpeakingSensitivity(double sensitivity) =>
+      lastSpeakingSensitivity = sensitivity;
+
   @override
   Future<List<CameraDevice>> cameraDevices() async => cameraDeviceList;
 
