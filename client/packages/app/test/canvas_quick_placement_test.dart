@@ -55,6 +55,7 @@ void main() {
         client: client,
         channelId: 'c1',
         document: CanvasDocument(),
+        timedOutUntil: () => null,
       );
       final longText = List.filled(40, 'a whole sentence.').join(' ');
 
@@ -72,6 +73,46 @@ void main() {
         greaterThan(140),
         reason: 'the whole point: a long note gets more than the default',
       );
+    },
+  );
+
+  testWidgets(
+    'a timed-out caller hears the freeze named, not a generic refusal',
+    (tester) async {
+      final client = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: api.SessionStore(
+          tokens: const api.TokenPair(
+            userId: 'me',
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            accessExpiresAt: 0,
+          ),
+        ),
+        httpClient: MockClient(
+          (request) async => http.Response('{"error":"no"}', 403),
+        ),
+      );
+      // A little past the exact hour so a later real-clock read cannot truncate this down a bucket.
+      final until = DateTime.now()
+          .add(const Duration(hours: 2, minutes: 5))
+          .millisecondsSinceEpoch;
+      final placement = CanvasQuickPlacement(
+        client: client,
+        channelId: 'c1',
+        document: CanvasDocument(),
+        timedOutUntil: () => until,
+      );
+
+      String? error;
+      await placement.placeShape(
+        Offset.zero,
+        CanvasShapeKind.rectangle,
+        onError: (message) => error = message,
+      );
+
+      expect(error, contains("You're timed out"));
+      expect(error, contains('2h'));
     },
   );
 }

@@ -19,6 +19,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../../ids.dart';
+import 'canvas_forbidden_message.dart';
 import 'canvas_note_sizing.dart';
 import 'canvas_sync.dart';
 
@@ -39,11 +40,17 @@ class CanvasQuickPlacement {
     required this.client,
     required this.channelId,
     required this.document,
+    required this.timedOutUntil,
   });
 
   final api.SlimmApi client;
   final String channelId;
   final CanvasDocument document;
+
+  /// The caller's own current timeout deadline, Unix milliseconds or null,
+  /// read fresh on every refusal rather than captured once at construction -
+  /// `CanvasCommitQueue` carries the same shaped field for the same reason.
+  final int? Function() timedOutUntil;
 
   /// Places a note carrying [text], centered at [world]. Text is set once
   /// here and never again - see [CanvasStrokeInput.text]'s own doc for why
@@ -113,17 +120,16 @@ class CanvasQuickPlacement {
       }
       return placed;
     } on api.ApiException catch (error) {
-      onError(_explain(error));
+      onError(_explain(error, timedOutUntil()));
       return null;
     }
   }
 
-  static String _explain(api.ApiException error) => switch (error) {
-    // Worded as a permission state, never as an outage that invites a retry.
-    api.ForbiddenException() =>
-      "You don't have permission to draw here right now.",
-    api.ConflictException() => 'This canvas is full.',
-    api.BadRequestException() => 'That was refused as too large.',
-    _ => 'That could not be placed.',
-  };
+  static String _explain(api.ApiException error, int? timedOutUntil) =>
+      switch (error) {
+        api.ForbiddenException() => canvasDrawForbiddenMessage(timedOutUntil),
+        api.ConflictException() => 'This canvas is full.',
+        api.BadRequestException() => 'That was refused as too large.',
+        _ => 'That could not be placed.',
+      };
 }

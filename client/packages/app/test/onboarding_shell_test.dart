@@ -212,5 +212,33 @@ void main() {
         expect(find.bySemanticsLabel(RegExp('does not match')), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'confirmed carries a visible word beside the glyph, not only a screen-reader label',
+      (tester) async {
+        await pump(tester, ServerIdentityStatus.confirmed);
+
+        expect(find.text('Confirmed'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'mismatch carries a visible word beside the glyph, not only a screen-reader label',
+      (tester) async {
+        await pump(tester, ServerIdentityStatus.mismatch);
+
+        expect(find.text('Changed'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'unknown renders no visible word, staying as quiet as the glyph',
+      (tester) async {
+        await pump(tester, ServerIdentityStatus.unknown);
+
+        expect(find.text('Confirmed'), findsNothing);
+        expect(find.text('Changed'), findsNothing);
+      },
+    );
   });
 }

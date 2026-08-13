@@ -191,7 +191,8 @@ class MemberTimeoutBadge extends StatelessWidget {
                     style: AppText.caption.copyWith(color: tokens.warnText),
                   ),
                   Text(
-                    "Can read, can't post or join voice.",
+                    'Can read messages and view the canvas; '
+                    "can't draw, send messages, or join voice.",
                     style: AppText.caption.copyWith(
                       color: tokens.textSecondary,
                     ),

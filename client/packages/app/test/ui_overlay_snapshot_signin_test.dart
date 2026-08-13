@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/api_failure.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -347,7 +348,10 @@ void main() {
             _jsonResponse({'error': _errorStrings.passwordLengthError}, 400),
       );
       await submitSignIn(tester);
-      expect(find.text(_errorStrings.passwordLengthError), findsOneWidget);
+      expect(
+        find.text(sentenceCase(_errorStrings.passwordLengthError)),
+        findsOneWidget,
+      );
       await _finish(tester, 'submit-bad-request-desktop');
     });
 

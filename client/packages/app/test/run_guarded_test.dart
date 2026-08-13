@@ -20,18 +20,21 @@ void main() {
     expect(failure, isNull);
   });
 
-  test('a bad request carries the server\'s own explanation', () async {
-    final failure = await runGuarded(
-      whatFailed: 'create the role',
-      action: () async => throw const api.BadRequestException(
-        'name must be 1 to 32 characters',
-      ),
-    );
-    expect(
-      failure,
-      'Could not create the role. name must be 1 to 32 characters',
-    );
-  });
+  test(
+    'a bad request carries the server\'s own explanation, sentence-cased',
+    () async {
+      final failure = await runGuarded(
+        whatFailed: 'create the role',
+        action: () async => throw const api.BadRequestException(
+          'name must be 1 to 32 characters',
+        ),
+      );
+      expect(
+        failure,
+        'Could not create the role. Name must be 1 to 32 characters.',
+      );
+    },
+  );
 
   test('a transport failure never leaks the exception string', () async {
     final failure = await runGuarded(

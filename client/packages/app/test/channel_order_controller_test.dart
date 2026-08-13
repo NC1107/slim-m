@@ -145,7 +145,7 @@ void main() {
           'a refusal must not leave the rail claiming an order that was '
           'never applied',
     );
-    expect(state.error, contains('missing live channel(s): c'));
+    expect(state.error, contains('Missing live channel(s): c'));
   });
 
   test('retry resubmits the same arrangement that last failed', () async {

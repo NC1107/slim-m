@@ -17,6 +17,7 @@ extension _CanvasPaneHelpers on _CanvasPaneState {
     document: _document,
     onPlaced: _selectPlaced,
     onError: (message) => _refresh(() => _error = message),
+    timedOutUntil: () => ref.read(meProvider).valueOrNull?.timedOutUntil,
   );
 
   CanvasQuickPlacement get _quickPlacement =>
@@ -24,6 +25,7 @@ extension _CanvasPaneHelpers on _CanvasPaneState {
         client: ref.read(apiProvider),
         channelId: widget.channelId,
         document: _document,
+        timedOutUntil: () => ref.read(meProvider).valueOrNull?.timedOutUntil,
       );
 
   CanvasCommitQueue get _commits => _queue ??= CanvasCommitQueue(
@@ -45,6 +47,7 @@ extension _CanvasPaneHelpers on _CanvasPaneState {
       );
     },
     onEraseOnConfirm: (id) => unawaited(_ops.eraseOnConfirm(id)),
+    timedOutUntil: () => ref.read(meProvider).valueOrNull?.timedOutUntil,
   );
 
   CanvasOpsController get _ops => _opsController ??= CanvasOpsController(

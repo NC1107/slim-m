@@ -11,6 +11,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import '../api_failure.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../routing/routes.dart';
@@ -273,7 +274,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             _ErrorField.username,
             'That username is already taken.',
           ),
-          BadRequestException(:final message) => (_ErrorField.form, message),
+          BadRequestException(:final message) => (
+            _ErrorField.form,
+            sentenceCase(message),
+          ),
           RateLimitedException() => (
             _ErrorField.form,
             'Too many attempts just now. Wait a moment and try again.',
@@ -287,7 +291,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             "This Space didn't answer. It may be restarting, or the "
                 'address may be wrong. Nothing was sent.',
           ),
-          _ => (_ErrorField.form, 'The server refused that. ${e.message}'),
+          _ => (
+            _ErrorField.form,
+            'The server refused that. ${sentenceCase(e.message)}',
+          ),
         },
       );
     } finally {

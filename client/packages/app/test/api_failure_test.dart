@@ -22,23 +22,52 @@ void main() {
     expect(message, contains('Nothing was changed'));
   });
 
-  test('a bad request keeps the server\'s own reason', () {
+  test('a bad request keeps the server\'s own reason, sentence-cased', () {
     expect(
       describeApiFailure(
         'create the role',
         const api.BadRequestException('name must be 1 to 32 characters'),
       ),
-      'Could not create the role. name must be 1 to 32 characters',
+      'Could not create the role. Name must be 1 to 32 characters.',
     );
   });
 
-  test('a conflict keeps the server\'s own reason', () {
+  test('a conflict keeps the server\'s own reason, sentence-cased', () {
     expect(
       describeApiFailure(
         'set the overwrite',
         const api.ConflictException('already exists'),
       ),
-      'Could not set the overwrite. already exists',
+      'Could not set the overwrite. Already exists.',
+    );
+  });
+
+  group('sentenceCase', () {
+    test('capitalizes the first letter and adds a trailing period', () {
+      expect(
+        sentenceCase('password must be 8 to 1024 characters'),
+        'Password must be 8 to 1024 characters.',
+      );
+    });
+
+    test('leaves terminal punctuation alone rather than doubling it', () {
+      expect(sentenceCase('already ends cleanly.'), 'Already ends cleanly.');
+      expect(sentenceCase('is this it?'), 'Is this it?');
+      expect(sentenceCase('really!'), 'Really!');
+    });
+
+    test('an empty string stays empty', () {
+      expect(sentenceCase(''), '');
+    });
+
+    test(
+      'a string already capitalized keeps its own casing past the first letter',
+      () {
+        expect(
+          sentenceCase('nick-c is not a valid username'),
+          'Nick-c is not a valid username.',
+        );
+      },
     );
   });
 

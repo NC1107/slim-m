@@ -100,6 +100,7 @@ class _Harness {
           ..refresh();
       },
       onEraseOnConfirm: (id) => ops.eraseOnConfirm(id),
+      timedOutUntil: () => null,
     );
     ops = CanvasOpsController(
       channelId: 'c1',

@@ -3,6 +3,16 @@
 /// Enter/Space once tabbed to - it used to be a bare `GestureDetector`,
 /// which Flutter never makes a tab stop, so a spoiler could not be revealed
 /// from the keyboard at all.
+///
+/// The hidden text stays mounted underneath the bar for sizing, which used
+/// to mean it stayed selectable too: a `SelectionArea` a level up (the
+/// desktop transcript's own `TranscriptSelection`) could select clean past
+/// an unrevealed bar and copy the spoiler's real text, opacity 0 or not -
+/// `transcript_selection_content_test.dart` is what caught it, by actually
+/// selecting and reading the clipboard back rather than only checking a
+/// widget was present. `SelectionContainer.disabled` around the hidden text
+/// is what a `SelectionArea` reads to mean "not part of this selection",
+/// the same job `ExcludeSemantics` already did for a screen reader.
 library;
 
 import 'package:flutter/material.dart';
@@ -51,9 +61,19 @@ class _MessageSpoilerState extends State<MessageSpoiler> {
                 excluding: !_revealed,
                 child: Opacity(
                   opacity: _revealed ? 1 : 0,
-                  child: Text.rich(
-                    TextSpan(style: widget.style, children: widget.spans),
-                  ),
+                  // Opacity hides pixels, not selectability - see this file's own doc comment.
+                  child: _revealed
+                      ? Text.rich(
+                          TextSpan(style: widget.style, children: widget.spans),
+                        )
+                      : SelectionContainer.disabled(
+                          child: Text.rich(
+                            TextSpan(
+                              style: widget.style,
+                              children: widget.spans,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               if (!_revealed)

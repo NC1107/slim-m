@@ -204,7 +204,10 @@ void main() {
 
         expect(find.textContaining('Timed out'), findsOneWidget);
         expect(
-          find.text("Can read, can't post or join voice."),
+          find.text(
+            'Can read messages and view the canvas; '
+            "can't draw, send messages, or join voice.",
+          ),
           findsOneWidget,
         );
         expect(

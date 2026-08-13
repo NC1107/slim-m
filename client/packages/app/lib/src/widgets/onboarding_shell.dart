@@ -389,9 +389,16 @@ class ServerIdentityChip extends StatelessWidget {
   }
 }
 
-/// The tick, its louder mismatch counterpart, or nothing - always with a
-/// semantic label, so what a sighted user reads from colour and shape a
-/// screen reader gets from words instead.
+/// The tick, its louder mismatch counterpart, or nothing - each with a
+/// visible word beside it, not only a screen-reader label.
+///
+/// This is a security-relevant signal (trust-on-first-use's one visible
+/// cue for whether a server is the one trusted last time), so a sighted,
+/// non-screen-reader user needs on-screen words for it too, not just a
+/// tooltip nobody has a reason to hover a 16px glyph for. The full
+/// semantic sentence stays on the [Semantics] wrapper for a screen reader;
+/// the short visible word is `excludeSemantics`-scoped so nothing is
+/// announced twice.
 class _IdentityStatusGlyph extends StatelessWidget {
   const _IdentityStatusGlyph({required this.status});
 
@@ -406,6 +413,14 @@ class _IdentityStatusGlyph extends StatelessWidget {
         'server may not be the one trusted last time.',
   };
 
+  /// The short visible word beside the glyph. Unknown renders neither an
+  /// icon nor a word, deliberately: it is not yet a claim in either
+  /// direction, so it stays as quiet as an unasked question.
+  static const _visibleText = {
+    ServerIdentityStatus.confirmed: 'Confirmed',
+    ServerIdentityStatus.mismatch: 'Changed',
+  };
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -414,15 +429,32 @@ class _IdentityStatusGlyph extends StatelessWidget {
       ServerIdentityStatus.unknown => (null, null),
       ServerIdentityStatus.mismatch => (AppIcons.danger, tokens.dangerText),
     };
+    final text = _visibleText[status];
 
     return Semantics(
       label: _labels[status],
-      child: SizedBox(
-        width: AppSizes.icon16,
-        height: AppSizes.icon16,
-        child: icon == null
-            ? null
-            : Icon(icon, size: AppSizes.icon16, color: color),
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: AppSizes.icon16,
+            height: AppSizes.icon16,
+            child: icon == null
+                ? null
+                : Icon(icon, size: AppSizes.icon16, color: color),
+          ),
+          if (text != null) ...[
+            const SizedBox(width: AppSpacing.s4),
+            Text(
+              text,
+              style: AppText.caption.copyWith(
+                color: color,
+                fontWeight: AppWeights.semi,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -55,7 +55,7 @@ api.SlimmApi _fakeApi(http.Response Function() onPlace) => api.SlimmApi(
 );
 
 class _Harness {
-  _Harness(this.client) {
+  _Harness(this.client, {int? Function()? timedOutUntil}) {
     queue = CanvasCommitQueue(
       client: client,
       channelId: 'c1',
@@ -63,6 +63,7 @@ class _Harness {
       onFailed: (id, message) => failed.add((id, message)),
       onRemoved: (id) => removed.add(id),
       onEraseOnConfirm: (id) => armedLanded.add(id),
+      timedOutUntil: timedOutUntil ?? () => null,
     );
   }
 
@@ -109,6 +110,34 @@ void main() {
         ('a', "You don't have permission to draw here right now."),
       ]);
       expect(harness.placed, isEmpty);
+    });
+  });
+
+  test('a timed-out caller gets the freeze named, not the generic refusal', () {
+    fakeAsync((async) {
+      // A little past the exact minute so a later real-clock read cannot truncate this down a bucket.
+      final until = DateTime.now()
+          .add(const Duration(minutes: 5, seconds: 30))
+          .millisecondsSinceEpoch;
+      final harness = _Harness(
+        _fakeApi(() => _json({'error': 'no'}, 403)),
+        timedOutUntil: () => until,
+      );
+      harness.queue.add(_commit('a'));
+      async.flushMicrotasks();
+
+      expect(harness.failed, hasLength(1));
+      final (id, message) = harness.failed.single;
+      expect(id, 'a');
+      expect(message, contains("You're timed out"));
+      expect(message, contains('5m'));
+      expect(
+        message,
+        isNot(contains("don't have permission")),
+        reason:
+            'a real timeout deadline names itself, not the generic '
+            'permission wording',
+      );
     });
   });
 

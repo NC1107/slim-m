@@ -23,6 +23,15 @@ import 'providers.dart';
 /// per-frame or per-rebuild cost.
 const voiceRosterPollInterval = Duration(seconds: 15);
 
+/// Consecutive non-`NotConfigured` failures before this stops treating the
+/// SFU as merely having a bad tick and surfaces it as an [AsyncValue] error
+/// instead - the [AsyncValue.hasError] a caller can check to tell "have not
+/// heard back yet" apart from "have been asking and it keeps failing", per
+/// `docs/reports/screen-review/voice.md`'s own request for a distinct state
+/// here rather than staying silent forever. One flaky tick is not this; a
+/// short unbroken run of them is.
+const persistentRosterFailureThreshold = 3;
+
 /// Who the server reports as connected to [channelId]'s voice room.
 ///
 /// A hidden participant is never in this list for any viewer but themselves;
@@ -44,10 +53,15 @@ const voiceRosterPollInterval = Duration(seconds: 15);
 /// A channel with no voice configured closes the stream on its first answer
 /// rather than polling a server that will only ever say the same thing
 /// again, which is why [AsyncLoading] is also what a text-only deployment
-/// settles on forever. A transient failure - unreachable SFU, a blip in
-/// authentication - adds nothing this tick and simply waits for the next
+/// settles on forever. A single transient failure - unreachable SFU, a blip
+/// in authentication - adds nothing this tick and simply waits for the next
 /// one, so the last roster this client actually saw stays on screen instead
-/// of being cleared to looking empty.
+/// of being cleared to looking empty. [persistentRosterFailureThreshold]
+/// unbroken failures in a row is no longer "this tick's bad luck" though,
+/// and surfaces as [AsyncValue.hasError] - a caller can check that
+/// alongside [AsyncValue.valueOrNull] (which the error keeps, if there was
+/// one) to tell a genuinely broken poll apart from one that just has not
+/// answered yet.
 ///
 /// `voice.activity` (`api.VoiceActivityChanged`) refreshes this promptly
 /// rather than leaving a join or hangup to surface on the next poll tick, up
@@ -58,10 +72,12 @@ final voiceRosterProvider = StreamProvider.autoDispose
     .family<List<api.VoiceRosterParticipant>, String>((ref, channelId) {
       final client = ref.watch(apiProvider);
       final controller = StreamController<List<api.VoiceRosterParticipant>>();
+      var consecutiveFailures = 0;
 
       Future<void> tick(Timer? self) async {
         try {
           final roster = await client.voiceRoster(channelId);
+          consecutiveFailures = 0;
           final selfId = client.session.tokens?.userId;
           final visible = selfId == null
               ? roster
@@ -70,8 +86,13 @@ final voiceRosterProvider = StreamProvider.autoDispose
         } on api.NotConfiguredException {
           self?.cancel();
           unawaited(controller.close());
-        } on api.ApiException {
-          // Unavailable, forbidden, rate-limited: try again on the next tick.
+        } on api.ApiException catch (e) {
+          // Unavailable, forbidden, rate-limited: try again, unless this has gone on long enough to say so.
+          consecutiveFailures++;
+          if (consecutiveFailures >= persistentRosterFailureThreshold &&
+              !controller.isClosed) {
+            controller.addError(e);
+          }
         }
       }
 

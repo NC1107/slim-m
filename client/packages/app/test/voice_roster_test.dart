@@ -227,6 +227,86 @@ void main() {
     });
   });
 
+  test('a short run of failures stays quiet, matching the transient case', () {
+    fakeAsync((async) {
+      final container = _containerWith(
+        MockClient((_) async => http.Response('{"error":"busy"}', 503)),
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+
+      // One tick short of the threshold: still ordinary "not known yet" loading, never an error.
+      async.elapse(
+        voiceRosterPollInterval * (persistentRosterFailureThreshold - 2),
+      );
+      expect(
+        container.read(voiceRosterProvider('general')).hasError,
+        isFalse,
+        reason: 'a short run of bad ticks is not yet a broken poll',
+      );
+      sub.close();
+    });
+  });
+
+  test('a sustained run of failures surfaces as a distinct error state, '
+      'not silence', () {
+    fakeAsync((async) {
+      final container = _containerWith(
+        MockClient((_) async => http.Response('{"error":"busy"}', 503)),
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+
+      async.elapse(
+        voiceRosterPollInterval * (persistentRosterFailureThreshold - 1),
+      );
+      final state = container.read(voiceRosterProvider('general'));
+      expect(
+        state.hasError,
+        isTrue,
+        reason:
+            '$persistentRosterFailureThreshold unbroken failures is a '
+            'broken poll, not this tick\'s bad luck',
+      );
+      expect(
+        state.valueOrNull,
+        isNull,
+        reason: 'nothing was ever fetched, so there is no roster to keep',
+      );
+      sub.close();
+    });
+  });
+
+  test('a success after a sustained failure clears the error, not just adds '
+      'a value beside it', () {
+    fakeAsync((async) {
+      var calls = 0;
+      final container = _containerWith(
+        MockClient((_) async {
+          calls++;
+          if (calls <= persistentRosterFailureThreshold) {
+            return http.Response('{"error":"busy"}', 503);
+          }
+          return _roster([
+            {'user_id': 'u1', 'display_name': 'Alice'},
+          ]);
+        }),
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+      async.elapse(
+        voiceRosterPollInterval * (persistentRosterFailureThreshold - 1),
+      );
+      expect(container.read(voiceRosterProvider('general')).hasError, isTrue);
+
+      async.elapse(voiceRosterPollInterval);
+      final state = container.read(voiceRosterProvider('general'));
+      expect(state.hasError, isFalse);
+      expect(state.value?.single.displayName, 'Alice');
+      sub.close();
+    });
+  });
+
   test('a voice.activity event for a different channel is ignored', () {
     fakeAsync((async) {
       var calls = 0;

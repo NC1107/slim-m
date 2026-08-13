@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/api_failure.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -244,7 +245,10 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
-      expect(find.textContaining(_errorStrings.internalError), findsOneWidget);
+      expect(
+        find.textContaining(sentenceCase(_errorStrings.internalError)),
+        findsOneWidget,
+      );
       await _finish(tester, 'invite-dialog-server-refused-desktop');
     });
   });
