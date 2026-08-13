@@ -44,10 +44,7 @@ class _PushToTalkListenerState extends ConsumerState<PushToTalkListener> {
   void initState() {
     super.initState();
     if (!isDesktopHost) return;
-    // Read once, unawaited, so the provider's own async load is already
-    // well under way by the time a key could plausibly be pressed - a
-    // handler-time first read would otherwise see the pre-load default
-    // (disabled) on this build's very first key event.
+    // Read once, unawaited: a handler-time first read would otherwise see the pre-load default on this build's very first key event.
     ref.read(voiceSettingsControllerProvider);
     HardwareKeyboard.instance.addHandler(_handleKey);
   }

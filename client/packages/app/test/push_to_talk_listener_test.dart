@@ -39,8 +39,7 @@ void main() {
         ),
       ),
     );
-    // The listener's own initState warm-up needs a turn of the event loop
-    // to resolve before a key event can see it; see its own doc comment.
+    // The listener's own initState warm-up needs a turn of the event loop to resolve before a key event can see it.
     await tester.pumpAndSettle();
     await controller.join('channel-1');
     session.emitState(VoiceSessionState.connected);
@@ -100,18 +99,16 @@ void main() {
           composerNode;
       await tester.pumpAndSettle();
       expect(composerNode.hasFocus, isTrue);
-      // Muted first, so a wrongly-triggered hold (which would unmute) is
-      // visible rather than hidden behind the field's own default true.
+      // Muted first, so a wrongly-triggered hold (which would unmute) is visible rather than hidden behind the default.
       await controller.toggleMicrophone();
       await tester.pumpAndSettle();
       expect(controller.state.microphoneEnabled, isFalse);
 
-      // "very" - v, e, r, y - typed as real hardware key events, the same
-      // shape a screen reader user or anyone drafting a message produces.
-      // Checked right after V's own key-down, not only once the whole word
-      // has been typed: a down that wrongly opened the mic and a later up
-      // that closed it again would cancel out and read as never having
-      // happened if only the word's final state were asserted.
+      /// "very" (v, e, r, y), as real hardware key events, checked right
+      /// after V's own key-down rather than only once the whole word has
+      /// been typed: a down that wrongly opened the mic and a later up that
+      /// closed it again would cancel out and read as never having happened
+      /// if only the word's final state were asserted.
       var checkedVDown = false;
       for (final key in [
         LogicalKeyboardKey.keyV,
