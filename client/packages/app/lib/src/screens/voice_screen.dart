@@ -25,9 +25,8 @@ import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../widgets/call_stage_layout.dart';
-import '../widgets/floating_dock_card.dart';
 import '../widgets/member_profile.dart';
-import 'voice_call_controls.dart';
+import 'voice_call_dock.dart';
 import 'voice_join_preview.dart';
 
 /// Whether [voice] describes a live call somewhere other than [channelId]:
@@ -138,7 +137,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
         // 'joining' reads as 'connecting' here, so a fresh arrival never fades through a stage nobody would see.
         key: ValueKey('voice-${stage == 'joining' ? 'connecting' : stage}'),
         child: switch (stage) {
-          'call' => _InCall(channelId: channelId),
+          'call' => _InCall(channelId: channelId, isDm: widget.isDm),
           'connecting' || 'joining' => const VoiceConnecting(),
           'switch' => VoiceSwitchPrompt(onSwitch: () => _switchNow(controller)),
           _ => VoiceRejoinScreen(
@@ -167,10 +166,15 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 /// `CallStageLayout` (`widgets/call_stage_layout.dart`), which carries its
 /// own bottom clearance so the floating card never sits on top of its
 /// content.
+///
+/// [isDm] withholds the dock's own canvas toggle - see `voice_call_dock.dart`
+/// for the DM half of why, and `canvas_pane_test.dart` for the header
+/// affordance this is in addition to, not a replacement for.
 class _InCall extends ConsumerWidget {
-  const _InCall({required this.channelId});
+  const _InCall({required this.channelId, required this.isDm});
 
   final String channelId;
+  final bool isDm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -193,8 +197,10 @@ class _InCall extends ConsumerWidget {
             child: AppFadeIn(
               key: ValueKey('call-dock-$channelId'),
               offset: 12,
-              child: FloatingDockCard(
-                rows: [CallControls(controller: controller, voice: voice)],
+              child: VoiceCallDock(
+                controller: controller,
+                voice: voice,
+                canvasChannelId: isDm ? null : channelId,
               ),
             ),
           ),

@@ -27,12 +27,13 @@
 /// limit, and this row is the one part of that screen with no dependency on
 /// which channel is being looked at.
 ///
-/// **`_ControlButton` used to draw a fixed 44dp chip at every width**, the
+/// **`CallDockButton` used to draw a fixed 44dp chip at every width**, the
 /// single largest contributor to the owner's "way more compact" report.
 /// It now follows `AppIconButton`'s own already-tested split instead
 /// (`design_system/test/touch_targets_test.dart`): a fixed visible chip,
 /// with only the invisible tap area growing to `AppSizes.rowTouch` at
-/// touch density.
+/// touch density. Public now, since `voice_call_dock.dart`'s canvas toggle
+/// draws the identical chip.
 library;
 
 import 'dart:async';
@@ -80,14 +81,14 @@ class _CallControlsState extends ConsumerState<CallControls> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _ControlButton(
+        CallDockButton(
           icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
           tooltip: voice.microphoneEnabled ? 'Mute' : 'Unmute',
           active: voice.microphoneEnabled,
           onPressed: widget.controller.toggleMicrophone,
         ),
         const SizedBox(width: AppSpacing.s8),
-        _ControlButton(
+        CallDockButton(
           icon: voice.cameraEnabled ? AppIcons.camera : AppIcons.cameraOff,
           tooltip: voice.cameraEnabled ? 'Turn off camera' : 'Turn on camera',
           active: voice.cameraEnabled,
@@ -95,7 +96,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
         ),
         if (voice.cameraEnabled) ...[
           const SizedBox(width: AppSpacing.s8),
-          _ControlButton(
+          CallDockButton(
             icon: AppIcons.switchCamera,
             tooltip: 'Switch camera',
             active: false,
@@ -107,7 +108,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
           ),
         ],
         const SizedBox(width: AppSpacing.s8),
-        _ControlButton(
+        CallDockButton(
           icon: AppIcons.screenShare,
           tooltip: _shareTooltip(voice),
           active: voice.screenSharing,
@@ -120,7 +121,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
           },
         ),
         const SizedBox(width: AppSpacing.s8),
-        _ControlButton(
+        CallDockButton(
           icon: AppIcons.leaveCall,
           tooltip: 'Leave call',
           active: false,
@@ -203,8 +204,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
   }
 }
 
-class _ControlButton extends StatelessWidget {
-  const _ControlButton({
+class CallDockButton extends StatelessWidget {
+  const CallDockButton({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.active,
