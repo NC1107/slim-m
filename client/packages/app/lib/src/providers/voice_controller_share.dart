@@ -58,8 +58,7 @@ mixin VoiceControllerShareMixin on StateNotifier<VoiceState> {
         state = state.copyWith(
           screenSharing: false,
           awaitingBroadcast: false,
-          // The cause is included rather than dropped: "the system refused the
-          // capture" alone sent a real Linux failure to a log nobody reads.
+          // Cause included, not dropped: the bare sentence once hid a real Linux failure.
           error: enabled
               ? 'Could not start sharing. ${cause ?? 'The system refused the capture.'}'
               : 'Could not stop sharing. ${cause ?? ''}'.trim(),
