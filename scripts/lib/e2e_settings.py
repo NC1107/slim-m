@@ -125,7 +125,12 @@ def change_join_policy(client, api):
     """Who can join is one row in the database and the whole security model."""
     _open_space(client)
     before = api.space_settings()['join_policy']
+    # Two taps since Space settings became a nav beside embedded panes: the
+    # first selects the pane, the second is the pane's own row opening the
+    # picker - distinguishable because only the row names the current value.
     client.click(L.WHO_CAN_JOIN, settle=2)
+    client.wait_for(L.WHO_CAN_JOIN_ROW)
+    client.click(L.WHO_CAN_JOIN_ROW, settle=2)
     client.wait_for(L.JOIN_OPEN)
     client.click(L.JOIN_OPEN, settle=3)
 
@@ -143,7 +148,7 @@ def change_join_policy(client, api):
         '/version still says an invite is required'
     print(f'  join policy {before} -> {after}, and /version agrees')
 
-    client.click(L.WHO_CAN_JOIN, settle=2)
+    client.click(L.WHO_CAN_JOIN_ROW, settle=2)
     client.click(L.JOIN_INVITE, settle=3)
     deadline = time.time() + 30
     while time.time() < deadline:
