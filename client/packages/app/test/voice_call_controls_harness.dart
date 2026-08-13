@@ -36,10 +36,14 @@ class InertSession implements VoiceSession {
     Future<List<ScreenShareSource>>? sources,
     ScreenShareOutcome outcome = ScreenShareOutcome.started,
     bool sourcePickerUseful = true,
+    this.supportsScreenShareAudio = true,
   }) : _needsSource = needsSource,
        _sources = sources ?? Future.value(const []),
        _outcome = outcome,
        screenShareSourcePickerUseful = sourcePickerUseful;
+
+  @override
+  final bool supportsScreenShareAudio;
 
   final bool _needsSource;
   final Future<List<ScreenShareSource>> _sources;
@@ -58,9 +62,16 @@ class InertSession implements VoiceSession {
   int sourceFetchCount = 0;
 
   /// Every call `setScreenShareEnabled` received, in order, so a test can
-  /// assert on the quality it was actually given rather than only on the
-  /// outcome.
-  final List<({bool enabled, ScreenShareQuality quality, String? sourceId})>
+  /// assert on the quality and audio choice it was actually given rather
+  /// than only on the outcome.
+  final List<
+    ({
+      bool enabled,
+      ScreenShareQuality quality,
+      String? sourceId,
+      bool includeAudio,
+    })
+  >
   screenShareCalls = [];
 
   @override
@@ -191,11 +202,13 @@ class InertSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async {
     screenShareCalls.add((
       enabled: enabled,
       quality: quality,
       sourceId: sourceId,
+      includeAudio: includeAudio,
     ));
     return _outcome;
   }

@@ -156,6 +156,86 @@ void main() {
     expect(prefs.getString('slimm.voice.screen_share_quality'), 'crisp');
   });
 
+  testWidgets(
+    'screen share audio is offered only where the platform can publish it',
+    (tester) async {
+      final unsupported = FakeSession(supportsScreenShareAudio: false);
+      await tester.pumpWidget(
+        wrap(
+          const VoiceSettingsBody(),
+          overrides: [
+            voiceControllerProvider.overrideWith(
+              (ref) => VoiceController(ref, session: unsupported),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      final toggle = find.byWidgetPredicate(
+        (w) =>
+            w is AppToggle &&
+            w.semanticLabel == 'Share audio with a screen share',
+      );
+      expect(
+        toggle,
+        findsNothing,
+        reason: 'absent, never disabled, where nothing would happen',
+      );
+
+      final supported = FakeSession(supportsScreenShareAudio: true);
+      await tester.pumpWidget(
+        wrap(
+          const VoiceSettingsBody(),
+          overrides: [
+            voiceControllerProvider.overrideWith(
+              (ref) => VoiceController(ref, session: supported),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        toggle,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(toggle, findsOneWidget);
+    },
+  );
+
+  testWidgets('turning on screen share audio persists it', (tester) async {
+    final session = FakeSession(supportsScreenShareAudio: true);
+    await tester.pumpWidget(
+      wrap(
+        const VoiceSettingsBody(),
+        overrides: [
+          voiceControllerProvider.overrideWith(
+            (ref) => VoiceController(ref, session: session),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final toggle = find.byWidgetPredicate(
+      (w) =>
+          w is AppToggle &&
+          w.semanticLabel == 'Share audio with a screen share',
+    );
+    await tester.scrollUntilVisible(
+      toggle,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('slimm.voice.screen_share_include_audio'), isTrue);
+  });
+
   testWidgets('turning off join and leave sounds persists it', (tester) async {
     await tester.pumpWidget(wrap(const VoiceSettingsBody()));
     await tester.pumpAndSettle();

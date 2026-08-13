@@ -20,6 +20,7 @@ const _cameraOnJoinKey = 'slimm.voice.camera_on_join';
 const _pushToTalkEnabledKey = 'slimm.voice.push_to_talk_enabled';
 const _pushToTalkKeyIdKey = 'slimm.voice.push_to_talk_key_id';
 const _sensitivityKey = 'slimm.voice.activity_sensitivity';
+const _shareAudioKey = 'slimm.voice.screen_share_include_audio';
 
 /// The push-to-talk key options offered in Voice settings: plain letters,
 /// so each is reachable while typing - the composer-focus guard is what
@@ -63,6 +64,7 @@ class VoiceSettingsState {
     this.pushToTalkEnabled = false,
     this.pushToTalkKey = LogicalKeyboardKey.keyV,
     this.voiceActivitySensitivity = 100.0,
+    this.screenShareIncludeAudio = false,
   });
 
   final bool joinLeaveSoundsEnabled;
@@ -95,6 +97,15 @@ class VoiceSettingsState {
   /// why it can only narrow the SFU's own decision, never invent one.
   final double voiceActivitySensitivity;
 
+  /// Whether a screen share should try to publish this device's own audio
+  /// alongside it. Defaults off: a stray notification chime becomes
+  /// everyone's problem, where a share's video is at least something the
+  /// sharer chose to show. The toggle offering this is shown only where
+  /// `VoiceController.supportsScreenShareAudio` is true, and
+  /// `VoiceController.setScreenShare` re-checks that same capability before
+  /// honouring this value.
+  final bool screenShareIncludeAudio;
+
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
     bool? callRingSoundEnabled,
@@ -103,6 +114,7 @@ class VoiceSettingsState {
     bool? pushToTalkEnabled,
     LogicalKeyboardKey? pushToTalkKey,
     double? voiceActivitySensitivity,
+    bool? screenShareIncludeAudio,
   }) => VoiceSettingsState(
     joinLeaveSoundsEnabled:
         joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
@@ -113,6 +125,8 @@ class VoiceSettingsState {
     pushToTalkKey: pushToTalkKey ?? this.pushToTalkKey,
     voiceActivitySensitivity:
         voiceActivitySensitivity ?? this.voiceActivitySensitivity,
+    screenShareIncludeAudio:
+        screenShareIncludeAudio ?? this.screenShareIncludeAudio,
   );
 }
 
@@ -139,6 +153,7 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
           .where((k) => k.keyId == storedKeyId)
           .firstOrDefault(LogicalKeyboardKey.keyV),
       voiceActivitySensitivity: prefs.getDouble(_sensitivityKey) ?? 100.0,
+      screenShareIncludeAudio: prefs.getBool(_shareAudioKey) ?? false,
     );
   }
 
@@ -158,6 +173,12 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     state = state.copyWith(screenShareQuality: quality);
     final prefs = await _ref.read(preferencesProvider.future);
     await prefs.setString(_qualityKey, quality.name);
+  }
+
+  Future<void> setScreenShareIncludeAudio(bool enabled) async {
+    state = state.copyWith(screenShareIncludeAudio: enabled);
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setBool(_shareAudioKey, enabled);
   }
 
   /// Persists the "join with camera on" preference and, since a call may

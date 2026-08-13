@@ -34,6 +34,9 @@ class _NoopSession implements VoiceSession {
   bool get supportsParticipantVolume => true;
 
   @override
+  bool get supportsScreenShareAudio => true;
+
+  @override
   double volumeFor(String identity) => 1.0;
 
   @override
@@ -128,6 +131,7 @@ class _NoopSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async => ScreenShareOutcome.started;
 
   @override

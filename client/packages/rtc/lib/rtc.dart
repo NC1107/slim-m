@@ -16,6 +16,7 @@ export 'src/desktop_sources.dart';
 export 'src/media_capabilities.dart';
 export 'src/remote_video_publication.dart';
 export 'src/screen_share.dart';
+export 'src/screen_share_audio.dart';
 export 'src/screen_share_control.dart';
 export 'src/video_subscription_culler.dart';
 export 'src/voice_models.dart';

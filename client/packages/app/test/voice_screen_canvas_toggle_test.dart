@@ -36,6 +36,9 @@ class _ConnectedSession implements VoiceSession {
   bool get supportsParticipantVolume => true;
 
   @override
+  bool get supportsScreenShareAudio => true;
+
+  @override
   void setSpeakingSensitivity(double sensitivity) {}
 
   @override
@@ -141,6 +144,7 @@ class _ConnectedSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async => ScreenShareOutcome.started;
 
   @override

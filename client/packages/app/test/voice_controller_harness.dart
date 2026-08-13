@@ -33,19 +33,6 @@ const tokens = TokenPair(
 /// Implemented rather than subclassed so that adding a method to the real
 /// session is a compile error here, not a silently untested path.
 class FakeSession implements VoiceSession {
-  @override
-  bool get supportsParticipantVolume => true;
-
-  final Map<String, double> _volumes = {};
-
-  @override
-  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
-
-  @override
-  Future<void> setVolumeFor(String identity, double volume) async {
-    _volumes[identity] = volume.clamp(0.0, 2.0);
-  }
-
   FakeSession({
     this.joinOutcome = VoiceSessionState.connected,
     this.microphoneGranted = true,
@@ -59,7 +46,28 @@ class FakeSession implements VoiceSession {
     this.canFlipCamera = false,
     this.cameraNeedsSelection = false,
     this.cameraDeviceList = const [],
+    this.supportsScreenShareAudio = true,
   });
+
+  @override
+  bool get supportsParticipantVolume => true;
+
+  @override
+  final bool supportsScreenShareAudio;
+
+  /// Every `includeAudio` a call to [setScreenShareEnabled] received, in
+  /// order.
+  final List<bool> screenShareAudioCalls = [];
+
+  final Map<String, double> _volumes = {};
+
+  @override
+  double volumeFor(String identity) => _volumes[identity] ?? 1.0;
+
+  @override
+  Future<void> setVolumeFor(String identity, double volume) async {
+    _volumes[identity] = volume.clamp(0.0, 2.0);
+  }
 
   final VoiceSessionState joinOutcome;
   final bool microphoneGranted;
@@ -270,8 +278,10 @@ class FakeSession implements VoiceSession {
     bool enabled, {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
+    bool includeAudio = false,
   }) async {
     lastSourceId = sourceId;
+    screenShareAudioCalls.add(includeAudio);
     if (!enabled) return ScreenShareOutcome.stopped;
     // The real session records why before reporting failure; a fake that does
     // not cannot catch a controller that drops the cause.

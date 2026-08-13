@@ -329,6 +329,33 @@ void main() {
     expect(session.lastSourceId, 'screen-2');
   });
 
+  test(
+    'a request for screen share audio reaches a session that supports it',
+    () async {
+      final session = FakeSession(supportsScreenShareAudio: true);
+      final controller = harness.controllerWith(session, voiceApi());
+      await controller.join('channel-1');
+
+      await controller.setScreenShare(true, includeAudio: true);
+
+      expect(session.screenShareAudioCalls, [true]);
+    },
+  );
+
+  test(
+    'a request for screen share audio is dropped on a session that cannot',
+    () async {
+      final session = FakeSession(supportsScreenShareAudio: false);
+      final controller = harness.controllerWith(session, voiceApi());
+      await controller.join('channel-1');
+
+      await controller.setScreenShare(true, includeAudio: true);
+
+      // See VoiceController.setScreenShare's own guard against exactly this.
+      expect(session.screenShareAudioCalls, [false]);
+    },
+  );
+
   group('the call recap leave() leaves behind', () {
     test('a real call with someone else in it produces a recap', () async {
       var now = DateTime(2026, 1, 1, 12);

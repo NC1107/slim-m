@@ -43,6 +43,10 @@ The spike's own conclusion, worth stating directly: "If Android is pursued, it n
 **CI verifies the release apk is signed with the real, Play-registered upload key rather than a debug key, and this check has a specific, quotable failure mode worth knowing.**
 Confirmed by reading `main-builds.yml`'s `android-client` job: it runs `apksigner verify --print-certs` on the built release apk and hard-fails if the debug keystore's own name (`Android Debug`) is found in the output, or if the signer's sha256 fingerprint does not match a hardcoded expected value (`9dc12a6a03bd6125065fb5f6eca2d8d8477f74009e0f6624efee2d2b98ec033b`, documented in the workflow as "Play's registered upload certificate fingerprint; public, not a secret"). This is a real, load-bearing CI gate, not a lint - it is what stops a misconfigured `key.properties` from shipping a debug-signed release apk without anyone noticing.
 
+**Screen-share audio (2026-08-13) has no path on Android, confirmed by reading the exact handler that would need it.**
+`flutter_webrtc` 1.6.0's `GetUserMediaImpl.java`'s `getDisplayMedia` builds its `MediaProjection`-backed video capturer and returns a hardcoded empty `ConstraintsArray()` for `audioTracks`; nothing in that file touches Android's own `AudioPlaybackCapture` API (`android.media.projection.MediaProjection`'s audio capture, available since API 29), which is the platform mechanism that would be needed to add this.
+`client/packages/rtc/lib/src/screen_share_audio.dart`'s `supportsScreenShareAudio` correctly excludes Android, so the toggle this feature added stays absent there.
+
 **Android push wake (a backgrounded device receiving a content-free push and fetching the message) is the last unclosed Phase 3 exit criterion, and it is explicitly a hardware gap, not a code gap.**
 `docs/ROADMAP.md`'s Phase 3 status: "Android device wake is not met, and is explicitly a hardware gap: no Android device test exists anywhere, and no Android hardware has been available to run one." The registration path, the pipeline, and the cross-repo envelope contract test (`push-relay-contract.yml`) are all built and green; only the real-device leg is missing.
 

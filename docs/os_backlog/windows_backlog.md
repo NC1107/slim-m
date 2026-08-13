@@ -80,6 +80,11 @@ Proven on Linux by reproducing the trap directly rather than only reasoning abou
 
 ## Suspected
 
+**Screen-share audio (2026-08-13) has a real native implementation waiting for Windows, unlike the camera-blur hook a few entries up, which genuinely has none.**
+`flutter_webrtc`'s `windows/application_loopback_capturer.cc` implements the same `LoopbackCapturer` interface (`common/cpp/include/loopback_capturer.h`) Linux's PulseAudio path does, over WASAPI's application-loopback API, and would be reached through the identical `GetDisplayMedia`/`captureScreenAudio` seam this project's `client/packages/rtc/lib/src/screen_share_audio.dart` now uses for Linux.
+`supportsScreenShareAudio` correctly excludes Windows today, for the same reason every capability in this file is excluded: there is no Windows target to enable it for, not because the underlying capture is missing the way it is on macOS, iOS and Android.
+*What would confirm or refute this*: once Windows is scaffolded, the same enumerate-then-capture-then-check-for-an-audio-track probe this file's other screen-share entry already asks for, extended to request `includeAudio: true` and check whether a real audio track is published.
+
 **Screen share is entirely unverified on Windows, in either direction.**
 `docs/research/reference-echo-messenger.md` and CLAUDE.md's Linux findings establish real, tested behaviour for Fedora Wayland (a segfault on window enumeration, fixed by never requesting `SourceType.Window`) and a working owner-confirmed screen share on Linux in general.
 Nothing in this repository, any CI workflow, or any research document exercises `getDisplayMedia`/`desktopCapturer.getSources` on Windows.

@@ -232,6 +232,10 @@ class _ScreenShareSection extends ConsumerWidget {
     final index = ScreenShareQuality.values.indexOf(
       settings.screenShareQuality,
     );
+    // A plain getter, not provider state, so `ref.read` rather than `ref.watch`.
+    final supportsAudio = ref
+        .read(voiceControllerProvider.notifier)
+        .supportsScreenShareAudio;
 
     return SettingsSectionCard(
       title: 'Screen share quality',
@@ -252,6 +256,18 @@ class _ScreenShareSection extends ConsumerWidget {
               .read(voiceSettingsControllerProvider.notifier)
               .setScreenShareQuality(ScreenShareQuality.values[i]),
         ),
+        // Absent, never disabled, where this platform cannot publish it; see supportsScreenShareAudio.
+        if (supportsAudio) ...[
+          const SizedBox(height: AppSpacing.s8),
+          SettingsToggleRow(
+            label: "Share this device's audio with the screen",
+            value: settings.screenShareIncludeAudio,
+            semanticLabel: 'Share audio with a screen share',
+            onChanged: (value) => ref
+                .read(voiceSettingsControllerProvider.notifier)
+                .setScreenShareIncludeAudio(value),
+          ),
+        ],
       ],
     );
   }

@@ -95,6 +95,51 @@ void main() {
     },
   );
 
+  testWidgets(
+    'sharing applies the saved audio choice already in Voice settings, asking nothing',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'slimm.voice.screen_share_include_audio': true,
+      });
+      final session = InertSession();
+      final container = await pumpControls(
+        tester,
+        const VoiceState(state: VoiceSessionState.connected),
+        session: session,
+      );
+
+      container.read(voiceSettingsControllerProvider);
+      await container.read(preferencesProvider.future);
+      await tester.pump();
+      expect(
+        container.read(voiceSettingsControllerProvider).screenShareIncludeAudio,
+        isTrue,
+      );
+
+      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.pumpAndSettle();
+
+      expect(session.screenShareCalls, hasLength(1));
+      expect(session.screenShareCalls.single.includeAudio, isTrue);
+    },
+  );
+
+  testWidgets("sharing defaults to not sharing this device's audio", (
+    tester,
+  ) async {
+    final session = InertSession();
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected),
+      session: session,
+    );
+
+    await tester.tap(find.byTooltip('Share a screen'));
+    await tester.pumpAndSettle();
+
+    expect(session.screenShareCalls.single.includeAudio, isFalse);
+  });
+
   testWidgets('a fast double-tap on share enumerates sources only once', (
     tester,
   ) async {
