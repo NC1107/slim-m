@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-need() { command -v "$1" >/dev/null || { echo "missing: $1" >&2; exit 1; }; }
+need() { local tool="$1"; command -v "$tool" >/dev/null || { echo "missing: $tool" >&2; exit 1; }; }
 need flutter; need python3; need curl
 CHROME="$(command -v google-chrome-stable || command -v google-chrome || true)"
 [[ -n "$CHROME" ]] || { echo "missing: google-chrome-stable" >&2; exit 1; }

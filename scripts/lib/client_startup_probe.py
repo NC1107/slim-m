@@ -27,6 +27,7 @@ control.
 """
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -36,6 +37,8 @@ import urllib.request
 
 INTERACTIVE_TIMEOUT = 90
 SETTLE_SECONDS = 5
+_ALLOWED_URL = re.compile(
+    r"^(about:blank|https?://[A-Za-z0-9.-]+(:\d+)?(/[\w./?%&=~+-]*)?)$")
 FLAGS = (
     "--headless=new",
     "--no-first-run",
@@ -261,7 +264,24 @@ def measure_app(chrome, work_dir, port, url):
         shutil.rmtree(profile, ignore_errors=True)
 
 
+def _validated_url(url):
+    """Refuses anything past a plain http(s) URL or `about:blank`.
+
+    [url] reaches `subprocess.Popen` as one of Chrome's own arguments, and
+    a security scanner flags any command-line-derived string reaching a
+    process launch as a tainted sink regardless of `Popen` taking a list
+    rather than a shell string (which is already immune to shell
+    injection). Validating here, once, at the boundary this value crosses
+    from caller input into a launched process, is the actual guard: a
+    caller passing anything else gets a refusal naming the value.
+    """
+    if not _ALLOWED_URL.match(url):
+        raise ValueError(f"refusing to launch chrome against {url!r}")
+    return url
+
+
 def run(url, runs, base_port=9820):
+    url = _validated_url(url)
     chrome = _chrome_binary()
     work_dir = tempfile.mkdtemp(prefix="client-startup-probe-")
     try:
