@@ -65,6 +65,16 @@ const UNCOVERED: &[(&str, &str)] = &[
      503 and neither carries a body. The frames that flow afterwards are exercised by \
      tests/ws.rs against a real socket.",
     ),
+    (
+        "getMetrics",
+        "its 200 does a real network round trip probing the configured SFU's reachability, \
+         same as listVoiceRoster and kickVoiceParticipant above, against this fixture's \
+         deliberately undialable wss://sfu.invalid; driving it here would add a real DNS \
+         lookup to a test that must not touch the network. The exposition format, every \
+         series, the gating, and both reachable/unreachable SFU cases are covered by \
+         tests/metrics.rs, which stands up a real (and a deliberately closed) HTTP \
+         listener instead.",
+    ),
 ];
 
 #[tokio::test]

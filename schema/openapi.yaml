@@ -146,6 +146,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Version"
 
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [system]
+      summary: Process and traffic health, as Prometheus text exposition format.
+      description: >
+        Gated on MANAGE_SERVER, the same bit as `/space/analytics`: this
+        discloses traffic volume by class and connection counts, more than
+        `/version`'s deployment-wide facts are meant to reveal to an
+        unauthenticated caller. Resident memory, a requests-admitted and a
+        requests-refused counter per rate-limit class since process start,
+        the number of currently open WebSocket connections, and whether this
+        deployment has an SFU configured. `slimm_livekit_reachable` is
+        present only when one is: it is the server's own live check of
+        whether the configured LiveKit answers, closing the gap where
+        `voice enabled` in `/version` only ever reports this server's own
+        config and says nothing about the SFU it names actually being up.
+      responses:
+        "200":
+          description: Prometheus text exposition format.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /auth/register:
     post:
       operationId: register

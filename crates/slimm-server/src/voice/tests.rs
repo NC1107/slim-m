@@ -154,3 +154,32 @@ fn the_room_service_address_is_derived_from_the_client_url() {
     );
     assert!(http_url_for("livekit.example.com").is_err());
 }
+
+#[tokio::test]
+async fn an_unconfigured_deployment_has_nothing_to_probe() {
+    assert_eq!(VoiceService::disabled().probe_reachable().await, None);
+}
+
+#[tokio::test]
+async fn any_http_answer_reads_as_reachable_even_a_404() {
+    // No route registered: every request still answers axum's own 404, which is what "reachable" asks about.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, axum::Router::new()).await.unwrap();
+    });
+
+    let service = VoiceService::for_test(&format!("http://{addr}"), "k", "s");
+    assert_eq!(service.probe_reachable().await, Some(true));
+}
+
+#[tokio::test]
+async fn a_closed_port_reads_as_unreachable() {
+    // Grabbed then dropped, so nothing answers on it: connection refused, not a slow timeout.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    drop(listener);
+
+    let service = VoiceService::for_test(&format!("http://{addr}"), "k", "s");
+    assert_eq!(service.probe_reachable().await, Some(false));
+}

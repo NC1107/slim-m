@@ -200,6 +200,13 @@ impl Hub {
         self.slots.clone().try_acquire_owned().ok()
     }
 
+    /// How many WebSocket connections are open right now, for `/metrics`.
+    /// Derived from the semaphore's own remaining permits rather than a
+    /// second counter, so it cannot drift from what actually gates a connect.
+    pub fn connection_count(&self) -> usize {
+        MAX_CONNECTIONS - self.slots.available_permits()
+    }
+
     /// The shared, cloneable presence tracker (a cheap `Arc` clone).
     pub fn presence(&self) -> PresenceTracker {
         self.presence.clone()
@@ -312,5 +319,26 @@ mod epoch_tests {
             hub.publish(event);
             assert!(hub.permissions_epoch() > before);
         }
+    }
+}
+
+#[cfg(test)]
+mod connection_count_tests {
+    use super::*;
+
+    #[test]
+    fn tracks_held_permits_directly() {
+        let hub = Hub::new();
+        assert_eq!(hub.connection_count(), 0);
+
+        let first = hub.try_connect().expect("a slot is free");
+        assert_eq!(hub.connection_count(), 1);
+        let second = hub.try_connect().expect("a slot is free");
+        assert_eq!(hub.connection_count(), 2);
+
+        drop(first);
+        assert_eq!(hub.connection_count(), 1);
+        drop(second);
+        assert_eq!(hub.connection_count(), 0);
     }
 }
