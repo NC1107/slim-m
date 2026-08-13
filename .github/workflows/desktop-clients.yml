@@ -32,7 +32,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: desktop-clients-${{ inputs.tag || github.ref }}
@@ -42,6 +42,9 @@ jobs:
   windows-client:
     name: windows tester build
     runs-on: windows-latest
+    # write, not read: the last step attaches the zip to the github release.
+    permissions:
+      contents: write
     env:
       # firebase_cpp_sdk_windows vendors a pre-3.5 cmake_minimum_required CMake 4.x refuses; CMake's own documented escape hatch, mirrored from client-windows-ci.yml.
       CMAKE_POLICY_VERSION_MINIMUM: "3.5"
@@ -91,6 +94,9 @@ jobs:
   macos-client:
     name: macos tester build (ad-hoc signed)
     runs-on: macos-latest
+    # write, not read: the last step attaches the zip to the github release.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
