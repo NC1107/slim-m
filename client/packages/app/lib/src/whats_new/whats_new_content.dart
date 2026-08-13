@@ -270,6 +270,37 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.42.0',
+    headline: 'Nineteen things at once',
+    points: [
+      WhatsNewPoint(
+        'Messages grew up: forward one to any channel or DM, swipe to '
+        'reply one-handed, mention @everyone or @here (permission-gated), '
+        'and set a status line under your name.',
+      ),
+      WhatsNewPoint(
+        'Search takes from:, in:, has: and before:/after: filters, GIF '
+        'search lands in the composer when your server configures a '
+        'provider, and threads finally have a list, unread state, and a cap.',
+      ),
+      WhatsNewPoint(
+        'Calls: push-to-talk and a mic sensitivity slider, screen shares '
+        'can carry this device audio where the platform allows, and the '
+        'canvas is one tap from the call dock.',
+      ),
+      WhatsNewPoint(
+        'Mute any channel (or narrow it to mentions), failed sends retry '
+        'themselves when the connection returns, notification sounds carry '
+        'a matching buzz, and rows grow with large text.',
+      ),
+      WhatsNewPoint(
+        'For operators: a Prometheus metrics route, per-member storage '
+        'numbers, opt-in message retention, and macOS plus Windows builds '
+        'now compile in CI.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
