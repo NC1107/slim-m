@@ -141,3 +141,91 @@ Take this measurement by hand, on real hardware, at each release.
 5. Fill in the `version` field, one `metrics` entry per criterion benchmark,
    and the four RSS entries the script printed.
 6. Commit the new baseline file alongside the release.
+
+## Measuring client cold start and idle memory
+
+`scripts/measure-client-startup.sh` (repo root) times how long the client
+takes to become interactive from a cold launch, and how much memory it holds
+once idle.
+It builds the web release, serves it locally, then drives a fresh headless
+`google-chrome-stable` process against it over the Chrome DevTools Protocol
+for each run (default 3), through `scripts/lib/client_startup_probe.py`.
+
+**It measures the web build, not the Linux desktop build, and says so rather
+than quietly substituting one for the other.**
+The Linux target links GTK, and GTK needs a display connection to construct a
+window even to run offscreen; this host carries no `Xvfb` and no passwordless
+`sudo` to install one (checked directly, not assumed).
+Headless Chrome opens no window on any display, on this host or otherwise,
+which is what makes it a legitimate stand-in for "offscreen" rather than a
+workaround for the hard "no visible window" rule.
+The numbers it produces are real, but they are dart2js-plus-CanvasKit
+booting inside V8, not the Linux GTK embedder's own native startup path, and
+a Chrome tab's resident memory, not a native process's RSS - see
+`docs/reports/perf-2026-08.md` for the actual figures and that distinction
+stated again next to them.
+
+Each run also measures headless Chrome against a bare `about:blank` tab
+under the identical flags and reports the app's cost over that baseline,
+the same control the Space analytics section of `CLAUDE.md` used for a
+server measurement: Chrome's own multi-process overhead (a zygote, a GPU
+process, several renderer helpers) turned out to dwarf the app's own cost
+on this box, and reporting only the raw total would have buried the number
+this script actually exists to answer.
+
+Memory is read as Pss (`/proc/<pid>/smaps_rollup`), summed across the whole
+process tree the launched Chrome spawns, not `VmRSS`: Chrome's processes
+share large mappings (its own binary, the V8 snapshot, ICU data), and
+summing `VmRSS` across them counts each shared page once per process. That
+inflated a bare `about:blank` idle tree to an implausible 1.3 GB of summed
+`VmRSS` on this box before the fix; `Pss` divides a shared page's cost across
+every process mapping it, which is what makes the sum mean the tree's real
+footprint.
+
+**Not wired into CI**, for the same reason idle RSS is not: cold-start
+timing and process-tree memory are both sensitive to what else a host is
+doing while they run, and a shared, virtualized CI runner is a third
+environment rather than a stand-in for a contributor's own machine or a
+real deployment. A number captured there would look exactly as
+authoritative as one taken by hand while measuring something noisier.
+
+## Canvas fps and memory at target object counts
+
+The Voice Canvas has its own benchmark machinery, from the Phase 5 spike,
+under `client/packages/voice_canvas/benchmark/`: `spatial_grid_benchmark.dart`
+(spatial-index query cost against a 16.6ms frame budget), `hot_path_benchmark
+.dart` and `remote_draft_paint_benchmark.dart` (dispatch and paint cost
+against the same budget, run via `flutter test` since they reach into
+`dart:ui`), and `presence_benchmark.dart` (camera-bubble layout cost).
+None of the four measured memory, so `canvas_memory_benchmark.dart` is new:
+it builds a real `CanvasDocument` at the roadmap's own soft-cap object counts
+(5,000 on iOS, 20,000 on Linux, `docs/ROADMAP.md`'s Phase 5 deliverable list)
+and reads the `flutter_tester` process's own resident memory
+(`dart:io`'s `ProcessInfo.currentRss`) before and after, the same "read the
+real process, not a guess" preference the idle-RSS script above already
+takes for the server.
+
+Real numbers from all five, at the documented target counts, are in
+`docs/reports/perf-2026-08.md` rather than duplicated here, since a number
+in two places is a number that can disagree with itself.
+
+**None of the five is wired into `perf.yml`, deliberately, past what already
+runs.**
+`client-ci`'s existing workspace-wide `dart analyze` already type-checks
+every file under `benchmark/`, including the new one, on every pull request
+touching `client/**` - confirmed directly rather than assumed: a
+deliberately broken constructor call in `canvas_memory_benchmark.dart` was
+caught by a plain `dart analyze` run with no new job needed. That already
+closes the failure mode a compile-gate would exist to catch (the benchmark
+machinery silently bit-rotting against the production API), for free, on
+the existing schedule.
+What a new CI job would add past that is asserting on the benchmarks' own
+*numbers* - and those are exactly the class of measurement the idle-RSS
+section above already declined to gate for: `canvas_memory_benchmark.dart`'s
+own n=5,000 delta swung roughly 65% between independent runs on this one box
+(see the report for the raw figures), because RSS tracks generational GC
+arena growth as much as it tracks live object count.
+A shared, virtualized CI runner under unpredictable scheduler contention is
+a worse environment for that reading than this one, not a better one, so a
+numeric assertion there would be exactly the flaky, falsely-authoritative
+gate this file already argues against for the server.
