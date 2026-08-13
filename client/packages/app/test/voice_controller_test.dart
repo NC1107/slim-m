@@ -88,6 +88,40 @@ void main() {
     },
   );
 
+  test('the persisted voice-activity sensitivity reaches the session before '
+      'any call is joined', () async {
+    SharedPreferences.setMockInitialValues({
+      'slimm.voice.activity_sensitivity': 40.0,
+    });
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+
+    await controller.restoreVoiceActivitySensitivity();
+
+    expect(session.lastSpeakingSensitivity, 0.4);
+  });
+
+  test(
+    'with no persisted sensitivity, restoring keeps the old default',
+    () async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+
+      await controller.restoreVoiceActivitySensitivity();
+
+      expect(session.lastSpeakingSensitivity, 1.0);
+    },
+  );
+
+  test('changing sensitivity live reaches the session immediately', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+
+    controller.setVoiceActivitySensitivity(70);
+
+    expect(session.lastSpeakingSensitivity, 0.7);
+  });
+
   test(
     'with no persisted preference, restoring leaves the camera off',
     () async {

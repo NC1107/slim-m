@@ -106,6 +106,9 @@ class _NoopSession implements VoiceSession {
   void setVideoInterest(Set<String>? tileKeys) {}
 
   @override
+  void setSpeakingSensitivity(double sensitivity) {}
+
+  @override
   bool get canFlipCamera => false;
 
   @override

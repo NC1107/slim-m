@@ -67,7 +67,7 @@ Future<void> main() async {
 
 /// The async sequence [StartupApp] masks: session restore (so the router's
 /// first redirect already knows the answer instead of showing sign-in and
-/// jumping to channels a frame later), the five preference-controller
+/// jumping to channels a frame later), the six preference-controller
 /// restores, sync/push bring-up, and the desktop window shell's own
 /// listener/tray registration - a no-op on every platform but a real
 /// desktop build. The sync and push controllers are read here rather than
@@ -83,6 +83,9 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   await container
       .read(voiceControllerProvider.notifier)
       .restoreCameraPreference();
+  await container
+      .read(voiceControllerProvider.notifier)
+      .restoreVoiceActivitySensitivity();
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
   await DesktopWindowShell.registerListenersAndTray(container);

@@ -31,6 +31,7 @@ import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
+import '../widgets/push_to_talk_listener.dart';
 import '../widgets/rail_drag_handle.dart';
 import '../widgets/voice_strip_indicator.dart';
 import '../widgets/whats_new_gate.dart';
@@ -187,25 +188,27 @@ class HomeShell extends ConsumerWidget {
     final nextChannel = activatorFor(AppAction.nextChannel);
     final previousChannel = activatorFor(AppAction.previousChannel);
     return WhatsNewGate(
-      child: CallbackShortcuts(
-        bindings: {
-          if (quickSwitch != null)
-            quickSwitch: () => openCommandPalette(context),
-          if (focusComposer != null)
-            focusComposer: () =>
-                ref.read(composerFocusNodeProvider)?.requestFocus(),
-          if (openSettings != null)
-            openSettings: () => context.push(Routes.personalSettings),
-          if (nextChannel != null)
-            nextChannel: () => unawaited(_cycleChannel(context, ref, 1)),
-          if (previousChannel != null)
-            previousChannel: () => unawaited(_cycleChannel(context, ref, -1)),
-        },
-        // CallbackShortcuts only fires for a focused descendant, so this
-        // default makes the shortcut work the instant the app opens.
-        child: Focus(
-          autofocus: true,
-          child: _LayoutBridge(layout: layout, child: scaffold),
+      child: PushToTalkListener(
+        child: CallbackShortcuts(
+          bindings: {
+            if (quickSwitch != null)
+              quickSwitch: () => openCommandPalette(context),
+            if (focusComposer != null)
+              focusComposer: () =>
+                  ref.read(composerFocusNodeProvider)?.requestFocus(),
+            if (openSettings != null)
+              openSettings: () => context.push(Routes.personalSettings),
+            if (nextChannel != null)
+              nextChannel: () => unawaited(_cycleChannel(context, ref, 1)),
+            if (previousChannel != null)
+              previousChannel: () => unawaited(_cycleChannel(context, ref, -1)),
+          },
+          // CallbackShortcuts only fires for a focused descendant, so this
+          // default makes the shortcut work the instant the app opens.
+          child: Focus(
+            autofocus: true,
+            child: _LayoutBridge(layout: layout, child: scaffold),
+          ),
         ),
       ),
     );

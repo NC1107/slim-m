@@ -114,6 +114,29 @@ void main() {
     await controller.leave();
   });
 
+  testWidgets('changing the sensitivity slider persists it', (tester) async {
+    await tester.pumpWidget(wrap(const VoiceSettingsBody()));
+    await tester.pumpAndSettle();
+
+    final slider = find.byWidgetPredicate(
+      (w) => w is AppSlider && w.semanticLabel == 'Voice activity sensitivity',
+    );
+    await tester.scrollUntilVisible(
+      slider,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    // The widget's own registered callback, rather than a drag gesture: this
+    // asserts the real reactive wiring without fighting Slider's own hit
+    // geometry for a coordinate that lands on 30.
+    tester.widget<AppSlider>(slider).onChanged!(30);
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getDouble('slimm.voice.activity_sensitivity'), 30.0);
+  });
+
   testWidgets('picking a screen share quality persists it', (tester) async {
     await tester.pumpWidget(wrap(const VoiceSettingsBody()));
     await tester.pumpAndSettle();

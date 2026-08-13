@@ -6,6 +6,7 @@
 /// widgets, this is the state they read and write.
 library;
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_rtc/rtc.dart';
 
@@ -16,6 +17,19 @@ const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
 const _callRingSoundKey = 'slimm.voice.call_ring_sound_enabled';
 const _qualityKey = 'slimm.voice.screen_share_quality';
 const _cameraOnJoinKey = 'slimm.voice.camera_on_join';
+const _pushToTalkEnabledKey = 'slimm.voice.push_to_talk_enabled';
+const _pushToTalkKeyIdKey = 'slimm.voice.push_to_talk_key_id';
+const _sensitivityKey = 'slimm.voice.activity_sensitivity';
+
+/// The push-to-talk key options offered in Voice settings: plain letters,
+/// so each is reachable while typing - the composer-focus guard is what
+/// keeps that safe, not the choice of key. `V` for voice is the default.
+const pushToTalkKeyOptions = [
+  LogicalKeyboardKey.keyV,
+  LogicalKeyboardKey.keyC,
+  LogicalKeyboardKey.keyX,
+  LogicalKeyboardKey.keyZ,
+];
 
 /// The persisted "join calls with your camera on" preference, read here
 /// (where every other voice preference's storage key already lives) for
@@ -25,6 +39,15 @@ const _cameraOnJoinKey = 'slimm.voice.camera_on_join';
 Future<bool> loadCameraOnJoinPreference(Ref ref) async {
   final prefs = await ref.read(preferencesProvider.future);
   return prefs.getBool(_cameraOnJoinKey) ?? false;
+}
+
+/// The persisted voice-activity sensitivity, [loadCameraOnJoinPreference]'s
+/// own shape and for the same reason: [VoiceController.restoreVoiceActivitySensitivity]
+/// has to reach the rtc package's session before any call is joined, not
+/// only once Voice Settings has been opened this session.
+Future<double> loadVoiceActivitySensitivity(Ref ref) async {
+  final prefs = await ref.read(preferencesProvider.future);
+  return prefs.getDouble(_sensitivityKey) ?? 100.0;
 }
 
 /// What the voice settings screen shows and edits. Every field is a pure
@@ -37,6 +60,9 @@ class VoiceSettingsState {
     this.callRingSoundEnabled = true,
     this.screenShareQuality = ScreenShareQuality.balanced,
     this.cameraOnJoin = false,
+    this.pushToTalkEnabled = false,
+    this.pushToTalkKey = LogicalKeyboardKey.keyV,
+    this.voiceActivitySensitivity = 100.0,
   });
 
   final bool joinLeaveSoundsEnabled;
@@ -52,17 +78,41 @@ class VoiceSettingsState {
   /// [VoiceSettingsController.setCameraOnJoin].
   final bool cameraOnJoin;
 
+  /// Whether holding [pushToTalkKey] unmutes for the hold and re-mutes on
+  /// release; see `push_to_talk_listener.dart`. Off by default and desktop
+  /// only - keyboard focus semantics make "held" meaningless on touch.
+  final bool pushToTalkEnabled;
+
+  /// One of [pushToTalkKeyOptions]. Held while typing (a screen-reader user
+  /// or anyone drafting a message may well type it), so what actually keeps
+  /// this safe is the composer-focus guard, not this being a rare key.
+  final LogicalKeyboardKey pushToTalkKey;
+
+  /// 0-100, how readily the speaking indicator lights: 100 (the default)
+  /// matches every call's behaviour before this setting existed, lower
+  /// values require a louder reported level on top of it; see
+  /// `passesActivationThreshold` in the rtc package for the exact floor and
+  /// why it can only narrow the SFU's own decision, never invent one.
+  final double voiceActivitySensitivity;
+
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
     bool? callRingSoundEnabled,
     ScreenShareQuality? screenShareQuality,
     bool? cameraOnJoin,
+    bool? pushToTalkEnabled,
+    LogicalKeyboardKey? pushToTalkKey,
+    double? voiceActivitySensitivity,
   }) => VoiceSettingsState(
     joinLeaveSoundsEnabled:
         joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
     callRingSoundEnabled: callRingSoundEnabled ?? this.callRingSoundEnabled,
     screenShareQuality: screenShareQuality ?? this.screenShareQuality,
     cameraOnJoin: cameraOnJoin ?? this.cameraOnJoin,
+    pushToTalkEnabled: pushToTalkEnabled ?? this.pushToTalkEnabled,
+    pushToTalkKey: pushToTalkKey ?? this.pushToTalkKey,
+    voiceActivitySensitivity:
+        voiceActivitySensitivity ?? this.voiceActivitySensitivity,
   );
 }
 
@@ -76,6 +126,7 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
   Future<void> _load() async {
     final prefs = await _ref.read(preferencesProvider.future);
     final storedQuality = prefs.getString(_qualityKey);
+    final storedKeyId = prefs.getInt(_pushToTalkKeyIdKey);
     state = state.copyWith(
       joinLeaveSoundsEnabled: prefs.getBool(_soundsKey) ?? true,
       callRingSoundEnabled: prefs.getBool(_callRingSoundKey) ?? true,
@@ -83,6 +134,11 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
           .where((q) => q.name == storedQuality)
           .firstOrDefault(ScreenShareQuality.balanced),
       cameraOnJoin: prefs.getBool(_cameraOnJoinKey) ?? false,
+      pushToTalkEnabled: prefs.getBool(_pushToTalkEnabledKey) ?? false,
+      pushToTalkKey: pushToTalkKeyOptions
+          .where((k) => k.keyId == storedKeyId)
+          .firstOrDefault(LogicalKeyboardKey.keyV),
+      voiceActivitySensitivity: prefs.getDouble(_sensitivityKey) ?? 100.0,
     );
   }
 
@@ -115,6 +171,32 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     final prefs = await _ref.read(preferencesProvider.future);
     await prefs.setBool(_cameraOnJoinKey, enabled);
     _ref.read(voiceControllerProvider.notifier).setCameraPreference(enabled);
+  }
+
+  Future<void> setPushToTalkEnabled(bool enabled) async {
+    state = state.copyWith(pushToTalkEnabled: enabled);
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setBool(_pushToTalkEnabledKey, enabled);
+  }
+
+  Future<void> setPushToTalkKey(LogicalKeyboardKey key) async {
+    state = state.copyWith(pushToTalkKey: key);
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setInt(_pushToTalkKeyIdKey, key.keyId);
+  }
+
+  /// Persists the sensitivity and applies it live, [setCameraOnJoin]'s own
+  /// reasoning: a call may already be open this session, and the persisted
+  /// copy alone only reaches a *future* launch's
+  /// [VoiceController.restoreVoiceActivitySensitivity].
+  Future<void> setVoiceActivitySensitivity(double value) async {
+    final clamped = value.clamp(0.0, 100.0);
+    state = state.copyWith(voiceActivitySensitivity: clamped);
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setDouble(_sensitivityKey, clamped);
+    _ref
+        .read(voiceControllerProvider.notifier)
+        .setVoiceActivitySensitivity(clamped);
   }
 }
 
