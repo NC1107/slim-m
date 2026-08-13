@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT u.uploaded_by AS \"user_id!: UserId\", SUM(a.size) AS \"bytes!: i64\"\n               FROM attachment_uploaders u\n               JOIN attachments a ON a.sha256 = u.sha256\n               GROUP BY u.uploaded_by\n               ORDER BY \"bytes!: i64\" DESC\n               LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "bytes!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "afefb14792951ceb11c7fa26739012c5733de6e1df92f7f976084188a0ebb737"
+}

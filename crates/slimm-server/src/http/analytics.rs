@@ -15,14 +15,23 @@ use super::extract::{Authed, Json, enforce};
 use crate::permissions::Permissions;
 use crate::process_metrics::current_rss_bytes;
 use crate::ratelimit::Class;
-use crate::store::AnalyticsStats;
+use crate::store::{AnalyticsStats, MAX_MESSAGE_RETENTION_DAYS, MemberAttachmentUsage};
 
 const BODY_LIMIT: usize = 256;
 
-/// The Space analytics routes, mounted by [`super::router`].
+/// The Space analytics and retention routes, mounted by [`super::router`].
+///
+/// Retention lives here rather than under `/space/settings`: both are
+/// operator-facing disk-pressure tooling and both are gated identically, so
+/// this keeps the two together rather than splitting them across files that
+/// would otherwise carry no other relationship.
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/space/analytics", get(read).patch(update))
+        .route(
+            "/space/retention",
+            get(read_retention).patch(update_retention),
+        )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -77,13 +86,33 @@ impl From<AnalyticsStats> for AnalyticsStatsDto {
     }
 }
 
-/// `stats` is present only when `enabled` is true: a disabled deployment
-/// answers 200 with nothing computed, rather than a 403 or 404 a client would
-/// have to special-case apart from a real permission or routing failure.
+/// One member's attachment byte total. Never reachable through `stats`; see
+/// [`MemberAttachmentUsage`]'s own doc for why this is a separate field.
+#[derive(Serialize)]
+struct MemberStorageDto {
+    user_id: String,
+    attachment_bytes: i64,
+}
+
+impl From<MemberAttachmentUsage> for MemberStorageDto {
+    fn from(usage: MemberAttachmentUsage) -> Self {
+        Self {
+            user_id: usage.user_id.to_string(),
+            attachment_bytes: usage.attachment_bytes,
+        }
+    }
+}
+
+/// `stats` and `member_storage` are present only when `enabled` is true: a
+/// disabled deployment answers 200 with nothing computed, rather than a 403
+/// or 404 a client would have to special-case apart from a real permission
+/// or routing failure. The two are siblings, never nested, on purpose: see
+/// [`MemberAttachmentUsage`]'s own doc for the privacy line between them.
 #[derive(Serialize)]
 struct AnalyticsDto {
     enabled: bool,
     stats: Option<AnalyticsStatsDto>,
+    member_storage: Option<Vec<MemberStorageDto>>,
 }
 
 #[derive(Deserialize)]
@@ -121,16 +150,60 @@ async fn current_analytics(state: &AppState) -> Result<AnalyticsDto, ApiError> {
         return Ok(AnalyticsDto {
             enabled: false,
             stats: None,
+            member_storage: None,
         });
     }
     if let Some(rss) = current_rss_bytes() {
         state.store.maybe_record_metrics_sample(rss).await?;
     }
     let stats = state.store.analytics_stats().await?;
+    let member_storage = state.store.member_attachment_bytes().await?;
     Ok(AnalyticsDto {
         enabled: true,
         stats: Some(stats.into()),
+        member_storage: Some(member_storage.into_iter().map(Into::into).collect()),
     })
+}
+
+#[derive(Serialize, Deserialize)]
+struct RetentionDto {
+    /// Days a message is kept before the sweep prunes it. `0` means
+    /// disabled - keep forever, the default.
+    retention_days: i64,
+}
+
+async fn read_retention(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+) -> Result<Json<RetentionDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    require_manage_server(&state, &ctx).await?;
+    Ok(Json(RetentionDto {
+        retention_days: state.store.message_retention_days().await?,
+    }))
+}
+
+/// A negative or absurdly large window is refused rather than clamped, so a
+/// typo cannot silently land on whichever bound the code happens to pick.
+async fn update_retention(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+    Json(body): Json<RetentionDto>,
+) -> Result<Json<RetentionDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    require_manage_server(&state, &ctx).await?;
+    if !(0..=MAX_MESSAGE_RETENTION_DAYS).contains(&body.retention_days) {
+        return Err(ApiError::BadRequest("retention_days out of range"));
+    }
+    state
+        .store
+        .set_message_retention_days(body.retention_days)
+        .await?;
+    Ok(Json(RetentionDto {
+        retention_days: body.retention_days,
+    }))
 }
 
 async fn require_manage_server(

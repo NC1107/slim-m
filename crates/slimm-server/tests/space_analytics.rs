@@ -213,6 +213,12 @@ async fn channel_count_excludes_dm_channels() {
 /// aggregate active-hours histogram must never carry anything that names an
 /// individual member, at any depth. Mirrors `message_ops`'s
 /// `no_op_carries_an_actor_on_any_kind`.
+///
+/// Scoped to `body["stats"]` rather than the whole response: `member_storage`
+/// is a deliberate exception to this rule (see
+/// `member_storage_is_a_sibling_of_stats_and_names_its_members` below), and
+/// checking the whole body here would make this test fail the moment that
+/// field exists, for the one field the project chose to let name a member.
 #[tokio::test]
 async fn the_analytics_response_never_names_a_member() {
     let (s, _pool, _guard) = store("slimm-analytics-privacy").await;
@@ -244,11 +250,94 @@ async fn the_analytics_response_never_names_a_member() {
         .await
         .unwrap();
     let body = json_body(response).await;
-    let text = body.to_string();
+    let text = body["stats"].to_string();
     assert!(!text.contains(&admin_id_str));
     assert!(!text.contains(&member_id_str));
     assert!(!text.contains("nia"));
     assert!(!text.contains("Nia"));
+}
+
+/// The other half of the same line: `member_storage` is where a member id
+/// deliberately does appear, as its own sibling field rather than folded
+/// into `stats` - storage stewardship, not usage surveillance. See
+/// `docs/decisions/0008-space-analytics.md`.
+#[tokio::test]
+async fn member_storage_is_a_sibling_of_stats_and_names_its_members() {
+    let (s, _pool, _guard) = store("slimm-analytics-member-storage").await;
+    let (admin, member) = deployment(&s).await;
+    s.store_attachment(&[1; 32], 4_000, "image/png", "a.png", Some(admin.id))
+        .await
+        .unwrap();
+    s.store_attachment(&[2; 32], 1_000, "image/png", "b.png", Some(member.id))
+        .await
+        .unwrap();
+    s.set_analytics_enabled(true).await.unwrap();
+
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let router = app(s);
+    let response = router
+        .oneshot(request(
+            "GET",
+            "/space/analytics",
+            &session.access_token,
+            None,
+        ))
+        .await
+        .unwrap();
+    let body = json_body(response).await;
+    let storage = body["member_storage"].as_array().unwrap();
+    assert_eq!(storage.len(), 2);
+    // Heaviest first.
+    assert_eq!(storage[0]["user_id"], json!(admin.id.to_string()));
+    assert_eq!(storage[0]["attachment_bytes"], json!(4_000));
+    assert_eq!(storage[1]["user_id"], json!(member.id.to_string()));
+    assert_eq!(storage[1]["attachment_bytes"], json!(1_000));
+    // Never nested inside the never-names-a-member block.
+    assert!(body["stats"]["member_storage"].is_null());
+}
+
+/// The same bytes uploaded by two different members charges each the full
+/// size: content addressing dedupes disk use, not per-member attribution.
+#[tokio::test]
+async fn identical_bytes_uploaded_twice_charges_both_uploaders_in_full() {
+    let (s, _pool, _guard) = store("slimm-analytics-member-storage-dedupe").await;
+    let (admin, member) = deployment(&s).await;
+    s.store_attachment(&[9; 32], 500, "image/png", "same.png", Some(admin.id))
+        .await
+        .unwrap();
+    s.store_attachment(&[9; 32], 500, "image/png", "same.png", Some(member.id))
+        .await
+        .unwrap();
+    s.set_analytics_enabled(true).await.unwrap();
+
+    let storage = s.member_attachment_bytes().await.unwrap();
+    assert_eq!(storage.len(), 2);
+    assert!(storage.iter().all(|m| m.attachment_bytes == 500));
+}
+
+/// `member_storage` follows the same "off means the feature does not run"
+/// rule as `stats`.
+#[tokio::test]
+async fn member_storage_is_absent_while_disabled() {
+    let (s, _pool, _guard) = store("slimm-analytics-member-storage-off").await;
+    let (admin, _member) = deployment(&s).await;
+    s.store_attachment(&[3; 32], 200, "image/png", "c.png", Some(admin.id))
+        .await
+        .unwrap();
+
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let router = app(s);
+    let response = router
+        .oneshot(request(
+            "GET",
+            "/space/analytics",
+            &session.access_token,
+            None,
+        ))
+        .await
+        .unwrap();
+    let body = json_body(response).await;
+    assert!(body["member_storage"].is_null());
 }
 
 /// A caller without MANAGE_SERVER is refused the same way `/space/settings`

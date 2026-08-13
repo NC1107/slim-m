@@ -20,6 +20,7 @@ use anyhow::Context;
 
 use super::Store;
 use super::now_ms;
+use crate::ids::UserId;
 
 /// How many trailing calendar days the derived breakdowns and the memory
 /// series cover. Bounded so a long-lived deployment's history does not grow
@@ -31,6 +32,10 @@ const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 /// The shortest gap between two recorded memory samples.
 const SAMPLE_MIN_GAP_MS: i64 = 5 * 60 * 1000;
 
+/// Most members [`Store::member_attachment_bytes`] reports on, heaviest
+/// first, the same bounded-list shape `GET /presence` already uses.
+const MAX_MEMBER_STORAGE_ROWS: i64 = 500;
+
 /// One calendar day's message count, UTC, zero-filled for days with none.
 pub struct DayCount {
     pub date: String,
@@ -41,6 +46,21 @@ pub struct DayCount {
 pub struct MetricSample {
     pub sampled_at: i64,
     pub rss_bytes: i64,
+}
+
+/// One member's own attachment byte total, from [`Store::member_attachment_bytes`].
+///
+/// Deliberately not part of [`AnalyticsStats`]: that struct's own doc
+/// promises never to name a member, and this is the one place in this file
+/// that does, on purpose, for storage stewardship rather than usage
+/// surveillance. See `docs/decisions/0008-space-analytics.md`.
+pub struct MemberAttachmentUsage {
+    pub user_id: UserId,
+    /// The sum of every attachment this member has personally uploaded, by
+    /// content hash. Two members who each uploaded the identical bytes are
+    /// each charged the full size: this counts what a member contributed,
+    /// not a share of deduplicated disk use.
+    pub attachment_bytes: i64,
 }
 
 /// The whole answer [`Store::analytics_stats`] renders, all Space-wide.
@@ -239,6 +259,33 @@ impl Store {
             .map(|r| MetricSample {
                 sampled_at: r.t,
                 rss_bytes: r.r,
+            })
+            .collect())
+    }
+
+    /// Attachment bytes attributed to each member who has uploaded any,
+    /// heaviest first, for the operator-facing storage-stewardship view -
+    /// never the aggregate `stats` block, see [`MemberAttachmentUsage`].
+    /// Callers gate this the same as [`Store::analytics_stats`]: it always
+    /// computes, so it must never be reached while analytics is off.
+    pub async fn member_attachment_bytes(&self) -> anyhow::Result<Vec<MemberAttachmentUsage>> {
+        let rows = sqlx::query!(
+            r#"SELECT u.uploaded_by AS "user_id!: UserId", SUM(a.size) AS "bytes!: i64"
+               FROM attachment_uploaders u
+               JOIN attachments a ON a.sha256 = u.sha256
+               GROUP BY u.uploaded_by
+               ORDER BY "bytes!: i64" DESC
+               LIMIT ?"#,
+            MAX_MEMBER_STORAGE_ROWS
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("member attachment bytes")?;
+        Ok(rows
+            .into_iter()
+            .map(|r| MemberAttachmentUsage {
+                user_id: r.user_id,
+                attachment_bytes: r.bytes,
             })
             .collect())
     }

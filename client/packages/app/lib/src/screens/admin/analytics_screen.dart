@@ -108,8 +108,13 @@ class _AnalyticsPaneState extends ConsumerState<AnalyticsPane>
           onRetry: () => ref.invalidate(spaceAnalyticsProvider),
           data: (context, value) => value.stats == null
               ? const _OffNotice()
-              : _StatsView(stats: value.stats!),
+              : _StatsView(
+                  stats: value.stats!,
+                  memberStorage: value.memberStorage ?? const [],
+                ),
         ),
+        const SizedBox(height: AppSpacing.s16),
+        const _RetentionSection(),
       ],
     );
   }
@@ -158,9 +163,10 @@ class _OffNotice extends StatelessWidget {
 }
 
 class _StatsView extends StatelessWidget {
-  const _StatsView({required this.stats});
+  const _StatsView({required this.stats, required this.memberStorage});
 
   final api.AnalyticsStats stats;
+  final List<api.MemberAttachmentUsage> memberStorage;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -173,6 +179,8 @@ class _StatsView extends StatelessWidget {
       ActiveHoursCard(stats: stats),
       const SizedBox(height: AppSpacing.s16),
       MemoryCard(stats: stats),
+      const SizedBox(height: AppSpacing.s16),
+      MemberStorageCard(usage: memberStorage),
     ],
   );
 }
@@ -229,6 +237,90 @@ class _StatTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Days a pruned message is kept before the sweep removes it; index-matched
+/// to the segmented options below. `0` is keep forever, the default and
+/// what every deployment keeps until an admin sets one.
+const _retentionDayOptions = <(String, int)>[
+  ('Never', 0),
+  ('30 days', 30),
+  ('90 days', 90),
+  ('365 days', 365),
+];
+
+/// The message retention window: an operator disk-pressure control,
+/// independent of the analytics toggle above - it stays visible and usable
+/// whether or not Space analytics recording is on.
+class _RetentionSection extends ConsumerStatefulWidget {
+  const _RetentionSection();
+
+  @override
+  ConsumerState<_RetentionSection> createState() => _RetentionSectionState();
+}
+
+class _RetentionSectionState extends ConsumerState<_RetentionSection>
+    with GuardedActionState<_RetentionSection> {
+  bool _saving = false;
+  int? _optimisticDays;
+
+  Future<void> _setDays(int days) async {
+    setState(() {
+      _saving = true;
+      _optimisticDays = days;
+    });
+    final ok = await guard(
+      whatFailed: 'change the message retention window',
+      action: () => ref.read(apiProvider).setSpaceMessageRetentionDays(days),
+    );
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (!ok) _optimisticDays = null;
+    });
+    if (ok) ref.invalidate(spaceRetentionProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final retention = ref.watch(spaceRetentionProvider);
+    ref.listen(spaceRetentionProvider, (previous, next) {
+      if (next.hasValue && !next.isLoading && _optimisticDays != null) {
+        setState(() => _optimisticDays = null);
+      }
+    });
+    final current = _optimisticDays ?? retention.valueOrNull ?? 0;
+    final selectedIndex = _retentionDayOptions.indexWhere(
+      (o) => o.$2 == current,
+    );
+
+    return SettingsSectionCard(
+      title: 'Message retention',
+      children: [
+        Text(
+          'How long a message is kept before it is pruned. Off by default: '
+          'nothing is ever deleted unless a window is set here.',
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        AppSegmentedControl.inline(
+          semanticLabel: 'Message retention window',
+          options: [
+            for (final option in _retentionDayOptions)
+              AppSegmentedOption(label: option.$1, disabled: _saving),
+          ],
+          selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+          onSegmentSelected: (i) => _setDays(_retentionDayOptions[i].$2),
+        ),
+        SuccessFlash(tick: successTick),
+        if (actionError != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppErrorState(message: actionError!, onDismiss: clearActionError),
+        ],
+      ],
     );
   }
 }

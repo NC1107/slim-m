@@ -51,6 +51,7 @@ pub async fn run() -> anyhow::Result<()> {
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
     spawn_call_sweep(voice.clone(), hub.clone());
+    spawn_message_retention_sweep(store.clone(), media.clone(), hub.clone());
     let app = cors.apply(http::router(http::AppState {
         store,
         auth,
@@ -239,6 +240,52 @@ pub async fn sweep_stale_voice_calls_at(
             ),
         }
     }
+}
+
+/// How often the message retention window is applied. Long, the same
+/// reasoning [`TOKEN_SWEEP_INTERVAL`] gives: a day-granularity setting has
+/// no reason to be checked more often than this, and a deployment with the
+/// window off pays only the one cheap config read every tick.
+const MESSAGE_RETENTION_SWEEP_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(6 * 60 * 60);
+
+/// Runs the message retention sweep in the background for the life of the
+/// process, on the same detached, best-effort, wait-first model as
+/// [`spawn_token_sweep`]. Unlike the other sweeps here, a pruned message is a
+/// state change a live connection needs to see now, not merely reclaimed
+/// space, so this publishes [`hub::Event::MessageDeleted`] for every message
+/// the sweep touched before reclaiming its freed attachment files.
+fn spawn_message_retention_sweep(store: store::Store, media: media::Media, hub: hub::Hub) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(MESSAGE_RETENTION_SWEEP_INTERVAL);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            match store.sweep_message_retention().await {
+                Ok(swept) if !swept.pruned.is_empty() || swept.ops_reclaimed > 0 => {
+                    tracing::info!(
+                        pruned = swept.pruned.len(),
+                        ops_reclaimed = swept.ops_reclaimed,
+                        "pruned messages past the retention window"
+                    );
+                    for message in swept.pruned {
+                        hub.publish(hub::Event::MessageDeleted {
+                            channel_id: message.channel_id,
+                            message_id: message.message_id,
+                            op_seq: message.op_seq,
+                        });
+                        for hex in message.freed_attachments {
+                            if let Err(err) = media.delete_attachment(&hex).await {
+                                tracing::warn!(error = %err, attachment = %hex, "failed to delete a retention-freed attachment file");
+                            }
+                        }
+                    }
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "message retention sweep failed"),
+            }
+        }
+    });
 }
 
 /// Imports a directory of images as custom emoji, printing a line per file.
