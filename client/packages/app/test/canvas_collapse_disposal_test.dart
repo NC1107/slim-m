@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_data/data.dart';
@@ -76,6 +77,8 @@ MockClient _imageCanvasClient() => MockClient((request) async {
 });
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets(
     'closing the canvas disposes the decoded bitmap it was showing, not '
     'just the widget painting it',
