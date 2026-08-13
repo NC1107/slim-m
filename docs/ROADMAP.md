@@ -374,7 +374,10 @@ The motion, haptic and hover polish pass closed 2026-07-29 (PR #121, `app_haptic
 ~~Still open: per-platform playback (nothing plays these sounds yet, and no client bundles them), the CallKit ringtone, and the CI bundle-check.~~
 The foreground in-app slice closed 2026-08-04: the client bundles and plays all seven sounds via `audioplayers`, and `notification_sound_bundle_test.dart` is the CI bundle-check, gated through `client-ci`'s ordinary `flutter test` rather than a new workflow.
 See "The seven sounds finally play: the in-app slice" in CLAUDE.md for what plays where, the >8-participant cutoff, and the call-audio-safety reasoning.
-Still open, and each needs a real device or a Mac this environment does not have: the iOS Notification Service Extension's on-device sound selection, Android versioned Notification Channels, and the CallKit ringtone.
+~~Still open, and each needs a real device or a Mac this environment does not have: the iOS Notification Service Extension's on-device sound selection, Android versioned Notification Channels, and the CallKit ringtone.~~
+Two of the three closed 2026-08-12: the NSE now attaches a bundled sound per push kind and silences every push while a call is active, and a dedicated `callkit_ringtone.wav` is generated and wired into `CXProviderConfiguration.ringtoneSound`.
+Both still need a real device to confirm, the same evidentiary bar as everything else here; see "The two iOS sound gaps the seven-sounds entry named as out of scope, closed" in CLAUDE.md.
+Android's versioned Notification Channels remain open.
 
 ## Phase 9 - Release Readiness and Store Submission
 
