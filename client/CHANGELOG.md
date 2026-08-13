@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.42.0](https://github.com/NC1107/slim-m/compare/client-v0.41.1...client-v0.42.0) (2026-08-13)
+
+
+### Features
+
+* **client,server:** forward a message, mass mentions, and a status line ([#645](https://github.com/NC1107/slim-m/issues/645)) ([3da6f6c](https://github.com/NC1107/slim-m/commit/3da6f6c770b7e6b0808384fe49512d0ebfff458a))
+* **client:** a CallKit ringtone and call-aware NSE sound selection ([#630](https://github.com/NC1107/slim-m/issues/630)) ([610f9ec](https://github.com/NC1107/slim-m/commit/610f9ec08859c103751eede0971d53dd13ec93f5))
+* **client:** a canvas toggle on the in-call dock, so nobody has to hunt the header mid-call ([#640](https://github.com/NC1107/slim-m/issues/640)) ([3d6d82b](https://github.com/NC1107/slim-m/commit/3d6d82b0cfc55d4324571a8d44b22fd602b601d1))
+* **client:** a whats-new entry for the nineteen-job release ([#649](https://github.com/NC1107/slim-m/issues/649)) ([3e99d7b](https://github.com/NC1107/slim-m/commit/3e99d7b6889a30529f742edcc3fd08633fd2b127))
+* **client:** desktop push-to-talk, and a voice-activity sensitivity floor ([#642](https://github.com/NC1107/slim-m/issues/642)) ([ac174a6](https://github.com/NC1107/slim-m/commit/ac174a63d45aaa8ac969471ba3db93660750bed9))
+* **client:** scaffold a Windows desktop target with a compile-only CI job ([#628](https://github.com/NC1107/slim-m/issues/628)) ([2dd0bfa](https://github.com/NC1107/slim-m/commit/2dd0bfaeb0516d75e6bb94183486f9a4b2c71f04))
+* **client:** scaffold the macOS desktop target ([#627](https://github.com/NC1107/slim-m/issues/627)) ([9d437c6](https://github.com/NC1107/slim-m/commit/9d437c6f09315feede944ca7322ec54c6ed9c5fb))
+* **client:** share this device's audio alongside a screen share ([#644](https://github.com/NC1107/slim-m/issues/644)) ([9f29d6a](https://github.com/NC1107/slim-m/commit/9f29d6a7d4e91c65e590748aea9356529bea9d06))
+* **client:** swipe a message row to start a reply ([#641](https://github.com/NC1107/slim-m/issues/641)) ([5698178](https://github.com/NC1107/slim-m/commit/5698178a5534641fea907bfd0980e58989076e5d))
+* **client:** versioned Android channels, and calls join Telecom ([#629](https://github.com/NC1107/slim-m/issues/629)) ([4b1ac0c](https://github.com/NC1107/slim-m/commit/4b1ac0cd7c3229baade6ff2b315dc5b588fcde97))
+* four thread gaps closed - listing, unread state, a cross-link, and a cap ([#634](https://github.com/NC1107/slim-m/issues/634)) ([4905df3](https://github.com/NC1107/slim-m/commit/4905df3fed131691617a525542d2bfbb12dacd4f))
+* GIF search in the composer, proxied through the server ([#639](https://github.com/NC1107/slim-m/issues/639)) ([e2573a6](https://github.com/NC1107/slim-m/commit/e2573a624be1a7475a34eb1f1b7c258b21522543))
+* mute a channel, or narrow it to mentions only ([#643](https://github.com/NC1107/slim-m/issues/643)) ([ea855c3](https://github.com/NC1107/slim-m/commit/ea855c35238c8e3fd0947d5e088678c19a630cdf))
+* **search:** Slack-style search operators (from:, in:, has:, before:/after:) ([#638](https://github.com/NC1107/slim-m/issues/638)) ([bf2aa7c](https://github.com/NC1107/slim-m/commit/bf2aa7cd29205f98f285c86c91d87f9c2d436028))
+* **server:** per-member attachment storage and message retention ([#633](https://github.com/NC1107/slim-m/issues/633)) ([b70fced](https://github.com/NC1107/slim-m/commit/b70fced88cf99778194efae88d049754f4ebb049))
+
+
+### Bug Fixes
+
+* **client:** retry failed sends on reconnect, announce sending state, add haptics, and grow rows for Dynamic Type ([#637](https://github.com/NC1107/slim-m/issues/637)) ([2245fcc](https://github.com/NC1107/slim-m/commit/2245fcc88e3650933af002c369e209d190b59468))
+* **client:** six small review residuals from the onboarding, moderation, voice and canvas passes ([#636](https://github.com/NC1107/slim-m/issues/636)) ([6f07375](https://github.com/NC1107/slim-m/commit/6f07375f3f514c821737307eccbee614989439cf))
+* **e2e:** retry the web-asset fetch instead of dying on one 503 ([#623](https://github.com/NC1107/slim-m/issues/623)) ([51fd9cc](https://github.com/NC1107/slim-m/commit/51fd9cccdb3dda23effa6bb2122542873d84d8ff))
+* **e2e:** the join-policy scenario taps twice now that space settings is panes ([#625](https://github.com/NC1107/slim-m/issues/625)) ([69ee853](https://github.com/NC1107/slim-m/commit/69ee853dfaf908e2fa22cb4317659daf778f5a6c))
+* **ios:** the sound tests learn the envelope's sentAt field ([#648](https://github.com/NC1107/slim-m/issues/648)) ([e86ec32](https://github.com/NC1107/slim-m/commit/e86ec323955927e94b668b16268c2653cd19286a))
+* **push:** stamp sent_at inside the sealed envelope and refuse stale previews ([#631](https://github.com/NC1107/slim-m/issues/631)) ([436f0ba](https://github.com/NC1107/slim-m/commit/436f0baa2d9b43af0af998d52f53fb8068da4cdb))
+
+
+### Performance Improvements
+
+* refresh the server baseline and measure client and canvas numbers nobody had taken ([#635](https://github.com/NC1107/slim-m/issues/635)) ([c020c58](https://github.com/NC1107/slim-m/commit/c020c587c5564505d24d9235ec3c2246da3c2271))
+
 ## [0.41.1](https://github.com/NC1107/slim-m/compare/client-v0.41.0...client-v0.41.1) (2026-08-12)
 
 
