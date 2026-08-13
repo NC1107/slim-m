@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Shows Android's local, content-free notification for a data-only push,
-/// and owns the versioned channel it displays through.
+/// and owns the versioned channels it displays through.
 ///
 /// Android 8+ (API 26) refuses to show anything without a channel, and a
-/// channel's importance is fixed forever once created: the OS silently
-/// ignores any later attempt to change it on an existing id. The id here is
-/// therefore versioned ("messages_v1"): raising or lowering importance later
-/// means minting "messages_v2" and letting this one age out, never editing
-/// this one's settings in place.
+/// channel's importance, sound and vibration are fixed forever once
+/// created: the OS silently ignores any later attempt to change them on an
+/// existing id. Every channel id here therefore follows `<kind>_v<version>`
+/// ("messages_v1", "mentions_v1"; the call channel is Android's own
+/// `NotificationCompat.CallStyle` one and lives natively in
+/// `IncomingCallNotifier.kt`, which follows the identical convention since
+/// `flutter_local_notifications` has no CallStyle support): raising or
+/// lowering a channel's settings later means minting that one channel's
+/// next version and letting the old id age out, never editing it in place.
+/// [LocalAlertChannel] is where a version bump actually happens - each
+/// variant's `id` is the one line that changes.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -15,11 +21,53 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'host_platform.dart';
 
-/// This app's one notification channel today. See the library doc for why a
-/// future change in importance mints a new, differently-versioned id rather
-/// than editing this one.
 const messagesChannelId = 'messages_v1';
 const messagesChannelName = 'Messages';
+const mentionsChannelId = 'mentions_v1';
+const mentionsChannelName = 'Mentions';
+
+/// The Android channel a plain content-free alert posts through, and the
+/// stable notification id it replaces rather than stacks beside.
+///
+/// Two channels rather than one, even with both at the same importance
+/// today: a channel is the only unit Android's own notification settings
+/// let a person control per *kind* of alert, so someone who wants a mention
+/// to buzz but an ordinary message to stay quiet - or the reverse - needs
+/// them split apart from the start. Collapsing the two into one channel now
+/// and splitting later would need the exact same mint-a-new-id dance the
+/// library doc above describes, for a distinction a person can already
+/// reach for the day this ships.
+enum LocalAlertChannel {
+  messages(
+    id: messagesChannelId,
+    name: messagesChannelName,
+    description: 'New messages.',
+    notificationId: 1,
+  ),
+  mentions(
+    id: mentionsChannelId,
+    name: mentionsChannelName,
+    description: 'Messages that mention you.',
+    notificationId: 2,
+  );
+
+  const LocalAlertChannel({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.notificationId,
+  });
+
+  final String id;
+  final String name;
+  final String description;
+
+  /// A fixed id per channel rather than one shared id: a person can
+  /// legitimately have an unread ordinary message and an unread mention at
+  /// once, and collapsing both onto one notification id would silently
+  /// drop whichever arrived first the moment the second one replaced it.
+  final int notificationId;
+}
 
 /// Registers the plugin's Android platform implementation, the way the real
 /// plugin does for itself in a running app. A plain `flutter_test` run never
@@ -85,17 +133,12 @@ class LocalNotifications {
   final AndroidPermissionRequester? _permissionRequester;
   bool _ready = false;
 
-  static const _channel = AndroidNotificationChannel(
-    messagesChannelId,
-    messagesChannelName,
-    description: 'New messages and mentions.',
-    importance: Importance.high,
-  );
-
-  /// Creates the channel and initializes the plugin. Both calls are
-  /// idempotent on the native side, so calling this more than once -
-  /// including once per background isolate, which cannot remember it
-  /// already ran - is safe.
+  /// Creates every [LocalAlertChannel] and initializes the plugin. Every
+  /// call here is idempotent on the native side, so calling this more than
+  /// once - including once per background isolate, which cannot remember it
+  /// already ran - is safe: an unchanged channel id is a no-op, and Android
+  /// only reads a changed name or description back out of it, never
+  /// importance.
   ///
   /// Deliberately does NOT request notification permission: that needs an
   /// Activity, and this is called from [show], which FCM invokes from its
@@ -108,7 +151,16 @@ class LocalNotifications {
     if (!_isAndroid || _ready) return;
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    await android?.createNotificationChannel(_channel);
+    for (final channel in LocalAlertChannel.values) {
+      await android?.createNotificationChannel(
+        AndroidNotificationChannel(
+          channel.id,
+          channel.name,
+          description: channel.description,
+          importance: Importance.high,
+        ),
+      );
+    }
     await _plugin.initialize(
       const InitializationSettings(
         android: AndroidInitializationSettings('@drawable/ic_stat_notify'),
@@ -135,25 +187,26 @@ class LocalNotifications {
     return requester.requestNotificationsPermission();
   }
 
-  /// Shows [text] as this app's one active notification, replacing whatever
-  /// this app last showed rather than stacking beside it. The payload is an
-  /// encrypted envelope nothing on this device can open yet, so every shown
-  /// notification is already identical and content-free; stacking several
+  /// Shows [text] as this app's one active notification for [channel],
+  /// replacing whatever this app last showed on that channel rather than
+  /// stacking beside it. The payload is an encrypted envelope nothing on
+  /// this device can open yet, so every shown notification is already
+  /// identical and content-free within its own channel; stacking several
   /// copies of the same unlabeled line would add clutter, not information.
-  /// It also matches the server's own choice to collapse a burst of messages
-  /// into at most one wake per idle recipient (see `PushSender`) rather than
-  /// one push per message.
-  Future<void> show(String text) async {
+  /// It also matches the server's own choice to collapse a burst of
+  /// messages into at most one wake per idle recipient (see `PushSender`)
+  /// rather than one push per message.
+  Future<void> show(String text, {required LocalAlertChannel channel}) async {
     if (!_isAndroid) return;
     await _ensureReady();
     await _plugin.show(
-      0,
+      channel.notificationId,
       'slim-m',
       text,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
-          messagesChannelId,
-          messagesChannelName,
+          channel.id,
+          channel.name,
           importance: Importance.high,
           priority: Priority.high,
         ),

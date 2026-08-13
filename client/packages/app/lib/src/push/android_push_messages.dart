@@ -25,9 +25,15 @@ import '../ids.dart';
 /// "call" rings through its own path (below) and "wake" is a deliberately
 /// silent background sync hint - both stay unshown here exactly as they do
 /// on iOS, where only `message` and `mention` carry a plaintext `aps.alert`.
-const _genericAlerts = {
-  'message': 'New message',
-  'mention': 'You were mentioned',
+///
+/// The text and the [LocalAlertChannel] it posts through are one record per
+/// kind, not two parallel maps: a second map keyed the same way is exactly
+/// the shape that has drifted before in this project (see CLAUDE.md's role-
+/// name and mention-charset entries), and a record makes "these two facts
+/// belong to the same kind" true by construction rather than by convention.
+const _genericAlerts = <String, ({String text, LocalAlertChannel channel})>{
+  'message': (text: 'New message', channel: LocalAlertChannel.messages),
+  'mention': (text: 'You were mentioned', channel: LocalAlertChannel.mentions),
 };
 
 /// The fixed, content-free text to show for a push of this `kind`, or null
@@ -35,7 +41,15 @@ const _genericAlerts = {
 /// way forward). A plain function, rather than inlined where it is used, so
 /// the kind-to-text mapping has a unit test that needs neither a plugin nor
 /// an Android device.
-String? genericAlertTextFor(String? kind) => _genericAlerts[kind];
+String? genericAlertTextFor(String? kind) => _genericAlerts[kind]?.text;
+
+/// The Android channel [genericAlertTextFor]'s line should post through for
+/// this `kind`, or null alongside it for the same reasons. Its own function
+/// rather than folded into [actionFor] so a kind routed to the wrong
+/// channel fails a test naming exactly that, not just a broader assertion
+/// on the whole [PushAction].
+LocalAlertChannel? genericAlertChannelFor(String? kind) =>
+    _genericAlerts[kind]?.channel;
 
 /// The caller name shown when a `call` push does not name one - the content-
 /// free envelope carries none today, so this is the honest label rather than
@@ -72,10 +86,11 @@ class PushActionNone extends PushAction {
   const PushActionNone();
 }
 
-/// Show [text] as the plain, content-free notification.
+/// Show [text] as the plain, content-free notification, on [channel].
 class PushActionGenericAlert extends PushAction {
-  const PushActionGenericAlert(this.text);
+  const PushActionGenericAlert(this.text, this.channel);
   final String text;
+  final LocalAlertChannel channel;
 }
 
 /// Show, or replace, the incoming-call notification for [callId].
@@ -100,7 +115,9 @@ PushAction actionFor(Map<String, dynamic> data) {
     );
   }
   final text = genericAlertTextFor(data['kind']);
-  return text == null ? const PushActionNone() : PushActionGenericAlert(text);
+  final channel = genericAlertChannelFor(data['kind']);
+  if (text == null || channel == null) return const PushActionNone();
+  return PushActionGenericAlert(text, channel);
 }
 
 /// The background isolate entry point FCM invokes when a data message
@@ -127,8 +144,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   switch (actionFor(message.data)) {
     case PushActionNone():
       return;
-    case PushActionGenericAlert(:final text):
-      await LocalNotifications().show(text);
+    case PushActionGenericAlert(:final text, :final channel):
+      await LocalNotifications().show(text, channel: channel);
     case PushActionIncomingCall(:final callId, :final callerName):
       await CallNotifications().showIncomingCall(
         callId: callId,
