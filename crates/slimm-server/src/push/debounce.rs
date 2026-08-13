@@ -4,7 +4,7 @@
 //! Split out of [`super`] because it is a self-contained decision with its own
 //! invariant - a window may only stay shut when somebody was really woken -
 //! and because that invariant is worth testing without a store, a relay, or an
-//! HTTP stack anywhere near it. [`super::deliver`] is the only caller.
+//! HTTP stack anywhere near it. [`super::deliver::deliver`] is the only caller.
 
 use std::collections::HashMap;
 use std::sync::Mutex;

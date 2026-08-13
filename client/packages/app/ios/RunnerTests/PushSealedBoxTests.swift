@@ -158,6 +158,21 @@ final class PushSealedBoxTests: XCTestCase {
       "an empty body must not replace the generic alert")
   }
 
+  /// `hasPreview` being false is not itself the guarantee - `applied(to:)` has
+  /// to actually consult it. It did not, once: the old guard unwrapped
+  /// `sender`/`body` for nil alone, so an envelope with an empty (not nil)
+  /// body still passed and overwrote the placeholder with a sender's name
+  /// above nothing.
+  func testAnAttachmentOnlyMessageIsNotAppliedToTheContent() throws {
+    let envelope = try decodeEnvelope(sender: "Nick", body: "")
+    let content = UNMutableNotificationContent()
+    content.title = "New message"
+    let applied = envelope.applied(to: content)
+    XCTAssertEqual(
+      applied.title, "New message",
+      "an empty body must not overwrite the placeholder title")
+  }
+
   func testARealBodyIsStillPreviewed() throws {
     let envelope = try decodeEnvelope(sender: "Nick", body: "hello")
     XCTAssertTrue(
@@ -165,15 +180,128 @@ final class PushSealedBoxTests: XCTestCase {
       "a real body must still be previewed, or this guard turned it off")
   }
 
+  /// The whole point of the staleness gate: a payload sealed too long ago to
+  /// trust must fall back to the placeholder rather than show real text -
+  /// exactly the behavior a hostile relay retaining and replaying a payload
+  /// would otherwise defeat.
+  func testAStalePayloadDoesNotShowAPreview() throws {
+    let now = Date()
+    let elevenMinutesAgo = now.addingTimeInterval(-11 * 60)
+    let envelope = try decodeEnvelope(
+      sender: "Nick", body: "hello", sentAt: epochMs(elevenMinutesAgo))
+    XCTAssertTrue(envelope.isStale(now: now))
+
+    let content = UNMutableNotificationContent()
+    content.title = "New message"
+    let applied = envelope.applied(to: content, now: now)
+    XCTAssertEqual(
+      applied.title, "New message",
+      "a stale payload must not overwrite the placeholder title")
+    XCTAssertTrue(
+      applied.body.isEmpty,
+      "a stale payload must not carry its body onto the lock screen")
+  }
+
+  /// The boundary itself must not be refused - only strictly past it counts
+  /// as stale, or the window would silently be shorter than documented.
+  func testAPayloadExactlyAtTheStaleBoundaryIsNotRefused() throws {
+    let now = Date()
+    let atTheBoundary = now.addingTimeInterval(-Double(PushEnvelope.staleAfterMs) / 1000)
+    let envelope = try decodeEnvelope(
+      sender: "Nick", body: "hello", sentAt: epochMs(atTheBoundary))
+    XCTAssertFalse(envelope.isStale(now: now))
+  }
+
+  func testAFreshPayloadIsNotStaleAndIsPreviewed() throws {
+    let now = Date()
+    let envelope = try decodeEnvelope(sender: "Nick", body: "hello", sentAt: epochMs(now))
+    XCTAssertFalse(envelope.isStale(now: now))
+
+    let applied = envelope.applied(to: UNMutableNotificationContent(), now: now)
+    XCTAssertEqual(applied.title, "Nick")
+    XCTAssertEqual(applied.body, "hello")
+  }
+
+  /// The wire-compatibility rule this whole feature depends on: an envelope
+  /// sealed by a server built before `sent_at` existed must keep rendering,
+  /// today and years from now, since "absent" and "just sealed" must never be
+  /// confused with "ancient".
+  func testAnEnvelopeWithNoSentAtIsNeverStaleRegardlessOfHowLateItIsRead() throws {
+    let envelope = try decodeEnvelope(sender: "Nick", body: "hello", sentAt: nil)
+    XCTAssertNil(envelope.sentAt)
+    XCTAssertFalse(envelope.isStale())
+
+    let farFuture = Date().addingTimeInterval(365 * 24 * 60 * 60)
+    XCTAssertFalse(
+      envelope.isStale(now: farFuture),
+      "absence of sent_at must not be read as staleness at any later read time")
+
+    let applied = envelope.applied(to: UNMutableNotificationContent())
+    XCTAssertEqual(applied.title, "Nick")
+  }
+
+  /// Routing must survive a refused preview exactly as it survives an
+  /// opted-out device: `channel_id`/`message_id` are real regardless of what
+  /// the age check decided about the text.
+  func testRoutingIsAttachedEvenWhenThePreviewIsRefusedForStaleness() throws {
+    let now = Date()
+    let elevenMinutesAgo = now.addingTimeInterval(-11 * 60)
+    let envelope = try decodeEnvelope(
+      sender: "Nick", body: "hello", sentAt: epochMs(elevenMinutesAgo),
+      channelId: "channel-1", messageId: "message-1")
+
+    let applied = envelope.applied(to: UNMutableNotificationContent(), now: now)
+    XCTAssertEqual(applied.userInfo[PushEnvelope.channelIdKey] as? String, "channel-1")
+    XCTAssertEqual(applied.userInfo[PushEnvelope.messageIdKey] as? String, "message-1")
+    XCTAssertNotEqual(applied.title, "Nick", "the stale preview itself must still be refused")
+  }
+
+  /// The real, fixture-driven end of this: an envelope actually sealed by
+  /// `crypto_box` with no `sent_at` field at all (the exact bytes a
+  /// pre-this-field server produced) still opens and still previews, proving
+  /// the wire-compatibility rule end to end rather than only against a
+  /// hand-written JSON literal.
+  func testTheFixturesPreSentAtCaseStillOpensAndPreviews() throws {
+    let fixture = try loadFixture()
+    let key = try privateKey(fixture)
+    let testCase = try XCTUnwrap(
+      fixture.cases.first { $0.name == "a pre-sent_at envelope from an older server" },
+      "the fixture generator's own case name changed; see push_envelope_fixture.rs")
+    let sealed = [UInt8](try XCTUnwrap(Data(base64Encoded: testCase.sealedBase64)))
+
+    let opened = try XCTUnwrap(PushSealedBox.open(sealed, privateKey: key))
+    let envelope = try XCTUnwrap(PushEnvelope.decode(opened))
+    XCTAssertNil(envelope.sentAt)
+    XCTAssertFalse(envelope.isStale())
+    XCTAssertTrue(envelope.hasPreview)
+  }
+
   /// Field names match `push/envelope.rs`'s own serialization, which carries
   /// no serde rename - so Swift's default `Decodable` keys are the property
-  /// names, and there are no `CodingKeys` to consult.
-  private func decodeEnvelope(sender: String, body: String) throws -> PushEnvelope {
-    let json = """
-      {"domain":"slim-m.push.v1","version":1,\
-      "sender":"\(sender)","body":"\(body)"}
-      """
+  /// names, and there are no `CodingKeys` to consult beyond the snake_case
+  /// ones `PushEnvelope.swift` itself already declares.
+  private func decodeEnvelope(
+    sender: String,
+    body: String,
+    sentAt: Int64? = nil,
+    channelId: String? = nil,
+    messageId: String? = nil
+  ) throws -> PushEnvelope {
+    var fields = [
+      "\"domain\":\"slim-m.push.v1\"",
+      "\"version\":1",
+      "\"sender\":\"\(sender)\"",
+      "\"body\":\"\(body)\"",
+    ]
+    if let sentAt { fields.append("\"sent_at\":\(sentAt)") }
+    if let channelId { fields.append("\"channel_id\":\"\(channelId)\"") }
+    if let messageId { fields.append("\"message_id\":\"\(messageId)\"") }
+    let json = "{" + fields.joined(separator: ",") + "}"
     return try JSONDecoder().decode(PushEnvelope.self, from: Data(json.utf8))
+  }
+
+  private func epochMs(_ date: Date) -> Int64 {
+    Int64(date.timeIntervalSince1970 * 1000)
   }
 
   private func hex(_ bytes: [UInt8]) -> String {

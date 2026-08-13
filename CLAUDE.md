@@ -90,7 +90,8 @@ The other correction was mine: my first count of uncharged handlers was 11 again
 **Left for the owner rather than decided, both genuine judgement calls.**
 Any administrator can issue a password-reset code for another administrator and take over that account - impersonation, where every other admin-on-admin verb is removal or restriction, and the only one that skips the `escalation_guard` containment check every sibling runs.
 Whether that is acceptable trust under "one deployment is one community" is a product decision, but it is currently an omission rather than a decision.
-And the sealed envelope carries no timestamp or expiry, so a hostile relay can retain a payload and re-deliver it later; bounded (it is replay of content that device was already entitled to see) and newly meaningful now that a preview carries real message text, with the cheap mitigation being a `sent_at` inside the sealed plaintext and an NSE that refuses anything stale.
+~~And the sealed envelope carries no timestamp or expiry, so a hostile relay can retain a payload and re-deliver it later; bounded (it is replay of content that device was already entitled to see) and newly meaningful now that a preview carries real message text, with the cheap mitigation being a `sent_at` inside the sealed plaintext and an NSE that refuses anything stale.~~
+Fixed 2026-08-12: `sent_at` rides inside the sealed plaintext on every envelope, content-free ones included, and the NSE refuses to render a preview once it is more than 10 minutes old, falling back to the placeholder while routing is unaffected either way (`push/envelope.rs`, `ios/NotificationService/PushEnvelope.swift`).
 
 ## The what's-new sheet was fixed twice and still never showed, because nobody was writing the entries (2026-08-11)
 
