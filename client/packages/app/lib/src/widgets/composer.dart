@@ -18,6 +18,7 @@ import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/typing_controller.dart';
 import 'attachment_picker.dart';
+import 'channel_rail_frame.dart' show serverInfoProvider;
 import 'composer_action_bar.dart';
 import 'composer_attachments.dart';
 import 'composer_autocomplete.dart';
@@ -27,6 +28,7 @@ import 'composer_clipboard_image.dart';
 import 'composer_clipboard_paste.dart';
 import 'composer_extras.dart';
 import 'emoji_picker.dart';
+import 'gif_picker.dart';
 import 'poll_composer_sheet.dart';
 import 'typing_indicator.dart';
 
@@ -89,6 +91,9 @@ class _ComposerState extends ConsumerState<Composer> {
   /// [build], so [_handleChange] can decide when a rebuild is worth it.
   int _charCount = 0;
   int? _overBy;
+
+  /// `Version.gifSearchEnabled`, refreshed in [build]; see [_openActions].
+  bool _gifSearchEnabled = false;
 
   /// Captured once rather than read from `ref` in [dispose]: by then
   /// Riverpod has already detached this element's `ref`, and reading it
@@ -354,6 +359,18 @@ class _ComposerState extends ConsumerState<Composer> {
           unawaited(pasteClipboardImage(_stageAttachment, _setAttachmentError)),
       onPoll: () => showPollComposerSheet(context, widget.channelId),
       onCode: _insertCodeFence,
+      onGif: _gifSearchEnabled ? _pickGif : null,
+    ),
+  );
+
+  /// The whole flow, opening through closing, is `gif_picker.dart`'s own
+  /// `pickGif` - nothing here but the wiring.
+  void _pickGif() => unawaited(
+    pickGif(
+      context: context,
+      ref: ref,
+      attachments: _attachments,
+      onError: _setAttachmentError,
     ),
   );
 
@@ -420,6 +437,8 @@ class _ComposerState extends ConsumerState<Composer> {
     final touch = AppTouchTargets.of(context);
     // In build because both sources are watched and can arrive late.
     _suggestions = _buildSuggestions();
+    _gifSearchEnabled =
+        ref.watch(serverInfoProvider).valueOrNull?.gifSearchEnabled ?? false;
 
     // top: false because the composer only ever touches the bottom edge; the
     // padding self-cancels when the keyboard covers the home indicator.
@@ -472,6 +491,8 @@ class _ComposerState extends ConsumerState<Composer> {
               onSendPressed: _sendFromButton,
               onInsertCode: _insertCodeFence,
               onPickEmoji: _pickEmoji,
+              gifSearchEnabled: _gifSearchEnabled,
+              onPickGif: _pickGif,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),

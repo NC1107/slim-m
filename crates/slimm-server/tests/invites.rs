@@ -40,6 +40,7 @@ fn app(store: Store) -> Router {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     })
 }
 
@@ -223,8 +224,7 @@ async fn concurrent_redemptions_cannot_exceed_the_limit() {
         }
     }
 
-    // The conditional UPDATE is what enforces this; without it two racing
-    // redemptions could both read uses=1 and both write uses=2.
+    // The conditional UPDATE enforces this; else two racing redemptions could both read uses=1.
     assert_eq!(succeeded, 2, "exactly the two available slots were taken");
     assert!(!store.invite_is_usable(&invite.code).await.unwrap());
 }

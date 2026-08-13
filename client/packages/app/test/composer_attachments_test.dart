@@ -108,6 +108,35 @@ void main() {
     );
   });
 
+  test(
+    'addResolved stages an already-uploaded attachment with no upload call',
+    () async {
+      var uploadCalls = 0;
+      final controller = AttachmentStagingController(
+        upload: (_, _) async {
+          uploadCalls += 1;
+          return _attachment();
+        },
+      );
+
+      controller.addResolved(
+        _attachment(id: 'gif-1', filename: 'gif.gif'),
+        bytes,
+      );
+
+      expect(controller.items.single, isA<UploadedAttachment>());
+      expect(controller.readyIds, ['gif-1']);
+      expect(controller.hasBlockingAttachment, isFalse);
+      expect(
+        uploadCalls,
+        0,
+        reason:
+            'the picker already stored it server-side; nothing here '
+            'should re-upload it',
+      );
+    },
+  );
+
   test('looksLikeImage matches by extension only', () {
     expect(looksLikeImage('photo.png'), isTrue);
     expect(looksLikeImage('photo.JPG'), isTrue);

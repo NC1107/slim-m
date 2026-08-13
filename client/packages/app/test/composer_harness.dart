@@ -319,6 +319,10 @@ Finder get moreActionsButton => find.byWidgetPredicate(
   (w) => w is AppIconButton && w.semanticLabel == 'More actions',
 );
 
+Finder get gifButton => find.byWidgetPredicate(
+  (w) => w is AppIconButton && w.semanticLabel == 'Insert a GIF',
+);
+
 bool fieldHasFocus(WidgetTester tester) =>
     tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus;
 

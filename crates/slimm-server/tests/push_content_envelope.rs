@@ -108,6 +108,7 @@ async fn world() -> World {
         push,
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     });
 
     let author_token = account(&store, "author", SENTINEL_SENDER).await;

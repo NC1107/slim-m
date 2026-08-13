@@ -64,4 +64,18 @@ void main() {
       expect(version.safetyTools, SafetyTools.present);
     });
   });
+
+  group('gif search', () {
+    test('a server offering it reports true', () {
+      expect(_version({'gif_search_enabled': true}).gifSearchEnabled, true);
+    });
+
+    test('a server without it configured reports false', () {
+      expect(_version({'gif_search_enabled': false}).gifSearchEnabled, false);
+    });
+
+    test('a server too old to report it is null, not false', () {
+      expect(_version({}).gifSearchEnabled, isNull);
+    });
+  });
 }

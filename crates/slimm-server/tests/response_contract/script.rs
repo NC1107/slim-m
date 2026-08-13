@@ -165,6 +165,26 @@ pub async fn run(c: &mut Contract) {
     safety_calls(c, root, bob_token, &bob_id).await;
 
     let channel = channel_calls(c, root, &bob_id).await;
+    // Against a fake local provider (see world.rs), so all three reach a real 2xx.
+    let gif_search = c
+        .bare("searchGifs", "GET", "/gifs/search?q=cat", root)
+        .await;
+    let gif_id = text(&gif_search["results"][0], "id");
+    c.bare(
+        "getGifPreview",
+        "GET",
+        &format!("/gifs/preview/{gif_id}"),
+        root,
+    )
+    .await;
+    c.json(
+        "selectGif",
+        "POST",
+        "/gifs/select",
+        root,
+        json!({ "id": gif_id }),
+    )
+    .await;
     let message = message_calls(c, root, &channel).await;
     thread_calls(c, root, &channel, &message).await;
     emoji_calls(c, root).await;

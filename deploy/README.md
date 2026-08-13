@@ -300,6 +300,26 @@ A deployment sitting at its ceiling therefore recovers as that sweep works throu
 Related, and stated elsewhere in this file but worth repeating here: **Litestream replicates the database only.**
 A restore gives you messages and their attachment references, not these bytes. Back the media volume up separately.
 
+## GIF search (optional, off by default)
+
+Unset, a self-host has no GIF search at all: no button anywhere in the client, and the three proxy routes answer 501.
+Set both variables to turn it on:
+
+```
+SLIMM_GIF_PROVIDER=tenor
+SLIMM_GIF_API_KEY=your-key-here
+```
+
+`SLIMM_GIF_PROVIDER` is `tenor` or `klipy`, case-insensitively; anything else fails the server at startup, so a typo is caught before anyone notices the button is simply missing.
+Tenor's key comes from Google's API console, free; Klipy's from klipy.com.
+
+**Every search, every thumbnail, and the eventual pick all go through this server, never straight from a client to the provider.**
+That is the reason this is proxied at all rather than a client-side integration: a client hitting Tenor or Klipy directly would hand it every member's own IP address and everything they typed to find a GIF.
+A search result's own token is opaque and expires after a few minutes - never the provider's id or a raw CDN URL - so nothing about displaying results or picking one ever depends on a client learning where the provider actually stores anything.
+
+Picking a result downloads the full image through this server and stores it exactly the way an uploaded attachment is stored: content-addressed, sniffed rather than trusted, checked against both `SLIMM_ATTACHMENT_MAX_BYTES` and `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES` above.
+A GIF a member picks is an ordinary attachment from that point on, with no further dependency on the provider or the search that found it.
+
 ## Rate limiting, and the one setting you need behind a proxy
 
 The server limits requests per caller with token buckets.

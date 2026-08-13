@@ -45,6 +45,7 @@ fn app(store: Store) -> Router {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     })
 }
 
@@ -80,8 +81,7 @@ async fn register(store: &Store, username: &str) -> (String, String) {
         .create_account(username, username, "not-a-real-hash")
         .await
         .unwrap();
-    // The first account through here claims the deployment, exactly as the
-    // first real registration does; later ones find it already set up.
+    // The first account through here claims the deployment; later ones find it set up.
     store.bootstrap_deployment(account.id).await.unwrap();
     let tokens = store.open_session(account.id, "cli").await.unwrap();
     (tokens.access_token, account.id.to_string())

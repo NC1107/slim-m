@@ -15,6 +15,7 @@ export 'models_admin.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_emoji.dart';
+export 'models_gifs.dart';
 export 'models_identity.dart';
 export 'models_moderation.dart';
 export 'models_canvas.dart';

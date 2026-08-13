@@ -50,6 +50,7 @@ fn state_for(store: &Store) -> AppState {
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
         media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
     }
 }
 
@@ -564,8 +565,7 @@ async fn poll_vote_event_never_reveals_the_voter() {
         None,
     )
     .await;
-    // Drain up to and including the poll's own message.created: this connection
-    // also gets its own presence-changed frame, in no guaranteed order.
+    // Drain to the poll's own message.created; a presence-changed frame may land in between.
     read_frame_of_type(&mut alice_ws, "message.created").await;
 
     let message_id = poll["id"].as_str().unwrap().to_owned();
