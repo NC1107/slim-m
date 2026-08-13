@@ -33,6 +33,8 @@ class MessageActions {
     required this.canOpenThread,
     required this.onOpenThread,
     this.hasExistingThread = false,
+    required this.canForward,
+    required this.onForward,
   });
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
@@ -78,6 +80,15 @@ class MessageActions {
   /// silent fork away from a conversation that already exists. See
   /// [MessageContextMenuRegion]'s own `_items` for how it renders.
   final bool hasExistingThread;
+
+  /// False for a pending or failed send, matching [canReply]: there is
+  /// nothing settled yet to forward. Unlike edit and delete this needs no
+  /// authorship or per-channel permission check here - forwarding reads
+  /// [content], it never re-sends this exact message, and the destination
+  /// picker itself only ever offers a channel or DM the caller can actually
+  /// send to.
+  final bool canForward;
+  final VoidCallback onForward;
 }
 
 /// Wraps [child] so a right-click or long-press over it opens a menu for
@@ -174,6 +185,12 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
         onTap: () =>
             run(() => Clipboard.setData(ClipboardData(text: widget.content))),
       ),
+      if (actions.canForward)
+        AppMenuItem(
+          label: 'Forward message',
+          leading: AppIcons.forward,
+          onTap: () => run(actions.onForward),
+        ),
       if (actions.canEdit)
         AppMenuItem(
           label: 'Edit',

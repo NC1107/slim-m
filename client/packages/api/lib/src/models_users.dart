@@ -18,6 +18,7 @@ class UserProfile {
     this.roles = const [],
     this.roleIds = const [],
     this.timedOutUntil,
+    this.statusText,
   });
 
   final String id;
@@ -53,6 +54,12 @@ class UserProfile {
   /// elapsed timeout arrives as null rather than as a past deadline.
   final int? timedOutUntil;
 
+  /// A short free-text status line this member set for themselves, or null
+  /// for none - shown in the member pane under the name. Absent (not just
+  /// null) on a server older than this field, which a caller must treat as
+  /// unknown rather than as "no status".
+  final String? statusText;
+
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -65,6 +72,7 @@ class UserProfile {
         roleIds:
             (json['role_ids'] as List<dynamic>?)?.cast<String>() ?? const [],
         timedOutUntil: json['timed_out_until'] as int?,
+        statusText: json['status_text'] as String?,
       );
 }
 
@@ -83,6 +91,7 @@ class Me {
     required this.permissions,
     this.avatarUpdatedAt,
     this.timedOutUntil,
+    this.statusText,
   });
 
   final String id;
@@ -106,6 +115,9 @@ class Me {
   /// rather than leaving somebody with a dead composer and no explanation.
   final int? timedOutUntil;
 
+  /// The caller's own status line; same meaning as [UserProfile.statusText].
+  final String? statusText;
+
   factory Me.fromJson(Map<String, dynamic> json) => Me(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -114,5 +126,6 @@ class Me {
         permissions: json['permissions'] as int,
         avatarUpdatedAt: json['avatar_updated_at'] as int?,
         timedOutUntil: json['timed_out_until'] as int?,
+        statusText: json['status_text'] as String?,
       );
 }

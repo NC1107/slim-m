@@ -6,6 +6,34 @@
 
 use std::path::{Path, PathBuf};
 
+use slimm_server::ids::{ChannelId, UserId};
+use slimm_server::presence::PresenceTracker;
+use slimm_server::store::Store;
+
+/// [`slimm_server::push::message_recipients`] against a fresh, empty
+/// [`PresenceTracker`] - shared by every push-recipient test that has no
+/// opinion about `@here`, so a perpetually-disconnected tracker is a correct
+/// no-op stand-in rather than a parameter each call site has to carry.
+///
+/// Allowed dead: this module is included by every test binary, and most of
+/// them never touch push recipients at all.
+#[allow(dead_code)]
+pub async fn wake_recipients(
+    store: &Store,
+    channel_id: ChannelId,
+    author_id: UserId,
+    content: &str,
+) -> anyhow::Result<Vec<UserId>> {
+    slimm_server::push::message_recipients(
+        store,
+        channel_id,
+        author_id,
+        content,
+        &PresenceTracker::new(),
+    )
+    .await
+}
+
 /// Deletes its temp SQLite database, and its `-wal`/`-shm` siblings, on drop.
 ///
 /// Runs on a panicking test too: `Drop` still runs during unwind, which is

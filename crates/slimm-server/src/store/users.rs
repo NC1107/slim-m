@@ -24,7 +24,7 @@ impl Store {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at
+                      avatar_updated_at, status_text
                FROM users WHERE id = ? AND deleted_at IS NULL"#,
             id
         )
@@ -36,6 +36,7 @@ impl Store {
             display_name: r.display_name,
             created_at: r.created_at,
             avatar_updated_at: r.avatar_updated_at,
+            status_text: r.status_text,
         }))
     }
 
@@ -52,8 +53,8 @@ impl Store {
         // Built rather than a fixed `query!` because the id list is variable
         // length and SQLite has no array binding.
         let mut builder = QueryBuilder::new(
-            "SELECT id, username, display_name, created_at, avatar_updated_at FROM users \
-             WHERE deleted_at IS NULL AND id IN (",
+            "SELECT id, username, display_name, created_at, avatar_updated_at, status_text \
+             FROM users WHERE deleted_at IS NULL AND id IN (",
         );
         let mut separated = builder.separated(", ");
         for id in ids {
@@ -72,6 +73,7 @@ impl Store {
                 display_name: row.try_get("display_name")?,
                 created_at: row.try_get("created_at")?,
                 avatar_updated_at: row.try_get("avatar_updated_at")?,
+                status_text: row.try_get("status_text")?,
             });
         }
         Ok(users)
@@ -116,29 +118,63 @@ impl Store {
         Ok(ids)
     }
 
-    /// Updates the caller's own display name. Username is not updatable
-    /// here: it backs the live per-account uniqueness index
-    /// (`users_username_live`), and changing it needs a dedicated flow that
-    /// can handle the resulting collision, not a field silently accepted (or
-    /// silently ignored) on this endpoint.
+    /// Updates the caller's own display name and/or status text - the same
+    /// "absent leaves it untouched" shape [`Store::update_channel`] uses for
+    /// a channel's name and topic, `status_text` carrying the identical
+    /// clear-to-`NULL` convention `topic` does there: `Some(None)` writes
+    /// `NULL`, `Some(Some(text))` writes `text`, and a bare `None` leaves the
+    /// column exactly as it was. Username is not updatable here: it backs
+    /// the live per-account uniqueness index (`users_username_live`), and
+    /// changing it needs a dedicated flow that can handle the resulting
+    /// collision, not a field silently accepted (or silently ignored) here.
     ///
     /// Returns `None` if the account is gone: the same tiny window
     /// documented on [`Store::delete_account`], where a write already in
     /// flight on a token that was still valid when the request started can
     /// land just after a concurrent deletion.
-    pub async fn update_display_name(
+    pub async fn update_profile(
         &self,
         user_id: UserId,
-        display_name: &str,
+        display_name: Option<&str>,
+        status_text: Option<Option<&str>>,
     ) -> anyhow::Result<Option<User>> {
-        let affected = sqlx::query!(
-            "UPDATE users SET display_name = ? WHERE id = ? AND deleted_at IS NULL",
-            display_name,
-            user_id
-        )
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
+        let affected = match (display_name, status_text) {
+            (Some(display_name), Some(status_text)) => sqlx::query!(
+                "UPDATE users SET display_name = ?, status_text = ? \
+                 WHERE id = ? AND deleted_at IS NULL",
+                display_name,
+                status_text,
+                user_id
+            )
+            .execute(&self.pool)
+            .await?
+            .rows_affected(),
+            (Some(display_name), None) => sqlx::query!(
+                "UPDATE users SET display_name = ? WHERE id = ? AND deleted_at IS NULL",
+                display_name,
+                user_id
+            )
+            .execute(&self.pool)
+            .await?
+            .rows_affected(),
+            (None, Some(status_text)) => sqlx::query!(
+                "UPDATE users SET status_text = ? WHERE id = ? AND deleted_at IS NULL",
+                status_text,
+                user_id
+            )
+            .execute(&self.pool)
+            .await?
+            .rows_affected(),
+            (None, None) => {
+                let exists = sqlx::query_scalar!(
+                    r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
+                    user_id
+                )
+                .fetch_optional(&self.pool)
+                .await?;
+                u64::from(exists.is_some())
+            }
+        };
         if affected == 0 {
             return Ok(None);
         }
@@ -174,7 +210,7 @@ impl Store {
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at
+                      avatar_updated_at, status_text
                FROM users WHERE deleted_at IS NULL AND id > ?
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)
                ORDER BY id ASC LIMIT ?"#,
@@ -191,6 +227,7 @@ impl Store {
                 display_name: r.display_name,
                 created_at: r.created_at,
                 avatar_updated_at: r.avatar_updated_at,
+                status_text: r.status_text,
             })
             .collect())
     }

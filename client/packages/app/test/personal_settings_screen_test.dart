@@ -272,42 +272,46 @@ void main() {
     expect(avatar.top, greaterThanOrEqualTo(0.0));
   });
 
-  testWidgets(
-    'the profile card edit affordance renames the account and the card '
-    'updates',
-    (tester) async {
-      final requests = <Uri>[];
-      final container = _signedInContainer(requests);
-      addTearDown(container.dispose);
+  testWidgets('the profile card edit affordance renames the account and the card '
+      'updates', (tester) async {
+    final requests = <Uri>[];
+    final container = _signedInContainer(requests);
+    addTearDown(container.dispose);
 
-      await tester.pumpWidget(_screen(container));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_screen(container));
+    await tester.pumpAndSettle();
 
-      // Renaming lives in the "Account & presence" pane now, not above the nav.
-      await tester.tap(find.text('Account & presence'));
-      await tester.pumpAndSettle();
+    // Renaming lives in the "Account & presence" pane now, not above the nav.
+    await tester.tap(find.text('Account & presence'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Self'), findsOneWidget);
+    expect(find.text('Self'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Edit display name'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Edit display name'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Edit display name'), findsOneWidget);
-      await tester.enterText(find.byType(TextField), 'Renamed');
-      await tester.pump();
-      await tester.tap(find.text('Save name'));
-      await tester.pumpAndSettle();
+    expect(find.text('Edit display name'), findsOneWidget);
+    // Scoped to the dialog: the Presence section's status field behind it is a second `TextField` (no phone `physicalSize` here, so `showAppSheet` opens a `Dialog`).
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextField),
+      ),
+      'Renamed',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Save name'));
+    await tester.pumpAndSettle();
 
-      expect(
-        requests.where((u) => u.path == '/me'),
-        isNotEmpty,
-        reason: 'both the initial GET and the PATCH land on /me',
-      );
-      expect(
-        find.text('Edit display name'),
-        findsNothing,
-        reason: 'a successful save closes the sheet',
-      );
-    },
-  );
+    expect(
+      requests.where((u) => u.path == '/me'),
+      isNotEmpty,
+      reason: 'both the initial GET and the PATCH land on /me',
+    );
+    expect(
+      find.text('Edit display name'),
+      findsNothing,
+      reason: 'a successful save closes the sheet',
+    );
+  });
 }

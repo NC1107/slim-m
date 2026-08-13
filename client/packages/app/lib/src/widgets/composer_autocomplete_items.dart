@@ -30,6 +30,7 @@ class AutocompleteSuggestion {
     this.glyph,
     this.imageEmoji,
     this.userId,
+    this.isMassMention = false,
   });
 
   final String insert;
@@ -48,6 +49,12 @@ class AutocompleteSuggestion {
 
   /// A member, so the row can show their avatar rather than a generic glyph.
   final String? userId;
+
+  /// `@everyone`/`@here` rather than a real member: the overlay (which is
+  /// free to depend on Flutter, unlike this file) draws a members glyph
+  /// instead of the plain command-row fallback. Kept as a flag rather than an
+  /// `IconData` field so this file's own vocabulary of offers stays pure Dart.
+  final bool isMassMention;
 }
 
 /// A slash command: text substitution only.
@@ -63,14 +70,28 @@ const _commands = <(String, String, String)>[
 ];
 
 /// The offers for [query], ranked, capped at [maxAutocompleteRows].
+///
+/// [canMentionEveryone] gates the two reserved rows [_massMentions] adds:
+/// offering `@everyone`/`@here` to somebody the server would not actually
+/// wake anyone for (`push::recipients::resolved_mentions`) would be a row
+/// that looks actionable and quietly is not, the same "no handler rather
+/// than a button that would just 403" choice this client already makes
+/// elsewhere. Defaults false so the emoji and command callers, which have no
+/// opinion on it, need not pass anything.
 List<AutocompleteSuggestion> autocompleteSuggestions({
   required AutocompleteQuery query,
   required List<api.CustomEmoji> custom,
   required List<api.UserProfile> members,
   String? selfId,
+  bool canMentionEveryone = false,
 }) => switch (query.kind) {
   AutocompleteKind.emoji => _emoji(query.term, custom),
-  AutocompleteKind.mention => _mentions(query.term, members, selfId),
+  AutocompleteKind.mention => _mentions(
+    query.term,
+    members,
+    selfId,
+    canMentionEveryone: canMentionEveryone,
+  ),
   AutocompleteKind.command => _commandRows(query.term),
 };
 
@@ -101,16 +122,28 @@ List<AutocompleteSuggestion> _emoji(
     },
 ];
 
-/// Members whose username or display name contains [term].
+/// The two reserved mentions `push::recipients::resolved_mentions` treats
+/// specially, offered ahead of any real member: they name the whole channel
+/// rather than one person in it, which is the more consequential thing to
+/// offer first when both would otherwise match equally on one typed letter.
+const _massMentions = <(String name, String detail)>[
+  ('everyone', 'Notify everyone who can see this channel'),
+  ('here', 'Notify everyone currently online'),
+];
+
+/// Members whose username or display name contains [term], plus
+/// `@everyone`/`@here` when [canMentionEveryone] allows offering them at all.
 ///
-/// Yourself excluded: mentioning yourself notifies nobody, and the row would
-/// sit where the person you meant to reach was about to appear. Prefix
-/// matches lead, because that is what somebody typing three letters means.
+/// Yourself excluded from the member half: mentioning yourself notifies
+/// nobody, and the row would sit where the person you meant to reach was
+/// about to appear. Prefix matches lead, because that is what somebody
+/// typing three letters means.
 List<AutocompleteSuggestion> _mentions(
   String term,
   List<api.UserProfile> members,
-  String? selfId,
-) {
+  String? selfId, {
+  required bool canMentionEveryone,
+}) {
   final candidates = members.where((m) => m.id != selfId).where((m) {
     if (term.isEmpty) return true;
     return m.username.toLowerCase().contains(term) ||
@@ -125,14 +158,23 @@ List<AutocompleteSuggestion> _mentions(
   });
 
   return [
-    for (final m in candidates.take(maxAutocompleteRows))
+    if (canMentionEveryone)
+      for (final (name, detail) in _massMentions)
+        if (term.isEmpty || name.startsWith(term))
+          AutocompleteSuggestion(
+            insert: '@$name ',
+            label: '@$name',
+            detail: detail,
+            isMassMention: true,
+          ),
+    for (final m in candidates)
       AutocompleteSuggestion(
         insert: '@${m.username} ',
         label: m.displayName,
         detail: '@${m.username}',
         userId: m.id,
       ),
-  ];
+  ].take(maxAutocompleteRows).toList(growable: false);
 }
 
 List<AutocompleteSuggestion> _commandRows(String term) => [

@@ -10,14 +10,22 @@ extension SlimmApiUsers on SlimmApi {
     return Me.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Updates the caller's own display name. The username is not editable
-  /// here: it backs the live per-account uniqueness index, so changing it
-  /// needs a dedicated flow that can handle the resulting collision.
-  Future<UserProfile> updateMe({required String displayName}) async {
+  /// Updates the caller's own display name and/or status line. Both are
+  /// optional, null meaning "leave it as it is" - a call naming neither
+  /// throws a 400. Pass an empty string for [statusText] to clear it back to
+  /// none, the same "blank clears it" convention `updateChannel`'s `topic`
+  /// uses. The username is not editable here: it backs the live per-account
+  /// uniqueness index, so changing it needs a dedicated flow that can handle
+  /// the resulting collision.
+  Future<UserProfile> updateMe(
+      {String? displayName, String? statusText}) async {
     final json = await _send(
       'PATCH',
       '/me',
-      body: {'display_name': displayName},
+      body: {
+        if (displayName != null) 'display_name': displayName,
+        if (statusText != null) 'status_text': statusText,
+      },
     );
     return UserProfile.fromJson(json as Map<String, dynamic>);
   }

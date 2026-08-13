@@ -59,6 +59,8 @@ const noActions = MessageActions(
   onBlockAuthor: noop,
   canOpenThread: false,
   onOpenThread: noop,
+  canForward: false,
+  onForward: noop,
 );
 
 /// The leading avatar is provider-backed (it resolves the author's own

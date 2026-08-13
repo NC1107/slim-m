@@ -108,6 +108,8 @@ void main() {
         onBlockAuthor: noop,
         canOpenThread: true,
         onOpenThread: () => opened = true,
+        canForward: false,
+        onForward: noop,
       );
       await tester.pumpWidget(_rowWith(threadReplyCount: 2, actions: actions));
 

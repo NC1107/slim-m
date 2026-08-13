@@ -21,5 +21,13 @@
   {
     "content": "email-like a@b.com looks the same",
     "mentions": ["b.com"]
+  },
+  {
+    "content": "@everyone please read this",
+    "mentions": ["everyone"]
+  },
+  {
+    "content": "is @here around?",
+    "mentions": ["here"]
   }
 ]

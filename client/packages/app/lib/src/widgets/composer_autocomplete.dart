@@ -105,7 +105,7 @@ class _Row extends StatelessWidget {
       );
     } else {
       leading = Icon(
-        AppIcons.code,
+        suggestion.isMassMention ? AppIcons.members : AppIcons.code,
         size: AppSizes.icon16,
         color: tokens.textSecondary,
       );

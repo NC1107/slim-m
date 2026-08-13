@@ -16,6 +16,7 @@ use slimm_server::notifications::NotificationPreference;
 use slimm_server::store::{PushRegistration, Store};
 
 mod support;
+use support::wake_recipients;
 
 const KEY: [u8; 32] = [7u8; 32];
 
@@ -76,7 +77,7 @@ async fn a_fresh_account_defaults_to_everything() {
         "a preference nobody has ever set reads as the pre-feature default"
     );
 
-    let recipients = slimm_server::push::message_recipients(&store, channel, alice, "hello")
+    let recipients = wake_recipients(&store, channel, alice, "hello")
         .await
         .unwrap();
     assert!(
@@ -102,7 +103,7 @@ async fn mentions_only_skips_a_plain_message_but_catches_a_mention() {
             .unwrap()
     );
 
-    let plain = slimm_server::push::message_recipients(&store, channel, alice, "just chatting")
+    let plain = wake_recipients(&store, channel, alice, "just chatting")
         .await
         .unwrap();
     assert!(
@@ -110,7 +111,7 @@ async fn mentions_only_skips_a_plain_message_but_catches_a_mention() {
         "bob asked for mentions only, and this names nobody, got {plain:?}"
     );
 
-    let mention = slimm_server::push::message_recipients(&store, channel, alice, "hey @bob look")
+    let mention = wake_recipients(&store, channel, alice, "hey @bob look")
         .await
         .unwrap();
     assert!(
@@ -138,7 +139,7 @@ async fn mentions_only_still_wakes_for_a_plain_dm() {
     );
 
     let dm = store.open_dm(alice, bob).await.unwrap();
-    let recipients = slimm_server::push::message_recipients(&store, dm.id, alice, "hi there")
+    let recipients = wake_recipients(&store, dm.id, alice, "hi there")
         .await
         .unwrap();
     assert!(
@@ -165,7 +166,7 @@ async fn nothing_silences_even_a_dm() {
     );
 
     let dm = store.open_dm(alice, bob).await.unwrap();
-    let recipients = slimm_server::push::message_recipients(&store, dm.id, alice, "hi there")
+    let recipients = wake_recipients(&store, dm.id, alice, "hi there")
         .await
         .unwrap();
     assert!(
@@ -191,10 +192,9 @@ async fn nothing_silences_even_a_direct_mention() {
             .unwrap()
     );
 
-    let recipients =
-        slimm_server::push::message_recipients(&store, channel, alice, "hey @bob look")
-            .await
-            .unwrap();
+    let recipients = wake_recipients(&store, channel, alice, "hey @bob look")
+        .await
+        .unwrap();
     assert!(
         !recipients.contains(&bob),
         "nothing overrides even a direct mention, got {recipients:?}"
@@ -222,7 +222,7 @@ async fn blocking_still_wins_over_an_everything_preference() {
     );
     store.block_user(bob, alice).await.unwrap();
 
-    let recipients = slimm_server::push::message_recipients(&store, channel, alice, "hello")
+    let recipients = wake_recipients(&store, channel, alice, "hello")
         .await
         .unwrap();
     assert!(
@@ -255,7 +255,7 @@ async fn repeated_exclusions_never_affect_a_later_qualifying_message() {
 
     for n in 0..3 {
         let content = format!("plain {n}");
-        let recipients = slimm_server::push::message_recipients(&store, channel, alice, &content)
+        let recipients = wake_recipients(&store, channel, alice, &content)
             .await
             .unwrap();
         assert!(
@@ -264,10 +264,9 @@ async fn repeated_exclusions_never_affect_a_later_qualifying_message() {
         );
     }
 
-    let recipients =
-        slimm_server::push::message_recipients(&store, channel, alice, "hey @bob, for real")
-            .await
-            .unwrap();
+    let recipients = wake_recipients(&store, channel, alice, "hey @bob, for real")
+        .await
+        .unwrap();
     assert!(
         recipients.contains(&bob),
         "the earlier exclusions must not have suppressed this genuine mention, got {recipients:?}"
@@ -343,10 +342,9 @@ async fn a_thread_hanging_off_a_dm_message_still_counts_as_a_dm() {
         .await
         .unwrap();
 
-    let recipients =
-        slimm_server::push::message_recipients(&store, thread.id, alice, "a plain second reply")
-            .await
-            .unwrap();
+    let recipients = wake_recipients(&store, thread.id, alice, "a plain second reply")
+        .await
+        .unwrap();
     assert!(
         recipients.contains(&bob),
         "a thread hung off a DM message still resolves to a DM, got {recipients:?}"

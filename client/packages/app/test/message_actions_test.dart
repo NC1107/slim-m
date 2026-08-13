@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /// `canOpenThreadFor`: gated like a reply, plus refused inside a thread
-/// already, since nesting is refused server-side too.
+/// already, since nesting is refused server-side too. `canForwardMessage`:
+/// the same pending/failed gate, deliberately with no permission check
+/// against the message's own channel.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,9 +10,14 @@ import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/message_actions.dart';
 import 'package:slimm_data/data.dart';
 
-Message _message({bool pending = false, bool failed = false}) => Message(
+Message _message({
+  bool pending = false,
+  bool failed = false,
+  String? authorId,
+}) => Message(
   id: 'm1',
   channelId: 'c1',
+  authorId: authorId,
   seq: 1,
   content: 'hello',
   createdAt: 0,
@@ -55,5 +62,15 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('a settled message, own or not, may be forwarded', () {
+    expect(canForwardMessage(_message()), isTrue);
+    expect(canForwardMessage(_message(authorId: 'someone-else')), isTrue);
+  });
+
+  test('a pending or failed send cannot be forwarded yet', () {
+    expect(canForwardMessage(_message(pending: true)), isFalse);
+    expect(canForwardMessage(_message(failed: true)), isFalse);
   });
 }

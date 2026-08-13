@@ -7,11 +7,14 @@
 /// into `InlineSpan`s and is where the two leaf tokens that need data
 /// (mention, emoji) get resolved against what this message actually has.
 ///
-/// There is no mention protocol on the wire (no server-side highlighting or
-/// notification hook); this is a client-side decoration only, so it is only
-/// ever applied to an `@name` token that matches a real, currently-known
-/// member's username. An `@` that does not match one renders as plain text
-/// rather than a mention, so nothing here invents a person who is not real.
+/// There is no mention *highlighting* protocol on the wire; deciding whether
+/// an `@name` token becomes a chip is a client-side judgement, applied to an
+/// `@name` that matches a real, currently-known member's username, or to the
+/// two reserved words `@everyone`/`@here` (`push::recipients` in
+/// `crates/slimm-server`, gated there on `Perm.mentionEveryone` - rendering a
+/// chip here does not imply the sender actually held it, only that the word
+/// is one the server recognises). An `@` that matches neither renders as
+/// plain text, so nothing here invents a person who is not real.
 ///
 /// A `:shortcode:` resolves the same way and for the same reason: only a name
 /// the deployment actually holds becomes an image, and everything else stays
@@ -221,6 +224,23 @@ class _MessageTextRun extends StatelessWidget {
   }
 }
 
+/// The two reserved mentions `crates/slimm-server/src/push/recipients.rs`
+/// resolves specially, never a real account (`validate_username` in
+/// `http/auth.rs` refuses to register either, case-insensitively) - kept
+/// lower-case, matched the same way against a lower-cased [raw].
+const _reservedMentions = {'everyone', 'here'};
+
+/// Whether [raw] (the whole `@name` token, `@` included) should render as a
+/// chip: either it names someone in [knownUsernames], or it is one of the
+/// two reserved words above. Rendering a reserved word as a chip says
+/// nothing about whether the sender actually held `Perm.mentionEveryone` -
+/// that permission only ever gates who gets woken for it, never whether the
+/// word itself is recognised - so it is drawn the same way regardless.
+bool _isRenderableMention(String raw, Set<String> knownUsernames) {
+  final name = raw.substring(1).toLowerCase();
+  return knownUsernames.contains(name) || _reservedMentions.contains(name);
+}
+
 /// Walks a [parseInline] tree into `InlineSpan`s. Bold, italic and
 /// strikethrough are a style diff on a wrapping [TextSpan]; Flutter merges a
 /// child span's style onto its parent's at paint time, which is the whole
@@ -240,7 +260,7 @@ List<InlineSpan> _buildSpans(
         child: AppInlineCode(text),
       ),
       InlineMention(:final raw) =>
-        knownUsernames.contains(raw.substring(1).toLowerCase())
+        _isRenderableMention(raw, knownUsernames)
             ? WidgetSpan(
                 alignment: PlaceholderAlignment.middle,
                 child: _MentionChip(raw),

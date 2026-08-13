@@ -237,6 +237,7 @@ class _MemberRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     // Only the first: a row that grew with role count would push the name out of a 236px pane.
     final badge = profile.roles.isEmpty ? null : profile.roles.first;
 
@@ -265,6 +266,31 @@ class _MemberRow extends ConsumerWidget {
       // Opens the profile, which is where every verb about a member lives now.
       onTap: open,
     );
-    return GestureDetector(onSecondaryTapDown: (_) => open(), child: row);
+
+    // AppListRow is deliberately single-line and fixed-height, so a status is a caption stacked beneath it, not a change to that row.
+    final content = profile.statusText == null
+        ? row
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              row,
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.s8 + 26 + AppSpacing.s8,
+                  right: AppSpacing.s8,
+                  bottom: AppSpacing.s4,
+                ),
+                child: Text(
+                  profile.statusText!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
+              ),
+            ],
+          );
+
+    return GestureDetector(onSecondaryTapDown: (_) => open(), child: content);
   }
 }

@@ -183,6 +183,12 @@ pub struct User {
     /// 0013). A client uses the value only as a cache-busting version
     /// appended to the fetch URL.
     pub avatar_updated_at: Option<i64>,
+    /// A short free-text status line ("in a meeting", "afk"), or `None` for
+    /// none set. Rides alongside `display_name` (migration 0044): set from
+    /// personal settings, shown in the member pane under the name, and
+    /// carries no independent live event - `Event::ProfileChanged` already
+    /// covers it the same way it covers a rename.
+    pub status_text: Option<String>,
 }
 
 /// A message. `author_id` is null once the author's account is anonymized.
@@ -293,6 +299,7 @@ impl Store {
             display_name: display_name.to_owned(),
             created_at: now,
             avatar_updated_at: None,
+            status_text: None,
         })
     }
 

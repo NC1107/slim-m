@@ -17,6 +17,7 @@ use slimm_server::ids::{DeviceId, MessageId, UserId};
 use slimm_server::store::{PushRegistration, Store};
 
 mod support;
+use support::wake_recipients;
 
 const KEY: [u8; 32] = [7u8; 32];
 
@@ -100,7 +101,7 @@ async fn a_mention_wakes_its_target_regardless_of_letter_case() {
         .unwrap();
 
     for mention in ["@Nick", "@nick", "@NICK"] {
-        let recipients = slimm_server::push::message_recipients(&store, thread.id, bob, mention)
+        let recipients = wake_recipients(&store, thread.id, bob, mention)
             .await
             .unwrap();
         assert!(
@@ -170,10 +171,9 @@ async fn a_case_insensitive_mention_can_resolve_to_two_differently_cased_account
         .await
         .unwrap();
 
-    let recipients =
-        slimm_server::push::message_recipients(&store, thread.id, bob, "hey @nick take a look")
-            .await
-            .unwrap();
+    let recipients = wake_recipients(&store, thread.id, bob, "hey @nick take a look")
+        .await
+        .unwrap();
     assert!(
         recipients.contains(&lower_nick) && recipients.contains(&upper_nick),
         "a case-insensitive mention must reach both differently-cased accounts, got {recipients:?}"

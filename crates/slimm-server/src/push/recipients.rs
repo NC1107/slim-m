@@ -10,7 +10,19 @@ use std::collections::HashSet;
 
 use crate::ids::{ChannelId, UserId};
 use crate::notifications::NotificationPreference;
+use crate::permissions::Permissions;
+use crate::presence::PresenceTracker;
 use crate::store::Store;
+
+/// The reserved mention naming every candidate viewer, never a real
+/// username: `validate_username` (`http/auth.rs`) refuses to register it for
+/// exactly this reason, so `@everyone` can never collide with an account.
+const EVERYONE_MENTION: &str = "everyone";
+
+/// The reserved mention naming every candidate viewer who is currently
+/// connected - the same reservation, and the same refusal, as
+/// [`EVERYONE_MENTION`].
+const HERE_MENTION: &str = "here";
 
 /// Who should be woken for `content` in `channel_id`, written by `author_id`.
 ///
@@ -38,11 +50,15 @@ use crate::store::Store;
 /// message is worth waking them for, the same "read where the audience is
 /// computed" choke point blocking already uses above, not a filter a client
 /// applies after a device has already buzzed.
+///
+/// `presence` answers `@here`'s "currently connected" question; see
+/// [`resolved_mentions`].
 pub async fn message_recipients(
     store: &Store,
     channel_id: ChannelId,
     author_id: UserId,
     content: &str,
+    presence: &PresenceTracker,
 ) -> anyhow::Result<Vec<UserId>> {
     // Push registrations first, permissions second; see the note above.
     let candidates = store.users_with_push_devices().await?;
@@ -52,25 +68,71 @@ pub async fn message_recipients(
         .filter(|user_id| *user_id != author_id && !blockers.contains(user_id))
         .collect();
     let viewers = store.viewers_among(channel_id, &candidates).await?;
-    let mentioned = resolved_mentions(store, content).await?;
+    let mentioned =
+        resolved_mentions(store, channel_id, author_id, content, &viewers, presence).await?;
     let viewers = narrow_for_thread(store, channel_id, &mentioned, viewers).await?;
     narrow_for_notification_preference(store, channel_id, &mentioned, viewers).await
 }
 
-/// The distinct accounts [`mentioned_usernames`] resolves to, in one query -
-/// shared by [`narrow_for_thread`] and [`narrow_for_notification_preference`]
-/// so a message that is both a thread reply and has mentions only pays for
-/// the username-to-id resolution once.
-async fn resolved_mentions(store: &Store, content: &str) -> anyhow::Result<HashSet<UserId>> {
-    let names: Vec<String> = mentioned_usernames(content).into_iter().collect();
-    if names.is_empty() {
-        return Ok(HashSet::new());
+/// The distinct accounts a message's mentions resolve to - shared by
+/// [`narrow_for_thread`] and [`narrow_for_notification_preference`] so a
+/// message that is both a thread reply and has mentions only pays for the
+/// resolution once.
+///
+/// [`EVERYONE_MENTION`] and [`HERE_MENTION`] are pulled out of the ordinary
+/// `@username` set before it goes to [`Store::user_ids_for_usernames`] -
+/// neither is ever a real account, so asking the username table about them
+/// would only ever answer "no such user". Each expands against `viewers`
+/// (already the candidates this message's channel and blocking already
+/// allow) rather than every account in the deployment, and only once the
+/// author is confirmed to hold [`Permissions::MENTION_EVERYONE`] in
+/// `channel_id` - checked here, at the one place a mass mention turns into an
+/// actual wake, rather than by refusing the send: a caller without the bit
+/// can still type the word, it just pings nobody extra, the same forgiving
+/// shape an ordinary `@nobody` already has. `@everyone` expands to every
+/// viewer; `@here` narrows that to whoever `presence` reports connected right
+/// now, which is what distinguishes the two words at all.
+async fn resolved_mentions(
+    store: &Store,
+    channel_id: ChannelId,
+    author_id: UserId,
+    content: &str,
+    viewers: &[UserId],
+    presence: &PresenceTracker,
+) -> anyhow::Result<HashSet<UserId>> {
+    let mut names = mentioned_usernames(content);
+    let mentions_everyone = names.remove(EVERYONE_MENTION);
+    let mentions_here = names.remove(HERE_MENTION);
+
+    let mut resolved: HashSet<UserId> = if names.is_empty() {
+        HashSet::new()
+    } else {
+        let names: Vec<String> = names.into_iter().collect();
+        store
+            .user_ids_for_usernames(&names)
+            .await?
+            .into_iter()
+            .collect()
+    };
+
+    if (mentions_everyone || mentions_here)
+        && store
+            .has_permission(author_id, channel_id, Permissions::MENTION_EVERYONE)
+            .await?
+    {
+        if mentions_everyone {
+            resolved.extend(viewers.iter().copied());
+        } else {
+            resolved.extend(
+                viewers
+                    .iter()
+                    .copied()
+                    .filter(|user_id| presence.is_connected(*user_id)),
+            );
+        }
     }
-    Ok(store
-        .user_ids_for_usernames(&names)
-        .await?
-        .into_iter()
-        .collect())
+
+    Ok(resolved)
 }
 
 /// Narrows `viewers` to a thread's own audience, for a reply into a thread's

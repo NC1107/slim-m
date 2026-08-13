@@ -58,6 +58,8 @@ const _fullActions = MessageActions(
   onBlockAuthor: noop,
   canOpenThread: true,
   onOpenThread: noop,
+  canForward: true,
+  onForward: noop,
 );
 
 /// Not `message_row_harness.dart`'s own `harness()`: that one is built for

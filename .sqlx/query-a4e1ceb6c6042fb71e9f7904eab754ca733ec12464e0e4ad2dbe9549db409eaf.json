@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at\n               FROM users WHERE deleted_at IS NULL AND id > ?\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)\n               ORDER BY id ASC LIMIT ?",
+  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at, status_text\n               FROM users WHERE deleted_at IS NULL AND id > ?\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)\n               ORDER BY id ASC LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,11 @@
         "name": "avatar_updated_at",
         "ordinal": 4,
         "type_info": "Integer"
+      },
+      {
+        "name": "status_text",
+        "ordinal": 5,
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -37,8 +42,9 @@
       false,
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "279c5bd7dbde59191f0f069221e2c8bbc5a08001b95a9b3b7da00aeb65ecb73e"
+  "hash": "a4e1ceb6c6042fb71e9f7904eab754ca733ec12464e0e4ad2dbe9549db409eaf"
 }

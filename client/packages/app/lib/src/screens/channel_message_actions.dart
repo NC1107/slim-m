@@ -27,6 +27,7 @@ import '../providers/threads.dart';
 import '../routing/routes.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/forward_message.dart' show forwardMessage;
 import '../widgets/message_context_menu.dart';
 import '../widgets/run_guarded.dart';
 import '../widgets/safety_actions.dart';
@@ -191,5 +192,7 @@ MessageActions messageActionsFor(
     ),
     onOpenThread: () => unawaited(openThreadForMessage(context, message)),
     hasExistingThread: hasExistingThread,
+    canForward: canForwardMessage(message),
+    onForward: () => unawaited(forwardMessage(context, ref, message)),
   );
 }

@@ -31,6 +31,45 @@ void main() {
     expect(find.text('flutter test'), findsOneWidget);
   });
 
+  testWidgets(
+    '@everyone and @here render as mentions with no known usernames at all',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const MessageBody(
+            content: '@everyone please see @here for the update',
+            knownUsernames: {},
+          ),
+        ),
+      );
+
+      expect(
+        find.text('@everyone'),
+        findsOneWidget,
+        reason: 'reserved words render as mentions with no member list',
+      );
+      expect(find.text('@here'), findsOneWidget);
+    },
+  );
+
+  testWidgets('an ordinary @name not in the known set stays plain text', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        const MessageBody(content: '@nobody is here', knownUsernames: {}),
+      ),
+    );
+
+    // A mention chip is its own isolated `Text`; plain text only answers `find.text` on the whole sentence, never the bare token.
+    expect(
+      find.text('@nobody'),
+      findsNothing,
+      reason: '@nobody must not be mistaken for @everyone/@here',
+    );
+    expect(find.text('@nobody is here'), findsOneWidget);
+  });
+
   testWidgets('a fenced block renders through AppCodeBlock with its language, '
       'and the surrounding text stays plain', (tester) async {
     await tester.pumpWidget(

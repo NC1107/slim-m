@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::attachments::serve;
-use super::auth::validate_label;
+use super::auth::{is_disallowed_label_char, validate_label};
 use super::error::ApiError;
 use super::extract::{ASSET, Authed, AuthedLimited, Bytes, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
@@ -37,6 +37,9 @@ const BODY_LIMIT: usize = 4 * 1024;
 /// single image, never a document or a large photo, so there is nothing here
 /// a self-host operator would need to tune.
 const AVATAR_MAX_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Longest a status line may be, in characters, once trimmed.
+const STATUS_TEXT_MAX_CHARS: usize = 80;
 
 /// Most ids `GET /users` may be asked about in one request.
 const MAX_USER_BATCH: usize = 100;
@@ -100,6 +103,10 @@ struct UserDto {
     /// as a past deadline, so a client never has to do the comparison to know
     /// whether the badge belongs on screen.
     timed_out_until: Option<i64>,
+    /// A short free-text status line this member set for themselves, or
+    /// `null` for none. Shown in the member pane under the name; see
+    /// migration 0044.
+    status_text: Option<String>,
 }
 
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
@@ -133,6 +140,7 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
                 roles: held.iter().map(|(_, name)| name.clone()).collect(),
                 role_ids: held.iter().map(|(id, _)| id.to_string()).collect(),
                 timed_out_until: timed_out.get(&user.id).copied(),
+                status_text: user.status_text,
             }
         })
         .collect())
@@ -159,6 +167,8 @@ struct MeDto {
     /// can name what happened rather than leaving somebody with a disabled
     /// composer and no explanation.
     timed_out_until: Option<i64>,
+    /// The caller's own status line, or `null`; see [`UserDto::status_text`].
+    status_text: Option<String>,
 }
 
 /// The editable half of a profile.
@@ -167,9 +177,21 @@ struct MeDto {
 /// uniqueness index (`users_username_live`), and changing it needs a dedicated
 /// flow that can handle the resulting collision. That is why it is absent
 /// rather than accepted and quietly ignored.
+///
+/// Both fields are optional, absence meaning "leave it as it is" - the same
+/// "at least one, absent means untouched" convention
+/// `channels::UpdateChannelRequest` uses for its own name and topic, so a
+/// caller changing only the status never has to resend the current display
+/// name to satisfy a field this route no longer requires.
 #[derive(Deserialize)]
 struct UpdateMeRequest {
-    display_name: String,
+    #[serde(default)]
+    display_name: Option<String>,
+    /// Present (even as an empty or whitespace-only string) replaces it,
+    /// clearing it back to `None` if the trimmed value is blank - see
+    /// [`validate_status_text`].
+    #[serde(default)]
+    status_text: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -203,6 +225,7 @@ async fn get_me(
         avatar_updated_at: user.avatar_updated_at,
         permissions: permissions.bits(),
         timed_out_until: state.store.timed_out_until(ctx.user_id).await?,
+        status_text: user.status_text,
     }))
 }
 
@@ -213,14 +236,29 @@ async fn update_me(
     Json(req): Json<UpdateMeRequest>,
 ) -> Result<Json<UserDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    validate_label(&req.display_name, "display_name must be 1 to 64 characters")?;
+
+    if let Some(display_name) = &req.display_name {
+        validate_label(display_name, "display_name must be 1 to 64 characters")?;
+    }
+    let status_text = req
+        .status_text
+        .as_deref()
+        .map(validate_status_text)
+        .transpose()?;
+    if req.display_name.is_none() && status_text.is_none() {
+        return Err(ApiError::BadRequest("nothing to update"));
+    }
 
     let user = state
         .store
-        .update_display_name(ctx.user_id, &req.display_name)
+        .update_profile(
+            ctx.user_id,
+            req.display_name.as_deref(),
+            status_text.as_ref().map(|s| s.as_deref()),
+        )
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    // Unconditional even on a no-op rename: this carries no ordering invariant a spurious publish could break.
+    // Unconditional even on a no-op edit: this carries no ordering invariant a spurious publish could break.
     state.hub.publish(Event::ProfileChanged(ctx.user_id));
     Ok(Json(to_dto(&state.store, user).await?))
 }
@@ -393,4 +431,29 @@ async fn get_avatar(
         ApiError::Internal
     })?;
     Ok(serve(bytes, content_type, "avatar"))
+}
+
+// --- Validation ---
+
+/// Normalizes a status-text edit: a blank (or whitespace-only) value clears
+/// it back to `None` rather than being stored as an empty string, the same
+/// convention `channels::validate_channel_topic` uses for a channel's topic -
+/// a status with nothing visible in it is not meaningfully different from
+/// having none. Rejects the same control and text-direction characters a
+/// display name refuses, since a status renders beside a name the same way.
+fn validate_status_text(status_text: &str) -> Result<Option<String>, ApiError> {
+    let trimmed = status_text.trim();
+    if trimmed.chars().count() > STATUS_TEXT_MAX_CHARS {
+        return Err(ApiError::BadRequest("status must be at most 80 characters"));
+    }
+    if trimmed.chars().any(is_disallowed_label_char) {
+        return Err(ApiError::BadRequest(
+            "status must not contain control or text-direction characters",
+        ));
+    }
+    Ok(if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_owned())
+    })
 }

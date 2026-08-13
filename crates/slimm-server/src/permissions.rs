@@ -64,6 +64,12 @@ impl Permissions {
     pub const MANAGE_CANVAS: Self = Self(1 << 14);
     /// Change community-wide settings.
     pub const MANAGE_SERVER: Self = Self(1 << 15);
+    /// Have an `@everyone` or `@here` mention actually wake anyone, rather
+    /// than sit as plain text nobody is pushed for. See
+    /// `push::recipients::resolved_mentions`, the one place this is read;
+    /// `@everyone`/`@here` remain typeable without it, they just reach
+    /// nobody extra, the same forgiving shape an unmatched `@nobody` has.
+    pub const MENTION_EVERYONE: Self = Self(1 << 16);
 
     /// The union of every defined permission. What administrator resolves to.
     pub const ALL: Self = Self(
@@ -82,7 +88,8 @@ impl Permissions {
             | Self::SPEAK.0
             | Self::USE_CANVAS.0
             | Self::MANAGE_CANVAS.0
-            | Self::MANAGE_SERVER.0,
+            | Self::MANAGE_SERVER.0
+            | Self::MENTION_EVERYONE.0,
     );
 
     /// Wraps a raw bitmask, for example one loaded from the database.
@@ -291,6 +298,7 @@ mod tests {
             Permissions::USE_CANVAS,
             Permissions::MANAGE_CANVAS,
             Permissions::MANAGE_SERVER,
+            Permissions::MENTION_EVERYONE,
         ];
         let union = named
             .into_iter()

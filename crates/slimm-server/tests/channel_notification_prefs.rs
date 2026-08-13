@@ -10,6 +10,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{ChannelId, DeviceId, UserId};
 use slimm_server::notifications::NotificationPreference;
+use slimm_server::presence::PresenceTracker;
 use slimm_server::store::{PushRegistration, Store};
 
 mod support;
@@ -81,9 +82,15 @@ async fn a_channel_mute_silences_a_channel_the_account_default_would_allow() {
         .await
         .unwrap();
 
-    let recipients = slimm_server::push::message_recipients(&store, channel, alice, "hello")
-        .await
-        .unwrap();
+    let recipients = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "hello",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         !recipients.contains(&bob),
         "bob muted this channel, so an everything default must not override it, got {recipients:?}"
@@ -112,17 +119,29 @@ async fn a_mentions_override_wakes_for_a_mention_despite_a_nothing_account_defau
         .await
         .unwrap();
 
-    let plain = slimm_server::push::message_recipients(&store, channel, alice, "just chatting")
-        .await
-        .unwrap();
+    let plain = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "just chatting",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         !plain.contains(&bob),
         "mentions-only still drops a plain message, got {plain:?}"
     );
 
-    let mention = slimm_server::push::message_recipients(&store, channel, alice, "hey @bob look")
-        .await
-        .unwrap();
+    let mention = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "hey @bob look",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         mention.contains(&bob),
         "the channel override must beat the stricter account default for a real mention, got {mention:?}"
@@ -148,9 +167,15 @@ async fn a_channel_with_no_override_follows_the_account_default() {
             .unwrap()
     );
 
-    let recipients = slimm_server::push::message_recipients(&store, channel, alice, "hello")
-        .await
-        .unwrap();
+    let recipients = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "hello",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         !recipients.contains(&bob),
         "with no channel override, the account default alone governs, got {recipients:?}"
@@ -173,17 +198,29 @@ async fn a_mute_on_one_channel_does_not_reach_a_second() {
         .await
         .unwrap();
 
-    let in_muted = slimm_server::push::message_recipients(&store, muted, alice, "hello")
-        .await
-        .unwrap();
+    let in_muted = slimm_server::push::message_recipients(
+        &store,
+        muted,
+        alice,
+        "hello",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         !in_muted.contains(&bob),
         "the muted channel must stay silent"
     );
 
-    let in_other = slimm_server::push::message_recipients(&store, other, alice, "hello")
-        .await
-        .unwrap();
+    let in_other = slimm_server::push::message_recipients(
+        &store,
+        other,
+        alice,
+        "hello",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         in_other.contains(&bob),
         "an unrelated channel must still notify at the account default, got {in_other:?}"
@@ -204,9 +241,15 @@ async fn clearing_an_override_reverts_to_the_account_default() {
         .set_channel_notification_preference(bob, channel, NotificationPreference::Nothing)
         .await
         .unwrap();
-    let muted = slimm_server::push::message_recipients(&store, channel, alice, "hello")
-        .await
-        .unwrap();
+    let muted = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "hello",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(!muted.contains(&bob));
 
     store
@@ -214,9 +257,15 @@ async fn clearing_an_override_reverts_to_the_account_default() {
         .await
         .unwrap();
 
-    let unmuted = slimm_server::push::message_recipients(&store, channel, alice, "hello")
-        .await
-        .unwrap();
+    let unmuted = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "hello",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         unmuted.contains(&bob),
         "clearing the override must restore the everything default, got {unmuted:?}"
@@ -250,10 +299,15 @@ async fn blocking_still_wins_over_a_mentions_override() {
         .unwrap();
     store.block_user(bob, alice).await.unwrap();
 
-    let recipients =
-        slimm_server::push::message_recipients(&store, channel, alice, "hey @bob look")
-            .await
-            .unwrap();
+    let recipients = slimm_server::push::message_recipients(
+        &store,
+        channel,
+        alice,
+        "hey @bob look",
+        &PresenceTracker::new(),
+    )
+    .await
+    .unwrap();
     assert!(
         !recipients.contains(&bob),
         "bob blocked alice, so a mentions override must not override the block, got {recipients:?}"
