@@ -218,6 +218,7 @@ MessageActions messageActionsFor(
   Message message, {
   required String channelId,
   required bool channelIsThread,
+  required bool hasExistingThread,
   required String? myId,
   required int myPermissions,
   required Set<String> pinnedIds,
@@ -253,5 +254,6 @@ MessageActions messageActionsFor(
       channelIsThread: channelIsThread,
     ),
     onOpenThread: () => unawaited(openThreadForMessage(context, message)),
+    hasExistingThread: hasExistingThread,
   );
 }

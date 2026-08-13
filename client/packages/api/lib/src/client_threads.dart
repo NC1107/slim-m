@@ -34,4 +34,15 @@ extension SlimmApiThreads on SlimmApi {
     final json = await _send('GET', '/channels/$channelId/thread-parent');
     return ThreadParent.fromJson(json as Map<String, dynamic>);
   }
+
+  /// Every live thread hanging off a message in [channelId], newest activity
+  /// first. Requires only VIEW_CHANNEL there, checked once: a thread's own
+  /// visibility always resolves to its parent's, so this cannot be reached
+  /// for a channel the caller cannot already view.
+  Future<List<ThreadListItem>> listThreads(String channelId) async {
+    final json = await _send('GET', '/channels/$channelId/threads');
+    return (json as List<dynamic>)
+        .map((row) => ThreadListItem.fromJson(row as Map<String, dynamic>))
+        .toList(growable: false);
+  }
 }

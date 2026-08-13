@@ -128,4 +128,49 @@ void main() {
       expect(extras.threadReplyCount, 1);
     },
   );
+
+  test('a thread.updated frame carries no per-viewer unread answer, so it '
+      'leaves an already-known unread count untouched', () async {
+    final events = StreamController<api.ServerEvent>.broadcast();
+    addTearDown(events.close);
+    final container = ProviderContainer(
+      overrides: [liveEventsProvider.overrideWithValue(events.stream)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(messageExtrasProvider.notifier);
+
+    controller.applyMessage(
+      const api.Message(
+        id: 'm1',
+        channelId: 'c1',
+        authorId: 'a1',
+        authorDisplayName: 'Alice',
+        seq: 1,
+        content: 'hi',
+        createdAt: 0,
+        editedAt: null,
+        threadChannelId: 't1',
+        threadReplyCount: 1,
+        threadUnreadCount: 5,
+      ),
+    );
+
+    events.add(
+      const api.ThreadUpdated(
+        channelId: 'c1',
+        parentMessageId: 'm1',
+        threadChannelId: 't1',
+        replyCount: 2,
+      ),
+    );
+    await _settle();
+
+    expect(
+      controller.extrasFor('m1').threadUnreadCount,
+      5,
+      reason:
+          'only a fresh REST fetch can answer unread; a live frame must '
+          'not reset it to whatever it left the field at construction',
+    );
+  });
 }

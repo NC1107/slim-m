@@ -21,6 +21,7 @@ import '../providers/providers.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
 import 'pinned_messages_sheet.dart';
+import 'threads_sheet.dart';
 
 /// The compact conversation app bar: back, the channel's name and topic, and
 /// the search, pins and members actions.
@@ -90,6 +91,7 @@ class CompactChannelAppBar extends ConsumerWidget
       actions: [
         if (!isVoice) ChannelSearchAction(channelId: channelId),
         if (!isVoice) _PinsAction(channelId: channelId),
+        if (!isVoice) _ThreadsAction(channelId: channelId),
         DmCallButton(channelId: channelId),
         CanvasOpenButton(channelId: channelId),
         if (!isDm) const _MembersAction(),
@@ -198,6 +200,25 @@ class _PinsAction extends ConsumerWidget {
       onPressed: () => showPinnedMessagesSheet(context, channelId),
     );
   }
+}
+
+/// Unlike [_PinsAction] this carries no live count in its accessible name:
+/// `threadsListProvider` is only fetched once the sheet actually opens (see
+/// `providers/threads.dart`'s own doc comment on why it is not wired to a
+/// live event), so there is nothing cheap to read here ahead of that.
+class _ThreadsAction extends StatelessWidget {
+  const _ThreadsAction({required this.channelId});
+
+  final String channelId;
+
+  @override
+  Widget build(BuildContext context) => AppIconButton(
+    icon: AppIcons.thread,
+    semanticLabel: 'Threads',
+    tooltip: 'Threads',
+    touch: true,
+    onPressed: () => showThreadsSheet(context, channelId),
+  );
 }
 
 class _MembersAction extends StatelessWidget {

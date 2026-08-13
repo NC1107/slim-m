@@ -18,6 +18,19 @@ use std::collections::HashSet;
 use super::{Channel, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, UserId};
 
+/// How many live threads one channel may have open at once.
+///
+/// A ceiling at the write, the same shape `MAX_PINS_PER_CHANNEL`
+/// (`store/pins.rs`) uses, because a thread is not free the way an ordinary
+/// message is: opening one hands it its own full-size canvas and pin budget
+/// (`MAX_OBJECTS_PER_CHANNEL`, `MAX_PINS_PER_CHANNEL`), so an unbounded
+/// number of threads is an unbounded number of those budgets stacking on one
+/// parent channel - see docs/IMPLIED-GAPS.md's "Threads give a free way to
+/// multiply two hand-set moderation ceilings". Generous against ordinary use:
+/// a channel busy enough to open 500 live side conversations has bigger
+/// problems than this ceiling.
+pub const MAX_THREADS_PER_CHANNEL: i64 = 500;
+
 /// Why opening a thread failed.
 #[derive(Debug)]
 pub enum OpenThreadError {
@@ -30,6 +43,12 @@ pub enum OpenThreadError {
     /// (empty) overwrite bucket instead of the real channel's, silently
     /// dropping whatever deny the real channel had set.
     NestedThread,
+    /// The parent channel already holds [`MAX_THREADS_PER_CHANNEL`] live
+    /// threads. Only checked when a genuinely new thread would be created -
+    /// reopening one that already exists never counts against the ceiling,
+    /// the same "idempotent reuse is free" rule `pin_message` applies to a
+    /// message already pinned.
+    TooMany,
     Internal(anyhow::Error),
 }
 
@@ -110,6 +129,19 @@ impl Store {
                 channel,
                 fresh: false,
             });
+        }
+
+        // Counted inside the write transaction, or two concurrent opens could both slip past the ceiling.
+        let thread_count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "n!: i64" FROM channels c
+               JOIN messages pm ON pm.id = c.parent_message_id
+               WHERE pm.channel_id = ? AND c.deleted_at IS NULL"#,
+            channel_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if thread_count >= MAX_THREADS_PER_CHANNEL {
+            return Err(OpenThreadError::TooMany);
         }
 
         let id = ChannelId::generate();

@@ -39,7 +39,6 @@ import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/composer.dart';
 import '../widgets/jump_to_latest_button.dart';
-import '../widgets/message_context_menu.dart';
 import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
 import '../widgets/reply_banner.dart';
@@ -208,29 +207,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     ref.read(editingMessageIdProvider(widget.channelId).notifier).state = null;
     unawaited(submitMessageEdit(ref, context, message, content));
   }
-
-  /// What this viewer may do to [message]; the policy itself now lives in
-  /// `channel_message_actions.dart`'s `messageActionsFor`, which this only
-  /// supplies the screen-held state (the session, the permission bits, and
-  /// the two callbacks that swap this screen's own composer state) to.
-  MessageActions _actionsFor(
-    Message message, {
-    required String? myId,
-    required int myPermissions,
-    required Set<String> pinnedIds,
-    required bool channelIsThread,
-  }) => messageActionsFor(
-    ref,
-    context,
-    message,
-    channelId: widget.channelId,
-    channelIsThread: channelIsThread,
-    myId: myId,
-    myPermissions: myPermissions,
-    pinnedIds: pinnedIds,
-    onReply: _startReply,
-    onEdit: _startEdit,
-  );
 
   /// Both the flag and the query live in [channelSearchProvider] so the
   /// compact layout's app bar, built above this screen, can drive them too.
@@ -408,13 +384,21 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                                   onLoadOlder: () =>
                                       unawaited(paging.loadOlder()),
                                   onRetryOlder: () => unawaited(paging.retry()),
-                                  actionsFor: (message) => _actionsFor(
-                                    message,
-                                    myId: myId,
-                                    myPermissions: myPermissions,
-                                    pinnedIds: pinnedIds,
-                                    channelIsThread: isThread,
-                                  ),
+                                  // The policy itself lives in `channel_message_actions.dart`; this only supplies the screen's own state.
+                                  actionsFor: (message, hasExistingThread) =>
+                                      messageActionsFor(
+                                        ref,
+                                        context,
+                                        message,
+                                        channelId: widget.channelId,
+                                        channelIsThread: isThread,
+                                        hasExistingThread: hasExistingThread,
+                                        myId: myId,
+                                        myPermissions: myPermissions,
+                                        pinnedIds: pinnedIds,
+                                        onReply: _startReply,
+                                        onEdit: _startEdit,
+                                      ),
                                   onRetry: (m) =>
                                       unawaited(retryMessage(ref, m)),
                                   onDiscard: (m) =>

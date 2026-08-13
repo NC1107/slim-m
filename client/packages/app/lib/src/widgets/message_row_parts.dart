@@ -49,6 +49,12 @@ class EditedMarker extends StatelessWidget {
 /// would just 403 on tap, the same "no tap handler at all" treatment
 /// `AppSegmentedOption.disabled` already gives an unavailable choice.
 ///
+/// [unread] surfaces the same read-tracking a channel's own unread dot
+/// already reads (`AppListRow.unread`), just for this one thread: a small
+/// leading dot plus a medium weight on the label, never colour alone -
+/// `unread` and `enabled` are independent, so a viewer who cannot open the
+/// thread right now still learns it has something new in it.
+///
 /// Always its own `Semantics(container: true)`, tappable or not: static text
 /// still has to be its own stop for a screen reader, and without a boundary
 /// here it would merge into the row's own long-press semantics, reading an
@@ -58,11 +64,13 @@ class ThreadReplySummary extends ConsumerWidget {
     super.key,
     required this.replyCount,
     this.lastReplyAt,
+    this.unread = false,
     this.onTap,
   });
 
   final int replyCount;
   final int? lastReplyAt;
+  final bool unread;
 
   /// Opens (or reuses) the thread and navigates to it. Null makes this
   /// inert; see this class's own doc comment for when that happens.
@@ -91,9 +99,22 @@ class ThreadReplySummary extends ConsumerWidget {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppText.caption.copyWith(color: color),
+            style: AppText.caption.copyWith(
+              color: color,
+              fontWeight: unread ? AppWeights.medium : AppWeights.regular,
+            ),
           ),
         ),
+        if (unread) ...[
+          const SizedBox(width: AppSpacing.s4),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: tokens.accent,
+              borderRadius: BorderRadius.circular(AppRadii.full),
+            ),
+            child: const SizedBox(width: 6, height: 6),
+          ),
+        ],
       ],
     );
     final padded = Padding(
@@ -104,7 +125,9 @@ class ThreadReplySummary extends ConsumerWidget {
     return Semantics(
       container: true,
       button: enabled,
-      label: enabled ? '$text. Open thread.' : text,
+      label: enabled
+          ? '$text${unread ? ", unread" : ""}. Open thread.'
+          : '$text${unread ? ", unread" : ""}',
       child: enabled
           ? AppFocusRing(
               radius: AppRadii.control,

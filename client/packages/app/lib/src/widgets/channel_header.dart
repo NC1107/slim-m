@@ -17,6 +17,7 @@ import '../screens/dm_call_button.dart';
 import '../routing/breakpoints.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
+import 'threads_sheet.dart';
 
 class ChannelHeader extends ConsumerWidget {
   const ChannelHeader({
@@ -121,6 +122,13 @@ class ChannelHeader extends ConsumerWidget {
             semanticLabel: 'Pinned messages',
             onPressed: () => showPinnedMessagesSheet(context, channelId),
           ),
+          const SizedBox(width: AppSpacing.s4),
+          if (!isVoice)
+            AppIconButton(
+              icon: AppIcons.thread,
+              semanticLabel: 'Threads',
+              onPressed: () => showThreadsSheet(context, channelId),
+            ),
           const SizedBox(width: AppSpacing.s4),
           DmCallButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),

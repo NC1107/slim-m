@@ -17,6 +17,7 @@ api.Message _withThread(
   String? threadChannelId,
   int? threadReplyCount,
   int? threadLastReplyAt,
+  int? threadUnreadCount,
 }) {
   final base = channelMessage(seq);
   return api.Message(
@@ -31,6 +32,7 @@ api.Message _withThread(
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
+    threadUnreadCount: threadUnreadCount,
   );
 }
 
@@ -104,5 +106,45 @@ void main() {
     final extras = controller.extrasFor('m1');
     expect(extras.threadReplyCount, 2);
     expect(extras.threadLastReplyAt, 1700000000000);
+  });
+
+  test('a REST fetch carrying an unread count is cached, zero included', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container
+        .read(messageExtrasProvider.notifier)
+        .applyMessage(
+          _withThread(
+            1,
+            threadChannelId: 't1',
+            threadReplyCount: 3,
+            threadUnreadCount: 0,
+          ),
+        );
+
+    final extras = container
+        .read(messageExtrasProvider.notifier)
+        .extrasFor('m1');
+    expect(
+      extras.threadUnreadCount,
+      0,
+      reason: 'a fully-read thread is a real 0, not absent',
+    );
+  });
+
+  test('a later REST fetch moves the unread count to its fresher answer', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(messageExtrasProvider.notifier);
+
+    controller.applyMessage(
+      _withThread(1, threadChannelId: 't1', threadUnreadCount: 3),
+    );
+    controller.applyMessage(
+      _withThread(1, threadChannelId: 't1', threadUnreadCount: 1),
+    );
+
+    expect(controller.extrasFor('m1').threadUnreadCount, 1);
   });
 }
