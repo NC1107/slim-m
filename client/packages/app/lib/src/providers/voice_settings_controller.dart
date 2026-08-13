@@ -61,13 +61,10 @@ class VoiceSettingsState {
     this.callRingSoundEnabled = true,
     this.screenShareQuality = ScreenShareQuality.balanced,
     this.cameraOnJoin = false,
-<<<<<<< HEAD
     this.pushToTalkEnabled = false,
     this.pushToTalkKey = LogicalKeyboardKey.keyV,
     this.voiceActivitySensitivity = 100.0,
-=======
     this.screenShareIncludeAudio = false,
->>>>>>> 0cf3fe71 (feat(client): share this device's audio alongside a screen share)
   });
 
   final bool joinLeaveSoundsEnabled;
@@ -83,7 +80,6 @@ class VoiceSettingsState {
   /// [VoiceSettingsController.setCameraOnJoin].
   final bool cameraOnJoin;
 
-<<<<<<< HEAD
   /// Whether holding [pushToTalkKey] unmutes for the hold and re-mutes on
   /// release; see `push_to_talk_listener.dart`. Off by default and desktop
   /// only - keyboard focus semantics make "held" meaningless on touch.
@@ -100,7 +96,7 @@ class VoiceSettingsState {
   /// `passesActivationThreshold` in the rtc package for the exact floor and
   /// why it can only narrow the SFU's own decision, never invent one.
   final double voiceActivitySensitivity;
-=======
+
   /// Whether a screen share should try to publish this device's own audio
   /// alongside it. Defaults off: a stray notification chime becomes
   /// everyone's problem, where a share's video is at least something the
@@ -109,35 +105,28 @@ class VoiceSettingsState {
   /// `VoiceController.setScreenShare` re-checks that same capability before
   /// honouring this value.
   final bool screenShareIncludeAudio;
->>>>>>> 0cf3fe71 (feat(client): share this device's audio alongside a screen share)
 
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
     bool? callRingSoundEnabled,
     ScreenShareQuality? screenShareQuality,
     bool? cameraOnJoin,
-<<<<<<< HEAD
     bool? pushToTalkEnabled,
     LogicalKeyboardKey? pushToTalkKey,
     double? voiceActivitySensitivity,
-=======
     bool? screenShareIncludeAudio,
->>>>>>> 0cf3fe71 (feat(client): share this device's audio alongside a screen share)
   }) => VoiceSettingsState(
     joinLeaveSoundsEnabled:
         joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
     callRingSoundEnabled: callRingSoundEnabled ?? this.callRingSoundEnabled,
     screenShareQuality: screenShareQuality ?? this.screenShareQuality,
     cameraOnJoin: cameraOnJoin ?? this.cameraOnJoin,
-<<<<<<< HEAD
     pushToTalkEnabled: pushToTalkEnabled ?? this.pushToTalkEnabled,
     pushToTalkKey: pushToTalkKey ?? this.pushToTalkKey,
     voiceActivitySensitivity:
         voiceActivitySensitivity ?? this.voiceActivitySensitivity,
-=======
     screenShareIncludeAudio:
         screenShareIncludeAudio ?? this.screenShareIncludeAudio,
->>>>>>> 0cf3fe71 (feat(client): share this device's audio alongside a screen share)
   );
 }
 
@@ -159,15 +148,12 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
           .where((q) => q.name == storedQuality)
           .firstOrDefault(ScreenShareQuality.balanced),
       cameraOnJoin: prefs.getBool(_cameraOnJoinKey) ?? false,
-<<<<<<< HEAD
       pushToTalkEnabled: prefs.getBool(_pushToTalkEnabledKey) ?? false,
       pushToTalkKey: pushToTalkKeyOptions
           .where((k) => k.keyId == storedKeyId)
           .firstOrDefault(LogicalKeyboardKey.keyV),
       voiceActivitySensitivity: prefs.getDouble(_sensitivityKey) ?? 100.0,
-=======
       screenShareIncludeAudio: prefs.getBool(_shareAudioKey) ?? false,
->>>>>>> 0cf3fe71 (feat(client): share this device's audio alongside a screen share)
     );
   }
 
