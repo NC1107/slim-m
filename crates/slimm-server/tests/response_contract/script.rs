@@ -187,12 +187,12 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
 
-    push_calls(c, root).await;
+    push_calls(c, root, &channel).await;
     invite_calls(c, root, bob_token).await;
     farewell_calls(c, root, &bob_id, &code, &channel).await;
 }
 
-async fn push_calls(c: &mut Contract, root: &str) {
+async fn push_calls(c: &mut Contract, root: &str, channel: &str) {
     c.get("getNotificationPreference", "/push/preference", root)
         .await;
     c.json(
@@ -224,7 +224,34 @@ async fn push_calls(c: &mut Contract, root: &str) {
         json!({ "state": "background" }),
     )
     .await;
+    channel_notification_override_calls(c, root, channel).await;
     c.bare("deregisterPush", "DELETE", "/push", root).await;
+}
+
+/// Set, list, and clear a per-channel override, in that order so the list
+/// call sees a real, non-empty answer rather than only the empty case.
+async fn channel_notification_override_calls(c: &mut Contract, root: &str, channel: &str) {
+    c.json(
+        "setChannelNotificationOverride",
+        "PUT",
+        &format!("/notification-preferences/channels/{channel}"),
+        root,
+        json!({ "preference": "nothing" }),
+    )
+    .await;
+    c.get(
+        "listChannelNotificationOverrides",
+        "/notification-preferences/channels",
+        root,
+    )
+    .await;
+    c.bare(
+        "clearChannelNotificationOverride",
+        "DELETE",
+        &format!("/notification-preferences/channels/{channel}"),
+        root,
+    )
+    .await;
 }
 
 /// A second, unlimited code, so redeeming and revoking it cannot spend or
