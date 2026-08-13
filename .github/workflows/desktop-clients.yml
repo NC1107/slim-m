@@ -69,9 +69,10 @@ jobs:
 
       - name: archive the release bundle
         shell: pwsh
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          $tag = "${{ inputs.tag || github.ref_name }}"
-          $version = $tag -replace "^client-v", ""
+          $version = $env:TAG -replace "^client-v", ""
           Compress-Archive -Path client/packages/app/build/windows/x64/runner/Release/* -DestinationPath "slim-m-client-$version-windows-x64.zip"
 
       - name: attach to the github release
@@ -112,8 +113,9 @@ jobs:
 
       - name: archive the app bundle
         # ditto rather than zip: it preserves the bundle's resource forks and symlinks, which a plain zip of a .app can mangle.
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
           VERSION="${TAG#client-v}"
           ditto -c -k --keepParent "client/packages/app/build/macos/Build/Products/Release/slimm_app.app" "slim-m-client-$VERSION-macos.zip"
 
