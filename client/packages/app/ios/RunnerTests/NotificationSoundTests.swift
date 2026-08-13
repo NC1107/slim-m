@@ -23,7 +23,8 @@ final class NotificationSoundTests: XCTestCase {
       messageId: "m1",
       sender: sender,
       channel: channel,
-      body: body
+      body: body,
+      sentAt: nil
     )
   }
 
