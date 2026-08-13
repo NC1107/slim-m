@@ -94,6 +94,7 @@ class _Harness {
       onFailed: (_, _) {},
       onRemoved: (_) {},
       onEraseOnConfirm: (_) async {},
+      timedOutUntil: () => null,
     );
     ops = CanvasOpsController(
       channelId: 'c1',

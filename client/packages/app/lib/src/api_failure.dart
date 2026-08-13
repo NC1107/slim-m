@@ -16,8 +16,10 @@ import 'package:slimm_api/api.dart' as api;
 /// server's own reason, which is worth reading; every other case names only
 /// what is safe to say without it.
 String describeApiFailure(String whatFailed, api.ApiException e) => switch (e) {
-  api.BadRequestException() => 'Could not $whatFailed. ${e.message}',
-  api.ConflictException() => 'Could not $whatFailed. ${e.message}',
+  api.BadRequestException() =>
+    'Could not $whatFailed. ${sentenceCase(e.message)}',
+  api.ConflictException() =>
+    'Could not $whatFailed. ${sentenceCase(e.message)}',
   api.ForbiddenException() =>
     'Could not $whatFailed: you are not allowed to do that.',
   api.UnauthorizedException() =>
@@ -30,3 +32,20 @@ String describeApiFailure(String whatFailed, api.ApiException e) => switch (e) {
         'Nothing was changed.',
   api.ApiException() => 'Could not $whatFailed.',
 };
+
+/// Normalizes a raw string this client did not write into the sentence
+/// case and closing punctuation every hand-written message on the same
+/// screen already carries: capitalizes the first letter and adds a
+/// trailing period if it lacks terminal punctuation.
+///
+/// This never rewrites what the server said, only how the sentence is
+/// cased and closed, so a validator's wording stays the validator's own -
+/// the one place this display seam is allowed to touch a server string at
+/// all.
+String sentenceCase(String s) {
+  if (s.isEmpty) return s;
+  final capitalized = s[0].toUpperCase() + s.substring(1);
+  return RegExp(r'[.!?]$').hasMatch(capitalized)
+      ? capitalized
+      : '$capitalized.';
+}

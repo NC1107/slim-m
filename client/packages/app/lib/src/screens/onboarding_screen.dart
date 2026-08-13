@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../api_failure.dart';
 import '../providers/providers.dart';
 import '../server_address_reduction.dart';
 import '../server_scheme_policy.dart';
@@ -253,7 +254,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       setState(
         () => _error = e is api.TransportException
             ? 'Could not reach that server.'
-            : 'The server refused that. ${e.message}',
+            : 'The server refused that. ${sentenceCase(e.message)}',
       );
     } finally {
       client.close();

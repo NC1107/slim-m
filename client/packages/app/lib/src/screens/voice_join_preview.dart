@@ -218,11 +218,15 @@ class VoiceRejoinScreen extends StatelessWidget {
 
 /// Who is already in the call, above the rejoin button.
 ///
-/// The three answers the roster can give are rendered as three different
-/// things, because collapsing them lies. Not known yet gets its own honest
-/// sentence rather than an empty room ("nobody is here" would be a claim
-/// this client never checked) and rather than nothing at all, which read as
-/// a stalled load or a missing widget and was indistinguishable from either.
+/// The answers the roster can give are rendered as different things,
+/// because collapsing them lies. Not known yet gets its own honest sentence
+/// rather than an empty room ("nobody is here" would be a claim this client
+/// never checked) and rather than nothing at all, which read as a stalled
+/// load or a missing widget and was indistinguishable from either. A poll
+/// that has been failing for a while (`voiceRosterProvider`'s own
+/// [persistentRosterFailureThreshold]) gets a third, distinct sentence
+/// rather than staying indistinguishable from a poll that simply has not
+/// answered yet.
 class _WhoIsHere extends ConsumerWidget {
   const _WhoIsHere({required this.channelId});
 
@@ -231,10 +235,13 @@ class _WhoIsHere extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final roster = ref.watch(voiceRosterProvider(channelId)).valueOrNull;
+    final rosterAsync = ref.watch(voiceRosterProvider(channelId));
+    final roster = rosterAsync.valueOrNull;
     if (roster == null) {
       return Text(
-        "Can't tell who else is here right now.",
+        rosterAsync.hasError
+            ? 'Could not check who is here.'
+            : "Can't tell who else is here right now.",
         textAlign: TextAlign.center,
         style: AppText.caption.copyWith(color: tokens.textSecondary),
       );

@@ -10,6 +10,8 @@ import 'dart:async';
 
 import 'package:slimm_api/api.dart' as api;
 
+import 'canvas_forbidden_message.dart';
+
 /// One queued placement.
 class CanvasCommit {
   CanvasCommit({
@@ -56,11 +58,17 @@ class CanvasCommitQueue {
     required this.onFailed,
     required this.onRemoved,
     required this.onEraseOnConfirm,
+    required this.timedOutUntil,
   });
 
   final api.SlimmApi client;
   final String channelId;
   final void Function(api.CanvasObject object) onPlaced;
+
+  /// The caller's own current timeout deadline, Unix milliseconds or null,
+  /// read fresh on every refusal rather than captured once at construction -
+  /// see [canvasDrawForbiddenMessage] for why.
+  final int? Function() timedOutUntil;
 
   /// Called with the id and a sentence to show, once a commit is beyond
   /// retry and was never a real object server-side.
@@ -150,7 +158,7 @@ class CanvasCommitQueue {
             if (_isRemovedConflict(error)) {
               onRemoved(commit.id);
             } else {
-              onFailed(commit.id, _explain(error));
+              onFailed(commit.id, _explain(error, timedOutUntil()));
             }
             return;
           }
@@ -178,10 +186,12 @@ class CanvasCommitQueue {
 
   static const _removedMessage = 'that object was removed';
 
-  static String _explain(api.ApiException error) => switch (error) {
-    // Covers a channel-wide refusal and a timeout freeze alike; worded as a permission state, never as an outage that invites a retry.
-    api.ForbiddenException() =>
-      "You don't have permission to draw here right now.",
+  static String _explain(
+    api.ApiException error,
+    int? timedOutUntil,
+  ) => switch (error) {
+    // Covers a channel-wide refusal and a timeout freeze alike; canvasDrawForbiddenMessage tells them apart from the caller's own timeout deadline.
+    api.ForbiddenException() => canvasDrawForbiddenMessage(timedOutUntil),
     // Matches canvas_quick_placement.dart and canvas_image_paste.dart's identical ConflictException wording: the id-collision half is an implementation detail nobody typed and cannot act on.
     api.ConflictException() => 'This canvas is full.',
     api.BadRequestException() => 'That stroke was refused as too large.',

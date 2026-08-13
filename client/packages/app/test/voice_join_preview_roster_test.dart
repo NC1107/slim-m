@@ -55,6 +55,8 @@ Future<void> _pump(
       voiceRosterProvider(_channel).overrideWith(
         (ref) => switch (roster) {
           AsyncData(:final value) => Stream.value(value),
+          AsyncError(:final error) =>
+            Stream<List<api.VoiceRosterParticipant>>.error(error),
           _ => const Stream<List<api.VoiceRosterParticipant>>.empty(),
         },
       ),
@@ -86,6 +88,29 @@ void main() {
       expect(
         find.text("Can't tell who else is here right now."),
         findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'a roster that has been failing rather than merely not yet answering '
+    'gets a distinct sentence',
+    (tester) async {
+      await _pump(
+        tester,
+        AsyncError<List<api.VoiceRosterParticipant>>(
+          Exception('unreachable'),
+          StackTrace.empty,
+        ),
+      );
+
+      expect(find.text('Could not check who is here.'), findsOneWidget);
+      expect(
+        find.text("Can't tell who else is here right now."),
+        findsNothing,
+        reason:
+            'a poll that has been failing reads differently from one '
+            'that simply has not answered yet',
       );
     },
   );

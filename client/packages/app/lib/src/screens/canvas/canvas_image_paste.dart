@@ -22,6 +22,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import '../../ids.dart';
 import '../../widgets/composer_clipboard_image.dart';
 import '../../widgets/composer_clipboard_paste.dart';
+import 'canvas_forbidden_message.dart';
 import 'canvas_sync.dart';
 
 /// Longest side, in world units, a pasted image is scaled to fit within.
@@ -40,11 +41,17 @@ class CanvasImagePaste {
     required this.document,
     required this.onPlaced,
     required this.onError,
+    required this.timedOutUntil,
   });
 
   final api.SlimmApi client;
   final String channelId;
   final CanvasDocument document;
+
+  /// The caller's own current timeout deadline, Unix milliseconds or null,
+  /// read fresh on every refusal rather than captured once at construction -
+  /// `CanvasCommitQueue` carries the same shaped field for the same reason.
+  final int? Function() timedOutUntil;
 
   /// Called once a paste is placed and confirmed, carrying its id so the
   /// caller can select it directly rather than merely switch tools - the
@@ -139,7 +146,7 @@ class CanvasImagePaste {
       );
     } on api.ApiException catch (error) {
       decoded.dispose();
-      onError(_explain(error));
+      onError(_explain(error, timedOutUntil()));
       return null;
     }
 
@@ -162,12 +169,11 @@ class CanvasImagePaste {
     return maxPastedImageSide / longest;
   }
 
-  static String _explain(api.ApiException error) => switch (error) {
-    // Worded as a permission state, never as an outage that invites a retry.
-    api.ForbiddenException() =>
-      "You don't have permission to draw here right now.",
-    api.ConflictException() => 'This canvas is full.',
-    api.BadRequestException() => 'That image was refused.',
-    _ => 'That image could not be pasted.',
-  };
+  static String _explain(api.ApiException error, int? timedOutUntil) =>
+      switch (error) {
+        api.ForbiddenException() => canvasDrawForbiddenMessage(timedOutUntil),
+        api.ConflictException() => 'This canvas is full.',
+        api.BadRequestException() => 'That image was refused.',
+        _ => 'That image could not be pasted.',
+      };
 }
