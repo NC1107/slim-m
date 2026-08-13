@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+name: client-windows-ci
+#
+# Compile-only, and deliberately not a required check yet: this is the first
+# CI job that has ever built a Windows target for this client, and
+# docs/os_backlog/windows_backlog.md's own record of what is confirmed versus
+# suspected on this platform has almost nothing behind it - a green run here
+# proves the native plugin graph links, not that the app runs, looks right,
+# or that the tray/window-shell features decision 0012 designed actually
+# work on a real Windows desktop. See that file before promoting this to a
+# required check or building anything further on top of a green run here.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-windows-ci.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - ".github/workflows/client-windows-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-windows-ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  windows-compiles:
+    name: windows desktop compiles
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      # Debug rather than release: this job exists to catch a link failure
+      # in the native plugin graph (window_manager, tray_manager,
+      # screen_retriever, flutter_webrtc, livekit_client, sqlite3_flutter_libs
+      # and the rest generated_plugin_registrant.cc now names for Windows),
+      # not to produce a shippable artifact - release packaging is Phase 9
+      # work nothing in docs/ROADMAP.md schedules for this platform yet.
+      - name: windows compiles
+        working-directory: client/packages/app
+        run: flutter build windows --debug
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-desktop-debug-bundle
+          path: client/packages/app/build/windows/x64/runner/Debug
+          if-no-files-found: error

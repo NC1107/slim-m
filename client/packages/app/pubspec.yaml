@@ -55,9 +55,13 @@ dev_dependencies:
   http: ^1.2.0
 flutter:
   uses-material-design: true
-  # A symlink to the repo-root `assets/audio/notifications/` (see its own
-  # generate.py): Flutter drops an asset path outside the package silently,
-  # confirmed by a build that produced no error and no bundled file.
+  # A checked-in copy of the repo-root `assets/audio/notifications/` (see its
+  # own generate.py), not a symlink: a `../../../` pubspec path bundles
+  # nothing (Flutter drops an asset path outside the package silently), and a
+  # git symlink checks out as a small text file on a Windows clone without
+  # `core.symlinks` set - Flutter then bundles that text file as the "sound".
+  # assets/audio/test_client_bundle.py keeps this copy byte-identical to the
+  # canonical source; see docs/os_backlog/windows_backlog.md.
   assets:
     - assets/audio/notifications/call_ring.wav
     - assets/audio/notifications/direct_message.wav
@@ -66,6 +70,6 @@ flutter:
     - assets/audio/notifications/member_join.wav
     - assets/audio/notifications/member_leave.wav
     - assets/audio/notifications/mention.wav
-    # A symlink to packaging/linux/icons/, same reason and same shape as the
-    # audio symlink above: a `../../../` pubspec path bundles nothing.
+    # A checked-in copy of packaging/linux/icons/, same reason as above: this
+    # one was a symlink too, with the identical Windows checkout trap.
     - assets/icons/tray_icon.png
