@@ -173,6 +173,14 @@ class MessageStore {
     });
   }
 
+  /// Every message currently marked failed, across every channel - what
+  /// `SyncController` reads to retry each one once on reconnect. Order is
+  /// unspecified: nothing downstream cares which failed row goes first.
+  Future<List<Message>> failedMessages() {
+    final query = db.select(db.messages)..where((m) => m.failed.equals(true));
+    return query.get();
+  }
+
   /// Every channel's cursors, for a bundled catch-up request.
   Future<List<api.ScopeCursor>> allCursors() async {
     final rows = await db.select(db.channels).get();

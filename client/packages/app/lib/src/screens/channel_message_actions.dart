@@ -21,11 +21,8 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
-import '../api_failure.dart';
 import '../providers/message_actions.dart';
-import '../providers/message_extras.dart';
 import '../providers/pins_controller.dart';
-import '../providers/providers.dart';
 import '../providers/threads.dart';
 import '../routing/routes.dart';
 import '../widgets/app_snackbar.dart';
@@ -47,67 +44,6 @@ Future<void> _reporting(
   final failure = await runGuarded(whatFailed: whatFailed, action: action);
   if (failure != null && context.mounted) showAppSnackbar(context, failure);
 }
-
-/// Puts a message on screen before the network has answered, then reconciles
-/// with the server's copy.
-///
-/// The id is the caller's and is reused on retry, so a retry after an
-/// uncertain failure can never post twice. [onQueued] fires once the local
-/// row exists and before the request goes out, which is when a sender wants
-/// the transcript scrolled.
-Future<void> sendOptimistically(
-  WidgetRef ref, {
-  required String id,
-  required String channelId,
-  required String authorId,
-  required String content,
-  List<String> attachmentIds = const [],
-  String? replyToId,
-  VoidCallback? onQueued,
-}) async {
-  final store = await ref.read(storeProvider.future);
-  await store.addPending(
-    id: id,
-    channelId: channelId,
-    authorId: authorId,
-    content: content,
-    replyToId: replyToId,
-  );
-  onQueued?.call();
-  try {
-    final sent = await ref
-        .read(apiProvider)
-        .sendMessage(
-          channelId: channelId,
-          id: id,
-          content: content,
-          attachmentIds: attachmentIds,
-          replyToId: replyToId,
-        );
-    // Lands on the same row, because it carries the same id.
-    await store.applyMessage(sent);
-    ref.read(messageExtrasProvider.notifier).applyMessage(sent);
-  } on api.ApiException catch (e) {
-    await store.markFailed(
-      id,
-      reason: describeApiFailure('send the message', e),
-    );
-  }
-}
-
-/// Re-sends a message whose first attempt failed, under its original id.
-Future<void> retryMessage(WidgetRef ref, Message message) => sendOptimistically(
-  ref,
-  id: message.id,
-  channelId: message.channelId,
-  authorId: message.authorId ?? '',
-  content: message.content,
-  replyToId: message.replyToId,
-);
-
-/// Discards a failed send. Nothing reached the server, so nothing to undo.
-Future<void> discardMessage(WidgetRef ref, Message message) async =>
-    (await ref.read(storeProvider.future)).discard(message.id);
 
 /// Saves an inline edit. Unchanged text is not a request.
 Future<void> submitMessageEdit(

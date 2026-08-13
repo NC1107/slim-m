@@ -221,9 +221,12 @@ void main() {
             touch ? AppSizes.rowTouch : AppSizes.controlMd,
             reason: 'the $name pass must render at the density it claims',
           );
+          // Past 100% the row grows to hold the scaled label rather than clipping it (AppListRow.heightFor), so only 100% pins the exact value.
+          final fixedRowHeight =
+              touch ? AppSizes.rowTouch : AppSizes.rowPointer;
           expect(
             tester.getSize(find.byType(AppListRow)).height,
-            touch ? AppSizes.rowTouch : AppSizes.rowPointer,
+            scale.value > 1 ? greaterThan(fixedRowHeight) : fixedRowHeight,
           );
           expect(
             tester.getSize(find.byType(AppMenuItem)).height,

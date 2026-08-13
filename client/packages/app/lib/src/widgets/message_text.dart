@@ -46,6 +46,7 @@ class MessageBody extends StatelessWidget {
     required this.knownUsernames,
     this.customEmoji = const {},
     this.dim = false,
+    this.announceSending = false,
   });
 
   final String content;
@@ -60,12 +61,21 @@ class MessageBody extends StatelessWidget {
   /// than delivered.
   final bool dim;
 
+  /// True only while still sending: dims the same way [dim] does, and also
+  /// gives the body a "Sending" semantics label, since [dim] on its own is a
+  /// sighted-only cue - a screen reader reading this body's text got nothing
+  /// distinguishing it from an already-delivered message. Deliberately not
+  /// merged with [dim] itself: a caller dimming for some other reason
+  /// (there is none today) must not also announce a delivery state that
+  /// is not true.
+  final bool announceSending;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     // Provisional-to-delivered ink lerps rather than snapping on confirm.
-    return TweenAnimationBuilder<double>(
+    final body = TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: dim ? 1.0 : 0.0),
       duration: AppMotion.reduced(context, AppMotion.base),
       curve: AppMotion.entrance,
@@ -111,6 +121,11 @@ class MessageBody extends StatelessWidget {
         );
       },
     );
+
+    // Its own container node: this body's several blocks already carry their own semantics, so a non-container label would have nowhere unambiguous to merge into.
+    return announceSending
+        ? Semantics(container: true, label: 'Sending', child: body)
+        : body;
   }
 }
 

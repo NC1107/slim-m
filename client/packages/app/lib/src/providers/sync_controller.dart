@@ -12,6 +12,7 @@ import 'package:slimm_data/data.dart';
 import 'channel_history.dart';
 import 'channel_refresher.dart';
 import 'dm_call_activity.dart';
+import 'failed_send_retry.dart';
 import 'message_ops_sync.dart';
 import 'message_extras.dart';
 import 'providers.dart';
@@ -169,6 +170,14 @@ class SyncController extends StateNotifier<SyncStatus> {
 
       _attempt = 0;
       state = SyncStatus.live;
+      // A DB read failure here must not read as this connect itself having failed; retryMessage's own catch already covers a failed resend.
+      unawaited(
+        retryFailedSends(
+          _ref.read,
+          store,
+          isCurrent: () => generation == _generation,
+        ).catchError((_) {}),
+      );
     } catch (_) {
       if (generation != _generation) return;
       // A connectivity or auth problem here: both mean show offline and retry with backoff.

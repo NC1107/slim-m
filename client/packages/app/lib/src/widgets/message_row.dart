@@ -286,6 +286,7 @@ class MessageRow extends StatelessWidget {
                                         knownUsernames: knownUsernames,
                                         customEmoji: customEmoji,
                                         dim: message.pending,
+                                        announceSending: message.pending,
                                       ),
                                     if (message.editedAt != null && !editing)
                                       const EditedMarker(),

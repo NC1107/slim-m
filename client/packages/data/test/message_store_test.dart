@@ -157,6 +157,39 @@ void main() {
     expect(await store.watchChannel('chan-1').first, isEmpty);
   });
 
+  test(
+      'failedMessages answers only what is actually failed, across every '
+      'channel', () async {
+    await store.upsertChannels([
+      const api.Channel(
+          id: 'chan-2', name: 'other', kind: 'text', createdAt: 0),
+    ]);
+    await store.addPending(
+      id: 'sending',
+      channelId: 'chan-1',
+      authorId: 'user-1',
+      content: 'still in flight',
+    );
+    await store.addPending(
+      id: 'failed-1',
+      channelId: 'chan-1',
+      authorId: 'user-1',
+      content: 'refused here',
+    );
+    await store.markFailed('failed-1', reason: 'nope');
+    await store.addPending(
+      id: 'failed-2',
+      channelId: 'chan-2',
+      authorId: 'user-1',
+      content: 'refused there',
+    );
+    await store.markFailed('failed-2', reason: 'also nope');
+    await store.applyMessage(_message(id: 'delivered', seq: 1));
+
+    final failed = await store.failedMessages();
+    expect(failed.map((m) => m.id).toSet(), {'failed-1', 'failed-2'});
+  });
+
   test('the read marker only ever moves forward', () async {
     await store.setReadMarker('chan-1', 2);
     expect(await _lastReadSeqOf(store, 'chan-1'), 2);
