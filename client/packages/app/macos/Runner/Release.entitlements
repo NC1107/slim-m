@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Outbound: every request this client makes, to the self-hosted
+	     server. Under App Sandbox this must be declared explicitly. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- livekit_client/flutter_webrtc need this to open a mic for a voice call. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- livekit_client/flutter_webrtc need this to open a camera for video. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<!-- file_picker's NSOpenPanel-driven attachment upload needs read access
+	     to whatever the user picks; sandboxed reads outside the app's own
+	     container are denied without this. -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+</dict>
+</plist>

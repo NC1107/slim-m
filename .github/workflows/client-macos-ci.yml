@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+name: client-macos-ci
+
+# Compile-only, unsigned, and deliberately not a required check.
+#
+# `client/packages/app/macos/` is a fresh `flutter create --platforms=macos`
+# scaffold with no signing identity, no notarization credential and no
+# Apple Developer team wired to it - see docs/os_backlog/macos_backlog.md
+# for what a real, distributable build still needs. This job only proves
+# the Dart and Swift compile against the macOS SDK: `flutter build macos
+# --debug` on this project's SPM-only plugin tree (no Podfile, no `pod
+# install`, matching how `client-ios-ci.yml` already builds with no
+# CocoaPods step), which produces a local "Sign to Run Locally" binary
+# with no Apple account of any kind.
+#
+# Narrower trigger paths than client-ios-ci.yml's release-build job on
+# purpose: nothing outside macos/, the two native-leaning packages, and the
+# workspace lockfile can change whether this compiles.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-macos-ci.yml"
+  pull_request:
+    paths:
+      - "client/packages/app/macos/**"
+      - "client/packages/rtc/**"
+      - "client/packages/platform/**"
+      - "client/pubspec.yaml"
+      - "client/pubspec.lock"
+      - "client/packages/app/pubspec.yaml"
+      - ".github/workflows/client-macos-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+# On main, keyed per commit: a group shared across pushes lets GitHub cancel an older still-queued run outright, which cancel-in-progress cannot prevent; see docs/ci.md.
+  group: client-macos-ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  macos-build:
+    name: macos debug build (unsigned)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: true
+
+      # --enforce-lockfile, for the same reason the Rust side builds --locked:
+      # without it the committed lockfile is advisory and CI can silently
+      # resolve versions nobody committed.
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      # No signing team, no provisioning profile, no GoogleService-Info.plist
+      # - a Debug build ad-hoc-signs itself ("Sign to Run Locally"), which
+      # needs no Apple account, matching how client-ios-ci.yml's own
+      # simulator build carries no signing secrets either.
+      - name: flutter build macos --debug
+        working-directory: client/packages/app
+        run: flutter build macos --debug
