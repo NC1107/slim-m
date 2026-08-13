@@ -125,9 +125,7 @@ def change_join_policy(client, api):
     """Who can join is one row in the database and the whole security model."""
     _open_space(client)
     before = api.space_settings()['join_policy']
-    # Two taps since Space settings became a nav beside embedded panes: the
-    # first selects the pane, the second is the pane's own row opening the
-    # picker - distinguishable because only the row names the current value.
+    # Two taps since #617: select the pane, then its row opens the picker.
     client.click(L.WHO_CAN_JOIN, settle=2)
     client.wait_for(L.WHO_CAN_JOIN_ROW)
     client.click(L.WHO_CAN_JOIN_ROW, settle=2)
