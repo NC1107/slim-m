@@ -30,6 +30,8 @@ STATUS = "Status"
 
 # Space settings
 WHO_CAN_JOIN = "Who can join"
+# The embedded pane's own row, distinct from the nav row by its value suffix.
+WHO_CAN_JOIN_ROW = "Who can join, currently"
 JOIN_OPEN = "Anyone with the address"
 JOIN_INVITE = "People with an invite"
 ROLES = "Roles"

@@ -222,4 +222,15 @@ void main() {
           'half the fix',
     );
   });
+
+  testWidgets('the embedded join-policy row still opens its picker', (
+    tester,
+  ) async {
+    await _pump(tester, permissions: -1);
+    await tester.tap(find.text('Who can join'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('People with an invite'));
+    await tester.pumpAndSettle();
+    expect(find.text('Anyone with the address'), findsOneWidget);
+  });
 }
