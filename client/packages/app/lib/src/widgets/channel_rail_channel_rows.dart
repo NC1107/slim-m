@@ -28,7 +28,7 @@ import 'voice_channel_tap.dart';
 
 /// The right-click/long-press menu every channel row gets: opening it
 /// always, muting it or narrowing it to mentions only (the same two toggles
-/// `ChannelNotificationMenuButton` offers from the channel header, tapping
+/// the header used to duplicate until 2026-08-13, tapping
 /// the active one clears back to the account default), and managing it
 /// (rename, topic, delete) only for the caller [canManage] already lets use
 /// the row's own kebab - that gate, reused rather than repeated.
