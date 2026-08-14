@@ -77,7 +77,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final storeAsync = ref.watch(storeProvider);
     final selected = selectedChannelId(context);
-    final me = ref.watch(meProvider).valueOrNull;
+    final me = ref.watch(effectiveMeProvider);
     final canManageChannels =
         me != null && me.permissions.hasPermission(Perm.manageChannels);
     final orderState = ref.watch(channelOrderControllerProvider);

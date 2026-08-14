@@ -234,6 +234,48 @@ final meProvider = FutureProvider.autoDispose<Me>(
   (ref) => ref.watch(apiProvider).me(),
 );
 
+/// [meProvider]'s answer, holding the last one that actually resolved while
+/// the connection is down.
+///
+/// Losing the network made this read as null, and a null `Me` is
+/// indistinguishable from a member holding no permissions at all - so the
+/// channel rail reshaped itself the moment a phone lost signal: empty
+/// categories vanished (they render only for a manager), every row's manage
+/// kebab went with them, and the reorderable list collapsed to a plain
+/// column. Reported 2026-08-13 as "channels format weird, colors change" when
+/// there is no connection to the server.
+///
+/// Keeping the last resolved answer is safe rather than a shortcut, and
+/// `schema/openapi.yaml` already says why: this bitmask is a UI nicety, and
+/// the server re-authorizes every write regardless, so a stale-but-real
+/// answer can only ever offer an action the server then refuses - where
+/// answering null hides actions the caller genuinely holds.
+///
+/// Cached per user, never across one: a sign-out must not leave the next
+/// account looking at whatever the last one could do. The check is on the
+/// answer's own id rather than on the fetch having succeeded, because an
+/// `AsyncError` keeps whatever value resolved before it - so a failed fetch
+/// under a new session still hands back the previous account's `Me`, and
+/// only comparing the answer's own id against the session's catches that.
+final effectiveMeProvider = NotifierProvider<EffectiveMe, Me?>(EffectiveMe.new);
+
+class EffectiveMe extends Notifier<Me?> {
+  String? _forUser;
+  Me? _last;
+
+  @override
+  Me? build() {
+    final userId = ref.watch(sessionProvider).tokens?.userId;
+    if (userId != _forUser) {
+      _forUser = userId;
+      _last = null;
+    }
+    final resolved = ref.watch(meProvider).valueOrNull;
+    if (resolved != null && resolved.id == userId) _last = resolved;
+    return _last;
+  }
+}
+
 /// This install's own build: version and build number, read once off the
 /// platform. The one source for it in the app; a tester reads it in Personal
 /// settings and the rail header names it beside the Space, and both must
