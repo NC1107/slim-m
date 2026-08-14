@@ -22,6 +22,12 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-macos-ci.yml"
+      # A release-please version bump touches these three and nothing else.
+      # It never moves client/pubspec.lock, so a genuine dependency change
+      # still triggers a full run through the lock file.
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
   pull_request:
     paths:
       - "client/packages/app/macos/**"
@@ -31,6 +37,12 @@ on:
       - "client/pubspec.lock"
       - "client/packages/app/pubspec.yaml"
       - ".github/workflows/client-macos-ci.yml"
+      # A release-please version bump touches these three and nothing else.
+      # It never moves client/pubspec.lock, so a genuine dependency change
+      # still triggers a full run through the lock file.
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
 
 permissions:
   contents: read

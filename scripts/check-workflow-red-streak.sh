@@ -105,7 +105,10 @@ This issue closes itself the next time a run on main succeeds."
   else
     echo "issue #${existing} is already open for this"
   fi
-  exit 1
+  # Zero: the issue is the signal, and this job going red for as long as the
+  # streak lasts is the second red workflow nobody opens that this watchdog
+  # exists to avoid. `set -e` still fails the job if the reporting itself broke.
+  exit 0
 fi
 
 if [ "$streak_len" -eq 0 ]; then

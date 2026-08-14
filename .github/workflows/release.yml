@@ -337,12 +337,7 @@ jobs:
       # libsecret-1-dev is here because flutter_secure_storage's Linux plugin
       # will not even configure without it. Why that is unavoidable: docs/ci.md.
       - name: linux build deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libayatana-appindicator3-dev libpulse-dev
+        uses: ./.github/actions/linux-build-deps
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -413,7 +408,7 @@ jobs:
         env:
           VER: ${{ steps.ver.outputs.version }}
         run: |
-          docker run --rm -v "${PWD}:/w" -w /w -e VER fedora:latest bash -eo pipefail -c '
+          docker run --rm -v "${PWD}:/w" -w /w -e VER fedora:44 bash -eo pipefail -c '
             dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
             mkdir -p rpmbuild/SOURCES
             cp dist/slim-m-client-*-linux-amd64.tar.gz \
@@ -459,7 +454,7 @@ jobs:
     needs: [release-please, linux-client, verify-client-ci]
     if: needs.verify-client-ci.result == 'success'
     runs-on: ubuntu-latest
-    container: fedora:latest
+    container: fedora:44
     environment: release
     permissions:
       contents: read

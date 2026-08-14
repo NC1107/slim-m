@@ -167,7 +167,7 @@ class CheckE2eRedStreakTest(unittest.TestCase):
         ]
         result = self._run(rows, extra_env={"FAKE_ISSUE_LIST_JSON": "[]"},
                             threshold=3)
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("::error::", result.stdout)
         self.assertIn("3 consecutive completed runs", result.stdout)
         self.assertIn("commit aaa", result.stdout)
@@ -194,7 +194,7 @@ class CheckE2eRedStreakTest(unittest.TestCase):
             "WATCHDOG_SUBJECT": "main-builds",
             "WATCHDOG_WHY": "no build is reaching a phone while this is red.",
         })
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("main-builds has failed", result.stdout)
 
         create = [c for c in self._log() if c[:2] == ["issue", "create"]]
@@ -226,7 +226,7 @@ class CheckE2eRedStreakTest(unittest.TestCase):
         ]
         result = self._run(rows, extra_env={"FAKE_ISSUE_LIST_JSON": "[]"},
                             threshold=3)
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("3 consecutive completed runs", result.stdout)
 
     def test_an_already_open_issue_is_not_duplicated(self):
@@ -240,7 +240,7 @@ class CheckE2eRedStreakTest(unittest.TestCase):
             rows, threshold=3,
             extra_env={"FAKE_ISSUE_LIST_JSON":
                        json.dumps([{"number": 42}])})
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("issue #42 is already open", result.stdout)
         calls = self._log()
         self.assertFalse(any(c[:2] == ["issue", "create"] for c in calls))
@@ -282,7 +282,7 @@ class CheckE2eRedStreakTest(unittest.TestCase):
         result = self._run(REAL_INCIDENT_AT_THIRD_FAILURE,
                             extra_env={"FAKE_ISSUE_LIST_JSON": "[]"},
                             threshold=3)
-        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("commit 0669245b4e", result.stdout)
         calls = self._log()
         self.assertTrue(any(c[:2] == ["issue", "create"] for c in calls))

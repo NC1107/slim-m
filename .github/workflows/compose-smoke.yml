@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: compose-smoke-${{ github.ref }}
+  group: compose-smoke-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:

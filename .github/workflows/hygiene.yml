@@ -294,15 +294,25 @@ jobs:
           fi
           echo "no emoji in UI source"
 
+      # Presence alone passed while two client-side files claimed AGPL; the
+      # identifier has to match the path or the licensing split is decorative.
       - name: SPDX headers on Rust source
         run: |
           missing=0
+          checked=0
           while IFS= read -r f; do
-            if ! head -1 "$f" | grep -q 'SPDX-License-Identifier'; then
-              echo "::error file=$f::missing SPDX-License-Identifier header"
+            checked=$((checked + 1))
+            if ! head -1 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0-only'; then
+              echo "::error file=$f::server source needs 'SPDX-License-Identifier: AGPL-3.0-only'"
               missing=1
             fi
           done < <(find crates -name '*.rs')
+          # A find that matches nothing left missing at 0 and reported success.
+          if [ "$checked" -eq 0 ]; then
+            echo "::error::found no Rust source under crates/; the check ran against nothing"
+            exit 1
+          fi
+          echo "spdx: $checked Rust files checked"
           exit $missing
 
       # Warns at 300 and fails at 500; the reasoning is in the script header.
