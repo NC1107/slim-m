@@ -15,10 +15,22 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-windows-ci.yml"
+      # A release-please version bump touches these three and nothing else.
+      # It never moves client/pubspec.lock, so a genuine dependency change
+      # still triggers a full run through the lock file.
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
   pull_request:
     paths:
       - "client/**"
       - ".github/workflows/client-windows-ci.yml"
+      # A release-please version bump touches these three and nothing else.
+      # It never moves client/pubspec.lock, so a genuine dependency change
+      # still triggers a full run through the lock file.
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
 
 permissions:
   contents: read
