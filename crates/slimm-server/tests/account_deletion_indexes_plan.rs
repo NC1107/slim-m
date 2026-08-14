@@ -33,80 +33,6 @@ fn source_of(relative: &str) -> String {
         .unwrap_or_else(|_| panic!("read {relative}"))
 }
 
-/// The SQL of the first `sqlx::query*!` call whose literal contains [anchor],
-/// plain or raw.
-///
-/// Anchored to a real macro call rather than to the nearest quote, because the
-/// nearest quote can belong to a comment. A comment quoting an older version of
-/// the query is extracted and validated in place of the code by a bare search,
-/// so the query itself can regress to a scan while this passes - the
-/// source-reading-gate trap `support::code_only` exists for, demonstrated
-/// against this very file before it was written this way. Asserting the anchor
-/// is unique does not close it: once the real query stops matching, the stale
-/// comment is the only occurrence left.
-///
-/// `code_only` blanks comments and strings in place and keeps every byte
-/// offset, so a call site found in its output is a call site in real code, and
-/// the literal is then read back out of the original source at that offset.
-fn query_literal_containing(source: &str, anchor: &str) -> String {
-    let code = support::code_only(source);
-    let mut from = 0usize;
-    while let Some(rel) = code[from..].find("query") {
-        let at = from + rel;
-        from = at + 1;
-        let Some(paren) = code[at..].find('(') else {
-            continue;
-        };
-        let name = &code[at..at + paren];
-        let macro_call = name.ends_with('!')
-            && name[..name.len() - 1]
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_');
-        if !macro_call {
-            continue;
-        }
-        if let Some(sql) = literal_at(source, at + paren + 1)
-            && sql.contains(anchor)
-        {
-            return sql;
-        }
-    }
-    panic!("no sqlx query literal contains {anchor:?}; has the query itself changed?")
-}
-
-/// The string literal starting at the next non-whitespace byte, `r#"..."#`
-/// included, or `None` when what follows is not one.
-fn literal_at(source: &str, from: usize) -> Option<String> {
-    let bytes = source.as_bytes();
-    let mut i = from;
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    if bytes.get(i) == Some(&b'r') {
-        let mut hashes = 0usize;
-        let mut j = i + 1;
-        while bytes.get(j) == Some(&b'#') {
-            hashes += 1;
-            j += 1;
-        }
-        if bytes.get(j) != Some(&b'"') {
-            return None;
-        }
-        let close: String = std::iter::once('"')
-            .chain(std::iter::repeat_n('#', hashes))
-            .collect();
-        let start = j + 1;
-        let end = source[start..].find(&close)? + start;
-        return Some(source[start..end].to_owned());
-    }
-    if bytes.get(i) == Some(&b'"') {
-        let start = i + 1;
-        let end = source[start..].find('"')? + start;
-        return Some(source[start..end].to_owned());
-    }
-    None
-}
-
 /// A 16-byte blob per placeholder, matching the affinity of the id columns
 /// every query here binds; `0i64` plans the same but claims the wrong type.
 async fn plan_of(pool: &SqlitePool, sql: &str, binds: usize) -> Vec<String> {
@@ -148,7 +74,7 @@ fn assert_uses(plan: &[String], index: &str, what: &str) {
 async fn deleting_an_account_seeks_the_reactions_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-reactions").await;
     let source = source_of("src/store/account_deletion.rs");
-    let sql = query_literal_containing(&source, "DELETE FROM reactions WHERE user_id");
+    let sql = support::query_literal_containing(&source, "DELETE FROM reactions WHERE user_id");
 
     let plan = plan_of(&pool, &sql, 1).await;
     assert_uses(&plan, "reactions_user", "the reaction cleanup");
@@ -159,7 +85,7 @@ async fn deleting_an_account_seeks_the_reactions_index() {
 async fn deleting_an_account_seeks_the_uploader_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-uploaders").await;
     let source = source_of("src/store/account_deletion.rs");
-    let sql = query_literal_containing(
+    let sql = support::query_literal_containing(
         &source,
         "DELETE FROM attachment_uploaders WHERE uploaded_by",
     );
@@ -177,7 +103,7 @@ async fn deleting_an_account_seeks_the_uploader_index() {
 async fn deleting_an_account_seeks_the_overwrite_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-overwrites").await;
     let source = source_of("src/store/account_deletion.rs");
-    let sql = query_literal_containing(&source, "DELETE FROM channel_overwrites WHERE target_type");
+    let sql = support::query_literal_containing(&source, "DELETE FROM channel_overwrites WHERE target_type");
 
     let plan = plan_of(&pool, &sql, 1).await;
     assert_uses(
@@ -195,7 +121,7 @@ async fn deleting_an_account_seeks_the_overwrite_index() {
 async fn deleting_a_role_seeks_the_overwrite_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-role-overwrites").await;
     let source = source_of("src/store/roles.rs");
-    let sql = query_literal_containing(&source, "DELETE FROM channel_overwrites WHERE target_type");
+    let sql = support::query_literal_containing(&source, "DELETE FROM channel_overwrites WHERE target_type");
 
     let plan = plan_of(&pool, &sql, 1).await;
     assert_uses(
@@ -213,7 +139,7 @@ async fn deleting_a_role_seeks_the_overwrite_index() {
 async fn listing_a_roles_members_seeks_the_member_roles_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-member-roles").await;
     let source = source_of("src/store/roles.rs");
-    let sql = query_literal_containing(&source, "FROM member_roles WHERE role_id");
+    let sql = support::query_literal_containing(&source, "FROM member_roles WHERE role_id");
 
     let plan = plan_of(&pool, &sql, 1).await;
     assert_uses(&plan, "member_roles_role", "the role member list");
@@ -231,7 +157,7 @@ fn a_stale_comment_quoting_the_old_query_does_not_satisfy_the_gate() {
         sqlx::query!("DELETE FROM reactions WHERE hex(user_id) = hex(?)", user_id)
     "#;
     let found = std::panic::catch_unwind(|| {
-        query_literal_containing(regressed, "DELETE FROM reactions WHERE user_id")
+        support::query_literal_containing(regressed, "DELETE FROM reactions WHERE user_id")
     });
     assert!(
         found.is_err(),
@@ -247,7 +173,7 @@ fn the_live_query_is_read_past_a_comment_quoting_it() {
         sqlx::query!("DELETE FROM reactions WHERE user_id = ? AND emoji = ?", a, b)
     "#;
     assert_eq!(
-        query_literal_containing(source, "DELETE FROM reactions WHERE user_id"),
+        support::query_literal_containing(source, "DELETE FROM reactions WHERE user_id"),
         "DELETE FROM reactions WHERE user_id = ? AND emoji = ?"
     );
 }
