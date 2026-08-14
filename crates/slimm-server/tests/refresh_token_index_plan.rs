@@ -101,9 +101,14 @@ async fn the_revocation_update_seeks_the_session_index() {
 async fn the_session_join_no_longer_builds_an_automatic_index() {
     let (pool, _guard) = new_pool("slimm-rt-plan-join").await;
     let push_source = read_source("src/store/push.rs");
-    assert!(
-        push_source.contains("JOIN refresh_tokens r ON r.session_id = s.id"),
-        "push.rs no longer carries the join this test represents; update or delete it"
+    // Anchored to a real query macro rather than searched for in the raw file.
+    // A comment quoting this join would otherwise satisfy the check while the
+    // query itself had changed shape, and `code_only` is no help here because
+    // the join lives inside the literal that scrubber blanks. Panics naming
+    // the anchor when no live query carries it, which is the assertion.
+    support::query_literal_containing(
+        &push_source,
+        "JOIN refresh_tokens r ON r.session_id = s.id",
     );
 
     let plan = plan_of(

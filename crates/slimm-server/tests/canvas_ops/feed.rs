@@ -264,9 +264,12 @@ async fn account_deletion_nulls_the_actor_id_of_a_placed_op() {
 /// `canvas_index.rs` reads the viewport query rather than timing anything.
 #[test]
 fn the_ops_feed_reads_only_through_one_transaction() {
-    let source =
+    let raw =
         fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/store/canvas_ops.rs"))
             .expect("read the canvas ops store module");
+    // Scrubbed, or a doc comment saying why a direct pool read would be wrong
+    // satisfies the check that no direct pool read exists.
+    let source = crate::support::code_only(&raw);
     assert!(
         !source.contains("&self.pool"),
         "a direct pool read here would race the transaction the feed's snapshot depends on"
