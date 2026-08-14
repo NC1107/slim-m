@@ -49,6 +49,23 @@ import 'channel_transcript_scroll.dart';
 export '../ids.dart' show newMessageId;
 
 /// One channel's messages.
+/// The usernames a mention can be matched against, read from the member
+/// roster [members].
+///
+/// `valueOrNull`, never `maybeWhen(data:)`: an `AsyncError` keeps whatever
+/// resolved before it, and only the first of those two can see that value.
+/// Reading it the other way made a failed fetch indistinguishable from an
+/// empty deployment, so every `@name` in view fell back to plain text the
+/// moment the connection dropped (reported 2026-08-13, "mentions also get
+/// unhighlighted when the server was offline").
+///
+/// A cold start with no connection genuinely has nothing to match against and
+/// still renders mentions plain; that is the honest answer rather than a gap,
+/// since nothing has ever told this client who the members are.
+Set<String> knownUsernamesFrom(AsyncValue<List<api.UserProfile>> members) =>
+    members.valueOrNull?.map((m) => m.username.toLowerCase()).toSet() ??
+    const <String>{};
+
 class ChannelScreen extends ConsumerStatefulWidget {
   const ChannelScreen({
     required this.channelId,
@@ -237,13 +254,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       if (!open) _searchController.clear();
     });
     final jumpArrival = watchMessageJump(ref, context, widget.channelId);
-    final knownUsernames = ref
-        .watch(membersProvider)
-        .maybeWhen(
-          data: (members) =>
-              members.map((m) => m.username.toLowerCase()).toSet(),
-          orElse: () => const <String>{},
-        );
+    final knownUsernames = knownUsernamesFrom(ref.watch(membersProvider));
     final customEmoji = ref.watch(customEmojiIndexProvider);
     final blocked = ref.watch(blocksProvider.select((state) => state.ids));
     final history = ref.watch(channelHistoryProvider(widget.channelId));
