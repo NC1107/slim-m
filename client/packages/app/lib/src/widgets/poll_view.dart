@@ -233,7 +233,11 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                 ),
                 borderRadius: BorderRadius.circular(AppRadii.control),
               ),
+              // Centred rather than a Stack's own top-start default, so the
+              // label sits on the row's middle line instead of hugging its
+              // top edge with the rest of a touch-height row left empty.
               child: Stack(
+                alignment: Alignment.center,
                 children: [
                   // The track, always visible, so a zero-vote option still reads as a bar.
                   Positioned.fill(child: Container(color: tokens.borderSubtle)),
