@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The apt packages a Linux Flutter build of this client needs, in one place.
+#
+# These lived in client-ci.yml, main-builds.yml and release.yml as three
+# byte-identical copies kept in step by a comment asking the next contributor
+# to remember. That is the shape that already failed once: adding audioplayers
+# put a gstreamer pkg-config requirement into the Linux build that nothing on
+# a pull request compiled, so main went red on merge and a release came close
+# to shipping without its Linux artifacts. A comment cannot fail a build.
+#
+# Adding a Flutter plugin with a native Linux dependency means adding its
+# package here, once, and every workflow that builds the client picks it up.
+#
+# libpulse-dev is flutter_webrtc's own build-time switch for Linux
+# screen-share audio; without it the build succeeds and silently ships
+# without that capability.
+
+name: linux build deps
+description: Install the apt packages a Linux build of the slim-m client needs.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
+          libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+          libayatana-appindicator3-dev libpulse-dev

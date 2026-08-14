@@ -8,10 +8,22 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-ci.yml"
+      # A release-please version bump touches these three and nothing else.
+      # It never moves client/pubspec.lock, so a genuine dependency change
+      # still triggers a full run through the lock file.
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
   pull_request:
     paths:
       - "client/**"
       - ".github/workflows/client-ci.yml"
+      # A release-please version bump touches these three and nothing else.
+      # It never moves client/pubspec.lock, so a genuine dependency change
+      # still triggers a full run through the lock file.
+      - "!client/CHANGELOG.md"
+      - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
 
 permissions:
   contents: read
@@ -90,15 +102,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # Must stay in step with the same list in main-builds.yml and release.yml;
-      # a plugin added here is a plugin those two need before the next release.
       - name: linux build deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libayatana-appindicator3-dev libpulse-dev
+        uses: ./.github/actions/linux-build-deps
 
       - name: set up flutter (stable channel)
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
