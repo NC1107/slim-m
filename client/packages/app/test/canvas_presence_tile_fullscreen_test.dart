@@ -204,11 +204,11 @@ void main() {
     final fixture = await _seated(tester);
     addTearDown(fixture.harness.dispose);
 
-    expect(
-      fixture.interest.last,
-      {'camera:user-noor', 'camera:user-ada', 'camera:user-rex'},
-      reason: 'all three cameras are inside the viewport to begin with',
-    );
+    expect(fixture.interest.last, {
+      'camera:user-noor',
+      'camera:user-ada',
+      'camera:user-rex',
+    }, reason: 'all three cameras are inside the viewport to begin with');
 
     await _hover(tester, 'camera:user-noor');
     await tester.tap(_expandButton('camera:user-noor'));

@@ -89,11 +89,9 @@ void main() {
     await container.read(channelSearchProvider('ch1').notifier).run('from');
 
     final state = container.read(channelSearchProvider('ch1'));
-    expect(
-      state.results?.map((m) => m.content),
-      ['from a friend'],
-      reason: 'a second search path is still a search path',
-    );
+    expect(state.results?.map((m) => m.content), [
+      'from a friend',
+    ], reason: 'a second search path is still a search path');
   });
 
   test('a 403 is reported as forbidden, not as an empty result', () async {
