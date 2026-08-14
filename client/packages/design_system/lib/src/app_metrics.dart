@@ -100,10 +100,20 @@ abstract final class AppShadows {
 /// Type sizes, avatar sizes and touch targets deliberately do not respond to
 /// it. Someone choosing "compact" wants more messages on screen, not smaller
 /// text, and conflating the two produces a mode nobody can read.
+/// [groupWindow] is how long one author keeps writing into the same block
+/// before the next message starts a fresh one with their picture and name
+/// above it again. It was minutes long, which read as one wall of text with
+/// nobody's name on it whenever a conversation was slow (owner, 2026-08-13:
+/// "even if there is a minute between messages, we should paste the users
+/// profile picture instead of extending the text wall with no name on left
+/// side"). A minute is the floor rather than a scale point: below it a burst
+/// of someone typing three lines in a row splits into three headed blocks,
+/// which is noisier than the problem being fixed - so normal and spacious
+/// share it, and only compact still groups for longer.
 enum AppDensity {
-  compact(rowGap: 4, groupedRowGap: 1, groupWindow: Duration(minutes: 7)),
-  normal(rowGap: 8, groupedRowGap: 2, groupWindow: Duration(minutes: 5)),
-  spacious(rowGap: 12, groupedRowGap: 4, groupWindow: Duration(minutes: 3));
+  compact(rowGap: 4, groupedRowGap: 1, groupWindow: Duration(minutes: 2)),
+  normal(rowGap: 8, groupedRowGap: 2, groupWindow: Duration(minutes: 1)),
+  spacious(rowGap: 12, groupedRowGap: 4, groupWindow: Duration(minutes: 1));
 
   const AppDensity({
     required this.rowGap,
