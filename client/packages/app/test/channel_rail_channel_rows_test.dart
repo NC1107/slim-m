@@ -238,4 +238,38 @@ void main() {
       );
     },
   );
+
+  testWidgets('a phone long-press on a channel row opens its context menu', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final channel = _channel('c1', 'general');
+    await tester.pumpWidget(
+      _harness(
+        ManagedChannelRow(
+          canManage: true,
+          reorderable: false,
+          dragHandleIndex: 0,
+          channel: channel,
+          row: (kebab) => AppListRow(label: channel.name, trailing: kebab),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.longPress(find.text('general'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Mute channel'),
+      findsOneWidget,
+      reason:
+          'a phone reaches this menu by held press and by nothing else, so '
+          'a reorderable rail must not take that gesture away',
+    );
+  });
 }

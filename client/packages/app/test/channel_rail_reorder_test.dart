@@ -3,8 +3,10 @@
 /// member, a completed drag within one section reporting the new order, -
 /// the property backlog item #34 asked for - a drag across two category
 /// sections reassigning the dragged channel's category, and that
-/// `rowBuilder`'s own `reorderable` flag matches which branch actually wraps
-/// a row in the drag listener. See docs/decisions/0006-channel-categories.md.
+/// `rowBuilder`'s own flags match which branch actually wraps a row in the
+/// drag listener, and that a phone hands the held press back to the context
+/// menu and drags from an explicit handle instead.
+/// See docs/decisions/0006-channel-categories.md.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -44,8 +46,8 @@ void main() {
           ],
           canManage: false,
           onReorder: (_) => fail('must not be reachable without canManage'),
-          rowBuilder: (channel, reorderable) {
-            expect(reorderable, isFalse);
+          rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+            expect(longPressDrags, isFalse);
             return Text(channel.id);
           },
           headerBuilder: _header,
@@ -71,8 +73,8 @@ void main() {
           ],
           canManage: true,
           onReorder: (order) => reported = order,
-          rowBuilder: (channel, reorderable) {
-            expect(reorderable, isTrue);
+          rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+            expect(longPressDrags, isTrue);
             return SizedBox(height: 48, child: Text(channel.id));
           },
           headerBuilder: _header,
@@ -121,8 +123,8 @@ void main() {
             ],
             canManage: true,
             onReorder: (order) => reported = order,
-            rowBuilder: (channel, reorderable) {
-              expect(reorderable, isTrue);
+            rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+              expect(longPressDrags, isTrue);
               return SizedBox(height: 48, child: Text(channel.id));
             },
             headerBuilder: _header,
@@ -153,6 +155,66 @@ void main() {
         isTrue,
         reason: 'a channel of any kind may be dragged into any category',
       );
+    },
+  );
+
+  testWidgets(
+    'a phone leaves the held press to the context menu and drags from a handle',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final indices = <int?>[];
+      List<ChannelOrderGroup>? reported;
+      await tester.pumpWidget(
+        _harness(
+          ReorderableChannelRows(
+            sections: [
+              (null, [_channel('a'), _channel('b'), _channel('c')]),
+            ],
+            canManage: true,
+            onReorder: (order) => reported = order,
+            rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+              expect(
+                longPressDrags,
+                isFalse,
+                reason:
+                    'a phone has no right-click, so a held press has to stay '
+                    'the context menu route',
+              );
+              indices.add(dragHandleIndex);
+              return SizedBox(
+                height: 48,
+                child: ReorderableDragStartListener(
+                  index: dragHandleIndex!,
+                  child: Text(channel.id),
+                ),
+              );
+            },
+            headerBuilder: _header,
+          ),
+        ),
+      );
+
+      expect(indices, isNot(contains(null)));
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('a')),
+      );
+      await tester.pump(kPressTimeout);
+      await gesture.moveBy(const Offset(0, 120));
+      await tester.pumpAndSettle();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        reported,
+        isNotNull,
+        reason: 'dragging the handle still reorders on a phone',
+      );
+      expect(reported!.single.channelIds, isNot(['a', 'b', 'c']));
     },
   );
 }
