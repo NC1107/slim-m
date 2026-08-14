@@ -207,3 +207,78 @@ pub fn function_body(source: &str, marker: &str) -> String {
     }
     panic!("{marker}'s body has no matching closing brace")
 }
+
+#[allow(dead_code)]
+/// The SQL of the first `sqlx::query*!` call whose literal contains [anchor],
+/// plain or raw.
+///
+/// Anchored to a real macro call rather than to the nearest quote, because the
+/// nearest quote can belong to a comment. A comment quoting an older version of
+/// the query is extracted and validated in place of the code by a bare search,
+/// so the query itself can regress to a scan while this passes - the
+/// source-reading-gate trap `support::code_only` exists for, demonstrated
+/// against this very file before it was written this way. Asserting the anchor
+/// is unique does not close it: once the real query stops matching, the stale
+/// comment is the only occurrence left.
+///
+/// `code_only` blanks comments and strings in place and keeps every byte
+/// offset, so a call site found in its output is a call site in real code, and
+/// the literal is then read back out of the original source at that offset.
+pub fn query_literal_containing(source: &str, anchor: &str) -> String {
+    let code = code_only(source);
+    let mut from = 0usize;
+    while let Some(rel) = code[from..].find("query") {
+        let at = from + rel;
+        from = at + 1;
+        let Some(paren) = code[at..].find('(') else {
+            continue;
+        };
+        let name = &code[at..at + paren];
+        let macro_call = name.ends_with('!')
+            && name[..name.len() - 1]
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_');
+        if !macro_call {
+            continue;
+        }
+        if let Some(sql) = literal_at(source, at + paren + 1)
+            && sql.contains(anchor)
+        {
+            return sql;
+        }
+    }
+    panic!("no sqlx query literal contains {anchor:?}; has the query itself changed?")
+}
+
+/// The string literal starting at the next non-whitespace byte, `r#"..."#`
+/// included, or `None` when what follows is not one.
+fn literal_at(source: &str, from: usize) -> Option<String> {
+    let bytes = source.as_bytes();
+    let mut i = from;
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if bytes.get(i) == Some(&b'r') {
+        let mut hashes = 0usize;
+        let mut j = i + 1;
+        while bytes.get(j) == Some(&b'#') {
+            hashes += 1;
+            j += 1;
+        }
+        if bytes.get(j) != Some(&b'"') {
+            return None;
+        }
+        let close: String = std::iter::once('"')
+            .chain(std::iter::repeat_n('#', hashes))
+            .collect();
+        let start = j + 1;
+        let end = source[start..].find(&close)? + start;
+        return Some(source[start..end].to_owned());
+    }
+    if bytes.get(i) == Some(&b'"') {
+        let start = i + 1;
+        let end = source[start..].find('"')? + start;
+        return Some(source[start..end].to_owned());
+    }
+    None
+}

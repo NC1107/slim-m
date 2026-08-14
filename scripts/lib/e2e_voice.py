@@ -174,6 +174,8 @@ def mute_propagates(a, b, room_id):
     time.sleep(4)
     unmuted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
                for p in sfu_participants(room_id) if p.get("tracks")}
+    # The comprehension drops the no-track participant this guards against.
+    assert unmuted, f"nobody is publishing a mic track: {sfu_participants(room_id)}"
     assert not any(unmuted.values()), f"still reads as muted: {unmuted}"
     print("  and unmuting clears it, so the next call this client joins starts unmuted")
 
@@ -221,6 +223,8 @@ def canvas_keeps_call_controls(client, room_id, channel=L.VOICE_CHANNEL):
     time.sleep(3)
     unmuted = {p["identity"][:13]: p["tracks"][0].get("muted", False)
                for p in sfu_participants(room_id) if p.get("tracks")}
+    # As above: an empty dict satisfies `not any` and hides a dropped track.
+    assert unmuted, f"nobody is publishing a mic track: {sfu_participants(room_id)}"
     assert not any(unmuted.values()), \
         f"unmuting from inside the canvas's own dock never reached the SFU: {unmuted}"
     print(f"  {client.name}: mute still reaches the SFU with the canvas open")

@@ -245,6 +245,9 @@ void main() {
         ),
       );
 
+      // Three at phone density, not the desktop test's five: poll and code
+      // fold into the "+" sheet here. Without this the loop can walk nothing.
+      expect(find.byType(AppIconButton), findsNWidgets(3));
       for (final element in find.byType(AppIconButton).evaluate()) {
         expect(
           tester.getSize(find.byWidget(element.widget)).shortestSide,

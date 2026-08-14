@@ -78,6 +78,10 @@ void main() {
   testWidgets('no rail control grows when expanded', (tester) async {
     await _pumpRail(tester, _desktop);
 
+    // The same proof the compact test above keeps: a loop over nothing passes.
+    expect(find.byType(AppIconButton), findsNWidgets(2));
+    expect(find.byType(AppListRow), findsNWidgets(2));
+
     for (final size in _sizesOf(tester, find.byType(AppIconButton))) {
       expect(size.shortestSide, AppSizes.rowPointer);
     }
