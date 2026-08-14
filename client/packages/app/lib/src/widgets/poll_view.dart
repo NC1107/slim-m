@@ -153,6 +153,17 @@ Color _fillColor(AppTokens tokens, bool selected, bool leading) {
   return tokens.borderStrong;
 }
 
+/// One option: a full-height track, the fill bar over it, and the label and
+/// percentage on top.
+///
+/// Those three are stacked, and a `Stack` puts a child that is not explicitly
+/// positioned at its own top-start corner - so the label hugged the top edge
+/// of what is a full touch-height row, leaving the rest of it empty
+/// (reported 2026-08-13, "the poll items text is not centered"). The stack's
+/// own alignment is what fixes it. Wrapping the label row in a
+/// `Positioned.fill` instead looks more explicit and is wrong: it takes that
+/// child out of what the stack measures itself against, and the percentage
+/// column then overflows.
 class _PollOptionRow extends StatefulWidget {
   const _PollOptionRow({
     required this.option,
@@ -233,9 +244,7 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                 ),
                 borderRadius: BorderRadius.circular(AppRadii.control),
               ),
-              // Centred rather than a Stack's own top-start default, so the
-              // label sits on the row's middle line instead of hugging its
-              // top edge with the rest of a touch-height row left empty.
+              // Centred rather than a Stack's top-start default; see _PollOptionRow's own doc comment.
               child: Stack(
                 alignment: Alignment.center,
                 children: [
