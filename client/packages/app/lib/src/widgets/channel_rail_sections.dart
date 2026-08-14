@@ -161,25 +161,27 @@ class ChannelCategorySections extends ConsumerWidget {
         if (canManage || section.$2.isNotEmpty) section,
     ];
 
-    Widget row(Channel channel, bool reorderable) => SelectionMarkerTarget(
-      selected: channel.id == selectedId,
-      child: ManagedChannelRow(
-        canManage: canManage,
-        reorderable: reorderable,
-        channel: channel,
-        row: (kebab) => channel.kind == 'voice'
-            ? VoiceChannelRow(
-                channel: channel,
-                selected: channel.id == selectedId,
-                trailingExtra: kebab,
-              )
-            : _TextChannelRow(
-                channel: channel,
-                selected: channel.id == selectedId,
-                trailingExtra: kebab,
-              ),
-      ),
-    );
+    Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) =>
+        SelectionMarkerTarget(
+          selected: channel.id == selectedId,
+          child: ManagedChannelRow(
+            canManage: canManage,
+            reorderable: longPressDrags,
+            dragHandleIndex: dragHandleIndex,
+            channel: channel,
+            row: (kebab) => channel.kind == 'voice'
+                ? VoiceChannelRow(
+                    channel: channel,
+                    selected: channel.id == selectedId,
+                    trailingExtra: kebab,
+                  )
+                : _TextChannelRow(
+                    channel: channel,
+                    selected: channel.id == selectedId,
+                    trailingExtra: kebab,
+                  ),
+          ),
+        );
 
     Widget header(ChannelCategoryRow? category) =>
         _SectionLabel(category?.name ?? 'Channels');

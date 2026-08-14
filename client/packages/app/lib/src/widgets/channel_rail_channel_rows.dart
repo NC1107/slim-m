@@ -108,6 +108,7 @@ class ManagedChannelRow extends StatefulWidget {
     super.key,
     required this.canManage,
     required this.reorderable,
+    this.dragHandleIndex,
     required this.channel,
     required this.row,
   });
@@ -122,6 +123,11 @@ class ManagedChannelRow extends StatefulWidget {
   /// gesture and win, leaving the drag unreachable; a right-click and the
   /// keyboard route are both unaffected either way.
   final bool reorderable;
+
+  /// Non-null when this row keeps its long-press menu and supplies its own
+  /// drag handle instead - see `channel_rail_reorder.dart` for which arrangement
+  /// applies where.
+  final int? dragHandleIndex;
 
   /// Builds the row given the kebab to place in its trailing slot, or null
   /// when [canManage] is false. Passed through unconditionally so the row
@@ -188,6 +194,12 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
         ),
       ),
     );
+    final handled = widget.dragHandleIndex == null
+        ? kebab
+        : ReorderableDragStartListener(
+            index: widget.dragHandleIndex!,
+            child: kebab,
+          );
     // Inside the row's trailing slot, so no combined height to float against.
     return ContextMenuRegion(
       itemsBuilder: _menuItems,
@@ -196,7 +208,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: widget.row(kebab),
+        child: widget.row(handled),
       ),
     );
   }

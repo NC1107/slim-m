@@ -64,11 +64,21 @@
 /// context menu's own long press exactly where, and only where, a row is
 /// actually wrapped in the drag listener that would otherwise lose to it -
 /// see `ManagedChannelRow`'s own `enableLongPress` wiring.
+///
+/// That withholding is correct at pointer widths and wrong at phone width,
+/// which is how the context menu became unreachable on mobile (reported
+/// 2026-08-13, "unable to hold press to pull up the menu of context options
+/// in this view", against the slide-over rail). A pointer reaches the menu by
+/// right-click, so a held press there can belong to the drag; a finger has no
+/// second gesture, so below `kCompactWidth` the held press stays the menu's
+/// and the row supplies an explicit drag handle instead - its own kebab,
+/// which touch already renders unconditionally, so this costs no new glyph.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 /// One category's ordered channels, `null` for the implicit uncategorised
 /// section, which always renders first.
@@ -121,7 +131,16 @@ class ReorderableChannelRows extends StatelessWidget {
   /// [ReorderableListView] one - so a caller can withhold a competing
   /// long-press gesture (a context menu, say) only where one would actually
   /// compete for the arena.
-  final Widget Function(Channel channel, bool reorderable) rowBuilder;
+  /// [longPressDrags] says a held press on this row starts a move, so the
+  /// row must withhold its own long-press context menu. [dragHandleIndex] is
+  /// the opposite arrangement: non-null means the row keeps its long press
+  /// and supplies its own drag handle at that index instead.
+  final Widget Function(
+    Channel channel,
+    bool longPressDrags,
+    int? dragHandleIndex,
+  )
+  rowBuilder;
   final Widget Function(ChannelCategoryRow? category) headerBuilder;
 
   List<_RailItem> get _items => [
@@ -142,11 +161,12 @@ class ReorderableChannelRows extends StatelessWidget {
           for (final item in items)
             switch (item) {
               _HeaderItem(:final category) => headerBuilder(category),
-              _ChannelItem(:final channel) => rowBuilder(channel, false),
+              _ChannelItem(:final channel) => rowBuilder(channel, false, null),
             },
         ],
       );
     }
+    final touch = AppTouchTargets.of(context);
     return ReorderableListView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -166,11 +186,17 @@ class ReorderableChannelRows extends StatelessWidget {
               key: ValueKey('header-${category?.id}'),
               child: headerBuilder(category),
             ),
-            _ChannelItem(:final channel) => ReorderableDelayedDragStartListener(
-              key: ValueKey(channel.id),
-              index: i,
-              child: rowBuilder(channel, true),
-            ),
+            _ChannelItem(:final channel) =>
+              touch
+                  ? KeyedSubtree(
+                      key: ValueKey(channel.id),
+                      child: rowBuilder(channel, false, i),
+                    )
+                  : ReorderableDelayedDragStartListener(
+                      key: ValueKey(channel.id),
+                      index: i,
+                      child: rowBuilder(channel, true, null),
+                    ),
           },
       ],
     );
