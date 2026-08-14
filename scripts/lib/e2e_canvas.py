@@ -127,10 +127,16 @@ def _fetched_url_containing(client, server, needle):
 
 
 def open_on_both(a, b, channel):
-    """Both clients into the same channel's canvas, empty."""
+    """Both clients into the same channel's canvas, empty.
+
+    A voice channel, because the canvas only belongs to one now (owner
+    decision, 2026-08-13): the header offers `Open canvas` there and nowhere
+    else. Clicking a voice channel joins its call directly, so the wait is on
+    being in the call rather than on a composer a voice channel does not have.
+    """
     for c in (a, b):
         c.click(channel)
-        c.wait_for(L.COMPOSER)
+        c.wait_for(L.IN_CALL)
         c.click(L.OPEN_CANVAS)
         c.wait_for("no objects")
     print("  both clients opened the canvas and see it empty")
