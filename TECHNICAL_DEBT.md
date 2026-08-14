@@ -335,24 +335,24 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   The real problem is that `expectSettled`, whose stated job is catching a placeholder standing in for content, did not fire, so the Roles surface is entirely unguarded by the snapshot suite.
   Fix: settle the roles provider on that surface (`roles` is absent from `_nestedResolveSurfaces`) and make `expectSettled` fail on an empty content area rather than emitting a blank PNG. Effort: medium.
 
-- ~~**TEST3. `message_row_test.dart:403` skips its only real assertion via an `if` guard.**~~ High. Fixed in PLACEHOLDER_PR.
+- ~~**TEST3. `message_row_test.dart:403` skips its only real assertion via an `if` guard.**~~ High. Fixed in #667.
   Worse than recorded, and worth keeping written down. The guarded finder looked for an `InkWell` inside the emoji panel, which that panel has never rendered - its tiles are `EmojiGrid` cells wrapped in a `GestureDetector` - so it matched zero widgets from the day the test was written and the tap never once ran. The entry assumed the block ran until the regression returned; it had never run at all.
 
-- ~~**TEST4. `touch_targets_test.dart:78` loops over possibly-empty finders.**~~ Medium. Fixed in PLACEHOLDER_PR.
+- ~~**TEST4. `touch_targets_test.dart:78` loops over possibly-empty finders.**~~ Medium. Fixed in #667.
 
-- ~~**TEST5. `sync_message_ops.rs:179` loops over a possibly-empty ops array.**~~ Medium. Fixed in PLACEHOLDER_PR.
+- ~~**TEST5. `sync_message_ops.rs:179` loops over a possibly-empty ops array.**~~ Medium. Fixed in #667.
 
-- ~~**TEST6. `canvas_ops/feed.rs:267` reads source text without the shared scrubber.**~~ Medium. Fixed in PLACEHOLDER_PR.
+- ~~**TEST6. `canvas_ops/feed.rs:267` reads source text without the shared scrubber.**~~ Medium. Fixed in #667.
   The recorded fix was wrong and the entry is kept rather than quietly corrected. It proposed narrowing to `support::function_body(&source, "pub async fn list_canvas_ops(")`, which would have scrubbed the comments and also dropped every other function in the file from a whole-file check. `support::code_only` over the whole file was shipped instead: same scrubbing, no loss of scope.
 
-- ~~**TEST7. `refresh_token_index_plan.rs:105` reads source text without the shared scrubber.**~~ Medium. Fixed in PLACEHOLDER_PR.
+- ~~**TEST7. `refresh_token_index_plan.rs:105` reads source text without the shared scrubber.**~~ Medium. Fixed in #667.
   The recorded fix would have broken the test, which is the more useful half of this entry. It proposed `support::code_only`, but the join being searched for lives *inside* a query string literal, and that scrubber blanks strings as well as comments, so it would have destroyed the thing being matched. The fix anchors to a real `sqlx::query*!` call site instead, which proves the text is in a live query rather than merely outside a comment.
 
-- ~~**TEST8. `e2e_voice.py:177` cannot fail on the case it names.**~~ Medium. Fixed in PLACEHOLDER_PR.
+- ~~**TEST8. `e2e_voice.py:177` cannot fail on the case it names.**~~ Medium. Fixed in #667.
 
-- ~~**TEST9. `e2e_voice.py:224` repeats TEST8's shape.**~~ Medium. Fixed in PLACEHOLDER_PR.
+- ~~**TEST9. `e2e_voice.py:224` repeats TEST8's shape.**~~ Medium. Fixed in #667.
 
-- ~~**TEST10. `composer_test.dart:248` loops over a possibly-empty finder.**~~ Low. Fixed in PLACEHOLDER_PR.
+- ~~**TEST10. `composer_test.dart:248` loops over a possibly-empty finder.**~~ Low. Fixed in #667.
   The entry copied the desktop sibling's `findsNWidgets(5)`; the phone density renders three, because poll and code fold into the "+" sheet.
 
 - **TEST11. Reserved-username refusal has no integration coverage** (`http/auth.rs:278`). Low.
