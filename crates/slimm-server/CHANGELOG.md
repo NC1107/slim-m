@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.39.0](https://github.com/NC1107/slim-m/compare/server-v0.38.0...server-v0.39.0) (2026-08-14)
+
+
+### Features
+
+* **client,server:** forward a message, mass mentions, and a status line ([#645](https://github.com/NC1107/slim-m/issues/645)) ([3da6f6c](https://github.com/NC1107/slim-m/commit/3da6f6c770b7e6b0808384fe49512d0ebfff458a))
+* four thread gaps closed - listing, unread state, a cross-link, and a cap ([#634](https://github.com/NC1107/slim-m/issues/634)) ([4905df3](https://github.com/NC1107/slim-m/commit/4905df3fed131691617a525542d2bfbb12dacd4f))
+* GIF search in the composer, proxied through the server ([#639](https://github.com/NC1107/slim-m/issues/639)) ([e2573a6](https://github.com/NC1107/slim-m/commit/e2573a624be1a7475a34eb1f1b7c258b21522543))
+* mute a channel, or narrow it to mentions only ([#643](https://github.com/NC1107/slim-m/issues/643)) ([ea855c3](https://github.com/NC1107/slim-m/commit/ea855c35238c8e3fd0947d5e088678c19a630cdf))
+* **search:** Slack-style search operators (from:, in:, has:, before:/after:) ([#638](https://github.com/NC1107/slim-m/issues/638)) ([bf2aa7c](https://github.com/NC1107/slim-m/commit/bf2aa7cd29205f98f285c86c91d87f9c2d436028))
+* **server:** add GET /metrics and a real livekit healthcheck ([#632](https://github.com/NC1107/slim-m/issues/632)) ([b89c8b2](https://github.com/NC1107/slim-m/commit/b89c8b23897d3daaf07130525243bb41a158f0cd))
+* **server:** per-member attachment storage and message retention ([#633](https://github.com/NC1107/slim-m/issues/633)) ([b70fced](https://github.com/NC1107/slim-m/commit/b70fced88cf99778194efae88d049754f4ebb049))
+
+
+### Bug Fixes
+
+* **push:** stamp sent_at inside the sealed envelope and refuse stale previews ([#631](https://github.com/NC1107/slim-m/issues/631)) ([436f0ba](https://github.com/NC1107/slim-m/commit/436f0baa2d9b43af0af998d52f53fb8068da4cdb))
+* **server:** renumber the notification-prefs migration off a collision ([#647](https://github.com/NC1107/slim-m/issues/647)) ([202f849](https://github.com/NC1107/slim-m/commit/202f849ea17cee853c0f2051ce32d4b3c4ec49d1))
+
 ## [0.38.0](https://github.com/NC1107/slim-m/compare/server-v0.37.0...server-v0.38.0) (2026-08-12)
 
 
