@@ -400,16 +400,23 @@ void main() {
       reason: 'the panel must outlive the pointer leaving the row',
     );
 
-    final tile = find.byType(InkWell).hitTestable();
-    if (tile.evaluate().isNotEmpty) {
-      await tester.tap(tile.first);
-      await tester.pumpAndSettle();
-      expect(
-        picked,
-        isNotNull,
-        reason: 'a tile click should report a reaction',
-      );
-    }
+    /// Asserted rather than guarded by an `if`. The old finder looked for an
+    /// `InkWell`, which the panel has never rendered - its tiles are
+    /// `EmojiGrid` cells - so the guarded block never ran once, and the tap
+    /// this test exists to make was never made. Found by its own character,
+    /// the way `emoji_picker_test.dart` taps the same grid.
+    final tile = find.descendant(
+      of: panel,
+      matching: find.text('\u{1F600}'),
+    );
+    expect(
+      tile,
+      findsOneWidget,
+      reason: 'the panel must still offer a clickable reaction tile',
+    );
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(picked, isNotNull, reason: 'a tile click should report a reaction');
   });
 
   testWidgets('reactions sit side by side and hug their content, rather than '

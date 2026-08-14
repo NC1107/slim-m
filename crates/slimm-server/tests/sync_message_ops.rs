@@ -176,7 +176,11 @@ async fn no_op_carries_an_actor_on_any_kind() {
         json!([{ "channel_id": channel.to_string(), "after_seq": 99, "after_op_seq": 0 }]),
     )
     .await;
-    for op in body["scopes"][0]["ops"].as_array().unwrap() {
+    let ops = body["scopes"][0]["ops"].as_array().unwrap();
+    // The edit and the delete above; a filter regression returning none would
+    // otherwise leave the loop below asserting nothing.
+    assert_eq!(ops.len(), 2, "expected the edit and the delete: {ops:?}");
+    for op in ops {
         let keys: Vec<&String> = op.as_object().unwrap().keys().collect();
         assert!(
             !keys.iter().any(|k| k.contains("actor")),
