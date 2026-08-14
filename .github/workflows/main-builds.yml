@@ -63,14 +63,20 @@ jobs:
       server: ${{ steps.filter.outputs.server }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Include patterns only. This action defaults to predicate-quantifier
+      # `some`, which ORs the patterns, so a negated entry like
+      # `!client/CHANGELOG.md` is true of nearly every file in the repo and
+      # makes the whole filter match unconditionally - which is exactly what
+      # it did, running the Android, iOS and Linux client jobs on every
+      # server-only merge and uploading a TestFlight build with no client
+      # change in it. The version-bump exclusion belongs in `on.push.paths`
+      # above, where GitHub's own path semantics apply negation correctly.
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
         with:
           filters: |
             client:
               - 'client/**'
-              - '!client/CHANGELOG.md'
-              - '!client/pubspec.yaml'
             server:
               - 'crates/**'
 
@@ -90,14 +96,8 @@ jobs:
           version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      # libpulse-dev is flutter_webrtc's own build-time switch for Linux screen-share audio; absent, it silently ships without it.
       - name: linux build deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libayatana-appindicator3-dev libpulse-dev
+        uses: ./.github/actions/linux-build-deps
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -149,7 +149,7 @@ jobs:
         env:
           VER: ${{ steps.ver.outputs.version }}
         run: |
-          docker run --rm -v "${PWD}:/w" -w /w -e VER fedora:latest bash -eo pipefail -c '
+          docker run --rm -v "${PWD}:/w" -w /w -e VER fedora:44 bash -eo pipefail -c '
             dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
             mkdir -p rpmbuild/SOURCES
             cp dist/slim-m-client-*-linux-amd64.tar.gz \
@@ -412,7 +412,11 @@ jobs:
     needs: [changes, linux-client]
     if: needs.changes.outputs.client == 'true'
     uses: ./.github/workflows/copr-publish.yml
-    secrets: inherit
+    # Named rather than `inherit`: this job reads COPR_CONFIG and nothing else,
+    # and inherit would hand a container running dnf-installed tooling ambient
+    # access to the signing keystores and App Store credentials too.
+    secrets:
+      COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
 
   # One native amd64 image per push, tagged by commit sha, main and latest; moving latest here is continuous deployment to the live instance, see the header above.
   server-image:
@@ -433,6 +437,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # sbom and provenance because this is the image Watchtower actually
+      # pulls: release.yml's own build carries both plus a cosign signature,
+      # and until now the artifact that reaches production carried none of it.
+      # Cache here and not in release.yml, where a stale layer would reach a
+      # signed artifact rather than a rebuildable continuous one.
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -443,3 +452,7 @@ jobs:
             ${{ env.IMAGE }}:main
             ${{ env.IMAGE }}:latest
           push: true
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
