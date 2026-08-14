@@ -13,7 +13,7 @@
 # .github/workflows/release.yml), so there is no slow QEMU cross-compilation and
 # no cross-linking toolchain to maintain.
 
-FROM rust:1-alpine AS builder
+FROM rust:1-alpine@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900 AS builder
 RUN apk add --no-cache musl-dev
 # Build against the committed .sqlx query cache; no database at build time.
 ENV SQLX_OFFLINE=true
@@ -23,7 +23,7 @@ RUN cargo build --locked --release --bin slimm-server \
     && mkdir -p /out/data \
     && cp target/release/slimm-server /out/slimm-server
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:1b7b9f0f0e0a1d2155f531db587cc48ec26aaf97ab64364225f5bf18a054e66a
 COPY --from=builder /out/slimm-server /usr/local/bin/slimm-server
 COPY --from=builder --chown=nonroot:nonroot /out/data /data
 

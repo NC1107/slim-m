@@ -4,7 +4,7 @@ name: copr-publish
 # Called from main-builds.yml's own copr job, pulled out into its own file
 # once that workflow reached the 500-line hard ceiling; see docs/ci.md.
 # A reusable workflow rather than a composite action, since this needs its
-# own container image (fedora:latest) a composite action cannot declare.
+# own container image (fedora:44) a composite action cannot declare.
 on:
   workflow_call:
     secrets:
@@ -18,7 +18,7 @@ jobs:
   # Snapshot build submitted to the same COPR project `dnf upgrade` already tracks on the owner's Fedora desktop.
   submit:
     runs-on: ubuntu-latest
-    container: fedora:latest
+    container: fedora:44
     permissions:
       contents: read
     env:
