@@ -1,49 +1,53 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The one affordance that opens a channel's canvas.
 ///
-/// It sits in every channel header, text and voice, at every width, rather
-/// than only inside a live call. A call needs a configured SFU and a voice
-/// channel, and a fresh self-host has neither - bootstrap seeds one text
-/// channel and `SLIMM_LIVEKIT_URL` is optional - so an in-call-only entry
-/// would leave the product's signature feature invisible on most deployments
-/// while the endpoint behind it works fine. That is the exact shape of gap
-/// this repo has shipped three times before.
+/// It sits in a voice channel's header, at every width, rather than only
+/// inside a live call: a call needs a configured SFU and somebody already in
+/// it, so an in-call-only entry would leave the product's signature feature
+/// invisible whenever the room is empty.
 ///
-/// Self-gated on the channel's own kind, the shape `DmCallButton`'s doc
-/// comment already names: a DM's base permissions never include
-/// `USE_CANVAS` (`store/dms.rs`'s `DM_BASE`, and DMs skip the overwrite
-/// evaluator that could otherwise grant it), so every canvas route 403s
-/// there unconditionally - the button hides rather than offering an
-/// affordance guaranteed to fail.
+/// Voice channels only, by owner decision (backlog, 2026-08-13, "there also
+/// should not be a canvas in text channels, only voice channels"). This
+/// deliberately reverses what this comment used to argue: that a text
+/// channel needs it too, because bootstrap seeds one text channel and
+/// `SLIMM_LIVEKIT_URL` is optional, so a fresh self-host with no voice
+/// channel now cannot reach the canvas at all. That consequence is real and
+/// accepted rather than overlooked - the canvas belongs to talking together,
+/// and a deployment that wants one creates a voice channel.
+///
+/// The kind arrives as [isVoice] from the header that builds this, rather
+/// than being read back out of the local store: every call site already
+/// knows it, and a store round trip would make an affordance appear a frame
+/// or two late on a screen that has the answer synchronously. It subsumes
+/// the DM case for free - a DM is not a voice channel, and its base
+/// permissions never include `USE_CANVAS` (`store/dms.rs`'s `DM_BASE`, and
+/// DMs skip the overwrite evaluator that could otherwise grant it), so every
+/// canvas route 403s there regardless.
 library;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../providers/providers.dart';
 import 'canvas_pane.dart';
 
 class CanvasOpenButton extends ConsumerWidget {
-  const CanvasOpenButton({super.key, required this.channelId});
+  const CanvasOpenButton({
+    super.key,
+    required this.channelId,
+    required this.isVoice,
+  });
 
   final String channelId;
 
+  /// Whether this channel is a voice channel, the only kind that has a canvas.
+  final bool isVoice;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!isVoice) return const SizedBox.shrink();
     final open = ref.watch(canvasOpenProvider) == channelId;
-    final storeAsync = ref.watch(storeProvider);
-    return storeAsync.maybeWhen(
-      // Unresolved reads as available - see this class's own doc comment.
-      orElse: () => _button(ref, open),
-      data: (store) => StreamBuilder<Channel?>(
-        stream: store.watchChannelRow(channelId),
-        builder: (context, snapshot) => snapshot.data?.kind == 'dm'
-            ? const SizedBox.shrink()
-            : _button(ref, open),
-      ),
-    );
+    return _button(ref, open);
   }
 
   Widget _button(WidgetRef ref, bool open) => AppIconButton(

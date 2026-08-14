@@ -297,8 +297,9 @@ void main() {
 
   /// The reachability guard. The canvas has no route, so nothing generic can
   /// see it: this is what fails if the header's affordance is ever dropped and
-  /// the feature quietly becomes unreachable again.
-  testWidgets('the channel header opens the canvas', (tester) async {
+  /// the feature quietly becomes unreachable again. A voice channel's header,
+  /// since that is the only kind that carries the button now.
+  testWidgets('a voice channel header opens the canvas', (tester) async {
     final fixture = CanvasPaneFixture();
     final container = fixture.container();
     addTearDown(container.dispose);
@@ -313,7 +314,7 @@ void main() {
             body: ChannelHeader(
               channelId: 'c1',
               name: 'general',
-              isVoice: false,
+              isVoice: true,
               searchOpen: false,
               onToggleSearch: _noop,
             ),

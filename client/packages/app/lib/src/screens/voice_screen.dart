@@ -110,6 +110,11 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
     // Without this, `join`'s own in-flight window (see its own comment) reads as `attemptedThis` and briefly flashes the rejoin screen.
     final joiningHere = inThisChannel && voice.joining;
     final busyElsewhere = _busyElsewhere(voice, channelId);
+    // Mounting already connected is not a fresh arrival, and this screen is
+    // remounted with an empty [_autoJoinedFor] every time the canvas pane
+    // swaps in and back out - without this, hanging up after that round trip
+    // reads as an arrival and auto-joins the call straight back.
+    if (connectedHere) _autoJoinedFor = channelId;
     final attemptedThis = _autoJoinedFor == channelId;
 
     // `join` never clears `channelId` on error, so an error only ever belongs here.

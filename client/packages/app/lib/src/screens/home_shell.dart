@@ -406,7 +406,7 @@ class _VoiceConversationHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: _ChannelTitle(channelId: channelId)),
-          CanvasOpenButton(channelId: channelId),
+          CanvasOpenButton(channelId: channelId, isVoice: true),
         ],
       ),
     );
