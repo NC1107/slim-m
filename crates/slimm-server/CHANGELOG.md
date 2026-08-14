@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.1](https://github.com/NC1107/slim-m/compare/server-v0.39.0...server-v0.39.1) (2026-08-14)
+
+
+### Performance Improvements
+
+* **db:** index the four account-deletion and role-member scans ([#663](https://github.com/NC1107/slim-m/issues/663)) ([921e97e](https://github.com/NC1107/slim-m/commit/921e97efb7a34a09ef1ae87aef68730c71492e31))
+
 ## [0.39.0](https://github.com/NC1107/slim-m/compare/server-v0.38.0...server-v0.39.0) (2026-08-14)
 
 
