@@ -12,6 +12,38 @@ The name "slim-m" is a working placeholder; a final name is chosen before 1.0.
 
 Core reading, in order: [docs/BRIEF.md](docs/BRIEF.md), [docs/STRATEGY.md](docs/STRATEGY.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the decision records in [docs/decisions/](docs/decisions/).
 
+## Renumbering a migration took production down, and main is continuously deployed (2026-08-13)
+
+The live instance crashlooped for five hours, reported by the owner as "server is offline in slim app".
+Read this before renaming, renumbering or editing any file under `crates/slimm-server/migrations/`, and before assuming a merge to main is not a deploy.
+
+**The cause was a merge train's own conflict repair, and it was invisible to every test in the repo.**
+Nineteen parallel jobs merged in one day, and three of them independently wrote a `0044_` migration.
+Two landed, so the second was dead on any database that had run the first; hotfix #647 renumbered `channel_notification_prefs` from 0044 to 0045 and gave 0044 to `message_retention`, which is correct for a fresh database and fatal for one already running.
+sqlx keys an applied migration by version number and validates it by a sha384 over the file's own bytes, so version 44 having new content made every later startup fail with `migration 44 was previously applied but has been modified`.
+The whole suite builds fresh databases, where the renumbered file applies perfectly, so nothing could see it: the failure only exists where a *previous* version 44 is already recorded.
+
+**The deployment assumption that let it reach production was wrong, and it was wrong in this file.**
+The "Running deployment" section below said `latest` is what a release publishes, and the merge train proceeded on that reading.
+`main-builds.yml`'s own `server-image` job also moves `latest`, on every push to main touching the server, and its own comment says so in the words "continuous deployment to the live instance".
+Watchtower pulled the pre-hotfix image, applied `channel_notification_prefs` as 44, and then pulled the post-hotfix image, which refused to start against the database the first one had just written.
+Server 0.39.0 was never even released; production had been running unreleased main all along.
+
+**The repair was one statement, and what made it safe was that the rename changed no content.**
+The applied row's stored checksum matched today's `0045_channel_notification_prefs.sql` byte for byte, so only the version number was ever wrong: `UPDATE _sqlx_migrations SET version=45 WHERE version=44 AND description='channel notification prefs'`, after which sqlx applied 44 and 46 normally on the next start.
+sqlx has no contiguity requirement, so applying 44 after 45 is already recorded is fine.
+Taken through a throwaway `python:3-alpine` container on the same volume, the way this file's own password-reset recovery note already describes, with a file copy of the database taken first.
+Verified after: 44, 45 and 46 all applied, 7012 messages and 52 users intact, `/healthz` and `/version` answering.
+
+**`scripts/check-migration-versions.py` is the gate, and it reads `origin/main` rather than a recorded list so it cannot go stale.**
+It fails on two files claiming one version, and on any migration already on main being edited, renamed to a different number, or deleted.
+Mutation-tested in all three directions against the real tree, each restored afterward and confirmed byte-identical.
+Wired into `hygiene`, which already runs on every PR and needs no toolchain for this.
+
+**The rule this leaves: a migration that has reached main is immutable.**
+Not "should not be changed" - it cannot be, because a deployed database validates it by checksum and refuses to start.
+Fixing a bad migration means adding another one, and a version collision has to be resolved in the PR that would create it rather than by renumbering afterward.
+
 ## The two iOS sound gaps the seven-sounds entry named as out of scope, closed (2026-08-12)
 
 The seven-sounds entry below lists three things as deliberately not built: "the iOS Notification Service Extension's on-device sound selection and its call-session precedence rules... and a separate CallKit ringtone file."
@@ -2304,7 +2336,9 @@ The public name is `slim.npc-server.top`, a subdomain under the `npc-server.top`
 A pinned instance runs on the owner's homelab box, deployed 2026-07-24.
 
 - Host `npc@10.0.0.100` (Ubuntu, Docker). Stack at `/home/npc/docker-server/npc_projects/slim-m/` (`docker-compose.yml` + `.env`), following that host's one-directory-per-stack convention.
-- Image `ghcr.io/nc1107/slim-m-server:latest` (the release now publishes a rolling `latest` alongside the version and sha tags), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
+- Image `ghcr.io/nc1107/slim-m-server:latest` (~~the release now publishes a rolling `latest` alongside the version and sha tags~~), SQLite on the named volume `slim-m_slimm_data`, reachable at `http://10.0.0.100:8095`.
+  Corrected 2026-08-13, and the correction is the whole reason the live instance went down for five hours: `release.yml` publishes `latest` **and so does `main-builds.yml`**, whose own `server-image` job moves that tag on every push to main touching the server, with its own comment calling that "continuous deployment to the live instance".
+  So a server change reaching main reaches this deployment within minutes, unreleased and ungated, and reading this line as "only a release deploys" is what let a merge train's renumbered migration land on production.
 - Auto-updates are on: the container carries `com.centurylinklabs.watchtower.enable=true`. That host runs **exactly one** Watchtower, `scw-watchtower` in `npc_projects/scw_server/`, in label mode across every stack. Do NOT add a second Watchtower to this stack: a new instance stops the existing one on startup, which is how `scw-watchtower` briefly got killed on 2026-07-24 before being restored.
 - Published at **`https://slim.npc-server.top`** through Traefik since 2026-07-25 (joined `traefik_proxy`, labels mirror the relay stack's), and still reachable on the LAN at `http://10.0.0.100:8095`.
 - Verified live against 0.5.0 (auto-updated from 0.4.0 by Watchtower with no manual step, proving the pipeline): `/healthz`, `/version`, a 13-check auth and WebSocket smoke run (including a real ws hello handshake and post-deletion refusal), and a 17-check messaging run (bootstrap seeding, send, idempotent retry, list, edit, read state, sync, and the member-versus-admin permission split), plus rate limiting confirmed live (5 answered, then 429).
