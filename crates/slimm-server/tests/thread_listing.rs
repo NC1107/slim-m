@@ -151,6 +151,9 @@ async fn listing_returns_threads_newest_activity_first_with_the_parent_snippet()
     let thread_b = open_thread(&app, &messages, &parent_b_id, &admin).await;
     let thread_b_id = thread_b["id"].as_str().unwrap().to_owned();
 
+    // Past the millisecond activity is measured in, or the reply ties thread_b's opening.
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+
     // Reply into the *older* thread last, so activity order and open order disagree.
     send(
         &app,
