@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.42.1](https://github.com/NC1107/slim-m/compare/client-v0.42.0...client-v0.42.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **mentions:** a dropped connection no longer unhighlights every mention ([#660](https://github.com/NC1107/slim-m/issues/660)) ([b5b2255](https://github.com/NC1107/slim-m/commit/b5b2255ed28a6354a59ff004aaff64cf00a03e0b))
+* **poll:** an option label sits on its row's centre line ([#658](https://github.com/NC1107/slim-m/issues/658)) ([8998ed0](https://github.com/NC1107/slim-m/commit/8998ed0de002b0cded4ecfe8505e73f9a6670445))
+* **rail:** a phone keeps the held press for the channel context menu ([#655](https://github.com/NC1107/slim-m/issues/655)) ([70666fe](https://github.com/NC1107/slim-m/commit/70666fe1abb2e81bd682c106fd31f827b773325b))
+* **rail:** losing the connection no longer reshapes the channel list ([#657](https://github.com/NC1107/slim-m/issues/657)) ([ce629cf](https://github.com/NC1107/slim-m/commit/ce629cf466ca1087e70429740a9356f01e1cfcf2))
+* **transcript:** a minute of silence starts a new message block ([#661](https://github.com/NC1107/slim-m/issues/661)) ([be13b2f](https://github.com/NC1107/slim-m/commit/be13b2f88df8cf95706876ef1641cf3ad680f3f8))
+* **voice:** hanging up after the canvas closes no longer rejoins the call ([#653](https://github.com/NC1107/slim-m/issues/653)) ([686d78e](https://github.com/NC1107/slim-m/commit/686d78ec46fae16c6ece3c398d9c41f03f68c99d))
+
 ## [0.42.0](https://github.com/NC1107/slim-m/compare/client-v0.41.1...client-v0.42.0) (2026-08-13)
 
 
