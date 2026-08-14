@@ -53,9 +53,10 @@ Four reported findings did not survive verification and were corrected or reject
 
 ## Server: performance and domain logic
 
-- **SRV1. The reaction summary is recomputed once per connected client** (`http/ws/authorization.rs:314`). High.
-  `authorize()` runs independently per open WebSocket for every hub broadcast, and the `ReactionsChanged` branch calls `store.reactions_for_message(message_id, ctx.user_id)` fresh each time with no cache, so N viewers cost N database round trips per reaction.
-  Note when fixing: the result is deliberately viewer-specific, because blocked reactors are excluded per viewer, so a single shared cache across connections would be wrong.
+- **SRV1. The reaction summary is recomputed once per connected client** (`http/ws/authorization.rs:314`). Medium.
+  `authorize()` runs independently per open WebSocket for every hub broadcast, and the `ReactionsChanged` branch calls `store.reactions_for_message(message_id, ctx.user_id)` fresh each time with no cache, so N viewers cost N of these per reaction.
+  Downgraded from High on 2026-08-14 after measuring it, and the original wording overstated it in two ways worth keeping written down. It is one query rather than a round trip per reactor: both sides are primary-key scans on `WITHOUT ROWID` tables, about 0.18ms on a realistic seed, of which the blocked-reactor subquery is roughly 17%. And the cost that actually scales is contention for a pool capped at 8 connections shared server-wide, which is a smaller and different claim than "N database round trips".
+  Note when fixing: the result is deliberately viewer-specific, because blocked reactors are excluded per viewer, so a single shared cache across connections would be wrong. This is not a theoretical objection - `hub/event.rs:49` says so in its own doc comment, decision record 0009 fixes it as an invariant, and commit `7cf0618b` fixed exactly this leak once already.
   Fix: compute once per event and filter per viewer, or cache per message keyed on the blocklist inputs. Effort: medium.
 
 - **SRV2. The retention sweep holds the write lock across roughly 1000 sequential round trips** (`store/message_retention.rs:129`). Medium.
@@ -334,39 +335,25 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   The real problem is that `expectSettled`, whose stated job is catching a placeholder standing in for content, did not fire, so the Roles surface is entirely unguarded by the snapshot suite.
   Fix: settle the roles provider on that surface (`roles` is absent from `_nestedResolveSurfaces`) and make `expectSettled` fail on an empty content area rather than emitting a blank PNG. Effort: medium.
 
-- **TEST3. `message_row_test.dart:403` skips its only real assertion via an `if` guard.** High.
-  The test exists to catch the emoji panel unmounting when the pointer leaves the row before a reaction tile can be clicked, and its own comment says so, but the tap-and-assert block is wrapped in `if (tile.evaluate().isNotEmpty)`.
-  If that regression reappears the finder matches zero widgets, the block is skipped, and the test still passes green.
-  Fix: `expect(tile, findsAtLeastNWidgets(1))` before the tap. Effort: small.
+- ~~**TEST3. `message_row_test.dart:403` skips its only real assertion via an `if` guard.**~~ High. Fixed in PLACEHOLDER_PR.
+  Worse than recorded, and worth keeping written down. The guarded finder looked for an `InkWell` inside the emoji panel, which that panel has never rendered - its tiles are `EmojiGrid` cells wrapped in a `GestureDetector` - so it matched zero widgets from the day the test was written and the tap never once ran. The entry assumed the block ran until the regression returned; it had never run at all.
 
-- **TEST4. `touch_targets_test.dart:78` loops over possibly-empty finders.** Medium.
-  It walks `AppIconButton` and `AppListRow` with no non-empty precheck, while the sibling test directly above asserts exactly that, with a comment calling it "proof the loop above had rows to walk rather than passing vacuously".
-  Fix: assert `findsNWidgets(2)` on both before the loops. Effort: small.
+- ~~**TEST4. `touch_targets_test.dart:78` loops over possibly-empty finders.**~~ Medium. Fixed in PLACEHOLDER_PR.
 
-- **TEST5. `sync_message_ops.rs:179` loops over a possibly-empty ops array.** Medium.
-  It asserts no op key contains `"actor"` without asserting the array is non-empty, so a filtering regression returning zero ops keeps it green.
-  Fix: assert the expected length of 2 first. Effort: small.
+- ~~**TEST5. `sync_message_ops.rs:179` loops over a possibly-empty ops array.**~~ Medium. Fixed in PLACEHOLDER_PR.
 
-- **TEST6. `canvas_ops/feed.rs:267` reads source text without the shared scrubber.** Medium.
-  It matches and counts substrings on raw `fs::read_to_string` output, and its own doc comment claims it reads the source "the way `canvas_index.rs` reads the viewport query" when that file routes the identical check through `support::function_body`.
-  A doc comment mentioning `&self.pool` would flip the assertion.
-  Fix: scope it with `support::function_body(&source, "pub async fn list_canvas_ops(")`. Effort: small.
+- ~~**TEST6. `canvas_ops/feed.rs:267` reads source text without the shared scrubber.**~~ Medium. Fixed in PLACEHOLDER_PR.
+  The recorded fix was wrong and the entry is kept rather than quietly corrected. It proposed narrowing to `support::function_body(&source, "pub async fn list_canvas_ops(")`, which would have scrubbed the comments and also dropped every other function in the file from a whole-file check. `support::code_only` over the whole file was shipped instead: same scrubbing, no loss of scope.
 
-- **TEST7. `refresh_token_index_plan.rs:105` reads source text without the shared scrubber.** Medium.
-  A local bare `read_source` feeds a `contains` check that is the only thing tying the test's hand-typed `EXPLAIN QUERY PLAN` SQL to the join `push.rs` runs, so a rewrite leaving a nearby comment quoting the old text keeps it passing.
-  Fix: wrap in `support::code_only`. Effort: small.
+- ~~**TEST7. `refresh_token_index_plan.rs:105` reads source text without the shared scrubber.**~~ Medium. Fixed in PLACEHOLDER_PR.
+  The recorded fix would have broken the test, which is the more useful half of this entry. It proposed `support::code_only`, but the join being searched for lives *inside* a query string literal, and that scrubber blanks strings as well as comments, so it would have destroyed the thing being matched. The fix anchors to a real `sqlx::query*!` call site instead, which proves the text is in a live query rather than merely outside a comment.
 
-- **TEST8. `e2e_voice.py:177` cannot fail on the case it names.** Medium.
-  `mute_propagates` builds `unmuted` with `if p.get("tracks")`, dropping any participant publishing no microphone track at all, then asserts `not any(unmuted.values())`, trivially true over an empty dict.
-  The docstring names "publishing no microphone track at all" as the failure mode it guards.
-  Fix: assert the dict is non-empty first. Effort: small.
+- ~~**TEST8. `e2e_voice.py:177` cannot fail on the case it names.**~~ Medium. Fixed in PLACEHOLDER_PR.
 
-- **TEST9. `e2e_voice.py:224` repeats TEST8's shape.** Medium.
-  `canvas_keeps_call_controls` guards its mute half with `assert any(...)` and leaves the unmute half vacuous.
-  Fix: as TEST8. Effort: small.
+- ~~**TEST9. `e2e_voice.py:224` repeats TEST8's shape.**~~ Medium. Fixed in PLACEHOLDER_PR.
 
-- **TEST10. `composer_test.dart:248` loops over a possibly-empty finder,** while the desktop test in the same file asserts `findsNWidgets(5)` before its otherwise identical loop. Low.
-  Fix: add the same precheck. Effort: small.
+- ~~**TEST10. `composer_test.dart:248` loops over a possibly-empty finder.**~~ Low. Fixed in PLACEHOLDER_PR.
+  The entry copied the desktop sibling's `findsNWidgets(5)`; the phone density renders three, because poll and code fold into the "+" sheet.
 
 - **TEST11. Reserved-username refusal has no integration coverage** (`http/auth.rs:278`). Low.
   The `@everyone` and `@here` refusal is covered only by a unit test calling `validate_username()` directly; no test posts `/auth/register` with those names over the real router, so a regression that stops the handler calling the validator would pass the suite.

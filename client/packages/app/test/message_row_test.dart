@@ -405,10 +405,7 @@ void main() {
     /// `EmojiGrid` cells - so the guarded block never ran once, and the tap
     /// this test exists to make was never made. Found by its own character,
     /// the way `emoji_picker_test.dart` taps the same grid.
-    final tile = find.descendant(
-      of: panel,
-      matching: find.text('\u{1F600}'),
-    );
+    final tile = find.descendant(of: panel, matching: find.text('\u{1F600}'));
     expect(
       tile,
       findsOneWidget,

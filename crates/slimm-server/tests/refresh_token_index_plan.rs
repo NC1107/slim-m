@@ -97,19 +97,18 @@ async fn the_revocation_update_seeks_the_session_index() {
 /// not valid SQL, so this asserts the shape itself: before 0042 this exact
 /// join planned as an automatic covering index (a scan in disguise), and the
 /// grep below is what keeps this test honest about the shape still existing.
+///
+/// That grep is anchored to a real query macro rather than run over the raw
+/// file, because a comment quoting this join would otherwise satisfy it while
+/// the query itself had changed shape. The usual scrubber is no help here:
+/// the join lives inside the literal `code_only` blanks. Anchoring instead
+/// proves the text sits in a live query, and panics naming the anchor when no
+/// query carries it, which is what makes the call below an assertion.
 #[tokio::test]
 async fn the_session_join_no_longer_builds_an_automatic_index() {
     let (pool, _guard) = new_pool("slimm-rt-plan-join").await;
     let push_source = read_source("src/store/push.rs");
-    // Anchored to a real query macro rather than searched for in the raw file.
-    // A comment quoting this join would otherwise satisfy the check while the
-    // query itself had changed shape, and `code_only` is no help here because
-    // the join lives inside the literal that scrubber blanks. Panics naming
-    // the anchor when no live query carries it, which is the assertion.
-    support::query_literal_containing(
-        &push_source,
-        "JOIN refresh_tokens r ON r.session_id = s.id",
-    );
+    support::query_literal_containing(&push_source, "JOIN refresh_tokens r ON r.session_id = s.id");
 
     let plan = plan_of(
         &pool,

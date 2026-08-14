@@ -103,7 +103,10 @@ async fn deleting_an_account_seeks_the_uploader_index() {
 async fn deleting_an_account_seeks_the_overwrite_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-overwrites").await;
     let source = source_of("src/store/account_deletion.rs");
-    let sql = support::query_literal_containing(&source, "DELETE FROM channel_overwrites WHERE target_type");
+    let sql = support::query_literal_containing(
+        &source,
+        "DELETE FROM channel_overwrites WHERE target_type",
+    );
 
     let plan = plan_of(&pool, &sql, 1).await;
     assert_uses(
@@ -121,7 +124,10 @@ async fn deleting_an_account_seeks_the_overwrite_index() {
 async fn deleting_a_role_seeks_the_overwrite_index() {
     let (pool, _guard) = new_pool("slimm-deletion-plan-role-overwrites").await;
     let source = source_of("src/store/roles.rs");
-    let sql = support::query_literal_containing(&source, "DELETE FROM channel_overwrites WHERE target_type");
+    let sql = support::query_literal_containing(
+        &source,
+        "DELETE FROM channel_overwrites WHERE target_type",
+    );
 
     let plan = plan_of(&pool, &sql, 1).await;
     assert_uses(

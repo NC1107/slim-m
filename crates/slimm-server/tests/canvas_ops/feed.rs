@@ -262,13 +262,18 @@ async fn account_deletion_nulls_the_actor_id_of_a_placed_op() {
 /// catch a regression here (SQLite's own writes are fast enough that the
 /// window rarely lands), so this reads the source the way
 /// `canvas_index.rs` reads the viewport query rather than timing anything.
+///
+/// It reads the scrubbed source rather than the raw file: unscrubbed, a doc
+/// comment explaining why a direct pool read would be wrong is itself enough
+/// to satisfy the check that no direct pool read exists. The whole file stays
+/// in scope rather than being narrowed to this one function, which would
+/// scrub the comments too and quietly drop every other function from the
+/// check.
 #[test]
 fn the_ops_feed_reads_only_through_one_transaction() {
     let raw =
         fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/store/canvas_ops.rs"))
             .expect("read the canvas ops store module");
-    // Scrubbed, or a doc comment saying why a direct pool read would be wrong
-    // satisfies the check that no direct pool read exists.
     let source = crate::support::code_only(&raw);
     assert!(
         !source.contains("&self.pool"),
