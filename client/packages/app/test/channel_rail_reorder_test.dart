@@ -95,11 +95,11 @@ void main() {
       isNot(['a', 'b', 'c']),
       reason: 'the drag must have reported a real reordering',
     );
-    expect(
-      reported!.single.channelIds.toSet(),
-      {'a', 'b', 'c'},
-      reason: 'the same three ids, just reordered',
-    );
+    expect(reported!.single.channelIds.toSet(), {
+      'a',
+      'b',
+      'c',
+    }, reason: 'the same three ids, just reordered');
   });
 
   testWidgets(
