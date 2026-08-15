@@ -121,6 +121,12 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         sqlx::query!(
+            "UPDATE moderation_audit_log SET actor_id = NULL WHERE actor_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
             "UPDATE message_ops SET actor_id = NULL WHERE actor_id = ?",
             user_id
         )

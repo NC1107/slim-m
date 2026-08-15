@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE moderation_audit_log SET actor_id = NULL WHERE actor_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "3933f6c86181df548ca3d62be851c58f5111aeb158257391851c26dcb775d200"
+}

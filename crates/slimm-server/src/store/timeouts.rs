@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::{Store, now_ms};
 use crate::ids::UserId;
 use crate::permissions::Permissions;
@@ -60,6 +61,10 @@ impl Store {
     ///
     /// Replacing rather than refusing is what lets a moderator shorten one
     /// they overdid, and re-issuing is the only thing "extend it" could mean.
+    ///
+    /// The replaced row is gone afterwards, so each issue is also appended to
+    /// `moderation_audit_log` in the same transaction; that log is the only
+    /// place a moderator can see that this is the third one this month.
     pub async fn set_member_timeout(
         &self,
         user_id: UserId,
@@ -68,6 +73,8 @@ impl Store {
         issued_by: UserId,
     ) -> anyhow::Result<()> {
         let now = now_ms();
+        let mut tx = self.begin_write().await?;
+
         sqlx::query!(
             "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)
              VALUES (?, ?, ?, ?, ?)
@@ -82,18 +89,68 @@ impl Store {
             issued_by,
             now
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: issued_by,
+                subject_id: user_id,
+                action: "timeout",
+                reason,
+                until: Some(until),
+                created_at: now,
+            },
+        )
+        .await?;
+
+        tx.commit().await?;
         Ok(())
     }
 
     /// Lifts a timeout. Idempotent: lifting one that already expired, or one
     /// that never existed, is a success rather than an error, because in both
     /// cases the member can speak afterwards, which is what the caller asked.
-    pub async fn clear_member_timeout(&self, user_id: UserId) -> anyhow::Result<()> {
-        sqlx::query!("DELETE FROM member_timeouts WHERE user_id = ?", user_id)
-            .execute(&self.pool)
+    ///
+    /// Only a lift that found a row is audited, and it carries the deadline it
+    /// cut short: an idempotent second call changed nothing, so recording it
+    /// would put an act in the trail that never happened. An elapsed row still
+    /// counts, since deleting it is a real edit even though nobody was silent
+    /// by then.
+    pub async fn clear_member_timeout(
+        &self,
+        user_id: UserId,
+        cleared_by: UserId,
+    ) -> anyhow::Result<()> {
+        let now = now_ms();
+        let mut tx = self.begin_write().await?;
+
+        let lifted = sqlx::query_scalar!(
+            "SELECT until FROM member_timeouts WHERE user_id = ?",
+            user_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(until) = lifted {
+            sqlx::query!("DELETE FROM member_timeouts WHERE user_id = ?", user_id)
+                .execute(&mut *tx)
+                .await?;
+            record_moderation_audit(
+                &mut tx,
+                ModerationAudit {
+                    actor_id: cleared_by,
+                    subject_id: user_id,
+                    action: "timeout_cleared",
+                    reason: None,
+                    until: Some(until),
+                    created_at: now,
+                },
+            )
             .await?;
+        }
+
+        tx.commit().await?;
         Ok(())
     }
 

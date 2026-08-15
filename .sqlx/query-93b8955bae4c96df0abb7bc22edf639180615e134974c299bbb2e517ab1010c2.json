@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT until FROM member_timeouts WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "until",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "93b8955bae4c96df0abb7bc22edf639180615e134974c299bbb2e517ab1010c2"
+}
