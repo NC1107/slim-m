@@ -75,6 +75,9 @@ def click(label_json):
         if ((nx.toLowerCase()===want)!==(ny.toLowerCase()===want)) {
           return nx.toLowerCase()===want ? -1 : 1;
         }
+        var sx=nx.toLowerCase().indexOf(want)===0;
+        var sy=ny.toLowerCase().indexOf(want)===0;
+        if (sx!==sy) return sx ? -1 : 1;
         if (x!==y && x.contains(y)) return 1;
         if (x!==y && y.contains(x)) return -1;
         return nx.length-ny.length;
