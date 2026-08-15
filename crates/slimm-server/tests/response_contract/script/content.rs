@@ -437,6 +437,17 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
     )
     .await;
 
+    // Two at once, so the bulk path is driven with more than one id.
+    let mut doomed_ids = Vec::new();
+    for _ in 0..2 {
+        let body = json!({ "id": Uuid::now_v7().to_string(), "content": "delete us" });
+        let sent = c.json("sendMessage", "POST", &messages, root, body).await;
+        doomed_ids.push(text(&sent, "id").to_owned());
+    }
+    let bulk = format!("{messages}/bulk-delete");
+    let ids = json!({ "message_ids": doomed_ids });
+    c.json("bulkDeleteMessages", "POST", &bulk, root, ids).await;
+
     message
 }
 

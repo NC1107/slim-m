@@ -40,6 +40,7 @@ mod message_ops;
 mod message_retention;
 mod message_search;
 mod messages;
+mod messages_bulk;
 mod moderation_audit;
 mod notifications;
 mod permissions;
@@ -88,6 +89,7 @@ pub use message_ops::{MessageOpEntry, MessageOpKind, MessageOpsPage};
 pub use message_retention::{MAX_MESSAGE_RETENTION_DAYS, PrunedMessage, SweptMessageRetention};
 pub use message_search::{MessageSearchFilters, SearchError};
 pub use messages::{Edited, MessageDeletion, SendError, Sent};
+pub use messages_bulk::{BulkDeleteError, BulkDeletion, DeletedMessage};
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
     CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,
