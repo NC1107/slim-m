@@ -53,6 +53,15 @@ def sign_in(client, server, username, password):
 
 
 def go_home(client):
+    """Back to a screen the next scenario can actually drive.
+
+    The URL test alone is not enough, and a real run proved it: a modal opened
+    over a channel leaves `#/channels` in the href while nothing behind it can
+    be clicked, so this returned happy and the next scenario failed looking for
+    a composer the barrier covered. That stranding cascaded into twenty
+    scenarios more than once, including on main.
+    """
+    client.dismiss_overlay()
     if "#/channels" not in (client.ev("location.href") or ""):
         client.ev("location.hash = '#/channels'")
         time.sleep(2)

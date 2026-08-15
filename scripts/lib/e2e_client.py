@@ -20,6 +20,7 @@ import e2e_js
 
 TIMEOUT = 90
 _MOUSE = "Input.dispatchMouseEvent"
+_KEY = "Input.dispatchKeyEvent"
 # A private directory when unset, rather than a guessable shared one.
 SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
 # Enough to carry a launch's worth of failures without holding a whole run.
@@ -212,6 +213,19 @@ class Client:
         value = "none" if on else ""
         self.ev(e2e_js.set_gestures(json.dumps(value)))
         time.sleep(0.2)
+
+    def dismiss_overlay(self, settle=0.4):
+        """Escape, to close whatever modal the last scenario left open.
+
+        A no-op with nothing open, which is why it is sent unconditionally
+        rather than after looking for one: a barrier that is already gone
+        cannot be detected any more cheaply than pressing the key.
+        """
+        for kind in ("keyDown", "keyUp"):
+            self.send(_KEY, {"type": kind, "key": "Escape", "code": "Escape",
+                             "windowsVirtualKeyCode": 27,
+                             "nativeVirtualKeyCode": 27})
+        time.sleep(settle)
 
     def hover(self, x, y, settle=1.2):
         self.send(_MOUSE,
