@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.40.0](https://github.com/NC1107/slim-m/compare/server-v0.39.1...server-v0.40.0) (2026-08-15)
+
+
+### Features
+
+* **moderation:** keep a record of a removal or timeout after it is undone ([#670](https://github.com/NC1107/slim-m/issues/670)) ([4b8b96c](https://github.com/NC1107/slim-m/commit/4b8b96c42b2d6089710a0fc875534d91f829b1ce))
+
 ## [0.39.1](https://github.com/NC1107/slim-m/compare/server-v0.39.0...server-v0.39.1) (2026-08-14)
 
 
