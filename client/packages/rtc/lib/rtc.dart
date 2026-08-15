@@ -13,6 +13,7 @@ export 'src/camera_devices.dart';
 export 'src/camera_failure.dart';
 export 'src/camera_switching.dart';
 export 'src/desktop_sources.dart';
+export 'src/local_audio.dart';
 export 'src/media_capabilities.dart';
 export 'src/remote_video_publication.dart';
 export 'src/screen_share.dart';
