@@ -1921,6 +1921,57 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /channels/{channelId}/messages/bulk-delete:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      operationId: bulkDeleteMessages
+      tags: [messages]
+      summary: Soft-delete several messages in one act.
+      description: >
+        Requires MANAGE_MESSAGES in the channel, and refuses a batch naming a
+        message whose author holds a permission the caller does not - a
+        containment rule `deleteMessage` does not apply, so this is deliberately
+        stricter than deleting the same messages one at a time. Ids already
+        deleted are not an error and are simply skipped. Nothing is deleted
+        unless every id resolves and passes, so a refused batch leaves the
+        channel untouched. Each message actually deleted publishes its own
+        `message.deleted` over the WebSocket, one per message rather than one
+        per batch, because clients apply the op stream strictly in sequence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_ids]
+              properties:
+                message_ids:
+                  type: array
+                  description: >
+                    The messages to delete, all in this channel. At most 64 -
+                    the same bound the canvas uses for ids in one op, chosen
+                    against the WebSocket frame ceiling and the op-stream gap
+                    past which a catching-up client is told to reset instead.
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 64
+      responses:
+        "204":
+          description: Every id that was still live has been deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /attachments:
     post:
       operationId: uploadAttachment

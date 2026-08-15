@@ -48,6 +48,7 @@ mod members;
 mod message_dto;
 mod message_enrich;
 mod messages;
+mod messages_bulk;
 mod metrics;
 mod overwrites;
 mod pins;
@@ -131,6 +132,7 @@ pub fn router(state: AppState) -> Router {
         .merge(invites::routes())
         .merge(members::routes())
         .merge(messages::routes())
+        .merge(messages_bulk::router())
         .merge(metrics::routes())
         .merge(overwrites::routes())
         .merge(presence::routes())
