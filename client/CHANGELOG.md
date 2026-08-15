@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.2](https://github.com/NC1107/slim-m/compare/client-v0.42.1...client-v0.42.2) (2026-08-15)
+
+
+### Performance Improvements
+
+* stop two per-frame reapplications, and gate the CI docs ([#668](https://github.com/NC1107/slim-m/issues/668)) ([62bfeb5](https://github.com/NC1107/slim-m/commit/62bfeb55a4c0d5cbff791eb187abaede22c28a43))
+
 ## [0.42.1](https://github.com/NC1107/slim-m/compare/client-v0.42.0...client-v0.42.1) (2026-08-14)
 
 
