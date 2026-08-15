@@ -22,12 +22,12 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-16 are now closed, leaving 54 open, of which 4 are high: CP2, MOD1, MOD2 and MOD5.
-Two of the four high items left are product decisions rather than defects, so they are owner calls and not simply unstarted work; MOD5 says so in its own entry.
+17 are now closed. 53 of the original 70 remain open, of which 3 are high: CP2, MOD2 and MOD5, and MOD1's own work opened three follow-ups (MOD10 to MOD12) recorded below rather than left implicit.
+Two of the three high items left are product decisions rather than defects, so they are owner calls and not simply unstarted work; MOD5 says so in its own entry.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
 CP1 is partly fixed in #668 and stays open, downgraded to Medium.
-MOD3 closed on 2026-08-15 in #670.
+MOD3 closed on 2026-08-15 in #670, and MOD1 in PLACEHOLDER_PR.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -114,6 +114,7 @@ Four reported findings did not survive verification and were corrected or reject
   `store::AttachmentSummary` is canonical and `http/message_dto.rs::AttachmentDto` already carries a `From` impl, but `attachments.rs` and `gifs.rs` each hand-roll the same four fields from the same locals.
   A field added to the canonical shape needs three synchronised edits, and missing one makes the upload or GIF-select response diverge from list and fetch for what the client treats as one object.
   Fix: delete both private DTOs and return `message_dto::AttachmentDto::from(summary)`. Effort: small.
+
 
 ## Client: package boundaries and architecture
 
@@ -234,10 +235,10 @@ Four reported findings did not survive verification and were corrected or reject
 Judged against real moderator scenarios rather than code style.
 Found sound and not listed: the escalation guards, per-channel permission masking, voice ejection, canvas moderation via `MANAGE_CANVAS`, and the conditional UPDATE that stops two moderators both resolving one report.
 
-- **MOD1. There is no way to delete more than one message at a time** (`http/messages.rs:225`). High.
-  `deleteMessage` is the only message-delete operation in the whole schema; there is no delete-by-author, no delete-by-time-range and no purge.
-  A raid therefore costs one API call and one confirmation dialog per spam message, while it is still arriving.
-  Fix: a bounded bulk delete scoped to `MANAGE_MESSAGES`, either an explicit id list or one author's messages in a channel within the last N minutes. Effort: medium.
+- ~~**MOD1. There is no way to delete more than one message at a time**~~ (`http/messages.rs:225`). High. Fixed in PLACEHOLDER_PR.
+  `POST /channels/{channelId}/messages/bulk-delete` takes up to 64 ids, scoped to `MANAGE_MESSAGES`, recorded in `moderation_audit_log` (which needed migration 0049 to widen its action set - 0048's CHECK had no room, exactly as decision 0015 warned a later bulk path would find).
+  The by-author-and-time-window half of the recorded fix was deliberately not built: no index supports `(author, channel, since T)`, so it plans as a channel seek that then walks the channel's whole live history. No `SCAN`, so the existing plan gate would pass while the query stayed unbounded. It needs its own index and migration; carried as MOD10 below.
+  One thing the entry did not anticipate, recorded because it is a real asymmetry rather than an oversight: the bulk path refuses a batch naming a message whose author holds a permission the caller does not, and the single delete has no such rule. `escalation_guard` has never guarded a message. So a moderator can still delete an administrator's message one at a time. Carried as MOD11.
 
 - **MOD2. A wave of new joiners cannot be found** (`client/packages/app/lib/src/widgets/member_pane.dart:113`). High.
   The only member-facing surface groups by presence and sorts alphabetically, with no search, no filter, no sort by join time and no multi-select.
@@ -278,6 +279,18 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   Ban evasion is therefore undetectable by anything the product keeps.
   Note the tension with the project's privacy posture: recording IPs is a decision, but recording the invite used is not.
   Fix, minimally: record the invite code a registration came through and surface it on the member and removal records. Effort: small.
+
+- **MOD10. Bulk delete cannot select by author and time window** (`http/messages_bulk.rs`). Medium.
+  The id-list form shipped; the raid case still wants "this author's last N minutes here" as one call rather than a client first selecting them.
+  Blocked on an index: `messages_channel_live (channel_id, seq DESC)` and `messages_author (author_id)` exist, neither serves the pair, and a query using them alone is unbounded without reporting a `SCAN`. Needs a new index and therefore a new migration. Effort: medium.
+
+- **MOD11. Deleting one message has no containment rule, deleting several does** (`http/messages.rs:255`). Medium.
+  `escalation_guard` guards role edits, member moderation and voice kicks, and now bulk message delete - but never the single delete. A member with `MANAGE_MESSAGES` in a channel can still delete an administrator's message there, one request at a time.
+  Fix: apply the same guard to `deleteMessage`, or decide deliberately that message deletion is exempt and say so in a decision record. Effort: small.
+
+- **MOD12. A delete publishes no unpin and no thread update** (`http/messages.rs:265`). Medium.
+  The `pinned_messages_on_delete` trigger removes the pin and nothing publishes `MessageUnpinned`; `send` calls `notify_reply` and `delete` does not. Both self-correct on refetch, so one stale badge is tolerable - but bulk delete turns one into up to sixty-four at once.
+  Fix: publish both from the delete paths, single and bulk. Effort: small.
 
 ## UX and UI
 
