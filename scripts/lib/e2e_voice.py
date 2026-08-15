@@ -204,7 +204,8 @@ def canvas_keeps_call_controls(client, room_id, channel=L.VOICE_CHANNEL):
     without ever triggering `ConversationPane`'s stage swap back.
     """
     client.click(L.OPEN_CANVAS)
-    client.wait_for("no objects")
+    # "Canvas," not "no objects": the canvas scenarios leave objects here.
+    client.wait_for("Canvas,")
     client.wait_for(L.MUTE)
     client.wait_for(L.LEAVE_CALL)
     client.shot("canvas-with-call-dock")

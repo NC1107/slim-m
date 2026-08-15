@@ -141,11 +141,11 @@ def scenarios(a, b, admin, member, room_id, server):
         ("canvas: placing a shape selects it, and a drag right after moves "
          "it rather than placing a second one",
          lambda: e2e_canvas_shapes.place_then_move_without_switching_tools(
-             a, admin, admin.channel_named(L.TEXT_CHANNEL)["id"])),
+             a, admin, admin.channel_named(L.VOICE_CHANNEL)["id"])),
         ("canvas: a reload proves it actually persisted",
          lambda: e2e_canvas.reload_persists(
-             b, L.TEXT_CHANNEL, admin,
-             admin.channel_named(L.TEXT_CHANNEL)["id"])),
+             b, L.VOICE_CHANNEL, admin,
+             admin.channel_named(L.VOICE_CHANNEL)["id"])),
         ("canvas: closing it", lambda: e2e_canvas.close_on_both(a, b)),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
