@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO moderation_audit_log\n               (actor_id, subject_id, action, reason, until, created_at)\n           VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "a4df651a077d43166d8836f02354e97ba83288125c0434c54fa74c462aeff938"
+}

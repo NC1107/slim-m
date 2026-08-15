@@ -163,7 +163,10 @@ async fn lift_timeout(
     let target = UserId(parse_uuid(&user_id)?);
     authorize(&state, ctx.user_id, target, Permissions::KICK_MEMBERS).await?;
 
-    state.store.clear_member_timeout(target).await?;
+    state
+        .store
+        .clear_member_timeout(target, ctx.user_id)
+        .await?;
     state.hub.publish(Event::MemberTimeoutChanged {
         user_id: target,
         until: None,
@@ -224,7 +227,7 @@ async fn restore_member(
     let target = UserId(parse_uuid(&user_id)?);
     require(&state, ctx.user_id, Permissions::BAN_MEMBERS).await?;
 
-    if state.store.restore_to_space(target).await? {
+    if state.store.restore_to_space(target, ctx.user_id).await? {
         state.hub.publish(Event::MemberRestored(target));
         Ok(StatusCode::NO_CONTENT)
     } else {

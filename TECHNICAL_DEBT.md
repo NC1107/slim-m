@@ -22,15 +22,16 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-15 are now closed, leaving 55 open, of which 5 are high: CP2, MOD1, MOD2, MOD3 and MOD5.
-Two of the five high items left are product decisions rather than defects, so they are owner calls and not simply unstarted work; MOD5 says so in its own entry.
+16 are now closed, leaving 54 open, of which 4 are high: CP2, MOD1, MOD2 and MOD5.
+Two of the four high items left are product decisions rather than defects, so they are owner calls and not simply unstarted work; MOD5 says so in its own entry.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
-CP1 is partly fixed in the same PR and stays open, downgraded to Medium.
+CP1 is partly fixed in #668 and stays open, downgraded to Medium.
+MOD3 closed on 2026-08-15 in #670.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
-Worth reading before picking anything here: of the twelve items worked on since this audit was written, five had a recorded fix that was wrong - TEST3 understated the damage, TEST6 and TEST7 each proposed a fix that would have broken the test, CP3's would have shipped a resubscribe bug, and CP1's would have frozen the presence tiles during a pan.
+Worth reading before picking anything here: of the thirteen items worked on since this audit was written, six had a recorded fix that was wrong - TEST3 understated the damage, TEST6 and TEST7 each proposed a fix that would have broken the test, CP3's would have shipped a resubscribe bug, CP1's would have frozen the presence tiles during a pan, and MOD3's would have let a re-removed member sign straight back in.
 Each is documented in place rather than deleted.
 Treat a "Fix:" line here as a starting hypothesis to verify, not an instruction.
 
@@ -243,14 +244,15 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   Identifying 50 accounts that joined in two minutes means reading an alphabetical list.
   Fix: the client already holds the full roster, so a client-side search box and a sort-by-joined toggle need no server change. Effort: medium.
 
-- **MOD3. Undoing a removal or a timeout erases who did it** (`store/removals.rs:141`, `store/timeouts.rs:94`). High.
-  Both undo paths hard-`DELETE` the row, so the record of which moderator removed or timed out whom, and why, is gone.
-  The only audit-log table in all 46 migrations is `canvas_audit_log`: the canvas has an audit trail and moderation does not.
-  Fix: soft-close with a `lifted_at`/`lifted_by` column instead of deleting. Effort: medium.
+- ~~**MOD3. Undoing a removal or a timeout erases who did it**~~ (`store/removals.rs:141`, `store/timeouts.rs:94`). High. Fixed in #670.
+  Fixed by `moderation_audit_log` (migration 0048), an append-only table after `canvas_audit_log`'s shape, written in the same transaction as each act. `space_removals` and `member_timeouts` are untouched.
+  The recorded fix was rejected, and this is the fifth entry whose prescribed fix would have shipped a bug, so it is worth the space. It said to soft-close with `lifted_at`/`lifted_by`. Three things make that unsafe, each verified against the source: `user_id` is the PRIMARY KEY on both tables, so history needs a surrogate key and a full SQLite table rebuild on each; both writers use `ON CONFLICT(user_id) DO UPDATE`, so re-removing a member would update the lifted row and leave it lifted, returning 204 while the member signs straight back in; and 15 statements read these tables rather than the six implied here, two of which fail closed in ways that are hard to undo on a self-hosted deployment - `sessions.rs:397` gates login, and `roles.rs:313` is the last-administrator guard. A third, `timeouts.rs:158`, is built with `QueryBuilder`, so it is absent from `.sqlx/` and invisible to a review that greps for query macros.
+  It would also have reversed a decision written into a shipped, immutable migration: `0020_member_timeouts.sql:9` says "One row per member rather than a history".
+  Reasoning and the accepted drift risk are in `docs/decisions/0015-moderation-audit-trail.md`.
 
 - **MOD4. Resolved reports have no read surface** (`store/reports.rs:173`). Medium.
   Distinct from MOD3 and milder than first reported: `resolved_at` and `resolved_by` *are* persisted, so nothing is lost, but `list_open_reports` filters `WHERE r.resolved_at IS NULL` and no second route reads resolved ones, so a resolved report vanishes from every UI.
-  Fix: an owner-visible moderation history route and screen reading resolved reports plus lifted removals and timeouts. Effort: medium.
+  Fix: an owner-visible moderation history route and screen. Since MOD3 shipped it now reads resolved reports plus `moderation_audit_log`, which is a single ordered feed rather than two live tables to union and filter. Effort: medium.
 
 - **MOD5. A removed or timed-out member cannot say anything back** (`store/sessions.rs:396`). High.
   `open_session` refuses to create a session for a removed account, so a removed member cannot log in at all, to appeal or even to read why.

@@ -14,6 +14,7 @@
 
 use sqlx::SqliteConnection;
 
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::roles::administrator_count;
 use super::sessions::revoke_session_rows;
 use super::{Store, now_ms};
@@ -129,6 +130,19 @@ impl Store {
         .execute(&mut *tx)
         .await?;
 
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: removed_by,
+                subject_id: user_id,
+                action: "remove",
+                reason,
+                until: None,
+                created_at: now,
+            },
+        )
+        .await?;
+
         tx.commit().await?;
         Ok(revoked)
     }
@@ -137,12 +151,40 @@ impl Store {
     ///
     /// Their sessions stay revoked: readmission restores the right to sign in,
     /// not the credentials on whatever devices were signed in at the time.
-    pub async fn restore_to_space(&self, user_id: UserId) -> anyhow::Result<bool> {
-        let affected = sqlx::query!("DELETE FROM space_removals WHERE user_id = ?", user_id)
-            .execute(&self.pool)
+    ///
+    /// Deleting the row is what lifts the removal, so the act itself is only
+    /// recorded in `moderation_audit_log` - and only when there was something
+    /// to lift, since restoring somebody who was never removed did nothing.
+    pub async fn restore_to_space(
+        &self,
+        user_id: UserId,
+        restored_by: UserId,
+    ) -> anyhow::Result<bool> {
+        let now = now_ms();
+        let mut tx = self.begin_write().await?;
+
+        let restored = sqlx::query!("DELETE FROM space_removals WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
             .await?
-            .rows_affected();
-        Ok(affected > 0)
+            .rows_affected()
+            > 0;
+        if restored {
+            record_moderation_audit(
+                &mut tx,
+                ModerationAudit {
+                    actor_id: restored_by,
+                    subject_id: user_id,
+                    action: "restore",
+                    reason: None,
+                    until: None,
+                    created_at: now,
+                },
+            )
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(restored)
     }
 
     /// Whether this account is currently removed from the Space.
