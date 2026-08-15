@@ -12,15 +12,21 @@ Each section below is named for its workflow file.
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
 | `client-ci` | changes under `client/` | dart analyze, format, every package's tests |
+| `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
+| `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
 | `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap |
+| `advisory-watchdog` | a daily schedule, and by hand | nothing. It opens a deduplicated GitHub issue for a security advisory against a dependency and closes it once the tree is clean; the trigger `licenses` deliberately does not carry |
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
 | `e2e` | every push to `main`, a nightly schedule, and by hand | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
+| `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
+| `copr-publish` | called by `main-builds` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
+| `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
@@ -556,6 +562,56 @@ A run number is monotonic and cannot be forgotten, so a reused build number stop
 
 `--build-name` comes from the tag, not from pubspec.
 The pubspec version is a local-build default and has sat at 0.1.0 across every release, so without this a tester cannot tell one build from another and every TestFlight build reads 0.1.0 whatever was tagged.
+
+## client-macos-ci and client-windows-ci
+
+Both are compile-only, both are deliberately not required checks, and both exist to catch a native break early rather than to prove the app works.
+
+`client-macos-ci` builds `client/packages/app/macos/`, which is still a fresh `flutter create` scaffold with no signing identity, no notarization credential and no Apple Developer team behind it.
+It builds `--debug` on this project's SPM-only plugin tree with no CocoaPods step, exactly as `client-ios-ci` does, which produces a local "Sign to Run Locally" binary needing no Apple account.
+`docs/os_backlog/macos_backlog.md` holds what a distributable build still needs.
+
+`client-windows-ci` is the first CI job that has ever built a Windows target here.
+A green run proves the native plugin graph links; it does not prove the app runs, looks right, or that the tray and window-shell behaviour decision 0012 designed works on a real desktop.
+Read `docs/os_backlog/windows_backlog.md` before promoting it to a required check or building anything on top of a green run.
+
+## advisory-watchdog
+
+`licenses` runs `cargo deny check licenses` and deliberately not `check all`, because a CVE published upstream would turn every unrelated pull request red through no fault of its own.
+That reasoning names a different trigger as the answer, and this is it.
+
+It gates nothing, and it does not report by its own colour: a scheduled workflow that only fails itself is a red tab nobody opens, which is the failure `red-streak-watchdog` already exists to correct.
+It opens a deduplicated GitHub issue instead, and closes it once the tree is clean again.
+
+## verify-release-checks
+
+Called twice from `release`, once per component, so every publish job - a GHCR push, a cosign signature, a GitHub Release asset, a Play or TestFlight upload - requires this exact commit's own CI to have completed and succeeded first.
+
+Before it existed, the tag path published unconditionally with no test workflow having run on that ref at all, straight into a deployment that auto-updates from the moving `latest` tag.
+
+`workflow_run` cannot do this job: it fires only when a named workflow completes for the event that triggered it, and none of `server-ci`, `client-ci`, `client-ios-ci`, `hygiene` or `licenses` trigger on a tag push, deliberately, to avoid re-running CI on a ref that already ran it on `main`.
+
+The `ref` input carries the sharp edge.
+It defaults to `github.sha`, which is right for the tag-push path, but the release-please path must pass the created tag instead: release-please acts on the repository's current state while `github.sha` is whatever commit started the run, and the two diverge whenever a release merge lands while an earlier run is still going.
+Verifying `github.sha` then waits on a check a path filter correctly skipped, times out, and skips every publish job behind it, which is what happened to server 0.23.0 on 2026-08-01.
+
+## copr-publish
+
+The Fedora COPR snapshot submission `main-builds` calls, pulled into its own file once that workflow reached the 500-line hard ceiling.
+
+A reusable workflow rather than a composite action, because it needs its own container image (`fedora:44`), which a composite action cannot declare.
+
+## desktop-clients
+
+The two desktop platforms `release` does not package: iOS goes through TestFlight, Android attaches an apk and aab, and `linux-client` ships a tarball, an rpm and a flatpak, all from `release` itself.
+This fills the gap with unsigned archives good enough to hand a tester, without touching `release`'s gated publish jobs.
+
+Unsigned is a stated trade rather than an oversight.
+Windows has no signing certificate anywhere in this project, so SmartScreen shows "unrecognized app" and the tester clicks through.
+The macOS app is ad-hoc signed by the build itself, so Gatekeeper quarantines a downloaded copy and a tester opens it with right-click Open, or strips the attribute with `xattr -d com.apple.quarantine`.
+
+Both jobs declare `environment: release`, matching every asset-publishing job in `release`.
+They are tag-triggered, so unlike `main-builds` they should sit behind a reviewer gate if one is ever added; `main-builds` documents its own opt-out for the opposite reason, that a continuous build must not block on review.
 
 ## main-builds
 
