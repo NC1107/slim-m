@@ -73,6 +73,11 @@ MOD4, an owner-visible moderation history, now has a single ordered feed to read
 Nothing reads the table over HTTP yet, which is the shape `canvas_audit_log` also started in and which 0037 defends: the writer has to exist before the reader has anything to show.
 There is no route, no DTO and no `schema/openapi.yaml` change in the change that introduced it.
 
+A timeout that simply lapses writes nothing.
+Only an explicit lift records a `timeout_cleared`, so a timeout that ran its course leaves just its original `timeout` row, carrying the deadline it ran to.
+That follows from 0011's decision that a lapse "expires by arithmetic, nothing runs and nothing is published" - there is no moment at which anything could write the row, and inventing a sweep to create one would mean running a job purely to log that time had passed.
+The deadline is already on the issue row, so the history is not missing anything; it is stated here because "no entry" and "nothing happened" look alike otherwise.
+
 There is no sweep. `canvas_audit_log` carries none either, for the same reason: outliving the thing that gets deleted is the point of the table.
 One row per moderation act on a deployment sized for a friend group is not a growth problem, and a retention policy is a decision to make when somebody has a reason for one rather than now.
 

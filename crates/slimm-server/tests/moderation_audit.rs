@@ -174,11 +174,12 @@ async fn an_undo_that_undid_nothing_records_nothing() {
 /// edit - leaves both a removal and an audit row behind for a removal that
 /// reports as refused, and fails here.
 ///
-/// It is deliberately not phrased as "the audit write is inside the
-/// transaction". That cannot regress the way it first appears: `begin_write`
-/// is `BEGIN IMMEDIATE`, so an audit written on a second pool connection
-/// contends for the write lock rather than escaping it, and every successful
-/// removal would hang instead of quietly logging a phantom act.
+/// The second assertion is not implied by the first. A refusal that rolls the
+/// removal back correctly, and then records the attempt anyway on a connection
+/// taken after the transaction is dropped, leaves `list_removals` empty and a
+/// phantom act in the trail. That is the shape this line catches, and it is
+/// why the trail is checked separately rather than trusted to follow from the
+/// live table being clean.
 #[tokio::test]
 async fn a_refused_removal_leaves_no_audit_row() {
     let (store, pool, _guard) = harness().await;
