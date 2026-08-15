@@ -22,12 +22,12 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-17 are now closed. 53 of the original 70 remain open, of which 3 are high: CP2, MOD2 and MOD5, and MOD1's own work opened three follow-ups (MOD10 to MOD12) recorded below rather than left implicit.
-Two of the three high items left are product decisions rather than defects, so they are owner calls and not simply unstarted work; MOD5 says so in its own entry.
+18 are now closed and MOD5 is decided-and-not-built, leaving 51 of the original 70 open, of which 2 are high: CP2 and MOD2. Neither is a product decision; both are work.
+MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
 CP1 is partly fixed in #668 and stays open, downgraded to Medium.
-MOD3 closed on 2026-08-15 in #670, and MOD1 in #675.
+MOD3 closed on 2026-08-15 in #670, and MOD1 in #675. MOD5 and MOD11 were decided rather than built, in #677; see decision 0016.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -255,11 +255,10 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   Distinct from MOD3 and milder than first reported: `resolved_at` and `resolved_by` *are* persisted, so nothing is lost, but `list_open_reports` filters `WHERE r.resolved_at IS NULL` and no second route reads resolved ones, so a resolved report vanishes from every UI.
   Fix: an owner-visible moderation history route and screen. Since MOD3 shipped it now reads resolved reports plus `moderation_audit_log`, which is a single ordered feed rather than two live tables to union and filter. Effort: medium.
 
-- **MOD5. A removed or timed-out member cannot say anything back** (`store/sessions.rs:396`). High.
-  `open_session` refuses to create a session for a removed account, so a removed member cannot log in at all, to appeal or even to read why.
-  A timed-out member stays logged in but `TIMEOUT_DENY` subtracts `SEND_MESSAGES` everywhere including DMs, so they cannot message a moderator either.
-  Whether an in-product appeal path is wanted at all is a product decision, not a defect; recorded because "no route back" is currently implicit rather than chosen.
-  Fix, minimally: exempt DM sends to a moderator or administrator from `TIMEOUT_DENY`. Effort: large.
+- ~~**MOD5. A removed or timed-out member cannot say anything back**~~ (`store/sessions.rs:396`). High. Decided on 2026-08-15, not built.
+  The entry asked the right question - "whether an in-product appeal path is wanted at all is a product decision, not a defect" - and the owner's answer is no. There will be no appeal route, no DM exemption for a timed-out member, and no read-only mode for a removed account.
+  Reasoning and the consequences accepted with it are in `docs/decisions/0016-message-deletion-has-no-hierarchy.md`. The short of it: one deployment is one community, its moderators are reachable by whatever the group already uses, and an appeal inbox reachable by removed accounts is a surface a raid can use.
+  A wrongly removed member still has recourse, just not self-service: an administrator can restore them, and since MOD3 that restoration is recorded with who did it. MOD6 - showing a timed-out member the reason - stays open and is worth more here than an appeal path would be.
 
 - **MOD6. A timeout's reason is captured but never shown to the person it was issued against** (`http/users.rs:150`). Medium.
   `member_timeouts.reason` is stored, but `MeDto` exposes only `timed_out_until`, so a blocked send surfaces as "you are not allowed to do that" with no reason and no end time.
@@ -284,9 +283,9 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   The id-list form shipped; the raid case still wants "this author's last N minutes here" as one call rather than a client first selecting them.
   Blocked on an index: `messages_channel_live (channel_id, seq DESC)` and `messages_author (author_id)` exist, neither serves the pair, and a query using them alone is unbounded without reporting a `SCAN`. Needs a new index and therefore a new migration. Effort: medium.
 
-- **MOD11. Deleting one message has no containment rule, deleting several does** (`http/messages.rs:255`). Medium.
-  `escalation_guard` guards role edits, member moderation and voice kicks, and now bulk message delete - but never the single delete. A member with `MANAGE_MESSAGES` in a channel can still delete an administrator's message there, one request at a time.
-  Fix: apply the same guard to `deleteMessage`, or decide deliberately that message deletion is exempt and say so in a decision record. Effort: small.
+- ~~**MOD11. Deleting one message has no containment rule, deleting several does**~~ (`http/messages.rs:255`). Medium. Resolved on 2026-08-15 by removing the guard.
+  The entry offered two ways out - apply the guard to the single delete, or decide message deletion is exempt and record it. The owner chose the second, so the asymmetry is gone in the direction that leaves both paths alike: `MANAGE_MESSAGES` reaches every message in the channel, an administrator's included.
+  `docs/decisions/0016-message-deletion-has-no-hierarchy.md` records why a guard on the bulk route alone protected nothing - it refused sixty-four at once while allowing the same sixty-four one at a time, a difference in patience rather than permission.
 
 - **MOD12. A delete publishes no unpin and no thread update** (`http/messages.rs:265`). Medium.
   The `pinned_messages_on_delete` trigger removes the pin and nothing publishes `MessageUnpinned`; `send` calls `notify_reply` and `delete` does not. Both self-correct on refetch, so one stale badge is tolerable - but bulk delete turns one into up to sixty-four at once.
