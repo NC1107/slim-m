@@ -27,7 +27,7 @@ Two of the four high items left are product decisions rather than defects, so th
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
 CP1 is partly fixed in #668 and stays open, downgraded to Medium.
-MOD3 closed on 2026-08-15 in PLACEHOLDER_PR.
+MOD3 closed on 2026-08-15 in #670.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -244,7 +244,7 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   Identifying 50 accounts that joined in two minutes means reading an alphabetical list.
   Fix: the client already holds the full roster, so a client-side search box and a sort-by-joined toggle need no server change. Effort: medium.
 
-- ~~**MOD3. Undoing a removal or a timeout erases who did it**~~ (`store/removals.rs:141`, `store/timeouts.rs:94`). High. Fixed in PLACEHOLDER_PR.
+- ~~**MOD3. Undoing a removal or a timeout erases who did it**~~ (`store/removals.rs:141`, `store/timeouts.rs:94`). High. Fixed in #670.
   Fixed by `moderation_audit_log` (migration 0048), an append-only table after `canvas_audit_log`'s shape, written in the same transaction as each act. `space_removals` and `member_timeouts` are untouched.
   The recorded fix was rejected, and this is the fifth entry whose prescribed fix would have shipped a bug, so it is worth the space. It said to soft-close with `lifted_at`/`lifted_by`. Three things make that unsafe, each verified against the source: `user_id` is the PRIMARY KEY on both tables, so history needs a surrogate key and a full SQLite table rebuild on each; both writers use `ON CONFLICT(user_id) DO UPDATE`, so re-removing a member would update the lifted row and leave it lifted, returning 204 while the member signs straight back in; and 15 statements read these tables rather than the six implied here, two of which fail closed in ways that are hard to undo on a self-hosted deployment - `sessions.rs:397` gates login, and `roles.rs:313` is the last-administrator guard. A third, `timeouts.rs:158`, is built with `QueryBuilder`, so it is absent from `.sqlx/` and invisible to a review that greps for query macros.
   It would also have reversed a decision written into a shipped, immutable migration: `0020_member_timeouts.sql:9` says "One row per member rather than a history".
