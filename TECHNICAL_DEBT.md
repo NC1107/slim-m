@@ -21,12 +21,18 @@ The security and frontend-lifecycle passes returned no findings.
 
 ## Summary
 
-70 items: 10 high, 43 medium, 17 low.
+70 items as found: 10 high, 43 medium, 17 low.
+15 are now closed, leaving 55 open, of which 5 are high: CP2, MOD1, MOD2, MOD3 and MOD5.
+Two of the five high items left are product decisions rather than defects, so they are owner calls and not simply unstarted work; MOD5 says so in its own entry.
 
-DB1 to DB4 closed on 2026-08-14 in #663.
+Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in PLACEHOLDER_PR.
+CP1 is partly fixed in the same PR and stays open, downgraded to Medium.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
-CI1 and CI2 below were not among them and are still open.
+
+Worth reading before picking anything here: of the twelve items worked on since this audit was written, five had a recorded fix that was wrong - TEST3 understated the damage, TEST6 and TEST7 each proposed a fix that would have broken the test, CP3's would have shipped a resubscribe bug, and CP1's would have frozen the presence tiles during a pan.
+Each is documented in place rather than deleted.
+Treat a "Fix:" line here as a starting hypothesis to verify, not an instruction.
 
 By area: test quality 15, moderation 9, client performance 8, UX and UI 7, server performance and domain 6, client architecture 6, database 4, API contract 3, client state 3, client data layer 3, client code quality 2, CI 2, architecture 1, platform 1.
 
@@ -156,18 +162,18 @@ Four reported findings did not survive verification and were corrected or reject
 
 ## Client: performance
 
-- **CP1. Canvas presence tiles rebuild on every pan and zoom frame** (`client/packages/app/lib/src/screens/canvas/canvas_presence_layer.dart:212`). High.
-  The layer listens to `CanvasDocument` and calls an unconditional `setState(() {})` on every notification, and `setCamera` (called from every pointer-move and scale-update during a pan or pinch) routes through `_reculled()` which always ends in `notifyListeners()` with no throttle.
-  `canvas_presence_backdrop.dart:66` has the identical pattern.
-  Fix: give `CanvasDocument` a separate lower-frequency notifier, or a `ValueNotifier<Camera>`, so camera-only changes do not trigger a full presence rebuild. Effort: medium.
+- **CP1. Canvas presence tiles rebuild on every pan and zoom frame.** Medium, was High. Partly fixed in PLACEHOLDER_PR.
+  The recorded fix must not be applied as written, and that is the useful half of this entry. It proposed keeping camera-only changes away from the presence layer, via a separate notifier or a `ValueNotifier<Camera>`. The layer reads `document.camera` and hands it to every tile, and `document.worldView` to its own visibility pass (`canvas_presence_layer.dart:236,246`), so a camera change it does not see is tiles frozen in place while the canvas pans under them.
+  What was actually wrong is narrower and is fixed: `setCamera` notified unconditionally, including when `_clamp` returned the camera already held, which is what a gesture run into a world edge or a zoom stop does for as long as the finger stays down. Measured before the fix, twenty pointer events held against an edge produced twenty notifications and twenty full presence rebuilds of an unchanged frame. `setViewport` immediately above it had always had that guard.
+  What remains, and why this stays open at Medium: on a camera that really did move, the layer still re-derives tile keys, the identity map and the on-canvas rects, none of which depend on the camera at all - only `_visibility.update` and the tile transforms do. Splitting the camera-independent prefix from the camera-dependent suffix is the real fix and is untouched here. Effort: medium.
 
 - **CP2. Dragging one canvas object repaints the whole scene** (`client/packages/voice_canvas/lib/src/canvas_document.dart:236`). High.
   Every pointer-move during a drag or resize calls `moveObject`, which reallocates a full `Float32List` copy of the object's entire point array and reindexes the spatial grid, then `refresh()` recomputes scene culling.
   Fix: give the actively-dragged object a thin ephemeral overlay painter for the duration of the drag, the isolation the package already applies to in-progress pen drafts, and defer the reallocation to drag end. Effort: large.
 
-- **CP3. Per-participant platform-channel calls fire on every room event** (`client/packages/rtc/lib/src/local_audio.dart:65`). High.
-  `applyTo(room)` is invoked unawaited from `_refreshParticipants()` on every event the catch-all listener receives, including `ActiveSpeakersChangedEvent`, which LiveKit pushes several times a second while anyone is talking, and it then calls enable/disable and volume for every remote participant's every audio track unconditionally.
-  Fix: cache the last-applied `(silenced, volume)` per track id and only call through when the desired value differs. Effort: medium.
+- ~~**CP3. Per-participant platform-channel calls fire on every room event**~~ (`client/packages/rtc/lib/src/local_audio.dart:65`). High. Fixed in PLACEHOLDER_PR.
+  Confirmed as recorded, and the cost is real rather than a local field write: flutter_webrtc's `enabled` setter invokes `mediaStreamTrackSetEnable` with no equality check of its own, and for an audio track it also fires that track's `onMute`/`onUnMute`.
+  The recorded fix was keyed wrongly and would have shipped a bug, which is worth keeping written down. It said to cache per track *id*. A resubscribe reuses the publication and its sid, so an id-keyed cache reads as a hit and skips the reapplication that exists precisely to catch a track that came back at source-default volume - the invariant the file's own header documents. The shipped cache is keyed on the platform track object, which a resubscribe replaces (`addSubscribedMediaTrack` builds a new `RemoteAudioTrack` around a new `MediaStreamTrack`), so it correctly misses. Mutation-testing the id-keyed version fails the resubscribe test.
 
 - **CP4. Every camera tile rebuilds on every room event** (`client/packages/rtc/lib/src/camera_view.dart:60`). Medium.
   Each `CameraView` and `ScreenShareView` subscribes to the whole `room.events` stream and calls unconditional `setState` with no relevance filtering, so cost is tiles times events.
@@ -309,16 +315,12 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
 
 ## CI and release
 
-- **CI1. `desktop-clients.yml` publishes release assets with no `environment`** (`.github/workflows/desktop-clients.yml:42,96`). Medium.
-  Both jobs hold `contents: write` and run `gh release upload`, while every other asset-publishing job in `release.yml` declares `environment: release` or `environment: testflight`.
-  Harmless today because neither environment carries protection rules, but it silently bypasses the stated policy the moment reviewer protection lands, which is an open owner item.
-  `main-builds.yml` opts out the same way but documents why in its header; this one does not.
-  Fix: add `environment: release` to both jobs, or document the exemption in a header comment. Effort: small.
+- ~~**CI1. `desktop-clients.yml` publishes release assets with no `environment`**~~ (`.github/workflows/desktop-clients.yml:42,96`). Medium. Fixed in PLACEHOLDER_PR.
+  Both jobs now declare `environment: release`, rather than taking the entry's other option of documenting an exemption. The exemption `main-builds.yml` documents rests on it being a continuous build that must not sit waiting on a reviewer gate; `desktop-clients.yml` is triggered by a `client-v*` tag, so it is a real release and that reasoning does not carry over.
 
-- **CI2. `docs/ci.md` documents 15 of 21 workflows.** Low.
-  `client-macos-ci.yml`, `client-windows-ci.yml`, `desktop-clients.yml` and `copr-publish.yml` have no entry, while CLAUDE.md tells reviewers to treat that file as authoritative before judging any workflow.
-  This is the gap that let CI1 through.
-  Fix: add rows and sections for the four. Effort: small.
+- ~~**CI2. `docs/ci.md` documents 15 of 21 workflows.**~~ Low. Fixed in PLACEHOLDER_PR.
+  The count was right and the list was short. Six were missing, not four: the entry named `client-macos-ci`, `client-windows-ci`, `desktop-clients` and `copr-publish`, and missed `advisory-watchdog` and `verify-release-checks`.
+  All six now have rows, with sections for what a row cannot hold. `scripts/check-ci-docs.py` gates it in both directions, because a doc fix alone drifts again: a workflow with no row, and a row naming a workflow that no longer exists. It is wired into `hygiene.yml`.
 
 ## Test quality and coverage
 

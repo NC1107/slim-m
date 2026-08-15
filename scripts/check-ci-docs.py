@@ -31,8 +31,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github" / "workflows"
 DOC = ROOT / "docs" / "ci.md"
 
-# A row opens with the workflow's file stem in backticks, as the table's own
-# first column already does for every entry.
+# A row opens with the workflow's file stem in backticks, as every row does.
 ROW = re.compile(r"^\|\s*`([a-z0-9._-]+)`\s*\|", re.MULTILINE)
 
 
