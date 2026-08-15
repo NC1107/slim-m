@@ -56,25 +56,25 @@ class _FakeTrack {
   }
 
   LocalAudioRef get ref => (
-    identity: identity,
-    track: key,
-    enable: () async {
-      enableCalls++;
-      if (failure != null) throw failure!;
-      enabled = true;
-    },
-    disable: () async {
-      disableCalls++;
-      if (failure != null) throw failure!;
-      enabled = false;
-    },
-    setVolume: (value) async {
-      volumeCalls++;
-      if (failure != null) return failure;
-      volume = value;
-      return null;
-    },
-  );
+        identity: identity,
+        track: key,
+        enable: () async {
+          enableCalls++;
+          if (failure != null) throw failure!;
+          enabled = true;
+        },
+        disable: () async {
+          disableCalls++;
+          if (failure != null) throw failure!;
+          enabled = false;
+        },
+        setVolume: (value) async {
+          volumeCalls++;
+          if (failure != null) return failure;
+          volume = value;
+          return null;
+        },
+      );
 }
 
 /// Drives the state the way the room-event listener does: repeatedly, with

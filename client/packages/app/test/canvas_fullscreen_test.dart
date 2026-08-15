@@ -163,7 +163,13 @@ void main() {
     await pumpCanvasPane(tester, container);
     await _enterFullscreen(tester);
 
-    final tree = tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!
+    final tree = tester
+        .binding
+        .renderViews
+        .first
+        .owner!
+        .semanticsOwner!
+        .rootSemanticsNode!
         .toStringDeep();
 
     expect(tree, contains('Exit fullscreen'));

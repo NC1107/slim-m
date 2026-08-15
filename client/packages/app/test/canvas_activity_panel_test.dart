@@ -122,7 +122,13 @@ void main() {
     expect(find.text('Alice placed a stroke.'), findsOneWidget);
 
     // The real tree, not a widget read on paper: two rows plus the header.
-    final tree = tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!
+    final tree = tester
+        .binding
+        .renderViews
+        .first
+        .owner!
+        .semanticsOwner!
+        .rootSemanticsNode!
         .toStringDeep();
     expect(tree, contains('The canvas was cleared.'));
     expect(tree, contains('2 objects: 2 strokes'));

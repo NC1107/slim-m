@@ -104,6 +104,7 @@ class VoiceController extends StateNotifier<VoiceState>
   /// How long to wait for iOS to actually start a broadcast before saying so.
   /// Long enough for the picker, its confirmation and a three second
   /// countdown; short enough that a build with no extension is not a mystery.
+  @override
   final Duration broadcastStartTimeout;
 
   final Ref _ref;
