@@ -6,20 +6,39 @@ name: e2e
 # onboarding, messaging, moderation, screen share and a two-party voice call,
 # checking each scenario against the server or the SFU. See docs/e2e.md.
 #
-# Deliberately NOT run on pull_request: it is far too slow and heavy for that,
-# and the faster per-area workflows already gate a PR. It runs on push to main
-# so a real regression on the trunk still surfaces, on a nightly schedule so a
-# slower drift (a renamed label, a restructured screen) is caught within a
-# day, and on workflow_dispatch for an ad hoc run.
+# Runs on pull requests as well as on push to main, on a nightly schedule for
+# slower drift (a renamed label, a restructured screen), and on
+# workflow_dispatch for an ad hoc run.
 #
-# Advisory rather than required, until it has proven stable: browser
-# automation can be flaky for reasons unrelated to the change under test, and
-# a red check nobody trusts teaches people to ignore CI. Promote it to a
-# required check once real runs on main show it green and stable; see
-# docs/ci.md.
+# The pull_request trigger reverses what this header used to argue - that e2e
+# was too slow and heavy for a PR, and the faster per-area workflows already
+# gated one. That reasoning held right up until it did not. #653 moved the
+# canvas into voice channels, the harness kept driving a text channel, and
+# fourteen scenarios went red on every commit for two days before anybody
+# looked; the per-area workflows were all green throughout, because none of
+# them drives the product. Both fixes then had to be merged unvalidated, since
+# nothing ran e2e until after the merge.
+#
+# Path-filtered so the cost lands only where it can be earned: a docs-only or
+# workflow-only PR still pays nothing.
+#
+# Still advisory rather than required, and deliberately so even now that it
+# runs on a PR: browser automation can be flaky for reasons unrelated to the
+# change under test, and a red check nobody trusts teaches people to ignore CI.
+# Running on a PR is about surfacing a break at the moment it is cheap to fix;
+# blocking a merge on it is a separate decision, and one to take only once real
+# runs show it stable. See docs/ci.md.
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - "client/**"
+      - "crates/**"
+      - "schema/openapi.yaml"
+      - "scripts/e2e.sh"
+      - "scripts/lib/**"
+      - ".github/workflows/e2e.yml"
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:

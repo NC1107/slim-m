@@ -22,7 +22,7 @@ Each section below is named for its workflow file.
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
-| `e2e` | every push to `main`, a nightly schedule, and by hand | the whole product through two real headless browsers; advisory, not required |
+| `e2e` | pull requests touching `client/`, `crates/`, the schema or the harness; every push to `main`; a nightly schedule; and by hand | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
 | `copr-publish` | called by `main-builds` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
@@ -309,6 +309,16 @@ Pulled into a script for the same reason `check-release-tag-lag.sh` was: `script
 No concurrency group, the same reasoning `release-tag-watchdog.yml`'s own header gives for having none: an unconditional `cancel-in-progress: true` over a cron interval is what made that workflow fail three times within an hour of shipping (a run slower than its own 15-minute interval gets cancelled by the next one, and a cancelled run never asks the question), and this job is read-only and idempotent, so two of it overlapping costs nothing worth guarding against.
 
 **This does not promote `e2e` to a required check.** `verify-release-checks.yml`'s required-check lists are untouched, and `e2e` still does not run on pull requests. Whether to promote it is still the open question this section's own advisory-not-required paragraph leaves for the owner; this closes the separate problem of a red streak going unnoticed regardless of what the answer turns out to be.
+
+It runs on pull requests as well, path-filtered to `client/`, `crates/`, `schema/openapi.yaml` and the harness itself, so a docs-only change pays nothing.
+
+That reverses the workflow's original position, and the reversal is worth recording because the original reasoning was good and still turned out to be incomplete.
+The argument was that e2e is too slow and heavy for a pull request, and that the faster per-area workflows already gate one.
+What that missed is that none of those workflows drives the product: when #653 moved the canvas into voice channels and the harness kept driving a text channel, fourteen scenarios were red on every commit for two days while every per-area check stayed green.
+Both fixes then had to be merged unvalidated, because nothing ran e2e until after a merge.
+
+It stays advisory rather than required even so.
+Surfacing a break while it is cheap to fix is worth a slow check; blocking a merge on browser automation that can be flaky for unrelated reasons is a separate decision, and one to take only once real runs show it stable.
 
 ## push-relay-contract
 
