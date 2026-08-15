@@ -10,7 +10,7 @@ mod support;
 use slimm_server::ids::MessageId;
 use slimm_server::store::Store;
 
-async fn new_store() -> (Store, support::TestDbGuard) {
+async fn new_store() -> (Store, sqlx::SqlitePool, support::TestDbGuard) {
     let (path, guard) = support::TestDbGuard::new("slimm-anon");
     let config = slimm_server::config::Config {
         port: 0,
@@ -21,7 +21,7 @@ async fn new_store() -> (Store, support::TestDbGuard) {
     let pool = slimm_server::db::connect(&config)
         .await
         .expect("connect + migrate");
-    (Store::new(pool), guard)
+    (Store::new(pool.clone()), pool, guard)
 }
 
 /// `Report.reporter_id`'s own doc comment promises it is "null once the
@@ -34,7 +34,7 @@ async fn new_store() -> (Store, support::TestDbGuard) {
 /// cleared explicitly; this pair was simply missed.
 #[tokio::test]
 async fn delete_account_anonymizes_a_report_the_deleted_user_filed() {
-    let (store, _guard) = new_store().await;
+    let (store, _pool, _guard) = new_store().await;
     let admin = store
         .create_account("root", "Root", "not-a-real-hash")
         .await
@@ -90,7 +90,7 @@ async fn delete_account_anonymizes_a_report_the_deleted_user_filed() {
 /// wire via `RemovalDto`, so a deleted moderator's id persisted forever.
 #[tokio::test]
 async fn delete_account_anonymizes_moderation_and_poll_authorship() {
-    let (store, _guard) = new_store().await;
+    let (store, pool, _guard) = new_store().await;
     let admin = store
         .create_account("root", "Root", "not-a-real-hash")
         .await
@@ -155,6 +155,20 @@ async fn delete_account_anonymizes_moderation_and_poll_authorship() {
         Some(moderator.id),
         "fixture must name the creator"
     );
+    let audited: Vec<Option<Vec<u8>>> =
+        sqlx::query_scalar("SELECT actor_id FROM moderation_audit_log ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        audited.len(),
+        2,
+        "the timeout and the removal are both logged"
+    );
+    assert!(
+        audited.iter().all(Option::is_some),
+        "fixture must name the actor of both audited acts"
+    );
 
     store.delete_account(moderator.id).await.unwrap();
 
@@ -176,5 +190,19 @@ async fn delete_account_anonymizes_moderation_and_poll_authorship() {
     assert_eq!(
         poll.created_by, None,
         "a deleted poll creator must be anonymized"
+    );
+    let audited: Vec<Option<Vec<u8>>> =
+        sqlx::query_scalar("SELECT actor_id FROM moderation_audit_log ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        audited.len(),
+        2,
+        "and the acts themselves are still recorded"
+    );
+    assert!(
+        audited.iter().all(Option::is_none),
+        "a deleted moderator must not stay named in the audit trail either"
     );
 }

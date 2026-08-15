@@ -207,13 +207,14 @@ async fn an_elapsed_timeout_is_not_in_force() {
 async fn re_issuing_replaces_the_deadline_in_both_directions() {
     let (s, _guard) = store().await;
     let user = s.create_user("rae", "Rae").await.unwrap();
+    let moderator = s.create_user("kit", "Kit").await.unwrap();
     let long = now() + 24 * HOUR_MS;
     let short = now() + HOUR_MS;
 
-    s.set_member_timeout(user.id, long, None, user.id)
+    s.set_member_timeout(user.id, long, None, moderator.id)
         .await
         .unwrap();
-    s.set_member_timeout(user.id, short, Some("shortened"), user.id)
+    s.set_member_timeout(user.id, short, Some("shortened"), moderator.id)
         .await
         .unwrap();
 
@@ -221,10 +222,10 @@ async fn re_issuing_replaces_the_deadline_in_both_directions() {
     assert_eq!(held.until, short);
     assert_eq!(held.reason.as_deref(), Some("shortened"));
 
-    s.clear_member_timeout(user.id).await.unwrap();
+    s.clear_member_timeout(user.id, moderator.id).await.unwrap();
     assert_eq!(s.timed_out_until(user.id).await.unwrap(), None);
     // Lifting an absent one still succeeds: they can speak either way.
-    s.clear_member_timeout(user.id).await.unwrap();
+    s.clear_member_timeout(user.id, moderator.id).await.unwrap();
 }
 
 /// The batched lookup the member list and push fan-out use has to answer the

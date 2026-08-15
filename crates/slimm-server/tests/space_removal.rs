@@ -267,13 +267,13 @@ async fn a_removal_can_be_undone() {
         .unwrap();
     assert!(s.is_removed(member.id).await.unwrap());
 
-    assert!(s.restore_to_space(member.id).await.unwrap());
+    assert!(s.restore_to_space(member.id, admin.id).await.unwrap());
     assert!(!s.is_removed(member.id).await.unwrap());
     assert!(s.open_session(member.id, "phone").await.is_ok());
     assert!(s.list_removals().await.unwrap().is_empty());
 
     // Restoring somebody who was never removed says so rather than pretending.
-    assert!(!s.restore_to_space(member.id).await.unwrap());
+    assert!(!s.restore_to_space(member.id, admin.id).await.unwrap());
 }
 
 /// Re-removing is a replace, not a second row, and it re-revokes anything

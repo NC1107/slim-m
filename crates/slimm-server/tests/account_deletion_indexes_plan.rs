@@ -183,3 +183,28 @@ fn the_live_query_is_read_past_a_comment_quoting_it() {
         "DELETE FROM reactions WHERE user_id = ? AND emoji = ?"
     );
 }
+
+/// The moderation trail's own actor cleanup, which arrived with 0048.
+///
+/// Its index is partial (`WHERE actor_id IS NOT NULL`), so this checks more
+/// than that some index exists: SQLite only uses a partial index when the
+/// statement's own predicate implies the index's, and `actor_id = ?` does
+/// imply `actor_id IS NOT NULL`. Widen the index, or narrow the statement, and
+/// the plan silently falls back to scanning every act ever recorded.
+#[tokio::test]
+async fn deleting_an_account_seeks_the_moderation_audit_actor_index() {
+    let (pool, _guard) = new_pool("slimm-deletion-plan-moderation").await;
+    let source = source_of("src/store/account_deletion.rs");
+    let sql = support::query_literal_containing(
+        &source,
+        "UPDATE moderation_audit_log SET actor_id = NULL",
+    );
+
+    let plan = plan_of(&pool, &sql, 1).await;
+    assert_uses(
+        &plan,
+        "moderation_audit_log_actor",
+        "the audit actor cleanup",
+    );
+    assert_no_scan(&plan, "the audit actor cleanup");
+}
