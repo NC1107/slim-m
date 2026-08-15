@@ -347,4 +347,34 @@ void main() {
       reason: 'the first event after it starts must silence it',
     );
   });
+
+  /// The production caller fires this without awaiting - `_refreshParticipants`
+  /// does `unawaited(_applyLocalAudioState(room))` on every room event - so two
+  /// events arriving faster than a platform round trip really do overlap over
+  /// the same state. Every other test here drives them one at a time.
+  test('overlapping applies still settle on the chosen state', () async {
+    final state = LocalAudioState();
+    final maya = _FakeTrack('maya');
+    final ines = _FakeTrack('ines');
+    state.setMuted('maya', true);
+    state.setVolumeFor('ines', 1.7);
+
+    await Future.wait([
+      for (var i = 0; i < 8; i++)
+        state.applyToRefs([maya, ines].map((t) => t.ref)),
+    ]);
+
+    expect(maya.enabled, isFalse, reason: 'the muted one ends silenced');
+    expect(ines.enabled, isTrue, reason: 'and the other stays audible');
+    expect(ines.volume, closeTo(1.7, 0.0001), reason: 'at the chosen gain');
+
+    // And the racing burst has not left a belief that blocks later corrections.
+    maya.enabled = true;
+    await _pumpEvents(state, [maya, ines]);
+    expect(
+      maya.enabled,
+      isFalse,
+      reason: 'a track re-enabled behind our back is still corrected',
+    );
+  });
 }
