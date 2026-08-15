@@ -102,7 +102,8 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
     alice_id = admin_api.me()["id"]
 
     b.click(L.OPEN_CANVAS)
-    b.wait_for("no objects")
+    # The surface, not an empty one: the canvas scenarios leave objects here.
+    b.wait_for("Canvas,")
     print("  b opened the same channel's canvas from the voice header")
 
     a.wait_for(ALICE_SELF_LABEL)

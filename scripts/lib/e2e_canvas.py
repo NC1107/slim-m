@@ -20,6 +20,17 @@ show: that a move, a resize (the same wire op with a different box) or a
 reorder actually arrived on the client that did not make it, not only that
 the server's own row changed.
 
+Stroke offsets clear the presence bubbles, which is why they sit low and to
+the left rather than at the `(80, 80)` they used to. A voice channel's canvas
+draws a tile per person in the call, and an untouched one starts at world
+`(24, 24)` and is 220x160 (`CanvasPresenceLayout`'s own margin, tileWidth and
+tileHeight), so the old offsets ran straight through the drawer's own bubble -
+which absorbed the press and left the surface with no stroke to commit. None
+of that existed while these scenarios ran in a text channel, where nobody is
+in a call and there are no tiles at all. `y` clears the untouched row
+(24 + 160), and `x` stays left of where `move_and_resize_converges` later
+drags that tile to, which is what the eraser needs afterwards.
+
 Camera math: `Camera` starts at `(0, 0)` with `zoom: 1` (canvas_stroke.dart)
 and nothing here ever pans or zooms, so a world coordinate and a page
 coordinate differ by exactly one constant offset for the whole scenario -
@@ -61,10 +72,10 @@ import time
 
 import e2e_labels as L
 
-# Offsets from the canvas's own top-left; the stroke's own midpoint is where the eraser lands on it later.
-STROKE_START = (80, 80)
-STROKE_MID = (150, 80)
-STROKE_END = (220, 80)
+# Offsets from the canvas's own top-left; the midpoint is the eraser's target.
+STROKE_START = (60, 280)
+STROKE_MID = (130, 280)
+STROKE_END = (200, 280)
 
 
 def origin(client):
@@ -289,7 +300,8 @@ def reload_persists(client, channel, admin_api, channel_id):
     client.go_away()
     client.come_back(f"{origin_url}/#/channels")
     client.click(channel)
-    client.wait_for(L.COMPOSER)
+    # In call, not a composer: clicking a voice channel joins it directly.
+    client.wait_for(L.IN_CALL)
     client.click(L.OPEN_CANVAS)
     client.wait_for("1 stroke, 1 image", timeout=30)
     client.wait_for(f"{server_count} objects", timeout=10)
@@ -299,6 +311,18 @@ def reload_persists(client, channel, admin_api, channel_id):
 
 
 def close_on_both(a, b):
+    """Both canvases closed, and both clients out of the call they joined.
+
+    Leaving is part of closing here, not tidiness. Opening a canvas now means
+    joining a voice call (the canvas belongs to one, owner decision
+    2026-08-13), and every voice scenario after this one starts by joining -
+    so a client still in the call from these scenarios makes the next one's
+    own join a no-op it then waits forever on. While these scenarios ran in a
+    text channel there was no call to leave and nothing to hand back.
+    """
     for c in (a, b):
         c.click(L.CLOSE_CANVAS)
-        c.wait_for(L.COMPOSER)
+        # A voice channel has no composer to come back to, only the call.
+        c.wait_for(L.IN_CALL)
+    for c in (a, b):
+        c.click(L.LEAVE_CALL, settle=6)
