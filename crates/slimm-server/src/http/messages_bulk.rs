@@ -6,15 +6,20 @@
 //! `canvas_ops_apply` sits beside `canvas_ops_write`: that file is already past
 //! the point where another handler plus its request type reads as an aside.
 //!
-//! **This is stricter than deleting the same messages one at a time**, and that
-//! is a decision rather than an oversight. The single delete has no containment
-//! rule at all - `escalation_guard` guards role edits, member moderation and
-//! voice kicks, and has never guarded a message - so somebody holding
-//! `MANAGE_MESSAGES` in a channel can delete an administrator's message there
-//! today, one request at a time. Adding the guard here stops that being done
-//! fifty at a time. Leaving the single path alone in the same change would be
-//! the larger surprise, so the asymmetry is recorded in `TECHNICAL_DEBT.md`
-//! rather than quietly resolved in either direction.
+//! **`MANAGE_MESSAGES` is the whole of the rule, and it reaches every message in
+//! the channel including an administrator's.** That is settled deliberately
+//! rather than inherited: this route briefly carried a containment guard, of
+//! the kind that stops a moderator acting on somebody whose permissions theirs
+//! do not contain, and it was taken back out. See
+//! `docs/decisions/0016-message-deletion-has-no-hierarchy.md`.
+//!
+//! The short version is that the single delete has never had such a rule -
+//! `escalation_guard` guards role edits, member moderation and voice kicks, and
+//! has never guarded a message - so a guard here would have made deleting
+//! sixty-four messages refuse where deleting the same sixty-four one at a time
+//! succeeds. A rule that is trivially sidestepped by doing the same thing more
+//! slowly is not protection; it is a difference between two doors into the same
+//! room.
 //!
 //! The cap is what actually bounds this, not the rate-limit class. `Class::Write`
 //! is flat-cost and generous by design; what keeps one request from wrecking a
@@ -30,7 +35,6 @@ use serde::Deserialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::escalation::escalation_guard;
 use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
@@ -112,28 +116,13 @@ async fn bulk_delete(
         Err(BulkDeleteError::Internal(err)) => return Err(err.into()),
     };
 
-    // Every author checked before the first row moves.
-    let caller_granted = state
-        .store
-        .granted_permissions_in_channel(ctx.user_id, channel_id)
-        .await?;
+    // The distinct authors, for the audit trail: one row each, not one per message.
     let mut subjects: Vec<UserId> = Vec::new();
     for (_, author_id) in &resolved {
         let Some(author_id) = author_id else { continue };
         if !subjects.contains(author_id) {
             subjects.push(*author_id);
         }
-    }
-    // Once per distinct author: a raid is one person's sixty-four messages.
-    for author_id in &subjects {
-        if *author_id == ctx.user_id {
-            continue;
-        }
-        let target_granted = state
-            .store
-            .granted_permissions_in_channel(*author_id, channel_id)
-            .await?;
-        escalation_guard(caller_granted, target_granted)?;
     }
 
     let outcome = state

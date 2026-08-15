@@ -1929,10 +1929,9 @@ paths:
       tags: [messages]
       summary: Soft-delete several messages in one act.
       description: >
-        Requires MANAGE_MESSAGES in the channel, and refuses a batch naming a
-        message whose author holds a permission the caller does not - a
-        containment rule `deleteMessage` does not apply, so this is deliberately
-        stricter than deleting the same messages one at a time. Ids already
+        Requires MANAGE_MESSAGES in the channel, and reaches every message
+        there including an administrator's - the same reach `deleteMessage`
+        has, and deliberately not a ranked one (see decision 0016). Ids already
         deleted are not an error and are simply skipped. Nothing is deleted
         unless every id resolves and passes, so a refused batch leaves the
         channel untouched. Each message actually deleted publishes its own

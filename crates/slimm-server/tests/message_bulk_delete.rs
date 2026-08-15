@@ -285,10 +285,15 @@ async fn an_id_from_another_channel_refuses_the_whole_batch() {
     );
 }
 
-/// Containment: a moderator holding only MANAGE_MESSAGES cannot bulk-delete an
-/// administrator's message, even though the single delete would let them.
+/// MANAGE_MESSAGES reaches every message in the channel, an administrator's
+/// included, and this pins that rather than leaving it to be inferred.
+///
+/// It is the same reach the single delete has always had. A guard here would
+/// only have meant refusing sixty-four at once while allowing the same
+/// sixty-four one at a time, which is a difference in patience rather than in
+/// permission - see docs/decisions/0016.
 #[tokio::test]
-async fn a_batch_naming_an_administrators_message_is_refused() {
+async fn manage_messages_reaches_an_administrators_message_too() {
     let (store, pool, _guard) = harness().await;
     let (admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
@@ -298,14 +303,14 @@ async fn a_batch_naming_an_administrators_message_is_refused() {
     let admins = send(&app, &channel, &admin.0, "an administrator speaking").await;
 
     let status = bulk_delete(&app, &channel, &moderator.0, &[theirs, admins]).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(status, StatusCode::NO_CONTENT);
 
     assert_eq!(
         live_count(&store, &channel).await,
-        2,
-        "the refusal happens before anything is written"
+        0,
+        "both went, including the one whose author outranks the caller"
     );
-    assert!(ops(&pool, &channel).await.is_empty());
+    assert_eq!(ops(&pool, &channel).await.len(), 2);
 }
 
 #[tokio::test]
@@ -351,12 +356,20 @@ async fn the_act_is_recorded_against_each_author() {
 #[tokio::test]
 async fn a_refused_batch_records_no_act() {
     let (store, pool, _guard) = harness().await;
-    let (admin, moderator, _member) = people(&store).await;
+    let (admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
+    let other = store
+        .create_channel("other", "text")
+        .await
+        .unwrap()
+        .id
+        .0
+        .to_string();
     let app = app(store.clone());
 
-    let admins = send(&app, &channel, &admin.0, "an administrator speaking").await;
-    bulk_delete(&app, &channel, &moderator.0, &[admins]).await;
+    let here = send(&app, &channel, &member.0, "spam").await;
+    let elsewhere = send(&app, &other, &admin.0, "not in this channel").await;
+    bulk_delete(&app, &channel, &moderator.0, &[here, elsewhere]).await;
 
     assert!(
         audit(&pool).await.is_empty(),
