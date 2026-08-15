@@ -27,7 +27,7 @@ MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is alre
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
 CP1 is partly fixed in #668 and stays open, downgraded to Medium.
-MOD3 closed on 2026-08-15 in #670, and MOD1 in #675. MOD5 and MOD11 were decided rather than built, in PLACEHOLDER_PR; see decision 0016.
+MOD3 closed on 2026-08-15 in #670, and MOD1 in #675. MOD5 and MOD11 were decided rather than built, in #677; see decision 0016.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
