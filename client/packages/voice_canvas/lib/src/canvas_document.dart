@@ -433,8 +433,18 @@ class CanvasDocument extends ChangeNotifier {
 
   /// Moves the camera, clamped so the view stays inside the bounded world and
   /// the zoom inside the range a viewport read is sized for.
+  ///
+  /// Silent when the clamp lands on the camera already held, the same guard
+  /// [setViewport] keeps and for a sharper reason. This is called once per
+  /// pointer event for the whole of a pan or a pinch, and a gesture that runs
+  /// into a world edge or a zoom stop keeps resolving to the held camera for
+  /// as long as the finger stays down. Every notification from here rebuilds
+  /// both presence layers, so those are whole rebuilds of a frame that has
+  /// not changed.
   void setCamera(Camera next) {
-    _camera = _clamp(next);
+    final clamped = _clamp(next);
+    if (clamped == _camera) return;
+    _camera = clamped;
     _reculled();
   }
 

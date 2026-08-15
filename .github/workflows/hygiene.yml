@@ -334,3 +334,9 @@ jobs:
       # five hours on 2026-08-13. See the script header.
       - name: no migration collides or changes under a deployed database
         run: python3 scripts/check-migration-versions.py
+
+      # CLAUDE.md sends reviewers to docs/ci.md as the authoritative workflow
+      # list, and an undocumented workflow is invisible there rather than
+      # wrong-looking. See the script header.
+      - name: every workflow is in the docs/ci.md table
+        run: python3 scripts/check-ci-docs.py

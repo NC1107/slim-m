@@ -144,7 +144,9 @@ void main() {
 
       final dump = tester
           .binding
-          .pipelineOwner
+          .renderViews
+          .first
+          .owner!
           .semanticsOwner!
           .rootSemanticsNode!
           .toStringDeep();
