@@ -38,6 +38,11 @@ class _FakeTrack {
   bool enabled = true;
   double volume = kDefaultParticipantVolume;
 
+  /// LiveKit's own `Track._active`. `enable()` and `disable()` check it and
+  /// do nothing at all when it is false, silently and without throwing, so a
+  /// caller cannot tell a push that landed from one that was dropped.
+  bool active = true;
+
   int enableCalls = 0;
   int disableCalls = 0;
   int volumeCalls = 0;
@@ -55,18 +60,37 @@ class _FakeTrack {
     volume = kDefaultParticipantVolume;
   }
 
+  /// The first half of a real resubscribe, stopping where the room event is
+  /// delivered: `addSubscribedMediaTrack` swaps the publication's track and
+  /// emits `TrackSubscribedEvent` before it awaits `track.start()`, and the
+  /// emitter is asynchronous, so a listener runs while the new track is still
+  /// inactive.
+  void resubscribeButNotYetStarted() {
+    resubscribe();
+    active = false;
+  }
+
+  /// The rest of it. `Track.start()` awaits `startCapture()` before setting
+  /// `_active`, and `RemoteTrack.start()` then calls `enable()` itself, so the
+  /// track comes back audible whatever was pushed to it while it was inactive.
+  void finishStarting() {
+    active = true;
+    enabled = true;
+  }
+
   LocalAudioRef get ref => (
         identity: identity,
         track: key,
+        isAudible: () => enabled,
         enable: () async {
           enableCalls++;
           if (failure != null) throw failure!;
-          enabled = true;
+          if (active) enabled = true;
         },
         disable: () async {
           disableCalls++;
           if (failure != null) throw failure!;
-          enabled = false;
+          if (active) enabled = false;
         },
         setVolume: (value) async {
           volumeCalls++;
@@ -265,6 +289,62 @@ void main() {
       second.enabled,
       isFalse,
       reason: 'the cache is per track, so a second track is not skipped',
+    );
+  });
+
+  /// The failure the cache can cause that unconditional reapplication could
+  /// not, and the reason this file models `Track._active` at all.
+  ///
+  /// `addSubscribedMediaTrack` emits `TrackSubscribedEvent` and only then
+  /// awaits `track.start()`, which awaits `startCapture()` before it sets
+  /// `_active`. The emitter is asynchronous, so the catch-all room listener
+  /// runs first, with the new track inactive, and the `disable()` it pushes
+  /// does nothing and says nothing. `RemoteTrack.start()` then calls
+  /// `enable()` of its own accord.
+  ///
+  /// So the push is dropped, the track is audible, and a cache that believed
+  /// the push landed will skip every later event. Before the cache existed the
+  /// next event re-pushed and fixed it within one event cycle.
+  test('a track that resubscribes while muted does not come back audible',
+      () async {
+    final state = LocalAudioState();
+    final track = _FakeTrack('maya');
+    state.setMuted('maya', true);
+    await _pumpEvents(state, [track]);
+    expect(track.enabled, isFalse, reason: 'silenced to begin with');
+
+    track.resubscribeButNotYetStarted();
+    await _pumpEvents(state, [track]);
+    track.finishStarting();
+
+    await _pumpEvents(state, [track], times: 10);
+
+    expect(
+      track.enabled,
+      isFalse,
+      reason: 'a muted participant must not be audible after a resubscribe',
+    );
+  });
+
+  test('a track still inactive when muted is silenced once it starts',
+      () async {
+    final state = LocalAudioState();
+    final track = _FakeTrack('maya')..active = false;
+    state.setMuted('maya', true);
+
+    await _pumpEvents(state, [track], times: 3);
+    expect(
+      track.enabled,
+      isTrue,
+      reason: 'the fixture is real: an inactive track cannot be pushed to',
+    );
+
+    track.active = true;
+    await _pumpEvents(state, [track]);
+    expect(
+      track.enabled,
+      isFalse,
+      reason: 'the first event after it starts must silence it',
     );
   });
 }

@@ -26,16 +26,35 @@
 /// with no equality check of its own, and for an audio track it also fires
 /// that track's `onMute`/`onUnMute` - so reapplying unconditionally spends a
 /// method channel per remote track per event to set values that are already
-/// set. [_applied] remembers what was last pushed and skips the rest.
+/// set.
 ///
-/// That cache is keyed on the platform track object, never on a track or
-/// publication id, and the difference is the whole reason the reapplication
-/// invariant above still holds. A resubscribe reuses the publication and its
-/// sid, so an id-keyed cache would report a hit and skip the reapplication
-/// that exists precisely to catch it. It does not reuse the objects:
-/// `addSubscribedMediaTrack` builds a new `RemoteAudioTrack` around the new
-/// `MediaStreamTrack` the peer connection just handed it, so a resubscribed
-/// track misses this cache and is reapplied, which is the point.
+/// **What it skips on is the track's own state, not a memory of what was
+/// asked for**, and the distinction is the whole safety of the thing. Whether
+/// a track is silenced is read back from it every time, which costs nothing:
+/// flutter_webrtc keeps `enabled` in a local field its setter maintains. So
+/// if anything at all leaves a track in a state this listener did not choose,
+/// the next event sees it and corrects it, exactly as unconditional
+/// reapplication did.
+///
+/// That matters because something does. `Track.enable`/`disable` do nothing
+/// when the track is not `_active`, silently and without throwing, and
+/// `addSubscribedMediaTrack` emits `TrackSubscribedEvent` *before* it awaits
+/// `track.start()`, which itself awaits `startCapture()` before setting
+/// `_active`. The emitter is asynchronous, so this runs on a resubscribed
+/// track while it is still inactive, the push is dropped with nothing said,
+/// and `RemoteTrack.start()` then calls `enable()` of its own accord. A cache
+/// that trusted the call would leave a muted participant audible for the rest
+/// of the call; reading the state back means the next event fixes it.
+///
+/// Gain is the exception, because there is nothing to read it back from -
+/// flutter_webrtc offers no getter. [_applied] remembers it, keyed on the
+/// platform track object rather than any id. A resubscribe reuses the
+/// publication and its sid, so an id-keyed cache would report a hit and skip
+/// the reapplication that exists precisely to catch a track that came back at
+/// source volume. It does not reuse the object: `addSubscribedMediaTrack`
+/// builds a new `RemoteAudioTrack` around the new `MediaStreamTrack`, so a
+/// resubscribed track misses, which is the point. The entry is also only
+/// written when the enable that precedes it can be seen to have landed.
 library;
 
 import 'package:livekit_client/livekit_client.dart' as lk;
@@ -50,22 +69,30 @@ import 'audio_gain.dart';
 /// testing here is which calls are made and which are skipped, and a test
 /// that needs a signalling server to find that out is a test nobody writes.
 ///
-/// [track] is the identity the skip-cache is keyed on. It must be the object
-/// whose state these closures actually set, so that the object being
-/// replaced is what invalidates the entry.
+/// [track] is the identity the volume cache is keyed on. It must be the object
+/// whose state these closures actually set, so that the object being replaced
+/// is what invalidates the entry.
+///
+/// [isAudible] reads that object's current state back rather than reporting
+/// what was last asked for. It must be cheap, and in production it is: it
+/// reads flutter_webrtc's own `enabled` field, which the setter maintains
+/// locally, with no platform call of its own.
 typedef LocalAudioRef = ({
   String identity,
   Object track,
+  bool Function() isAudible,
   Future<void> Function() enable,
   Future<void> Function() disable,
   Future<Object?> Function(double volume) setVolume,
 });
 
-/// What was last successfully pushed to one platform track.
+/// The gain last successfully pushed to one platform track.
+///
+/// Only gain. Whether a track is silenced is read back from the track itself
+/// rather than remembered, so nothing here can disagree with the device.
 class _AppliedAudio {
-  const _AppliedAudio({required this.silenced, required this.volume});
+  const _AppliedAudio({required this.volume});
 
-  final bool silenced;
   final double volume;
 }
 
@@ -119,6 +146,7 @@ class LocalAudioState {
         yield (
           identity: participant.identity,
           track: track.mediaStreamTrack,
+          isAudible: () => track.mediaStreamTrack.enabled,
           enable: track.enable,
           disable: track.disable,
           setVolume: (volume) => applyParticipantVolume(track, volume),
@@ -133,45 +161,40 @@ class LocalAudioState {
     for (final ref in refs) {
       // Deafened silences everyone; otherwise only the individually muted.
       final silence = deafened || muted.contains(ref.identity);
-      final volume = volumeFor(ref.identity);
-      if (_isAlreadyApplied(ref.track, silence: silence, volume: volume)) {
+      final audible = ref.isAudible();
+
+      if (silence) {
+        if (!audible) continue;
+        try {
+          await ref.disable();
+        } catch (e) {
+          failure = e;
+        }
+        // Whatever was believed about gain stops being true once it is silent.
+        _applied[ref.track] = null;
         continue;
       }
 
+      final volume = volumeFor(ref.identity);
+      final last = _applied[ref.track];
+      if (audible && last != null && last.volume == volume) continue;
+
       Object? here;
       try {
-        await (silence ? ref.disable() : ref.enable());
+        await ref.enable();
       } catch (e) {
         here = e;
       }
-      if (!silence) {
-        // After the enable, never before: re-enabling can reset source volume.
-        here = await ref.setVolume(volume) ?? here;
-      }
+      // After the enable, never before: re-enabling can reset source volume.
+      here = await ref.setVolume(volume) ?? here;
 
-      // Only a clean push is remembered, so a failure still retries next event.
-      _applied[ref.track] = here == null
-          ? _AppliedAudio(silenced: silence, volume: volume)
+      // Remembered only if it both went cleanly and can be seen to have landed.
+      _applied[ref.track] = here == null && ref.isAudible()
+          ? _AppliedAudio(volume: volume)
           : null;
       failure = here ?? failure;
     }
     return failure;
-  }
-
-  /// Whether this track already carries this state, so nothing need be sent.
-  ///
-  /// Volume is compared only between two unsilenced states, because volume is
-  /// not pushed while silenced: comparing it there would make a slider moved
-  /// during a mute re-send a `disable` the track is already holding.
-  bool _isAlreadyApplied(
-    Object track, {
-    required bool silence,
-    required double volume,
-  }) {
-    final last = _applied[track];
-    if (last == null) return false;
-    if (last.silenced || silence) return last.silenced && silence;
-    return last.volume == volume;
   }
 
   /// Weakly keyed, so remembering a track never keeps a finished call's
