@@ -159,8 +159,7 @@ impl Store {
             deleted.push(DeletedMessage { message_id, op_seq });
         }
 
-        // Only when something was actually removed: an act that deleted nothing
-        // is not an act, the rule the removal and timeout undo paths already keep.
+        // An act that deleted nothing is not an act, as the undo paths keep.
         if !deleted.is_empty() {
             for subject_id in subjects {
                 record_moderation_audit(

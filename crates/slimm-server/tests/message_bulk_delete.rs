@@ -421,3 +421,45 @@ async fn deleting_releases_the_attachments_the_messages_held() {
         .unwrap();
     assert_eq!(rows, 0, "and the now-unreferenced attachment collected");
 }
+
+/// A caller who cannot see the channel is refused before the route ever looks
+/// for the messages, so its answer cannot be used to find out whether a channel
+/// or a message exists - decision 0011's masking rule.
+///
+/// Both halves matter and they must be indistinguishable: a real id in a hidden
+/// channel and an id that exists nowhere have to come back the same way. This
+/// was missing when the route first shipped, and reordering the existence
+/// lookup ahead of the permission checks passed every other test in this file.
+#[tokio::test]
+async fn a_caller_who_cannot_see_the_channel_learns_nothing_from_the_answer() {
+    let (store, _pool, _guard) = harness().await;
+    let (admin, _moderator, outsider) = people(&store).await;
+    let channel = channel_id(&store).await;
+    let app = app(store.clone());
+
+    let real = send(&app, &channel, &admin.0, "in a channel you cannot see").await;
+
+    // The everyone role loses VIEW_CHANNEL, so the outsider cannot see it at all.
+    let everyone = store
+        .list_roles()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|r| r.is_everyone)
+        .unwrap();
+    store
+        .update_role(everyone.id, None, Some(Permissions::NONE))
+        .await
+        .unwrap();
+
+    let for_real_id = bulk_delete(&app, &channel, &outsider.0, &[real]).await;
+    let invented = Uuid::now_v7().to_string();
+    let for_invented = bulk_delete(&app, &channel, &outsider.0, &[invented]).await;
+
+    assert_eq!(for_real_id, StatusCode::FORBIDDEN);
+    assert_eq!(
+        for_real_id, for_invented,
+        "a real id and an invented one must answer identically, or the route \
+         says which messages exist in a channel the caller cannot see"
+    );
+}

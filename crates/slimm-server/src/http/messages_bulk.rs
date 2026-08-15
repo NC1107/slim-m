@@ -83,8 +83,7 @@ async fn bulk_delete(
         return Err(ApiError::BadRequest("too many message ids"));
     }
 
-    // Before anything else, so the route cannot answer whether a channel exists
-    // to somebody who cannot see it - the masking rule decision 0011 sets.
+    // First, so this cannot say a channel exists; decision 0011's masking rule.
     if !state
         .store
         .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
@@ -113,8 +112,7 @@ async fn bulk_delete(
         Err(BulkDeleteError::Internal(err)) => return Err(err.into()),
     };
 
-    // Every author checked before the first row moves: an id this caller may
-    // not delete must not leave an earlier one in the same request already gone.
+    // Every author checked before the first row moves.
     let caller_granted = state
         .store
         .granted_permissions_in_channel(ctx.user_id, channel_id)
@@ -125,6 +123,9 @@ async fn bulk_delete(
         if !subjects.contains(author_id) {
             subjects.push(*author_id);
         }
+    }
+    // Once per distinct author: a raid is one person's sixty-four messages.
+    for author_id in &subjects {
         if *author_id == ctx.user_id {
             continue;
         }
@@ -140,9 +141,7 @@ async fn bulk_delete(
         .bulk_delete_messages(channel_id, &ids, ctx.user_id, &subjects)
         .await?;
 
-    // One event per message, carrying its own op seq: the client applies an op
-    // only when its seq is exactly one past its cursor, so an aggregate frame
-    // would make every connected client resync instead.
+    // One event per message, each with its own seq; see this module's doc.
     for deleted in &outcome.deleted {
         state.hub.publish(Event::MessageDeleted {
             op_seq: Some(deleted.op_seq),
