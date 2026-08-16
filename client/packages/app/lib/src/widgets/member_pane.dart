@@ -22,18 +22,17 @@
 /// `channel_header.dart`'s `ChannelHeader.isDm` are what withhold it there.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_presence.dart';
+import '../providers/member_search.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
-import 'member_profile.dart';
-import 'user_avatar.dart';
+import 'member_pane_rows.dart';
+import 'member_pane_search.dart';
 
 /// Whether the member pane is shown, wherever it fits. Defaults open; the
 /// channel header's members toggle flips it. [HomeShell] also gates this on
@@ -110,10 +109,17 @@ class AppMemberPane extends ConsumerWidget {
             for (final entry in presence.entries)
               entry.key: presenceOf(entry.value),
           };
-          final grouped = groupMembersByPresence(members, statusOf);
+          final matching = membersMatching(
+            members,
+            ref.watch(memberQueryProvider),
+          );
+          final byJoined = ref.watch(memberSortProvider) == MemberSort.joined;
+          final grouped = groupMembersByPresence(matching, statusOf);
           return Column(
             children: [
+              // The whole roster, never the filtered view; see _Header.
               _Header(count: members.length),
+              const MemberPaneSearch(),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(
@@ -121,19 +127,29 @@ class AppMemberPane extends ConsumerWidget {
                     vertical: AppSpacing.s8,
                   ),
                   children: [
-                    if (grouped.online.isNotEmpty) ...[
-                      _GroupLabel('Online · ${grouped.online.length}'),
+                    if (matching.isEmpty)
+                      MemberEmptyResult(query: ref.watch(memberQueryProvider)),
+                    if (byJoined) ...[
+                      MemberGroupLabel('Recently joined · ${matching.length}'),
+                      for (final m in membersByJoinedNewestFirst(matching))
+                        MemberRow(
+                          profile: m,
+                          status: statusOf[m.id] ?? AppPresence.offline,
+                          isSelf: m.id == myId,
+                        ),
+                    ] else if (grouped.online.isNotEmpty) ...[
+                      MemberGroupLabel('Online · ${grouped.online.length}'),
                       for (final m in grouped.online)
-                        _MemberRow(
+                        MemberRow(
                           profile: m,
                           status: statusOf[m.id] ?? AppPresence.offline,
                           isSelf: m.id == myId,
                         ),
                     ],
-                    if (grouped.offline.isNotEmpty) ...[
-                      _GroupLabel('Offline · ${grouped.offline.length}'),
+                    if (!byJoined && grouped.offline.isNotEmpty) ...[
+                      MemberGroupLabel('Offline · ${grouped.offline.length}'),
                       for (final m in grouped.offline)
-                        _MemberRow(
+                        MemberRow(
                           profile: m,
                           status: statusOf[m.id] ?? AppPresence.offline,
                           isSelf: m.id == myId,
@@ -150,6 +166,11 @@ class AppMemberPane extends ConsumerWidget {
   }
 }
 
+/// The pane's own title bar, counting the whole roster.
+///
+/// Never the filtered count: this pane is where somebody checks how big the
+/// Space is, and a search box quietly changing that number would answer a
+/// question nobody asked.
 class _Header extends StatelessWidget {
   const _Header({required this.count});
 
@@ -170,127 +191,5 @@ class _Header extends StatelessWidget {
         style: AppText.label.copyWith(color: tokens.textSecondary),
       ),
     );
-  }
-}
-
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
-      // A heading in its natural case, for the same reason the rail's are.
-      child: Semantics(
-        container: true,
-        header: true,
-        label: text,
-        child: ExcludeSemantics(
-          child: Text(
-            text.toUpperCase(),
-            style: AppText.label.copyWith(color: tokens.textSecondary),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// How a presence state is spoken, since on screen it is only a dot's colour
-/// and silhouette.
-///
-/// Hidden is deliberately absent: it renders for the one person appearing
-/// offline, and naming it aloud beside their own name tells them nothing they
-/// did not choose.
-String? _presenceDescription(AppPresence status) => switch (status) {
-  AppPresence.online => 'online',
-  AppPresence.away => 'away',
-  AppPresence.dnd => 'do not disturb',
-  AppPresence.offline => 'offline',
-  AppPresence.hidden => null,
-};
-
-/// A row is muted (dimmed, per [AppListRow.muted]) only once fully offline;
-/// away and do-not-disturb still read as present, matching the grouping
-/// rule above.
-///
-/// A right-click reaches the same profile popover a tap already does, rather
-/// than a second, narrower menu: every verb this row could offer already
-/// lives there, gated exactly as it already is.
-class _MemberRow extends ConsumerWidget {
-  const _MemberRow({
-    required this.profile,
-    required this.status,
-    required this.isSelf,
-  });
-
-  final api.UserProfile profile;
-  final AppPresence status;
-
-  /// Nothing opens a DM with yourself: `POST /dms/{userId}` has no concept
-  /// of one, and a self-conversation would just be a second copy of the
-  /// notes only you would ever see.
-  final bool isSelf;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    // Only the first: a row that grew with role count would push the name out of a 236px pane.
-    final badge = profile.roles.isEmpty ? null : profile.roles.first;
-
-    void open() => unawaited(
-      showMemberProfile(context, ref, profile: profile, status: status),
-    );
-
-    final row = AppListRow(
-      // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
-      height: 36,
-      label: profile.displayName,
-      muted: status == AppPresence.offline,
-      // Presence is a dot and an opacity on screen, and was reaching a screen
-      // reader as the word "muted" or as nothing at all.
-      stateDescription: _presenceDescription(status),
-      trailing: badge == null
-          ? null
-          : AppBadge(variant: AppBadgeVariant.role, label: badge),
-      leading: UserAvatar(
-        userId: profile.id,
-        avatarUpdatedAt: profile.avatarUpdatedAt,
-        name: profile.displayName,
-        size: 26,
-        status: status,
-      ),
-      // Opens the profile, which is where every verb about a member lives now.
-      onTap: open,
-    );
-
-    // AppListRow is deliberately single-line and fixed-height, so a status is a caption stacked beneath it, not a change to that row.
-    final content = profile.statusText == null
-        ? row
-        : Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              row,
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: AppSpacing.s8 + 26 + AppSpacing.s8,
-                  right: AppSpacing.s8,
-                  bottom: AppSpacing.s4,
-                ),
-                child: Text(
-                  profile.statusText!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ),
-            ],
-          );
-
-    return GestureDetector(onSecondaryTapDown: (_) => open(), child: content);
   }
 }

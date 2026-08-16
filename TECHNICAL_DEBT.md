@@ -22,12 +22,12 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-18 are now closed and MOD5 is decided-and-not-built, leaving 51 of the original 70 open, of which 2 are high: CP2 and MOD2. Neither is a product decision; both are work.
-MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5.
+19 are now closed and MOD5 is decided-and-not-built, leaving 50 of the original 70 open, of which 1 is high: CP2. It is not a product decision; it is work.
+MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
 CP1 is partly fixed in #668 and stays open, downgraded to Medium.
-MOD3 closed on 2026-08-15 in #670, and MOD1 in #675. MOD5 and MOD11 were decided rather than built, in #677; see decision 0016.
+MOD3 closed on 2026-08-15 in #670, MOD1 in #675, and MOD2 in #681. MOD5 and MOD11 were decided rather than built, in #677; see decision 0016.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -240,10 +240,10 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   The by-author-and-time-window half of the recorded fix was deliberately not built: no index supports `(author, channel, since T)`, so it plans as a channel seek that then walks the channel's whole live history. No `SCAN`, so the existing plan gate would pass while the query stayed unbounded. It needs its own index and migration; carried as MOD10 below.
   One thing the entry did not anticipate, recorded because it is a real asymmetry rather than an oversight: the bulk path refuses a batch naming a message whose author holds a permission the caller does not, and the single delete has no such rule. `escalation_guard` has never guarded a message. So a moderator can still delete an administrator's message one at a time. Carried as MOD11.
 
-- **MOD2. A wave of new joiners cannot be found** (`client/packages/app/lib/src/widgets/member_pane.dart:113`). High.
-  The only member-facing surface groups by presence and sorts alphabetically, with no search, no filter, no sort by join time and no multi-select.
-  Identifying 50 accounts that joined in two minutes means reading an alphabetical list.
-  Fix: the client already holds the full roster, so a client-side search box and a sort-by-joined toggle need no server change. Effort: medium.
+- ~~**MOD2. A wave of new joiners cannot be found**~~ (`client/packages/app/lib/src/widgets/member_pane.dart:113`). High. Fixed in #681.
+  The pane gains a search box matching username and display name, and a toggle that reorders it newest-account-first. Both are client-side over the roster the pane already holds, so neither costs a request, and the recorded fix was right that no server change was needed.
+  Two details the entry did not specify, decided while building. The sort ties break on username, because several accounts registered in the same millisecond is exactly what a scripted wave looks like and a list that reshuffles between rebuilds cannot be worked through. And the header keeps counting the whole roster while a filter is applied: that number is what somebody reads to learn how big the Space is, and a search box quietly changing it would answer a question nobody asked.
+  The multi-select half of the description is deliberately not built and is carried as MOD13; the search and sort halves are what the recorded fix asked for and what a moderator needs first.
 
 - ~~**MOD3. Undoing a removal or a timeout erases who did it**~~ (`store/removals.rs:141`, `store/timeouts.rs:94`). High. Fixed in #670.
   Fixed by `moderation_audit_log` (migration 0048), an append-only table after `canvas_audit_log`'s shape, written in the same transaction as each act. `space_removals` and `member_timeouts` are untouched.
@@ -290,6 +290,11 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
 - **MOD12. A delete publishes no unpin and no thread update** (`http/messages.rs:265`). Medium.
   The `pinned_messages_on_delete` trigger removes the pin and nothing publishes `MessageUnpinned`; `send` calls `notify_reply` and `delete` does not. Both self-correct on refetch, so one stale badge is tolerable - but bulk delete turns one into up to sixty-four at once.
   Fix: publish both from the delete paths, single and bulk. Effort: small.
+
+- **MOD13. Nothing in the app can select several members, or several messages** (`client/packages/app/lib/src/widgets/member_pane.dart`). Medium.
+  MOD2 makes a wave of throwaway accounts findable and MOD1 gives the server a bulk delete taking 64 ids, but there is still no multi-select anywhere in the client, so acting on what the search now surfaces is one member and one message at a time.
+  This is the reader for the endpoint #675 shipped without one, which is the shape `canvas_audit_log` also took and decision 0037 defends.
+  Fix: selection state through `member_pane` and `message_transcript`, and a bar naming what is selected and what can be done to it. Effort: medium.
 
 ## UX and UI
 
