@@ -37,11 +37,10 @@ import '../routing/breakpoints.dart';
 import '../widgets/blocked_dm_notice.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
-import '../widgets/composer.dart';
 import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
-import '../widgets/reply_banner.dart';
+import 'channel_composer_area.dart';
 import 'channel_message_actions.dart';
 import 'channel_read_marker.dart';
 import 'channel_transcript_scroll.dart';
@@ -467,22 +466,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               ),
               if (blockedDm)
                 BlockedDmNotice(userId: dmPartnerId, name: channelName)
-              else ...[
-                AppRevealBand(
-                  child: _replyingTo == null
-                      ? null
-                      : ReplyBanner(
-                          message: _replyingTo!,
-                          onCancel: _cancelReply,
-                        ),
-                ),
-                Composer(
-                  controller: _composer,
+              else
+                ChannelComposerArea(
                   channelId: widget.channelId,
+                  controller: _composer,
                   channelName: hashChannelName ?? '',
                   onSend: _send,
+                  replyingTo: _replyingTo,
+                  onCancelReply: _cancelReply,
                 ),
-              ],
             ],
           );
         },

@@ -50,12 +50,6 @@ const Map<String, String> _allowlist = {
   'pinnedMessageCount':
       'the pins sheet lists pinned messages and shows no count beside the '
           'header, so nothing asks for one (2026-07-30)',
-  'bulkDeleteMessages':
-      'no multi-select exists anywhere in the app, so nothing can name several '
-          'messages at once yet. The endpoint shipped without a reader on '
-          'purpose (MOD1, 2026-08-15), the same way canvas_audit_log shipped a '
-          'writer with no reader; the selection UI is its own change and this '
-          'entry should go with it',
   'health': 'a liveness probe. Onboarding deliberately probes /version instead, '
       'because that answers push_enabled, invite_required and capabilities in '
       'the same round trip, and /healthz answers none of them',

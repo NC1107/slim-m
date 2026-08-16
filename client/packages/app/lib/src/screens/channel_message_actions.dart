@@ -22,6 +22,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
 import '../providers/message_actions.dart';
+import '../providers/message_selection.dart';
 import '../providers/pins_controller.dart';
 import '../providers/threads.dart';
 import '../routing/routes.dart';
@@ -79,6 +80,42 @@ Future<void> confirmAndDeleteMessage(
     'delete the message',
     () => deleteMessageAction(ref, message),
   );
+}
+
+/// Asks, deletes the whole selection in one request, then leaves the mode.
+///
+/// The selection is read once, before the dialog, so what is deleted is what
+/// was counted on the button rather than whatever the set happens to hold
+/// after an await. It is cleared only on success: a refused delete leaves the
+/// selection intact to retry or cancel, since rebuilding it by hand is the
+/// expensive part.
+Future<void> confirmAndDeleteSelectedMessages(
+  WidgetRef ref,
+  BuildContext context, {
+  required String channelId,
+}) async {
+  final ids = ref.read(messageSelectionProvider(channelId)).ids.toList();
+  if (ids.isEmpty) return;
+  final confirmed = await confirmDangerousAction(
+    context,
+    title: ids.length == 1
+        ? 'Delete message?'
+        : 'Delete ${ids.length} messages?',
+    message: deleteMessageConfirmMessage,
+    confirmLabel: 'Delete',
+  );
+  if (!confirmed || !context.mounted) return;
+  // runGuarded directly rather than _reporting, which cannot say it succeeded.
+  final failure = await runGuarded(
+    whatFailed: ids.length == 1 ? 'delete the message' : 'delete the messages',
+    action: () =>
+        bulkDeleteMessagesAction(ref, channelId: channelId, messageIds: ids),
+  );
+  if (failure != null) {
+    if (context.mounted) showAppSnackbar(context, failure);
+    return;
+  }
+  ref.read(messageSelectionProvider(channelId).notifier).clear();
 }
 
 /// Pins or unpins, [pinned] being what it is now rather than what to make it.
@@ -194,5 +231,8 @@ MessageActions messageActionsFor(
     hasExistingThread: hasExistingThread,
     canForward: canForwardMessage(message),
     onForward: () => unawaited(forwardMessage(context, ref, message)),
+    onStartSelecting: () => ref
+        .read(messageSelectionProvider(channelId).notifier)
+        .start(message.id),
   );
 }

@@ -35,7 +35,17 @@ class MessageActions {
     this.hasExistingThread = false,
     required this.canForward,
     required this.onForward,
+    this.onStartSelecting,
   });
+
+  /// Enters the transcript's selection mode with this message picked, for
+  /// deleting several at once.
+  ///
+  /// Optional because only a channel transcript has a selection mode to
+  /// enter; the reported-message viewer builds these actions too and has no
+  /// list to select within. Paired with [canDelete] at the menu, since
+  /// selecting messages is only ever a prelude to removing them.
+  final VoidCallback? onStartSelecting;
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
   /// replying is a new send, not an act on a message you already authored.
@@ -221,6 +231,12 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
       ],
       if (actions.canDelete) ...[
         const AppMenuDivider(),
+        if (actions.onStartSelecting case final VoidCallback start)
+          AppMenuItem(
+            label: 'Select messages',
+            leading: AppIcons.check,
+            onTap: () => run(start),
+          ),
         AppMenuItem(
           label: 'Delete',
           leading: AppIcons.delete,

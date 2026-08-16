@@ -20,6 +20,7 @@ import '../providers/sync_controller.dart';
 import 'message_context_menu.dart';
 import 'message_jump.dart';
 import 'message_row.dart';
+import 'message_selectable.dart';
 import 'message_transcript_extent.dart';
 import 'transcript_selection.dart';
 import 'message_row_identity.dart';
@@ -356,50 +357,54 @@ class _MessageTranscriptState extends State<MessageTranscript> {
               key: ValueKey(message.id),
               messageId: message.id,
               channelId: widget.channelId,
-              builder: (extras, editing) => MessageRow(
-                message: message,
-                // A new day breaks a group so a continuation across midnight regains its avatar and header.
-                grouped: isGrouped(message, previous) && !newDay,
-                showNewDivider: startsUnread(
-                  message,
-                  previous,
-                  widget.lastReadSeq,
-                  widget.selfId,
-                ),
-                dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
-                knownUsernames: widget.knownUsernames,
-                customEmoji: widget.customEmoji,
-                onRetry: () => widget.onRetry(message),
-                onDiscard: () => widget.onDiscard(message),
-                onEditFailed: widget.onEditFailed == null
-                    ? null
-                    : () => widget.onEditFailed!(message),
-                onPickReaction: (emoji) =>
-                    widget.onPickReaction(message, emoji),
-                onReactionTap: (reaction) =>
-                    widget.onReactionTap(message, reaction),
-                onVote: (option) => widget.onVote(message, option),
-                reactions: extras.reactions,
-                attachments: extras.attachments,
-                poll: extras.poll,
-                threadReplyCount: extras.threadReplyCount,
-                threadLastReplyAt: extras.threadLastReplyAt,
-                threadUnreadCount: extras.threadUnreadCount,
-                replyTo: switch (message.replyToId) {
-                  final String id => byId[id],
-                  null => null,
-                },
-                onReplyTap: switch (message.replyToId) {
-                  final String id => () => widget.onJumpToReply(id),
-                  null => null,
-                },
-                editing: editing,
-                onSubmitEdit: (content) =>
-                    widget.onSubmitEdit(message, content),
-                onCancelEdit: widget.onCancelEdit,
-                actions: widget.actionsFor(
-                  message,
-                  extras.threadChannelId != null,
+              builder: (extras, editing) => MessageSelectable(
+                channelId: widget.channelId,
+                messageId: message.id,
+                child: MessageRow(
+                  message: message,
+                  // A new day breaks a group so a continuation across midnight regains its avatar and header.
+                  grouped: isGrouped(message, previous) && !newDay,
+                  showNewDivider: startsUnread(
+                    message,
+                    previous,
+                    widget.lastReadSeq,
+                    widget.selfId,
+                  ),
+                  dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
+                  knownUsernames: widget.knownUsernames,
+                  customEmoji: widget.customEmoji,
+                  onRetry: () => widget.onRetry(message),
+                  onDiscard: () => widget.onDiscard(message),
+                  onEditFailed: widget.onEditFailed == null
+                      ? null
+                      : () => widget.onEditFailed!(message),
+                  onPickReaction: (emoji) =>
+                      widget.onPickReaction(message, emoji),
+                  onReactionTap: (reaction) =>
+                      widget.onReactionTap(message, reaction),
+                  onVote: (option) => widget.onVote(message, option),
+                  reactions: extras.reactions,
+                  attachments: extras.attachments,
+                  poll: extras.poll,
+                  threadReplyCount: extras.threadReplyCount,
+                  threadLastReplyAt: extras.threadLastReplyAt,
+                  threadUnreadCount: extras.threadUnreadCount,
+                  replyTo: switch (message.replyToId) {
+                    final String id => byId[id],
+                    null => null,
+                  },
+                  onReplyTap: switch (message.replyToId) {
+                    final String id => () => widget.onJumpToReply(id),
+                    null => null,
+                  },
+                  editing: editing,
+                  onSubmitEdit: (content) =>
+                      widget.onSubmitEdit(message, content),
+                  onCancelEdit: widget.onCancelEdit,
+                  actions: widget.actionsFor(
+                    message,
+                    extras.threadChannelId != null,
+                  ),
                 ),
               ),
             );
