@@ -16,6 +16,22 @@
 /// sensitivity, push-to-talk and share quality sit beside the account they
 /// belong to instead of behind a second route nothing linked to twice.
 ///
+/// **Two headings over seven panes, not four.** `Calls` held one pane and
+/// `About` held one, so the nav alternated heading, row, heading, row down
+/// its whole length - a heading roughly as often as a thing to click, which
+/// is what made the list read as choppy rather than grouped.
+///
+/// Voice sits under `You` now, where a personal microphone and share-quality
+/// preference always belonged. `About slim-m` keeps its own run but drops the
+/// heading entirely: it is one pane, and naming a group of one is decoration.
+/// A heading here always marks more than one pane, which
+/// `settings_taxonomy_test.dart` holds as a rule rather than a habit.
+///
+/// `Delete account` moved with it, out of the pane labelled `About slim-m`
+/// and into `Account & presence`. It is permanent and irreversible, and it
+/// was reached by opening a pane whose name promises a version number. About
+/// is the app's own build information now and nothing else.
+///
 /// Who you are, and the rename affordance for it, used to float above the nav
 /// as its own unlabelled block - editable, yet outside every named section,
 /// so "rename yourself" read as belonging to nothing. It lives inside
@@ -56,7 +72,11 @@ class PersonalSettingsScreen extends StatelessWidget {
               label: 'Account & presence',
               icon: AppIcons.account,
               builder: (context) => const Column(
-                children: [AvatarSettingsSection(), PresenceSection()],
+                children: [
+                  AvatarSettingsSection(),
+                  PresenceSection(),
+                  AccountSection(),
+                ],
               ),
             ),
             SettingsPane(
@@ -71,11 +91,6 @@ class PersonalSettingsScreen extends StatelessWidget {
               icon: AppIcons.notificationsOn,
               builder: (context) => const NotificationsSection(),
             ),
-          ],
-        ),
-        SettingsPaneGroup(
-          label: 'Calls',
-          panes: [
             SettingsPane(
               id: 'voice',
               label: 'Voice & screen share',
@@ -102,14 +117,12 @@ class PersonalSettingsScreen extends StatelessWidget {
           ],
         ),
         SettingsPaneGroup(
-          label: 'About',
           panes: [
             SettingsPane(
               id: 'about',
               label: 'About slim-m',
               icon: AppIcons.info,
-              builder: (context) =>
-                  const Column(children: [AppInfoSection(), AccountSection()]),
+              builder: (context) => const AppInfoSection(),
             ),
           ],
         ),
