@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.43.0](https://github.com/NC1107/slim-m/compare/client-v0.42.2...client-v0.43.0) (2026-08-16)
+
+
+### Features
+
+* **members:** find a member, and find who just arrived ([#681](https://github.com/NC1107/slim-m/issues/681)) ([e5b1c52](https://github.com/NC1107/slim-m/commit/e5b1c522c9247922f3db444c33d98a879f0258cc))
+
+
+### Bug Fixes
+
+* **api:** add the bulk delete client method, and let a schema change reach client-ci ([#679](https://github.com/NC1107/slim-m/issues/679)) ([3687bb9](https://github.com/NC1107/slim-m/commit/3687bb9404e117adb1c6b4d3b9fc02600c1f1887))
+* **settings:** a heading marks a group, not a single row ([#682](https://github.com/NC1107/slim-m/issues/682)) ([1371e0a](https://github.com/NC1107/slim-m/commit/1371e0a34115db23b7d035a428c0f6bb7c3c56e1))
+
 ## [0.42.2](https://github.com/NC1107/slim-m/compare/client-v0.42.1...client-v0.42.2) (2026-08-15)
 
 
