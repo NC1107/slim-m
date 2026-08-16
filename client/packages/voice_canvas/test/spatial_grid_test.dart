@@ -219,4 +219,95 @@ void main() {
           'would wrongly pick linear',
     );
   });
+
+  /// [UniformGrid.move] against the same oracle the insert path already uses.
+  ///
+  /// The risk it exists for is a desynchronised bucket: `move` skips the
+  /// bucket work when a box stays inside the cells it already spanned, so a
+  /// wrong comparison there leaves an object indexed at its old cells and
+  /// findable only by the linear scan. Random moves across a world with a
+  /// small cell size hit both the same-cell and the crossing case.
+  test('moved boxes stay findable, and the two scans still agree', () {
+    final rng = Random(11);
+    for (var trial = 0; trial < 40; trial++) {
+      final cellSize = <double>[64, 256, 2048][trial % 3];
+      final grid = UniformGrid(cellSize: cellSize, capacity: 8);
+      final slots = <int>[];
+      for (var i = 0; i < 120; i++) {
+        final x = -4000 + rng.nextDouble() * 8000;
+        final y = -4000 + rng.nextDouble() * 8000;
+        final w = 1 + rng.nextDouble() * cellSize * 3;
+        final h = 1 + rng.nextDouble() * cellSize * 3;
+        slots.add(grid.insert(x, y, x + w, y + h));
+      }
+
+      final before = grid.length;
+      for (var i = 0; i < 400; i++) {
+        final slot = slots[rng.nextInt(slots.length)];
+        final x = -4000 + rng.nextDouble() * 8000;
+        final y = -4000 + rng.nextDouble() * 8000;
+        final w = 1 + rng.nextDouble() * cellSize * 3;
+        final h = 1 + rng.nextDouble() * cellSize * 3;
+        grid.move(slot, x, y, x + w, y + h);
+      }
+
+      expect(
+        grid.length,
+        before,
+        reason: 'a move must not hand out a slot; that is the leak it fixes',
+      );
+      expect(grid.liveLength, slots.length);
+
+      final cx = -4000 + rng.nextDouble() * 8000;
+      final cy = -4000 + rng.nextDouble() * 8000;
+      final vw = 10 + rng.nextDouble() * 4000;
+      final vh = 10 + rng.nextDouble() * 4000;
+
+      final viaGrid = CullResult();
+      final viaLinear = CullResult();
+      grid.queryGrid(cx, cy, cx + vw, cy + vh, viaGrid);
+      grid.queryLinear(cx, cy, cx + vw, cy + vh, viaLinear);
+      expect(
+        viaGrid.slots.toSet(),
+        viaLinear.slots.toSet(),
+        reason: 'trial $trial: a move left the buckets out of step with the '
+            'bounds, so only the linear scan can still find the object',
+      );
+    }
+  });
+
+  test('a moved box is indexed nowhere it no longer covers', () {
+    final grid = UniformGrid(cellSize: 100, capacity: 4);
+    final slot = grid.insert(10, 10, 20, 20);
+
+    grid.move(slot, 5000, 5000, 5010, 5010);
+
+    final atOld = CullResult();
+    grid.queryGrid(0, 0, 100, 100, atOld);
+    expect(
+      atOld.slots,
+      isEmpty,
+      reason: 'left behind in its old cell, a moved object is still hit at a '
+          'place it no longer is',
+    );
+
+    final atNew = CullResult();
+    grid.queryGrid(4990, 4990, 5020, 5020, atNew);
+    expect(atNew.slots, [slot]);
+  });
+
+  test('moving a removed slot brings it back exactly once', () {
+    final grid = UniformGrid(cellSize: 100, capacity: 4);
+    final slot = grid.insert(10, 10, 20, 20);
+    grid.remove(slot);
+    expect(grid.liveLength, 0);
+
+    grid.move(slot, 30, 30, 40, 40);
+
+    expect(grid.liveLength, 1, reason: 'un-parking restores the live count');
+    expect(grid.length, 1, reason: 'and still hands out no new slot');
+    final found = CullResult();
+    grid.queryGrid(25, 25, 45, 45, found);
+    expect(found.slots, [slot]);
+  });
 }

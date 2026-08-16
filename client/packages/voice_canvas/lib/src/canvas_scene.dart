@@ -36,6 +36,16 @@ class CanvasScene extends ChangeNotifier {
   int get candidates => _cull.candidates;
   int get cellsVisited => _cull.cellsVisited;
 
+  /// Every slot the grid has ever handed out, parked ones included.
+  ///
+  /// Beside [objectCount], which counts only live ones, because the gap
+  /// between the two is what a repeated remove-then-add leaks: a parked slot
+  /// costs nothing on the grid branch but is still walked by the linear one,
+  /// and it never comes back. A drag that reindexes per pointer event is the
+  /// way that gap opens, so this is the number a test watches to prove it
+  /// does not.
+  int get slotCount => _grid.length;
+
   /// Adds an object without notifying, so a bulk snapshot load costs one
   /// notification rather than one per object.
   int add(double left, double top, double right, double bottom) =>
@@ -46,6 +56,12 @@ class CanvasScene extends ChangeNotifier {
   /// rather than paying a cull per removed object. `_grid` is private, so
   /// this is the only way to publish a removal through the scene.
   void remove(int slot) => _grid.remove(slot);
+
+  /// Repositions a slot already in the index, keeping its number, without
+  /// notifying - the same batching [add] and [remove] keep. See
+  /// [UniformGrid.move] for why a drag must not use remove-then-add.
+  void move(int slot, double left, double top, double right, double bottom) =>
+      _grid.move(slot, left, top, right, bottom);
 
   /// Empties the index for a document-wide reset, without notifying - the
   /// same reason [add] and [remove] do not.
