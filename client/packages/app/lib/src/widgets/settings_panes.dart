@@ -71,11 +71,15 @@ class SettingsPane {
   final List<Widget>? actions;
 }
 
-/// A labelled run of panes: `YOU`, `CALLS`, `SAFETY`.
+/// A run of panes, usually under a heading: `YOU`, `SAFETY`.
 class SettingsPaneGroup {
-  const SettingsPaneGroup({required this.label, required this.panes});
+  const SettingsPaneGroup({required this.panes, this.label});
 
-  final String label;
+  /// Null for a trailing run that is not a category - `About slim-m` is one
+  /// pane and naming a group of one is decoration, so it takes a gap instead
+  /// of a heading. A heading here should always mark more than one pane;
+  /// `settings_taxonomy_test.dart` holds that rule.
+  final String? label;
   final List<SettingsPane> panes;
 }
 
@@ -271,18 +275,26 @@ class _Nav extends StatelessWidget {
             ),
             children: [
               for (final group in groups) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, AppSpacing.s12, 10, 6),
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      group.label.toUpperCase(),
-                      style: AppText.label.copyWith(
-                        color: tokens.textSecondary,
+                if (group.label case final label?)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      10,
+                      AppSpacing.s12,
+                      10,
+                      6,
+                    ),
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        label.toUpperCase(),
+                        style: AppText.label.copyWith(
+                          color: tokens.textSecondary,
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                  )
+                else
+                  const SizedBox(height: AppSpacing.s20),
                 for (final pane in group.panes)
                   AppListRow(
                     label: pane.label,

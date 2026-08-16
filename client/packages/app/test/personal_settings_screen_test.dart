@@ -137,8 +137,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Deletion sits in the About pane now, not at the end of one column.
-    await tester.tap(find.text('About slim-m'));
+    // Deletion sits with the account it deletes, not under "About slim-m".
+    await tester.tap(find.text('Account & presence'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();

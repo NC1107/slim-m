@@ -19,14 +19,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'settings_harness.dart';
 
 /// Every nav entry the personal screen offers, and the group it sits under.
-const _panes = [
+const List<(String?, String)> _panes = [
   ('You', 'Account & presence'),
   ('You', 'Appearance'),
   ('You', 'Notifications'),
-  ('Calls', 'Voice & screen share'),
+  ('You', 'Voice & screen share'),
   ('Safety', 'Devices'),
   ('Safety', 'Blocked'),
-  ('About', 'About slim-m'),
+  (null, 'About slim-m'),
 ];
 
 const _spaceRows = [
@@ -48,9 +48,53 @@ void main() {
     await pumpPersonalSettings(tester, 0, scrollToBottom: false);
 
     for (final (group, pane) in _panes) {
-      expect(find.text(group.toUpperCase()), findsWidgets, reason: group);
+      if (group != null) {
+        expect(find.text(group.toUpperCase()), findsWidgets, reason: group);
+      }
       expect(find.text(pane), findsOneWidget, reason: pane);
     }
+  });
+
+  /// The guard for the regrouping: `Calls` and `About` used to hold one pane
+  /// each, so the nav alternated heading and row down its whole length. A
+  /// heading is worth its space only when it marks more than one thing.
+  testWidgets('every group heading marks more than one pane', (tester) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
+
+    final counts = <String, int>{};
+    for (final (group, _) in _panes) {
+      if (group == null) continue;
+      counts[group] = (counts[group] ?? 0) + 1;
+    }
+    final singletons = counts.entries
+        .where((e) => e.value < 2)
+        .map((e) => e.key)
+        .toList();
+    expect(
+      singletons,
+      isEmpty,
+      reason: 'a heading over one row is decoration, not grouping',
+    );
+
+    for (final heading in counts.keys) {
+      expect(find.text(heading.toUpperCase()), findsWidgets, reason: heading);
+    }
+  });
+
+  testWidgets('deleting the account is not filed under About', (tester) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
+
+    await tester.tap(find.text('About slim-m'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Delete account'),
+      findsNothing,
+      reason:
+          'permanent and irreversible, so it does not hide behind a pane '
+          'whose name promises a version number',
+    );
   });
 
   testWidgets('the nav is the same whoever is looking', (tester) async {
