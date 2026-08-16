@@ -14,6 +14,7 @@
 /// appearing on the first would be a permission leak rather than a layout slip.
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'settings_harness.dart';
@@ -80,6 +81,55 @@ void main() {
     for (final heading in counts.keys) {
       expect(find.text(heading.toUpperCase()), findsWidgets, reason: heading);
     }
+  });
+
+  /// A pane whose whole body is one card must not title that card with the
+  /// name the nav already gives it: "Appearance" under "Appearance" is a
+  /// header carrying no information, which is the case decision 0013 made
+  /// `SettingsSectionCard.title` nullable for.
+  ///
+  /// `Blocked` is the deliberate exception and is absent from this list: its
+  /// header earns the repeat by carrying a real description under it.
+  testWidgets('a single-card pane does not restate its own name', (
+    tester,
+  ) async {
+    // Two-pane width: the restatement only shows with nav and pane together.
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 2400);
+    addTearDown(tester.view.reset);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
+
+    for (final label in [
+      'Appearance',
+      'Notifications',
+      'Devices',
+      'About slim-m',
+    ]) {
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(label),
+        findsOneWidget,
+        reason:
+            'the nav row is the only place "$label" should appear; a section '
+            'header repeating it says nothing the nav has not already said',
+      );
+    }
+  });
+
+  testWidgets('the delete warning survives, above the action', (tester) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
+    await tester.tap(find.text('Account & presence'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('permanent and cannot be undone'),
+      findsOneWidget,
+      reason:
+          'moving this off the row must not drop it: it is the whole warning '
+          'on the most consequential action in personal settings',
+    );
   });
 
   testWidgets('deleting the account is not filed under About', (tester) async {

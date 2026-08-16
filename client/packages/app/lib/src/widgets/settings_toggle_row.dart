@@ -60,42 +60,45 @@ class SettingsToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s8,
-        vertical: AppSpacing.s8,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: AppText.ui.copyWith(color: tokens.textPrimary),
-                ),
-                if (description != null) ...[
-                  const SizedBox(height: AppSpacing.s4),
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: AppListRow.heightFor(context)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s8,
+          vertical: AppSpacing.s4,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    description!,
-                    style: AppText.caption.copyWith(
-                      color: tokens.textSecondary,
-                    ),
+                    label,
+                    style: AppText.ui.copyWith(color: tokens.textPrimary),
                   ),
+                  if (description != null) ...[
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      description!,
+                      style: AppText.caption.copyWith(
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.s12),
-          AppToggle(
-            value: value,
-            onChanged: onChanged,
-            semanticLabel: semanticLabel,
-          ),
-        ],
+            const SizedBox(width: AppSpacing.s12),
+            AppToggle(
+              value: value,
+              onChanged: onChanged,
+              semanticLabel: semanticLabel,
+            ),
+          ],
+        ),
       ),
     );
   }

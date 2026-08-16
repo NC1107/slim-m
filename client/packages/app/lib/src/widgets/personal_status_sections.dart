@@ -93,7 +93,6 @@ class NotificationsSection extends ConsumerWidget {
     final blocked = status == PushStatus.registeredNotificationsBlocked;
 
     return SettingsSectionCard(
-      title: 'Notifications',
       children: [
         AppListRow(
           leading: Icon(

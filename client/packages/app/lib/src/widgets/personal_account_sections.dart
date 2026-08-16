@@ -38,7 +38,6 @@ class DevicesSection extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return SettingsSectionCard(
-      title: 'Devices',
       children: [
         devices.when(
           loading: () => const Padding(
@@ -272,6 +271,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   Widget build(BuildContext context) {
     return SettingsSectionCard(
       title: 'Account',
+      description: 'Deleting your account is permanent and cannot be undone.',
       children: [
         AppListRow(
           // Matches SignOutRow: only the leading glyph carries the danger tone.
@@ -280,7 +280,6 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
             color: Theme.of(context).extension<AppTokens>()!.dangerText,
           ),
           label: 'Delete account',
-          meta: 'Permanent. This cannot be undone.',
           onTap: () => _confirmDeletion(context, ref),
         ),
         if (_deleteError case final error?)
