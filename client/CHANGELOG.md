@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.44.0](https://github.com/NC1107/slim-m/compare/client-v0.43.0...client-v0.44.0) (2026-08-16)
+
+
+### Features
+
+* **messages:** select several messages and delete them at once ([#683](https://github.com/NC1107/slim-m/issues/683)) ([d67e14a](https://github.com/NC1107/slim-m/commit/d67e14ac5aed9c1f9b57801dbf4608d7bd447426))
+
+
+### Bug Fixes
+
+* **settings:** give each section a shape it earns ([#685](https://github.com/NC1107/slim-m/issues/685)) ([f04b77a](https://github.com/NC1107/slim-m/commit/f04b77a7becf03da466eb1cc56684f789b932994))
+
 ## [0.43.0](https://github.com/NC1107/slim-m/compare/client-v0.42.2...client-v0.43.0) (2026-08-16)
 
 
