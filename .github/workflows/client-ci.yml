@@ -8,6 +8,11 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-ci.yml"
+      # The client reads this: schema_coverage_test.dart fails when a route is
+      # documented with no SlimmApi call behind it. A schema-only change used
+      # to skip this workflow entirely and land that failure on main, which is
+      # how bulkDeleteMessages (#675) broke the api package unnoticed.
+      - "schema/openapi.yaml"
       # A release-please version bump touches these three and nothing else.
       # It never moves client/pubspec.lock, so a genuine dependency change
       # still triggers a full run through the lock file.
@@ -18,6 +23,11 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-ci.yml"
+      # The client reads this: schema_coverage_test.dart fails when a route is
+      # documented with no SlimmApi call behind it. A schema-only change used
+      # to skip this workflow entirely and land that failure on main, which is
+      # how bulkDeleteMessages (#675) broke the api package unnoticed.
+      - "schema/openapi.yaml"
       # A release-please version bump touches these three and nothing else.
       # It never moves client/pubspec.lock, so a genuine dependency change
       # still triggers a full run through the lock file.

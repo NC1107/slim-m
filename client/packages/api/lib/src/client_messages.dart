@@ -79,6 +79,29 @@ extension SlimmApiMessages on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Soft-deletes several messages in one act, requiring MANAGE_MESSAGES in
+  /// the channel.
+  ///
+  /// Ids already deleted are skipped rather than refused, but nothing at all is
+  /// deleted unless every id resolves to a message in this channel - so a
+  /// batch with one bad id leaves the channel untouched rather than half
+  /// purged. At most 64 per call; the server refuses more rather than
+  /// truncating, so a caller with a longer list has to chunk it and decide for
+  /// itself what a partial failure means.
+  ///
+  /// Each message deleted arrives separately over the WebSocket as
+  /// `message.deleted`, not as one aggregate frame.
+  Future<void> bulkDeleteMessages({
+    required String channelId,
+    required List<String> messageIds,
+  }) =>
+      _send(
+        'POST',
+        '/channels/$channelId/messages/bulk-delete',
+        body: {'message_ids': messageIds},
+        expectNoContent: true,
+      );
+
   /// Full-text searches a channel's live messages. [q] reaches FTS5 close to
   /// as-is, so its mini query language (`AND`/`OR`/`NOT`, `"phrase"`, a
   /// trailing `*` prefix) is available; it is optional now, since the

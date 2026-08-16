@@ -11,7 +11,7 @@ Each section below is named for its workflow file.
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
-| `client-ci` | changes under `client/` | dart analyze, format, every package's tests |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml` | dart analyze, format, every package's tests |
 | `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
@@ -84,6 +84,10 @@ CocoaPods is cached on the lockfiles, since rebuilding those pods is most of wha
 
 The simulator is chosen from what the runner actually has rather than by name.
 A hardcoded `iPhone 16` broke the first time this ran, and it would break again silently every time GitHub rolls the image forward.
+
+`schema/openapi.yaml` is in the path filter even though it is not Dart, for the same reason `server-ci` watches it: a client test reads it.
+`packages/api`'s `schema_coverage_test.dart` fails when a route is documented with no `SlimmApi` call behind it, so a schema-only change can break this workflow while never triggering it.
+That is not hypothetical - #675 documented `bulkDeleteMessages`, touched no `client/` file, and landed a red `api` package on main that no PR check had run.
 
 ## schema-ci
 
