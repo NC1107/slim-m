@@ -291,10 +291,12 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   The `pinned_messages_on_delete` trigger removes the pin and nothing publishes `MessageUnpinned`; `send` calls `notify_reply` and `delete` does not. Both self-correct on refetch, so one stale badge is tolerable - but bulk delete turns one into up to sixty-four at once.
   Fix: publish both from the delete paths, single and bulk. Effort: small.
 
-- **MOD13. Nothing in the app can select several members, or several messages** (`client/packages/app/lib/src/widgets/member_pane.dart`). Medium.
+- **MOD13. Nothing in the app can select several members, or several messages** (`client/packages/app/lib/src/widgets/member_pane.dart`). Medium. Message half fixed in #683; member half still open.
   MOD2 makes a wave of throwaway accounts findable and MOD1 gives the server a bulk delete taking 64 ids, but there is still no multi-select anywhere in the client, so acting on what the search now surfaces is one member and one message at a time.
   This is the reader for the endpoint #675 shipped without one, which is the shape `canvas_audit_log` also took and decision 0037 defends.
-  Fix: selection state through `member_pane` and `message_transcript`, and a bar naming what is selected and what can be done to it. Effort: medium.
+  The message half is built: a transcript enters selection from a message's own menu, rows become one target apiece, and a bar in the composer's slot deletes the lot in one request. `bulkDeleteMessages` is out of `app_reachability_test.dart`'s unreachable allowlist as a result, which is the mechanical confirmation that the endpoint now has a reader.
+  The entry as first written conflated two jobs, and only one of them was ready. Selecting messages spends an endpoint that already exists; selecting *members* spends nothing, because there is no bulk remove, no bulk timeout and no bulk role grant on the server. Building a member multi-select first would have been a selection UI with no verb behind it.
+  Remaining fix: a bulk membership route to act on, then selection in `member_pane` against it. That order, not the reverse. Effort: medium.
 
 ## UX and UI
 

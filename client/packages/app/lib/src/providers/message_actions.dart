@@ -172,6 +172,33 @@ Future<void> deleteMessageAction(WidgetRef ref, Message message) async {
   await store.discard(message.id);
 }
 
+/// Deletes several messages in one request, then drops their local rows the
+/// same way [deleteMessageAction] drops one.
+///
+/// One request rather than a loop, which is the whole point of the endpoint:
+/// a loop would hold the moderator through N round trips while a raid
+/// continues, and would half-succeed in a way neither they nor the audit log
+/// could describe afterwards.
+///
+/// Ids the server did not delete - already gone, or never in this channel -
+/// are not an error there, so nothing is reported here either. The local
+/// discard is unconditional for the same reason: a row for a message the
+/// server says is not there should not survive on this device.
+Future<void> bulkDeleteMessagesAction(
+  WidgetRef ref, {
+  required String channelId,
+  required List<String> messageIds,
+}) async {
+  if (messageIds.isEmpty) return;
+  await ref
+      .read(apiProvider)
+      .bulkDeleteMessages(channelId: channelId, messageIds: messageIds);
+  final store = await ref.read(storeProvider.future);
+  for (final id in messageIds) {
+    await store.discard(id);
+  }
+}
+
 /// Puts a message on screen before the network has answered, then reconciles
 /// with the server's copy.
 ///
