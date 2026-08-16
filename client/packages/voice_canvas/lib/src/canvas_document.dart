@@ -89,6 +89,16 @@ class CanvasDocument extends ChangeNotifier {
     return (stroke != null && stroke.alive) ? stroke : null;
   }
 
+  /// The slot [id] currently occupies, or null if it is unknown or no longer
+  /// alive. The companion to [strokeAt], which takes a slot: together they
+  /// let a caller holding an id reach the object without this document
+  /// handing out its own map.
+  int? slotOf(String id) {
+    final slot = _slotById[id];
+    if (slot == null) return null;
+    return (_strokes[slot]?.alive ?? false) ? slot : null;
+  }
+
   bool knows(String id) => _slotById.containsKey(id);
 
   /// True if [id] names a stroke this document currently shows as alive: it
@@ -225,14 +235,23 @@ class CanvasDocument extends ChangeNotifier {
     return (x: stroke.x, y: stroke.y, w: stroke.w, h: stroke.h);
   }
 
-  /// Repositions a live object to a new box, reindexing the spatial grid
-  /// slot it occupies - a stroke's own points move with it, so a moved
-  /// stroke still hit-tests against its drawn shape rather than its old one.
-  /// Returns false if [id] is unknown or has been removed.
+  /// Repositions a live object to a new box, in place - a stroke's own points
+  /// move with it, so a moved stroke still hit-tests against its drawn shape
+  /// rather than its old one. Returns false if [id] is unknown or has been
+  /// removed.
   ///
-  /// The grid never updates a slot in place ([UniformGrid] has no such
-  /// operation), so this frees the old slot and inserts a fresh one, the same
-  /// remove-then-add [_freeSlot] and [applyPlaced] already do separately.
+  /// **Called once per pointer event for the whole of a drag or a resize**,
+  /// which is what every choice here is about. It used to free the grid slot
+  /// and insert a fresh one, allocating a replacement [CanvasStroke], a fresh
+  /// `Float32List` of every point, and a shifted [Path] each time. The grid
+  /// never renumbers or reuses a parked slot, so the remove-then-add also
+  /// leaked one slot per pointer event, for the session: a single drag across
+  /// a screen leaked a few hundred, and every later linear cull walked all of
+  /// them.
+  ///
+  /// Now [UniformGrid.move] keeps the slot, the points are shifted in place,
+  /// and the object keeps its identity. Only [path] is still reallocated,
+  /// because `dart:ui` has no in-place translate.
   bool moveObject(String id, double x, double y, double w, double h) {
     final slot = _slotById[id];
     if (slot == null) return false;
@@ -240,37 +259,17 @@ class CanvasDocument extends ChangeNotifier {
     if (stroke == null || !stroke.alive) return false;
     final dx = x - stroke.x;
     final dy = y - stroke.y;
-    final points = Float32List(stroke.points.length);
-    for (var i = 0; i < stroke.points.length; i++) {
-      points[i] = stroke.points[i] + (i.isEven ? dx : dy);
+    final points = stroke.points;
+    for (var i = 0; i < points.length; i++) {
+      points[i] += i.isEven ? dx : dy;
     }
-    scene.remove(slot);
-    final newSlot = scene.add(x, y, x + w, y + h);
-    _strokes.add(
-      CanvasStroke(
-        id: stroke.id,
-        x: x,
-        y: y,
-        path: stroke.path.shift(Offset(dx, dy)),
-        points: points,
-        width: stroke.width,
-        colorKey: stroke.colorKey,
-        zIndex: stroke.zIndex,
-        seq: stroke.seq,
-        authorId: stroke.authorId,
-        kind: stroke.kind,
-        w: w,
-        h: h,
-        attachmentId: stroke.attachmentId,
-        image: stroke.image,
-        imageLoadFailed: stroke.imageLoadFailed,
-        text: stroke.text,
-        shapeKind: stroke.shapeKind,
-      ),
-    );
-    assert(newSlot == _strokes.length - 1, 'scene.add must stay dense');
-    _strokes[slot] = null;
-    _slotById[id] = newSlot;
+    scene.move(slot, x, y, x + w, y + h);
+    stroke
+      ..x = x
+      ..y = y
+      ..w = w
+      ..h = h
+      ..path = stroke.path.shift(Offset(dx, dy));
     return true;
   }
 

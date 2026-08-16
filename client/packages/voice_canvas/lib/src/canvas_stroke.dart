@@ -179,9 +179,18 @@ class CanvasStroke {
   });
 
   final String id;
-  final double x;
-  final double y;
-  final Path path;
+
+  /// Where the object sits, and how big it is. Mutable, with [w] and [h]
+  /// below, because a drag repositions the object it started on rather than
+  /// replacing it: see [CanvasDocument.moveObject], which is called once per
+  /// pointer event and must not allocate an object per event.
+  double x;
+  double y;
+
+  /// The drawn shape. Reassigned on a move, since `dart:ui` has no in-place
+  /// translate - one allocation per move rather than the three a replaced
+  /// object cost.
+  Path path;
   final double width;
   final String colorKey;
 
@@ -192,9 +201,9 @@ class CanvasStroke {
 
   /// The object's own extent, needed to paint an [CanvasObjectKind.image]
   /// (which has no [path] to bound it) and to reposition either kind on a
-  /// move.
-  final double w;
-  final double h;
+  /// move. Mutable with [x] and [y], and for the same reason.
+  double w;
+  double h;
 
   /// See [CanvasStrokeInput.attachmentId].
   final String? attachmentId;

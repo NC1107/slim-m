@@ -141,6 +141,63 @@ class UniformGrid {
     _removed++;
   }
 
+  /// Repositions a slot already in the index, keeping its number.
+  ///
+  /// The operation [remove] then [insert] used to stand in for, and the
+  /// reason that stand-in was wrong: [insert] always hands out a *fresh*
+  /// slot, and [remove] parks the old one forever, since slots are never
+  /// renumbered. A drag calls this once per pointer event, so the pair
+  /// leaked a slot per event - hundreds across one gesture, never
+  /// reclaimed, each one walked by every later linear cull.
+  ///
+  /// Only the buckets that actually change are touched: an object nudged
+  /// inside one cell rewrites its bounds and nothing else.
+  void move(int slot, double left, double top, double right, double bottom) {
+    final base = slot << 2;
+    final oldLeft = _bounds[base];
+    final oldTop = _bounds[base + 1];
+    final oldRight = _bounds[base + 2];
+    final oldBottom = _bounds[base + 3];
+    final parked = oldRight < oldLeft;
+
+    final ncx0 = (left / cellSize).floor();
+    final ncy0 = (top / cellSize).floor();
+    final ncx1 = (right / cellSize).floor();
+    final ncy1 = (bottom / cellSize).floor();
+
+    if (!parked) {
+      final ocx0 = (oldLeft / cellSize).floor();
+      final ocy0 = (oldTop / cellSize).floor();
+      final ocx1 = (oldRight / cellSize).floor();
+      final ocy1 = (oldBottom / cellSize).floor();
+      if (ocx0 == ncx0 && ocy0 == ncy0 && ocx1 == ncx1 && ocy1 == ncy1) {
+        _bounds[base] = left;
+        _bounds[base + 1] = top;
+        _bounds[base + 2] = right;
+        _bounds[base + 3] = bottom;
+        return;
+      }
+      for (var cy = ocy0; cy <= ocy1; cy++) {
+        for (var cx = ocx0; cx <= ocx1; cx++) {
+          _removeFromBucket(_key(cx, cy), slot);
+        }
+      }
+    } else {
+      // Un-parking one: it left the live count when it was removed.
+      _removed--;
+    }
+
+    _bounds[base] = left;
+    _bounds[base + 1] = top;
+    _bounds[base + 2] = right;
+    _bounds[base + 3] = bottom;
+    for (var cy = ncy0; cy <= ncy1; cy++) {
+      for (var cx = ncx0; cx <= ncx1; cx++) {
+        (_cells[_key(cx, cy)] ??= <int>[]).add(slot);
+      }
+    }
+  }
+
   /// Empties the index for a document-wide reset.
   ///
   /// The typed arrays are kept at their current size rather than
