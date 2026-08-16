@@ -36,7 +36,6 @@ class AppInfoSection extends ConsumerWidget {
     final errors = ref.watch(debugLogProvider);
 
     return SettingsSectionCard(
-      title: 'App',
       children: [
         AppListRow(
           leading: const Icon(AppIcons.info),
@@ -48,7 +47,7 @@ class AppInfoSection extends ConsumerWidget {
           ),
         ),
         AppListRow(
-          leading: const Icon(AppIcons.info),
+          leading: const Icon(AppIcons.activityLog),
           label: 'Debug log',
           meta: errors.isEmpty
               ? 'Nothing caught this session'
