@@ -46,8 +46,13 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  analyze-format-test:
-    name: analyze, format check, test
+  # Split from the test job so a typo or an unformatted file reports in about
+  # three minutes instead of fourteen. The two share a setup and a pub get,
+  # which is the duplicated cost this buys the fast signal with; everything
+  # after that is disjoint. Both are in verify-client-ci's required_checks,
+  # since each can fail with the other green.
+  analyze-format:
+    name: analyze, format check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -73,6 +78,26 @@ jobs:
       - name: format check (workspace-wide)
         working-directory: client
         run: dart format --output=none --set-exit-if-changed .
+
+  test-web:
+    name: test and web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      # --enforce-lockfile, for the same reason the Rust side builds --locked:
+      # without it the committed lockfile is advisory and CI can silently
+      # resolve versions nobody committed.
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
 
       # Goldens run inside these suites, not a job of their own, and only ever on
       # this channel and runner. If they start flaking, see docs/ci.md.

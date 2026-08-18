@@ -27,6 +27,11 @@ jobs:
         with:
           python-version: "3.14"
 
+      # setup-python is a clean interpreter, so the one gate here that parses
+      # workflow YAML rather than scraping it needs its parser installed.
+      - name: python dependencies for the gates
+        run: pip install --disable-pip-version-check pyyaml
+
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         if: github.event_name == 'pull_request'
         with:
@@ -340,3 +345,9 @@ jobs:
       # wrong-looking. See the script header.
       - name: every workflow is in the docs/ci.md table
         run: python3 scripts/check-ci-docs.py
+
+      # The release gate matches check runs by exact name, and nothing else
+      # connects that string to the jobs it names, so a rename points it at a
+      # check that never appears. See the script header.
+      - name: every required release check names a real job
+        run: python3 scripts/check-required-checks-exist.py
