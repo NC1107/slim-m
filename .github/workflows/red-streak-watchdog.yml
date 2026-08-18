@@ -23,7 +23,7 @@ name: red-streak-watchdog
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "17 7 * * *"
   workflow_dispatch:
 
 permissions:
