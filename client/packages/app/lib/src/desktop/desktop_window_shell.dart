@@ -72,6 +72,15 @@ class DesktopWindowShell {
     _framelessApplied = false;
   }
 
+  /// Flips the two flags [DesktopChrome] reads, so a widget test can render
+  /// the active chrome without driving the whole native bring-up. Pair with
+  /// [debugPort] and [debugReset]; [frameless] mounts the title bar.
+  @visibleForTesting
+  static void debugActivate({bool frameless = false}) {
+    _active = true;
+    _framelessApplied = frameless;
+  }
+
   /// The one port [TitleBar] drags, minimizes and maximizes through.
   static DesktopWindowPort get port => _port;
 
