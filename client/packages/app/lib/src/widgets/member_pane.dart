@@ -28,11 +28,9 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_presence.dart';
-import '../providers/member_search.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import 'member_pane_rows.dart';
-import 'member_pane_search.dart';
 
 /// Whether the member pane is shown, wherever it fits. Defaults open; the
 /// channel header's members toggle flips it. [HomeShell] also gates this on
@@ -109,17 +107,10 @@ class AppMemberPane extends ConsumerWidget {
             for (final entry in presence.entries)
               entry.key: presenceOf(entry.value),
           };
-          final matching = membersMatching(
-            members,
-            ref.watch(memberQueryProvider),
-          );
-          final byJoined = ref.watch(memberSortProvider) == MemberSort.joined;
-          final grouped = groupMembersByPresence(matching, statusOf);
+          final grouped = groupMembersByPresence(members, statusOf);
           return Column(
             children: [
-              // The whole roster, never the filtered view; see _Header.
               _Header(count: members.length),
-              const MemberPaneSearch(),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(
@@ -127,17 +118,7 @@ class AppMemberPane extends ConsumerWidget {
                     vertical: AppSpacing.s8,
                   ),
                   children: [
-                    if (matching.isEmpty)
-                      MemberEmptyResult(query: ref.watch(memberQueryProvider)),
-                    if (byJoined) ...[
-                      MemberGroupLabel('Recently joined · ${matching.length}'),
-                      for (final m in membersByJoinedNewestFirst(matching))
-                        MemberRow(
-                          profile: m,
-                          status: statusOf[m.id] ?? AppPresence.offline,
-                          isSelf: m.id == myId,
-                        ),
-                    ] else if (grouped.online.isNotEmpty) ...[
+                    if (grouped.online.isNotEmpty) ...[
                       MemberGroupLabel('Online · ${grouped.online.length}'),
                       for (final m in grouped.online)
                         MemberRow(
@@ -146,7 +127,7 @@ class AppMemberPane extends ConsumerWidget {
                           isSelf: m.id == myId,
                         ),
                     ],
-                    if (!byJoined && grouped.offline.isNotEmpty) ...[
+                    if (grouped.offline.isNotEmpty) ...[
                       MemberGroupLabel('Offline · ${grouped.offline.length}'),
                       for (final m in grouped.offline)
                         MemberRow(

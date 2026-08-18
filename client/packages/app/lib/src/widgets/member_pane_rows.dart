@@ -139,26 +139,3 @@ class MemberRow extends ConsumerWidget {
     return GestureDetector(onSecondaryTapDown: (_) => open(), child: content);
   }
 }
-
-/// What a search that matched nobody shows, so an empty pane reads as an
-/// answer rather than as a roster that failed to load.
-class MemberEmptyResult extends StatelessWidget {
-  const MemberEmptyResult({required this.query, super.key});
-
-  final String query;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s8,
-        vertical: AppSpacing.s16,
-      ),
-      child: Text(
-        query.trim().isEmpty ? 'No members yet' : 'Nobody matches "$query"',
-        style: AppText.body.copyWith(color: tokens.textSecondary),
-      ),
-    );
-  }
-}
