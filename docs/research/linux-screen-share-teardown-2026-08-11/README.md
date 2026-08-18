@@ -1,6 +1,6 @@
 # Linux screen share teardown: what re-checking the research found, and a ready patch
 
-Follow-up to CLAUDE.md's "A screen share outliving its call" entry (2026-08-10).
+Follow-up to PR #528 ("A screen share outliving its call") (2026-08-10).
 Three things: re-verifying that entry's own claims against the real source rather than trusting them, tracing whether PR #529's client-side fix changes anything on Linux, and a prepared (not filed) upstream patch.
 Read the CLAUDE.md entry first; this doc is the detail behind its correction.
 
@@ -96,4 +96,4 @@ Match PR #2133's shape and tone for the PR body: a short **Problem** section (th
 Not filed in this pass, per the owner's own standing instruction that this kind of external contribution should go out under his own account if he wants it to, not an agent's.
 
 **Deliberately not done: a `dependency_overrides` fork pin.**
-Considered again here and rejected for the same reason CLAUDE.md's own entry already gives: Part 2's trace found the implicit path already correct and already running on every disconnect, so a forked pin would carry the ongoing cost this project has a recorded scar about, for a fix whose payoff (over the already-working implicit path) is unverified without a device.
+Considered again here and rejected for the same reason PR #528 already gives: Part 2's trace found the implicit path already correct and already running on every disconnect, so a forked pin would carry the ongoing cost this project has a recorded scar about, for a fix whose payoff (over the already-working implicit path) is unverified without a device.

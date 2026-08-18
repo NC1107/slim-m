@@ -28,7 +28,7 @@ import 'member_profile.dart';
 /// it - `excludeSemantics: true` on the outer [Semantics] is what does that,
 /// mutation-tested: without it a resolved avatar's label silently grew a
 /// second line merged in from `AppAvatar`'s own built-in name label, the same
-/// shape of bleed CLAUDE.md's "54, the resize bar" entry records, found only
+/// shape of bleed PR #370 ("54, the resize bar") records, found only
 /// by dumping the real semantics tree, not by reading the widget.
 /// `excludeFromSemantics` on the [GestureDetector] is redundant given that
 /// (removing it alone changes nothing observable), kept anyway to match that

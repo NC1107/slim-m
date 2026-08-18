@@ -34,7 +34,7 @@ None of reactions, pins or polls share that property, and the reason differs per
 ## Reactions: there is no delta to log, because the server never computes one
 
 `Event::ReactionsChanged` (`crates/slimm-server/src/hub/event.rs`) carries only `channel_id` and `message_id` on the wire event itself - no tally, no reactor.
-`http/ws/authorization.rs`'s dispatch reads `store.reactions_for_message(message_id, ctx.user_id)` fresh, per connection, at send time, and that per-viewer read is what keeps a blocked reactor's count off the blocking party's screen (see CLAUDE.md's "Blocking, and the two halves of it a client cannot do").
+`http/ws/authorization.rs`'s dispatch reads `store.reactions_for_message(message_id, ctx.user_id)` fresh, per connection, at send time, and that per-viewer read is what keeps a blocked reactor's count off the blocking party's screen (see PR #147 ("Blocking, and the two halves of it a client cannot do")).
 
 That means there is structurally no shared fact an op stream could record.
 An edit op can carry the message's current content because content is the same for everyone; a reaction "op" would have to be either a global answer (reintroducing the blocking bug `tests/blocking_live.rs` already exists to catch) or a per-viewer answer, which cannot be written once and read by every future viewer the way a message op can.

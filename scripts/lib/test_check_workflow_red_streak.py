@@ -3,7 +3,7 @@
 
 e2e.yml is advisory and does not gate a PR or a release, so a red run there
 produced no signal anyone else would see - twice, for two days each time
-(see CLAUDE.md's two "e2e was red" entries). Failing this workflow's own
+(see PRs #379 and #550, both "e2e was red"). Failing this workflow's own
 job again would repeat exactly that mistake, so the real output under test
 is a GitHub issue: opened once a real streak crosses a threshold, closed
 once main is green again, deduplicated by label so a run every hour cannot

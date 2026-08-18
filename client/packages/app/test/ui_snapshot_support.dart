@@ -365,7 +365,7 @@ Future<void> teardownFixture(
 ///
 /// [settleNestedResolve] is for a widget whose own `initState` fires a
 /// *second*, nested async resolve after it mounts - `ReportCard`'s own
-/// shape (see CLAUDE.md's "report card overflow" entry) - which the two
+/// shape (see PR #545 ("report card overflow")) - which the two
 /// pumps above do not reach: they settle the list that creates the widget,
 /// not what that widget goes on to do once it exists. One further bare
 /// pump is what [expectSettled] itself proved sufficient to let it land, so

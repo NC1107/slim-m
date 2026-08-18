@@ -299,7 +299,7 @@ See `docs/e2e.md` for what the harness actually covers and what it does not.
 
 ### red-streak-watchdog closes the "advisory and nobody is watching" gap this section already names
 
-`e2e` has been red for a day, then red for two days a second time, each time with a release shipping over the top of it and nothing anywhere saying so; see CLAUDE.md's two "e2e was red" entries for both incidents.
+`e2e` has been red for a day, then red for two days a second time, each time with a release shipping over the top of it and nothing anywhere saying so; see PRs #379 and #550 for the two incidents.
 Neither happened because `e2e` gates anything - it does not, on purpose, per this section above - they happened because nothing was watching a check that fails loudly in its own terms but reaches nobody.
 
 `red-streak-watchdog.yml` runs on an hourly schedule (plus `workflow_dispatch`) and asks `scripts/check-workflow-red-streak.sh` a plain question of `e2e`'s own run history on `main`: how many completed runs in a row, most recent first, have failed, treating a cancelled run as neither a failure nor a recovery since it never actually ran the harness (see `e2e.yml`'s own "queued, not cancelled" concurrency comment).
@@ -360,7 +360,7 @@ When a release PR is merged, that same push run cuts the GitHub Release plus tag
 A direct tag push (`server-v*` or `client-v*`) is also honored, so a release can be re-published without another release-please run.
 
 The release-please job runs manifest mode twice, once per package, each against its own config and manifest file (`release-please-config.server.json` / `.release-please-manifest.server.json` for the server, the `.client.json` pair for the client), and only on main-branch pushes.
-Splitting the manifest is what stops one package's release commit from conflicting the other's still-open standing PR: both used to read and write one shared `.release-please-manifest.json`, so merging either PR moved that file underneath the other, on every merge that did not also carry releasable commits for it. See CLAUDE.md's release-PR-conflict entry for the incident history.
+Splitting the manifest is what stops one package's release commit from conflicting the other's still-open standing PR: both used to read and write one shared `.release-please-manifest.json`, so merging either PR moved that file underneath the other, on every merge that did not also carry releasable commits for it. See PR #321 for the incident history.
 On a tag push both invocations are a no-op so downstream jobs can still resolve their outputs via `needs`.
 
 Server (AGPL-3.0-only) and client (Apache-2.0) are versioned and released independently, each with its own tag and its own set of jobs.
@@ -430,7 +430,7 @@ Per-commit groups on `main` mean distinct pushes are never in one group, so no p
 The other unconditionally-`true` workflows (`compose-smoke`, `audio-ci`, `push-relay-contract`, `perf`, `e2e`) were checked too and are not required checks in either `required_checks` string above, so a cancellation there cannot block a release the way `schema-ci`'s could; `main-builds.yml`'s own `cancel-in-progress: true` is unrelated to this release pipeline entirely and is documented as deliberate in its own section below.
 
 **Proven versus reasoned, stated plainly.** The 2026-08-06 sequence above (run IDs, timestamps, an empty job list, the tag's own commit) is read from the real run history through `gh`, not inferred. That a SHA-keyed group can never produce a pending run is a property of the group key having no collisions across distinct pushes, which is git's own guarantee rather than something this repo can test against a real two-workflow-runs-racing GitHub instance; the git-ref-race trade for an ordinary push's release-please refresh is reasoned from how release-please's own standing-PR mechanism is documented to behave and from this repository's own recorded experience of it self-healing, not measured against a live race.
-See CLAUDE.md's "A release can succeed and still ship no store build" entry for the fuller incident record and the earlier variant of this bug.
+See PR #250 ("A release can succeed and still ship no store build") for the fuller incident record and the earlier variant of this bug.
 
 ### release-tag-watchdog closes the detection gap the fix alone leaves open
 

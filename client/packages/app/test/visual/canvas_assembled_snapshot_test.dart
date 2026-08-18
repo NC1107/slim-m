@@ -5,7 +5,7 @@
 ///
 /// This exists because #460's redesign shipped through a rescued,
 /// five-conflict landing with nobody having looked at the result on a
-/// screen: see CLAUDE.md's own entries on the redesign for why. Every other
+/// screen: see PR #460 and the commits around it for why. Every other
 /// widget test in this package proves one behaviour in isolation; this one
 /// proves the composition - whether the dock, the roster and the self
 /// bubble read as one interface once real content is behind them.

@@ -31,7 +31,7 @@ jobs:
   # conflicted the other package's still-open standing PR on every merge that
   # didn't also touch it. Splitting the manifest removes the shared file
   # rather than working around it, so there is nothing left for the two PRs
-  # to collide on. See docs/ci.md and CLAUDE.md's release-PR-conflict entry.
+  # to collide on. See docs/ci.md and PR #321.
   release-please:
     runs-on: ubuntu-latest
     permissions:

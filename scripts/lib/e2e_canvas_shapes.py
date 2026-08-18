@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """The three tools e2e_canvas.py's own module doc says it does not cover:
 note, shape, and reordering a stroke - each written after the canvas grew
-past the single pen it shipped with (see CLAUDE.md's canvas entries).
+past the single pen it shipped with (see docs/research/canvas-removal-design-2026-07-31.md
+and the canvas decision records for why).
 
 Split out of e2e_canvas.py to stay under the file budget; every helper used
 here (origin, at_frac, wait_for_summary, wait_for_kind_count,

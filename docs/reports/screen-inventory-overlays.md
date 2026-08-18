@@ -69,7 +69,7 @@ Each of these opens with the harness's own fixed parameters; only the generic in
 - **settings-select-row-generic-picker** — a generic single-choice sheet reused across several settings rows (theme, screen-share quality, notification preference); each concrete instantiation is a distinct effective overlay content-wise, none captured.
 - **role-assign-sheet** — see the settings doc.
 
-## Remaining `SnackBar` sites (post-audit; CLAUDE.md's "27 sites" reduced to a small, deliberate allowlist)
+## Remaining `SnackBar` sites (post-audit; PR #132 ("27 sites") reduced to a small, deliberate allowlist)
 
 Each of these is legitimate per this codebase's own stated rule (a still-mounted persistent surface must use `AppErrorState`; a `SnackBar` is only correct once the triggering surface has already closed): debug log's "copied" confirmation, `channel_message_actions.dart`'s shared post-menu-close failure helper, invite code "copied" confirmations, channel-overwrite **success** toasts (failure is already inline elsewhere), member-popover eject/remove failures (popover closed first), a jump-to-message failure, and the shared `safety_actions.dart` report/block/unblock result sentence.
 None of the remaining sites catch an exception directly on a surface that is still mounted, which is the shape the original 27-site regression had.

@@ -1,5 +1,7 @@
 # A product and UX review of slim-m
 
+A point-in-time product review, kept as written. Its references to CLAUDE.md entries describe the 2,591-line CLAUDE.md of the time; PR #666 rewrote that file and moved the history into git and `docs/`.
+
 Date: 2026-08-02.
 Method: `bash scripts/ui-snapshots.sh` rendered all twelve routed screens plus both canvas surfaces, at every shipped viewport, in both themes (136 PNGs), then each was actually opened and looked at.
 Where a claim rests on code rather than a render, it says so.
