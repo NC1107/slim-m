@@ -34,7 +34,7 @@ pub use content_type::{is_inline, sniff_content_type};
 /// Largest attachment a single upload may store, for [`Media::for_tests`],
 /// which builds a handle without a `Config` to read the real default from.
 /// Matches `default_attachment_max_bytes` in `src/config.rs`.
-const DEFAULT_ATTACHMENT_MAX_BYTES: u64 = 10 * 1024 * 1024;
+const DEFAULT_ATTACHMENT_MAX_BYTES: u64 = 100 * 1024 * 1024;
 
 /// Longest a sanitized filename may be, in characters.
 const FILENAME_MAX_CHARS: usize = 200;
