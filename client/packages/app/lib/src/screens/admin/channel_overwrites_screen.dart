@@ -28,21 +28,28 @@ import 'overwrite_target_picker_sheets.dart';
 import 'permission_overwrite_row.dart';
 
 class ChannelOverwritesScreen extends StatelessWidget {
-  const ChannelOverwritesScreen({super.key});
+  const ChannelOverwritesScreen({super.key, this.initialChannel});
+
+  /// Pre-selects a channel when opened from that channel's own context menu,
+  /// skipping the picker; null when reached from Space settings, where the
+  /// picker is the point.
+  final Channel? initialChannel;
 
   @override
-  Widget build(BuildContext context) => const SettingsScreenScaffold(
+  Widget build(BuildContext context) => SettingsScreenScaffold(
     title: 'Channel permissions',
     backTooltip: 'Back to Space settings',
     backFallback: Routes.spaceSettings,
-    child: ChannelOverwritesPane(),
+    child: ChannelOverwritesPane(initialChannel: initialChannel),
   );
 }
 
 /// The overwrite editor itself, embeddable as a Space settings pane as well
 /// as routed.
 class ChannelOverwritesPane extends ConsumerStatefulWidget {
-  const ChannelOverwritesPane({super.key});
+  const ChannelOverwritesPane({super.key, this.initialChannel});
+
+  final Channel? initialChannel;
 
   @override
   ConsumerState<ChannelOverwritesPane> createState() =>
@@ -53,6 +60,13 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
     with GuardedActionState<ChannelOverwritesPane> {
   Channel? _channel;
   api.OverwriteTarget _kind = api.OverwriteTarget.role;
+
+  @override
+  void initState() {
+    super.initState();
+    _channel = widget.initialChannel;
+  }
+
   String? _targetId;
   String? _targetLabel;
   final Map<int, OverwriteState> _state = {

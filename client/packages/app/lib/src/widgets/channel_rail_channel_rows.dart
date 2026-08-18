@@ -17,7 +17,9 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../permissions.dart';
 import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
@@ -47,6 +49,14 @@ List<Widget> _channelMenuItems(
   final current = container
       .read(channelNotificationOverridesProvider)
       .overrideFor(channel.id);
+  // Coarse deployment-wide gate like the channel-manage one; the overwrite screen re-checks this channel's own MANAGE_ROLES on open.
+  final canManageRoles =
+      container
+          .read(meProvider)
+          .valueOrNull
+          ?.permissions
+          .hasPermission(Perm.manageRoles) ??
+      false;
 
   void toggle(api.NotificationPreference preference) {
     close();
@@ -92,6 +102,17 @@ List<Widget> _channelMenuItems(
         onTap: () {
           close();
           showManageChannelSheet(context, channel);
+        },
+      ),
+    ],
+    if (canManageRoles) ...[
+      if (!canManage) const AppMenuDivider(),
+      AppMenuItem(
+        label: 'Channel permissions...',
+        leading: AppIcons.permissions,
+        onTap: () {
+          close();
+          context.push(Routes.adminOverwrites, extra: channel);
         },
       ),
     ],

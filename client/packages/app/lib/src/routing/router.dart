@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/categories_screen.dart';
+import 'package:slimm_data/data.dart' show Channel;
 import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
@@ -124,8 +125,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.adminOverwrites,
-        pageBuilder: (context, state) =>
-            modalPage(context, const ChannelOverwritesScreen()),
+        // `extra` pre-selects a channel when opened from its own menu; absent from Space settings, where the picker leads.
+        pageBuilder: (context, state) => modalPage(
+          context,
+          ChannelOverwritesScreen(initialChannel: state.extra as Channel?),
+        ),
       ),
       GoRoute(
         path: Routes.adminCategories,
