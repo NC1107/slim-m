@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.45.0](https://github.com/NC1107/slim-m/compare/client-v0.44.0...client-v0.45.0) (2026-08-18)
+
+
+### Features
+
+* **settings:** a user cap on the decoded-image cache, default 100 MB ([#697](https://github.com/NC1107/slim-m/issues/697)) ([8fd8051](https://github.com/NC1107/slim-m/commit/8fd80517c2787a264a662ce767b9c3047fbe39da))
+
+
+### Bug Fixes
+
+* **avatars:** decode avatars at a floor so a scaled desktop keeps them crisp ([#695](https://github.com/NC1107/slim-m/issues/695)) ([47a14d2](https://github.com/NC1107/slim-m/commit/47a14d2c7322551a7049aa32931ddbc93c1fc68d))
+* **desktop:** the title bar's yellow underline was a missing Material ([#696](https://github.com/NC1107/slim-m/issues/696)) ([3e62cc2](https://github.com/NC1107/slim-m/commit/3e62cc21c4aae01244d551d310122d0403c7e56d))
+* **members:** drop the member-pane search box and sort toggle ([#694](https://github.com/NC1107/slim-m/issues/694)) ([df9d04f](https://github.com/NC1107/slim-m/commit/df9d04fc0984289f9c131452a3f20d4c89cfed96))
+
+
+### Performance Improvements
+
+* **canvas:** a drag repositions an object instead of replacing it ([#686](https://github.com/NC1107/slim-m/issues/686)) ([2e3757a](https://github.com/NC1107/slim-m/commit/2e3757a0af2f682fa9c0bde4d45117207d34c5ff))
+
 ## [0.44.0](https://github.com/NC1107/slim-m/compare/client-v0.43.0...client-v0.44.0) (2026-08-16)
 
 
