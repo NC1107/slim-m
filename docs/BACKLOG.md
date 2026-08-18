@@ -219,3 +219,19 @@ Fixed to `slim-m` in both places.
 ~~Neither branch reads the current Space name: that would need a runtime Dart-to-native bridge that does not exist yet, so it is out of scope for a one-liner and belongs with the frameless-window work above if it is ever built.~~
 Half stale, corrected 2026-08-11: the frameless-window work above did get built, and it brought `window_manager` with it, so the bridge this said does not exist is `desktop_window_port.dart` and a window title is one call away now.
 Still true is that nothing sets it to the Space name; the C++ default is what a native title bar would show, and on Windows and Linux the app hides that bar anyway.
+
+## Multiple spaces within one deployment
+
+Owner concern, raised 2026-08-18.
+Recorded for later consideration only; no design or feasibility work has been done, and none was asked for.
+
+The current model is one deployment (one Docker container) is one community, locked in `docs/decisions/0001-owner-decisions.md` and stated in `CLAUDE.md`.
+
+The concern is whether that one-community-per-container shape should stay that way.
+A person may belong to several unrelated communities at once: the owner's own examples were being in a Dungeon Defenders community, keeping school friends in a separate one, and keeping Counter-Strike friends in a third.
+Under the current model each of those is a separate deployment the person joins separately, rather than several communities reachable from one place.
+
+The rough direction floated, not a design: perhaps a user could create their own "space" within a single container, so one deployment could host more than one community.
+
+This is left as a raised question against decision 0001 rather than an accepted feature, because it changes a founding constraint rather than adding on top of it.
+It is not scheduled and it is not to be acted on until the owner decides to.
