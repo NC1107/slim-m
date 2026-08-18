@@ -68,4 +68,42 @@ void main() {
       expect(find.byType(Material), findsWidgets);
     },
   );
+
+  testWidgets("the title bar's window menu opens - the chrome carries an Overlay", (
+    tester,
+  ) async {
+    // The window menu is an OverlayPortal; without the chrome's own Overlay it threw "No Overlay widget found" and never opened.
+    DesktopWindowShell.debugPort = FakeDesktopWindowPort();
+    DesktopWindowShell.debugActivate(frameless: true);
+    addTearDown(DesktopWindowShell.debugReset);
+    tester.view.physicalSize = const Size(1400, 880);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          builder: (context, child) => DesktopChrome(child: child!),
+          home: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(AppIcons.moreVertical), warnIfMissed: false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.text('Quit slim-m'), findsOneWidget);
+    // The menu sizes to its content, not the window: a full-width band was the no-overlay symptom.
+    final menu = tester.getSize(
+      find
+          .ancestor(
+            of: find.text('Quit slim-m'),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    expect(menu.width, lessThan(300));
+  });
 }
