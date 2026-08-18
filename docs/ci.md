@@ -11,13 +11,13 @@ Each section below is named for its workflow file.
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
-| `client-ci` | changes under `client/`, or to `schema/openapi.yaml` | dart analyze, format, every package's tests |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml` | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about three minutes rather than fourteen |
 | `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
-| `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap |
+| `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
 | `advisory-watchdog` | a daily schedule, and by hand | nothing. It opens a deduplicated GitHub issue for a security advisory against a dependency and closes it once the tree is clean; the trigger `licenses` deliberately does not carry |
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
@@ -384,7 +384,10 @@ It shipped three separate incidents before anything tested it: a cancelled check
 All three are now regression tests, not just fixed code.
 
 `verify-server-ci` requires `check` (server-ci), `hygiene`, `cargo dependency licenses` (licenses) and `breaking-change gate (additive-only, push to main)` (schema-ci).
-`verify-client-ci` requires `analyze, format check, test`, `linux desktop compiles` and `linux desktop shell smoke (Xvfb)` (all client-ci), `ios unit tests (callkit invariant)` and `ios sources are registered in project.pbxproj` (client-ios-ci), `hygiene`, `pub dependency licenses` (licenses) and the same schema-ci gate.
+`verify-client-ci` requires `analyze, format check`, `test and web build`, `linux desktop compiles` and `linux desktop shell smoke (Xvfb)` (all client-ci), `ios unit tests (callkit invariant)` and `ios sources are registered in project.pbxproj` (client-ios-ci), `hygiene`, `pub dependency licenses` (licenses) and the same schema-ci gate.
+
+Those names are matched by exact string against check-run names, and nothing in the workflow graph connects the string to the jobs it names.
+`scripts/lib/test_release_required_checks_exist.py` is what closes that: it fails a pull request when a `required_checks` entry names no job, so a rename is caught there rather than at release time on `main`. Its sibling `test_release_required_checks_schema_gate.py` checks the other half - that the entry named can structurally reach a release commit at all.
 The two Linux jobs joined the list on 2026-08-11: a release ships a Linux tarball, rpm and flatpak from every `client-v*` tag, and until then a client release could cut with the Linux desktop build red - the exact class both jobs' own doc comments describe main going red on, only at release time with nothing failing loudly.
 Neither is path-filtered on `main` (both run on every push there), so the same guarantee the iOS checks rely on - `main` is never trusted on a filter alone - already holds for them.
 Those are exact check-run names (a job's `name:`, or its id when a job sets none), matched literally; renaming one of those jobs without updating the matching `required_checks` string silently reopens the gap this closes, since the renamed check is simply absent and the gate times out and fails rather than warns.

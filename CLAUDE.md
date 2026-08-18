@@ -120,6 +120,7 @@ Never use `:memory:` for tests that depend on the multi-connection SQLite pool.
 - `scripts/check-comment-cap.sh` - ratchets the one-line plain-comment cap; a file may not gain a new run. `comment-cap-allow.txt` holds the pre-existing ones at their count.
 - `scripts/check-error-surface.py` - no API failure may be caught and surfaced with a SnackBar; use the persistent `AppErrorState`. This regressed back three times.
 - `scripts/check-migration-versions.py` - duplicate or mutated migrations.
+- `scripts/lib/test_release_required_checks_*.py` - the two structural gates on `release.yml`'s `required_checks`: every name is a real job name, and the one it names can reach a release commit. Both run in the `scripts/lib` unittest suite, not as their own step.
 - `scripts/commit-lint` (`npm ci && node check-parses.mjs`) - the PR title parses, and no commit body crashes release-please's parser. A body that crashes it is dropped from the changelog silently.
 - `scripts/check-ci-docs.py` - every workflow has a row in `docs/ci.md`'s table. It checks the row exists, never what the row says.
 - Inline in the workflow: no emoji in `client/` Dart/YAML/ARB sources, an SPDX header on the first line of every `crates/**/*.rs` file, orientation locked on phones only, the iOS Info.plist/broadcast-extension/notification-extension wiring checks, and unit tests for the e2e harness's own scenario logic.
