@@ -361,6 +361,23 @@ A direct tag push (`server-v*` or `client-v*`) is also honored, so a release can
 
 The release-please job runs manifest mode twice, once per package, each against its own config and manifest file (`release-please-config.server.json` / `.release-please-manifest.server.json` for the server, the `.client.json` pair for the client), and only on main-branch pushes.
 Splitting the manifest is what stops one package's release commit from conflicting the other's still-open standing PR: both used to read and write one shared `.release-please-manifest.json`, so merging either PR moved that file underneath the other, on every merge that did not also carry releasable commits for it. See PR #321 for the incident history.
+
+### The release PR's own checks
+
+Both `release-please-action` invocations take `token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}`, and which one is in play decides whether a release PR can ever go green.
+
+A PR opened with `GITHUB_TOKEN` is authored by `app/github-actions`.
+GitHub holds bot-triggered workflow runs at `action_required`, so `e2e`, `licenses` and `hygiene` never start on it, and the PR sits at `UNSTABLE` with only SonarCloud reporting, permanently.
+It is not a failure and not a slow queue, and it looks identical from `gh pr checks` to the other reason a PR here shows few checks, which is a merge conflict.
+Measured on 2026-08-18 over every `hygiene` run ever queued on a release-please branch: bot-triggered was held 13 of 13, owner-triggered ran 3 of 3, and the three that ran are the ones approved by hand.
+The discriminator is `triggering_actor`, not the workflow, the branch or the event.
+
+With `RELEASE_PLEASE_TOKEN` set to a fine-grained PAT, the PR is authored by the token's owner and its checks run like any other PR's.
+The PAT needs `contents: read and write` and `pull requests: read and write` on this repository, and nothing else.
+Set it with `gh secret set RELEASE_PLEASE_TOKEN` so the value never lands in a file or a shell history; rotating it is a re-run of that one command.
+
+The fallback to `GITHUB_TOKEN` keeps releases working while the secret is absent, at the cost of that behaviour.
+So an unset secret is a quiet degradation rather than a broken release, which is the right default for a self-hoster forking this repository, and the reason it is written as a fallback rather than required.
 On a tag push both invocations are a no-op so downstream jobs can still resolve their outputs via `needs`.
 
 Server (AGPL-3.0-only) and client (Apache-2.0) are versioned and released independently, each with its own tag and its own set of jobs.
