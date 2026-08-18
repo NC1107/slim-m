@@ -19,6 +19,7 @@ import '../diagnostics/debug_log.dart';
 import '../routing/routes.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/settings_notice.dart';
+import '../widgets/memory_diagnostics.dart';
 import '../widgets/settings_section_header.dart';
 import 'settings_screen_scaffold.dart';
 
@@ -52,18 +53,25 @@ class DebugLogScreen extends ConsumerWidget {
           onPressed: entries.isEmpty ? null : log.clear,
         ),
       ],
-      child: entries.isEmpty
-          ? const SettingsNotice(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const MemoryDiagnostics(),
+          if (entries.isEmpty)
+            const SettingsNotice(
               message: 'Nothing has gone wrong this session.',
               detail:
                   'Errors the app catches are collected here so you can copy '
                   'them into a bug report.',
             )
-          : SettingsSectionCard(
+          else
+            SettingsSectionCard(
               title: 'This session',
               description: '${entries.length} caught, newest first.',
               children: [for (final entry in entries) _EntryTile(entry: entry)],
             ),
+        ],
+      ),
     );
   }
 }
