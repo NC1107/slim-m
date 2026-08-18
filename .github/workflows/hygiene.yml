@@ -27,10 +27,6 @@ jobs:
         with:
           python-version: "3.14"
 
-      # setup-python is a clean interpreter, so the one gate here that parses
-      # workflow YAML rather than scraping it needs its parser installed.
-      - name: python dependencies for the gates
-        run: pip install --disable-pip-version-check pyyaml
 
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         if: github.event_name == 'pull_request'
