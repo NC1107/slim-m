@@ -301,6 +301,28 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.45.0',
+    headline: 'Cleaner, crisper, lighter',
+    points: [
+      WhatsNewPoint(
+        'Select several messages and delete them in one go, and the '
+        'settings screens got a real going-over - each section reads as '
+        'its own thing now instead of one flat scroll.',
+      ),
+      WhatsNewPoint(
+        'Avatars and profile pictures render sharp on scaled desktop '
+        'displays instead of soft, and the desktop title bar dropped a '
+        'stray underline it should never have shown.',
+      ),
+      WhatsNewPoint(
+        'The member list lost its search box and sort toggle, since '
+        'typing @name already finds anyone, and Appearance settings gained '
+        'an image-cache size control if you want to trade a little memory '
+        'for a lot less.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
