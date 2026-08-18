@@ -4,9 +4,16 @@
 /// the first-run tray notice banner, both mounted above the routed content
 /// rather than deep inside `home_shell.dart`, so every screen gets them with
 /// no change to any of them.
+///
+/// It carries its own [Material]. This sits in `MaterialApp`'s `builder`,
+/// above the Navigator, so nothing here has a `Scaffold` - and without a
+/// `Material` the title bar and banner inherit the fallback `DefaultTextStyle`,
+/// which is a debug colour and an underline. That is the yellow underline the
+/// title shipped with. The title bar's own tests wrap it in a `Scaffold` and
+/// so never rendered it the way the real chrome does.
 library;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import 'close_behavior.dart';
 import 'desktop_window_shell.dart';
@@ -22,18 +29,22 @@ class DesktopChrome extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!DesktopWindowShell.active) return child;
 
-    return Column(
-      children: [
-        // frameless is only ever set true on the Linux branch below.
-        if (DesktopWindowShell.frameless)
-          TitleBar(
-            port: DesktopWindowShell.port,
-            platform: DesktopPlatform.linux,
-            onRequestClose: DesktopWindowShell.requestClose,
-          ),
-        const FirstRunTrayNoticeBanner(),
-        Expanded(child: child),
-      ],
+    // Transparent so each piece keeps its own surface; see the library doc for why a Material is here.
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        children: [
+          // frameless is only ever set true on the Linux branch below.
+          if (DesktopWindowShell.frameless)
+            TitleBar(
+              port: DesktopWindowShell.port,
+              platform: DesktopPlatform.linux,
+              onRequestClose: DesktopWindowShell.requestClose,
+            ),
+          const FirstRunTrayNoticeBanner(),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }

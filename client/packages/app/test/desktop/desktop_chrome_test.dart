@@ -7,9 +7,13 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/desktop/desktop_chrome.dart';
 import 'package:slimm_app/src/desktop/desktop_window_shell.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+import 'support/fake_desktop_window_port.dart';
 
 void main() {
   testWidgets(
@@ -28,6 +32,40 @@ void main() {
       expect(find.text('real content'), findsOneWidget);
       // Exactly what was handed in - no ProviderScope required either.
       expect(find.byType(Column), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'active chrome gives its text a real style, not the fallback underline',
+    (tester) async {
+      // The real placement: chrome in MaterialApp's builder, no Scaffold, so it must carry its own Material or the text inherits the fallback underline.
+      DesktopWindowShell.debugPort = FakeDesktopWindowPort();
+      DesktopWindowShell.debugActivate(frameless: true);
+      addTearDown(DesktopWindowShell.debugReset);
+      tester.view.physicalSize = const Size(1400, 880);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildTheme(Brightness.dark, AppTokens.dark),
+            builder: (context, child) => DesktopChrome(child: child!),
+            home: const SizedBox.expand(),
+          ),
+        ),
+      );
+
+      final style = DefaultTextStyle.of(
+        tester.element(find.text('slim-m')),
+      ).style;
+      expect(
+        style.decoration,
+        isNot(TextDecoration.underline),
+        reason: 'chrome text inherited the fallback underline: no Material',
+      );
+      expect(DesktopChrome, isNotNull);
+      expect(find.byType(Material), findsWidgets);
     },
   );
 }
