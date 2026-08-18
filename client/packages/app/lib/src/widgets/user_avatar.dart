@@ -52,8 +52,8 @@ class UserAvatar extends ConsumerWidget {
           .watch(avatarBytesProvider((userId: id, updatedAt: avatarUpdatedAt)))
           .valueOrNull;
       if (bytes != null) {
-        // Never decodes past the pixels this avatar is ever drawn at.
-        final edge = decodeEdge(context, size);
+        // Floored at 2x so a window-scaled desktop that under-reports its ratio still gets a crisp avatar; see decodeEdge.
+        final edge = decodeEdge(context, size, minRatio: 2);
         image = ResizeImage(
           MemoryImage(bytes),
           width: edge,
