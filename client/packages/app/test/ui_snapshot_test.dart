@@ -166,7 +166,7 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
 
 /// `ReportCard`'s own nested resolve needs `renderSurface`'s
 /// `settleNestedResolve` pump, or `expectSettled` catches it as a
-/// mid-flight capture - see CLAUDE.md's "report card overflow" entry.
+/// mid-flight capture - see PR #545 ("report card overflow").
 const _nestedResolveSurfaces = {
   'admin-reports',
   // Wide space settings embeds the reports pane and its nested resolve.

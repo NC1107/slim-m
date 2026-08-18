@@ -25,11 +25,18 @@ A finding earns its place only if it names a concrete improvement, cites the ima
 That count is a sum of what each report itself labels, not an estimate; the tally by area is in the table below.
 
 Nothing in the product is broken outright.
-Every one of the seven areas has at least one finding that would mislead or fail a real person, and the same missing piece of client architecture - no per-channel permission read - was independently rediscovered in five of the seven areas, which is the finding that most changes how the rest of this list should be read.
+Every one of the seven areas has at least one finding that would mislead or fail a real person, and the same missing piece of client architecture - no per-channel permission read - was independently rediscovered in five of the seven areas, which is the finding that most changes how the rest of this list should be read. That one is now closed; see the section below.
 
-## The systemic finding
+## The systemic finding - closed
 
-The client gates actions on the caller's deployment-wide base permissions (`GET /me`, `Store::base_permissions`), while the server authorizes the same actions per channel (`permissions_in_channel`, which folds in channel overwrites and, for a DM, an entirely different evaluator that never grants moderation bits to anyone).
+**This was closed on main in PRs #522 and #523, under `docs/decisions/0011-per-channel-permissions.md`, and the record below is history rather than an open finding.**
+All seven sites now read a per-channel permission, and `channelPermissionsProvider` (`client/packages/app/lib/src/providers/channel_permissions.dart`) is the abstraction this section was written to ask for.
+Verified against current source on 2026-08-18, site by site, not taken from the area reports' own strikethroughs.
+Two of the files named below have also moved since: `channel_message_actions.dart` and `canvas_pane.dart` now live under `lib/src/screens/`.
+
+It is kept because it is the clearest statement of why the seven were one bug, which is what decision 0011 was written from.
+
+The client gated actions on the caller's deployment-wide base permissions (`GET /me`, `Store::base_permissions`), while the server authorizes the same actions per channel (`permissions_in_channel`, which folds in channel overwrites and, for a DM, an entirely different evaluator that never grants moderation bits to anyone).
 This was found independently in seven places across five areas by three different backend passes, and each report names its own site by file and line:
 
 1. **shell.md** - the DM/thread message-action menu (Pin, Delete) gates on `myPermissionsProvider` (`admin_providers.dart:28`), read by `channel_screen.dart`, against the server's per-channel `permissions_in_channel`, which never grants `MANAGE_MESSAGES` inside a DM at all.
@@ -40,12 +47,13 @@ This was found independently in seven places across five areas by three differen
 6. **moderation.md** - the member popover's own Eject control reads the identical deployment-wide bit (`member_profile.dart:301-305`) against the same per-channel server route as site 3, found again here through the popover rather than the confirmation dialog.
 7. **moderation.md** - the report card's "Delete message" button reads deployment-wide `mine.hasPermission(Perm.manageMessages)` (`report_card.dart:180-181`) against the server's per-channel check (`http/messages.rs:255-259`).
 
-There is no per-channel effective-permission provider anywhere in `client/packages/app/lib/src/providers/` - both shell.md and moderation.md confirm this by grepping the whole client tree and finding nothing.
+At the time of the pass there was no per-channel effective-permission provider anywhere in `client/packages/app/lib/src/providers/` - both shell.md and moderation.md confirmed this by grepping the whole client tree and finding nothing. `channel_permissions.dart` is that provider, added since.
 So this is one missing abstraction, not seven bugs: every site above would close the same way, by reading a per-channel permission the way the server does instead of the flat bitmask off `GET /me`.
 
-The sharpest instance is site 7.
+The sharpest instance was site 7.
 A DM message report is a real, reachable item in the moderation queue by design, and for a DM channel the server's permission model structurally never contains `MANAGE_MESSAGES` for anyone, not even an administrator.
-So a moderator opening a report about DM harassment sees "Delete message" rendered as an available, enabled button, and every tap against it fails.
+So a moderator opening a report about DM harassment saw "Delete message" rendered as an available, enabled button, and every tap against it failed.
+`report_card.dart` now reads `report.channelPermissions`, the batched per-report field decision 0011 added.
 
 None of the seven is a security hole.
 The server re-authorizes and refuses every one of these requests correctly on its own, independent of what the client showed.
@@ -55,7 +63,7 @@ The cost is entirely on the other side: the client offers actions that are guara
 
 - **The canvas background grid has never actually rendered in the assembled pane, in any theme or scenario, since PR #505.** It paints correctly in every isolated painter fixture and in none of the 39 assembled screenshots; a bare `CustomPaint` with no child and no `StackFit.expand` collapses to zero size. Fixed in PR #515, at the widget rather than the call site, with a test that asserts the layer's real size rather than its position in a child list. [canvas.md](canvas.md)
 - **The clear-canvas confirmation says "This cannot be undone" while the same client arms a working local undo for that exact action**, found independently by two different reviews reading the same dialog from different directions. [canvas.md](canvas.md), [overlays.md](overlays.md)
-- **The report card's "Delete message" button is a guaranteed dead click on a DM harassment report**, offered as an available action for a permission no one can structurally hold in a DM, on exactly the report class this product's own moderation history went out of its way to make visible. [moderation.md](moderation.md)
+- **The report card's "Delete message" button was a guaranteed dead click on a DM harassment report** (closed, PR #523), offered as an available action for a permission no one can structurally hold in a DM, on exactly the report class this product's own moderation history went out of its way to make visible. [moderation.md](moderation.md)
 - **The command palette overflows sideways off the phone viewport and ships visibly broken on real phone-width hardware** - it is the one overlay in the whole set that never adopted the shared bottom-sheet pattern every other sheet in the product uses. [overlays.md](overlays.md)
 - **A thread panel gives no orientation once you are inside it**: no channel name, no parent message, just the word "Thread," the single biggest orientation gap found across the whole shell pass. [shell.md](shell.md)
 

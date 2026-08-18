@@ -179,7 +179,7 @@ Backend has nothing to check here: this is a purely local diagnostic capture wit
 
 ## Cross-cutting
 
-- **Documentation correction, not a screen finding: CLAUDE.md's claim that `POST /invites` "exposes `max_uses` and `expires_at` only" and that a role-granting invite "has no HTTP surface at all" is stale.**
+- **Documentation correction, not a screen finding. Since resolved: the claim below did not survive the PR #666 CLAUDE.md rewrite, so there is nothing left to correct. The pre-rewrite CLAUDE.md's claim that `POST /invites` "exposes `max_uses` and `expires_at` only" and that a role-granting invite "has no HTTP surface at all" is stale.**
   `CreateRequest.role_grant` has existed since PR #87 (`25b10fb6`), `resolve_grant` enforces the same no-escalation rule role assignment uses, and the client's `InviteRoleGrantPicker` already matches the server's `grantable` shape one-for-one.
   Update the entry in CLAUDE.md rather than treating this as still-open work.
 

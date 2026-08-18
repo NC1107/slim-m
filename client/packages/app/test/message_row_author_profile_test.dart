@@ -5,7 +5,7 @@
 /// member pane already opens, via [AuthorProfileTapTarget].
 ///
 /// The semantics half is the point of this file, not an afterthought:
-/// CLAUDE.md's "54, the resize bar" entry records a real bug where a
+/// PR #370 ("54, the resize bar") records a real bug where a
 /// `GestureDetector`'s own tap action bled a control's label onto an
 /// unrelated ancestor, found only by dumping the real semantics tree - so
 /// this dumps the real tree too, rather than trusting that

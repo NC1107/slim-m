@@ -7,7 +7,7 @@ What is missing is a layer above them.
 A pushed tag publishes signed images and moves `:latest` with no test workflow having run on that ref.
 The most comprehensive check in the repo, `scripts/e2e.sh`, runs in no workflow at all and can screenshot a stale build without saying so.
 Seven public API methods have no caller anywhere in the app, which is the third time this project has paid for that failure shape, and no gate can see it.
-And the documentation - which this project treats as instructions, and CLAUDE.md explicitly calls "the durable memory of the project" - has drifted far enough that two of its lists ask for work that is already shipping, three documents promise codegen and vulnerability scanning that were never built, and one names a source file that no longer exists as the place a permission gate lives.
+And the documentation - which this project treats as instructions, and the CLAUDE.md of the time explicitly called "the durable memory of the project" (that file was rewritten in PR #666; this audit describes the 2,591-line version) - has drifted far enough that two of its lists ask for work that is already shipping, three documents promise codegen and vulnerability scanning that were never built, and one names a source file that no longer exists as the place a permission gate lives.
 The stale-documentation set below is listed exhaustively for that reason.
 None of it is a product defect; all of it sends the next contributor at the wrong problem.
 
@@ -460,7 +460,7 @@ The item shapes at ws.rs:135-155 (`ReactionCountDto`, `PollOptionCountDto`) are 
 
 ### Stale gaps: work described as open that is done
 
-CLAUDE.md's own rule applies to every entry here: "A stale gap costs more than a missing one, because it sends work at a problem that no longer exists and gets quoted forward into later documents as though still live."
+The rule the CLAUDE.md of the time stated applies to every entry here, and it did not survive the PR #666 rewrite: "A stale gap costs more than a missing one, because it sends work at a problem that no longer exists and gets quoted forward into later documents as though still live."
 
 | Claim | Where | Reality |
 | --- | --- | --- |

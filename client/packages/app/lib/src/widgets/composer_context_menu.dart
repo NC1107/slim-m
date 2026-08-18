@@ -7,7 +7,7 @@
 /// `EditableTextState.contextMenuButtonItems`, whose `paste` entry is gated
 /// on `Clipboard.hasStrings()` alone (`editable_text.dart:2660`) - an
 /// image-only pasteboard never gets a `paste` entry into the list Dart sends
-/// native at all. See CLAUDE.md's "Image paste on iPhone, confirmed working"
+/// native at all. See PR #327 ("Image paste on iPhone, confirmed working")
 /// entry for the full trace through the engine and framework source, and
 /// confirmation this now works end to end on a real iPhone.
 ///

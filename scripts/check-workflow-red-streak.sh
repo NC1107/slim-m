@@ -4,8 +4,8 @@
 # Some workflows fail without anything else noticing. e2e.yml is advisory and
 # does not run on pull_request (see its own header), so a red run there never
 # failed a PR or blocked a release - twice that silence let a multi-day
-# regression ship underneath two releases (CLAUDE.md's two "e2e was red"
-# entries). main-builds.yml is worse in a quieter way: it is what puts a build
+# regression ship underneath two releases (PRs #379 and #550, both
+# "e2e was red"). main-builds.yml is worse in a quieter way: it is what puts a build
 # on a phone between releases, so a red run there means no build is being
 # produced and the only evidence is a colour on a tab nobody has open.
 # A second red workflow does not fix that: a workflow's own colour is

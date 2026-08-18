@@ -165,7 +165,7 @@ Future<Uint8List?> readClipboardImage() async {
 /// clipboard holds an image, which is what makes native ask
 /// `canPerformAction:` at all; confirmed working end to end on a real
 /// iPhone 2026-08-02. See `composer_clipboard_paste.dart`'s doc comment and
-/// CLAUDE.md's "Image paste on iPhone, confirmed working" entry.
+/// PR #327 ("Image paste on iPhone, confirmed working").
 Future<bool> editMenuPasteSwizzleInstalled() async {
   try {
     return await _clipboardImageChannel.invokeMethod<bool>(

@@ -7,7 +7,7 @@ name: red-streak-watchdog
 # e2e.yml is deliberately advisory: it does not gate a PR or a release, so a
 # red run there produces no failure anyone else would see. Twice now that
 # silence let a genuine multi-day regression ship underneath two releases
-# with nothing anywhere saying so (CLAUDE.md's two "e2e was red" entries).
+# with nothing anywhere saying so (PRs #379 and #550, both "e2e was red").
 #
 # main-builds.yml is what puts a build on a phone between releases. When it
 # is red no build is being produced, and nothing downstream says so: it

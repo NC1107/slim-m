@@ -2,9 +2,12 @@
 # What slim-m does today
 
 This is an inventory of the product as it actually stands, derived by reading the server's route table (`crates/slimm-server/src/http.rs` and `http/*.rs`, gated against `schema/openapi.yaml`) and the client's screens, routes, and providers, not by reading the planning docs.
-`docs/BRIEF.md`, `docs/STRATEGY.md`, and `docs/ROADMAP.md` describe the product that was planned; this describes the product that exists, as of server 0.37.0 and client 0.39.0 (`.release-please-manifest.server.json`, `.release-please-manifest.client.json`).
-`CLAUDE.md` is closer to the ground truth than the planning docs and, as of a deliberate sweep on 2026-08-11, has had 26 of its own stale claims corrected in place; it is still a session log rather than an index, so read this file for the current inventory and `CLAUDE.md` for how each thing got that way.
+`docs/BRIEF.md`, `docs/STRATEGY.md`, and `docs/ROADMAP.md` describe the product that was planned; this describes the product that existed when it was last derived, on 2026-08-11, against server 0.37.0 and client 0.39.0 (`.release-please-manifest.server.json`, `.release-please-manifest.client.json`).
+Those manifests now read server 0.40.0 and client 0.44.0, so read the inventory below as a floor rather than as current: everything in it shipped, and things have shipped since that are not in it.
+`CLAUDE.md` used to be a session log and was the best record of how each thing got that way; PR #666 rewrote it into a short durable-context file and moved that history into git and `docs/`, so it is no longer the place to look for it.
+Read this file for the inventory, `docs/decisions/` for why a thing is shaped the way it is, and the git history for how it got there.
 This file is meant to be re-derived the same way, not hand-maintained by memory.
+The header above is the one part kept current by hand, precisely so a reader can see how far the rest has drifted without having to re-derive it first.
 
 ## What it is
 

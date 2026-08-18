@@ -28,8 +28,9 @@
 /// tell apart without a real Linux desktop capture session. A small patch to
 /// register the desktop capturer the same way the camera path does, closing
 /// the gap explicitly rather than leaning on refcounting alone, is proposed
-/// upstream rather than carried as a fork - see CLAUDE.md's entry on this
-/// fix for the reasoning and the patch itself.
+/// upstream rather than carried as a fork - see
+/// docs/research/linux-screen-share-teardown-2026-08-11/ for the reasoning
+/// and the patch itself.
 library;
 
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;

@@ -112,6 +112,10 @@ Look specifically at its Voice Canvas implementation.
 
 The goal is a Figma-like infinite collaborative canvas that exists during voice calls.
 
+This document is the brief as written, so "infinite" is kept here as the ask.
+As built it is a very large bounded double-precision world, roughly plus or minus 5,000,000 logical pixels by owner decision, with client-side recentering, and the literal-infinity wording is kept out of in-app copy.
+See `docs/STRATEGY.md`'s canvas section for the technique and the reason.
+
 Capabilities:
 
 - Infinite canvas

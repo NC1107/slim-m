@@ -3,7 +3,7 @@
 /// the order `canvas_presence_depth_test.dart`'s own structural test only
 /// infers from `Stack.children`'s list order.
 ///
-/// That is the exact weak-test shape CLAUDE.md's own canvas-grid entry names
+/// That is the exact weak-test shape PR #515's canvas-grid fix names
 /// as the reason the grid painted over a sent-to-back tile for weeks with a
 /// green suite the whole time: a widget correctly *positioned* in the tree
 /// can still paint nothing, or paint the wrong thing, and an ordering

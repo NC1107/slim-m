@@ -2,7 +2,7 @@
 /// Makes a capture harness's `BoxShadow` render the way a real device does,
 /// closing the artifact that has now misled five separate review passes
 /// into reading the floating dock's shadow as a hard-edged defect (see
-/// CLAUDE.md's own entry on this).
+/// the commit that added this file, and the review passes it names).
 ///
 /// **The cause was never the software rasterizer itself** - it was
 /// `flutter_test`'s own `AutomatedTestWidgetsFlutterBinding`, which sets
