@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.41.0](https://github.com/NC1107/slim-m/compare/server-v0.40.0...server-v0.41.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **messages:** MANAGE_MESSAGES reaches every message, an administrator's too ([#677](https://github.com/NC1107/slim-m/issues/677))
+
+### Features
+
+* **messages:** delete several messages as one act ([#675](https://github.com/NC1107/slim-m/issues/675)) ([293f3e2](https://github.com/NC1107/slim-m/commit/293f3e2f90b05b3bac861bff05693efda183f309))
+* **messages:** MANAGE_MESSAGES reaches every message, an administrator's too ([#677](https://github.com/NC1107/slim-m/issues/677)) ([b63d29e](https://github.com/NC1107/slim-m/commit/b63d29e1e11da6d2652bc62e4914f9cfad5b9d3e))
+
 ## [0.40.0](https://github.com/NC1107/slim-m/compare/server-v0.39.1...server-v0.40.0) (2026-08-15)
 
 
