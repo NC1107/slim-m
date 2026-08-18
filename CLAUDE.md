@@ -121,7 +121,8 @@ Never use `:memory:` for tests that depend on the multi-connection SQLite pool.
 - `scripts/check-error-surface.py` - no API failure may be caught and surfaced with a SnackBar; use the persistent `AppErrorState`. This regressed back three times.
 - `scripts/check-migration-versions.py` - duplicate or mutated migrations.
 - `scripts/commit-lint` (`npm ci && node check-parses.mjs`) - the PR title parses, and no commit body crashes release-please's parser. A body that crashes it is dropped from the changelog silently.
-- Inline in the workflow: no emoji in `client/` Dart/YAML/ARB sources, an SPDX header on the first line of every `crates/**/*.rs` file, and the iOS Info.plist/broadcast-extension/notification-extension wiring checks.
+- `scripts/check-ci-docs.py` - every workflow has a row in `docs/ci.md`'s table. It checks the row exists, never what the row says.
+- Inline in the workflow: no emoji in `client/` Dart/YAML/ARB sources, an SPDX header on the first line of every `crates/**/*.rs` file, orientation locked on phones only, the iOS Info.plist/broadcast-extension/notification-extension wiring checks, and unit tests for the e2e harness's own scenario logic.
 
 ## Local environment
 
