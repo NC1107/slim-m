@@ -11,7 +11,7 @@ Each section below is named for its workflow file.
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
-| `client-ci` | changes under `client/`, or to `schema/openapi.yaml` | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about three minutes rather than fourteen |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml` | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen |
 | `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |

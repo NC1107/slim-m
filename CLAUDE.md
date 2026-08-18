@@ -252,6 +252,7 @@ Do not silently decide these:
 
 - Real Android end-to-end background push test.
 - Reviewer protection for `release` and `testflight` GitHub Environments.
+- Release PRs never run `e2e`, `licenses` or `hygiene`. They are authored by `app/github-actions`, and GitHub holds bot-triggered runs at `action_required`, so a release PR shows `UNSTABLE` with only SonarCloud reporting and cannot go green. Measured over every hygiene run ever queued on a release branch: bot-triggered held 13 of 13, owner-triggered ran 3 of 3. The setting is Actions -> General -> "Approval for running fork pull request workflows from contributors"; the robust fix is a PAT for release-please so the PRs are authored by the owner. Do not read a release PR's sparse checks as a failure.
 - Optional GPG signing secret for Linux client checksums.
 - Whether to keep release-please's auto-PR flow or switch to manual tag releases.
 - Play internal tester management requires the owner; there is no Play Developer API credential available.

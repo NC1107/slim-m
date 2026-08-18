@@ -47,7 +47,8 @@ concurrency:
 
 jobs:
   # Split from the test job so a typo or an unformatted file reports in about
-  # three minutes instead of fourteen. The two share a setup and a pub get,
+  # a minute instead of fourteen, measured on the first run. They share a
+  # setup and a pub get,
   # which is the duplicated cost this buys the fast signal with; everything
   # after that is disjoint. Both are in verify-client-ci's required_checks,
   # since each can fail with the other green.
