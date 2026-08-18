@@ -21,16 +21,28 @@ Each section below is named for its workflow file.
 | `advisory-watchdog` | a daily schedule, and by hand | nothing. It opens a deduplicated GitHub issue for a security advisory against a dependency and closes it once the tree is clean; the trigger `licenses` deliberately does not carry |
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
-| `compose-smoke` | changes to the self-host stack, plus a weekly schedule | `docker compose up` on a fresh box produces a working deployment |
+| `compose-smoke` | changes to the self-host stack, a weekly schedule, and by hand | `docker compose up` on a fresh box produces a working deployment |
 | `e2e` | pull requests touching `client/`, `crates/`, the schema or the harness; every push to `main`; a nightly schedule; and by hand | the whole product through two real headless browsers; advisory, not required |
-| `push-relay-contract` | changes to the server's push path | a server-generated envelope through the relay repo's real HTTP handler |
+| `push-relay-contract` | changes to the server's push path, and by hand | a server-generated envelope through the relay repo's real HTTP handler |
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
 | `copr-publish` | called by `main-builds` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
-| `main-builds` | changes under `client/` or `crates/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
+| `main-builds` | changes under `client/`, `crates/` or `packaging/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
+
+## Keeping this table honest
+
+Two gates in the `scripts/lib` unittest suite watch the table above, because CLAUDE.md sends readers here as the authoritative workflow list and a row that is wrong is worse than a row that is missing.
+
+`scripts/check-ci-docs.py` enforces that every workflow has a row and every row names a real workflow file. It reads nothing inside the row, so for a long time the "Runs on" column could describe a trigger a workflow did not have, or omit one it did, with the gate green.
+
+`scripts/lib/test_ci_docs_triggers.py` covers that next layer: a row for a workflow with a `schedule:` has to say so, and one with `workflow_dispatch:` has to admit it can be run by hand.
+The rest of the column is prose and not mechanically checkable, but an omitted trigger kind is a factual gap rather than a wording choice.
+Two rows had omitted `workflow_dispatch` before this existed.
+
+It checks every workflow yields at least one trigger kind, per file rather than in aggregate: a workflow whose `on:` block drifts out of the parser's reach would otherwise be silently exempt while the other twenty keep the suite green.
 
 ## server-ci
 
