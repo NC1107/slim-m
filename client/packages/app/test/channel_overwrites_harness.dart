@@ -16,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' hide Channel;
 import 'package:slimm_api/api.dart' as api show Channel;
+import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
 import 'package:slimm_data/data.dart' show MessageStore, SlimmDatabase;
@@ -69,6 +70,7 @@ Future<void> pumpToTargetPicker(
   WidgetTester tester, {
   required http.Response Function(http.Request) handler,
   int channelPermissions = channelOverwritesMePermissions,
+  Channel? initialChannel,
 }) async {
   final db = SlimmDatabase(NativeDatabase.memory());
   await MessageStore(db).upsertChannels(const [
@@ -112,12 +114,17 @@ Future<void> pumpToTargetPicker(
       ),
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const ChannelOverwritesScreen(),
+        home: ChannelOverwritesScreen(initialChannel: initialChannel),
       ),
     ),
   );
   await tester.pumpAndSettle();
 
+  if (initialChannel != null) {
+    // Already selected from a channel's own menu; no picker to walk.
+    await tester.pumpAndSettle();
+    return;
+  }
   await tester.runAsync(() async {
     await tester.tap(find.text('Choose a channel'));
     await tester.pumpAndSettle();

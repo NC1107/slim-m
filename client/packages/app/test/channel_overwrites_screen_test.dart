@@ -12,11 +12,35 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
 import 'channel_overwrites_harness.dart';
 
 void main() {
+  testWidgets('an initial channel is pre-selected, skipping the picker', (
+    tester,
+  ) async {
+    await pumpToTargetPicker(
+      tester,
+      handler: (request) => http.Response('{}', 404),
+      initialChannel: const Channel(
+        id: 'c1',
+        name: 'general',
+        kind: 'text',
+        createdAt: 0,
+        position: 0,
+        cursor: 0,
+        lastReadSeq: 0,
+        isPersonalSpace: false,
+      ),
+    );
+
+    // The channel is already chosen: its name shows and the picker prompt does not.
+    expect(find.text('general'), findsWidgets);
+    expect(find.text('Choose a channel'), findsNothing);
+  });
+
   testWidgets('the role picker sheet lists the roles once they load', (
     tester,
   ) async {

@@ -17,9 +17,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+api.Me me(int permissions) => api.Me(
+  id: 'self',
+  username: 'self',
+  displayName: 'Self',
+  createdAt: 0,
+  permissions: permissions,
+);
 
 Channel _channel(String id, String name) => Channel(
   id: id,
@@ -38,12 +49,18 @@ GoRouter _router(Channel channel, {required bool canManage}) => GoRouter(
     GoRoute(
       path: '/',
       builder: (context, state) => Scaffold(
-        body: ChannelCategorySections(
-          channels: [channel],
-          categories: const [],
-          selectedId: null,
-          canManage: canManage,
-          onReorder: (_) {},
+        // The real rail watches meProvider; do the same so it stays resolved for the menu, not autoDisposed mid-test.
+        body: Consumer(
+          builder: (context, ref, _) {
+            ref.watch(meProvider);
+            return ChannelCategorySections(
+              channels: [channel],
+              categories: const [],
+              selectedId: null,
+              canManage: canManage,
+              onReorder: (_) {},
+            );
+          },
         ),
       ),
     ),
@@ -72,12 +89,21 @@ Widget _reorderableHarness({required bool canManage}) => ProviderScope(
   ),
 );
 
-Widget _harness(GoRouter router) => ProviderScope(
-  child: MaterialApp.router(
-    theme: buildTheme(Brightness.light, AppTokens.light),
-    routerConfig: router,
-  ),
-);
+Widget _harness(GoRouter router, {List<Override> overrides = const []}) =>
+    ProviderScope(
+      overrides: overrides,
+      child: MaterialApp.router(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        routerConfig: router,
+      ),
+    );
+
+/// The real rail watches meProvider, keeping it resolved by the time a menu
+/// opens; this harness renders the section alone, so force that resolution.
+Future<void> _resolveMe(WidgetTester tester) async {
+  // The harness watches meProvider; one settle lets the override resolve.
+  await tester.pumpAndSettle();
+}
 
 Future<void> _openMenu(WidgetTester tester) => tester.tapAt(
   tester.getCenter(find.text('general')),
@@ -119,6 +145,45 @@ void main() {
       expect(find.text('Mentions only'), findsOneWidget);
     },
   );
+
+  testWidgets('a caller with MANAGE_ROLES also sees Channel permissions', (
+    tester,
+  ) async {
+    final channel = _channel('c1', 'general');
+    await tester.pumpWidget(
+      _harness(
+        _router(channel, canManage: true),
+        overrides: [
+          meProvider.overrideWith((ref) async => me(Perm.manageRoles)),
+        ],
+      ),
+    );
+    await _resolveMe(tester);
+
+    await _openMenu(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Channel permissions...'), findsOneWidget);
+  });
+
+  testWidgets('without MANAGE_ROLES there is no Channel permissions item', (
+    tester,
+  ) async {
+    final channel = _channel('c1', 'general');
+    await tester.pumpWidget(
+      _harness(
+        _router(channel, canManage: true),
+        overrides: [meProvider.overrideWith((ref) async => me(0))],
+      ),
+    );
+    await _resolveMe(tester);
+
+    await _openMenu(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Manage channel...'), findsOneWidget);
+    expect(find.text('Channel permissions...'), findsNothing);
+  });
 
   testWidgets(
     'a plain member sees only Open channel, the same gate the kebab uses',
