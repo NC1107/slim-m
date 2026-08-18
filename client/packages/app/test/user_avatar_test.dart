@@ -99,9 +99,9 @@ void main() {
     final image = tester.widget<Image>(find.byType(Image));
     final resized = image.image as ResizeImage;
     expect((resized.imageProvider as MemoryImage).bytes, bytes);
-    // A 40dp avatar at 1x decodes at 40 real pixels, not a photo's own size.
-    expect(resized.width, 40);
-    expect(resized.height, 40);
+    // A 40dp avatar decodes at 2x even on a 1x display: the minRatio floor for a window-scaled desktop that under-reports its ratio.
+    expect(resized.width, 80);
+    expect(resized.height, 80);
   });
 
   testWidgets('the decode cap scales with the device pixel ratio', (
