@@ -14,6 +14,8 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
+import 'context_menu_region.dart';
+import 'manage_category_sheet.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
 import 'channel_rail_selection_marker.dart';
@@ -183,8 +185,24 @@ class ChannelCategorySections extends ConsumerWidget {
           ),
         );
 
-    Widget header(ChannelCategoryRow? category) =>
-        _SectionLabel(category?.name ?? 'Channels');
+    Widget header(ChannelCategoryRow? category) {
+      final label = _SectionLabel(category?.name ?? 'Channels');
+      // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
+      if (category == null || !canManage) return label;
+      return ContextMenuRegion(
+        itemsBuilder: (context, close) => [
+          AppMenuItem(
+            label: 'Manage category...',
+            leading: AppIcons.settings,
+            onTap: () {
+              close();
+              showManageCategorySheet(context, category);
+            },
+          ),
+        ],
+        child: label,
+      );
+    }
 
     return ReorderableChannelRows(
       sections: sections,
