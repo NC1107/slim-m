@@ -32,6 +32,8 @@ jobs:
   # didn't also touch it. Splitting the manifest removes the shared file
   # rather than working around it, so there is nothing left for the two PRs
   # to collide on. See docs/ci.md and PR #321.
+  #
+  # RELEASE_PLEASE_TOKEN decides whether the release PR's own checks ever run; without it they cannot. See docs/ci.md.
   release-please:
     runs-on: ubuntu-latest
     permissions:
@@ -49,12 +51,14 @@ jobs:
         id: rp-server
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           manifest-file: .release-please-manifest.server.json
           config-file: release-please-config.server.json
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         id: rp-client
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           manifest-file: .release-please-manifest.client.json
           config-file: release-please-config.client.json
 
