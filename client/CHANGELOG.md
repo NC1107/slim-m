@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.46.0](https://github.com/NC1107/slim-m/compare/client-v0.45.0...client-v0.46.0) (2026-08-18)
+
+
+### Features
+
+* **channels:** manage a category from its own context menu ([#703](https://github.com/NC1107/slim-m/issues/703)) ([43985b6](https://github.com/NC1107/slim-m/commit/43985b624f28099d4ff1ae14eead6b315e7810ca))
+* **channels:** reach a channel's permissions from its own context menu ([#704](https://github.com/NC1107/slim-m/issues/704)) ([8e1e8ef](https://github.com/NC1107/slim-m/commit/8e1e8efdb13fa8e18c363ca22234b441ec334cd6))
+* **diagnostics:** a live memory readout on the debug screen ([#699](https://github.com/NC1107/slim-m/issues/699)) ([5445191](https://github.com/NC1107/slim-m/commit/544519112acfb1257c077f0d4f241774b13f33a7))
+
+
+### Bug Fixes
+
+* **desktop:** the title bar's window menu had no Overlay to open into ([#702](https://github.com/NC1107/slim-m/issues/702)) ([9e178cf](https://github.com/NC1107/slim-m/commit/9e178cfbd77bb978c29accc89ca097d2f9e033f7))
+* **whats-new:** add the 0.45.0 entry the release left main red without ([#700](https://github.com/NC1107/slim-m/issues/700)) ([48eda58](https://github.com/NC1107/slim-m/commit/48eda582f290c6f0353faa053c1f1362ebcda73c))
+
 ## [0.45.0](https://github.com/NC1107/slim-m/compare/client-v0.44.0...client-v0.45.0) (2026-08-18)
 
 
