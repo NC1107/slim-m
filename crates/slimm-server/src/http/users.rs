@@ -27,6 +27,7 @@ use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
 use crate::media;
+use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Store, User};
 
@@ -107,6 +108,13 @@ struct UserDto {
     /// `null` for none. Shown in the member pane under the name; see
     /// migration 0044.
     status_text: Option<String>,
+    /// The invite this member registered through, or `null` if they had
+    /// none. Absent from the response entirely for a caller who does not
+    /// hold BAN_MEMBERS, so it is only ever populated on the `GET /members`
+    /// path and only for a moderator looking for a ban-evading return
+    /// account; see MOD9.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    invite_code: Option<String>,
 }
 
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
@@ -141,6 +149,7 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
                 role_ids: held.iter().map(|(id, _)| id.to_string()).collect(),
                 timed_out_until: timed_out.get(&user.id).copied(),
                 status_text: user.status_text,
+                invite_code: None,
             }
         })
         .collect())
@@ -309,8 +318,13 @@ async fn list_users(
 /// Lists the deployment's live members for a member list. Any authenticated
 /// caller may read it: a member list is deployment-wide, not scoped to any
 /// one channel, so there is no channel permission to check it against.
+///
+/// A BAN_MEMBERS caller additionally gets each member's registration invite
+/// code attached (see MOD9) - a moderation signal, not a public one, so it
+/// is fetched and attached only here rather than in [`to_dtos`] itself,
+/// which every other `UserDto` response also goes through.
 async fn list_members(
-    AuthedLimited(_ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<READ>,
     Query(params): Query<ListMembersParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserDto>>, ApiError> {
@@ -326,7 +340,21 @@ async fn list_members(
         .clamp(1, MEMBERS_MAX_LIMIT);
 
     let members = state.store.list_members(after, limit).await?;
-    Ok(Json(to_dtos(&state.store, members).await?))
+    let ids: Vec<UserId> = members.iter().map(|m| m.id).collect();
+    let mut dtos = to_dtos(&state.store, members).await?;
+
+    let is_moderator = state
+        .store
+        .base_permissions(ctx.user_id)
+        .await?
+        .contains(Permissions::BAN_MEMBERS);
+    if is_moderator {
+        let invite_codes = state.store.registration_invite_codes(&ids).await?;
+        for (dto, id) in dtos.iter_mut().zip(ids.iter()) {
+            dto.invite_code = invite_codes.get(id).cloned();
+        }
+    }
+    Ok(Json(dtos))
 }
 
 // --- Handlers: avatars ---

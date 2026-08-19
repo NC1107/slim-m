@@ -30,6 +30,11 @@ pub struct SpaceRemoval {
     /// Null once the removing moderator's own account is deleted.
     pub removed_by: Option<UserId>,
     pub removed_at: i64,
+    /// The invite this member registered through, or `None` if they had
+    /// none - a ban-evasion signal for whoever is reviewing this list; see
+    /// MOD9. `/members/removed` already requires BAN_MEMBERS, so this is
+    /// never gated further.
+    pub invite_code: Option<String>,
 }
 
 /// Why a removal was refused.
@@ -205,9 +210,12 @@ impl Store {
         )
         .fetch_all(&self.pool)
         .await?;
+        let ids: Vec<UserId> = rows.iter().map(|r| r.user_id).collect();
+        let invite_codes = self.registration_invite_codes(&ids).await?;
         Ok(rows
             .into_iter()
             .map(|r| SpaceRemoval {
+                invite_code: invite_codes.get(&r.user_id).cloned(),
                 user_id: r.user_id,
                 username: r.username,
                 display_name: r.display_name,

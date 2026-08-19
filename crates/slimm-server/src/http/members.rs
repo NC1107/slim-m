@@ -85,6 +85,10 @@ struct RemovalDto {
     reason: Option<String>,
     removed_by: Option<String>,
     removed_at: i64,
+    /// The invite this member registered through, or `null` if they had
+    /// none. This route already requires BAN_MEMBERS, so unlike
+    /// `UserDto.invite_code` it is never gated further.
+    invite_code: Option<String>,
 }
 
 impl From<SpaceRemoval> for RemovalDto {
@@ -96,6 +100,7 @@ impl From<SpaceRemoval> for RemovalDto {
             reason: removal.reason,
             removed_by: removal.removed_by.map(|id| id.to_string()),
             removed_at: removal.removed_at,
+            invite_code: removal.invite_code,
         }
     }
 }

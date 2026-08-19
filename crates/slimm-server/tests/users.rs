@@ -12,6 +12,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -285,4 +286,172 @@ async fn the_member_list_requires_authentication() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// A moderator's whole reason for wanting this: spotting a returning,
+/// ban-evading account by the invite it came in through. Absent (not just
+/// null) for the caller's own entry, since `register` claims the deployment
+/// through `create_account` directly rather than an invite; see MOD9.
+#[tokio::test]
+async fn a_ban_members_caller_sees_the_invite_code_a_member_registered_through() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, admin_id) = register(&store, "alice").await;
+    let admin_user_id = slimm_server::ids::UserId(Uuid::parse_str(&admin_id).unwrap());
+
+    let invite = store
+        .create_invite(admin_user_id, None, None, None)
+        .await
+        .unwrap();
+    let joiner = store
+        .register_account("bob", "Bob", "not-a-real-hash", Some(&invite.code))
+        .await
+        .unwrap();
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/members?limit=10",
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    let entries = body.as_array().unwrap();
+
+    let bob_entry = entries
+        .iter()
+        .find(|u| u["id"] == joiner.id.to_string())
+        .expect("bob is in the member list");
+    assert_eq!(bob_entry["invite_code"], invite.code);
+
+    let admin_entry = entries
+        .iter()
+        .find(|u| u["id"] == admin_id)
+        .expect("admin is in the member list");
+    assert!(
+        admin_entry["invite_code"].is_null(),
+        "the admin claimed the deployment directly, with no invite behind it"
+    );
+}
+
+/// Two members through two different invites: a moderator must see each
+/// member's own code, never the other's. The lookup is keyed by id, not by
+/// list position, and this fails loudly if that ever regresses to positional.
+#[tokio::test]
+async fn each_member_shows_its_own_invite_not_another_members() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, admin_id) = register(&store, "alice").await;
+    let admin_user_id = slimm_server::ids::UserId(Uuid::parse_str(&admin_id).unwrap());
+
+    let invite_bob = store
+        .create_invite(admin_user_id, None, None, None)
+        .await
+        .unwrap();
+    let bob = store
+        .register_account("bob", "Bob", "not-a-real-hash", Some(&invite_bob.code))
+        .await
+        .unwrap();
+    let invite_carol = store
+        .create_invite(admin_user_id, None, None, None)
+        .await
+        .unwrap();
+    let carol = store
+        .register_account(
+            "carol",
+            "Carol",
+            "not-a-real-hash",
+            Some(&invite_carol.code),
+        )
+        .await
+        .unwrap();
+    assert_ne!(
+        invite_bob.code, invite_carol.code,
+        "the two invites must differ for this test to prove anything"
+    );
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/members?limit=10",
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    let entries = body.as_array().unwrap();
+
+    let bob_entry = entries
+        .iter()
+        .find(|u| u["id"] == bob.id.to_string())
+        .expect("bob is listed");
+    assert_eq!(bob_entry["invite_code"], invite_bob.code);
+    let carol_entry = entries
+        .iter()
+        .find(|u| u["id"] == carol.id.to_string())
+        .expect("carol is listed");
+    assert_eq!(carol_entry["invite_code"], invite_carol.code);
+}
+
+/// The invite code is a moderation signal, not a public one: a caller
+/// without BAN_MEMBERS must not see the field at all, not even as null.
+#[tokio::test]
+async fn a_non_moderator_does_not_see_the_invite_code_field() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (_admin_token, admin_id) = register(&store, "alice").await;
+    let admin_user_id = slimm_server::ids::UserId(Uuid::parse_str(&admin_id).unwrap());
+
+    let invite = store
+        .create_invite(admin_user_id, None, None, None)
+        .await
+        .unwrap();
+    store
+        .register_account("bob", "Bob", "not-a-real-hash", Some(&invite.code))
+        .await
+        .unwrap();
+
+    let plain = store
+        .create_account("carol", "Carol", "not-a-real-hash")
+        .await
+        .unwrap();
+    assert!(
+        !store
+            .base_permissions(plain.id)
+            .await
+            .unwrap()
+            .contains(Permissions::BAN_MEMBERS),
+        "carol must not hold BAN_MEMBERS for this test to prove anything"
+    );
+    let plain_token = store
+        .open_session(plain.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            "/members?limit=10",
+            Some(&plain_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    for entry in body.as_array().unwrap() {
+        assert!(
+            entry.get("invite_code").is_none(),
+            "invite_code must be absent, not null, for a non-moderator caller: {entry}"
+        );
+    }
 }

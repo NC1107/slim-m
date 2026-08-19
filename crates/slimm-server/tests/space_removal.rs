@@ -295,6 +295,54 @@ async fn removing_twice_replaces_rather_than_stacking() {
     assert_eq!(removals[0].reason.as_deref(), Some("second"));
 }
 
+/// The whole point of MOD9: a removed member's registration invite has to
+/// show up beside them in the removals list, so a moderator can recognize a
+/// returning account by the code it came in through. Built on SRV5's
+/// recording of `invite_redemptions`.
+#[tokio::test]
+async fn a_removed_members_registration_invite_shows_in_the_removals_list() {
+    let (s, _guard) = store().await;
+    let (admin, _member) = deployment(&s).await;
+
+    let invite = s.create_invite(admin.id, None, None, None).await.unwrap();
+    let joiner = s
+        .register_account("evader", "Evader", "not-a-real-hash", Some(&invite.code))
+        .await
+        .unwrap();
+
+    s.remove_from_space(joiner.id, admin.id, Some("ban evasion"))
+        .await
+        .unwrap();
+
+    let removals = s.list_removals().await.unwrap();
+    let entry = removals
+        .iter()
+        .find(|r| r.user_id == joiner.id)
+        .expect("the removed joiner is in the removals list");
+    assert_eq!(entry.invite_code.as_deref(), Some(invite.code.as_str()));
+}
+
+/// A member removed without ever having redeemed an invite reads as `None`,
+/// not an error - open registration on an unclaimed deployment, or a
+/// removed administrator who claimed it directly, both leave nothing to
+/// report.
+#[tokio::test]
+async fn a_removed_member_with_no_invite_has_no_invite_code() {
+    let (s, _guard) = store().await;
+    let (admin, member) = deployment(&s).await;
+
+    s.remove_from_space(member.id, admin.id, None)
+        .await
+        .unwrap();
+
+    let removals = s.list_removals().await.unwrap();
+    let entry = removals
+        .iter()
+        .find(|r| r.user_id == member.id)
+        .expect("the removed member is in the removals list");
+    assert!(entry.invite_code.is_none());
+}
+
 #[tokio::test]
 async fn removing_an_account_that_does_not_exist_says_so() {
     let (s, _guard) = store().await;
