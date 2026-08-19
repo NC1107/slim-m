@@ -231,6 +231,27 @@ impl Store {
         Ok(rows)
     }
 
+    /// The distinct channel ids named by ANY report, open or resolved,
+    /// thread or not.
+    ///
+    /// The history feed's own `http::reports::hidden_channels` call needs this
+    /// rather than `Self::open_report_channel_ids`: a resolved report still
+    /// carries its content snapshot, so a thread whose only report has since
+    /// been resolved must still be checked against the caller's `VIEW_CHANNEL`
+    /// on its parent - `open_report_channel_ids` stops naming that thread the
+    /// instant its report closes, which is exactly the gap that let a
+    /// resolved report from a thread under a hidden parent leak into the
+    /// history feed.
+    pub async fn report_channel_ids_including_resolved(&self) -> anyhow::Result<Vec<ChannelId>> {
+        let rows = sqlx::query_scalar!(
+            r#"SELECT DISTINCT channel_id AS "channel_id!: ChannelId"
+               FROM reports WHERE channel_id IS NOT NULL"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// The channel an open report is about, if it is about a message at all.
     ///
     /// `Ok(None)` means no open report by that id; `Ok(Some(None))` means one

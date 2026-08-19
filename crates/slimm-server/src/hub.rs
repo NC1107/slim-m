@@ -107,7 +107,9 @@ fn moves_permissions(event: &Event) -> bool {
         // Who is on a call changes no permission's answer.
         | Event::VoiceActivityChanged { .. }
         // A category grants and denies nothing (docs/decisions/0006).
-        | Event::CategoryChanged => false,
+        | Event::CategoryChanged
+        // A report being filed or resolved changes no permission's answer either.
+        | Event::ReportsChanged => false,
     }
 }
 

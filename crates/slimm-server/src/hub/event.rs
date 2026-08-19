@@ -432,4 +432,17 @@ pub enum Event {
         locked: bool,
         sent_to_back: bool,
     },
+    /// A report was filed or resolved: the moderation queue changed and a
+    /// moderator watching it should refetch.
+    ///
+    /// Carries nothing at all, deliberately - a report's content, reporter and
+    /// subject must never fan out to a live connection the way `ReportDto`'s
+    /// own doc comment already forbids over REST. `http::ws::authorization`
+    /// gates this event per viewer, delivering it only to a connection whose
+    /// user holds `MANAGE_MESSAGES` and withholding it from everyone else;
+    /// this is the one event in the file for which that gate is a security
+    /// boundary rather than a visibility nicety, since every other
+    /// deployment-wide event here (`RoleChanged`, `CategoryChanged`,
+    /// `MemberTimeoutChanged`) is already fine to broadcast unfiltered.
+    ReportsChanged,
 }

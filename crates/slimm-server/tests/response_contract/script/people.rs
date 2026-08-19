@@ -95,4 +95,6 @@ pub(super) async fn moderation_calls(c: &mut Contract, root: &str, bob_token: &s
         json!({ "resolution": "dismissed" }),
     )
     .await;
+    // The report resolved above is now a `resolved_report` entry in the feed.
+    c.get("moderationHistory", "/reports/history", root).await;
 }
