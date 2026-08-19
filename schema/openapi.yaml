@@ -2047,6 +2047,20 @@ paths:
         `X-Content-Type-Options: nosniff` and a Content-Disposition that
         forces a download for every content type except the handful of
         image types the allowlist marks safe to render inline.
+
+
+        Every response advertises `Accept-Ranges: bytes`. A `Range` request
+        header carrying a single `bytes=` range is honoured with a 206 and a
+        `Content-Range`; an unsatisfiable range answers 416; a multi-range or
+        malformed value is ignored and the whole body is returned. This is what
+        lets a large download resume and a video or audio file seek.
+      parameters:
+        - name: Range
+          in: header
+          required: false
+          description: An optional single `bytes=` byte range (RFC 9110).
+          schema:
+            type: string
       responses:
         "200":
           description: >-
@@ -2105,6 +2119,16 @@ paths:
               schema:
                 type: string
                 format: binary
+        "206":
+          description: >-
+            The requested byte range, returned when the client sent a single
+            satisfiable `Range`. Carries `Content-Range: bytes start-end/total`
+            and the same sniffed content type as the 200.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -2113,6 +2137,10 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "416":
+          description: >-
+            The `Range` header named a byte range no part of the attachment can
+            satisfy. Carries `Content-Range: bytes */total`.
 
   /gifs/search:
     get:

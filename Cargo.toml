@@ -13,10 +13,12 @@ repository = "https://github.com/NC1107/slim-m"
 # Why each crate and feature set is what it is: docs/dependencies.md.
 [workspace.dependencies]
 axum = { version = "0.8", features = ["ws"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "io-util", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "io-util", "sync", "time", "fs"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "timeout"] }
 # Splitting a WebSocket into independent read and write halves (StreamExt/SinkExt).
 futures-util = "0.3"
+# Streams a std/tokio file as an axum response body without buffering it (ReaderStream).
+tokio-util = { version = "0.7", features = ["io"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 serde = { version = "1", features = ["derive"] }
