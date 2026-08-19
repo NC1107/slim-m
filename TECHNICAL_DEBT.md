@@ -152,6 +152,16 @@ Four reported findings did not survive verification and were corrected or reject
   `rail_call_summary.dart:56`, `voice_strip_indicator.dart:130`, `compact_channel_app_bar.dart:58`, `command_palette.dart:233` and `channel_rail.dart:152` each open their own stream over the entire channels table and filter to one id in the builder, each with slightly different null handling.
   Fix: add a `channelByIdProvider(String id)` family over one shared stream provider and route all six through it. Effort: medium.
 
+- **CS4. `MessageExtrasController`'s map grows unbounded for the session** (`client/packages/app/lib/src/providers/message_extras.dart:99`). Medium.
+  `StateNotifier<Map<String, MessageExtras>>` keyed on message id, one entry per distinct message ever seen (live, every paged page, search, pins), each holding a reactions list, an attachments list and a poll. Nothing evicts one entry at a time (`:26`) and the provider is not `autoDispose`; only sign-out `clear()`s it. The subscription is cancelled on dispose, so this is retention, not a leak.
+  Surfaced by the 2026-08-19 memory profile: the resting footprint is healthy, so this only matters once a session pages thousands of messages. Backlogged until message volume proves it, per owner. Shares a root with CD2; a per-channel retention sweep should evict extras alongside the store rows.
+  Fix: LRU-cap the map by message id, evicting only entries no longer visible, or fold into the CD2 sweep. Effort: medium.
+
+- **CS5. `BatchProfilesController`'s map is screen-lifetime and uncapped** (`client/packages/app/lib/src/providers/user_profiles.dart:48`). Low.
+  `StateNotifier<Map<String, UserProfile?>>`; one entry per distinct author/reporter resolved, removed only on a `ProfileChanged` eviction or sign-out `clear()`; not `autoDispose`. The sibling single-id `userProfileProvider` is `autoDispose.family` and fine; only the batch map accumulates.
+  Entry size is display-name-sized, so impact is small; recorded from the 2026-08-19 memory profile as a known-bounded-in-practice item, backlogged until it proves an issue.
+  Fix: LRU-cap, or accept given the tiny per-entry size. Effort: small.
+
 ## Client: performance
 
 - **CP1. Canvas presence tiles rebuild on every pan and zoom frame.** Medium, was High. Partly fixed in #668.
