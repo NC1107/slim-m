@@ -14,7 +14,10 @@
 //! - [`Store::redeem_invite`], for an account that already exists and is
 //!   spending a code for the role it grants.
 
+use std::collections::HashMap;
+
 use rand_core::{OsRng, RngCore};
+use sqlx::QueryBuilder;
 
 use super::{Store, now_ms};
 use crate::ids::{RoleId, UserId};
@@ -280,6 +283,44 @@ impl Store {
 
         tx.commit().await?;
         Ok(())
+    }
+
+    /// The invite each of `ids` first registered through, for surfacing to a
+    /// BAN_MEMBERS moderator as a ban-evasion signal (see MOD9, building on
+    /// SRV5's recording of this table). An id with more than one redemption
+    /// keeps only the earliest - the registration one, since a later
+    /// redemption is somebody spending a code on an account they already
+    /// held. An id with no redemption at all is simply absent, the same
+    /// contract [`Store::user_profiles`] has for a missing id.
+    ///
+    /// Chunked under SQLite's bind limit the same way `user_profiles` is.
+    pub async fn registration_invite_codes(
+        &self,
+        ids: &[UserId],
+    ) -> anyhow::Result<HashMap<UserId, String>> {
+        use sqlx::Row;
+
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let mut out = HashMap::new();
+        for chunk in ids.chunks(super::MAX_IDS_PER_QUERY) {
+            // Built not `query!` (variable id list); ROW_NUMBER keeps one row per user - earliest redemption, ties broken by code - so two same-millisecond redemptions cannot return two rows.
+            let mut builder = QueryBuilder::new(
+                "SELECT user_id, code FROM (SELECT user_id, code, ROW_NUMBER() OVER \
+                 (PARTITION BY user_id ORDER BY redeemed_at, code) AS rn \
+                 FROM invite_redemptions WHERE user_id IN (",
+            );
+            let mut separated = builder.separated(", ");
+            for id in chunk {
+                separated.push_bind(*id);
+            }
+            builder.push(")) WHERE rn = 1");
+            for row in builder.build().fetch_all(&self.pool).await? {
+                out.insert(row.try_get("user_id")?, row.try_get("code")?);
+            }
+        }
+        Ok(out)
     }
 }
 

@@ -4509,6 +4509,14 @@ components:
             null for none. Shown in the member pane under the name. Absent
             on servers older than this field, which a client must treat as
             unknown rather than "no status".
+        invite_code:
+          type: [string, "null"]
+          description: >
+            The invite this member registered through, present only to
+            callers with BAN_MEMBERS - a moderation signal for spotting a
+            returning (ban-evading) account, never a public value. Absent
+            entirely for any other caller, and for a member who registered
+            without an invite.
 
     SpaceRemoval:
       type: object
@@ -4531,6 +4539,13 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        invite_code:
+          type: [string, "null"]
+          description: >
+            The invite this member registered through, or null if they had
+            none. Every caller of this endpoint already holds BAN_MEMBERS, so
+            unlike `UserProfile.invite_code` this is never gated by
+            permission - it is always present, either a code or null.
 
     Me:
       type: object
