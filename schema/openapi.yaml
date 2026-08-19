@@ -145,6 +145,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Version"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /metrics:
     get:
@@ -293,6 +295,8 @@ paths:
           description: The session was revoked.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /account:
     delete:
@@ -307,6 +311,8 @@ paths:
           description: The account was deleted.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /auth/reset:
     post:
@@ -388,6 +394,8 @@ paths:
                 $ref: "#/components/schemas/Me"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     patch:
       operationId: updateMe
       tags: [users]
@@ -413,6 +421,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /users:
     get:
@@ -442,6 +452,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /users/{userId}:
     parameters:
@@ -472,6 +484,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /members:
     get:
@@ -511,6 +525,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /presence:
     get:
@@ -544,6 +560,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     patch:
       operationId: setPresenceVisibility
       tags: [presence]
@@ -613,6 +631,8 @@ paths:
           description: The avatar was removed (or there was none).
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /users/{userId}/avatar:
     parameters:
@@ -659,6 +679,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /devices:
     get:
@@ -676,6 +698,8 @@ paths:
                   $ref: "#/components/schemas/Device"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /devices/{deviceId}:
     parameters:
@@ -701,6 +725,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /blocks:
     get:
@@ -719,6 +745,8 @@ paths:
                   format: uuid
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /blocks/{userId}:
     parameters:
@@ -743,6 +771,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     delete:
       operationId: unblockUser
       tags: [safety]
@@ -752,6 +782,8 @@ paths:
           description: The user is no longer blocked.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /reports:
     get:
@@ -793,6 +825,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: fileReport
       tags: [safety]
@@ -822,6 +856,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /reports/{reportId}:
     parameters:
@@ -877,6 +913,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: createInvite
       tags: [invites]
@@ -900,6 +938,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /invites/{code}:
     parameters:
@@ -920,6 +960,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /invites/{code}/check:
     parameters:
@@ -952,6 +994,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CheckInviteResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /invites/{code}/redeem:
     parameters:
@@ -972,6 +1016,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels:
     get:
@@ -996,6 +1042,8 @@ paths:
                   $ref: "#/components/schemas/Channel"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: createChannel
       tags: [channels]
@@ -1020,6 +1068,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}:
     parameters:
@@ -1057,6 +1107,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     delete:
       operationId: deleteChannel
       tags: [channels]
@@ -1078,6 +1130,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/permissions:
     parameters:
@@ -1109,6 +1163,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/thread-parent:
     parameters:
@@ -1140,6 +1196,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/threads:
     parameters:
@@ -1184,6 +1242,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/order:
     put:
@@ -1227,6 +1287,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /categories:
     get:
@@ -1251,6 +1313,8 @@ paths:
                   $ref: "#/components/schemas/ChannelCategory"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: createCategory
       tags: [channels]
@@ -1277,6 +1341,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /categories/{categoryId}:
     parameters:
@@ -1314,6 +1380,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     delete:
       operationId: deleteCategory
       tags: [channels]
@@ -1329,6 +1397,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /dms:
     get:
@@ -1351,6 +1421,8 @@ paths:
                   $ref: "#/components/schemas/DmConversation"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /dms/{userId}:
     parameters:
@@ -1390,6 +1462,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /roles:
     get:
@@ -1409,6 +1483,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: createRole
       tags: [roles]
@@ -1835,6 +1911,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: sendMessage
       tags: [messages]
@@ -1903,6 +1981,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     delete:
       operationId: deleteMessage
       tags: [messages]
@@ -1920,6 +2000,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/messages/{messageId}/history:
     parameters:
@@ -1970,6 +2052,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/messages/bulk-delete:
     parameters:
@@ -2191,6 +2275,8 @@ paths:
           description: >-
             The `Range` header named a byte range no part of the attachment can
             satisfy. Carries `Content-Range: bytes */total`.
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /gifs/search:
     get:
@@ -2530,6 +2616,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/pins/count:
     parameters:
@@ -2552,6 +2640,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/messages/search:
     parameters:
@@ -2652,6 +2742,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /messages/{messageId}/reactions/{emoji}:
     parameters:
@@ -2843,6 +2935,8 @@ paths:
                 $ref: "#/components/schemas/NotificationPreference"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     put:
       operationId: setNotificationPreference
       tags: [push]
@@ -2894,6 +2988,8 @@ paths:
                   $ref: "#/components/schemas/ChannelNotificationOverrideEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /notification-preferences/channels/{channelId}:
     parameters:
@@ -2963,6 +3059,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     put:
       operationId: markRead
       tags: [sync]
@@ -2983,6 +3081,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/canvas/objects:
     parameters:
@@ -3075,6 +3175,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: placeCanvasObject
       tags: [canvas]
@@ -3160,6 +3262,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/canvas/ops:
     parameters:
@@ -3228,6 +3332,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: submitCanvasOp
       tags: [canvas]
@@ -3328,6 +3434,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/canvas/media-slots:
     parameters:
@@ -3362,6 +3470,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/canvas/media-slots/{kind}/{userId}:
     parameters:
@@ -3425,6 +3535,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /channels/{channelId}/voice/token:
     post:
@@ -3839,6 +3951,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /ws:
     get:
@@ -3881,6 +3995,8 @@ paths:
                   $ref: "#/components/schemas/CustomEmoji"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     post:
       operationId: uploadCustomEmoji
       tags: [emoji]
@@ -3913,6 +4029,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "507":
           $ref: "#/components/responses/InsufficientStorage"
   /emoji/{emoji_id}:
@@ -3938,6 +4056,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /emoji/{emoji_id}/image:
     get:
       operationId: fetchCustomEmojiImage
@@ -3967,6 +4087,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
 components:
   securitySchemes:

@@ -10,6 +10,10 @@ use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::presence::PresenceTracker;
 use slimm_server::store::Store;
 
+/// Route and schema extraction shared by `tests/openapi_contract.rs` and
+/// `tests/openapi_429_coverage.rs`.
+pub mod openapi;
+
 /// [`slimm_server::push::message_recipients`] against a fresh, empty
 /// [`PresenceTracker`] - shared by every push-recipient test that has no
 /// opinion about `@here`, so a perpetually-disconnected tracker is a correct
