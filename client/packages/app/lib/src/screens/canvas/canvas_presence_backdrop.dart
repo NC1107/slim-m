@@ -112,7 +112,11 @@ class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
         .toSet();
     if (backKeys.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
-    final painted = presencePaintOrder(backKeys, widget.overrides.zFor);
+    final painted = presencePaintOrder(
+      backKeys,
+      widget.overrides.zFor,
+      widget.overrides.sentToBackFor,
+    );
     return IgnorePointer(
       key: canvasPresenceBackdropIgnorePointerKey,
       child: Stack(

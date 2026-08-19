@@ -95,6 +95,12 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
   /// sorts by.
   int? zFor(String key) => _z[key];
 
+  /// Whether this key sits behind the drawing surface (the shared front/back
+  /// depth). Paint order uses it as the primary key so every sent-to-back
+  /// tile - and its controls - sits beneath every front tile, before the
+  /// per-viewer touch order breaks ties within each group.
+  bool sentToBackFor(String key) => stateFor(key).sentToBack;
+
   /// Replaces [rect]/[locked]/[sentToBack] with the server's current answer
   /// for [key] - a fetch on opening the canvas, or a live
   /// `canvas.media_slot.changed` frame - leaving [hidden] untouched, since

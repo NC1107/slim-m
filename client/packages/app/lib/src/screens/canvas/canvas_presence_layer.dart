@@ -243,7 +243,11 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     _reportInterest(wantsVideo);
     if (visibleIds.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
-    final painted = presencePaintOrder(visibleIds, widget.overrides.zFor);
+    final painted = presencePaintOrder(
+      visibleIds,
+      widget.overrides.zFor,
+      widget.overrides.sentToBackFor,
+    );
     return Stack(
       clipBehavior: Clip.none,
       children: [
