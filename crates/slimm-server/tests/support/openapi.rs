@@ -8,6 +8,11 @@
 //! trusted by inspection, for the reason `openapi_contract.rs`'s own module
 //! doc gives: a schema that only has to be updated by someone remembering to
 //! do it always rots.
+//!
+//! Allowed dead: `mod.rs` pulls this module into every integration test
+//! binary via `mod support;`, and only the two gates named above ever touch
+//! it, the same reason `support::wake_recipients` carries the same allow.
+#![allow(dead_code)]
 
 use std::fs;
 use std::path::{Path, PathBuf};

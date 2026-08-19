@@ -5,6 +5,8 @@
 //! surface it was introduced with; this module is the CRUD paths for a
 //! single channel.
 
+use sqlx::SqliteExecutor;
+
 use super::{Channel, Store, now_ms};
 use crate::ids::ChannelId;
 
@@ -25,8 +27,54 @@ impl From<sqlx::Error> for DeleteChannelError {
     }
 }
 
+/// Why creating a channel by id failed outright, rather than succeeding
+/// fresh or as a retry.
+#[derive(Debug)]
+pub enum CreateChannelError {
+    /// This id already names a DM or a thread, not a POST /channels-creatable
+    /// channel. `channels` holds all three kinds under one id namespace, so a
+    /// colliding id must never be handed back as if it were the caller's own
+    /// text/voice channel - the same reason
+    /// [`super::messages::SendError::IdConflict`] refuses to alias a foreign
+    /// message rather than returning it.
+    IdConflict,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for CreateChannelError {
+    fn from(err: sqlx::Error) -> Self {
+        CreateChannelError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for CreateChannelError {
+    fn from(err: anyhow::Error) -> Self {
+        CreateChannelError::Internal(err)
+    }
+}
+
+/// The outcome of a create, which is idempotent by client-supplied id and so
+/// may be a retry; see [`Store::create_channel_with_id`].
+#[derive(Debug, Clone)]
+pub struct CreatedChannel {
+    pub channel: Channel,
+    /// False when this id already named a channel, so the call was a retry
+    /// of a create that already succeeded. The caller publishes
+    /// `ChannelCreated` only when this is true, or a retry would wake every
+    /// connected client a second time for a channel they already know about.
+    pub fresh: bool,
+}
+
 impl Store {
     /// Creates a channel and seeds its message and canvas sequence counters.
+    /// Idempotent by `id`: a retry with the same id returns the row already
+    /// stored under it rather than inserting again, the same contract
+    /// [`super::messages::Store::send_message`] gives a message send.
+    ///
+    /// [`Store::create_channel`] is the convenience form for a caller with no
+    /// client-supplied id of its own; it mints one and always sees
+    /// [`CreatedChannel::fresh`] true, since a freshly generated UUIDv7 id
+    /// cannot already be in use.
     ///
     /// Appended to the end of the deployment's channel order: one more than
     /// the highest position among live, non-DM, non-thread channels,
@@ -36,10 +84,46 @@ impl Store {
     /// excluded from every position-ordered query - the same exclusion
     /// [`super::bootstrap::Store::list_channels`] and
     /// [`super::channel_order::Store::reorder_channels`] already apply.
-    pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
-        let id = ChannelId::generate();
+    ///
+    /// Uses [`Store::begin_write`] (`BEGIN IMMEDIATE`) rather than a deferred
+    /// transaction, for the same reason [`super::messages::Store::send_message`]
+    /// does: this reads the id before it writes.
+    ///
+    /// The id probe matches a deleted row as well as a live one: the id
+    /// column is unique either way, so a retry of a create whose channel was
+    /// since removed must still match here and come back as the retry it is,
+    /// rather than fall through to an INSERT that hits the unique id and
+    /// maps to a 500.
+    ///
+    /// `channels` also holds DM channels and threads (a thread is a channel
+    /// with `parent_message_id` set), neither of which this route can create
+    /// or return: a match is only a retry when it is the same
+    /// text/voice-and-top-level shape this call itself would have inserted,
+    /// otherwise it is [`CreateChannelError::IdConflict`] rather than a 500
+    /// or a wrong-typed 200.
+    pub async fn create_channel_with_id(
+        &self,
+        id: ChannelId,
+        name: &str,
+        kind: &str,
+    ) -> Result<CreatedChannel, CreateChannelError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
+
+        // Probes including a deleted row; see this function's doc for why.
+        if let Some(existing) = fetch_channel_by_id(&mut *tx, id).await? {
+            tx.commit().await?;
+            let creatable_kind = matches!(existing.kind.as_str(), "text" | "voice")
+                && existing.parent_message_id.is_none();
+            if !creatable_kind {
+                return Err(CreateChannelError::IdConflict);
+            }
+            return Ok(CreatedChannel {
+                channel: existing,
+                fresh: false,
+            });
+        }
+
         let position = sqlx::query_scalar!(
             r#"SELECT COALESCE(MAX(position), -1) + 1 AS "next!: i64" FROM channels
                WHERE deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL"#
@@ -65,17 +149,40 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(Channel {
-            id,
-            name: name.to_owned(),
-            kind: kind.to_owned(),
-            topic: None,
-            position,
-            parent_message_id: None,
-            // Uncategorised until dragged; there is no default (docs/decisions/0006).
-            category_id: None,
-            created_at: now,
+        Ok(CreatedChannel {
+            channel: Channel {
+                id,
+                name: name.to_owned(),
+                kind: kind.to_owned(),
+                topic: None,
+                position,
+                parent_message_id: None,
+                // Uncategorised until dragged; there is no default (docs/decisions/0006).
+                category_id: None,
+                created_at: now,
+            },
+            fresh: true,
         })
+    }
+
+    /// Creates a channel with a server-minted id; see
+    /// [`Store::create_channel_with_id`] for the idempotent form a caller
+    /// with a client-supplied id wants instead.
+    ///
+    /// [`CreateChannelError::IdConflict`] cannot happen here: a freshly
+    /// generated UUIDv7 cannot already name a DM or a thread, so the only
+    /// error this ever actually surfaces is `Internal`.
+    pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
+        match self
+            .create_channel_with_id(ChannelId::generate(), name, kind)
+            .await
+        {
+            Ok(created) => Ok(created.channel),
+            Err(CreateChannelError::IdConflict) => {
+                anyhow::bail!("a freshly generated channel id collided with an existing row")
+            }
+            Err(CreateChannelError::Internal(err)) => Err(err),
+        }
     }
 
     /// Fetches a live channel by id, or `None` if it is missing or deleted.
@@ -142,27 +249,7 @@ impl Store {
         &self,
         id: ChannelId,
     ) -> anyhow::Result<Option<Channel>> {
-        let row = sqlx::query!(
-            r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
-                      position AS "position!: i64",
-                      parent_message_id AS "parent_message_id: crate::ids::MessageId",
-                      category_id AS "category_id: crate::ids::ChannelCategoryId",
-                      created_at AS "created_at!"
-               FROM channels WHERE id = ?"#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.map(|r| Channel {
-            id: r.id,
-            name: r.name,
-            kind: r.kind,
-            topic: r.topic,
-            position: r.position,
-            parent_message_id: r.parent_message_id,
-            category_id: r.category_id,
-            created_at: r.created_at,
-        }))
+        fetch_channel_by_id(&self.pool, id).await
     }
 
     /// Renames a channel and/or replaces its topic. `None` for either leaves
@@ -300,4 +387,34 @@ impl Store {
             Ok(false)
         }
     }
+}
+
+/// Fetches a channel by id, live or deleted, over any executor - the pool for
+/// [`Store::channel_including_deleted`], or an open transaction for the id
+/// probe inside [`Store::create_channel_with_id`].
+async fn fetch_channel_by_id<'e, E>(executor: E, id: ChannelId) -> anyhow::Result<Option<Channel>>
+where
+    E: SqliteExecutor<'e>,
+{
+    let row = sqlx::query!(
+        r#"SELECT id AS "id!: ChannelId", name AS "name!", kind AS "kind!", topic,
+                  position AS "position!: i64",
+                  parent_message_id AS "parent_message_id: crate::ids::MessageId",
+                  category_id AS "category_id: crate::ids::ChannelCategoryId",
+                  created_at AS "created_at!"
+           FROM channels WHERE id = ?"#,
+        id
+    )
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.map(|r| Channel {
+        id: r.id,
+        name: r.name,
+        kind: r.kind,
+        topic: r.topic,
+        position: r.position,
+        parent_message_id: r.parent_message_id,
+        category_id: r.category_id,
+        created_at: r.created_at,
+    }))
 }

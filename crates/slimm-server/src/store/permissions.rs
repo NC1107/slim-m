@@ -6,7 +6,7 @@
 
 use uuid::Uuid;
 
-use super::{Store, now_ms};
+use super::Store;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::{Overwrite, Permissions, evaluate};
 
@@ -19,41 +19,6 @@ pub(super) struct RoleContext {
 }
 
 impl Store {
-    /// Creates a role. Exactly one role carries `is_everyone`; that base role
-    /// applies to every member whether or not they hold it explicitly. A partial
-    /// unique index enforces the singleton, so a second `@everyone` role is
-    /// rejected here rather than corrupting the evaluation base.
-    pub async fn create_role(
-        &self,
-        name: &str,
-        permissions: Permissions,
-        is_everyone: bool,
-    ) -> anyhow::Result<RoleId> {
-        let id = RoleId::generate();
-        let now = now_ms();
-        let bits = permissions.bits();
-        let is_everyone = i64::from(is_everyone);
-        let result = sqlx::query!(
-            "INSERT INTO roles (id, name, permissions, is_everyone, created_at)
-             VALUES (?, ?, ?, ?, ?)",
-            id,
-            name,
-            bits,
-            is_everyone,
-            now
-        )
-        .execute(&self.pool)
-        .await;
-
-        match result {
-            Ok(_) => Ok(id),
-            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-                anyhow::bail!("an @everyone role already exists")
-            }
-            Err(e) => Err(e.into()),
-        }
-    }
-
     /// Grants a role to a member. Idempotent.
     pub async fn assign_role(&self, user_id: UserId, role_id: RoleId) -> anyhow::Result<()> {
         sqlx::query!(

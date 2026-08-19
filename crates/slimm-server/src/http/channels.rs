@@ -112,6 +112,9 @@ impl From<Channel> for ChannelDto {
 
 #[derive(Deserialize)]
 struct CreateRequest {
+    /// Client-generated UUIDv7 that makes the create idempotent on retry.
+    /// Absent means the server mints one and this is always a fresh create.
+    id: Option<String>,
     name: String,
     /// "text" or "voice"; defaults to text.
     kind: Option<String>,
@@ -186,10 +189,21 @@ async fn create(
     if !matches!(kind, "text" | "voice") {
         return Err(ApiError::BadRequest("kind must be text or voice"));
     }
+    let id = req
+        .id
+        .as_deref()
+        .map(|raw| parse_uuid(raw).map(ChannelId))
+        .transpose()?
+        .unwrap_or_else(ChannelId::generate);
 
-    let channel = state.store.create_channel(name, kind).await?;
-    state.hub.publish(Event::ChannelCreated(channel.clone()));
-    Ok(Json(channel.into()))
+    let created = state.store.create_channel_with_id(id, name, kind).await?;
+    // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
+    if created.fresh {
+        state
+            .hub
+            .publish(Event::ChannelCreated(created.channel.clone()));
+    }
+    Ok(Json(created.channel.into()))
 }
 
 /// Renames a channel and/or replaces its topic. Requires MANAGE_CHANNELS at

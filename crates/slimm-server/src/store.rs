@@ -80,8 +80,9 @@ pub use canvas_ops::{
 };
 pub use canvas_ops_sweep::{CANVAS_OP_RETENTION_MS, SweptCanvasOps};
 pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError, SubmittedOp};
+pub use categories::CreatedCategory;
 pub use channel_order::{ChannelOrderGroup, ReorderChannelsError, ReorderOutcome};
-pub use channels::DeleteChannelError;
+pub use channels::{CreateChannelError, CreatedChannel, DeleteChannelError};
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
@@ -102,7 +103,7 @@ pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use removals::{RemoveMemberError, SpaceRemoval};
 pub use reports::{Report, ReportError, ReportSubject};
-pub use roles::{Role, RoleGuardError};
+pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};
 pub use safety::Device;
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
