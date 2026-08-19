@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.47.0](https://github.com/NC1107/slim-m/compare/client-v0.46.1...client-v0.47.0) (2026-08-19)
+
+
+### Features
+
+* **client:** push-to-talk joins a call with the mic closed ([#712](https://github.com/NC1107/slim-m/issues/712)) ([a3be33c](https://github.com/NC1107/slim-m/commit/a3be33c43ed58cc36041be7328e4735a8f17633e))
+* **client:** view a message's edit history from the edited marker ([#717](https://github.com/NC1107/slim-m/issues/717)) ([64a5815](https://github.com/NC1107/slim-m/commit/64a581568679306cfb0988ee6880c14820503524))
+* **server:** store and serve a message's edit history ([#716](https://github.com/NC1107/slim-m/issues/716)) ([54ad86c](https://github.com/NC1107/slim-m/commit/54ad86cd92ece1b2592dfc6bcd89e2dfec8b2bc6))
+
 ## [0.46.1](https://github.com/NC1107/slim-m/compare/client-v0.46.0...client-v0.46.1) (2026-08-19)
 
 
