@@ -28,12 +28,10 @@ on:
     paths:
       - "client/**"
       - ".github/workflows/client-ios-ci.yml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
-      - "!client/CHANGELOG.md"
-      - "!client/pubspec.yaml"
-      - "!client/packages/app/pubspec.yaml"
+      # A release-please version bump is deliberately NOT excluded:
+      # verify-release-checks.yml gates the client publish jobs on this
+      # workflow's checks being present on the release commit, so it must run
+      # there. See docs/ci.md and client-ci.yml's matching note.
   pull_request:
     paths:
       - "client/packages/app/ios/**"
@@ -43,12 +41,10 @@ on:
       - "client/pubspec.lock"
       - "client/packages/app/pubspec.yaml"
       - ".github/workflows/client-ios-ci.yml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
-      - "!client/CHANGELOG.md"
-      - "!client/pubspec.yaml"
-      - "!client/packages/app/pubspec.yaml"
+      # A release-please version bump is deliberately NOT excluded:
+      # verify-release-checks.yml gates the client publish jobs on this
+      # workflow's checks being present on the release commit, so it must run
+      # there. See docs/ci.md and client-ci.yml's matching note.
 
 permissions:
   contents: read
