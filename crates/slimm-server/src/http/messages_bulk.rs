@@ -137,6 +137,17 @@ async fn bulk_delete(
             channel_id,
             message_id: deleted.message_id,
         });
+        // The DB trigger already dropped the pin row; tell live clients too.
+        if deleted.was_pinned {
+            state.hub.publish(Event::MessageUnpinned {
+                channel_id,
+                message_id: deleted.message_id,
+            });
+        }
+    }
+    // One reply-summary refresh for the whole batch; see `threads::notify_reply`.
+    if !outcome.deleted.is_empty() {
+        super::threads::notify_reply(&state, channel_id).await;
     }
     for hex in &outcome.freed_attachments {
         if let Err(err) = state.media.delete_attachment(hex).await {

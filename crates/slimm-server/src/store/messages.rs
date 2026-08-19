@@ -80,6 +80,10 @@ pub struct MessageDeletion {
     /// `false` means the message was already gone (a retry after a dropped
     /// response), the same idempotency contract the old boolean return had.
     pub deleted: bool,
+    /// Whether the message was pinned at the moment this call deleted it,
+    /// read before the soft-delete `UPDATE` fires `pinned_messages_on_delete`.
+    /// A retry of an already-gone message is `false`, exactly like `deleted`.
+    pub was_pinned: bool,
     /// Hex ids of attachments this delete left with no message referencing
     /// them. Their database rows are already gone; the caller still needs to
     /// delete the backing files, which is filesystem I/O kept outside the
@@ -325,6 +329,13 @@ impl Store {
     ) -> anyhow::Result<MessageDeletion> {
         let mut tx = self.begin_write().await?;
         let now = now_ms();
+        // Read before the trigger below removes it; see `MessageDeletion::was_pinned`.
+        let was_pinned = sqlx::query_scalar!(
+            r#"SELECT EXISTS(SELECT 1 FROM pinned_messages WHERE message_id = ?) AS "was_pinned!: bool""#,
+            id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
         let channel_id = sqlx::query_scalar!(
             r#"UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL
                RETURNING channel_id AS "channel_id!: ChannelId""#,
@@ -344,6 +355,7 @@ impl Store {
         tx.commit().await?;
         Ok(MessageDeletion {
             deleted: true,
+            was_pinned,
             freed_attachments,
             op_seq: Some(op_seq),
         })

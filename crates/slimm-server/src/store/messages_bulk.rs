@@ -46,6 +46,9 @@ pub struct BulkDeletion {
 pub struct DeletedMessage {
     pub message_id: MessageId,
     pub op_seq: i64,
+    /// Whether this message was pinned at the moment this call deleted it,
+    /// read before the batched `UPDATE` fires `pinned_messages_on_delete`.
+    pub was_pinned: bool,
 }
 
 /// Why a bulk delete refused, before it wrote anything.
@@ -128,6 +131,21 @@ impl Store {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
 
+        // Read before the UPDATE fires the trigger; see `DeletedMessage::was_pinned`.
+        let mut pinned_query =
+            QueryBuilder::new("SELECT message_id FROM pinned_messages WHERE message_id IN (");
+        let mut pinned_separated = pinned_query.separated(", ");
+        for id in ids {
+            pinned_separated.push_bind(*id);
+        }
+        pinned_query.push(")");
+        let pinned_ids: std::collections::HashSet<MessageId> = pinned_query
+            .build_query_scalar::<MessageId>()
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .collect();
+
         let mut builder = QueryBuilder::new("UPDATE messages SET deleted_at = ");
         builder.push_bind(now);
         builder.push(" WHERE channel_id = ");
@@ -156,7 +174,11 @@ impl Store {
             )
             .await?;
             freed_attachments.extend(release_message_attachments(&mut tx, message_id).await?);
-            deleted.push(DeletedMessage { message_id, op_seq });
+            deleted.push(DeletedMessage {
+                message_id,
+                op_seq,
+                was_pinned: pinned_ids.contains(&message_id),
+            });
         }
 
         // An act that deleted nothing is not an act, as the undo paths keep.
