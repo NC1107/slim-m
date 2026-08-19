@@ -82,17 +82,27 @@ Map<String, Rect> presenceOnCanvasRects({
   return onCanvas;
 }
 
-/// [keys] sorted so a tile this viewer has ever dragged or resized paints
-/// above every untouched one, most recently touched last (topmost) - the
-/// same "a real sheet of paper does not slide under the pile" rule
-/// regardless of which paint layer (front or backdrop) is asking.
-List<String> presencePaintOrder(Set<String> keys, int? Function(String) zFor) {
+/// [keys] sorted for paint order. A sent-to-back tile always paints beneath
+/// a front one (the primary key), so a back tile's own controls can never
+/// sit over a front tile - the bug a `sentToBack`-blind sort left open.
+/// Within each group the old rule holds: a tile this viewer has ever dragged
+/// or resized paints above every untouched one, most recently touched last
+/// (topmost), the same "a real sheet of paper does not slide under the pile"
+/// rule regardless of which paint layer (front or backdrop) is asking.
+List<String> presencePaintOrder(
+  Set<String> keys,
+  int? Function(String) zFor,
+  bool Function(String) sentToBack,
+) {
   final ordered = keys.toList(growable: false);
   final rank = <String, int>{
     for (var i = 0; i < ordered.length; i++) ordered[i]: i,
   };
-  final withZ = ordered.map((key) => (key: key, z: zFor(key) ?? -1)).toList();
+  final withZ = ordered
+      .map((key) => (key: key, back: sentToBack(key), z: zFor(key) ?? -1))
+      .toList();
   withZ.sort((a, b) {
+    if (a.back != b.back) return a.back ? -1 : 1;
     final byZ = a.z.compareTo(b.z);
     return byZ != 0 ? byZ : rank[a.key]!.compareTo(rank[b.key]!);
   });
