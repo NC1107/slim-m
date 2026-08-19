@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.0](https://github.com/NC1107/slim-m/compare/server-v0.41.0...server-v0.42.0) (2026-08-19)
+
+
+### Features
+
+* **server:** raise the default upload limit to 100 MiB ([#705](https://github.com/NC1107/slim-m/issues/705)) ([8c7db57](https://github.com/NC1107/slim-m/commit/8c7db57ca2f5fb8b6c9d8575ff904955fc6696ad))
+
 ## [0.41.0](https://github.com/NC1107/slim-m/compare/server-v0.40.0...server-v0.41.0) (2026-08-18)
 
 
