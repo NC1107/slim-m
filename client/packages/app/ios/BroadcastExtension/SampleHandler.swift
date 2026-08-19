@@ -42,7 +42,7 @@ class SampleHandler: RPBroadcastSampleHandler {
     os_log(.debug, log: broadcastLogger, "broadcast socket at %{public}s", socketFilePath)
   }
 
-  override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
+  override func broadcastStarted(withSetupInfo _: [String: NSObject]?) {
     DarwinNotificationCenter.shared.postNotification(.broadcastStarted)
     observeStopRequest()
     openConnection()

@@ -48,6 +48,7 @@ fi
 # allow nesting and this closes on the first '*/', which is wrong for a
 # nested one, but nothing in this tree nests one today.
 runs_in() {
+  local file="$1"
   awk '
     # A plain comment is // followed by neither / nor ! (both are doc
     # comments), or # not followed by !.
@@ -74,7 +75,7 @@ runs_in() {
       if (in_block && block_lines > 1) runs++
       print runs + 0
     }
-  ' "$1"
+  ' "$file"
 }
 
 status=0
@@ -84,11 +85,13 @@ over=0
 while IFS= read -r file; do
   case $file in
     *.g.dart | *.freezed.dart | .sqlx/* | */generated/*) continue ;;
+    *) ;;
   esac
   # Shell, YAML and TOML get a file-header exemption this counter cannot see,
   # so they are out of scope entirely rather than counted wrongly.
   case $file in
     *.sh | *.yml | *.yaml | *.toml) continue ;;
+    *) ;;
   esac
   checked=$((checked + 1))
   count=$(runs_in "$file")

@@ -53,14 +53,16 @@ LINKS_BY_CATEGORY = {
 # Flattened for callers (and tests) that only need "is this a real link".
 LINKS = tuple(url for urls in LINKS_BY_CATEGORY.values() for url in urls)
 
+_FOUND_EARLIER = "found this earlier"
+
 _INTROS_BY_CATEGORY = {
     "video": ("worth a watch", "you have to see this", "check this out",
               "this had me cracking up"),
-    "article": ("worth a read", "relevant", "found this earlier",
+    "article": ("worth a read", "relevant", _FOUND_EARLIER,
                 "for reference"),
-    "image": ("found this earlier", "look at this", "saw this today"),
+    "image": (_FOUND_EARLIER, "look at this", "saw this today"),
     "repo": ("here's the repo", "linking this before I forget",
-             "for reference", "found this earlier"),
+             "for reference", _FOUND_EARLIER),
 }
 
 # Share of link messages sent with no intro at all - just the bare URL.

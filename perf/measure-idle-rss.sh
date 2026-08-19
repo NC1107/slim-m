@@ -70,7 +70,8 @@ read_stable_rss() {
 }
 
 read_hwm() {
-  awk '/^VmHWM/ {print $2}' "/proc/$1/status"
+  local pid="$1"
+  awk '/^VmHWM/ {print $2}' "/proc/${pid}/status"
 }
 
 measure_glibc() {

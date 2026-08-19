@@ -294,7 +294,7 @@ jobs:
 
       - name: checksums
         working-directory: dist
-        run: sha256sum * > SHA256SUMS
+        run: sha256sum -- * > SHA256SUMS
 
       - name: sign checksums (optional)
         if: env.GPG_PRIVATE_KEY != ''
@@ -431,7 +431,7 @@ jobs:
         working-directory: dist
         run: |
           shopt -s nullglob
-          sha256sum slim-m-client-*-linux-amd64.tar.gz *.flatpak */*.rpm > SHA256SUMS
+          sha256sum -- slim-m-client-*-linux-amd64.tar.gz *.flatpak */*.rpm > SHA256SUMS
           cat SHA256SUMS
 
       - name: sign checksums (optional)

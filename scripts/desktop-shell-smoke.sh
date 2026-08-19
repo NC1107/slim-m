@@ -28,6 +28,7 @@
 # group deliberately leaves open (the window staying reachable, not quit).
 set -euo pipefail
 
+readonly APP_NAME="slim-m"
 BUNDLE="${1:?usage: desktop-shell-smoke.sh <bundle-dir>}"
 BIN="${BUNDLE}/slimm_app"
 export DISPLAY=:99
@@ -42,11 +43,11 @@ XVFB_PID=$!
 
 wait_for_x_socket() {
   local timeout_s="$1" waited=0
-  while [ ! -S "/tmp/.X11-unix/X${DISPLAY#:}" ]; do
+  while [[ ! -S "/tmp/.X11-unix/X${DISPLAY#:}" ]]; do
     sleep 0.2
     waited=$((waited + 1))
-    if [ "$waited" -ge "$((timeout_s * 5))" ]; then
-      echo "::error::Xvfb never opened its socket within ${timeout_s}s"
+    if [[ "$waited" -ge "$((timeout_s * 5))" ]]; then
+      echo "::error::Xvfb never opened its socket within ${timeout_s}s" >&2
       exit 1
     fi
   done
@@ -68,18 +69,18 @@ trap cleanup EXIT
 
 wait_for_window() {
   local timeout_s="$1" waited=0
-  while ! wmctrl -l | grep -q "slim-m"; do
+  while ! wmctrl -l | grep -q "$APP_NAME"; do
     sleep 0.5
     waited=$((waited + 1))
-    if [ "$waited" -ge "$((timeout_s * 2))" ]; then
-      echo "::error::window titled slim-m did not appear within ${timeout_s}s"
+    if [[ "$waited" -ge "$((timeout_s * 2))" ]]; then
+      echo "::error::window titled slim-m did not appear within ${timeout_s}s" >&2
       exit 1
     fi
   done
 }
 
 window_id() {
-  wmctrl -l | grep "slim-m" | head -1 | awk '{print $1}'
+  wmctrl -l | grep "$APP_NAME" | head -1 | awk '{print $1}'
 }
 
 assert_geometry() {
@@ -114,14 +115,14 @@ echo "::endgroup::"
 
 echo "::group::a close request no longer terminates the process, and the window stays reachable"
 sleep 3
-wmctrl -c "slim-m"
+wmctrl -c "$APP_NAME"
 sleep 3
 if ! kill -0 "$APP_PID" 2>/dev/null; then
-  echo "::error::the process exited after a close request; setPreventClose did not intercept it"
+  echo "::error::the process exited after a close request; setPreventClose did not intercept it" >&2
   exit 1
 fi
-if ! wmctrl -l | grep -q "slim-m"; then
-  echo "::error::the window is unreachable after close; that is hideToTray with no tray, not minimizeToTaskbar"
+if ! wmctrl -l | grep -q "$APP_NAME"; then
+  echo "::error::the window is unreachable after close; that is hideToTray with no tray, not minimizeToTaskbar" >&2
   exit 1
 fi
 echo "process still running and its window still reachable after close, as decision 0012's fallback expects"
@@ -134,21 +135,21 @@ waited=0
 while kill -0 "$SECOND_PID" 2>/dev/null; do
   sleep 0.5
   waited=$((waited + 1))
-  if [ "$waited" -ge 20 ]; then
-    echo "::error::the second launch is still running after 10s; it should hand off to the first process and exit"
+  if [[ "$waited" -ge 20 ]]; then
+    echo "::error::the second launch is still running after 10s; it should hand off to the first process and exit" >&2
     kill -9 "$SECOND_PID" 2>/dev/null || true
     exit 1
   fi
 done
 sleep 1
-window_count="$(wmctrl -l | grep -c "slim-m" || true)"
-if [ "$window_count" -ne 1 ]; then
-  echo "::error::expected exactly one slim-m window after a second launch, found ${window_count}"
+window_count="$(wmctrl -l | grep -c "$APP_NAME" || true)"
+if [[ "$window_count" -ne 1 ]]; then
+  echo "::error::expected exactly one slim-m window after a second launch, found ${window_count}" >&2
   wmctrl -l
   exit 1
 fi
 if ! kill -0 "$APP_PID" 2>/dev/null; then
-  echo "::error::the original process exited; a second launch should focus it, not replace it"
+  echo "::error::the original process exited; a second launch should focus it, not replace it" >&2
   exit 1
 fi
 echo "the second launch exited after handing off, exactly one window remains, and it is still the original process's"
@@ -162,8 +163,8 @@ waited=0
 while kill -0 "$APP_PID" 2>/dev/null; do
   sleep 0.5
   waited=$((waited + 1))
-  if [ "$waited" -ge 20 ]; then
-    echo "::error::the process is still running 10s after Ctrl+Q; there is still no way to quit with no tray"
+  if [[ "$waited" -ge 20 ]]; then
+    echo "::error::the process is still running 10s after Ctrl+Q; there is still no way to quit with no tray" >&2
     exit 1
   fi
 done

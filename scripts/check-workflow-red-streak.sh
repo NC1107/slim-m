@@ -39,7 +39,7 @@ gate a PR or a release, so nothing else notices this on its own; see
 docs/ci.md's e2e section."
 WHY="${WATCHDOG_WHY:-$DEFAULT_WHY}"
 
-if [ -n "${E2E_RUNS_JSON:-}" ]; then
+if [[ -n "${E2E_RUNS_JSON:-}" ]]; then
   runs_json="$(cat "$E2E_RUNS_JSON")"
 else
   runs_json="$(gh api \
@@ -56,13 +56,13 @@ completed_count=$(jq 'length' <<<"$completed_json")
 streak_len=0
 oldest_in_streak=""
 i=0
-while [ "$i" -lt "$completed_count" ]; do
+while [[ "$i" -lt "$completed_count" ]]; do
   row=$(jq -c ".[$i]" <<<"$completed_json")
   conclusion=$(jq -r '.conclusion' <<<"$row")
-  if [ "$conclusion" = "success" ]; then
+  if [[ "$conclusion" = "success" ]]; then
     break
   fi
-  if [ "$conclusion" = "cancelled" ]; then
+  if [[ "$conclusion" = "cancelled" ]]; then
     i=$((i + 1))
     continue
   fi
@@ -78,14 +78,14 @@ existing_open() {
   jq -r '.[0].number // empty' <<<"$list"
 }
 
-if [ "$streak_len" -ge "$FAILURE_THRESHOLD" ]; then
+if [[ "$streak_len" -ge "$FAILURE_THRESHOLD" ]]; then
   latest_row=$(jq -c '.[0]' <<<"$completed_json")
   latest_url=$(jq -r '.html_url' <<<"$latest_row")
   first_url=$(jq -r '.html_url' <<<"$oldest_in_streak")
   first_sha=$(jq -r '.head_sha' <<<"$oldest_in_streak")
   echo "::error::${SUBJECT} has failed ${streak_len} consecutive completed runs on main, starting at ${first_url} (commit ${first_sha}); latest ${latest_url}"
   existing="$(existing_open)"
-  if [ -z "$existing" ]; then
+  if [[ -z "$existing" ]]; then
     gh label create "$LABEL" --repo "$GITHUB_REPOSITORY" --color B60205 \
       --description "${SUBJECT} has failed for several runs in a row on main" \
       >/dev/null 2>&1 || true
@@ -111,9 +111,9 @@ This issue closes itself the next time a run on main succeeds."
   exit 0
 fi
 
-if [ "$streak_len" -eq 0 ]; then
+if [[ "$streak_len" -eq 0 ]]; then
   existing="$(existing_open)"
-  if [ -n "$existing" ]; then
+  if [[ -n "$existing" ]]; then
     gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
       --comment "${SUBJECT} passed again on main; closing." >/dev/null
     echo "closed issue #${existing}"

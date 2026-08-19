@@ -41,7 +41,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          npm ci
+          npm ci --ignore-scripts
           node check-parses.mjs
 
       # e2e.yml runs these too, but only post-merge and advisory; this is the

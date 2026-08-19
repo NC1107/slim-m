@@ -24,7 +24,7 @@ stuck=0
 
 check_package() {
   local manifest="$1" prefix="$2"
-  [ -f "$manifest" ] || return 0
+  [[ -f "$manifest" ]] || return 0
   local version
   version="$(jq -r 'to_entries[0].value' "$manifest")"
   local tag="${prefix}-v${version}"
@@ -33,12 +33,12 @@ check_package() {
   fi
   local touched_at
   touched_at="$(git log -1 --format=%ct -- "$manifest" || true)"
-  if [ -z "$touched_at" ]; then
+  if [[ -z "$touched_at" ]]; then
     echo "::warning::${manifest} names ${version} but has no git history for itself; skipping"
     return 0
   fi
   local age=$(( NOW_EPOCH - touched_at ))
-  if [ "$age" -lt "$GRACE_SECONDS" ]; then
+  if [[ "$age" -lt "$GRACE_SECONDS" ]]; then
     echo "${tag} not yet cut, ${age}s since ${manifest} last changed, within the ${GRACE_SECONDS}s grace window"
     return 0
   fi

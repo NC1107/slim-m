@@ -49,27 +49,27 @@ while :; do
       <<<"$runs")
     case "$status" in
       absent) missing+=("$name") ;;
-      completed) [ "$conclusion" = success ] || failed+=("$name:$conclusion") ;;
+      completed) [[ "$conclusion" = success ]] || failed+=("$name:$conclusion") ;;
       *) pending+=("$name") ;;
     esac
   done
-  if [ "${#failed[@]}" -gt 0 ]; then
+  if [[ "${#failed[@]}" -gt 0 ]]; then
     echo "::error::required check(s) failed on ${SHA}: ${failed[*]}"
     exit 1
   fi
-  if [ "${#missing[@]}" -eq 0 ] && [ "${#pending[@]}" -eq 0 ]; then
+  if [[ "${#missing[@]}" -eq 0 ]] && [[ "${#pending[@]}" -eq 0 ]]; then
     echo "required checks passed on ${SHA}: ${required[*]}"
     exit 0
   fi
   now=$(date +%s)
   # Absent-and-nothing-running is a typo; absent-while-running is a queue.
-  if [ "${#missing[@]}" -gt 0 ] && [ $(( now - started )) -ge "$CREATION_GRACE_SECONDS" ] \
-    && [ "$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&per_page=100" \
-          --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo 1)" = "0" ]; then
+  if [[ "${#missing[@]}" -gt 0 ]] && [[ $(( now - started )) -ge "$CREATION_GRACE_SECONDS" ]] \
+    && [[ "$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&per_page=100" \
+          --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo 1)" = "0" ]]; then
     echo "::error::no check run named ${missing[*]} exists on ${SHA} and nothing is still running for it; either it never ran or required_checks names it wrongly"
     exit 1
   fi
-  if [ "$now" -ge "$deadline" ]; then
+  if [[ "$now" -ge "$deadline" ]]; then
     echo "::error::timed out waiting on ${SHA} (missing: ${missing[*]:-none}, pending: ${pending[*]:-none})"
     exit 1
   fi

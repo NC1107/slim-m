@@ -21,6 +21,7 @@ import e2e_js
 TIMEOUT = 90
 _MOUSE = "Input.dispatchMouseEvent"
 _KEY = "Input.dispatchKeyEvent"
+_DEFAULT_MIME = "image/png"
 # A private directory when unset, rather than a guessable shared one.
 SHOTS = os.environ.get("E2E_SHOTS") or tempfile.mkdtemp(prefix="e2e-")
 # Enough to carry a launch's worth of failures without holding a whole run.
@@ -250,7 +251,7 @@ class Client:
         """
         self.ev(e2e_js.WATCH_FILES)
 
-    def give_file(self, path, mime="image/png"):
+    def give_file(self, path, mime=_DEFAULT_MIME):
         """Hand the caught input a real file, as a person's picker would.
 
         `files` cannot be assigned a plain list, but it will take a
@@ -266,7 +267,7 @@ class Client:
             raise AssertionError(f"{self.name}: {ok}")
         time.sleep(3)
 
-    def attach_file(self, open_label, path, mime="image/png"):
+    def attach_file(self, open_label, path, mime=_DEFAULT_MIME):
         """Open a picker and answer it, in the order those have to happen."""
         self.watch_for_file_input()
         self.click(open_label, settle=2)
@@ -299,7 +300,7 @@ class Client:
             raise AssertionError(f"{self.name}: canvas surface not found")
         return json.loads(raw)
 
-    def paste_clipboard_image(self, path, mime="image/png"):
+    def paste_clipboard_image(self, path, mime=_DEFAULT_MIME):
         """Dispatches a real `paste` DOM event carrying [path]'s bytes."""
         with open(path, "rb") as fh:
             payload = base64.b64encode(fh.read()).decode()

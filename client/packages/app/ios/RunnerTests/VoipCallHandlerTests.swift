@@ -12,16 +12,16 @@ private final class RecordingProvider: CallReporting {
   var reportError: Error?
 
   func reportNewIncomingCall(
-    with UUID: UUID,
+    with uuid: UUID,
     update: CXCallUpdate,
     completion: @escaping (Error?) -> Void
   ) {
-    reported.append((UUID, update))
+    reported.append((uuid, update))
     completion(reportError)
   }
 
-  func reportCall(with UUID: UUID, endedAt: Date?, reason: CXCallEndedReason) {
-    ended.append((UUID, reason))
+  func reportCall(with uuid: UUID, endedAt _: Date?, reason: CXCallEndedReason) {
+    ended.append((uuid, reason))
   }
 }
 
