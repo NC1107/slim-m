@@ -53,6 +53,10 @@ const Map<String, String> _allowlist = {
   'health': 'a liveness probe. Onboarding deliberately probes /version instead, '
       'because that answers push_enabled, invite_required and capabilities in '
       'the same round trip, and /healthz answers none of them',
+  'getMessageHistory':
+      'the server endpoint and this client binding ship together; the UI that '
+          'surfaces edit history off the existing edited affordance is the '
+          'tracked follow-up, not yet wired (2026-08-19)',
 };
 
 /// Names that are not API surface, so their absence proves nothing.

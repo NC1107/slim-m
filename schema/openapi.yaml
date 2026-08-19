@@ -1921,6 +1921,56 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /channels/{channelId}/messages/{messageId}/history:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getMessageHistory
+      tags: [messages]
+      summary: A message's edit history.
+      description: >
+        Every version the message has held, oldest first, ending with its
+        current content. Gated on VIEW_CHANNEL, the same as reading the
+        message; a message that does not exist, is not in this channel, or is
+        deleted answers 404. A never-edited message returns a single element,
+        its original content.
+      responses:
+        "200":
+          description: The message's versions, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [content, at]
+                  properties:
+                    content:
+                      type: string
+                      description: This version's message content.
+                    at:
+                      type: integer
+                      format: int64
+                      description: >-
+                        Unix milliseconds when this version became the message's
+                        content: the message's created_at for the original, and
+                        the edit time for each later one.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /channels/{channelId}/messages/bulk-delete:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
