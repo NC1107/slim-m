@@ -46,35 +46,33 @@ impl Store {
     /// expecting one entry per input, the same contract
     /// [`Store::reactions_for_messages`] has for a message with no reactions.
     pub async fn user_profiles(&self, ids: &[UserId]) -> anyhow::Result<Vec<User>> {
-        if ids.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        // Built rather than a fixed `query!` because the id list is variable
-        // length and SQLite has no array binding.
-        let mut builder = QueryBuilder::new(
-            "SELECT id, username, display_name, created_at, avatar_updated_at, status_text \
-             FROM users WHERE deleted_at IS NULL AND id IN (",
-        );
-        let mut separated = builder.separated(", ");
-        for id in ids {
-            separated.push_bind(*id);
-        }
-        builder.push(")");
-
-        let rows = builder.build().fetch_all(&self.pool).await?;
-
         use sqlx::Row;
-        let mut users = Vec::with_capacity(rows.len());
-        for row in rows {
-            users.push(User {
-                id: row.try_get("id")?,
-                username: row.try_get("username")?,
-                display_name: row.try_get("display_name")?,
-                created_at: row.try_get("created_at")?,
-                avatar_updated_at: row.try_get("avatar_updated_at")?,
-                status_text: row.try_get("status_text")?,
-            });
+
+        // Chunked under SQLite's bind limit so a large id list cannot fail the query; empty makes no chunks.
+        let mut users = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(super::MAX_IDS_PER_QUERY) {
+            // Built rather than a fixed `query!` because the id list is variable
+            // length and SQLite has no array binding.
+            let mut builder = QueryBuilder::new(
+                "SELECT id, username, display_name, created_at, avatar_updated_at, status_text \
+                 FROM users WHERE deleted_at IS NULL AND id IN (",
+            );
+            let mut separated = builder.separated(", ");
+            for id in chunk {
+                separated.push_bind(*id);
+            }
+            builder.push(")");
+
+            for row in builder.build().fetch_all(&self.pool).await? {
+                users.push(User {
+                    id: row.try_get("id")?,
+                    username: row.try_get("username")?,
+                    display_name: row.try_get("display_name")?,
+                    created_at: row.try_get("created_at")?,
+                    avatar_updated_at: row.try_get("avatar_updated_at")?,
+                    status_text: row.try_get("status_text")?,
+                });
+            }
         }
         Ok(users)
     }

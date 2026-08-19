@@ -24,6 +24,8 @@
 //! deployment; a separate explicit check has no such bypass to accidentally
 //! inherit.
 
+use std::collections::HashMap;
+
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 
@@ -230,16 +232,28 @@ impl Store {
         .fetch_all(&self.pool)
         .await?;
 
+        // One profile fetch and one unread count for the whole list, not a pair per conversation; see SRV3.
+        let other_ids: Vec<UserId> = rows.iter().map(|row| row.other_id).collect();
+        let channel_ids: Vec<ChannelId> = rows.iter().map(|row| row.channel_id).collect();
+        let profiles: HashMap<UserId, User> = self
+            .user_profiles(&other_ids)
+            .await?
+            .into_iter()
+            .map(|user| (user.id, user))
+            .collect();
+        let unread = self.unread_counts(user_id, &channel_ids).await?;
+
         let mut conversations = Vec::with_capacity(rows.len());
         for row in rows {
-            let Some(other) = self.user_profile(row.other_id).await? else {
+            // A missing profile is a since-deleted other account, skipped as the per-row None was.
+            let Some(other) = profiles.get(&row.other_id).cloned() else {
                 continue;
             };
-            let unread = self.unread_count(user_id, row.channel_id).await?;
             conversations.push(DmConversation {
                 channel_id: row.channel_id,
                 other,
-                unread,
+                // Absent from the map means nothing unread; see unread_counts.
+                unread: unread.get(&row.channel_id).copied().unwrap_or(0),
                 created_at: row.created_at,
             });
         }
