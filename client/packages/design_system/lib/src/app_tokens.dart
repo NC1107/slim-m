@@ -176,7 +176,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     accent: Color(0xFF1B6F91),
     accentFill: Color(0xFF1B6F91),
     accentOn: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFD8E7F0),
+    accentSoft: Color(0xFFDAE9F2),
     accentRing: Color(0x381B6F91),
     focusRing: Color(0xFF1B6F91),
     status: AppStatusColors.light,
