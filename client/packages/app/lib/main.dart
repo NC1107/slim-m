@@ -88,6 +88,9 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   await container
       .read(voiceControllerProvider.notifier)
       .restoreVoiceActivitySensitivity();
+  await container
+      .read(voiceControllerProvider.notifier)
+      .restorePushToTalkPreference();
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
   await DesktopWindowShell.registerListenersAndTray(container);

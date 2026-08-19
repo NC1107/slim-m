@@ -35,7 +35,9 @@ Rows left as they are rather than deleted, since the segment and sizing reasonin
 
 Shipped, in whole or in the part that matters: pinned messages (the saved-items half is not built); in-chat polls; rich markdown and code blocks, hand-rolled rather than packaged, client 0.19.0; the command palette, on Ctrl/Cmd+K with the shortcut table bound into the shell; temporary member timeout with auto-expiry, which lapses by arithmetic at read time so nothing has to run on schedule; colour-blind-safe redundant cues (five presence states, five silhouettes, with a desaturation test proving it) and the density setting in `AppDensity`; the backup and restore half of the operator item, as `scripts/backup.py` and `scripts/restore-drill.py`; and the screen-share quality toggle, though not its audio capture.
 
-Partly shipped: message editing is built, edit *history* is not; per-user volume is built and works on three of six platforms for reasons `audio_gain.dart` records, while push-to-talk and voice-activity sensitivity are not.
+Partly shipped: message editing is built, edit *history* is not; per-user volume is built and works on three of six platforms for reasons `audio_gain.dart` records.
+Push-to-talk and voice-activity sensitivity are built too, in Voice settings: push-to-talk is desktop only (`push_to_talk_listener.dart`), holds the mic closed until its key is held, and now joins a call closed rather than open-until-the-first-press.
+Voice-activity sensitivity only moves the speaking-indicator threshold, never the SFU's own transmit decision; `passesActivationThreshold` records why it can narrow that decision but not invent one.
 
 Not started, checked rather than assumed: low-bandwidth and data-saver mode, advanced search operators (`GET /search` takes a `before` cursor, which is paging rather than a `before:` operator), webhooks, and tap-to-add in any of its three shapes.
 

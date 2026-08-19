@@ -99,4 +99,61 @@ void main() {
           'and a held key after it must not overwrite that',
     );
   });
+
+  test(
+    'push-to-talk joins with the mic closed, so it never opens itself',
+    () async {
+      final session = FakeSession();
+      final controller = harness.controllerWith(session, voiceApi());
+      controller.setPushToTalkPreference(true);
+
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await pumpEventQueue();
+
+      expect(
+        session.askedForMicrophoneOnJoin,
+        isFalse,
+        reason: 'push-to-talk must not publish an open mic on join',
+      );
+      expect(
+        controller.state.microphoneEnabled,
+        isFalse,
+        reason: 'and the button must show the closed mic',
+      );
+    },
+  );
+
+  test('enabling push-to-talk during a call closes the open mic', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+    await controller.join('channel-1');
+    session.emitState(VoiceSessionState.connected);
+    await pumpEventQueue();
+    expect(controller.state.microphoneEnabled, isTrue);
+
+    controller.setPushToTalkPreference(true);
+    await pumpEventQueue();
+
+    expect(controller.state.microphoneEnabled, isFalse);
+  });
+
+  test('disabling push-to-talk during a call reopens the mic', () async {
+    final session = FakeSession();
+    final controller = harness.controllerWith(session, voiceApi());
+    controller.setPushToTalkPreference(true);
+    await controller.join('channel-1');
+    session.emitState(VoiceSessionState.connected);
+    await pumpEventQueue();
+    expect(controller.state.microphoneEnabled, isFalse);
+
+    controller.setPushToTalkPreference(false);
+    await pumpEventQueue();
+
+    expect(
+      controller.state.microphoneEnabled,
+      isTrue,
+      reason: 'leaving push-to-talk returns to an open mic, Discord-style',
+    );
+  });
 }
