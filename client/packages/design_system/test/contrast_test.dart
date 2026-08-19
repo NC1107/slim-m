@@ -135,9 +135,7 @@ void main() {
       // What matters is the text on the fill, not the fill against the page
       // behind it. See "Accent fill" in the library doc above.
       _expectAA(t.accentOn, t.accentFill, '$name accentOn over accentFill');
-      // The mention pill and the search-operator chip put accent as body text
-      // over accentSoft; hold that pair to AA too. It was the one accent pair
-      // no test covered, and light sat at 4.45:1 until accentSoft was lifted.
+      // Accent as text over accentSoft (mention pill, operator chip): the one accent pair no test covered, at 4.45:1 in light until accentSoft was lifted.
       _expectAA(t.accent, t.accentSoft, '$name accent text over accentSoft');
     });
 
