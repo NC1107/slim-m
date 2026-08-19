@@ -33,11 +33,11 @@ let callKitRingtoneFileName = "callkit_ringtone.wav"
 /// still needs a real device to confirm end to end.
 protocol CallReporting {
   func reportNewIncomingCall(
-    with UUID: UUID,
+    with uuid: UUID,
     update: CXCallUpdate,
     completion: @escaping (Error?) -> Void
   )
-  func reportCall(with UUID: UUID, endedAt: Date?, reason: CXCallEndedReason)
+  func reportCall(with uuid: UUID, endedAt: Date?, reason: CXCallEndedReason)
 }
 
 extension CXProvider: CallReporting {}
@@ -134,7 +134,7 @@ final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   // MARK: PKPushRegistryDelegate
 
   func pushRegistry(
-    _ registry: PKPushRegistry,
+    _: PKPushRegistry,
     didUpdate pushCredentials: PKPushCredentials,
     for type: PKPushType
   ) {
@@ -144,7 +144,7 @@ final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   }
 
   func pushRegistry(
-    _ registry: PKPushRegistry,
+    _: PKPushRegistry,
     didReceiveIncomingPushWith payload: PKPushPayload,
     for type: PKPushType,
     completion: @escaping () -> Void
@@ -158,5 +158,7 @@ final class VoipPushRegistrar: NSObject, PKPushRegistryDelegate, CXProviderDeleg
 
   // MARK: CXProviderDelegate
 
-  func providerDidReset(_ provider: CXProvider) {}
+  func providerDidReset(_: CXProvider) {
+    // Intentionally empty: this app holds no CallKit state to tear down on a provider reset.
+  }
 }

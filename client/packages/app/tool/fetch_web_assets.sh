@@ -21,7 +21,8 @@ DRIFT_VERSION=2.31.0
 DRIFT_SHA=f0a9b87085f732fd7b6ee7eb34d3858c556f05d221eb1febfc443649cd365752
 
 pinned() {
-  awk -v pkg="  $1:" '$0 == pkg {found=1} found && /version:/ {gsub(/[" ]/, "", $2); print $2; exit}' "$LOCK"
+  local name=$1
+  awk -v pkg="  $name:" '$0 == pkg {found=1} found && /version:/ {gsub(/[" ]/, "", $2); print $2; exit}' "$LOCK"
 }
 
 # A digest pinned here against a different lockfile version is worse than no

@@ -30,7 +30,7 @@ fi
 published="$(printf '%s\n' "$raw" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)"
 newest="$(printf '%s\n%s\n' "$version" "$published" | sort -V | tail -n1)"
 
-if [ "$newest" = "$version" ]; then
+if [[ "$newest" = "$version" ]]; then
   echo true
 else
   echo "::warning::${version} is older than the newest published tag (${newest}); leaving :latest where it is" >&2

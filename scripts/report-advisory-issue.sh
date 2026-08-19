@@ -34,8 +34,8 @@ esac
 existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$LABEL" \
   --state open --limit 1 --json number --jq '.[0].number // empty')"
 
-if [ "$STATUS" = "found" ]; then
-  if [ -n "$existing" ]; then
+if [[ "$STATUS" = "found" ]]; then
+  if [[ -n "$existing" ]]; then
     echo "advisory issue #$existing is already open; leaving it alone"
     exit 0
   fi
@@ -67,7 +67,7 @@ EOF
   exit 0
 fi
 
-if [ -n "$existing" ]; then
+if [[ -n "$existing" ]]; then
   gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
     --comment "No advisories reported on the latest scheduled scan; closing." >/dev/null
   echo "closed advisory issue #$existing"

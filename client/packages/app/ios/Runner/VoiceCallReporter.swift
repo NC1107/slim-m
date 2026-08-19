@@ -7,9 +7,9 @@ import Foundation
 /// to start, as distinct from [CallReporting] in `VoipCallHandler.swift`,
 /// which is what an inbound VoIP push uses.
 protocol OutgoingCallReporting {
-  func reportOutgoingCall(with UUID: UUID, startedConnectingAt date: Date?)
-  func reportOutgoingCall(with UUID: UUID, connectedAt date: Date?)
-  func reportCall(with UUID: UUID, endedAt date: Date?, reason: CXCallEndedReason)
+  func reportOutgoingCall(with uuid: UUID, startedConnectingAt date: Date?)
+  func reportOutgoingCall(with uuid: UUID, connectedAt date: Date?)
+  func reportCall(with uuid: UUID, endedAt date: Date?, reason: CXCallEndedReason)
 }
 
 extension CXProvider: OutgoingCallReporting {}
@@ -207,13 +207,15 @@ final class VoiceCallChannel: NSObject, CXProviderDelegate {
 
   // MARK: CXProviderDelegate
 
-  func providerDidReset(_ provider: CXProvider) {}
+  func providerDidReset(_: CXProvider) {
+    // Intentionally empty: this app holds no CallKit state to tear down on a provider reset.
+  }
 
-  func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+  func provider(_: CXProvider, perform action: CXStartCallAction) {
     lifecycle.handleStartAction(action)
   }
 
-  func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+  func provider(_: CXProvider, perform action: CXEndCallAction) {
     lifecycle.handleEndAction(action)
   }
 }

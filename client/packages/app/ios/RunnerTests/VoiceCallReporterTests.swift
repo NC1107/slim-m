@@ -28,16 +28,16 @@ private final class RecordingProvider: OutgoingCallReporting {
   var connected: [(uuid: UUID, date: Date?)] = []
   var ended: [(uuid: UUID, reason: CXCallEndedReason)] = []
 
-  func reportOutgoingCall(with UUID: UUID, startedConnectingAt date: Date?) {
-    startedConnecting.append((UUID, date))
+  func reportOutgoingCall(with uuid: UUID, startedConnectingAt date: Date?) {
+    startedConnecting.append((uuid, date))
   }
 
-  func reportOutgoingCall(with UUID: UUID, connectedAt date: Date?) {
-    connected.append((UUID, date))
+  func reportOutgoingCall(with uuid: UUID, connectedAt date: Date?) {
+    connected.append((uuid, date))
   }
 
-  func reportCall(with UUID: UUID, endedAt date: Date?, reason: CXCallEndedReason) {
-    ended.append((UUID, reason))
+  func reportCall(with uuid: UUID, endedAt _: Date?, reason: CXCallEndedReason) {
+    ended.append((uuid, reason))
   }
 }
 

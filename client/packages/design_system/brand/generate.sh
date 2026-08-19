@@ -18,14 +18,14 @@ render() {
   local density got
   density="$(awk -v p="${px}" -v u="${units}" 'BEGIN{printf "%.6f", 96*p/u}')"
   mkdir -p "$(dirname "${out}")"
-  if [ "${mode}" = "opaque" ]; then
+  if [[ "${mode}" = "opaque" ]]; then
     magick -density "${density}" "${here}/${src}" -strip \
       -background "#17191C" -alpha remove -alpha off PNG24:"${out}"
   else
     magick -background none -density "${density}" "${here}/${src}" -strip png32:"${out}"
   fi
   got="$(magick identify -format '%wx%h' "${out}")"
-  [ "${got}" = "${px}x${px}" ] || { echo "${out}: rendered ${got}, wanted ${px}x${px}" >&2; exit 1; }
+  [[ "${got}" = "${px}x${px}" ]] || { echo "${out}: rendered ${got}, wanted ${px}x${px}" >&2; exit 1; }
 }
 
 echo "ios"

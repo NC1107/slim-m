@@ -76,6 +76,7 @@ import e2e_labels as L
 STROKE_START = (60, 280)
 STROKE_MID = (130, 280)
 STROKE_END = (200, 280)
+_ONE_STROKE = "1 stroke"
 
 
 def origin(client):
@@ -160,8 +161,8 @@ def draw_stroke_and_see_it_live(a, b):
     a.drag([at(org, STROKE_START), at(org, STROKE_MID),
             at(org, STROKE_END)])
     a.gestures(False)
-    wait_for_summary(a, "1 stroke")
-    wait_for_summary(b, "1 stroke")
+    wait_for_summary(a, _ONE_STROKE)
+    wait_for_summary(b, _ONE_STROKE)
     print("  a's stroke arrived on b's screen live")
 
 
@@ -268,7 +269,7 @@ def erase_undo_clear_and_restore(a, b, admin_api, channel_id):
 
     a.click(L.UNDO)
     for c in (a, b):
-        wait_for_summary(c, "1 stroke")
+        wait_for_summary(c, _ONE_STROKE)
     print("  undo restored it on both clients")
 
     a.click(L.MORE_CANVAS_ACTIONS)
