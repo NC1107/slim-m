@@ -59,6 +59,7 @@ class MessageRow extends StatelessWidget {
     required this.editing,
     required this.onSubmitEdit,
     required this.onCancelEdit,
+    this.onViewEditHistory,
     this.customEmoji = const {},
     this.isWebhook = false,
     this.reactions = const [],
@@ -176,6 +177,10 @@ class MessageRow extends StatelessWidget {
   /// a reply.
   final VoidCallback? onReplyTap;
 
+  /// Opens this message's edit history. Null leaves the "(edited)" marker
+  /// inert - a view-only surface, or a message with nothing to show.
+  final VoidCallback? onViewEditHistory;
+
   bool get _unsent => message.pending || message.failed;
 
   /// Exposed so a test can find the hover/menu-open background fill without
@@ -289,7 +294,7 @@ class MessageRow extends StatelessWidget {
                                         announceSending: message.pending,
                                       ),
                                     if (message.editedAt != null && !editing)
-                                      const EditedMarker(),
+                                      EditedMarker(onTap: onViewEditHistory),
                                     if (poll != null)
                                       Padding(
                                         padding: const EdgeInsets.only(

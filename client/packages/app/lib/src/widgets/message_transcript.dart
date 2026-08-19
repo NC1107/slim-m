@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/channel_history.dart';
 import '../providers/sync_controller.dart';
+import 'edit_history_sheet.dart';
 import 'message_context_menu.dart';
 import 'message_jump.dart';
 import 'message_row.dart';
@@ -401,6 +402,11 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                   onSubmitEdit: (content) =>
                       widget.onSubmitEdit(message, content),
                   onCancelEdit: widget.onCancelEdit,
+                  onViewEditHistory: () => showMessageEditHistorySheet(
+                    context,
+                    widget.channelId,
+                    message.id,
+                  ),
                   actions: widget.actionsFor(
                     message,
                     extras.threadChannelId != null,
