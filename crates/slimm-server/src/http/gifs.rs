@@ -48,9 +48,11 @@ use super::AppState;
 use super::attachments::room_for;
 use super::error::ApiError;
 use super::extract::{ASSET, AuthedLimited, GIF, Json, Query};
+use super::message_dto::AttachmentDto;
 use crate::config::Config;
 use crate::media;
 use crate::permissions::Permissions;
+use crate::store::AttachmentSummary;
 
 use cache::Cache;
 use provider::Provider;
@@ -291,17 +293,6 @@ struct SelectRequest {
     id: String,
 }
 
-/// The same wire shape `uploadAttachment` answers with, deliberately: a
-/// selected GIF becomes an ordinary attachment the moment it is stored, so a
-/// client reuses `Attachment.fromJson` rather than a second model.
-#[derive(Serialize)]
-struct AttachmentDto {
-    id: String,
-    filename: String,
-    content_type: String,
-    size: i64,
-}
-
 const DEFAULT_LIMIT: u32 = 20;
 
 // --- Handlers ---
@@ -419,12 +410,12 @@ async fn select(
 
     Ok((
         StatusCode::CREATED,
-        Json(AttachmentDto {
+        Json(AttachmentDto::from(AttachmentSummary {
             id: hex_id,
             filename,
             content_type: content_type.to_owned(),
             size,
-        }),
+        })),
     ))
 }
 

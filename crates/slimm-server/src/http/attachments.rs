@@ -22,7 +22,7 @@ use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio_util::io::ReaderStream;
@@ -30,8 +30,10 @@ use tokio_util::io::ReaderStream;
 use super::AppState;
 use super::error::ApiError;
 use super::extract::{ASSET, AuthedLimited, Bytes, Json, Query, UPLOAD};
+use super::message_dto::AttachmentDto;
 use crate::media;
 use crate::permissions::Permissions;
+use crate::store::AttachmentSummary;
 
 /// A fetched attachment's bytes never change (they are keyed by their own
 /// content hash), so a client may cache one forever.
@@ -50,14 +52,6 @@ pub fn routes(max_attachment_bytes: u64) -> Router<AppState> {
 }
 
 // --- Wire types ---
-
-#[derive(Serialize)]
-struct AttachmentUploadDto {
-    id: String,
-    filename: String,
-    content_type: String,
-    size: i64,
-}
 
 #[derive(Deserialize)]
 struct UploadParams {
@@ -90,7 +84,7 @@ async fn upload(
     Query(params): Query<UploadParams>,
     State(state): State<AppState>,
     Bytes(body): Bytes,
-) -> Result<(StatusCode, Json<AttachmentUploadDto>), ApiError> {
+) -> Result<(StatusCode, Json<AttachmentDto>), ApiError> {
     // Deployment-wide because an upload names no channel; see the note above.
     if !state
         .store
@@ -135,12 +129,12 @@ async fn upload(
 
     Ok((
         StatusCode::CREATED,
-        Json(AttachmentUploadDto {
+        Json(AttachmentDto::from(AttachmentSummary {
             id: hex_id,
             filename,
             content_type: content_type.to_owned(),
             size,
-        }),
+        })),
     ))
 }
 
