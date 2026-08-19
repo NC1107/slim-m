@@ -306,24 +306,42 @@ pub(super) async fn authorize(
             message_id: message_id.to_string(),
             op_seq,
         },
-        // A separate store read past the view check; see `Authorization::Unknown`.
+        // A separate, fresh-per-event store read past the view check; see `Authorization::Unknown`.
         Event::ReactionsChanged {
             channel_id,
             message_id,
+            reactors,
         } => {
-            let summaries = match store.reactions_for_message(message_id, ctx.user_id).await {
-                Ok(summaries) => summaries,
+            let reactor_ids: Vec<_> = reactors
+                .iter()
+                .flat_map(|(_, entries)| entries.iter().map(|(id, _)| *id))
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+            let blocked = match store.blocked_among(ctx.user_id, &reactor_ids).await {
+                Ok(blocked) => blocked,
                 Err(_) => return Authorization::Unknown,
             };
+            // This viewer's own `first_at` per emoji, reduced only from unblocked reactors - same as the old `reactions_for_messages` query did.
+            let mut visible: Vec<(String, i64, i64)> = reactors
+                .into_iter()
+                .filter_map(|(emoji, entries)| {
+                    let unblocked_at: Vec<i64> = entries
+                        .into_iter()
+                        .filter(|(id, _)| !blocked.contains(id))
+                        .map(|(_, created_at)| created_at)
+                        .collect();
+                    let first_at = unblocked_at.iter().copied().min()?;
+                    Some((emoji, unblocked_at.len() as i64, first_at))
+                })
+                .collect();
+            visible.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.0.cmp(&b.0)));
             ServerFrame::ReactionsChanged {
                 channel_id: channel_id.to_string(),
                 message_id: message_id.to_string(),
-                reactions: summaries
+                reactions: visible
                     .into_iter()
-                    .map(|summary| ReactionCountDto {
-                        emoji: summary.emoji,
-                        count: summary.count,
-                    })
+                    .map(|(emoji, count, _)| ReactionCountDto { emoji, count })
                     .collect(),
             }
         }

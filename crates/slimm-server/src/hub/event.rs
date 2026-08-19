@@ -46,15 +46,44 @@ pub enum Event {
         /// delete found nothing to do.
         op_seq: Option<i64>,
     },
-    /// A message's reactions changed. Carries the ids only: the tally itself is
-    /// per viewer, since a reactor the receiver has blocked is not counted for
-    /// them, so it is derived per receiving connection at send time the way
-    /// [`Event::PresenceChanged`]'s status is. A precomputed tally here would be
-    /// one global answer fanned out to everybody, which is exactly what made a
-    /// live reaction undo a block.
+    /// A message's reactions changed. The tally itself stays per viewer, since
+    /// a reactor the receiver has blocked is not counted for them, so it is
+    /// still derived per receiving connection at send time the way
+    /// [`Event::PresenceChanged`]'s status is - `reactors` below only saves
+    /// that derivation a repeat store read.
+    ///
+    /// `reactors` carries every reactor of the message, grouped by emoji, each
+    /// paired with its own reaction time rather than a pre-reduced `first_at` -
+    /// the raw fact this event exists to broadcast, read once via
+    /// [`crate::store::Store::reaction_reactors`] rather than once per
+    /// receiving connection. It exists on this internal enum only:
+    /// [`crate::http::ws::frames::ServerFrame::ReactionsChanged`] carries
+    /// emoji and count alone, never a reactor id or a timestamp, and each
+    /// receiving connection is responsible for turning this shared,
+    /// unfiltered answer into its own view with a fresh
+    /// [`crate::store::Store::blocked_among`] read before it is allowed
+    /// anywhere near the wire - excluding a blocked reactor there, and
+    /// re-deriving that viewer's own `first_at` from what is left, since the
+    /// per-viewer emoji ordering a blocked reactor's early timestamp must not
+    /// be able to shift. A precomputed tally broadcast unfiltered is exactly
+    /// what made a live reaction undo a block; carrying the raw reactors
+    /// instead of a tally keeps that filtering step mandatory rather than
+    /// optional.
+    ///
+    /// The reactor snapshot is taken once, at publish time in
+    /// `http/reactions.rs`, not at delivery time per connection. Reactions
+    /// are eventually consistent by design (decision 0009: a live frame
+    /// overwrites the one row it names, and a reconnect clears and refetches
+    /// rather than reconciling), and this event carries no sequence number,
+    /// so two reactions on the same message published close together can
+    /// reach a connection out of order and leave a briefly wrong count on
+    /// screen; the next reaction on that message, or a reconnect, corrects
+    /// it. A strict fix would need a per-message reaction sequence number,
+    /// deliberately out of scope here.
     ReactionsChanged {
         channel_id: ChannelId,
         message_id: MessageId,
+        reactors: Vec<(String, Vec<(UserId, i64)>)>,
     },
     /// A thread's reply summary changed: it was just opened, or gained a
     /// reply. Carries the current `reply_count`/`last_reply_at` rather than a

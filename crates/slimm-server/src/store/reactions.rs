@@ -217,4 +217,46 @@ impl Store {
         }
         Ok(grouped)
     }
+
+    /// Every reactor of one message, with no viewer and no blocklist filter
+    /// applied: grouped by emoji, each reactor paired with its own
+    /// `created_at` rather than a pre-reduced `first_at`, because the old
+    /// per-viewer `first_at` this replaces was always computed *after*
+    /// excluding a viewer's blocked reactors - a blocked reactor's early
+    /// timestamp must not be able to shift where an emoji sorts for that
+    /// viewer, so the reduction has to happen per viewer, downstream of this
+    /// method, not here. Rows arrive grouped by emoji (not yet ordered by any
+    /// per-viewer `first_at`, since there is no single one); the caller sorts.
+    ///
+    /// Meant to be read once per live [`crate::hub::Event::ReactionsChanged`]
+    /// rather than once per receiving connection - the N-viewers-cost-N-queries
+    /// debt this method exists to close. A receiving connection turns this
+    /// shared answer into its own view with [`Store::blocked_among`], read
+    /// fresh against this same set of reactors rather than cached, so a block
+    /// made a moment ago is never served stale.
+    pub async fn reaction_reactors(
+        &self,
+        message_id: MessageId,
+    ) -> anyhow::Result<Vec<(String, Vec<(UserId, i64)>)>> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            "SELECT emoji, user_id, created_at FROM reactions \
+             WHERE message_id = ? ORDER BY emoji ASC, created_at ASC",
+        )
+        .bind(message_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut grouped: Vec<(String, Vec<(UserId, i64)>)> = Vec::new();
+        for row in rows {
+            let emoji: String = row.try_get("emoji")?;
+            let user_id: UserId = row.try_get("user_id")?;
+            let created_at: i64 = row.try_get("created_at")?;
+            match grouped.iter_mut().find(|(e, _)| *e == emoji) {
+                Some((_, reactors)) => reactors.push((user_id, created_at)),
+                None => grouped.push((emoji, vec![(user_id, created_at)])),
+            }
+        }
+        Ok(grouped)
+    }
 }

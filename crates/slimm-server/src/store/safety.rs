@@ -7,6 +7,10 @@
 //! or media scanning anywhere, by decision, so nothing here inspects message
 //! content.
 
+use std::collections::HashSet;
+
+use sqlx::QueryBuilder;
+
 use super::sessions::revoke_session_rows;
 use super::{Store, now_ms};
 use crate::ids::{DeviceId, SessionId, UserId};
@@ -239,6 +243,41 @@ impl Store {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().map(|r| r.blocker_id).collect())
+    }
+
+    /// Which of `candidates` the `viewer` has blocked. Reads `user_blocks`
+    /// fresh on every call, deliberately uncached, so a block made a moment
+    /// ago is reflected the very next read rather than sitting behind a stale
+    /// answer - the live-reaction-undoing-a-block bug `blocking_live.rs`
+    /// guards against was a precomputed *tally*, not this kind of read, but
+    /// the same staleness would reintroduce it.
+    ///
+    /// Sized for a small, per-event candidate list (a live reaction's distinct
+    /// reactors), not a broad audit; chunked under SQLite's bind cap regardless
+    /// so a large list cannot fail the query outright.
+    pub async fn blocked_among(
+        &self,
+        viewer: UserId,
+        candidates: &[UserId],
+    ) -> anyhow::Result<HashSet<UserId>> {
+        use sqlx::Row;
+        let mut blocked = HashSet::new();
+        // Reserve one bind for viewer under the chunk limit; empty makes no chunks.
+        for chunk in candidates.chunks(super::MAX_IDS_PER_QUERY - 1) {
+            let mut builder =
+                QueryBuilder::new("SELECT blocked_id FROM user_blocks WHERE blocker_id = ");
+            builder.push_bind(viewer);
+            builder.push(" AND blocked_id IN (");
+            let mut separated = builder.separated(", ");
+            for id in chunk {
+                separated.push_bind(*id);
+            }
+            builder.push(")");
+            for row in builder.build().fetch_all(&self.pool).await? {
+                blocked.insert(row.try_get("blocked_id")?);
+            }
+        }
+        Ok(blocked)
     }
 
     pub async fn has_blocked(&self, blocker: UserId, blocked: UserId) -> anyhow::Result<bool> {
