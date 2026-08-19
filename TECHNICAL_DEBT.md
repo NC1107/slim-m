@@ -22,12 +22,14 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-19 of them are now accounted for - 18 fixed, and MOD5 decided-and-not-built - leaving 51 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+23 of them are now accounted for - 22 fixed, and MOD5 decided-and-not-built - leaving 47 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
 CP1 is partly fixed in #668 and stays open, downgraded to Medium.
 MOD3 closed on 2026-08-15 in #670, MOD1 in #675, and MOD2 in #681. MOD5 and MOD11 were decided rather than built, in #677; see decision 0016.
+
+The server performance and correctness items closed on 2026-08-19: SRV4 in #711, SRV3 in #715, SRV2 in #719, and SRV5 in #721.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -66,25 +68,13 @@ Four reported findings did not survive verification and were corrected or reject
   Note when fixing: the result is deliberately viewer-specific, because blocked reactors are excluded per viewer, so a single shared cache across connections would be wrong. This is not a theoretical objection - `hub/event.rs:49` says so in its own doc comment, decision record 0009 fixes it as an invariant, and commit `7cf0618b` fixed exactly this leak once already.
   Fix: compute once per event and filter per viewer, or cache per message keyed on the blocklist inputs. Effort: medium.
 
-- **SRV2. The retention sweep holds the write lock across roughly 1000 sequential round trips** (`store/message_retention.rs:129`). Medium.
-  `prune_messages_before` selects up to 200 candidates, then loops doing a per-message `UPDATE ... RETURNING`, an `insert_message_op` (two round trips), and `release_message_attachments` (a SELECT, a DELETE, and a SELECT per linked attachment), all inside one `begin_write()`.
-  Fix: batch the soft-delete with `WHERE id IN (...) RETURNING`, then one multi-row op insert and a batched attachment release, as `canvas_ops_apply.rs` already does after M7 in the 2026-08-11 review. Effort: medium.
+- ~~**SRV2. The retention sweep holds the write lock across roughly 1000 sequential round trips**~~ (`store/message_retention.rs:129`). Medium. Fixed in #719.
 
-- **SRV3. `list_dm_conversations` costs 1 + 2N round trips** (`store/dms.rs:234`). Medium.
-  It pages the DM list, then loops calling `user_profile` and `unread_count` per conversation, on every `GET /dms` and inside `evict_from_voice`.
-  A batched `Store::user_profiles(ids)` already exists in `store/users.rs` and is unused here; no batched unread count exists yet.
-  Fix: collect ids, call `user_profiles` once, add a batched unread count grouped by channel the way `permissions_batch.rs` batches overwrites. Effort: small.
+- ~~**SRV3. `list_dm_conversations` costs 1 + 2N round trips**~~ (`store/dms.rs:234`). Medium. Fixed in #715.
 
-- **SRV4. Attachment serving buffers whole files and supports no Range requests** (`media/mod.rs:196`). Medium.
-  `read_attachment` reads the file into a `Vec<u8>` and `serve()` builds `Body::from(bytes)`, with no `Range`, `If-Range` or `Accept-Ranges` handling.
-  `video/mp4` and `video/webm` are in the content-type allowlist, so a video player seeking re-downloads the whole file, and one large attachment is fully resident in memory per concurrent request.
-  Fix: stream via `ReaderStream` over an async file handle and add single-range support. Effort: medium.
+- ~~**SRV4. Attachment serving buffers whole files and supports no Range requests**~~ (`media/mod.rs:196`). Medium. Fixed in #711.
 
-- **SRV5. A retried invite redemption either falsely fails or burns a second use** (`store/invites.rs:286`). Medium.
-  `spend_invite`'s conditional UPDATE guards the invite's own `uses`, `max_uses`, expiry and revoked columns, but never whether this caller already redeemed this code.
-  On a `max_uses=1` invite whose response was lost, the retry reports failure for a redemption that succeeded; on a limited invite it spends a second real use for one logical redemption.
-  `tests/invites.rs` never covers it: its use-limit test redeems as two different users.
-  Fix: record redemptions per `(code, user_id)` so a repeat call from an already-redeemed user is a no-op. Effort: small.
+- ~~**SRV5. A retried invite redemption either falsely fails or burns a second use**~~ (`store/invites.rs:286`). Medium. Fixed in #721.
 
 - **SRV6. The stale-call sweep evicts participants one at a time** (`lib.rs:228`). Low.
   `sweep_stale_voice_calls_at` awaits `voice.remove_participant` per stale pair, each a real HTTP POST to LiveKit, so a blip that expires many heartbeats in one tick serialises N round trips.
