@@ -7,6 +7,10 @@
 //! the messages after a client's per-scope cursor in ascending order, which the
 //! bundled sync endpoint calls once per requested scope.
 
+use std::collections::HashMap;
+
+use sqlx::QueryBuilder;
+
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
@@ -82,6 +86,49 @@ impl Store {
         .fetch_one(&self.pool)
         .await?;
         Ok(count)
+    }
+
+    /// [`unread_count`] for many channels in one query, so a caller listing N
+    /// channels does not pay N round trips; see [`Store::list_dm_conversations`].
+    ///
+    /// A channel with nothing unread is absent from the map, not present with
+    /// a zero: the `seq >` filter leaves it with no rows to group, and the
+    /// caller reads a missing entry as zero. `read_states` is left-joined so a
+    /// channel the user has never opened still counts every live message,
+    /// matching [`unread_count`]'s `COALESCE(..., 0)`.
+    pub async fn unread_counts(
+        &self,
+        user_id: UserId,
+        channel_ids: &[ChannelId],
+    ) -> anyhow::Result<HashMap<ChannelId, i64>> {
+        use sqlx::Row;
+
+        // Reserve one bind for user_id under the chunk limit; empty makes no chunks and returns empty.
+        let mut counts = HashMap::new();
+        for chunk in channel_ids.chunks(super::MAX_IDS_PER_QUERY - 1) {
+            // Built, not a fixed query!: a variable-length id list with no SQLite array binding, user_profiles' shape.
+            let mut builder = QueryBuilder::new(
+                "SELECT m.channel_id, COUNT(*) AS count \
+                 FROM messages m \
+                 LEFT JOIN read_states r \
+                   ON r.channel_id = m.channel_id AND r.user_id = ",
+            );
+            builder.push_bind(user_id);
+            builder.push(
+                " WHERE m.deleted_at IS NULL AND m.seq > COALESCE(r.last_read_seq, 0) \
+                 AND m.channel_id IN (",
+            );
+            let mut separated = builder.separated(", ");
+            for id in chunk {
+                separated.push_bind(*id);
+            }
+            builder.push(") GROUP BY m.channel_id");
+
+            for row in builder.build().fetch_all(&self.pool).await? {
+                counts.insert(row.try_get("channel_id")?, row.try_get("count")?);
+            }
+        }
+        Ok(counts)
     }
 
     /// The highest message seq allocated in a channel, or 0 if none. Used to size

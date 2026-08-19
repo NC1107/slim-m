@@ -112,6 +112,15 @@ pub use threads::{
 };
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
 
+/// Largest number of ids to bind into one `IN (...)` list, for the batched
+/// reads that build a variable-length query. Well under SQLite's default
+/// `SQLITE_MAX_VARIABLE_NUMBER` of 32766, with headroom for the odd extra
+/// bind a query carries alongside the list (a `user_id`, say). A caller with
+/// more ids than this chunks and merges rather than handing SQLite a
+/// statement it refuses to prepare; see [`Store::user_profiles`] and
+/// [`Store::unread_counts`].
+pub(crate) const MAX_IDS_PER_QUERY: usize = 20_000;
+
 /// Unix milliseconds, `pub(crate)` so the push trigger path (outside this
 /// module) can compare a lifecycle report's age against the same clock
 /// everything here is stamped with.
