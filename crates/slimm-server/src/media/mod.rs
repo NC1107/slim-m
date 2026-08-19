@@ -197,6 +197,18 @@ impl Media {
         read(self.attachment_path(sha256_hex)).await
     }
 
+    /// Opens a stored attachment for streaming, returning the handle and its
+    /// length, so a large download is served straight from disk rather than
+    /// read into a `Vec` first. The length is read from this same handle, so
+    /// it describes the bytes this handle will serve: writes here are atomic
+    /// renames ([`write_atomic`]), so an open handle keeps the file it opened
+    /// even if a concurrent write replaces the path.
+    pub async fn open_attachment(&self, sha256_hex: &str) -> io::Result<(tokio::fs::File, u64)> {
+        let file = tokio::fs::File::open(self.attachment_path(sha256_hex)).await?;
+        let len = file.metadata().await?.len();
+        Ok((file, len))
+    }
+
     pub async fn delete_attachment(&self, sha256_hex: &str) -> io::Result<()> {
         remove(self.attachment_path(sha256_hex)).await
     }
