@@ -226,3 +226,226 @@ async fn a_live_reaction_from_a_blocked_user_is_absent_for_the_blocker_alone() {
     );
     assert_eq!(hers[0]["count"], 1, "and counts only herself");
 }
+
+/// A second, non-blocked reactor on the same emoji a blocked person also
+/// used: the blocker's frame still shows the emoji, counting only the
+/// reactor they have not blocked, and every reaction object on the wire
+/// carries exactly `emoji` and `count` - never a reactor id, not even for the
+/// one reactor left standing after the exclusion.
+///
+/// This is the SRV1 path: the server now computes `reaction_reactors` once
+/// per event and filters per connection with `blocked_among`, rather than
+/// re-running the old per-viewer `reactions_for_message` query for every
+/// connection. The wire shape this test checks is exactly what guarded the
+/// old path too, so a regression in either the computation or the filtering
+/// step fails here the same way.
+#[tokio::test]
+async fn a_live_reactions_frame_never_carries_a_reactor_id_and_mixes_blocked_with_unblocked() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::ADD_REACTIONS),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+
+    let (_alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
+    let (pest_access, _pest_ticket, pest) = user_ticket(&store, "pest").await;
+    let (carol_access, _carol_ticket, _carol) = user_ticket(&store, "carol").await;
+
+    let message = store
+        .send_message(
+            channel.id,
+            alice,
+            slimm_server::ids::MessageId::generate(),
+            "hello",
+            &[],
+            None,
+        )
+        .await
+        .unwrap()
+        .message
+        .id;
+    store.block_user(alice, pest).await.unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+
+    let uri = format!("/messages/{message}/reactions/wave");
+    let response = http::router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&uri)
+                .header("authorization", format!("Bearer {pest_access}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let for_alice = next_frame_of(&mut alice_ws, "reactions.changed").await;
+    assert_eq!(
+        for_alice["reactions"].as_array().unwrap().len(),
+        0,
+        "the only reactor on this emoji is blocked, so the emoji is absent, not zero: {for_alice}"
+    );
+
+    let response = http::router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(&uri)
+                .header("authorization", format!("Bearer {carol_access}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let for_alice = next_frame_of(&mut alice_ws, "reactions.changed").await;
+    let reactions = for_alice["reactions"].as_array().unwrap();
+    assert_eq!(
+        reactions.len(),
+        1,
+        "carol's unblocked reaction brings the emoji back: {for_alice}"
+    );
+    assert_eq!(reactions[0]["emoji"], "wave");
+    assert_eq!(
+        reactions[0]["count"], 1,
+        "pest still does not count, only carol does: {for_alice}"
+    );
+
+    let mut keys: Vec<&String> = reactions[0].as_object().unwrap().keys().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec!["count", "emoji"],
+        "the wire object must carry only emoji and count, never a reactor id: {for_alice}"
+    );
+}
+
+/// A blocked reactor's early timestamp must not be able to shift where an
+/// emoji sorts for the blocker: `apple` gets a blocked reactor's reaction
+/// first, then `banana` gets an unblocked one, then `apple` gets a second,
+/// unblocked reaction. Unfiltered, `apple` would sort first (it was reacted
+/// to first, by anybody). For the blocker, `apple`'s only *visible* reactor
+/// reacted last, so `banana` must sort first; a non-blocking viewer sees the
+/// unfiltered order, `apple` before `banana`.
+///
+/// This is the ordering half of SRV1: `reaction_reactors` hands `authorize`
+/// every reactor's own timestamp rather than a pre-reduced `first_at`,
+/// specifically so this per-viewer reduction can happen downstream, the same
+/// place the old `reactions_for_messages` query did it (`first_at` computed
+/// after excluding blocked reactors, not before).
+#[tokio::test]
+async fn a_blocked_reactors_early_timestamp_cannot_reorder_an_emoji_for_the_blocker() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::ADD_REACTIONS),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+
+    let (_alice_access, alice_ticket, alice) = user_ticket(&store, "alice").await;
+    let (_dana_access, dana_ticket, _dana) = user_ticket(&store, "dana").await;
+    let (pest_access, _pest_ticket, pest) = user_ticket(&store, "pest").await;
+    let (yara_access, _yara_ticket, _yara) = user_ticket(&store, "yara").await;
+    let (zane_access, _zane_ticket, _zane) = user_ticket(&store, "zane").await;
+
+    let message = store
+        .send_message(
+            channel.id,
+            alice,
+            slimm_server::ids::MessageId::generate(),
+            "hello",
+            &[],
+            None,
+        )
+        .await
+        .unwrap()
+        .message
+        .id;
+    store.block_user(alice, pest).await.unwrap();
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut dana_ws = connect(addr, &dana_ticket).await;
+
+    let apple_uri = format!("/messages/{message}/reactions/apple");
+    let banana_uri = format!("/messages/{message}/reactions/banana");
+
+    let react = |uri: String, access: String| {
+        let state = state.clone();
+        async move {
+            let response = http::router(state)
+                .oneshot(
+                    Request::builder()
+                        .method("PUT")
+                        .uri(&uri)
+                        .header("authorization", format!("Bearer {access}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        }
+    };
+
+    // pest (blocked by alice) reacts apple first.
+    react(apple_uri.clone(), pest_access).await;
+    next_frame_of(&mut alice_ws, "reactions.changed").await;
+    next_frame_of(&mut dana_ws, "reactions.changed").await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+
+    // yara reacts banana second.
+    react(banana_uri, yara_access).await;
+    next_frame_of(&mut alice_ws, "reactions.changed").await;
+    next_frame_of(&mut dana_ws, "reactions.changed").await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+
+    // zane reacts apple third, the only visible reactor on it for alice.
+    react(apple_uri, zane_access).await;
+    let for_alice = next_frame_of(&mut alice_ws, "reactions.changed").await;
+    let for_dana = next_frame_of(&mut dana_ws, "reactions.changed").await;
+
+    let alice_order: Vec<&str> = for_alice["reactions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["emoji"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        alice_order,
+        vec!["banana", "apple"],
+        "apple's only visible reactor for alice reacted last, so banana sorts first: {for_alice}"
+    );
+
+    let dana_order: Vec<&str> = for_dana["reactions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["emoji"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        dana_order,
+        vec!["apple", "banana"],
+        "dana blocks nobody, so the unfiltered order holds: apple was reacted to first: {for_dana}"
+    );
+}

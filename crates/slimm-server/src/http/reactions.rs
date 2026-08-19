@@ -94,7 +94,7 @@ async fn add(
         Err(ReactError::Internal(e)) => return Err(e.into()),
     }
 
-    publish(&state, channel_id, message_id);
+    publish(&state, channel_id, message_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -112,24 +112,35 @@ async fn remove(
         .store
         .remove_reaction(message_id, ctx.user_id, &emoji)
         .await?;
-    publish(&state, channel_id, message_id);
+    publish(&state, channel_id, message_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Tells live connections the message's reactions changed.
 ///
-/// The frame carries only the ids. The tally is per viewer - a reactor the
-/// receiver has blocked is not counted for them - so it is derived per
-/// receiving connection in `ws.rs`, the same shape `presence.changed` uses for
-/// a status. Computing it once here and fanning it out would be one global
-/// answer for everybody, which is what let a live reaction quietly undo a
-/// block: the client replaces its cached tally with whatever a frame says.
+/// Reads the raw reactors once here, rather than once per receiving
+/// connection: `reactors` rides the internal [`Event`] but never the wire, and
+/// each connection still derives its own per-viewer tally from it at send
+/// time in `ws.rs` (the same shape `presence.changed` uses for a status), by
+/// reading the blocklist fresh against `reactors` rather than trusting a
+/// count computed here. A precomputed *tally* fanned out unfiltered from here
+/// is what previously let a live reaction quietly undo a block: the client
+/// replaces its cached tally with whatever a frame says. Carrying raw
+/// reactors instead of a tally keeps that per-connection filtering step
+/// mandatory.
 ///
 /// `reacted` is likewise absent from the wire and derived per client, so one
 /// connection is never told what another user reacted with beyond the count.
-fn publish(state: &AppState, channel_id: crate::ids::ChannelId, message_id: MessageId) {
+async fn publish(
+    state: &AppState,
+    channel_id: crate::ids::ChannelId,
+    message_id: MessageId,
+) -> Result<(), ApiError> {
+    let reactors = state.store.reaction_reactors(message_id).await?;
     state.hub.publish(Event::ReactionsChanged {
         channel_id,
         message_id,
+        reactors,
     });
+    Ok(())
 }
