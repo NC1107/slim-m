@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.43.0](https://github.com/NC1107/slim-m/compare/server-v0.42.0...server-v0.43.0) (2026-08-19)
+
+
+### Features
+
+* **server:** store and serve a message's edit history ([#716](https://github.com/NC1107/slim-m/issues/716)) ([54ad86c](https://github.com/NC1107/slim-m/commit/54ad86cd92ece1b2592dfc6bcd89e2dfec8b2bc6))
+* **server:** stream attachments and support HTTP Range ([#711](https://github.com/NC1107/slim-m/issues/711)) ([e27e2ea](https://github.com/NC1107/slim-m/commit/e27e2eab7fffa95ff01ba3da9b3a20ead125c5cf))
+
+
+### Performance Improvements
+
+* **server:** batch the DM list's per-conversation queries ([#715](https://github.com/NC1107/slim-m/issues/715)) ([93d3aa5](https://github.com/NC1107/slim-m/commit/93d3aa531cb4825ebab92d4feb977dd49d7a831c))
+
 ## [0.42.0](https://github.com/NC1107/slim-m/compare/server-v0.41.0...server-v0.42.0) (2026-08-19)
 
 
