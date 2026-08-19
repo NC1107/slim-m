@@ -4,7 +4,11 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <!-- A normal permission, granted at install with no runtime prompt; required to register the self-managed PhoneAccount SlimmConnectionService answers for. -->
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
-    <application>
+    <!-- No ADB/cloud backup of the app's data (cached messages, session tokens),
+         and no cleartext traffic: v1 is transport-encrypted (HTTPS/WSS) only. -->
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
         <receiver
             android:name=".CallActionReceiver"
             android:exported="false">

@@ -26,10 +26,6 @@ on:
     - cron: "17 7 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  issues: write
-
 # No concurrency group, on the same reasoning release-tag-watchdog.yml
 # already gives for having none: this runs hourly against workflows that
 # themselves run far less often, so two overlapping checks are
@@ -41,6 +37,10 @@ jobs:
   e2e:
     name: e2e has not been red for several runs in a row
     runs-on: ubuntu-latest
+    # Scoped to the job, not the workflow: least privilege, one job needs it.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
