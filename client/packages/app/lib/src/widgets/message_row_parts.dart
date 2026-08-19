@@ -15,20 +15,40 @@ import '../routing/breakpoints.dart';
 import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
 
 class EditedMarker extends StatelessWidget {
-  const EditedMarker({super.key});
+  const EditedMarker({super.key, this.onTap});
+
+  /// Opens the edit-history sheet when set. Null leaves the marker as inert
+  /// text - the same treatment `ThreadRow` gives a thread a viewer cannot
+  /// open, rather than a button that would only 403.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final label = Text(
+      '(edited)',
+      style: AppText.micro.copyWith(
+        color: tokens.textSecondary,
+        decoration: TextDecoration.underline,
+        decorationStyle: TextDecorationStyle.dotted,
+        decorationColor: tokens.textSecondary,
+      ),
+    );
+    if (onTap == null) {
+      return Padding(padding: const EdgeInsets.only(top: 2), child: label);
+    }
     return Padding(
       padding: const EdgeInsets.only(top: 2),
-      child: Text(
-        '(edited)',
-        style: AppText.micro.copyWith(
-          color: tokens.textSecondary,
-          decoration: TextDecoration.underline,
-          decorationStyle: TextDecorationStyle.dotted,
-          decorationColor: tokens.textSecondary,
+      child: Semantics(
+        button: true,
+        label: 'Edited. View edit history',
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: label,
+          ),
         ),
       ),
     );
