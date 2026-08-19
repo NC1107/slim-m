@@ -129,6 +129,12 @@ class VoiceController extends StateNotifier<VoiceState>
   /// exists.
   int _callGeneration = 0;
 
+  /// Whether push-to-talk is on, kept here so [join] can start the mic closed
+  /// without reaching into another provider on the hot path. Voice Settings
+  /// pushes changes through [setPushToTalkPreference], the same way it feeds
+  /// [setCameraPreference] and [setVoiceActivitySensitivity].
+  bool _pushToTalkEnabled = false;
+
   /// Sets the camera preference before joining; use [toggleCamera] for the
   /// live in-call control. Its microphone sibling died with the join lobby
   /// (d190a711) and was deleted rather than left as an uncalled method.
@@ -146,6 +152,23 @@ class VoiceController extends StateNotifier<VoiceState>
   /// depend on mocked shared preferences it has no reason to set up.
   Future<void> restoreCameraPreference() async {
     setCameraPreference(await loadCameraOnJoinPreference(_ref));
+  }
+
+  /// Records whether push-to-talk is on, and applies the change to a call
+  /// already in progress: enabling closes the mic so it is push-only from
+  /// now, disabling reopens it, since the person is no longer holding a key
+  /// to be heard on. Outside a call it only sets the flag [join] reads.
+  void setPushToTalkPreference(bool enabled) {
+    _pushToTalkEnabled = enabled;
+    if (state.state != VoiceSessionState.connected) return;
+    unawaited(setPushToTalkHeld(enabled ? false : true));
+  }
+
+  /// Seeds [setPushToTalkPreference] at launch, [restoreCameraPreference]'s
+  /// own shape and for the same reason: [join] must know before the first
+  /// call, not only once Voice Settings has been opened this session.
+  Future<void> restorePushToTalkPreference() async {
+    setPushToTalkPreference(await loadPushToTalkEnabled(_ref));
   }
 
   /// A channel switch (or a [leave]) mid-join starts or ends a newer call on
@@ -179,15 +202,22 @@ class VoiceController extends StateNotifier<VoiceState>
         return;
       }
       state = state.copyWith(canPublish: token.canPublish);
+      // Push-to-talk joins closed: it opens only while the key is held; see setPushToTalkPreference.
+      final microphoneAtJoin =
+          state.microphoneEnabled && token.canPublish && !_pushToTalkEnabled;
       await _session.join(
         url: token.url,
         token: token.token,
         // Asking for a microphone or camera a token cannot publish just
         // produces a failure to report; not asking is the honest thing.
-        microphoneEnabled: state.microphoneEnabled && token.canPublish,
+        microphoneEnabled: microphoneAtJoin,
         cameraEnabled: state.cameraEnabled && token.canPublish,
       );
       if (superseded()) return;
+      // Show the push-to-talk-closed mic in the button; scoped to PTT so the canPublish path is untouched.
+      if (_pushToTalkEnabled && state.microphoneEnabled) {
+        state = state.copyWith(microphoneEnabled: false);
+      }
       if (_session.state == VoiceSessionState.failed) {
         state = state.copyWith(
           error: 'Could not connect to the call. ${_session.lastError ?? ''}'

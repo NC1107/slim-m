@@ -51,6 +51,15 @@ Future<double> loadVoiceActivitySensitivity(Ref ref) async {
   return prefs.getDouble(_sensitivityKey) ?? 100.0;
 }
 
+/// The persisted push-to-talk toggle, [loadCameraOnJoinPreference]'s own
+/// shape: [VoiceController.restorePushToTalkPreference] needs it before the
+/// first call so a push-to-talk join starts with the mic closed, not only
+/// once Voice Settings has been opened this session.
+Future<bool> loadPushToTalkEnabled(Ref ref) async {
+  final prefs = await ref.read(preferencesProvider.future);
+  return prefs.getBool(_pushToTalkEnabledKey) ?? false;
+}
+
 /// What the voice settings screen shows and edits. Every field is a pure
 /// local device preference with no server truth, unlike
 /// [presenceVisibilityDisplayProvider]'s session-only echo, so they are
@@ -194,10 +203,16 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     _ref.read(voiceControllerProvider.notifier).setCameraPreference(enabled);
   }
 
+  /// Persists the toggle and applies it live, [setCameraOnJoin]'s reasoning:
+  /// a call may already be open, so enabling must close its mic now rather
+  /// than only affecting the next launch's [VoiceController.restorePushToTalkPreference].
   Future<void> setPushToTalkEnabled(bool enabled) async {
     state = state.copyWith(pushToTalkEnabled: enabled);
     final prefs = await _ref.read(preferencesProvider.future);
     await prefs.setBool(_pushToTalkEnabledKey, enabled);
+    _ref
+        .read(voiceControllerProvider.notifier)
+        .setPushToTalkPreference(enabled);
   }
 
   Future<void> setPushToTalkKey(LogicalKeyboardKey key) async {
