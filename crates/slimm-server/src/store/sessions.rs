@@ -22,7 +22,7 @@
 
 use sqlx::{Sqlite, SqliteConnection, Transaction};
 
-use super::invites::spend_invite;
+use super::invites::{record_redemption, spend_invite};
 use super::{JoinPolicy, Store, now_ms};
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{DeviceId, FamilyId, SessionId, UserId};
@@ -293,6 +293,8 @@ impl Store {
                 let Some(spent) = spend_invite(&mut tx, code, now).await? else {
                     return Err(RegisterError::InviteUnusable);
                 };
+                // Record it so this account cannot redeem the same code again for a second use; see SRV5.
+                record_redemption(&mut tx, code, id, now).await?;
                 if let Some(role_id) = spent {
                     sqlx::query!(
                         "INSERT OR IGNORE INTO member_roles (user_id, role_id) VALUES (?, ?)",

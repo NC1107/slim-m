@@ -192,6 +192,10 @@ impl Store {
         sqlx::query!("DELETE FROM member_roles WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        // Which inviter's code this account joined with is theirs to forget too; the tombstone never fires its CASCADE.
+        sqlx::query!("DELETE FROM invite_redemptions WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query!(
             "DELETE FROM attachment_uploaders WHERE uploaded_by = ?",
             user_id

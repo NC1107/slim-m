@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO invite_redemptions (code, user_id, redeemed_at) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "dca517c9c1aa4546f95e42c5593677f28a4477285799b8c9d892565dc9ba2e2e"
+}

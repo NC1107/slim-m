@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM invite_redemptions WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "3ea6e9af5c2a47010114d1f8ef084c0322b1ff52904ea5bd0d0a0ff2a73e80ca"
+}
