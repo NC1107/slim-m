@@ -335,6 +335,13 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         json!({ "content": "the first message, edited" }),
     )
     .await;
+    // Now that it has been edited, its history has more than one version.
+    c.get(
+        "getMessageHistory",
+        &format!("{messages}/{message}/history"),
+        root,
+    )
+    .await;
     let poll = c
         .json(
             "sendPollMessage",

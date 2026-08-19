@@ -8,7 +8,7 @@
 use serde::Serialize;
 
 use super::polls::PollDto;
-use crate::store::{AttachmentSummary, Message};
+use crate::store::{AttachmentSummary, Message, MessageRevision};
 
 #[derive(Serialize)]
 pub(crate) struct MessageDto {
@@ -137,6 +137,24 @@ impl From<Message> for MessageDto {
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),
+        }
+    }
+}
+
+/// One version a message has held, for the edit-history read. `at` is when
+/// this version became the message's content; the list is oldest first and
+/// its last element is the current content.
+#[derive(Serialize)]
+pub(crate) struct MessageRevisionDto {
+    content: String,
+    at: i64,
+}
+
+impl From<MessageRevision> for MessageRevisionDto {
+    fn from(revision: MessageRevision) -> Self {
+        Self {
+            content: revision.content,
+            at: revision.at,
         }
     }
 }

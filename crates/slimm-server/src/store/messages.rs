@@ -273,6 +273,15 @@ impl Store {
         }
 
         let now = now_ms();
+        // Capture the version being replaced before the row is overwritten; see migration 0050.
+        sqlx::query!(
+            "INSERT INTO message_edits (message_id, content, replaced_at) VALUES (?, ?, ?)",
+            id,
+            existing.content,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
         sqlx::query!(
             "UPDATE messages SET content = ?, edited_at = ? WHERE id = ?",
             content,
@@ -433,7 +442,10 @@ where
     Ok(message)
 }
 
-async fn fetch_message<'e, E>(executor: E, id: MessageId) -> anyhow::Result<Option<Message>>
+pub(super) async fn fetch_message<'e, E>(
+    executor: E,
+    id: MessageId,
+) -> anyhow::Result<Option<Message>>
 where
     E: SqliteExecutor<'e>,
 {

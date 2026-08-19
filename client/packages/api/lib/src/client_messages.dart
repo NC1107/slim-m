@@ -215,6 +215,22 @@ extension SlimmApiMessages on SlimmApi {
         .toList(growable: false);
   }
 
+  /// Every version a message has held, oldest first, ending with its current
+  /// content. Requires only VIEW_CHANNEL, the same as reading the message; a
+  /// deleted, absent, or wrong-channel message answers 404.
+  Future<List<MessageRevision>> getMessageHistory(
+    String channelId,
+    String messageId,
+  ) async {
+    final json = await _send(
+      'GET',
+      '/channels/$channelId/messages/$messageId/history',
+    );
+    return (json as List<dynamic>)
+        .map((r) => MessageRevision.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// How many messages are pinned in a channel. Cheap: a single indexed
   /// count, never a fetch of every pinned message.
   Future<int> pinnedMessageCount(String channelId) async {

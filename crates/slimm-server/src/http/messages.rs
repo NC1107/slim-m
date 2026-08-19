@@ -27,7 +27,7 @@ use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Edited, MAX_ATTACHMENTS_PER_MESSAGE};
 
-pub(crate) use super::message_dto::{AttachmentDto, MessageDto, ReactionDto};
+pub(crate) use super::message_dto::{AttachmentDto, MessageDto, MessageRevisionDto, ReactionDto};
 
 /// Message bodies carry one text field; cap it generously but bounded.
 const MESSAGE_BODY_LIMIT: usize = 64 * 1024;
@@ -44,6 +44,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/channels/{channel_id}/messages/{message_id}",
             patch(edit).delete(delete),
+        )
+        .route(
+            "/channels/{channel_id}/messages/{message_id}/history",
+            get(history),
         )
         .layer(DefaultBodyLimit::max(MESSAGE_BODY_LIMIT))
 }
@@ -351,6 +355,50 @@ async fn edit(
         }
     };
     Ok(Json(updated.into()))
+}
+
+/// Every version a message has held, oldest first, ending with its current
+/// content. Gated on VIEW_CHANNEL like reading the message itself; a message
+/// that does not exist, is not in this channel, or is deleted answers 404,
+/// exactly as [`list`] and [`edit`] do.
+async fn history(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+    Path((channel_id, message_id)): Path<(String, String)>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<MessageRevisionDto>>, ApiError> {
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let message_id = MessageId(parse_uuid(&message_id)?);
+
+    // Not being able to see the channel hides whether the message exists.
+    if !state
+        .store
+        .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
+        .await?
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    // A live message in this channel, not merely a real id in some other one.
+    let in_channel = state
+        .store
+        .message(message_id)
+        .await?
+        .is_some_and(|message| message.channel_id == channel_id);
+    if !in_channel {
+        return Err(ApiError::NotFound("message not found"));
+    }
+
+    let revisions = state
+        .store
+        .message_edit_history(message_id)
+        .await?
+        .ok_or(ApiError::NotFound("message not found"))?;
+    Ok(Json(
+        revisions
+            .into_iter()
+            .map(MessageRevisionDto::from)
+            .collect(),
+    ))
 }
 
 // --- Validation ---
