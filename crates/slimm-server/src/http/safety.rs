@@ -260,7 +260,11 @@ async fn file_report(
     }
 
     match state.store.file_report(ctx.user_id, subject, &reason).await {
-        Ok(id) => Ok(Json(ReportFiled { id: id.to_string() })),
+        Ok(id) => {
+            // No content rides along; see `Event::ReportsChanged`'s own doc.
+            state.hub.publish(Event::ReportsChanged);
+            Ok(Json(ReportFiled { id: id.to_string() }))
+        }
         Err(ReportError::AlreadyOpen) => Err(ApiError::Conflict("you already reported that")),
         Err(ReportError::NotFound) => Err(ApiError::NotFound("that was not found")),
         Err(ReportError::Internal(e)) => Err(e.into()),

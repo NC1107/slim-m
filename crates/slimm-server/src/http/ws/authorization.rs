@@ -89,7 +89,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. }
-        | Event::CategoryChanged => None,
+        | Event::CategoryChanged
+        | Event::ReportsChanged => None,
     }
 }
 
@@ -117,6 +118,18 @@ pub(super) async fn authorize(
             user_id: target_id.to_string(),
             status: status.as_str().to_owned(),
         }));
+    }
+    // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
+    if let Event::ReportsChanged = event {
+        let is_moderator = matches!(
+            store.base_permissions(ctx.user_id).await,
+            Ok(permissions) if permissions.contains(Permissions::MANAGE_MESSAGES)
+        );
+        return if is_moderator {
+            Authorization::Deliver(Box::new(ServerFrame::ReportsChanged))
+        } else {
+            Authorization::Withhold
+        };
     }
     // Deployment-wide like presence, but with nothing per-viewer to resolve.
     match event {
@@ -214,7 +227,8 @@ pub(super) async fn authorize(
             | Event::RoleChanged { .. }
             | Event::MemberRoleChanged { .. }
             | Event::ChannelDeleted { .. }
-            | Event::CategoryChanged => return Authorization::Withhold,
+            | Event::CategoryChanged
+            | Event::ReportsChanged => return Authorization::Withhold,
         },
     };
     // The one event whose subject may have just lost this very view.
@@ -434,6 +448,7 @@ pub(super) async fn authorize(
         | Event::RoleChanged { .. }
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. }
-        | Event::CategoryChanged => return Authorization::Withhold,
+        | Event::CategoryChanged
+        | Event::ReportsChanged => return Authorization::Withhold,
     }))
 }

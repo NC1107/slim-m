@@ -175,6 +175,13 @@ pub(super) enum ServerFrame {
         locked: bool,
         sent_to_back: bool,
     },
+    /// The moderation queue changed: a report was filed or resolved. Carries
+    /// nothing beyond the type tag; see [`crate::hub::Event::ReportsChanged`]
+    /// for why. Delivered only to a connection whose user holds
+    /// `MANAGE_MESSAGES`, per `http::ws::authorization` - this is a security
+    /// boundary, not a visibility nicety.
+    #[serde(rename = "reports.changed")]
+    ReportsChanged,
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

@@ -60,6 +60,14 @@ const Map<String, String> _allowlist = {
       'same as GET /attachments/{}',
   'GET /gifs/preview/{}': 'reads raw bytes through SlimmApi._fetchBytes, the '
       'same as GET /attachments/{}',
+  'GET /reports/history': 'MOD4 (TECHNICAL_DEBT.md): the moderation-history '
+      'screen is a deliberate owner-decision backlog item, so this ships the '
+      'server-only reader with no client caller yet. The same shape MOD3 '
+      'shipped first for moderation_audit_log itself (0048/0015: "nothing '
+      'reads it over HTTP yet, the shape canvas_audit_log also started in") '
+      'and MOD1 shipped for bulkDeleteMessages, which sat in '
+      'app_reachability_test.dart\'s own unreachable allowlist until MOD13 '
+      'built the transcript multi-select that finally called it (2026-08-18)',
 };
 
 const _httpMethods = {

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT channel_id AS \"channel_id!: ChannelId\"\n               FROM reports WHERE channel_id IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "88100447cca7ecd6e01290ab8a5ac7222947bcc6c11aea41003b24326eb11bc7"
+}

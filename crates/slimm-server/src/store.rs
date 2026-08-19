@@ -43,6 +43,7 @@ mod message_search;
 mod messages;
 mod messages_bulk;
 mod moderation_audit;
+mod moderation_history;
 mod notifications;
 mod permissions;
 mod permissions_batch;
@@ -93,6 +94,7 @@ pub use message_retention::{MAX_MESSAGE_RETENTION_DAYS, PrunedMessage, SweptMess
 pub use message_search::{MessageSearchFilters, SearchError};
 pub use messages::{Edited, MessageDeletion, SendError, Sent};
 pub use messages_bulk::{BulkDeleteError, BulkDeletion, DeletedMessage};
+pub use moderation_history::{AuditLogEntry, HistoryCursor, ModerationHistoryItem};
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
     CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,

@@ -19,10 +19,11 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::Report;
+use crate::store::{HistoryCursor, ModerationHistoryItem, Report};
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -37,6 +38,7 @@ const MAX_LIMIT: i64 = 200;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/reports", get(list))
+        .route("/reports/history", get(history))
         .route("/reports/{report_id}", patch(resolve))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
@@ -162,7 +164,8 @@ async fn list(
     };
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
 
-    let hidden = hidden_channels(&state, ctx.user_id).await?;
+    let report_channel_ids = state.store.open_report_channel_ids().await?;
+    let hidden = hidden_channels(&state, ctx.user_id, &report_channel_ids).await?;
     let reports = state.store.list_open_reports(after, &hidden, limit).await?;
 
     let channel_ids: Vec<ChannelId> = reports.iter().filter_map(|r| r.channel_id).collect();
@@ -190,10 +193,160 @@ async fn list(
     Ok(Json(dtos))
 }
 
+/// One page of the history feed. The cursor extends [`ListParams`]'s shape
+/// across two source kinds: `after_kind` says which of [`HistoryCursor`]'s
+/// variants `after`/`after_id` build, since a resolved report's id is a UUID
+/// and an audit row's is an integer rowid, and neither parses as the other.
+/// All three or none, the same all-or-nothing contract `ListParams` uses.
+#[derive(Deserialize)]
+struct HistoryListParams {
+    after: Option<i64>,
+    after_kind: Option<String>,
+    after_id: Option<String>,
+    limit: Option<i64>,
+}
+
+/// One entry in the moderation-history feed: a resolved report, carrying the
+/// same fields [`ReportDto`] does plus its resolution, or a
+/// `moderation_audit_log` row. `kind` is also the value `after_kind` expects
+/// back, so a client can build its next page's cursor straight from the last
+/// item on this one.
+#[derive(Serialize)]
+#[serde(tag = "kind")]
+enum ModerationHistoryItemDto {
+    #[serde(rename = "resolved_report")]
+    ResolvedReport {
+        id: String,
+        reporter_id: Option<String>,
+        subject_kind: String,
+        subject_id: String,
+        channel_id: Option<String>,
+        reason: String,
+        snapshot: Option<String>,
+        subject_author_id: Option<String>,
+        created_at: i64,
+        resolved_at: i64,
+        resolved_by: Option<String>,
+        resolution: Option<String>,
+    },
+    #[serde(rename = "audit_log")]
+    AuditLog {
+        id: String,
+        /// Null once the actor's account has been anonymized.
+        actor_id: Option<String>,
+        subject_id: String,
+        action: String,
+        reason: Option<String>,
+        until: Option<i64>,
+        created_at: i64,
+    },
+}
+
+impl From<ModerationHistoryItem> for ModerationHistoryItemDto {
+    fn from(item: ModerationHistoryItem) -> Self {
+        match item {
+            ModerationHistoryItem::ResolvedReport(report) => Self::ResolvedReport {
+                id: report.id.to_string(),
+                reporter_id: report.reporter_id.map(|id| id.to_string()),
+                subject_kind: report.subject_kind,
+                subject_id: report.subject_id.to_string(),
+                channel_id: report.channel_id.map(|id| id.to_string()),
+                reason: report.reason,
+                snapshot: report.snapshot,
+                subject_author_id: report.subject_author_id.map(|id| id.to_string()),
+                created_at: report.created_at,
+                resolved_at: report
+                    .resolved_at
+                    .expect("the history feed only ever carries resolved reports"),
+                resolved_by: report.resolved_by.map(|id| id.to_string()),
+                resolution: report.resolution,
+            },
+            ModerationHistoryItem::Audit(entry) => Self::AuditLog {
+                id: entry.id.to_string(),
+                actor_id: entry.actor_id.map(|id| id.to_string()),
+                subject_id: entry.subject_id.to_string(),
+                action: entry.action,
+                reason: entry.reason,
+                until: entry.until,
+                created_at: entry.created_at,
+            },
+        }
+    }
+}
+
+/// Parses a history cursor's `after_kind`/`after_id` pair against the
+/// `after` event time. `after_kind` says which id shape `after_id` must be:
+/// a UUID for a resolved report, a plain integer for an audit row's rowid.
+fn parse_history_cursor(event_time: i64, kind: &str, id: &str) -> Result<HistoryCursor, ApiError> {
+    match kind {
+        "resolved_report" => Ok(HistoryCursor::Report {
+            resolved_at: event_time,
+            id: parse_uuid(id)?,
+        }),
+        "audit_log" => {
+            let id: i64 = id.parse().map_err(|_| {
+                ApiError::BadRequest("after_id must be an integer for an audit_log cursor")
+            })?;
+            Ok(HistoryCursor::Audit {
+                created_at: event_time,
+                id,
+            })
+        }
+        _ => Err(ApiError::BadRequest(
+            "after_kind must be resolved_report or audit_log",
+        )),
+    }
+}
+
+/// Lists one page of the moderation-history feed: resolved reports and
+/// `moderation_audit_log` rows, merged and ordered newest first.
+///
+/// Gated on the same `MANAGE_MESSAGES` bar as [`list`], and applies the same
+/// per-channel exclusion to the resolved-report side, since a resolved report
+/// still carries the reported content snapshot. An audit row is
+/// deployment-wide and needs no such exclusion.
+async fn history(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+    Query(params): Query<HistoryListParams>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ModerationHistoryItemDto>>, ApiError> {
+    require_manage_messages(&state, ctx.user_id).await?;
+    let after = match (
+        params.after,
+        params.after_kind.as_deref(),
+        params.after_id.as_deref(),
+    ) {
+        (Some(event_time), Some(kind), Some(id)) => {
+            Some(parse_history_cursor(event_time, kind, id)?)
+        }
+        (None, None, None) => None,
+        _ => {
+            return Err(ApiError::BadRequest(
+                "after, after_kind and after_id go together or not at all",
+            ));
+        }
+    };
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+    let report_channel_ids = state.store.report_channel_ids_including_resolved().await?;
+    let hidden = hidden_channels(&state, ctx.user_id, &report_channel_ids).await?;
+    let items = state
+        .store
+        .moderation_history(after, &hidden, limit)
+        .await?;
+
+    Ok(Json(
+        items
+            .into_iter()
+            .map(ModerationHistoryItemDto::from)
+            .collect(),
+    ))
+}
+
 /// The channels this caller may not read reports from: every live non-DM
 /// channel [`crate::store::Store::list_channels`] returns that they cannot
-/// moderate, plus every thread reported against that resolves to one of
-/// those.
+/// moderate, plus every thread named in `report_channel_ids` that resolves to
+/// one of those.
 ///
 /// The complement rather than the allowed set, because the three kinds of report
 /// that are *not* about a live non-DM channel - one with no channel, one about a
@@ -206,10 +359,24 @@ async fn list(
 /// channel (see [`crate::store::Store::channel_scopes_moderation`]), so a
 /// report about one has to be excluded exactly when that parent is. The batch
 /// above cannot see that resolution, since it never asks about a thread at
-/// all; this loop asks only about the channels open reports actually name and
+/// all; this loop asks only about the channels `report_channel_ids` names and
 /// `list_channels` did not already answer for, reusing [`report_visible_in`]
 /// rather than a second copy of its resolve-then-check logic.
-async fn hidden_channels(state: &AppState, user_id: UserId) -> Result<Vec<ChannelId>, ApiError> {
+///
+/// `report_channel_ids` is the caller's choice of which reports' channels to
+/// walk: [`list`] passes only open ones
+/// ([`crate::store::Store::open_report_channel_ids`]), since that is all it
+/// shows. [`history`] must pass every report's channel, open or resolved
+/// ([`crate::store::Store::report_channel_ids_including_resolved`]) - a
+/// resolved report still carries its content snapshot, and the open-only ids
+/// stop naming a thread the instant its one report closes, which previously
+/// let a resolved report from a thread under a hidden parent leak into the
+/// history feed.
+async fn hidden_channels(
+    state: &AppState,
+    user_id: UserId,
+    report_channel_ids: &[ChannelId],
+) -> Result<Vec<ChannelId>, ApiError> {
     let all_ids: std::collections::HashSet<ChannelId> = state
         .store
         .list_channels()
@@ -230,7 +397,8 @@ async fn hidden_channels(state: &AppState, user_id: UserId) -> Result<Vec<Channe
         .copied()
         .filter(|id| !moderatable.contains(id))
         .collect();
-    for channel_id in state.store.open_report_channel_ids().await? {
+    for channel_id in report_channel_ids {
+        let channel_id = *channel_id;
         if !all_ids.contains(&channel_id) && !report_visible_in(state, user_id, channel_id).await {
             hidden.push(channel_id);
         }
@@ -283,6 +451,8 @@ async fn resolve(
     if !closed {
         return Err(ApiError::NotFound("report not found"));
     }
+    // No content rides along; see `Event::ReportsChanged`'s own doc.
+    state.hub.publish(Event::ReportsChanged);
     Ok(StatusCode::NO_CONTENT)
 }
 
