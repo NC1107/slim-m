@@ -20,6 +20,13 @@
 /// pane must never be offered for a DM, whose two participants are never
 /// this list; `home_shell.dart`'s `_MemberPaneSlot` and
 /// `channel_header.dart`'s `ChannelHeader.isDm` are what withhold it there.
+///
+/// This pane watches presence only through `reachablePresenceKey`, a
+/// selector over the reachable id set rather than the raw map, so a member's
+/// dot changing colour within the same Online/Offline section never
+/// rebuilds the pane; only someone crossing sections does. Each `MemberRow`
+/// separately watches its own id for the dot itself, which is what actually
+/// keeps a single dot change from rebuilding every row.
 library;
 
 import 'package:flutter/material.dart';
@@ -54,7 +61,8 @@ class AppMemberPane extends ConsumerWidget {
     ref.watch(memberRosterKeepAliveProvider);
     // Same shape: a timeout or a removal makes a row on screen wrong.
     ref.watch(memberModerationWatcherProvider);
-    final presence = ref.watch(presenceControllerProvider);
+    // Scoped watch: see the class doc comment above for why.
+    ref.watch(presenceControllerProvider.select(reachablePresenceKey));
     final myId = ref.watch(meProvider).valueOrNull?.id;
 
     return Container(
@@ -103,6 +111,8 @@ class AppMemberPane extends ConsumerWidget {
           ],
         ),
         data: (members) {
+          // A read, not a watch: this build already reruns on the scoped watch above.
+          final presence = ref.read(presenceControllerProvider);
           final statusOf = {
             for (final entry in presence.entries)
               entry.key: presenceOf(entry.value),
@@ -121,20 +131,12 @@ class AppMemberPane extends ConsumerWidget {
                     if (grouped.online.isNotEmpty) ...[
                       MemberGroupLabel('Online · ${grouped.online.length}'),
                       for (final m in grouped.online)
-                        MemberRow(
-                          profile: m,
-                          status: statusOf[m.id] ?? AppPresence.offline,
-                          isSelf: m.id == myId,
-                        ),
+                        MemberRow(profile: m, isSelf: m.id == myId),
                     ],
                     if (grouped.offline.isNotEmpty) ...[
                       MemberGroupLabel('Offline · ${grouped.offline.length}'),
                       for (final m in grouped.offline)
-                        MemberRow(
-                          profile: m,
-                          status: statusOf[m.id] ?? AppPresence.offline,
-                          isSelf: m.id == myId,
-                        ),
+                        MemberRow(profile: m, isSelf: m.id == myId),
                     ],
                   ],
                 ),

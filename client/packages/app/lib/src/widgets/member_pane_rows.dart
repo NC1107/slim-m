@@ -15,8 +15,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/member_presence.dart';
+import '../providers/presence_controller.dart';
 import 'member_profile.dart';
 import 'user_avatar.dart';
+
+/// Test-only: how many times each member's row has actually run `build`,
+/// keyed by user id. A rendered frame looks the same whether or not a
+/// rebuild happened, so a rebuild-scoping test needs this to tell the two
+/// apart. Reset with [debugResetMemberRowBuildCounts] between cases.
+@visibleForTesting
+final Map<String, int> debugMemberRowBuildCounts = {};
+
+/// See [debugMemberRowBuildCounts].
+@visibleForTesting
+void debugResetMemberRowBuildCounts() => debugMemberRowBuildCounts.clear();
 
 class MemberGroupLabel extends StatelessWidget {
   const MemberGroupLabel(this.text, {super.key});
@@ -65,16 +78,15 @@ String? _presenceDescription(AppPresence status) => switch (status) {
 /// A right-click reaches the same profile popover a tap already does, rather
 /// than a second, narrower menu: every verb this row could offer already
 /// lives there, gated exactly as it already is.
+///
+/// Presence is looked up here rather than passed in, and scoped to this
+/// member's own id: `AppMemberPane` no longer watches the raw presence map,
+/// so a `PresenceChanged` for someone else never reaches this row's build
+/// at all, only the row for whoever actually changed.
 class MemberRow extends ConsumerWidget {
-  const MemberRow({
-    required this.profile,
-    required this.status,
-    required this.isSelf,
-    super.key,
-  });
+  const MemberRow({required this.profile, required this.isSelf, super.key});
 
   final api.UserProfile profile;
-  final AppPresence status;
 
   /// Nothing opens a DM with yourself: `POST /dms/{userId}` has no concept
   /// of one, and a self-conversation would just be a second copy of the
@@ -83,7 +95,12 @@ class MemberRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugMemberRowBuildCounts[profile.id] =
+        (debugMemberRowBuildCounts[profile.id] ?? 0) + 1;
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final status = presenceOf(
+      ref.watch(presenceControllerProvider.select((m) => m[profile.id])),
+    );
     // Only the first: a row that grew with role count would push the name out of a 236px pane.
     final badge = profile.roles.isEmpty ? null : profile.roles.first;
 

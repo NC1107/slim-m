@@ -142,12 +142,18 @@ AppPresence presenceOf(api.PresenceState? state) => switch (state) {
   api.PresenceState.offline || null => AppPresence.offline,
 };
 
+/// Away and do-not-disturb both count as "online" for grouping purposes:
+/// both are a live, connected session, just with a status layered on top,
+/// and grouping either under "Offline" would read as a lie the row's own
+/// presence dot then has to contradict.
+bool isReachablePresence(AppPresence status) =>
+    status == AppPresence.online ||
+    status == AppPresence.away ||
+    status == AppPresence.dnd;
+
 /// Splits and sorts [members] by presence. A member absent from [statusOf]
 /// counts as offline, which is the only honest default when presence is
-/// unknown rather than assumed online. Away and do-not-disturb both count as
-/// "online" for grouping purposes: both are a live, connected session, just
-/// with a status layered on top, and grouping either under "Offline" would
-/// read as a lie the row's own presence dot then has to contradict.
+/// unknown rather than assumed online.
 ({List<api.UserProfile> online, List<api.UserProfile> offline})
 groupMembersByPresence(
   List<api.UserProfile> members,
@@ -157,10 +163,7 @@ groupMembersByPresence(
   final offline = <api.UserProfile>[];
   for (final member in members) {
     final status = statusOf[member.id];
-    final isOnlineGroup =
-        status == AppPresence.online ||
-        status == AppPresence.away ||
-        status == AppPresence.dnd;
+    final isOnlineGroup = status != null && isReachablePresence(status);
     (isOnlineGroup ? online : offline).add(member);
   }
   int byName(api.UserProfile a, api.UserProfile b) =>
@@ -168,4 +171,20 @@ groupMembersByPresence(
   online.sort(byName);
   offline.sort(byName);
   return (online: online, offline: offline);
+}
+
+/// A stable, order-independent summary of who currently reads as reachable
+/// (online/away/dnd), meant for `presenceControllerProvider.select`. `Map`
+/// has no structural `==`, so selecting the raw map can never detect "no
+/// group-relevant change" and would rebuild a watcher on every single
+/// presence event; joining the reachable ids into a sorted `String` gives
+/// `.select` something two calls can actually compare, so a watcher of this
+/// only rebuilds when someone crosses between the Online and Offline
+/// sections, not on every dot-colour change within the same one.
+String reachablePresenceKey(Map<String, api.PresenceState> presence) {
+  final ids = [
+    for (final entry in presence.entries)
+      if (isReachablePresence(presenceOf(entry.value))) entry.key,
+  ]..sort();
+  return ids.join(',');
 }
