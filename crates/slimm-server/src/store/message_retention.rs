@@ -23,10 +23,12 @@
 //! and `cutoff` sits a whole retention window behind it, so no ordering of
 //! these two passes could make the reclaim treat that op as stale.
 
-use super::attachments::release_message_attachments;
-use super::message_ops::insert_message_op;
+use std::collections::HashMap;
+
+use sqlx::QueryBuilder;
+
 use super::{Store, now_ms};
-use crate::ids::{ChannelId, MessageId};
+use crate::ids::{ChannelId, MessageId, UserId};
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
@@ -108,10 +110,15 @@ impl Store {
     }
 
     /// Soft-deletes up to [`CONTENT_SWEEP_BATCH`] live messages older than
-    /// `cutoff`, oldest first, each exactly the way
-    /// [`Store::delete_message`] does it, under one system actor
-    /// (`actor_id: None`).
+    /// `cutoff`, oldest first, each ending in exactly the state
+    /// [`Store::delete_message`] leaves - `deleted_at` set, a `delete` op
+    /// written, attachments released - under one system actor
+    /// (`actor_id: None`), but batched rather than per message so the write
+    /// lock is held across a handful of round trips instead of one per
+    /// message; see SRV2.
     async fn prune_messages_before(&self, cutoff: i64) -> anyhow::Result<Vec<PrunedMessage>> {
+        use sqlx::Row;
+
         let mut tx = self.begin_write().await?;
         let candidates = sqlx::query_scalar!(
             r#"SELECT id AS "id!: MessageId" FROM messages
@@ -123,33 +130,102 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
+        if candidates.is_empty() {
+            tx.commit().await?;
+            return Ok(Vec::new());
+        }
 
         let now = now_ms();
-        let mut pruned = Vec::with_capacity(candidates.len());
-        for message_id in candidates {
-            let channel_id = sqlx::query_scalar!(
-                r#"UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL
-                   RETURNING channel_id AS "channel_id!: ChannelId""#,
-                now,
-                message_id
+
+        // One soft-delete for the whole batch; RETURNING names the rows it actually flipped and their channel.
+        let mut update = QueryBuilder::new("UPDATE messages SET deleted_at = ");
+        update.push_bind(now);
+        update.push(" WHERE deleted_at IS NULL AND id IN (");
+        let mut separated = update.separated(", ");
+        for id in &candidates {
+            separated.push_bind(*id);
+        }
+        update.push(") RETURNING id, channel_id");
+        let channel_of: HashMap<MessageId, ChannelId> = update
+            .build()
+            .fetch_all(&mut *tx)
+            .await?
+            .iter()
+            .map(|row| Ok((row.try_get("id")?, row.try_get("channel_id")?)))
+            .collect::<Result<_, sqlx::Error>>()?;
+        if channel_of.is_empty() {
+            tx.commit().await?;
+            return Ok(Vec::new());
+        }
+
+        // Candidate (created_at ASC) order, restricted to what was really deleted, so seqs land in that order.
+        let ordered: Vec<(MessageId, ChannelId)> = candidates
+            .iter()
+            .filter_map(|id| channel_of.get(id).map(|channel| (*id, *channel)))
+            .collect();
+
+        // One dense seq run per channel: bump each counter once by its count, then hand the run out in order.
+        let mut count_per_channel: HashMap<ChannelId, i64> = HashMap::new();
+        for (_, channel) in &ordered {
+            *count_per_channel.entry(*channel).or_default() += 1;
+        }
+        let mut next_seq: HashMap<ChannelId, i64> = HashMap::new();
+        for (channel, count) in &count_per_channel {
+            let count = *count;
+            // Seeds a fresh counter at count + 1 so the first seq is 1, as insert_message_op's VALUES(...,2) does for one.
+            let seed = count + 1;
+            let advanced = sqlx::query_scalar!(
+                r#"INSERT INTO channel_seq_counters (channel_id, stream, next_seq)
+                   VALUES (?, 'message_op', ?)
+                   ON CONFLICT(channel_id, stream) DO UPDATE SET next_seq = next_seq + ?
+                   RETURNING next_seq AS "next_seq!: i64""#,
+                channel,
+                seed,
+                count
             )
-            .fetch_optional(&mut *tx)
+            .fetch_one(&mut *tx)
             .await?;
-            let Some(channel_id) = channel_id else {
-                continue;
-            };
-            let op_seq =
-                insert_message_op(&mut tx, channel_id, message_id, "delete", None, now).await?;
-            let freed_attachments = release_message_attachments(&mut tx, message_id).await?;
-            pruned.push(PrunedMessage {
+            next_seq.insert(*channel, advanced - count);
+        }
+        let mut op_seq_of: HashMap<MessageId, i64> = HashMap::new();
+        for (message_id, channel) in &ordered {
+            let seq = next_seq.get_mut(channel).expect("counted above");
+            op_seq_of.insert(*message_id, *seq);
+            *seq += 1;
+        }
+
+        // One multi-row op insert; each row carries its own seq, so insertion order does not matter.
+        let mut ops = QueryBuilder::new(
+            "INSERT INTO message_ops (channel_id, seq, message_id, kind, actor_id, created_at) ",
+        );
+        ops.push_values(&ordered, |mut row, (message_id, channel)| {
+            row.push_bind(*channel)
+                .push_bind(op_seq_of[message_id])
+                .push_bind(*message_id)
+                .push_bind("delete")
+                .push_bind(None::<UserId>)
+                .push_bind(now);
+        });
+        ops.build().execute(&mut *tx).await?;
+
+        // One attachment release for the whole batch.
+        let message_ids: Vec<MessageId> = ordered.iter().map(|(id, _)| *id).collect();
+        let mut freed_of: HashMap<MessageId, Vec<String>> = HashMap::new();
+        for (message_id, hex) in release_message_attachments_batch(&mut tx, &message_ids).await? {
+            freed_of.entry(message_id).or_default().push(hex);
+        }
+
+        tx.commit().await?;
+
+        Ok(ordered
+            .into_iter()
+            .map(|(message_id, channel_id)| PrunedMessage {
                 channel_id,
                 message_id,
-                op_seq: Some(op_seq),
-                freed_attachments,
-            });
-        }
-        tx.commit().await?;
-        Ok(pruned)
+                op_seq: Some(op_seq_of[&message_id]),
+                freed_attachments: freed_of.remove(&message_id).unwrap_or_default(),
+            })
+            .collect())
     }
 
     /// Deletes up to [`OP_FLOOR_SWEEP_BATCH`] `message_ops` rows older than
@@ -169,4 +245,81 @@ impl Store {
         .rows_affected();
         Ok(reclaimed)
     }
+}
+
+/// Unlinks a batch of messages' attachments in one pass and reports each freed
+/// hex once, the batched form of `attachments::release_message_attachments`
+/// the prune above needs. Lives here rather than there so that file stays
+/// under its ceiling; the single-message path remains its owner.
+///
+/// A sha256 is freed when nothing outside this batch still references it - a
+/// live message not being pruned, a custom emoji, or a canvas object - the
+/// single path's exact final state, reached by deleting every link in the
+/// batch first and only then testing each distinct sha256. Each freed hex is
+/// reported once,
+/// attributed to one of the messages that linked it; which one does not
+/// matter, since the caller only uses the set to delete files.
+async fn release_message_attachments_batch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    message_ids: &[MessageId],
+) -> Result<Vec<(MessageId, String)>, sqlx::Error> {
+    use std::collections::HashSet;
+
+    use sqlx::Row;
+
+    if message_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut select = QueryBuilder::new(
+        "SELECT message_id, sha256 FROM message_attachments WHERE message_id IN (",
+    );
+    let mut separated = select.separated(", ");
+    for id in message_ids {
+        separated.push_bind(*id);
+    }
+    select.push(")");
+    let rows = select.build().fetch_all(&mut **tx).await?;
+    let links: Vec<(MessageId, Vec<u8>)> = rows
+        .iter()
+        .map(|row| Ok((row.try_get("message_id")?, row.try_get("sha256")?)))
+        .collect::<Result<_, sqlx::Error>>()?;
+
+    let mut delete = QueryBuilder::new("DELETE FROM message_attachments WHERE message_id IN (");
+    let mut separated = delete.separated(", ");
+    for id in message_ids {
+        separated.push_bind(*id);
+    }
+    delete.push(")");
+    delete.build().execute(&mut **tx).await?;
+
+    let mut freed = Vec::new();
+    let mut checked: HashSet<Vec<u8>> = HashSet::new();
+    for (message_id, sha256) in &links {
+        // Each distinct sha256 tested once; a later duplicate link is skipped.
+        if !checked.insert(sha256.clone()) {
+            continue;
+        }
+        // The third holder, canvas_object_attachments, has no ON DELETE guard, so omitting it fails the FK below; see sweep_orphaned_attachments.
+        let still_referenced = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64"
+               WHERE EXISTS (SELECT 1 FROM message_attachments WHERE sha256 = ?)
+                  OR EXISTS (SELECT 1 FROM custom_emoji WHERE sha256 = ?)
+                  OR EXISTS (SELECT 1 FROM canvas_object_attachments WHERE sha256 = ?)"#,
+            sha256,
+            sha256,
+            sha256
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .is_some();
+        if still_referenced {
+            continue;
+        }
+        sqlx::query!("DELETE FROM attachments WHERE sha256 = ?", sha256)
+            .execute(&mut **tx)
+            .await?;
+        freed.push((*message_id, crate::media::to_hex(sha256)));
+    }
+    Ok(freed)
 }
