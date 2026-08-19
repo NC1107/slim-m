@@ -10,7 +10,7 @@
 /// guard itself.
 library;
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter/services.dart' show MethodCall, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -110,8 +110,26 @@ class DesktopWindowShell {
   /// ever shown, so there is nothing to visibly jump once it appears -
   /// `main.dart` calls this before `runApp`, ahead of the startup screen's
   /// own first frame.
+  ///
+  /// Bounded by [_setupTimeout] and never throws, for the same reason
+  /// [registerListenersAndTray] is not allowed to: this runs before `runApp`,
+  /// so a native window or display call that hangs (a portal or compositor
+  /// not answering at the instant of launch) would otherwise block the first
+  /// frame forever - a silent-forever startup screen strictly worse than the
+  /// one that method already guards, since not even an empty window paints.
+  /// On a timeout or error the window simply opens at its default geometry. No
+  /// [ProviderContainer] exists this early, so the breadcrumb goes to
+  /// [debugPrint] rather than the app log this file uses elsewhere.
   static Future<void> applyInitialGeometry() async {
     if (currentDesktopPlatform() == null) return;
+    try {
+      await _applySavedGeometry().timeout(_setupTimeout);
+    } catch (error) {
+      debugPrint('desktop: initial geometry setup failed: $error');
+    }
+  }
+
+  static Future<void> _applySavedGeometry() async {
     await _port.ensureInitialized();
 
     final prefs = await SharedPreferences.getInstance();

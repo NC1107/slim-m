@@ -4,6 +4,11 @@
 /// window/tray plumbing has to be logged and swallowed, not left to strand
 /// the caller - `appReadyProvider` only ever flips once this future
 /// resolves, and the startup screen it gates has no timeout of its own.
+///
+/// [DesktopWindowShell.applyInitialGeometry] carries the same obligation for
+/// the same reason, and more sharply: it runs before `runApp`, so a hang
+/// there blocks the very first frame from ever painting, not a later ready
+/// flip - the strictly worse silent-forever screen.
 library;
 
 import 'dart:async';
@@ -94,5 +99,31 @@ void main() {
       expect(completed, isTrue);
       expect(_loggedFromDesktop(container), isTrue);
     });
+  });
+
+  test('applyInitialGeometry gives up on a hanging native call after the '
+      'timeout, so a stuck portal at launch cannot block the first frame', () {
+    fakeAsync((async) {
+      DesktopWindowShell.debugPort = _HangingPort();
+
+      var completed = false;
+      unawaited(
+        DesktopWindowShell.applyInitialGeometry().whenComplete(
+          () => completed = true,
+        ),
+      );
+      async.flushMicrotasks();
+      expect(completed, isFalse);
+
+      async.elapse(const Duration(seconds: 5));
+      expect(completed, isTrue);
+    });
+  });
+
+  test('applyInitialGeometry swallows a throwing native call rather than '
+      'letting it strand main() before runApp', () async {
+    DesktopWindowShell.debugPort = _ThrowingPort();
+
+    await DesktopWindowShell.applyInitialGeometry();
   });
 }
