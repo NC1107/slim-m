@@ -273,6 +273,15 @@ async fn delete(
             channel_id,
             message_id,
         });
+        // The DB trigger already dropped the pin row; tell live clients too.
+        if outcome.was_pinned {
+            state.hub.publish(Event::MessageUnpinned {
+                channel_id,
+                message_id,
+            });
+        }
+        // A no-op for an ordinary channel; see `threads::notify_reply`.
+        super::threads::notify_reply(&state, channel_id).await;
         // File reclamation only, best-effort; see the note on this function.
         for hex in outcome.freed_attachments {
             if let Err(err) = state.media.delete_attachment(&hex).await {

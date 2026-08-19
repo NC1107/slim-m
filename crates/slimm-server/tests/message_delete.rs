@@ -11,7 +11,7 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use slimm_server::hub::{Event, Hub};
 use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
@@ -39,6 +39,21 @@ fn app(store: Store) -> Router {
         store,
         auth: Auth::new(2).unwrap(),
         hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
+    })
+}
+
+/// Like `app`, but keeps a handle to the hub so a test can subscribe and
+/// inspect what a route actually published.
+fn app_with_hub(store: Store, hub: Hub) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub,
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice: slimm_server::voice::VoiceService::disabled(),
@@ -260,4 +275,172 @@ async fn deleting_an_unknown_message_in_a_visible_channel_is_not_found() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+/// `send` calls `notify_reply` so a bystander watching the parent sees a
+/// live reply count; delete has to mirror that or the count only moves once
+/// the client happens to refetch. `channel.updated` proves the count itself
+/// moved (thread_reply_count.rs); this proves the live signal fires too.
+#[tokio::test]
+async fn deleting_a_reply_in_a_thread_publishes_thread_updated() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let hub = Hub::new();
+    let app = app_with_hub(store.clone(), hub.clone());
+    let (token, _user) = register(&store, "alice").await;
+
+    let parent = send(&app, &channel.id.to_string(), &token, "root").await;
+    let parent_id = parent["id"].as_str().unwrap().to_owned();
+
+    let opened = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/messages/{parent_id}/thread", channel.id),
+            Some(&token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(opened.status(), StatusCode::OK);
+    let thread_id = json_body(opened).await["id"].as_str().unwrap().to_owned();
+
+    let reply = send(&app, &thread_id, &token, "a reply").await;
+    let reply_id = reply["id"].as_str().unwrap().to_owned();
+
+    let mut rx = hub.subscribe();
+    let deleted = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/channels/{thread_id}/messages/{reply_id}"),
+            Some(&token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    let mut reply_count = None;
+    while let Ok(event) = rx.try_recv() {
+        if let Event::ThreadUpdated {
+            reply_count: count, ..
+        } = event
+        {
+            reply_count = Some(count);
+        }
+    }
+    assert_eq!(
+        reply_count,
+        Some(0),
+        "deleting the only reply must publish ThreadUpdated with the count back at zero"
+    );
+}
+
+/// `notify_reply` is a no-op outside a thread channel; an ordinary channel's
+/// delete must not publish `ThreadUpdated` just because it happens to run
+/// the same call.
+#[tokio::test]
+async fn deleting_in_an_ordinary_channel_publishes_no_thread_updated() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let hub = Hub::new();
+    let app = app_with_hub(store.clone(), hub.clone());
+    let (token, _user) = register(&store, "alice").await;
+
+    let posted = send(&app, &channel.id.to_string(), &token, "not a reply").await;
+    let message_id = posted["id"].as_str().unwrap().to_owned();
+
+    let mut rx = hub.subscribe();
+    let deleted = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/channels/{}/messages/{message_id}", channel.id),
+            Some(&token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    while let Ok(event) = rx.try_recv() {
+        assert!(
+            !matches!(event, Event::ThreadUpdated { .. }),
+            "an ordinary channel's delete must not publish ThreadUpdated"
+        );
+    }
+}
+
+/// A retry delete of an already-gone message stays idempotent for both new
+/// signals, not just the original `MessageDeleted`: the second call must
+/// publish nothing at all, including no `ThreadUpdated`.
+#[tokio::test]
+async fn a_retry_delete_publishes_nothing_the_second_time() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let hub = Hub::new();
+    let app = app_with_hub(store.clone(), hub.clone());
+    let (token, _user) = register(&store, "alice").await;
+
+    let parent = send(&app, &channel.id.to_string(), &token, "root").await;
+    let parent_id = parent["id"].as_str().unwrap().to_owned();
+    let opened = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{}/messages/{parent_id}/thread", channel.id),
+            Some(&token),
+            None,
+        ))
+        .await
+        .unwrap();
+    let thread_id = json_body(opened).await["id"].as_str().unwrap().to_owned();
+    let reply = send(&app, &thread_id, &token, "a reply").await;
+    let reply_id = reply["id"].as_str().unwrap().to_owned();
+    let uri = format!("/channels/{thread_id}/messages/{reply_id}");
+
+    let first = app
+        .clone()
+        .oneshot(request("DELETE", &uri, Some(&token), None))
+        .await
+        .unwrap();
+    assert_eq!(first.status(), StatusCode::NO_CONTENT);
+
+    let mut rx = hub.subscribe();
+    let second = app
+        .clone()
+        .oneshot(request("DELETE", &uri, Some(&token), None))
+        .await
+        .unwrap();
+    assert_eq!(second.status(), StatusCode::NO_CONTENT);
+
+    assert!(
+        rx.try_recv().is_err(),
+        "a retry of an already-deleted message must publish nothing at all"
+    );
 }
