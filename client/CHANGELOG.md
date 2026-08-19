@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.46.1](https://github.com/NC1107/slim-m/compare/client-v0.46.0...client-v0.46.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **canvas:** sort sent-to-back tiles beneath front ones so their controls stop overlapping ([#708](https://github.com/NC1107/slim-m/issues/708)) ([a069b98](https://github.com/NC1107/slim-m/commit/a069b9884bd22c63acc70d235638201587454472))
+* **desktop:** bound applyInitialGeometry so a stuck native call cannot freeze launch ([#707](https://github.com/NC1107/slim-m/issues/707)) ([6b6ea7b](https://github.com/NC1107/slim-m/commit/6b6ea7b9d6d4c63beb355326c576052985f519f3))
+
 ## [0.46.0](https://github.com/NC1107/slim-m/compare/client-v0.45.0...client-v0.46.0) (2026-08-18)
 
 
