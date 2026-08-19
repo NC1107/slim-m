@@ -413,12 +413,16 @@ pub(super) async fn release_message_attachments(
 
     let mut freed = Vec::new();
     for row in linked {
-        // A custom emoji counts as a reference, not just a message. Content
-        // addressing makes an emoji sharing a message's bytes the normal case.
+        // A custom emoji or a canvas object counts as a reference, not just a
+        // message: content addressing makes bytes shared across all three the
+        // normal case, and canvas_object_attachments has no ON DELETE guard, so
+        // freeing under it fails the DELETE's FK. See sweep_orphaned_attachments.
         let still_referenced = sqlx::query_scalar!(
             r#"SELECT 1 AS "one!: i64"
                WHERE EXISTS (SELECT 1 FROM message_attachments WHERE sha256 = ?)
-                  OR EXISTS (SELECT 1 FROM custom_emoji WHERE sha256 = ?)"#,
+                  OR EXISTS (SELECT 1 FROM custom_emoji WHERE sha256 = ?)
+                  OR EXISTS (SELECT 1 FROM canvas_object_attachments WHERE sha256 = ?)"#,
+            row.sha256,
             row.sha256,
             row.sha256
         )
