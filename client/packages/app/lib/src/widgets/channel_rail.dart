@@ -149,7 +149,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               error: (e, _) =>
                   const Center(child: Text('Could not load channels.')),
               data: (store) => StreamBuilder<List<Channel>>(
-                stream: store.watchChannels(),
+                // Deduped to what the rail draws; see MessageStore.watchRailChannels.
+                stream: store.watchRailChannels(),
                 builder: (context, channelSnapshot) {
                   return StreamBuilder<List<ChannelCategoryRow>>(
                     stream: store.watchCategories(),

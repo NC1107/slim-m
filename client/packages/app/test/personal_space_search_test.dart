@@ -69,6 +69,10 @@ class _FakeStore extends MessageStore {
 
   @override
   Stream<List<Channel>> watchChannels() => Stream.value([_personalChannel]);
+
+  // The rail reads watchRailChannels (CP8), not watchChannels; same canned row.
+  @override
+  Stream<List<Channel>> watchRailChannels() => Stream.value([_personalChannel]);
 }
 
 /// Only `/blocks` is ever hit: `blocksProvider` fetches it as soon as
