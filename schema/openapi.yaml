@@ -1048,7 +1048,12 @@ paths:
       operationId: createChannel
       tags: [channels]
       summary: Create a channel.
-      description: Requires the MANAGE_CHANNELS permission.
+      description: >
+        Requires the MANAGE_CHANNELS permission. Idempotent by the optional
+        client-supplied `id`: a retry with the same id returns the channel
+        already stored under it. `channels` also holds DM channels and
+        threads under the same id namespace, so an id already used by either
+        is a conflict rather than a wrong-typed 200.
       requestBody:
         required: true
         content:
@@ -1068,6 +1073,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -1494,6 +1501,9 @@ paths:
         own effective permissions, or this is refused: MANAGE_ROLES alone is
         never enough to hand out a permission the caller does not hold.
         Never creates `@everyone`; that role is seeded once, by bootstrap.
+        Idempotent by the optional client-supplied `id`: a retry with the
+        same id returns the role already stored under it. An id already used
+        by the `@everyone` role is a conflict rather than a wrong-typed 200.
       requestBody:
         required: true
         content:
@@ -1513,6 +1523,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -5029,6 +5041,12 @@ components:
       type: object
       required: [name]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            Client-generated UUIDv7. Retrying with the same id returns the
+            stored category instead of creating a second one.
         name:
           type: string
           minLength: 1
@@ -5053,6 +5071,12 @@ components:
       type: object
       required: [name]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            Client-generated UUIDv7. Retrying with the same id returns the
+            stored channel instead of creating a second one.
         name:
           type: string
           minLength: 1
@@ -5167,6 +5191,12 @@ components:
       type: object
       required: [name, permissions]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            Client-generated UUIDv7. Retrying with the same id returns the
+            stored role instead of creating a second one.
         name:
           type: string
           minLength: 1

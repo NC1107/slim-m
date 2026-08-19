@@ -58,6 +58,9 @@ impl From<ChannelCategory> for CategoryDto {
 
 #[derive(Deserialize)]
 struct CreateCategoryRequest {
+    /// Client-generated UUIDv7 that makes the create idempotent on retry.
+    /// Absent means the server mints one and this is always a fresh create.
+    id: Option<String>,
     name: String,
 }
 
@@ -99,9 +102,19 @@ async fn create(
     require_manage_channels(&state, ctx.user_id).await?;
 
     let name = validate_category_name(&req.name)?;
-    let category = state.store.create_category(name).await?;
-    state.hub.publish(Event::CategoryChanged);
-    Ok(Json(category.into()))
+    let id = req
+        .id
+        .as_deref()
+        .map(|raw| parse_uuid(raw).map(ChannelCategoryId))
+        .transpose()?
+        .unwrap_or_else(ChannelCategoryId::generate);
+
+    let created = state.store.create_category_with_id(id, name).await?;
+    // An idempotent retry must not fan out again; see the note on `CreatedCategory::fresh`.
+    if created.fresh {
+        state.hub.publish(Event::CategoryChanged);
+    }
+    Ok(Json(created.category.into()))
 }
 
 async fn update(

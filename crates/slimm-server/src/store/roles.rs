@@ -15,7 +15,7 @@
 
 use sqlx::{QueryBuilder, SqliteConnection};
 
-use super::Store;
+use super::{Store, now_ms};
 use crate::ids::{RoleId, UserId};
 use crate::permissions::Permissions;
 
@@ -53,7 +53,142 @@ impl From<anyhow::Error> for RoleGuardError {
     }
 }
 
+/// The outcome of a create, which is idempotent by client-supplied id and so
+/// may be a retry; see [`Store::create_role_with_id`].
+#[derive(Debug, Clone, Copy)]
+pub struct CreatedRole {
+    pub id: RoleId,
+    /// False when this id already named a role, so the call was a retry of a
+    /// create that already succeeded. The caller publishes `RoleChanged`
+    /// only when this is true, or a retry would wake every connected client
+    /// a second time for a role they already know about.
+    pub fresh: bool,
+}
+
+/// Why creating a role by id failed outright, rather than succeeding fresh
+/// or as a retry.
+#[derive(Debug)]
+pub enum CreateRoleError {
+    /// This id already names the deployment's singleton `@everyone` role.
+    /// `roles` holds it in the same id namespace as every ordinary role, so
+    /// a colliding id must never be handed back as if it were the caller's
+    /// own new role - the same reason
+    /// [`super::messages::SendError::IdConflict`] refuses to alias a
+    /// foreign message rather than returning it.
+    ///
+    /// Scoped to `is_everyone` only: it is the sole structural marker this
+    /// table carries. The bootstrap `admin` role is not otherwise
+    /// distinguished from any role a MANAGE_ROLES holder creates for
+    /// themselves - that is what `create_role` is for - so there is no
+    /// column here to key a second case off.
+    IdConflict,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for CreateRoleError {
+    fn from(err: sqlx::Error) -> Self {
+        CreateRoleError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for CreateRoleError {
+    fn from(err: anyhow::Error) -> Self {
+        CreateRoleError::Internal(err)
+    }
+}
+
 impl Store {
+    /// Creates a role. Exactly one role carries `is_everyone`; that base role
+    /// applies to every member whether or not they hold it explicitly. A partial
+    /// unique index enforces the singleton, so a second `@everyone` role is
+    /// rejected here rather than corrupting the evaluation base.
+    ///
+    /// Idempotent by `id`: a retry with the same id returns the row already
+    /// stored under it rather than inserting again, the same contract
+    /// [`super::messages::Store::send_message`] gives a message send. Uses
+    /// [`Store::begin_write`] (`BEGIN IMMEDIATE`) rather than a bare pool
+    /// execute, for the same reason `send_message` does: this reads the id
+    /// before it writes.
+    ///
+    /// [`Store::create_role`] is the convenience form for a caller with no
+    /// client-supplied id of its own; it mints one and always sees
+    /// [`CreatedRole::fresh`] true, since a freshly generated UUIDv7 id
+    /// cannot already be in use.
+    pub async fn create_role_with_id(
+        &self,
+        id: RoleId,
+        name: &str,
+        permissions: Permissions,
+        is_everyone: bool,
+    ) -> Result<CreatedRole, CreateRoleError> {
+        let mut tx = self.begin_write().await?;
+
+        let existing = sqlx::query_scalar!(
+            r#"SELECT is_everyone AS "is_everyone!: bool" FROM roles WHERE id = ?"#,
+            id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(existing_is_everyone) = existing {
+            tx.commit().await?;
+            if existing_is_everyone {
+                return Err(CreateRoleError::IdConflict);
+            }
+            return Ok(CreatedRole { id, fresh: false });
+        }
+
+        let now = now_ms();
+        let bits = permissions.bits();
+        let is_everyone = i64::from(is_everyone);
+        let result = sqlx::query!(
+            "INSERT INTO roles (id, name, permissions, is_everyone, created_at)
+             VALUES (?, ?, ?, ?, ?)",
+            id,
+            name,
+            bits,
+            is_everyone,
+            now
+        )
+        .execute(&mut *tx)
+        .await;
+
+        match result {
+            Ok(_) => {
+                tx.commit().await?;
+                Ok(CreatedRole { id, fresh: true })
+            }
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Err(
+                CreateRoleError::Internal(anyhow::anyhow!("an @everyone role already exists")),
+            ),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Creates a role with a server-minted id; see
+    /// [`Store::create_role_with_id`] for the idempotent form a caller with
+    /// a client-supplied id wants instead.
+    ///
+    /// [`CreateRoleError::IdConflict`] cannot happen here: a freshly
+    /// generated UUIDv7 cannot already name the `@everyone` role, so the
+    /// only error this ever actually surfaces is `Internal`.
+    pub async fn create_role(
+        &self,
+        name: &str,
+        permissions: Permissions,
+        is_everyone: bool,
+    ) -> anyhow::Result<RoleId> {
+        match self
+            .create_role_with_id(RoleId::generate(), name, permissions, is_everyone)
+            .await
+        {
+            Ok(created) => Ok(created.id),
+            Err(CreateRoleError::IdConflict) => {
+                anyhow::bail!("a freshly generated role id collided with an existing row")
+            }
+            Err(CreateRoleError::Internal(err)) => Err(err),
+        }
+    }
+
     /// Every role, highest position first.
     pub async fn list_roles(&self) -> anyhow::Result<Vec<Role>> {
         let rows = sqlx::query_as!(

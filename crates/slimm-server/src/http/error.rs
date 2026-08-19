@@ -16,7 +16,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
 use crate::auth::HashError;
-use crate::store::{OpenError, PushError, SendError};
+use crate::store::{CreateChannelError, CreateRoleError, OpenError, PushError, SendError};
 
 /// The fixed body a 500 always carries, never a stack trace or type path.
 ///
@@ -147,6 +147,34 @@ impl From<HashError> for ApiError {
             HashError::Busy => ApiError::Unavailable,
             HashError::Internal(e) => {
                 tracing::error!(error = %e, "password hashing failed");
+                ApiError::Internal
+            }
+        }
+    }
+}
+
+impl From<CreateChannelError> for ApiError {
+    fn from(err: CreateChannelError) -> Self {
+        match err {
+            CreateChannelError::IdConflict => {
+                ApiError::Conflict("channel id already used by a dm or a thread")
+            }
+            CreateChannelError::Internal(e) => {
+                tracing::error!(error = %e, "channel create failed");
+                ApiError::Internal
+            }
+        }
+    }
+}
+
+impl From<CreateRoleError> for ApiError {
+    fn from(err: CreateRoleError) -> Self {
+        match err {
+            CreateRoleError::IdConflict => {
+                ApiError::Conflict("role id already used by the @everyone role")
+            }
+            CreateRoleError::Internal(e) => {
+                tracing::error!(error = %e, "role create failed");
                 ApiError::Internal
             }
         }

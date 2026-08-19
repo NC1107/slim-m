@@ -5,8 +5,23 @@
 //! kind, and grants and denies nothing. See
 //! docs/decisions/0006-channel-categories.md and docs/IMPLIED-GAPS.md.
 
+use sqlx::SqliteExecutor;
+
 use super::{ChannelCategory, Store, now_ms};
 use crate::ids::ChannelCategoryId;
+
+/// The outcome of a create, which is idempotent by client-supplied id and so
+/// may be a retry; see [`Store::create_category_with_id`].
+#[derive(Debug, Clone)]
+pub struct CreatedCategory {
+    pub category: ChannelCategory,
+    /// False when this id already named a category, so the call was a retry
+    /// of a create that already succeeded. The caller publishes
+    /// `CategoryChanged` only when this is true, or a retry would wake every
+    /// connected client a second time for a category they already know
+    /// about.
+    pub fresh: bool,
+}
 
 impl Store {
     /// Lists the deployment's live categories, in display order.
@@ -33,12 +48,41 @@ impl Store {
 
     /// Creates a category, appended after every live one - the same
     /// "read the live maximum inside this transaction" shape
-    /// [`super::channels::Store::create_channel`] uses for a channel's own
-    /// position, so two concurrent creates cannot both claim the last slot.
-    pub async fn create_category(&self, name: &str) -> anyhow::Result<ChannelCategory> {
-        let id = ChannelCategoryId::generate();
+    /// [`super::channels::Store::create_channel_with_id`] uses for a
+    /// channel's own position, so two concurrent creates cannot both claim
+    /// the last slot.
+    ///
+    /// Idempotent by `id`: a retry with the same id returns the row already
+    /// stored under it rather than inserting again, the same contract
+    /// [`super::messages::Store::send_message`] gives a message send.
+    /// [`Store::create_category`] is the convenience form for a caller with
+    /// no client-supplied id of its own; it mints one and always sees
+    /// [`CreatedCategory::fresh`] true, since a freshly generated UUIDv7 id
+    /// cannot already be in use.
+    ///
+    /// Unlike [`super::channels::Store::create_channel_with_id`] and
+    /// [`super::permissions::Store::create_role_with_id`], the id probe
+    /// below is never scoped to a sub-type: `channel_categories` is written
+    /// by nothing but this function and migration 0031's own seed, so every
+    /// row this probe can find is a POST /categories-creatable category and
+    /// a bare id match is always a genuine retry.
+    pub async fn create_category_with_id(
+        &self,
+        id: ChannelCategoryId,
+        name: &str,
+    ) -> anyhow::Result<CreatedCategory> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
+
+        // Probes including a deleted row; see `create_channel_with_id`'s doc.
+        if let Some(existing) = fetch_category_by_id(&mut *tx, id).await? {
+            tx.commit().await?;
+            return Ok(CreatedCategory {
+                category: existing,
+                fresh: false,
+            });
+        }
+
         let position = sqlx::query_scalar!(
             r#"SELECT COALESCE(MAX(position), -1) + 1 AS "next!: i64" FROM channel_categories
                WHERE deleted_at IS NULL"#
@@ -55,12 +99,25 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(ChannelCategory {
-            id,
-            name: name.to_owned(),
-            position,
-            created_at: now,
+        Ok(CreatedCategory {
+            category: ChannelCategory {
+                id,
+                name: name.to_owned(),
+                position,
+                created_at: now,
+            },
+            fresh: true,
         })
+    }
+
+    /// Creates a category with a server-minted id; see
+    /// [`Store::create_category_with_id`] for the idempotent form a caller
+    /// with a client-supplied id wants instead.
+    pub async fn create_category(&self, name: &str) -> anyhow::Result<ChannelCategory> {
+        Ok(self
+            .create_category_with_id(ChannelCategoryId::generate(), name)
+            .await?
+            .category)
     }
 
     /// Renames and/or repositions a category. `None` for either leaves that
@@ -158,4 +215,29 @@ impl Store {
         tx.commit().await?;
         Ok(affected > 0)
     }
+}
+
+/// Fetches a category by id, live or deleted, over any executor - an open
+/// transaction for the id probe inside [`Store::create_category_with_id`].
+async fn fetch_category_by_id<'e, E>(
+    executor: E,
+    id: ChannelCategoryId,
+) -> anyhow::Result<Option<ChannelCategory>>
+where
+    E: SqliteExecutor<'e>,
+{
+    let row = sqlx::query!(
+        r#"SELECT id AS "id!: ChannelCategoryId", name AS "name!",
+                  position AS "position!: i64", created_at AS "created_at!"
+           FROM channel_categories WHERE id = ?"#,
+        id
+    )
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.map(|r| ChannelCategory {
+        id: r.id,
+        name: r.name,
+        position: r.position,
+        created_at: r.created_at,
+    }))
 }

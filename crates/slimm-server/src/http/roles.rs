@@ -81,6 +81,9 @@ impl From<Role> for RoleDto {
 
 #[derive(Deserialize)]
 struct CreateRoleRequest {
+    /// Client-generated UUIDv7 that makes the create idempotent on retry.
+    /// Absent means the server mints one and this is always a fresh create.
+    id: Option<String>,
     name: String,
     permissions: i64,
 }
@@ -113,12 +116,30 @@ async fn create(
 
     let name = validate_role_name(&req.name)?;
     let permissions = grantable(caller_permissions, req.permissions)?;
+    let id = req
+        .id
+        .as_deref()
+        .map(|raw| parse_uuid(raw).map(RoleId))
+        .transpose()?
+        .unwrap_or_else(RoleId::generate);
 
     // Never `@everyone`: exactly one exists, seeded only by
     // `Store::bootstrap_deployment`, and this endpoint cannot ask for it.
-    let id = state.store.create_role(name, permissions, false).await?;
-    let role = state.store.role(id).await?.ok_or(ApiError::Internal)?;
-    state.hub.publish(Event::RoleChanged { role_id: id });
+    let created = state
+        .store
+        .create_role_with_id(id, name, permissions, false)
+        .await?;
+    let role = state
+        .store
+        .role(created.id)
+        .await?
+        .ok_or(ApiError::Internal)?;
+    // An idempotent retry must not fan out again; see the note on `CreatedRole::fresh`.
+    if created.fresh {
+        state.hub.publish(Event::RoleChanged {
+            role_id: created.id,
+        });
+    }
     Ok(Json(role.into()))
 }
 
