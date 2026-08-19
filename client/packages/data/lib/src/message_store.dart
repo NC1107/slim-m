@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import 'database.dart';
+import 'rail_channel.dart';
 
 /// The local store's read and write surface.
 ///
@@ -74,6 +75,37 @@ class MessageStore {
         (c) => OrderingTerm(expression: c.createdAt),
       ]);
     return query.watch();
+  }
+
+  /// [watchChannels]'s own rows and ordering, deduped to the fields
+  /// `channel_rail.dart` actually renders or groups by (CP8).
+  ///
+  /// [watchChannels] is a table-wide watch: it re-emits on any write to
+  /// `channels`, and drift's [Channel] equality is over every column, so a
+  /// write nothing on screen reads - [setOpCursor] moving the message-op
+  /// cursor, or [applyMessage]'s own advance of the ordinary one - still
+  /// produces a genuinely different [Channel] list and re-triggers every
+  /// subscriber. The rail pays for this on every incoming message anywhere
+  /// in the deployment, rebuilding rows for channels the write never
+  /// touched. This keeps the same query and still emits full [Channel]
+  /// rows - every existing row widget keeps reading them unmodified,
+  /// [Channel.cursor]/[Channel.lastReadSeq] included - but folds each
+  /// emission down to [RailChannelKey] first, so a new emission that
+  /// projects identically to the last one is dropped rather than passed on.
+  ///
+  /// A projected `unread` is the derived boolean the rail shows, not the raw
+  /// `cursor`/`lastReadSeq` behind it: a channel already unread stays
+  /// unread through every further message, so only the flip in or out of
+  /// that state is a real rebuild for a text channel row, a DM row or the
+  /// personal space row to make. See `rail_channel.dart` for the projection.
+  Stream<List<Channel>> watchRailChannels() {
+    final query = db.select(db.channels)
+      ..where((c) => c.parentMessageId.isNull())
+      ..orderBy([
+        (c) => OrderingTerm(expression: c.position),
+        (c) => OrderingTerm(expression: c.createdAt),
+      ]);
+    return query.watch().distinct(railChannelsUnchanged);
   }
 
   /// [watchChannels]'s own snapshot, for a caller that wants today's list

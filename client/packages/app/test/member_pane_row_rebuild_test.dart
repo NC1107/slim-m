@@ -94,9 +94,7 @@ void main() {
           apiProvider.overrideWith((ref) {
             final api = _fakeApi(
               ref.watch(sessionProvider),
-              // Both start online, in the same section, so the pane's own
-              // grouping never changes below and the only thing left that
-              // can rebuild a row is that row's own scoped watch.
+              // Both online in one section, so grouping never changes and only a row's own scoped watch can rebuild it.
               presence: {'a': PresenceState.online, 'b': PresenceState.online},
             );
             ref.onDispose(api.close);
