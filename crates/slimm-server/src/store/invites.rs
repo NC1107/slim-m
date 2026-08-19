@@ -245,11 +245,28 @@ impl Store {
     /// because only one UPDATE can match.
     pub async fn redeem_invite(&self, code: &str, user_id: UserId) -> Result<(), RedeemError> {
         let now = now_ms();
-        let mut tx = self.pool.begin().await?;
+        // BEGIN IMMEDIATE: reads whether the caller already redeemed before writing, so two retries cannot each spend a use.
+        let mut tx = self.begin_write().await?;
+
+        // A retry by an already-redeemed user is a no-op: the role is granted and no second use is spent; see SRV5.
+        let already_redeemed = sqlx::query_scalar!(
+            r#"SELECT 1 AS "one!: i64" FROM invite_redemptions
+               WHERE code = ? AND user_id = ?"#,
+            code,
+            user_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .is_some();
+        if already_redeemed {
+            tx.commit().await?;
+            return Ok(());
+        }
 
         let Some(role_grant) = spend_invite(&mut tx, code, now).await? else {
             return Err(RedeemError::Unusable);
         };
+        record_redemption(&mut tx, code, user_id, now).await?;
 
         if let Some(role_id) = role_grant {
             sqlx::query!(
@@ -296,4 +313,26 @@ pub(super) async fn spend_invite(
     .fetch_optional(&mut **tx)
     .await?;
     Ok(claimed.map(|row| row.role_grant))
+}
+
+/// Records that `user_id` redeemed `code`, the (code, user) key that makes a
+/// repeat redemption a no-op. Called by both spend paths after the invite's
+/// own use has been spent, so the code and the user both exist and the two
+/// foreign keys hold; see SRV5. The `redeemed_at` is informational only - the
+/// primary key is what enforces one redemption per pair.
+pub(super) async fn record_redemption(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    code: &str,
+    user_id: UserId,
+    now: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "INSERT INTO invite_redemptions (code, user_id, redeemed_at) VALUES (?, ?, ?)",
+        code,
+        user_id,
+        now
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
