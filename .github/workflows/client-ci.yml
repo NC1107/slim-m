@@ -13,12 +13,13 @@ on:
       # to skip this workflow entirely and land that failure on main, which is
       # how bulkDeleteMessages (#675) broke the api package unnoticed.
       - "schema/openapi.yaml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
-      - "!client/CHANGELOG.md"
-      - "!client/pubspec.yaml"
-      - "!client/packages/app/pubspec.yaml"
+      # A release-please version bump (CHANGELOG + the two pubspecs) is
+      # deliberately NOT excluded here. verify-release-checks.yml gates every
+      # client publish job on this workflow's checks being present on the exact
+      # release commit; excluding these left them absent, verify-client-ci
+      # timed out, and client 0.47.0 shipped no COPR/TestFlight/Play. server-ci
+      # never excluded its own version files, which is why server releases
+      # deliver. See docs/ci.md.
   pull_request:
     paths:
       - "client/**"
@@ -28,12 +29,13 @@ on:
       # to skip this workflow entirely and land that failure on main, which is
       # how bulkDeleteMessages (#675) broke the api package unnoticed.
       - "schema/openapi.yaml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
-      - "!client/CHANGELOG.md"
-      - "!client/pubspec.yaml"
-      - "!client/packages/app/pubspec.yaml"
+      # A release-please version bump (CHANGELOG + the two pubspecs) is
+      # deliberately NOT excluded here. verify-release-checks.yml gates every
+      # client publish job on this workflow's checks being present on the exact
+      # release commit; excluding these left them absent, verify-client-ci
+      # timed out, and client 0.47.0 shipped no COPR/TestFlight/Play. server-ci
+      # never excluded its own version files, which is why server releases
+      # deliver. See docs/ci.md.
 
 permissions:
   contents: read

@@ -415,6 +415,11 @@ All three are now regression tests, not just fixed code.
 `verify-server-ci` requires `check` (server-ci), `hygiene`, `cargo dependency licenses` (licenses) and `breaking-change gate (additive-only, push to main)` (schema-ci).
 `verify-client-ci` requires `analyze, format check`, `test and web build`, `linux desktop compiles` and `linux desktop shell smoke (Xvfb)` (all client-ci), `ios unit tests (callkit invariant)` and `ios sources are registered in project.pbxproj` (client-ios-ci), `hygiene`, `pub dependency licenses` (licenses) and the same schema-ci gate.
 
+Every name in that list comes from `client-ci` or `client-ios-ci`, so both must run on the release commit itself, which is why neither path-excludes a release-please version bump the way `main-builds` does.
+Excluding `client/CHANGELOG.md` and the two pubspecs once did exactly that: the checks were absent on the release commit, `verify-client-ci` timed out, and client 0.47.0 published its GitHub release and macOS/Windows builds but shipped nothing to COPR, TestFlight or Play.
+`server-ci` never excluded its own version files, which is why server releases always delivered.
+Do not re-add that exclusion to save a run on a version bump; it silently breaks client delivery.
+
 Those names are matched by exact string against check-run names, and nothing in the workflow graph connects the string to the jobs it names.
 `scripts/lib/test_release_required_checks_exist.py` is what closes that: it fails a pull request when a `required_checks` entry names no job, so a rename is caught there rather than at release time on `main`. Its sibling `test_release_required_checks_schema_gate.py` checks the other half - that the entry named can structurally reach a release commit at all.
 The two Linux jobs joined the list on 2026-08-11: a release ships a Linux tarball, rpm and flatpak from every `client-v*` tag, and until then a client release could cut with the Linux desktop build red - the exact class both jobs' own doc comments describe main going red on, only at release time with nothing failing loudly.
