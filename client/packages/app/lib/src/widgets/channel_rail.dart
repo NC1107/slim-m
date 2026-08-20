@@ -67,6 +67,11 @@ class ChannelRail extends ConsumerStatefulWidget {
   /// kept at the app's prior medium-width value.
   static const double mediumWidth = 240;
 
+  /// [CollapsedRailStrip]'s own width: narrow enough to read as "collapsed"
+  /// rather than a third rail size, wide enough for one [AppIconButton]
+  /// column with real breathing room either side.
+  static const double collapsedWidth = 48;
+
   @override
   ConsumerState<ChannelRail> createState() => _ChannelRailState();
 }

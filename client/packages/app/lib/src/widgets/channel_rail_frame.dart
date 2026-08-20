@@ -249,6 +249,42 @@ class RailConnectionBar extends ConsumerWidget {
   }
 }
 
+/// The mic/deafen toggle pair, shared by [RailUserFooter]'s row and
+/// [CollapsedRailStrip]'s column so the two surfaces cannot diverge on icon,
+/// label or enabled state. Both read the same [VoiceState]/[VoiceController];
+/// only the surrounding layout differs.
+List<Widget> railVoiceToggleButtons({
+  required VoiceState voice,
+  required VoiceController voiceController,
+}) {
+  final inCall = voice.state == VoiceSessionState.connected;
+  return [
+    AppIconButton(
+      icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
+      semanticLabel: voice.microphoneEnabled ? 'Mute' : 'Unmute',
+      tooltip: inCall ? null : 'Not in a call',
+      onPressed: inCall ? voiceController.toggleMicrophone : null,
+    ),
+    // Same icon either way, the toggle carried by `active`: there is no
+    // dedicated "deafened" glyph in AppIcons.
+    AppIconButton(
+      icon: AppIcons.headphones,
+      semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',
+      active: voice.deafened,
+      tooltip: inCall ? null : 'Not in a call',
+      onPressed: inCall ? voiceController.toggleDeafen : null,
+    ),
+  ];
+}
+
+/// The personal-settings nav button, shared the same way
+/// [railVoiceToggleButtons] is.
+Widget railSettingsButton(BuildContext context) => AppIconButton(
+  icon: AppIcons.settings,
+  semanticLabel: 'Personal settings',
+  onPressed: () => context.push(Routes.personalSettings),
+);
+
 class RailUserFooter extends ConsumerWidget {
   const RailUserFooter({super.key, this.activeChannelId});
 
@@ -335,32 +371,11 @@ class RailUserFooter extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    AppIconButton(
-                      icon: voice.microphoneEnabled
-                          ? AppIcons.mic
-                          : AppIcons.micOff,
-                      semanticLabel: voice.microphoneEnabled
-                          ? 'Mute'
-                          : 'Unmute',
-                      tooltip: inCall ? null : 'Not in a call',
-                      onPressed: inCall
-                          ? voiceController.toggleMicrophone
-                          : null,
+                    ...railVoiceToggleButtons(
+                      voice: voice,
+                      voiceController: voiceController,
                     ),
-                    // Same icon either way, the toggle carried by `active`:
-                    // there is no dedicated "deafened" glyph in AppIcons.
-                    AppIconButton(
-                      icon: AppIcons.headphones,
-                      semanticLabel: voice.deafened ? 'Undeafen' : 'Deafen',
-                      active: voice.deafened,
-                      tooltip: inCall ? null : 'Not in a call',
-                      onPressed: inCall ? voiceController.toggleDeafen : null,
-                    ),
-                    AppIconButton(
-                      icon: AppIcons.settings,
-                      semanticLabel: 'Personal settings',
-                      onPressed: () => context.push(Routes.personalSettings),
-                    ),
+                    railSettingsButton(context),
                   ],
                 ),
                 if (inCallElsewhere) ...[
