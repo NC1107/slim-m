@@ -21,6 +21,22 @@
 /// again. A real, finished product state cannot change what it says just
 /// because the event loop got one more turn; a placeholder still waiting on
 /// its own async hop can.
+///
+/// A settled surface can still be wrong in a way the comparison above can
+/// never catch: a stable BLANK. `before == after == []` reads as
+/// "identical", so the mid-flight check alone would wave a content-free
+/// screen through - a surface that renders nothing settles into agreeing
+/// with itself just as cleanly as one that rendered correctly.
+/// [expectSettled] additionally fails when the settled read has no visible
+/// text at all, unless [allowNoText] says this surface is genuinely
+/// text-free (a pure canvas/graphic, say).
+///
+/// This only catches a surface with truly nothing on screen. A route pushed
+/// over `ui_snapshot_support.dart`'s base channel shell (every settings and
+/// admin surface) keeps that base shell's own text mounted underneath, so a
+/// pane that renders empty while its surrounding chrome still has a title
+/// cannot reach an empty [renderedText] this way; only a standalone route
+/// can demonstrate this check failing.
 library;
 
 import 'package:flutter/widgets.dart';
@@ -62,23 +78,36 @@ List<String> renderedText(WidgetTester tester) {
 /// written, before an overflow assertion is trusted - never afterward, or
 /// the extra pumps this runs would let the very drift it looks for slip in
 /// ahead of the read.
+///
+/// [allowNoText] opts a genuinely text-free surface (a pure canvas/graphic)
+/// out of the blank check below; every other surface is expected to render
+/// at least one string a person reading the screen would see.
 Future<void> expectSettled(
   WidgetTester tester,
   String snapshotName, {
   bool knownTransient = false,
+  bool allowNoText = false,
 }) async {
   final before = renderedText(tester);
   for (var i = 0; i < extraSettlePumps; i++) {
     await tester.pump();
   }
   final after = renderedText(tester);
-  if (knownTransient || _sameText(before, after)) return;
-  fail(
-    'mid-flight capture: "$snapshotName" still had content resolving when '
-    'the settle budget declared it done.\n'
-    'captured: $before\n'
-    'settled:  $after',
-  );
+  if (!knownTransient && !_sameText(before, after)) {
+    fail(
+      'mid-flight capture: "$snapshotName" still had content resolving when '
+      'the settle budget declared it done.\n'
+      'captured: $before\n'
+      'settled:  $after',
+    );
+  }
+  if (!allowNoText && after.isEmpty) {
+    fail(
+      'blank capture: "$snapshotName" settled with no visible text at all.\n'
+      'A real screen a person reads shows something; pass allowNoText: '
+      'true if this surface is genuinely text-free.',
+    );
+  }
 }
 
 bool _sameText(List<String> a, List<String> b) {

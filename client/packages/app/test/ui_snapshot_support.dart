@@ -376,6 +376,8 @@ Future<void> teardownFixture(
 /// difference is not a defect - two valid states along one loading
 /// sequence, never a placeholder standing in for content - see that
 /// function's own doc for the one surface this is true of today.
+/// [allowNoText] passes straight through to [expectSettled]'s own blank
+/// check, for the rare surface that is genuinely text-free.
 Future<void> renderSurface(
   WidgetTester tester,
   String route,
@@ -386,6 +388,7 @@ Future<void> renderSurface(
   bool settleJoinTransition = false,
   bool settleNestedResolve = false,
   bool knownTransient = false,
+  bool allowNoText = false,
 }) async {
   tester.view.physicalSize = viewports[viewportName]!;
   tester.view.devicePixelRatio = 1.0;
@@ -426,7 +429,12 @@ Future<void> renderSurface(
   }
 
   // Before writeSnapshot: its own extra pumps could mask what this looks for.
-  await expectSettled(tester, snapshotName, knownTransient: knownTransient);
+  await expectSettled(
+    tester,
+    snapshotName,
+    knownTransient: knownTransient,
+    allowNoText: allowNoText,
+  );
 
   await writeSnapshot(tester, snapshotName);
 
