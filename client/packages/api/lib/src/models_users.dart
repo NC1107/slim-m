@@ -91,6 +91,7 @@ class Me {
     required this.permissions,
     this.avatarUpdatedAt,
     this.timedOutUntil,
+    this.timeoutReason,
     this.statusText,
   });
 
@@ -115,6 +116,11 @@ class Me {
   /// rather than leaving somebody with a dead composer and no explanation.
   final int? timedOutUntil;
 
+  /// Why the caller was timed out, or null if they are not timed out, or the
+  /// moderator left no reason. Self-view only: the server never puts this on
+  /// [UserProfile], which other members can read.
+  final String? timeoutReason;
+
   /// The caller's own status line; same meaning as [UserProfile.statusText].
   final String? statusText;
 
@@ -126,6 +132,7 @@ class Me {
         permissions: json['permissions'] as int,
         avatarUpdatedAt: json['avatar_updated_at'] as int?,
         timedOutUntil: json['timed_out_until'] as int?,
+        timeoutReason: json['timeout_reason'] as String?,
         statusText: json['status_text'] as String?,
       );
 }
