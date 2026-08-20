@@ -33,7 +33,7 @@ import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/push_to_talk_listener.dart';
-import '../widgets/rail_drag_handle.dart';
+import '../widgets/rail_slot.dart';
 import '../widgets/voice_strip_indicator.dart';
 import '../widgets/whats_new_gate.dart';
 import 'canvas/canvas_fullscreen.dart';
@@ -90,30 +90,13 @@ class HomeShell extends ConsumerWidget {
       scaffold = Scaffold(
         body: Row(
           children: [
-            // Collapsing gives the transcript the rail's width back. The rail
-            // unmounts rather than sitting at zero width, the same reasoning
-            // the member pane's slot carries: it polls voice rosters while
-            // built, and a hidden pane must not keep fetching.
-            ClipRect(
-              child: AnimatedContainer(
-                duration: AppMotion.reduced(context, AppMotion.base),
-                curve: AppMotion.entrance,
-                width: showRail ? railWidth : 0,
-                child: showRail
-                    ? OverflowBox(
-                        minWidth: railWidth,
-                        maxWidth: railWidth,
-                        alignment: Alignment.centerRight,
-                        child: const AppPanelReveal(
-                          fromLeft: true,
-                          child: ChannelRail(),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
+            // The rail, the collapsed strip, or neither, plus the drag handle; see railSlot's own doc.
+            ...railSlot(
+              context: context,
+              showRail: showRail,
+              canvasFullscreen: canvasFullscreen,
+              railWidth: railWidth,
             ),
-            // Always present, even collapsed - it is the only way back; gone only in canvas fullscreen, where it would be a live control over a provider showRail is already overriding.
-            if (!canvasFullscreen) const RailDragHandle(),
             // Its own semantics node, or the modal barrier inside this pane's
             // navigator blocks everything painted before it, which is the
             // whole rail: no channel row, section or search field reached a

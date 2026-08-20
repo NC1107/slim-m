@@ -59,8 +59,12 @@ class _FixedBlocks extends BlocksController {
   Future<void> refresh() async {}
 }
 
-Future<void> _finish(WidgetTester tester, String name) async {
-  await expectSettled(tester, name);
+Future<void> _finish(
+  WidgetTester tester,
+  String name, {
+  bool allowNoText = false,
+}) async {
+  await expectSettled(tester, name, allowNoText: allowNoText);
   await writeSnapshot(tester, name);
   expect(tester.takeException(), isNull);
 }
@@ -186,9 +190,11 @@ void main() {
           ),
         );
         await tester.pump();
+        // Deliberately text-free: the whole point is a blocked-by-them composer that looks entirely ordinary, so nothing on it can tell.
         await _finish(
           tester,
           'dm-blocked-by-them-invisible-composer-normal-desktop',
+          allowNoText: true,
         );
       },
     );
