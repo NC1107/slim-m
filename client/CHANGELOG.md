@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.48.0](https://github.com/NC1107/slim-m/compare/client-v0.47.0...client-v0.48.0) (2026-08-20)
+
+
+### Features
+
+* **client:** keep mic, deafen and settings reachable on a collapsed rail (UX2) ([#738](https://github.com/NC1107/slim-m/issues/738)) ([901fed8](https://github.com/NC1107/slim-m/commit/901fed808302772a117b932eb75eaf45afac71c7))
+* **moderation:** server foundation for report history and live sync (MOD4, MOD7) ([#732](https://github.com/NC1107/slim-m/issues/732)) ([882ebcd](https://github.com/NC1107/slim-m/commit/882ebcd32ed44c2aee9d047cc5c9dcc996071a6b))
+* **moderation:** show a timed-out member the reason and expiry (MOD6) ([#736](https://github.com/NC1107/slim-m/issues/736)) ([d0ef529](https://github.com/NC1107/slim-m/commit/d0ef5299a1c2ef5a476b2c9c61ed2ea521d94805))
+
+
+### Bug Fixes
+
+* address SonarQube security and code-quality findings ([#722](https://github.com/NC1107/slim-m/issues/722)) ([d6bdbc5](https://github.com/NC1107/slim-m/commit/d6bdbc59398ae02e1fb898cc578be316e1d0c0ab))
+* **design:** clear AA contrast on the mention pill and operator chip (UX3) ([#733](https://github.com/NC1107/slim-m/issues/733)) ([1df51b0](https://github.com/NC1107/slim-m/commit/1df51b0f023f3c9322d63d0d40ea691b5f61d352))
+
+
+### Performance Improvements
+
+* **client:** scope the member pane's presence watch per row (CS1) ([#734](https://github.com/NC1107/slim-m/issues/734)) ([823e01d](https://github.com/NC1107/slim-m/commit/823e01d4f42b21acf980754f9a3a62a5721fdcd7))
+* **client:** stop rebuilding the channel rail on every message (CP8) ([#735](https://github.com/NC1107/slim-m/issues/735)) ([d554cf5](https://github.com/NC1107/slim-m/commit/d554cf5b981af978c3864e02ff32789044389ac4))
+
 ## [0.47.0](https://github.com/NC1107/slim-m/compare/client-v0.46.1...client-v0.47.0) (2026-08-19)
 
 
