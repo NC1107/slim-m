@@ -176,6 +176,11 @@ struct MeDto {
     /// can name what happened rather than leaving somebody with a disabled
     /// composer and no explanation.
     timed_out_until: Option<i64>,
+    /// Why the caller was timed out, or `null` if they are not timed out, or
+    /// the moderator left no reason. Self-view only: this is moderation
+    /// information about the caller, so it belongs on [`MeDto`] and must
+    /// never appear on [`UserDto`], which other members can read.
+    timeout_reason: Option<String>,
     /// The caller's own status line, or `null`; see [`UserDto::status_text`].
     status_text: Option<String>,
 }
@@ -226,6 +231,7 @@ async fn get_me(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let permissions = state.store.base_permissions(ctx.user_id).await?;
+    let timeout = state.store.member_timeout(ctx.user_id).await?;
     Ok(Json(MeDto {
         id: user.id.to_string(),
         username: user.username,
@@ -233,7 +239,8 @@ async fn get_me(
         created_at: user.created_at,
         avatar_updated_at: user.avatar_updated_at,
         permissions: permissions.bits(),
-        timed_out_until: state.store.timed_out_until(ctx.user_id).await?,
+        timed_out_until: timeout.as_ref().map(|t| t.until),
+        timeout_reason: timeout.and_then(|t| t.reason),
         status_text: user.status_text,
     }))
 }

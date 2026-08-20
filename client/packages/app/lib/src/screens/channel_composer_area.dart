@@ -23,9 +23,11 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/message_selection.dart';
+import '../providers/providers.dart';
 import '../widgets/composer.dart';
 import '../widgets/message_selection_bar.dart';
 import '../widgets/reply_banner.dart';
+import '../widgets/timeout_banner.dart';
 import 'channel_message_actions.dart';
 
 class ChannelComposerArea extends ConsumerWidget {
@@ -58,9 +60,19 @@ class ChannelComposerArea extends ConsumerWidget {
         ),
       );
     }
+    final me = ref.watch(meProvider).valueOrNull;
+    final timedOutUntil = me?.timedOutUntil;
+    final stillTimedOut =
+        timedOutUntil != null &&
+        timedOutUntil > DateTime.now().millisecondsSinceEpoch;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        AppRevealBand(
+          child: stillTimedOut
+              ? TimeoutBanner(until: timedOutUntil, reason: me?.timeoutReason)
+              : null,
+        ),
         AppRevealBand(
           child: replyingTo == null
               ? null

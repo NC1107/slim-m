@@ -4661,6 +4661,13 @@ components:
             When the caller's own timeout lifts, or null. Present so a client
             can name what happened rather than leaving somebody with a
             disabled composer and no explanation.
+        timeout_reason:
+          type: [string, "null"]
+          description: >
+            Why the caller was timed out, or null if they are not timed out,
+            or the moderator left no reason. Self-view only: moderation
+            information about the caller, never exposed on `UserProfile`
+            (which other members read) - only this endpoint may return it.
         status_text:
           type: [string, "null"]
           maxLength: 80
