@@ -107,4 +107,27 @@ void main() {
     await expectSettled(tester, 'never-resolves-probe');
     expect(renderedText(tester), ['Loading...']);
   });
+
+  testWidgets('fails a settled surface with no visible text at all', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(textDirection: TextDirection.ltr, child: SizedBox()),
+    );
+
+    await expectLater(
+      () => expectSettled(tester, 'blank-probe'),
+      throwsA(isA<TestFailure>()),
+    );
+  });
+
+  testWidgets('allowNoText lets a genuinely text-free surface pass', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(textDirection: TextDirection.ltr, child: SizedBox()),
+    );
+
+    await expectSettled(tester, 'blank-probe', allowNoText: true);
+  });
 }
