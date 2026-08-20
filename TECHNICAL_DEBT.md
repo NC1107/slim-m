@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-23 of them are now accounted for - 22 fixed, and MOD5 decided-and-not-built - leaving 47 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+38 of them are now accounted for - 36 fixed, and MOD5 plus UX7 decided rather than built - leaving 32 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -30,6 +30,8 @@ CP1 is partly fixed in #668 and stays open, downgraded to Medium.
 MOD3 closed on 2026-08-15 in #670, MOD1 in #675, and MOD2 in #681. MOD5 and MOD11 were decided rather than built, in #677; see decision 0016.
 
 The server performance and correctness items closed on 2026-08-19: SRV4 in #711, SRV3 in #715, SRV2 in #719, and SRV5 in #721.
+
+A second 2026-08-19 batch closed API3 (#725), API2 (#726), MOD9 (#727), ARCH1 (#728), SRV1 (#729), MOD12 (#731), UX3 (#733), CS1 (#734), CP8 (#735), MOD6 (#736), TEST2 (#737) and UX2 (#738), plus the server foundations of MOD4 and MOD7 (#732) with their client screens backlogged. UX7 was decided rather than built (disabled text is WCAG-exempt). CP7, MOD8 and the two new retention findings CS4/CS5 (#730) were backlogged, and a profile-mode memory pass that day confirmed the client's resting footprint is healthy, so the retention work waits for real message volume.
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -62,11 +64,7 @@ Four reported findings did not survive verification and were corrected or reject
 
 ## Server: performance and domain logic
 
-- **SRV1. The reaction summary is recomputed once per connected client** (`http/ws/authorization.rs:314`). Medium.
-  `authorize()` runs independently per open WebSocket for every hub broadcast, and the `ReactionsChanged` branch calls `store.reactions_for_message(message_id, ctx.user_id)` fresh each time with no cache, so N viewers cost N of these per reaction.
-  Downgraded from High on 2026-08-14 after measuring it, and the original wording overstated it in two ways worth keeping written down. It is one query rather than a round trip per reactor: both sides are primary-key scans on `WITHOUT ROWID` tables, about 0.18ms on a realistic seed, of which the blocked-reactor subquery is roughly 17%. And the cost that actually scales is contention for a pool capped at 8 connections shared server-wide, which is a smaller and different claim than "N database round trips".
-  Note when fixing: the result is deliberately viewer-specific, because blocked reactors are excluded per viewer, so a single shared cache across connections would be wrong. This is not a theoretical objection - `hub/event.rs:49` says so in its own doc comment, decision record 0009 fixes it as an invariant, and commit `7cf0618b` fixed exactly this leak once already.
-  Fix: compute once per event and filter per viewer, or cache per message keyed on the blocklist inputs. Effort: medium.
+- ~~**SRV1. The reaction summary is recomputed once per connected client**~~ (`http/ws/authorization.rs:314`). Medium. Fixed in #729.
 
 - ~~**SRV2. The retention sweep holds the write lock across roughly 1000 sequential round trips**~~ (`store/message_retention.rs:129`). Medium. Fixed in #719.
 
@@ -88,22 +86,13 @@ Four reported findings did not survive verification and were corrected or reject
   The live consequence is on `voice::roster` (`http/voice.rs:260`), whose own doc comment tells clients to poll it on an interval while it shares the `Write` bucket with token mint, heartbeat and kick.
   Moving it to `Class::Read` would tighten it, not loosen it, so this is a decision rather than a swap: either widen `Read` to mean "cheap authenticated read" and move the read-only GETs onto it (`voice::roster`, `http/space.rs:43`, `http/members.rs:242`), or give polled reads their own class and move `metrics` and `analytics` back onto `Write`. Effort: medium.
 
-- **API2. Channel, category and role creation are not idempotent** (`http/channels.rs:190` and siblings). Medium.
-  They take no client-supplied UUIDv7 id, unlike `sendMessage` and `createPollMessage`, and none of the three tables has a `UNIQUE` constraint on `name` the way `custom_emoji.name` does.
-  A retried POST after a lost response creates a real duplicate row, against the documented UUIDv7-idempotent-writes architecture.
-  Fix: accept a client-supplied id and return the existing row on retry, or add a `UNIQUE` index on name as a cheaper backstop. Effort: medium.
+- ~~**API2. Channel, category and role creation are not idempotent**~~ (`http/channels.rs:190` and siblings). Medium. Fixed in #726.
 
-- **API3. 62 of 113 documented operations omit the 429 response** (`schema/openapi.yaml`). Medium.
-  Counted by parsing every `operationId` block for a `"429"` key.
-  `getMe` runs through `AuthedLimited<READ>` (`http/users.rs:211`) and can 429 but documents only 200 and 401, while `sendMessage` documents 429 for the same shape.
-  Fix: add the shared `TooManyRequests` response to every rate-limited operation, with a gate in the spirit of `tests/openapi_contract.rs` so the two cannot drift again. Effort: medium.
+- ~~**API3. 62 of 113 documented operations omit the 429 response**~~ (`schema/openapi.yaml`). Medium. Fixed in #725, with a gate so it cannot drift back.
 
 ## Architecture
 
-- **ARCH1. The attachment wire shape is defined three times** (`http/gifs.rs:298`, `http/attachments.rs:51`). Low.
-  `store::AttachmentSummary` is canonical and `http/message_dto.rs::AttachmentDto` already carries a `From` impl, but `attachments.rs` and `gifs.rs` each hand-roll the same four fields from the same locals.
-  A field added to the canonical shape needs three synchronised edits, and missing one makes the upload or GIF-select response diverge from list and fetch for what the client treats as one object.
-  Fix: delete both private DTOs and return `message_dto::AttachmentDto::from(summary)`. Effort: small.
+- ~~**ARCH1. The attachment wire shape is defined three times**~~ (`http/gifs.rs:298`, `http/attachments.rs:51`). Low. Fixed in #728.
 
 
 ## Client: package boundaries and architecture
@@ -139,10 +128,7 @@ Four reported findings did not survive verification and were corrected or reject
 
 ## Client: state management
 
-- **CS1. The whole presence map is watched with no `.select`** (`client/packages/app/lib/src/providers/presence_controller.dart:22`). Medium.
-  State is one `Map<String, PresenceState>` for every user, replaced wholesale on every `PresenceChanged`, and `member_pane.dart:60` watches the whole map.
-  Any single member's presence flicker reruns `AppMemberPane.build`, re-sorts and re-groups the entire roster, and rebuilds every row.
-  Fix: give each row its own `presenceControllerProvider.select((m) => m[userId])`. Effort: small.
+- ~~**CS1. The whole presence map is watched with no `.select`**~~ (`client/packages/app/lib/src/providers/presence_controller.dart:22`). Medium. Fixed in #734.
 
 - **CS2. `VoiceState` bundles a high-churn participant list with low-churn flags** (`client/packages/app/lib/src/providers/voice_state.dart:33`). Medium.
   `participants` updates on every join, leave, mute and speaking change while sharing one state object with `cameraEnabled`, `deafened` and `error`, and a workspace-wide search finds zero `voiceControllerProvider.select` call sites across roughly ten consuming widgets.
@@ -193,10 +179,9 @@ Four reported findings did not survive verification and were corrected or reject
 - **CP7. The transcript's live-watched window grows without bound** (`client/packages/app/lib/src/providers/channel_history.dart:153`). Medium.
   `loadOlder()` grows `state.window` by up to 50 per scroll-back with no ceiling, and `channel_screen.dart:345` passes it straight through as the `limit` of a drift `.watch()` query that re-runs on any write to the messages table anywhere in the app.
   Fix: cap window growth, or stop re-deriving the whole window from one growing-LIMIT stream. Effort: medium.
+  Backlogged 2026-08-19 per owner: the memory profile that day confirmed it is not yet an issue (884 KB local cache); it shares a root with CD2/CS4, best done as one retention sweep when volume warrants.
 
-- **CP8. Every incoming message rebuilds the entire channel rail** (`client/packages/app/lib/src/widgets/channel_rail.dart:151`). Medium.
-  The rail watches `store.watchChannels()`, a drift watch over the whole `channels` table, while `_advanceCursor` (`message_store.dart:436`) writes `channels.cursor` on essentially every applied message in any channel, invalidating that table-level watch.
-  Fix: move the per-channel read cursor out of the row the rail's list query watches. Effort: medium.
+- ~~**CP8. Every incoming message rebuilds the entire channel rail**~~ (`client/packages/app/lib/src/widgets/channel_rail.dart:151`). Medium. Fixed in #735.
 
 ## Client: data layer
 
@@ -252,33 +237,23 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   It would also have reversed a decision written into a shipped, immutable migration: `0020_member_timeouts.sql:9` says "One row per member rather than a history".
   Reasoning and the accepted drift risk are in `docs/decisions/0015-moderation-audit-trail.md`.
 
-- **MOD4. Resolved reports have no read surface** (`store/reports.rs:173`). Medium.
-  Distinct from MOD3 and milder than first reported: `resolved_at` and `resolved_by` *are* persisted, so nothing is lost, but `list_open_reports` filters `WHERE r.resolved_at IS NULL` and no second route reads resolved ones, so a resolved report vanishes from every UI.
-  Fix: an owner-visible moderation history route and screen. Since MOD3 shipped it now reads resolved reports plus `moderation_audit_log`, which is a single ordered feed rather than two live tables to union and filter. Effort: medium.
+- ~~**MOD4. Resolved reports have no read surface**~~ (`store/reports.rs:173`). Medium. Server foundation shipped in #732 (`GET /reports/history` merges resolved reports and the audit log); the moderator history SCREEN is backlogged, per owner.
 
 - ~~**MOD5. A removed or timed-out member cannot say anything back**~~ (`store/sessions.rs:396`). High. Decided on 2026-08-15, not built.
   The entry asked the right question - "whether an in-product appeal path is wanted at all is a product decision, not a defect" - and the owner's answer is no. There will be no appeal route, no DM exemption for a timed-out member, and no read-only mode for a removed account.
   Reasoning and the consequences accepted with it are in `docs/decisions/0016-message-deletion-has-no-hierarchy.md`. The short of it: one deployment is one community, its moderators are reachable by whatever the group already uses, and an appeal inbox reachable by removed accounts is a surface a raid can use.
   A wrongly removed member still has recourse, just not self-service: an administrator can restore them, and since MOD3 that restoration is recorded with who did it. MOD6 - showing a timed-out member the reason - stays open and is worth more here than an appeal path would be.
 
-- **MOD6. A timeout's reason is captured but never shown to the person it was issued against** (`http/users.rs:150`). Medium.
-  `member_timeouts.reason` is stored, but `MeDto` exposes only `timed_out_until`, so a blocked send surfaces as "you are not allowed to do that" with no reason and no end time.
-  Fix: add `timeout_reason` to `MeDto` and show a persistent composer banner naming the expiry and reason. Effort: small.
+- ~~**MOD6. A timeout's reason is captured but never shown to the person it was issued against**~~ (`http/users.rs:150`). Medium. Fixed in #736.
 
-- **MOD7. The report queue has no live sync** (`hub/event.rs`). Medium.
-  No `Report*` hub event variant exists, so a second moderator working the queue learns a report was already handled only by receiving a bare 404 on resolve.
-  The conditional UPDATE does prevent a double action landing, so this is wasted work and confusion rather than a correctness bug.
-  Fix: publish a hub event on resolution and have the queue drop or grey the card live. Effort: medium.
+- ~~**MOD7. The report queue has no live sync**~~ (`hub/event.rs`). Medium. Server foundation shipped in #732 (a moderator-gated, field-free `ReportsChanged` event); the client queue consumer is backlogged, per owner.
 
 - **MOD8. A reporter never learns anything happened** (`http/safety.rs:211`). Medium.
   `file_report` returns only the new id; there is no "my reports" route, no resolution notification, and `GET /reports` is gated on `MANAGE_MESSAGES`, so a reporter cannot look up even their own report.
   Fix: a narrow status-only "my reports" read, or a notification when a reporter's own report is resolved. Effort: small.
+  Backlogged 2026-08-19 per owner, alongside the MOD4/MOD7 moderation client work: needs a reporter-facing notification surface.
 
-- **MOD9. Nothing links a returning account to a removed one** (`migrations/0002_core_schema.sql:19`). Medium.
-  `users` carries no device fingerprint and no IP, and every IP hit in the server is transient rate-limiter state; nothing records which invite a registration used either.
-  Ban evasion is therefore undetectable by anything the product keeps.
-  Note the tension with the project's privacy posture: recording IPs is a decision, but recording the invite used is not.
-  Fix, minimally: record the invite code a registration came through and surface it on the member and removal records. Effort: small.
+- ~~**MOD9. Nothing links a returning account to a removed one**~~ (`migrations/0002_core_schema.sql:19`). Medium. Fixed in #727 (surfaced to moderators; SRV5 already recorded the invite).
 
 - **MOD10. Bulk delete cannot select by author and time window** (`http/messages_bulk.rs`). Medium.
   The id-list form shipped; the raid case still wants "this author's last N minutes here" as one call rather than a client first selecting them.
@@ -288,9 +263,7 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
   The entry offered two ways out - apply the guard to the single delete, or decide message deletion is exempt and record it. The owner chose the second, so the asymmetry is gone in the direction that leaves both paths alike: `MANAGE_MESSAGES` reaches every message in the channel, an administrator's included.
   `docs/decisions/0016-message-deletion-has-no-hierarchy.md` records why a guard on the bulk route alone protected nothing - it refused sixty-four at once while allowing the same sixty-four one at a time, a difference in patience rather than permission.
 
-- **MOD12. A delete publishes no unpin and no thread update** (`http/messages.rs:265`). Medium.
-  The `pinned_messages_on_delete` trigger removes the pin and nothing publishes `MessageUnpinned`; `send` calls `notify_reply` and `delete` does not. Both self-correct on refetch, so one stale badge is tolerable - but bulk delete turns one into up to sixty-four at once.
-  Fix: publish both from the delete paths, single and bulk. Effort: small.
+- ~~**MOD12. A delete publishes no unpin and no thread update**~~ (`http/messages.rs:265`). Medium. Fixed in #731.
 
 - **MOD13. Nothing in the app can select several members, or several messages** (`client/packages/app/lib/src/widgets/member_pane.dart`). Medium. Message half fixed in #683; member half still open.
   MOD2 makes a wave of throwaway accounts findable and MOD1 gives the server a bulk delete taking 64 ids, but there is still no multi-select anywhere in the client, so acting on what the search now surfaces is one member and one message at a time.
@@ -309,14 +282,9 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   Discord and Slack, the products the design language names as reference, keep the parent visible.
   Fix: dock the thread as a fixed-width side pane at expanded widths, reusing the member pane's existing dock and reveal mechanism. Effort: large.
 
-- **UX2. Collapsing the rail removes the only access to settings, mic and deafen** (`rail-collapsed-desktop-light.png`). Medium, desktop.
-  The collapse removes the entire rail subtree including the user footer, and nothing else in the chrome offers those controls, so a user who collapsed the rail for transcript width cannot mute themselves without expanding it again.
-  Fix: keep a minimal persistent strip when collapsed, or relocate mic, deafen and settings into the top chrome. Effort: medium.
+- ~~**UX2. Collapsing the rail removes the only access to settings, mic and deafen**~~ (`rail-collapsed-desktop-light.png`). Medium, desktop. Fixed in #738.
 
-- **UX3. The mention pill and search operator chip miss AA contrast** (`design_system/lib/src/components/forms/chip.dart:101`, `message_text.dart:339`). Medium, both.
-  Accent text on accent-soft fill measures 4.45:1 in light theme, under the 4.5:1 AA floor that `design-language.md` itself sets as the explicit target.
-  Being mentioned is one of the highest-salience moments in the product, so this is the wrong place to be under the line.
-  Fix: darken light-theme `accentSoft`, or use the darker `accent` value already reserved for sunken surfaces, which clears 4.97:1. Effort: small.
+- ~~**UX3. The mention pill and search operator chip miss AA contrast**~~ (`design_system/lib/src/components/forms/chip.dart:101`, `message_text.dart:339`). Medium, both. Fixed in #733.
 
 - **UX4. Onboarding and sign-in waste a fifth of the desktop viewport** (`onboarding-desktop-light.png`). Medium, desktop.
   Both are two-column layouts whose left column is flat background carrying only the wordmark, roughly 540 of 2800px, on the first screens a new self-host operator or invited teammate ever sees.
@@ -330,10 +298,7 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   "Unknown" reads as an uninitialised or error value against the online, away, dnd and offline vocabulary used everywhere else, and it is the first thing a new admin sees about their own account after onboarding.
   Fix: default a freshly created account's presence to whatever bootstrap actually intends, or give "Unknown" a friendlier rendering. Effort: small.
 
-- **UX7. `textDisabled` sits below the AA text floor** (`design_system/lib/src/app_tokens.dart:173`). Low, both.
-  2.96:1 on `surfaceBase` and 2.78:1 on `surfaceSunken`, against a 4.5:1 stated target.
-  This is almost certainly fine: WCAG exempts disabled controls, and the token's own doc comment argues disabled and de-emphasised text must stay distinguishable.
-  Fix: no code change, just one line in that doc comment confirming the exemption is deliberate so a future contributor does not "fix" it. Effort: small.
+- ~~**UX7. `textDisabled` sits below the AA text floor**~~ (`design_system/lib/src/app_tokens.dart:173`). Low. Won't fix (see #733): disabled text is deliberately WCAG 1.4.3-exempt - `contrast_test.dart` reports its ratio rather than gating it.
 
 ## CI and release
 
@@ -353,11 +318,7 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   TEST2 is what that missing coverage let through.
   Fix: generate references on the CI runner with `--update-goldens`, commit them, and set both variables in `client-ci.yml`. Effort: medium.
 
-- **TEST2. The snapshot suite captures a blank Roles screen and nothing notices** (`client/packages/app/test/ui_snapshot_test.dart:170`). Medium.
-  Every Roles capture, in both themes and every viewport, renders the modal chrome (title, back arrow, add button) over an entirely empty body, though the fixture wires three roles and sibling admin screens render correctly in the same run.
-  This is a harness gap and not a product defect: `roles_screen_test.dart` passes and asserts on the `@everyone` row, so the screen renders correctly under an ordinary widget test.
-  The real problem is that `expectSettled`, whose stated job is catching a placeholder standing in for content, did not fire, so the Roles surface is entirely unguarded by the snapshot suite.
-  Fix: settle the roles provider on that surface (`roles` is absent from `_nestedResolveSurfaces`) and make `expectSettled` fail on an empty content area rather than emitting a blank PNG. Effort: medium.
+- ~~**TEST2. The snapshot suite captures a blank Roles screen and nothing notices**~~ (`client/packages/app/test/ui_snapshot_test.dart:170`). Medium. Fixed in #737 (the harness now fails a stable-blank surface; the blank Roles screen itself was already closed by #166).
 
 - ~~**TEST3. `message_row_test.dart:403` skips its only real assertion via an `if` guard.**~~ High. Fixed in #667.
   Worse than recorded, and worth keeping written down. The guarded finder looked for an `InkWell` inside the emoji panel, which that panel has never rendered - its tiles are `EmojiGrid` cells wrapped in a `GestureDetector` - so it matched zero widgets from the day the test was written and the tap never once ran. The entry assumed the block ran until the regression returned; it had never run at all.
