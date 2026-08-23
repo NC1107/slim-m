@@ -36,9 +36,6 @@ use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 
-/// An emoji's bytes are content-addressed, so they never change under an id.
-const IMMUTABLE_CACHE: &str = "private, max-age=31536000, immutable";
-
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/emoji", get(list).post(upload))
@@ -177,12 +174,8 @@ async fn image(
         ApiError::Internal
     })?;
 
-    let mut response = serve(bytes, &meta.content_type, &meta.filename);
-    response.headers_mut().insert(
-        axum::http::header::CACHE_CONTROL,
-        axum::http::HeaderValue::from_static(IMMUTABLE_CACHE),
-    );
-    Ok(response)
+    // serve already applies the immutable cache header, right for a content-addressed emoji.
+    Ok(serve(bytes, &meta.content_type, &meta.filename))
 }
 
 // --- Helpers ---
