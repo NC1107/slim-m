@@ -6,13 +6,19 @@
 /// honestly: the message it names is always one this session just fetched
 /// and is looking straight at, since the only way to start a reply is
 /// tapping "Reply" on a row already on screen.
+///
+/// An inset, rounded chip rather than a full-bleed bar: it reads as one
+/// recessed quote above the composer, on the design's rounded surfaces,
+/// instead of a heavy sharp-cornered strip the width of the pane.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/message_extras.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
 
@@ -30,55 +36,84 @@ class ReplyBanner extends ConsumerWidget {
       cachedDisplayName: message.authorDisplayName,
       profiles: ref.watch(batchProfilesControllerProvider),
     );
-    final snippet = message.content.replaceAll('\n', ' ').trim();
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
-        border: Border(top: BorderSide(color: tokens.borderSubtle)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s16,
-          vertical: AppSpacing.s8,
-        ),
-        child: Row(
-          children: [
-            Icon(AppIcons.reply, size: 14, color: tokens.textSecondary),
-            const SizedBox(width: AppSpacing.s8),
-            Expanded(
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Replying to $label',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: AppWeights.semi,
-                      ),
-                    ),
-                    if (snippet.isNotEmpty)
-                      TextSpan(
-                        text: '  $snippet',
-                        style: AppText.caption.copyWith(
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+    // A text-less parent is named by what it carried, not left blank.
+    final text = message.content.replaceAll('\n', ' ').trim();
+    final snippet = text.isNotEmpty
+        ? text
+        : _attachmentSummary(
+            ref.watch(
+              messageExtrasProvider.select(
+                (extras) => extras[message.id]?.attachments ?? const [],
               ),
             ),
-            AppIconButton(
-              icon: AppIcons.dismiss,
-              semanticLabel: 'Cancel reply',
-              tooltip: 'Cancel reply',
-              size: AppIconButtonSize.sm,
-              onPressed: onCancel,
-            ),
-          ],
+          );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s8,
+        AppSpacing.s8,
+        AppSpacing.s8,
+        AppSpacing.s4,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: tokens.surfaceSunken,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          border: Border.all(color: tokens.borderSubtle),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s12,
+            vertical: AppSpacing.s8,
+          ),
+          child: Row(
+            children: [
+              Icon(AppIcons.reply, size: 14, color: tokens.textSecondary),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Replying to $label',
+                        style: AppText.caption.copyWith(
+                          color: tokens.textPrimary,
+                          fontWeight: AppWeights.semi,
+                        ),
+                      ),
+                      if (snippet.isNotEmpty)
+                        TextSpan(
+                          text: '  $snippet',
+                          style: AppText.caption.copyWith(
+                            color: tokens.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              AppIconButton(
+                icon: AppIcons.dismiss,
+                semanticLabel: 'Cancel reply',
+                tooltip: 'Cancel reply',
+                size: AppIconButtonSize.sm,
+                onPressed: onCancel,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// What a text-less parent carried, so its reply chip names something rather
+/// than trailing off after the author: one image reads as "Photo", one file as
+/// its own name, several as a plain count.
+String _attachmentSummary(List<api.Attachment> attachments) {
+  if (attachments.isEmpty) return '';
+  if (attachments.length > 1) return '${attachments.length} attachments';
+  final only = attachments.first;
+  return only.contentType.startsWith('image/') ? 'Photo' : only.filename;
 }
