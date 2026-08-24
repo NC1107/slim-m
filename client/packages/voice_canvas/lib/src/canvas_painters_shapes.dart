@@ -48,21 +48,29 @@ extension _StrokePainterShapes on StrokePainter {
     }
     const lineHeightMultiple = 1.3;
     final fontSize = 12 * camera.zoom;
-    final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          fontFamily: textFontFamily,
-          fontSize: fontSize,
-          color: textInk,
-          height: lineHeightMultiple,
+    // Keyed on all the layout depends on: a pan holds these steady and hits, a zoom or resize changes one and rebuilds.
+    final painter = _noteLabels.painterFor(
+      stroke.id,
+      (text, camera.zoom, stroke.w, stroke.h),
+      () => TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            fontFamily: textFontFamily,
+            fontSize: fontSize,
+            color: textInk,
+            height: lineHeightMultiple,
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-      maxLines:
-          noteMaxLines(box.height, fontSize * lineHeightMultiple, pad: pad),
-      ellipsis: '…',
-    )..layout(maxWidth: box.width - pad * 2, minWidth: 0);
+        textDirection: TextDirection.ltr,
+        maxLines: noteMaxLines(
+          box.height,
+          fontSize * lineHeightMultiple,
+          pad: pad,
+        ),
+        ellipsis: '…',
+      )..layout(maxWidth: box.width - pad * 2, minWidth: 0),
+    );
     canvas.save();
     // A clip at exactly `pad`, matching the text's own offset below.
     canvas.clipRect(box.deflate(pad));
