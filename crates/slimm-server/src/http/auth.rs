@@ -347,6 +347,37 @@ mod tests {
         assert!(super::validate_username("not-here").is_ok());
     }
 
+    /// The length rule is inclusive at both ends: empty is refused, one
+    /// character is enough, thirty-two is the ceiling, and thirty-three is
+    /// over it.
+    #[test]
+    fn a_username_must_be_one_to_thirty_two_characters() {
+        assert!(super::validate_username("").is_err());
+        assert!(super::validate_username("a").is_ok());
+        assert!(super::validate_username(&"a".repeat(32)).is_ok());
+        assert!(super::validate_username(&"a".repeat(33)).is_err());
+    }
+
+    /// Only ASCII letters, digits and `_ . -` pass; a space, an `@`, a
+    /// non-ASCII letter, and other punctuation are each refused, so a username
+    /// can never carry a character a mention or a path would then have to
+    /// escape. Length is checked first, so every case here is short enough to
+    /// reach the character rule.
+    #[test]
+    fn a_username_allows_only_letters_digits_and_a_few_marks() {
+        assert!(super::validate_username("aZ09_.-").is_ok());
+        for bad in [
+            "has space",
+            "has@at",
+            "café",
+            "bang!",
+            "slash/here",
+            "colon:",
+        ] {
+            assert!(super::validate_username(bad).is_err(), "{bad:?}");
+        }
+    }
+
     /// Cross-checked against the same string in `client/packages/app/test/
     /// support/onboarding_error_strings.dart`, both read from `tests/
     /// fixtures/onboarding_error_strings.json` - editing the length rule's
