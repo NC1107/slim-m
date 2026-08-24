@@ -108,10 +108,7 @@ class OnboardingShell extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              // A slim brand rail, not a third of the viewport: below the
-              // wordmark this column is deliberately empty (see [_BrandPanel]),
-              // and at 380 that emptiness read as an unfinished half rather
-              // than a margin. Narrow enough to frame the form, not host one.
+              // A slim brand rail, not a third of the viewport; see [_BrandPanel].
               width: 260,
               decoration: BoxDecoration(
                 color: tokens.surfaceSunken,
@@ -166,7 +163,9 @@ class _Wordmark extends StatelessWidget {
 /// because this is the screen where somebody decides whether to trust one.
 ///
 /// The layout is kept rather than collapsed so there is a place to put real
-/// words when there are some.
+/// words when there are some - but the rail is narrow (its container's width),
+/// because at a third of the viewport this emptiness read as an unfinished
+/// half rather than a margin.
 class _BrandPanel extends StatelessWidget {
   const _BrandPanel();
 
