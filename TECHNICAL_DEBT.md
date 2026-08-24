@@ -271,10 +271,8 @@ Found sound and not listed: the escalation guards, per-channel permission maskin
 Taken from 302 PNGs rendered from the real widget tree.
 Deliberately excluded: everything in `ui-review.md` (accepted motion and feel work), and M8 in the 2026-08-11 review.
 
-- **UX1. Threads hide the parent channel on desktop** (`thread-desktop-light.png`). Medium, desktop.
-  A thread opens as a centered modal card over a dimmed scrim, fully obscuring the transcript it belongs to, even at 2800px where there is ample room to dock beside it.
-  Discord and Slack, the products the design language names as reference, keep the parent visible.
-  Fix: dock the thread as a fixed-width side pane at expanded widths, reusing the member pane's existing dock and reveal mechanism. Effort: large.
+- ~~**UX1. Threads hide the parent channel on desktop**~~ (`thread-desktop-light.png`). Medium, desktop. Fixed in #824.
+  An in-app thread open now sets `openThreadProvider` and the shell docks the thread as a fixed-width side pane beside the transcript at widths that fit it (`fitsThreadPane`), reusing the member pane's own reveal; the thread and the roster share that one third-pane slot so the transcript is never squeezed by two. The recorded fix's own words, with two deliberate limits: the `/thread/:id` modal route is kept unchanged for compact widths and cold deep links (so URLs and e2e keep working), and the docked pane is not URL-backed, so a reload closes it back to the channel. Docking a cold deep link too would need an async router redirect that reads layout and sets the provider - carried as a follow-up rather than built here.
 
 - ~~**UX2. Collapsing the rail removes the only access to settings, mic and deafen**~~ (`rail-collapsed-desktop-light.png`). Medium, desktop. Fixed in #738.
 
