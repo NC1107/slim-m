@@ -343,6 +343,7 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   `AppSpeakingRing` starts an unbounded `repeat(reverse: true)` on call join, which hangs `pumpAndSettle` forever unless the test sets `disableAnimations: true` first.
   Every current test does this correctly, but each does it by hand, so the next one to mount a speaking-capable widget hangs instead of failing.
   Fix: fold the guard into a shared pump helper. Effort: small.
+  The shared helper now exists (`test/support/reduced_motion_harness.dart`'s `reducedMotionApp`, added in #827) and `member_profile_eject_test` uses it; the entry stays open because the other speaking-capable tests keep their own local reduce-motion wrappers, several of them router-based rather than this `MaterialApp`-home shape, so they are migrated as they are next touched rather than rewritten in one sweep.
 
 - ~~**TEST15. Four tests use a deprecated semantics API**~~ (`client/packages/app/test/canvas_activity_panel_test.dart:125`). Low. Fixed in #755.
   The named files had partly moved on already; the deprecated `tester.binding.pipelineOwner` remained in `context_menu_region_reachability_test.dart`, `voice_settings_camera_test.dart`, `message_row_author_profile_test.dart` and `desktop/window_menu_button_test.dart`. All four now read `tester.binding.renderViews.first.owner!.semanticsOwner!`, the pattern the already-migrated files use; each test still dumps and asserts over the real semantics tree, so a wrong accessor would fail rather than pass.
