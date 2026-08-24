@@ -217,6 +217,11 @@ class RunTest(unittest.TestCase):
             for call in ctx.api.call.call_args_list:
                 if call.args[0] == "PUT" and call.args[1] == "/messages/p1/polls/vote":
                     votes_by_account[ctx.username] += 1
+        self.assertTrue(
+            votes_by_account,
+            "the fixed seed must record some votes, or the no-double-vote "
+            "assertion below passes vacuously",
+        )
         self.assertTrue(all(count <= 1 for count in votes_by_account.values()))
 
     def test_a_poll_the_coverage_roll_skips_gets_no_votes_at_all(self):
