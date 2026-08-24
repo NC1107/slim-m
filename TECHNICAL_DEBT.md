@@ -76,9 +76,8 @@ Four reported findings did not survive verification and were corrected or reject
 
 - ~~**SRV5. A retried invite redemption either falsely fails or burns a second use**~~ (`store/invites.rs:286`). Medium. Fixed in #721.
 
-- **SRV6. The stale-call sweep evicts participants one at a time** (`lib.rs:228`). Low.
-  `sweep_stale_voice_calls_at` awaits `voice.remove_participant` per stale pair, each a real HTTP POST to LiveKit, so a blip that expires many heartbeats in one tick serialises N round trips.
-  Fix: fan out with a bounded `for_each_concurrent`. Effort: small.
+- ~~**SRV6. The stale-call sweep evicts participants one at a time**~~ (`lib.rs:228`). Low. Fixed in #761.
+  `sweep_stale_voice_calls_at` now publishes `VoiceActivityChanged` for every stale pair up front, then fans the removals out with `for_each_concurrent` bounded by `STALE_SWEEP_CONCURRENCY` (16), so a blip that expires many heartbeats in one tick no longer serialises N LiveKit round trips. Each removal still swallows its own error per pair, so one failure cannot cancel the rest, and the 10s ticker still awaits the sweep before the next tick. Two tests pin it: a burst overlaps (mutation-checked against concurrency 1) and the fan-out stays under its ceiling (mutation-checked against an unbounded bound).
 
 ## Server: API contract
 
