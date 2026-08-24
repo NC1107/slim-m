@@ -178,3 +178,45 @@ fn join_ids(ids: &[ChannelId]) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ReorderGroupRequest, parse_groups};
+
+    const UUID_A: &str = "00000000-0000-0000-0000-00000000000a";
+    const UUID_B: &str = "00000000-0000-0000-0000-00000000000b";
+
+    fn group(category: Option<&str>, channels: &[&str]) -> ReorderGroupRequest {
+        ReorderGroupRequest {
+            category_id: category.map(str::to_owned),
+            channel_ids: channels.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// A null category is the implicit uncategorised section, which must parse
+    /// to `None` rather than being refused.
+    #[test]
+    fn a_null_category_parses_as_the_uncategorised_section() {
+        let Ok(out) = parse_groups(&[group(None, &[UUID_A])]) else {
+            panic!("a null category is valid");
+        };
+        assert_eq!(out.len(), 1);
+        assert!(out[0].category_id.is_none());
+        assert_eq!(out[0].channel_ids.len(), 1);
+    }
+
+    #[test]
+    fn a_present_category_and_its_channels_parse() {
+        let Ok(out) = parse_groups(&[group(Some(UUID_B), &[UUID_A, UUID_B])]) else {
+            panic!("valid ids parse");
+        };
+        assert!(out[0].category_id.is_some());
+        assert_eq!(out[0].channel_ids.len(), 2);
+    }
+
+    #[test]
+    fn an_unparseable_id_is_refused_in_either_position() {
+        assert!(parse_groups(&[group(Some("not-a-uuid"), &[])]).is_err());
+        assert!(parse_groups(&[group(None, &["not-a-uuid"])]).is_err());
+    }
+}
