@@ -175,8 +175,13 @@ void main() {
 
         expect(
           _anyNodeHasLongPress(
-            // ignore: deprecated_member_use
-            tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!,
+            tester
+                .binding
+                .renderViews
+                .first
+                .owner!
+                .semanticsOwner!
+                .rootSemanticsNode!,
           ),
           isFalse,
           reason:

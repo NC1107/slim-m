@@ -92,10 +92,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Window menu'));
       await tester.pumpAndSettle();
 
-      final owner = tester
-          .binding
-          // ignore: deprecated_member_use
-          .pipelineOwner;
+      final owner = tester.binding.renderViews.first.owner!;
       final dump = owner.semanticsOwner!.rootSemanticsNode!.toStringDeep();
       expect(dump, contains('Quit slim-m'));
 

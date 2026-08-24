@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-49 of them are now accounted for - 47 fixed, and MOD5 plus UX7 decided rather than built - leaving 21 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+50 of them are now accounted for - 48 fixed, and MOD5 plus UX7 decided rather than built - leaving 20 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -352,9 +352,8 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   Every current test does this correctly, but each does it by hand, so the next one to mount a speaking-capable widget hangs instead of failing.
   Fix: fold the guard into a shared pump helper. Effort: small.
 
-- **TEST15. Four tests use a deprecated semantics API** (`client/packages/app/test/canvas_activity_panel_test.dart:125`). Low.
-  `tester.binding.pipelineOwner` has been deprecated since Flutter 3.10, repeated in `canvas_fullscreen_test.dart:166`, `rail_drag_handle_test.dart:147` and `context_menu_region_reachability_test.dart:179`.
-  Fix: use `rootPipelineOwner.semanticsOwner`. Effort: small.
+- ~~**TEST15. Four tests use a deprecated semantics API**~~ (`client/packages/app/test/canvas_activity_panel_test.dart:125`). Low. Fixed in #755.
+  The named files had partly moved on already; the deprecated `tester.binding.pipelineOwner` remained in `context_menu_region_reachability_test.dart`, `voice_settings_camera_test.dart`, `message_row_author_profile_test.dart` and `desktop/window_menu_button_test.dart`. All four now read `tester.binding.renderViews.first.owner!.semanticsOwner!`, the pattern the already-migrated files use; each test still dumps and asserts over the real semantics tree, so a wrong accessor would fail rather than pass.
 
 ## Rejected or corrected during verification, so nobody re-finds them
 
