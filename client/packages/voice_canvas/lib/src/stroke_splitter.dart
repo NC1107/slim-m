@@ -50,33 +50,91 @@ List<StrokeSegment> splitStroke(
   if (worldPoints.isEmpty) return const <StrokeSegment>[];
   final segments = <StrokeSegment>[];
   var start = 0;
-  var end = 1;
   while (start < worldPoints.length) {
-    var candidate = end;
-    while (candidate < worldPoints.length) {
-      final next = candidate + 1;
-      if (_encodedLength(worldPoints, start, next) > maxPropsBytes ||
-          !_withinExtent(worldPoints, start, next)) {
-        break;
-      }
-      candidate = next;
-    }
+    final candidate = _growSegment(worldPoints, start, maxPropsBytes);
     // At least two points, or a single tap never becomes a mark at all.
     final stop = math.max(candidate, math.min(start + 2, worldPoints.length));
     segments.add(_segment(worldPoints, start, stop));
     if (stop >= worldPoints.length) break;
     start = stop - 1;
-    end = start + 1;
   }
   return segments;
 }
 
+/// The largest `candidate` for which the segment `[start, candidate)` still
+/// fits the byte and extent budgets, growing one point at a time.
+///
+/// Both budgets are tracked incrementally so each step is O(1), rather than
+/// re-deriving the whole segment's bounds and re-encoding its whole point list
+/// on every probe (which made the old scan O(L^2) in a segment's length). The
+/// bounding box only ever grows, so extent is a running min/max; the encoded
+/// length is a running sum of each coordinate's JSON length, recomputed only
+/// when a new point moves the origin the coordinates are stored relative to.
+/// The result is identical to re-encoding from scratch at each point, which the
+/// equivalence test pins against the pre-existing implementation.
+int _growSegment(List<Offset> points, int start, int maxPropsBytes) {
+  final len = points.length;
+  var candidate = start + 1;
+  if (candidate >= len) return candidate;
+
+  var minX = points[start].dx;
+  var minY = points[start].dy;
+  var maxX = minX;
+  var maxY = minY;
+  var originX = _quantise(minX);
+  var originY = _quantise(minY);
+  var count = 2;
+  var sumNumLen =
+      _numLen(points[start].dx - originX) + _numLen(points[start].dy - originY);
+
+  while (candidate < len) {
+    final p = points[candidate];
+    final newMinX = math.min(minX, p.dx);
+    final newMinY = math.min(minY, p.dy);
+    final newMaxX = math.max(maxX, p.dx);
+    final newMaxY = math.max(maxY, p.dy);
+    if (newMaxX - newMinX > maxObjectExtent ||
+        newMaxY - newMinY > maxObjectExtent) {
+      break;
+    }
+
+    final newOriginX = _quantise(newMinX);
+    final newOriginY = _quantise(newMinY);
+    final newCount = count + 2;
+    final int newSumNumLen;
+    if (newOriginX == originX && newOriginY == originY) {
+      newSumNumLen =
+          sumNumLen + _numLen(p.dx - originX) + _numLen(p.dy - originY);
+    } else {
+      var sum = 0;
+      for (var i = start; i <= candidate; i++) {
+        sum += _numLen(points[i].dx - newOriginX);
+        sum += _numLen(points[i].dy - newOriginY);
+      }
+      newSumNumLen = sum;
+    }
+
+    // jsonEncode of a list is "[" + numbers joined by "," + "]".
+    if (2 + newSumNumLen + (newCount - 1) > maxPropsBytes) break;
+
+    candidate++;
+    minX = newMinX;
+    minY = newMinY;
+    maxX = newMaxX;
+    maxY = newMaxY;
+    originX = newOriginX;
+    originY = newOriginY;
+    count = newCount;
+    sumNumLen = newSumNumLen;
+  }
+  return candidate;
+}
+
 double _quantise(double v) => (v * 100).roundToDouble() / 100;
 
-bool _withinExtent(List<Offset> points, int start, int stop) {
-  final box = _bounds(points, start, stop);
-  return box.width <= maxObjectExtent && box.height <= maxObjectExtent;
-}
+/// The JSON-encoded length of one coordinate, quantised the way [_segment]
+/// stores it, so a running sum of these equals re-encoding the whole list.
+int _numLen(double relative) => jsonEncode(_quantise(relative)).length;
 
 Rect _bounds(List<Offset> points, int start, int stop) {
   var minX = points[start].dx;
@@ -110,6 +168,3 @@ StrokeSegment _segment(List<Offset> points, int start, int stop) {
     points: flat,
   );
 }
-
-int _encodedLength(List<Offset> points, int start, int stop) =>
-    jsonEncode(_segment(points, start, stop).points).length;
