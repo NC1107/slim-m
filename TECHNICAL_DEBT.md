@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-41 of them are now accounted for - 39 fixed, and MOD5 plus UX7 decided rather than built - leaving 29 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+42 of them are now accounted for - 40 fixed, and MOD5 plus UX7 decided rather than built - leaving 28 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -33,7 +33,7 @@ The server performance and correctness items closed on 2026-08-19: SRV4 in #711,
 
 A second 2026-08-19 batch closed API3 (#725), API2 (#726), MOD9 (#727), ARCH1 (#728), SRV1 (#729), MOD12 (#731), UX3 (#733), CS1 (#734), CP8 (#735), MOD6 (#736), TEST2 (#737) and UX2 (#738), plus the server foundations of MOD4 and MOD7 (#732) with their client screens backlogged. UX7 was decided rather than built (disabled text is WCAG-exempt). CP7, MOD8 and the two new retention findings CS4/CS5 (#730) were backlogged, and a profile-mode memory pass that day confirmed the client's resting footprint is healthy, so the retention work waits for real message volume.
 
-A client-performance pass on 2026-08-23/24 profiled the CP cluster and closed CP4 (#742), CP6 (#743) and CP5 (#744). CP2 was measured for the first time and stays backlogged - its paint cost is a fraction of a millisecond even at 2000 visible objects. CP1 was reviewed and deliberately left open: the profile rated it modest allocation churn during a gesture, while its safe fix carries the exact risk this file already warns about (a stale-cache miss freezing the presence tiles). The pass also surfaced CP9, the same re-shape-every-paint waste CP5 fixed but in sticky-note labels. Two test-coverage gaps were closed alongside it: the emoji HTTP routes (#740) and the reports queue controller (#741).
+A client-performance pass on 2026-08-23/24 profiled the CP cluster and closed CP4 (#742), CP6 (#743) and CP5 (#744). CP2 was measured for the first time and stays backlogged - its paint cost is a fraction of a millisecond even at 2000 visible objects. CP1 was reviewed and deliberately left open: the profile rated it modest allocation churn during a gesture, while its safe fix carries the exact risk this file already warns about (a stale-cache miss freezing the presence tiles). The pass also surfaced CP9, the same re-shape-every-paint waste CP5 fixed but in sticky-note labels; CP9 was then built and closed (#746). Two test-coverage gaps were closed alongside it: the emoji HTTP routes (#740) and the reports queue controller (#741). The data layer's catch-up write path CD1 was batched next (#747).
 
 Nine findings from the same day's CI audit closed in #665, and are not itemised here because that audit was reported separately: the client path filter that matched every push, the red-streak watchdog failing its own job, `secrets: inherit` on the copr job, the deployed image carrying no sbom or provenance, the apt list duplicated across three workflows, two SPDX headers labelling client tooling AGPL, the SPDX gate passing on an empty file list, three stale concurrency keys, and unpinned base images.
 
@@ -184,16 +184,13 @@ Four reported findings did not survive verification and were corrected or reject
 
 - ~~**CP8. Every incoming message rebuilds the entire channel rail**~~ (`client/packages/app/lib/src/widgets/channel_rail.dart:151`). Medium. Fixed in #735.
 
-- **CP9. Sticky-note labels re-shape text on every paint** (`client/packages/voice_canvas/lib/src/canvas_painters_shapes.dart:51`). Medium.
-  `_paintNote` builds a fresh `TextPainter` and lays it out for every visible note on every `StrokePainter` paint, which repaints on every camera move - the same waste CP5 fixed for cursor labels, but for committed note objects rather than live cursors. Surfaced during the 2026-08-24 CP-cluster profiling.
-  Fix: cache the laid-out painter per note id, keyed on its text and style, the way `CursorLabelCache` now does for cursors. A note's text can change (an edit), so the key must include it. Effort: small.
+- ~~**CP9. Sticky-note labels re-shape text on every paint**~~ (`client/packages/voice_canvas/lib/src/canvas_painters_shapes.dart:51`). Medium. Fixed in #746.
+  A `NoteLabelCache` (its own file, like `CursorLabelCache`) now keeps each note's laid-out `TextPainter`, keyed on a `(text, zoom, w, h)` record - everything the layout depends on - so a pan reuses it while a zoom, a resize or an edit rebuilds it. Reconciled to the visible notes each frame and disposed on teardown; a miss only ever re-lays-out, never draws stale.
 
 ## Client: data layer
 
-- **CD1. Catch-up writes are unbatched** (`client/packages/data/lib/src/message_store.dart:306`). Medium.
-  `applyMessages` loops `applyMessage`, each doing its own select, insert-on-conflict and `_advanceCursor` select plus update: four sequential awaited round trips per message, on the path a user hits returning from offline.
-  `upsertChannels` in the same file already batches the equivalent write via `db.batch()`.
-  Fix: batch the existence check, write inserts via `db.batch()`, and advance each channel's cursor once at the end. Effort: medium.
+- ~~**CD1. Catch-up writes are unbatched**~~ (`client/packages/data/lib/src/message_store.dart:306`). Medium. Fixed in #747.
+  `applyMessages` now reads every colliding row in one select, resolves the winning version per id in memory, writes the survivors in one `db.batch()`, and advances each channel's cursor once - the four-plus round trips a message are gone. The body moved to `message_store_batch.dart` to keep the file under budget. It must decide idempotency and ordering exactly as `applyMessage` does, so an equivalence test runs the same mixed batch through both paths and diffs the result; an adversarial review caught an equal-seq tie-break (first-wins vs the sequential path's last-wins) before merge, now fixed and pinned.
 
 - **CD2. The local store has no retention policy** (`client/packages/data/lib/src/message_store.dart:27`). Medium.
   Every delete path fires only on a server-signalled reset, a delete, or sign-out; nothing evicts by age or count, so the local sqlite or OPFS store grows for the life of an account as history pagination pages older messages in.

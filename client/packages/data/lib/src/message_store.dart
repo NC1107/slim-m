@@ -8,6 +8,8 @@ import 'package:slimm_api/api.dart' as api;
 import 'database.dart';
 import 'rail_channel.dart';
 
+part 'message_store_batch.dart';
+
 /// The local store's read and write surface.
 ///
 /// Every write path in the app goes through here, which is what makes the two
@@ -333,15 +335,12 @@ class MessageStore {
     });
   }
 
-  /// Applies a batch, for catch-up. One transaction so a partial apply cannot
-  /// leave the cursor ahead of the messages it claims to cover.
-  Future<void> applyMessages(Iterable<api.Message> messages) async {
-    await db.transaction(() async {
-      for (final message in messages) {
-        await applyMessage(message);
-      }
-    });
-  }
+  /// Applies a batch, for catch-up and scroll-back, in one transaction and with
+  /// far fewer round trips than a call to [applyMessage] per message. The body
+  /// lives in `message_store_batch.dart`; the same idempotency and ordering
+  /// rules [applyMessage] enforces are applied there.
+  Future<void> applyMessages(Iterable<api.Message> messages) =>
+      _applyMessagesBatched(this, messages);
 
   /// Drops a channel's cached messages and rewinds its cursor. Used when the
   /// server answers catch-up with `reset`, meaning the gap was too large to
