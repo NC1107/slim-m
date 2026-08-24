@@ -358,8 +358,10 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           // A blank canvas otherwise looks identical to a broken one; the screen-reader label above already says so for a screen reader, and this is the sighted-user half of that same guarantee.
           if (widget.loading)
             CanvasLoadingHint(tokens: tokens)
-          // Never alongside an error banner: see CanvasEmptyHint's own doc.
-          else if (count == 0 && widget.error == null)
+          // Not over an error banner (see the hint's own doc), nor over a call's participant tiles, where "nothing here yet" contradicts the video feeds already on screen.
+          else if (count == 0 &&
+              widget.error == null &&
+              widget.callParticipants.isEmpty)
             CanvasEmptyHint(tokens: tokens),
         ],
       ),

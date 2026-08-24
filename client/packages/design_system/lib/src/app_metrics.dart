@@ -72,11 +72,11 @@ abstract final class AppSizes {
   static const double icon32 = 32;
 }
 
-/// The two shadows, for the two things that genuinely float.
+/// The shadows, for the few things that genuinely float.
 ///
 /// Elevation is otherwise carried entirely by a 1px hairline. A shadow here is
 /// a statement that something is above the plane rather than part of it, which
-/// is true of a menu and a dragged canvas object and of nothing else.
+/// is true of a menu, a dragged canvas object, and a live media tile.
 abstract final class AppShadows {
   static const List<BoxShadow> menu = [
     BoxShadow(
@@ -91,6 +91,19 @@ abstract final class AppShadows {
       color: Color(0x85000000),
       blurRadius: 64,
       offset: Offset(0, 24),
+    ),
+  ];
+
+  /// A live camera or screen tile resting on the canvas, which sits over the
+  /// grid all the time rather than only while a drag lifts it. [float]'s deep,
+  /// far-offset cast reads as a hard dark band under a permanent tile,
+  /// especially against the dark-theme canvas; this is the same lift at a
+  /// fraction of the weight - a resting elevation, not a picked-up one.
+  static const List<BoxShadow> canvasTile = [
+    BoxShadow(
+      color: Color(0x40000000),
+      blurRadius: 24,
+      offset: Offset(0, 6),
     ),
   ];
 }
