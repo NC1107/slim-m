@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-52 of them are now accounted for - 50 fixed, and MOD5 plus UX7 decided rather than built - leaving 18 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+53 of them are now accounted for - 51 fixed, and MOD5 plus UX7 decided rather than built - leaving 17 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -201,9 +201,8 @@ Four reported findings did not survive verification and were corrected or reject
 - ~~**CQ1. Channel extras are hydrated on mount but not on channel switch**~~ (`client/packages/app/lib/src/screens/channel_screen.dart:125`). Medium. Fixed in #750.
   `ChannelScreen.didUpdateWidget` now calls `_hydrateExtras()` again when the channel id changes, and `ThreadScreen` gained a matching `didUpdateWidget` that re-runs `_ensureThreadChannelRow`, so the thread modal (which reuses its State across a switch) seeds the new channel's reactions, polls and attachments instead of leaving them blank until a live event. The regression test isolates the hydration fetch from channel_history's paging by the absence of a `before` cursor, and is mutation-checked against dropping the re-hydrate call.
 
-- **CQ2. `home_shell.dart:429` reinvents `firstOrNull`.** Low.
-  `_ChannelTitle.build` uses `.firstWhere((c) => true, orElse: () => null)` while `ConversationPane.build` does the identical lookup with `.firstOrNull` 200 lines earlier in the same file.
-  Fix: use `.firstOrNull`. Effort: small.
+- ~~**CQ2. `home_shell.dart:429` reinvents `firstOrNull`.**~~ Low. Fixed in #758.
+  `_ChannelTitle.build` now uses `.firstOrNull` (dropping the `.cast<Channel?>().firstWhere((c) => true, orElse: () => null)`), matching `ConversationPane.build`'s own lookup in the same file. Provably equivalent; the home-shell suite stays green.
 
 - **CQ3. Extras merge can never reflect a reaction dropping to zero** (`client/packages/app/lib/src/providers/message_extras.dart:169`). Low.
   `_merged` takes `message.reactions.isNotEmpty ? message.reactions : existing?.reactions ?? []`, so a hydrate or catch-up response reporting a message now has no reactions falls through to the stale cached list rather than clearing it - the last reaction removed on another device stays shown until a live `ReactionsChanged` or a sign-out. Surfaced during CQ1's review (2026-08-24); pre-existing, but CQ1's re-hydrate on every channel switch runs the merge more often. Attachments and poll use the same guard.
