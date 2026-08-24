@@ -43,7 +43,8 @@ enum LayoutClass {
   /// transcript: that boundary minus the medium rail's own width and its
   /// handle, the same arithmetic the compact/medium switch already rests on,
   /// reused here rather than a fresh number picked by feel.
-  bool fitsMemberPane(double width) => _fitsThirdPane(width, AppMemberPane.width);
+  bool fitsMemberPane(double width) =>
+      _fitsThirdPane(width, AppMemberPane.width);
 
   /// Whether a docked thread pane fits, the same test as [fitsMemberPane] with
   /// the thread pane's own wider width. The thread pane and the member pane are
