@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-45 of them are now accounted for - 43 fixed, and MOD5 plus UX7 decided rather than built - leaving 25 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+46 of them are now accounted for - 44 fixed, and MOD5 plus UX7 decided rather than built - leaving 24 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -213,10 +213,8 @@ Four reported findings did not survive verification and were corrected or reject
   `_merged` takes `message.reactions.isNotEmpty ? message.reactions : existing?.reactions ?? []`, so a hydrate or catch-up response reporting a message now has no reactions falls through to the stale cached list rather than clearing it - the last reaction removed on another device stays shown until a live `ReactionsChanged` or a sign-out. Surfaced during CQ1's review (2026-08-24); pre-existing, but CQ1's re-hydrate on every channel switch runs the merge more often. Attachments and poll use the same guard.
   Fix: distinguish "the response carried no reactions" from "this response is not authoritative about reactions" - the live path already knows which events are authoritative; the REST hydrate should replace rather than coalesce. Effort: small, once the authority question is settled.
 
-- **PLAT1. Platform channel calls are unguarded, including one on the FCM background isolate** (`client/packages/platform/lib/src/call_notifications.dart:41`). Medium.
-  `showIncomingCall` awaits `invokeMethod` with no `try`/`catch`, and it runs from the FCM background isolate's top-level handler where there is no outer catch either, so a `PlatformException` or `MissingPluginException` silently loses an incoming-call notification.
-  This is the package norm rather than an outlier: `call_lifecycle_channel.dart` (three calls) and `notification_tap_channel.dart` (one) are equally unguarded, and only `apns_token_channel.dart` catches anything.
-  Fix: guard all four channel files uniformly, starting with the background-isolate path, and assert a thrown platform exception is swallowed. Effort: small.
+- ~~**PLAT1. Platform channel calls are unguarded, including one on the FCM background isolate**~~ (`client/packages/platform/lib/src/call_notifications.dart:41`). Medium. Fixed in #751.
+  `showIncomingCall` now wraps its `invokeMethod` in `try`/`catch` for `PlatformException` and `MissingPluginException`, matching the sibling channels, so a native failure on the FCM background isolate's top-level handler is a missed banner rather than an uncaught throw that drops the whole push. By the time this was reached the other three files the entry named (`call_lifecycle_channel`, three calls; `notification_tap_channel`, one) had already been guarded, so this closed the last unguarded call. Two tests assert both exception kinds are swallowed, mutation-checked against removing the guard.
 
 ## Moderation and community safety
 

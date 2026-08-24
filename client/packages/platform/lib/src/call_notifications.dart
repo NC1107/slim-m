@@ -39,9 +39,15 @@ class CallNotifications {
     required String callerName,
   }) async {
     if (!_isAndroid) return;
-    await _channel.invokeMethod<void>('showIncomingCall', {
-      'callId': callId,
-      'callerName': callerName,
-    });
+    try {
+      await _channel.invokeMethod<void>('showIncomingCall', {
+        'callId': callId,
+        'callerName': callerName,
+      });
+    } on PlatformException {
+      // This runs on the FCM background isolate's top-level handler, which has no outer catch; an uncaught throw here loses the whole push, so a missed banner is the better failure.
+    } on MissingPluginException {
+      // A build or isolate with no native CallNotificationPlugin registered; there is no notification surface to reach.
+    }
   }
 }

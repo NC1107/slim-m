@@ -47,5 +47,29 @@ void main() {
       expect(
           calls.single.arguments, {'callId': 'call-42', 'callerName': 'Bob'});
     });
+
+    test(
+        'a platform exception is swallowed, not thrown onto the background '
+        'isolate', () async {
+      _mockPlugin((call) async {
+        throw PlatformException(code: 'ERR', message: 'native side blew up');
+      });
+      addTearDown(() => _mockPlugin(null));
+
+      final notifications = CallNotifications(isAndroid: true);
+      await expectLater(
+        notifications.showIncomingCall(callId: 'call-1', callerName: 'Ada'),
+        completes,
+      );
+    });
+
+    test('a missing native plugin is swallowed too', () async {
+      // No mock handler installed, so the channel answers MissingPluginException.
+      final notifications = CallNotifications(isAndroid: true);
+      await expectLater(
+        notifications.showIncomingCall(callId: 'call-1', callerName: 'Ada'),
+        completes,
+      );
+    });
   });
 }
