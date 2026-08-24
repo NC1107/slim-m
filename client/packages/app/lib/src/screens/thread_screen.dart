@@ -143,6 +143,15 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
     unawaited(_ensureThreadChannelRow());
   }
 
+  @override
+  void didUpdateWidget(ThreadScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // This modal route reuses the State across a thread switch, so the new thread's channel row must be ensured again; initState ran only for the first.
+    if (oldWidget.channelId != widget.channelId) {
+      unawaited(_ensureThreadChannelRow());
+    }
+  }
+
   Future<void> _ensureThreadChannelRow() async {
     final api.ThreadParent parent;
     try {

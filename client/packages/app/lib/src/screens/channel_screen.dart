@@ -140,6 +140,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       _scrollTracker.resetForChannelSwitch();
       _drafts.save(oldWidget.channelId, _composer.text);
       _composer.text = _drafts.draftFor(widget.channelId);
+      // Re-seed extras: on a route that reuses this State across a switch (a thread modal), initState ran only for the first channel, leaving synced messages' reactions, polls and attachments blank until a live event touched them.
+      unawaited(_hydrateExtras());
     }
   }
 
