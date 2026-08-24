@@ -10,10 +10,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/providers.dart';
+import '../providers/channel_by_id_provider.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart';
 import 'call_participant_tiles.dart';
@@ -50,90 +49,77 @@ class _RailCallSummaryState extends ConsumerState<RailCallSummary> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final store = ref.watch(storeProvider).valueOrNull;
+    final name =
+        ref.watch(channelByIdProvider(widget.channelId)).valueOrNull?.name ??
+        'a call';
 
-    return StreamBuilder<List<Channel>>(
-      stream: store?.watchChannels() ?? const Stream.empty(),
-      builder: (context, snapshot) {
-        final name =
-            snapshot.data
-                ?.where((c) => c.id == widget.channelId)
-                .map((c) => c.name)
-                .firstOrNull ??
-            'a call';
-
-        return Row(
-          children: [
-            Expanded(
-              child: Semantics(
-                button: true,
-                label: 'Back to the call in $name',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (_) => setState(() => _pressed = true),
-                  onTapUp: (_) => setState(() => _pressed = false),
-                  onTapCancel: () => setState(() => _pressed = false),
-                  onTap: () {
-                    AppHaptics.selection();
-                    // A no-op for a real voice channel; load-bearing for a DM.
-                    ref.read(dmCallOpenProvider.notifier).state =
-                        widget.channelId;
-                    context.go(Routes.channel(widget.channelId));
-                  },
-                  child: AnimatedOpacity(
-                    opacity: _pressed ? 0.6 : 1,
-                    duration: AppMotion.reduced(context, AppMotion.fast),
-                    child: Column(
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: 'Back to the call in $name',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => setState(() => _pressed = true),
+              onTapUp: (_) => setState(() => _pressed = false),
+              onTapCancel: () => setState(() => _pressed = false),
+              onTap: () {
+                AppHaptics.selection();
+                // A no-op for a real voice channel; load-bearing for a DM.
+                ref.read(dmCallOpenProvider.notifier).state = widget.channelId;
+                context.go(Routes.channel(widget.channelId));
+              },
+              child: AnimatedOpacity(
+                opacity: _pressed ? 0.6 : 1,
+                duration: AppMotion.reduced(context, AppMotion.fast),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.ui.copyWith(
+                        color: tokens.textPrimary,
+                        fontWeight: AppWeights.medium,
+                        height: 1.25,
+                      ),
+                    ),
+                    Row(
                       mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.ui.copyWith(
-                            color: tokens.textPrimary,
-                            fontWeight: AppWeights.medium,
-                            height: 1.25,
-                          ),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (widget.connectedAt case final since?)
-                              CallDuration(since: since),
-                            Flexible(
-                              child: Text(
-                                widget.screenSharing
-                                    ? ' - sharing'
-                                    : ' - in call',
-                                overflow: TextOverflow.ellipsis,
-                                style: AppText.micro.copyWith(
-                                  color: widget.screenSharing
-                                      ? tokens.accent
-                                      : tokens.textSecondary,
-                                ),
-                              ),
+                        if (widget.connectedAt case final since?)
+                          CallDuration(since: since),
+                        Flexible(
+                          child: Text(
+                            widget.screenSharing ? ' - sharing' : ' - in call',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.micro.copyWith(
+                              color: widget.screenSharing
+                                  ? tokens.accent
+                                  : tokens.textSecondary,
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: AppSpacing.s8),
-            AppIconButton(
-              icon: AppIcons.leaveCall,
-              semanticLabel: 'Leave call',
-              tooltip: 'Leave call',
-              variant: AppIconButtonVariant.danger,
-              // Instant: the in-call bar's own leave button asks nothing either.
-              onPressed: widget.onLeave,
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        AppIconButton(
+          icon: AppIcons.leaveCall,
+          semanticLabel: 'Leave call',
+          tooltip: 'Leave call',
+          variant: AppIconButtonVariant.danger,
+          // Instant: the in-call bar's own leave button asks nothing either.
+          onPressed: widget.onLeave,
+        ),
+      ],
     );
   }
 }

@@ -61,8 +61,9 @@ Future<void> _teardown(
   SlimmDatabase db,
 ) async {
   await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(milliseconds: 1));
+  // Dispose before the pump: the button reads its channel through an autoDispose provider that defers cancelling its drift subscription to disposal, so the pump has to land after it to advance drift's cleanup timer.
   container.dispose();
+  await tester.pump(const Duration(milliseconds: 1));
   await db.close();
 }
 

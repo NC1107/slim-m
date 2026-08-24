@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-42 of them are now accounted for - 40 fixed, and MOD5 plus UX7 decided rather than built - leaving 28 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+43 of them are now accounted for - 41 fixed, and MOD5 plus UX7 decided rather than built - leaving 27 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -136,9 +136,8 @@ Four reported findings did not survive verification and were corrected or reject
   `participants` updates on every join, leave, mute and speaking change while sharing one state object with `cameraEnabled`, `deafened` and `error`, and a workspace-wide search finds zero `voiceControllerProvider.select` call sites across roughly ten consuming widgets.
   Fix: split `participants` out, or add `.select`-based derived providers for the flags each widget actually reads. Effort: medium.
 
-- **CS3. The same `watchChannels()` StreamBuilder is reimplemented in six widgets** (`client/packages/app/lib/src/screens/dm_call_button.dart:27`). Medium.
-  `rail_call_summary.dart:56`, `voice_strip_indicator.dart:130`, `compact_channel_app_bar.dart:58`, `command_palette.dart:233` and `channel_rail.dart:152` each open their own stream over the entire channels table and filter to one id in the builder, each with slightly different null handling.
-  Fix: add a `channelByIdProvider(String id)` family over one shared stream provider and route all six through it. Effort: medium.
+- ~~**CS3. The same `watchChannels()` StreamBuilder is reimplemented in six widgets**~~ (`client/packages/app/lib/src/screens/dm_call_button.dart:27`). Medium. Fixed in #749.
+  A `channelByIdProvider(String id)` family (`providers/channel_by_id_provider.dart`) now watches a single indexed row via the store's existing `watchChannelRow`, so a widget rebuilds only when its own channel changes rather than on every write to any channel, and riverpod folds identical ids into one shared subscription. Only four of the six listed sites were genuine per-id filters and were routed through it - `dm_call_button`, `rail_call_summary`, `voice_strip_indicator`'s `CallChannelName`, and `compact_channel_app_bar`; each keeps its own absent-channel fallback (hide, "a call", "In a call", or a blank-but-visible bar). The other two named sites turned out to consume the whole list, not one id: `command_palette` searches across all channels, and `channel_rail` renders the full deduped rail (CP8's `watchRailChannels`), so both were correctly left alone.
 
 - **CS4. `MessageExtrasController`'s map grows unbounded for the session** (`client/packages/app/lib/src/providers/message_extras.dart:99`). Medium.
   `StateNotifier<Map<String, MessageExtras>>` keyed on message id, one entry per distinct message ever seen (live, every paged page, search, pins), each holding a reactions list, an attachments list and a poll. Nothing evicts one entry at a time (`:26`) and the provider is not `autoDispose`; only sign-out `clear()`s it. The subscription is cancelled on dispose, so this is retention, not a leak.
