@@ -201,3 +201,33 @@ pub(super) async fn place(
         Json(CanvasObjectDto::from(placement.object)),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::image_attachment;
+    use serde_json::json;
+
+    #[test]
+    fn a_valid_attachment_id_parses_to_thirty_two_bytes() {
+        let props = json!({ "attachment": "0".repeat(64) });
+        let Ok(bytes) = image_attachment(&props) else {
+            panic!("a well-formed 32-byte id parses");
+        };
+        assert_eq!(bytes.len(), 32);
+    }
+
+    /// The field must be present and a string: a missing key and a non-string
+    /// value are both refused, so an image object can never be placed pointing
+    /// at nothing.
+    #[test]
+    fn a_missing_or_non_string_attachment_is_refused() {
+        assert!(image_attachment(&json!({})).is_err());
+        assert!(image_attachment(&json!({ "attachment": 7 })).is_err());
+    }
+
+    #[test]
+    fn a_malformed_or_wrong_length_attachment_is_refused() {
+        assert!(image_attachment(&json!({ "attachment": "not hex" })).is_err());
+        assert!(image_attachment(&json!({ "attachment": "abcd" })).is_err());
+    }
+}
