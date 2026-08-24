@@ -181,10 +181,42 @@ fn join_ids(ids: &[ChannelId]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{ReorderGroupRequest, parse_groups};
+    use super::{ReorderGroupRequest, join_ids, mismatch_message, parse_groups};
+    use crate::ids::ChannelId;
 
     const UUID_A: &str = "00000000-0000-0000-0000-00000000000a";
     const UUID_B: &str = "00000000-0000-0000-0000-00000000000b";
+
+    /// The reorder-mismatch error names only the halves that apply, and joins
+    /// both when both do, so a moderator sees exactly which channels were
+    /// missing and which were unknown or repeated.
+    #[test]
+    fn mismatch_message_names_only_the_halves_that_apply() {
+        let a = ChannelId::generate();
+        let b = ChannelId::generate();
+
+        let missing_only = mismatch_message(&[a], &[]);
+        assert!(missing_only.contains("missing live channel"));
+        assert!(!missing_only.contains("unknown"));
+
+        let extra_only = mismatch_message(&[], &[b]);
+        assert!(extra_only.contains("unknown or repeated"));
+        assert!(!extra_only.contains("missing"));
+
+        let both = mismatch_message(&[a], &[b]);
+        assert!(both.contains("missing") && both.contains("unknown"));
+        assert!(both.contains("; "), "the two halves are joined");
+    }
+
+    #[test]
+    fn join_ids_comma_separates_each_id() {
+        let a = ChannelId::generate();
+        let b = ChannelId::generate();
+        let joined = join_ids(&[a, b]);
+        assert!(joined.contains(&a.to_string()));
+        assert!(joined.contains(&b.to_string()));
+        assert!(joined.contains(", "));
+    }
 
     fn group(category: Option<&str>, channels: &[&str]) -> ReorderGroupRequest {
         ReorderGroupRequest {
