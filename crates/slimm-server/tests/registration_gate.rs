@@ -334,3 +334,38 @@ async fn a_failed_signup_does_not_spend_the_invite() {
         .unwrap();
     assert_eq!(joined.status(), StatusCode::OK);
 }
+
+/// `@everyone` and `@here` are reserved so a mention can never collide with a
+/// real account. Covered by a unit test on `validate_username`, but nothing
+/// posted the names over the router - a regression that stopped `register`
+/// calling the validator would pass that unit test (TEST11).
+#[tokio::test]
+async fn a_reserved_username_is_refused_at_registration() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+
+    // Reserved case-insensitively, and refused before any invite/claim check, so even an unclaimed deployment answers 400 rather than claiming the name.
+    for name in ["everyone", "here", "EVERYONE", "Here"] {
+        let response = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/auth/register",
+                None,
+                Some(signup(name, None)),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "registering {name:?} must be refused as reserved"
+        );
+    }
+
+    // And the deployment stays unclaimed: a refused reserved name is a no-op.
+    assert!(
+        !store.is_bootstrapped().await.unwrap(),
+        "a refused reserved registration must not claim the deployment"
+    );
+}

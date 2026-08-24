@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-48 of them are now accounted for - 46 fixed, and MOD5 plus UX7 decided rather than built - leaving 22 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+49 of them are now accounted for - 47 fixed, and MOD5 plus UX7 decided rather than built - leaving 21 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -335,9 +335,8 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
 - ~~**TEST10. `composer_test.dart:248` loops over a possibly-empty finder.**~~ Low. Fixed in #667.
   The entry copied the desktop sibling's `findsNWidgets(5)`; the phone density renders three, because poll and code fold into the "+" sheet.
 
-- **TEST11. Reserved-username refusal has no integration coverage** (`http/auth.rs:278`). Low.
-  The `@everyone` and `@here` refusal is covered only by a unit test calling `validate_username()` directly; no test posts `/auth/register` with those names over the real router, so a regression that stops the handler calling the validator would pass the suite.
-  Fix: add a registration case asserting 400. Effort: small.
+- ~~**TEST11. Reserved-username refusal has no integration coverage**~~ (`http/auth.rs:278`). Low. Fixed in #754.
+  `registration_gate.rs` now posts `/auth/register` with `everyone`/`here` (and mixed case) over the real router and asserts 400, and that a refused reserved name leaves the deployment unclaimed. Mutation-checked: removing the handler's `validate_username` call fails it.
 
 - **TEST12. `test_seed_settle.py:220` asserts over a possibly-empty Counter.** Low.
   `all(count <= 1 ...)` is vacuously true if no votes were recorded, and `_vote_on_poll` has an RNG-gated early return that could skip voting entirely.
