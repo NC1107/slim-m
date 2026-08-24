@@ -29,7 +29,9 @@ import 'status_text_row.dart';
 /// [presenceVisibilityDisplayProvider] for why the selected segment is a
 /// local echo of the last choice rather than a value read back from the
 /// server: there is no endpoint that returns it, so a null [selected] is
-/// rendered as its own "Unknown" rather than asserting one of the choices.
+/// rendered as its own "Not set" rather than asserting one of the choices.
+/// "Not set" over the row's default "Unknown", which read as an error value
+/// against the online/away/dnd/offline vocabulary on a fresh account (UX6).
 class PresenceSection extends ConsumerStatefulWidget {
   const PresenceSection({super.key});
 
@@ -53,6 +55,7 @@ class _PresenceSectionState extends ConsumerState<PresenceSection>
           label: 'Status',
           sheetTitle: 'Presence',
           value: selected,
+          unknownLabel: 'Not set',
           choices: [
             for (final (visibility, label, _) in presenceOptions)
               SettingsChoice(value: visibility, label: label),

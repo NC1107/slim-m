@@ -175,32 +175,41 @@ void main() {
     );
   });
 
-  testWidgets('an unresolved visibility reads as its own Unknown, not Online', (
-    tester,
-  ) async {
-    final requests = <Uri>[];
-    final container = _signedInContainer(requests);
-    addTearDown(container.dispose);
+  testWidgets(
+    'an unresolved visibility reads as its own "Not set", not Online',
+    (tester) async {
+      final requests = <Uri>[];
+      final container = _signedInContainer(requests);
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(_screen(container));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Status'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.ensureVisible(find.text('Status'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_screen(container));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Status'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(find.text('Status'));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.text('Online'),
-      findsNothing,
-      reason:
-          'a value this client cannot read back must never read as the '
-          'most public choice',
-    );
-    expect(find.text('Unknown'), findsOneWidget);
-  });
+      expect(
+        find.text('Online'),
+        findsNothing,
+        reason:
+            'a value this client cannot read back must never read as the '
+            'most public choice',
+      );
+      expect(
+        find.text('Not set'),
+        findsOneWidget,
+        reason:
+            'the unresolved state reads as a deliberate "no choice yet", not '
+            'the row default "Unknown" that reads as an error on a fresh '
+            'account (UX6)',
+      );
+      expect(find.text('Unknown'), findsNothing);
+    },
+  );
 
   testWidgets('a refused presence change keeps the last known choice and '
       'reports the failure, rather than reading as Online', (tester) async {
