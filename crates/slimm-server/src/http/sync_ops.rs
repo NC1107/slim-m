@@ -195,7 +195,7 @@ fn trim_to_budget(ops: &mut Vec<MessageOpDto>, budget: &mut usize) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{MessageOpDto, collapse_repeated_content};
+    use super::{MessageOpDto, collapse_repeated_content, effective_floor, trim_to_budget};
 
     fn edit(id: &str, seq: i64, content: &str) -> MessageOpDto {
         MessageOpDto {
@@ -252,5 +252,48 @@ mod tests {
         let mut ops = vec![edit("m1", 1, "keep"), delete("m1", 2)];
         collapse_repeated_content(&mut ops);
         assert_eq!(ops[0].content.as_deref(), Some("keep"));
+    }
+
+    /// The first op is admitted however little budget is left, or one message
+    /// bigger than the whole budget would stall the cursor on it forever - a
+    /// livelock, not a slow sync.
+    #[test]
+    fn the_first_op_is_always_admitted_even_past_budget() {
+        let mut ops = vec![edit("m1", 1, &"x".repeat(500))];
+        let mut budget = 10usize;
+        assert!(!trim_to_budget(&mut ops, &mut budget));
+        assert_eq!(ops.len(), 1);
+        assert_eq!(
+            budget, 0,
+            "an over-budget first op saturates the budget to 0"
+        );
+    }
+
+    #[test]
+    fn a_later_op_that_does_not_fit_is_trimmed_and_the_budget_is_spent() {
+        let mut ops = vec![edit("m1", 1, "a"), edit("m2", 2, &"y".repeat(500))];
+        let mut budget = 100usize; // first op costs 1+64; the second's 500+64 will not fit
+        assert!(trim_to_budget(&mut ops, &mut budget));
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].message_id, "m1");
+    }
+
+    #[test]
+    fn a_page_within_budget_is_untouched_and_spends_each_op() {
+        let mut ops = vec![edit("m1", 1, "a"), edit("m2", 2, "b")];
+        let mut budget = 1000usize;
+        assert!(!trim_to_budget(&mut ops, &mut budget));
+        assert_eq!(ops.len(), 2);
+        assert_eq!(budget, 1000 - (1 + 64) - (1 + 64));
+    }
+
+    /// A reclaimed op log returns `None` for its floor, which must stand in as
+    /// `latest + 1` so every earlier cursor resets - while the never-had-an-op
+    /// case (`latest == 0`) is left alone, since no real cursor is negative.
+    #[test]
+    fn effective_floor_forces_a_reset_only_for_a_reclaimed_log() {
+        assert_eq!(effective_floor(Some(5), 10), 5);
+        assert_eq!(effective_floor(None, 10), 11);
+        assert_eq!(effective_floor(None, 0), 1);
     }
 }
