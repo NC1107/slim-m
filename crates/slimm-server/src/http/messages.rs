@@ -18,14 +18,14 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use super::AppState;
+use super::attachment_ids::parse_attachment_ids;
 use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
-use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{Edited, MAX_ATTACHMENTS_PER_MESSAGE};
+use crate::store::Edited;
 
 pub(crate) use super::message_dto::{AttachmentDto, MessageDto, MessageRevisionDto, ReactionDto};
 
@@ -432,31 +432,6 @@ fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
         )));
     }
     Ok(content)
-}
-
-/// Parses and bounds a send's attachment id list. Each id must be a
-/// well-formed 32-byte sha256 in hex. Whether the sender uploaded it, or can
-/// currently view a channel that already has it, is checked by
-/// [`crate::store::Store::send_message`], and answers exactly as a
-/// never-uploaded id does.
-fn parse_attachment_ids(raw: &[String]) -> Result<Vec<Vec<u8>>, ApiError> {
-    if raw.len() > MAX_ATTACHMENTS_PER_MESSAGE {
-        return Err(ApiError::BadRequest("too many attachments"));
-    }
-    let ids: Vec<Vec<u8>> = raw
-        .iter()
-        .map(|s| {
-            media::from_hex(s)
-                .filter(|bytes| bytes.len() == 32)
-                .ok_or(ApiError::BadRequest("invalid attachment id"))
-        })
-        .collect::<Result<_, _>>()?;
-    // Refused here rather than as the 500 the link table's primary key turns a repeat into.
-    let mut seen = std::collections::HashSet::new();
-    if !ids.iter().all(|id| seen.insert(id.clone())) {
-        return Err(ApiError::BadRequest("duplicate attachment id"));
-    }
-    Ok(ids)
 }
 
 pub(crate) fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
