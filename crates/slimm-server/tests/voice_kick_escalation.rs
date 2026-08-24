@@ -213,3 +213,116 @@ async fn kicking_yourself_is_not_refused_by_the_escalation_guard() {
         "authorized and past the guard; the unreachable SFU is what answers next"
     );
 }
+
+/// A timeout on the target must not become the lever that makes them kickable.
+///
+/// `escalation_guard` reads the target's *granted* channel permissions, never
+/// their effective ones, so a timeout already stripping a senior participant's
+/// grant cannot be what drops them into a junior moderator's reach. This is
+/// the voice-kick sibling of the property `member_timeout.rs` pins for member
+/// moderation ("else a timeout is what makes somebody re-timeout-able") - the
+/// same subtraction, the same trap, a different handler. carol out-ranks bob
+/// only by SPEAK, which `TIMEOUT_DENY` removes, so reading effective
+/// permissions here would let bob eject a carol he can never eject otherwise.
+#[tokio::test]
+async fn a_timeout_on_the_target_is_not_a_lever_to_kick_them() {
+    let (store, _guard) = new_store().await;
+    let alice = store
+        .create_account("alice", "alice", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(alice.id).await.unwrap();
+    let channel = store.create_channel("mod-lounge", "voice").await.unwrap();
+
+    let bob = store
+        .create_account("bob", "bob", "not-a-real-hash")
+        .await
+        .unwrap();
+    let bob_token = store
+        .open_session(bob.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+    store
+        .set_member_overwrite(
+            channel.id,
+            bob.id,
+            Permissions::VIEW_CHANNEL.union(Permissions::KICK_MEMBERS),
+            // Deny SPEAK: the default everyone role grants it, and this test turns on bob lacking exactly the bit carol keeps.
+            Permissions::SPEAK,
+        )
+        .await
+        .unwrap();
+
+    let carol = store
+        .create_account("carol", "carol", "not-a-real-hash")
+        .await
+        .unwrap();
+    store
+        .set_member_overwrite(
+            channel.id,
+            carol.id,
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::KICK_MEMBERS)
+                .union(Permissions::SPEAK),
+            Permissions::NONE,
+        )
+        .await
+        .unwrap();
+
+    // Asserted so the test cannot pass vacuously: carol out-ranks bob only by SPEAK, a bit a timeout takes away.
+    let bob_granted = store
+        .granted_permissions_in_channel(bob.id, channel.id)
+        .await
+        .unwrap();
+    assert!(!bob_granted.contains(Permissions::SPEAK));
+    assert!(
+        store
+            .granted_permissions_in_channel(carol.id, channel.id)
+            .await
+            .unwrap()
+            .contains(Permissions::SPEAK)
+    );
+
+    // A far-future timeout on carol collapses her effective SPEAK to nothing.
+    const YEAR_3000_MS: i64 = 32_503_680_000_000;
+    store
+        .set_member_timeout(carol.id, YEAR_3000_MS, Some("cool off"), alice.id)
+        .await
+        .unwrap();
+    assert!(
+        !store
+            .permissions_in_channel(carol.id, channel.id)
+            .await
+            .unwrap()
+            .contains(Permissions::SPEAK),
+        "the timeout must actually be in force, or this test proves nothing",
+    );
+    // Her granted SPEAK, the side the guard compares against, is untouched.
+    assert!(
+        store
+            .granted_permissions_in_channel(carol.id, channel.id)
+            .await
+            .unwrap()
+            .contains(Permissions::SPEAK)
+    );
+
+    let app = app(store.clone(), unreachable_voice());
+    let response = app
+        .oneshot(request(
+            "POST",
+            &format!(
+                "/channels/{}/voice/participants/{}/kick",
+                channel.id, carol.id
+            ),
+            Some(&bob_token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::FORBIDDEN,
+        "a timed-out senior must stay out of a junior moderator's reach; a 503 \
+         would mean the guard compared effective permissions and let it through"
+    );
+}
