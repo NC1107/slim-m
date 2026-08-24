@@ -360,6 +360,7 @@ class _CanvasSurfaceState extends State<CanvasSurface>
   void dispose() {
     widget.cursors?.removeListener(_onCursorsChanged);
     _cursorPainter?.disposeLabels();
+    _strokes.disposeNoteLabels();
     // Before super: the ticker mixin asserts nothing is still ticking.
     _glideTicker.dispose();
     _cursorGlideTick.dispose();

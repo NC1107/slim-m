@@ -23,6 +23,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
 import 'canvas_document.dart';
+import 'note_label_cache.dart';
 
 export 'canvas_live_painters.dart';
 
@@ -119,10 +120,20 @@ class StrokePainter extends CustomPainter {
   /// choice `CanvasSurface.selectionOutline` already makes.
   final List<BoxShadow> elevationShadow;
 
+  final NoteLabelCache _noteLabels = NoteLabelCache();
+
+  /// Frees the note-text cache; a [CustomPainter] has no teardown hook of its
+  /// own, so the owning surface calls this from its own `dispose`.
+  void disposeNoteLabels() => _noteLabels.dispose();
+
+  @visibleForTesting
+  int get debugNoteLabelCacheSize => _noteLabels.size;
+
   @override
   void paint(Canvas canvas, Size size) {
     final camera = document.camera;
     final elevated = document.elevatedObjectId.value;
+    final noteIds = <String>{};
     final paint = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke
@@ -138,6 +149,7 @@ class StrokePainter extends CustomPainter {
           _paintImage(canvas, stroke, camera, elevated: isElevated);
           continue;
         case CanvasObjectKind.note:
+          noteIds.add(stroke.id);
           _paintNote(
             canvas,
             stroke,
@@ -169,6 +181,8 @@ class StrokePainter extends CustomPainter {
       canvas.drawPath(stroke.path, paint);
       canvas.restore();
     }
+    // Reconcile every frame so a note culled or removed since the last paint drops its cached text.
+    _noteLabels.retain(noteIds);
   }
 
   /// A live bitmap paints normally; a load that failed for good draws the
