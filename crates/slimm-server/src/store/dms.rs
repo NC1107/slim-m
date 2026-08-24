@@ -339,3 +339,21 @@ impl Store {
         Ok(DM_BASE)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_pair;
+    use crate::ids::UserId;
+    use uuid::Uuid;
+
+    /// The canonical pair is the same whichever order the two ids arrive in,
+    /// which is what makes a DM between two people resolve to one channel
+    /// rather than a second one when the other person writes first.
+    #[test]
+    fn normalize_pair_is_symmetric_and_ordered() {
+        let lo = UserId(Uuid::from_u128(1));
+        let hi = UserId(Uuid::from_u128(2));
+        assert_eq!(normalize_pair(lo, hi), normalize_pair(hi, lo));
+        assert_eq!(normalize_pair(hi, lo), (lo, hi));
+    }
+}
