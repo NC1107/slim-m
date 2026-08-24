@@ -27,6 +27,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'support/reduced_motion_harness.dart';
 import 'voice_controller_harness.dart' show FakeSession, tokens;
 
 const _channelId = 'channel-shared';
@@ -114,21 +115,13 @@ Future<void> _joinShared(
   await tester.pump();
 }
 
-Widget _harness(ProviderContainer container) => UncontrolledProviderScope(
+Widget _harness(ProviderContainer container) => reducedMotionApp(
   container: container,
-  child: MediaQuery(
-    data: const MediaQueryData(disableAnimations: true),
-    child: MaterialApp(
-      theme: buildTheme(Brightness.light, AppTokens.light),
-      home: Scaffold(
-        body: MemberProfileBody(
-          profile: _other,
-          status: AppPresence.online,
-          compact: false,
-          onDone: () {},
-        ),
-      ),
-    ),
+  child: MemberProfileBody(
+    profile: _other,
+    status: AppPresence.online,
+    compact: false,
+    onDone: () {},
   ),
 );
 
