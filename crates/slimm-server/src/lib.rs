@@ -26,6 +26,7 @@ pub mod voice;
 
 use std::net::SocketAddr;
 
+use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -219,30 +220,53 @@ pub async fn sweep_stale_voice_calls(voice: &voice::VoiceService, hub: &hub::Hub
 /// `(user, channel)` pair regardless of whether the best-effort SFU removal
 /// below it succeeds: the heartbeat going stale is already the real
 /// transition, committed by [`voice::VoiceService::sweep_stale_calls_at`]
-/// before this loop ever runs.
+/// before this ever runs, so bystanders are told up front rather than behind
+/// the removal round trips.
+///
+/// The removals themselves fan out with bounded concurrency. Each is a real
+/// HTTP POST to LiveKit, so a blip that expires many heartbeats in one tick
+/// would otherwise serialise N round trips end to end; [`STALE_SWEEP_CONCURRENCY`]
+/// collapses that burst without opening an unbounded number of connections at
+/// once (SRV6).
 pub async fn sweep_stale_voice_calls_at(
     voice: &voice::VoiceService,
     hub: &hub::Hub,
     now: std::time::Instant,
 ) {
-    for (user_id, channel_id) in voice.sweep_stale_calls_at(now) {
-        hub.publish(hub::Event::VoiceActivityChanged { channel_id });
-        match voice.remove_participant(channel_id, user_id).await {
-            Ok(()) => tracing::info!(
-                %user_id,
-                %channel_id,
-                "removed a voice participant with no recent heartbeat"
-            ),
-            Err(voice::VoiceError::Unavailable) => {}
-            Err(voice::VoiceError::Internal(err)) => tracing::warn!(
-                error = %err,
-                %user_id,
-                %channel_id,
-                "failed to remove a stale voice participant"
-            ),
-        }
+    let stale = voice.sweep_stale_calls_at(now);
+    for (_, channel_id) in &stale {
+        hub.publish(hub::Event::VoiceActivityChanged {
+            channel_id: *channel_id,
+        });
     }
+    futures_util::stream::iter(stale)
+        .for_each_concurrent(
+            STALE_SWEEP_CONCURRENCY,
+            |(user_id, channel_id)| async move {
+                match voice.remove_participant(channel_id, user_id).await {
+                    Ok(()) => tracing::info!(
+                        %user_id,
+                        %channel_id,
+                        "removed a voice participant with no recent heartbeat"
+                    ),
+                    Err(voice::VoiceError::Unavailable) => {}
+                    Err(voice::VoiceError::Internal(err)) => tracing::warn!(
+                        error = %err,
+                        %user_id,
+                        %channel_id,
+                        "failed to remove a stale voice participant"
+                    ),
+                }
+            },
+        )
+        .await;
 }
+
+/// How many stale-participant removals the sweep runs at once. A burst that
+/// expires many heartbeats in one tick is rare, so this only has to keep that
+/// burst from serialising while staying well under a thundering herd of
+/// simultaneous connections to the SFU.
+const STALE_SWEEP_CONCURRENCY: usize = 16;
 
 /// How often the message retention window is applied. Long, the same
 /// reasoning [`TOKEN_SWEEP_INTERVAL`] gives: a day-granularity setting has
