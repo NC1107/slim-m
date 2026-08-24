@@ -26,6 +26,16 @@ import 'providers.dart';
 /// exists to avoid, just with the wrong value.
 const String threadChannelName = '';
 
+/// The thread docked beside the transcript right now, as its channel id, or
+/// null for none. The single source of truth for the desktop side-pane
+/// presentation, mirroring [canvasOpenProvider]/[memberPaneVisibleProvider]:
+/// at expanded widths an in-app "open thread" sets this and the shell docks a
+/// pane, so the parent transcript stays visible (UX1). At compact widths, and
+/// for a cold deep link or reload, the `/thread/:id` route and its modal are
+/// used instead - so this is deliberately not URL-backed, and a reload closes
+/// a docked thread back to its channel rather than restoring the pane.
+final openThreadProvider = StateProvider<String?>((ref) => null);
+
 /// What a thread's own channel id hangs off, for a thread panel opened cold
 /// - a deep link, a reload, or a notification - that never went through
 /// [openThreadFromMessage] on this device and so never learned its parent

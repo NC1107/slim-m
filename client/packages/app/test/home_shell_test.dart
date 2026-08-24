@@ -19,6 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/dm_call_pane.dart';
 import 'package:slimm_app/src/screens/voice_join_preview.dart'
     show VoiceRejoinScreen;
+import 'package:slimm_app/src/providers/threads.dart';
+import 'package:slimm_app/src/screens/thread_screen.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/widgets/channel_search.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
@@ -103,6 +105,46 @@ void main() {
       final s = setup();
       await pumpAtWidth(tester, s.container, 955);
       expect(find.byType(AppMemberPane), findsOneWidget);
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
+    'an open thread docks beside the transcript at expanded width, and the '
+    'roster yields the third-pane slot to it (UX1)',
+    (tester) async {
+      final s = setup();
+      await pumpAtWidth(tester, s.container, 1400);
+      expect(find.byType(AppMemberPane), findsOneWidget);
+      expect(find.byType(ThreadScreen), findsNothing);
+
+      s.container.read(openThreadProvider.notifier).state = 'c-thread';
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(ThreadScreen),
+        findsOneWidget,
+        reason: 'the thread is a docked side pane, not a modal over the shell',
+      );
+      expect(
+        find.byType(AppMemberPane),
+        findsNothing,
+        reason: 'the roster and the thread never both take the third-pane slot',
+      );
+      await teardown(tester, s.container, s.db);
+    },
+  );
+
+  testWidgets(
+    'below the width that fits the thread pane, an open thread does not dock - '
+    'the compact/deep-link modal route is kept',
+    (tester) async {
+      final s = setup();
+      // Medium: two panes fit, but not a 360px thread pane and a transcript.
+      await pumpAtWidth(tester, s.container, 700);
+      s.container.read(openThreadProvider.notifier).state = 'c-thread';
+      await tester.pumpAndSettle();
+      expect(find.byType(ThreadScreen), findsNothing);
       await teardown(tester, s.container, s.db);
     },
   );

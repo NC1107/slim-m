@@ -25,6 +25,7 @@ import '../providers/message_actions.dart';
 import '../providers/message_selection.dart';
 import '../providers/pins_controller.dart';
 import '../providers/threads.dart';
+import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/app_snackbar.dart';
 import '../widgets/confirm_dialog.dart';
@@ -176,7 +177,23 @@ Future<void> openThreadForMessage(BuildContext context, Message message) async {
     );
   });
   if (threadId == null || !context.mounted) return;
-  GoRouter.of(context).push(Routes.thread(threadId!));
+  openThreadPresenting(context, container, threadId!);
+}
+
+/// Docks the thread beside the transcript where there is room for the pane
+/// (UX1), and otherwise pushes the modal `/thread/:id` route - the compact and
+/// deep-link path, which the docked provider deliberately does not replace.
+void openThreadPresenting(
+  BuildContext context,
+  ProviderContainer container,
+  String threadId,
+) {
+  final width = MediaQuery.sizeOf(context).width;
+  if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
+    container.read(openThreadProvider.notifier).state = threadId;
+  } else {
+    GoRouter.of(context).push(Routes.thread(threadId));
+  }
 }
 
 /// Builds what this viewer may do to [message]: the policy is here rather

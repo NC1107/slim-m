@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: Apache-2.0
+part of 'home_shell.dart';
+
+// The two docked third-pane slots (member roster, thread), split from home_shell.dart for the line budget; kept as private part-of classes so the shell's Row still names them.
+/// The wide-layout member pane's slot: width-animated, and withheld for a
+/// DM regardless of [requested] (the header toggle's own answer, already
+/// `memberPaneVisibleProvider`-gated) - that provider defaults open, so
+/// hiding only the toggle would still leave the deployment roster showing
+/// by default for a two-person conversation, the exact bug `ChannelHeader.isDm`
+/// exists to name. [channelId] null (nothing selected) or a store not yet
+/// resolved both read as "show": only a confirmed DM withholds it.
+class _MemberPaneSlot extends ConsumerWidget {
+  const _MemberPaneSlot({required this.channelId, required this.requested});
+
+  final String? channelId;
+  final bool requested;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!requested) return _animated(context, false);
+    final channelId = this.channelId;
+    if (channelId == null) return _animated(context, true);
+    final storeAsync = ref.watch(storeProvider);
+    return storeAsync.maybeWhen(
+      orElse: () => _animated(context, true),
+      data: (store) => StreamBuilder<Channel?>(
+        stream: store.watchChannelRow(channelId),
+        builder: (context, snapshot) =>
+            _animated(context, snapshot.data?.kind != 'dm'),
+      ),
+    );
+  }
+
+  Widget _animated(BuildContext context, bool show) => ClipRect(
+    child: AnimatedContainer(
+      duration: AppMotion.reduced(context, AppMotion.base),
+      curve: AppMotion.entrance,
+      width: show ? AppMemberPane.width : 0,
+      child: show
+          ? OverflowBox(
+              minWidth: AppMemberPane.width,
+              maxWidth: AppMemberPane.width,
+              alignment: Alignment.centerLeft,
+              child: const AppPanelReveal(
+                fromLeft: false,
+                child: AppMemberPane(),
+              ),
+            )
+          : const SizedBox.shrink(),
+    ),
+  );
+}
+
+/// The docked thread, beside the transcript at expanded widths (UX1). Mirrors
+/// [_MemberPaneSlot]'s reveal exactly - an [AnimatedContainer] width that
+/// unmounts its content when closed so a hidden pane stops fetching - but wraps
+/// [ThreadScreen], whose close affordance clears [openThreadProvider] rather
+/// than popping, since docked there is no route entry to pop.
+class _ThreadPaneSlot extends ConsumerWidget {
+  const _ThreadPaneSlot({required this.channelId, required this.requested});
+
+  final String? channelId;
+  final bool requested;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final id = channelId;
+    final show = requested && id != null;
+    return ClipRect(
+      child: AnimatedContainer(
+        duration: AppMotion.reduced(context, AppMotion.base),
+        curve: AppMotion.entrance,
+        width: show ? kThreadPaneWidth : 0,
+        child: show
+            ? OverflowBox(
+                minWidth: kThreadPaneWidth,
+                maxWidth: kThreadPaneWidth,
+                alignment: Alignment.centerLeft,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: tokens.borderSubtle),
+                    ),
+                  ),
+                  child: AppPanelReveal(
+                    fromLeft: false,
+                    child: ThreadScreen(
+                      channelId: id,
+                      onClose: () =>
+                          ref.read(openThreadProvider.notifier).state = null,
+                    ),
+                  ),
+                ),
+              )
+            : const SizedBox.shrink(),
+      ),
+    );
+  }
+}
