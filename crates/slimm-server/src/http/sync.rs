@@ -266,3 +266,65 @@ fn dedupe_scopes(scopes: Vec<ScopeCursor>) -> Vec<ScopeCursor> {
     }
     deduped
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ScopeCursor, dedupe_scopes};
+
+    fn sc(id: &str, after_seq: i64, after_op_seq: Option<i64>) -> ScopeCursor {
+        ScopeCursor {
+            channel_id: id.to_owned(),
+            after_seq,
+            after_op_seq,
+        }
+    }
+
+    #[test]
+    fn distinct_channels_pass_through_in_order() {
+        let out = dedupe_scopes(vec![sc("a", 5, None), sc("b", 3, Some(1))]);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].channel_id, "a");
+        assert_eq!(out[1].channel_id, "b");
+    }
+
+    /// A channel named twice collapses to the *smaller* seq, never the larger:
+    /// syncing from the earlier point re-sends a little, but syncing from the
+    /// later one would skip everything between the two - silent message loss.
+    #[test]
+    fn a_repeated_channel_keeps_the_smaller_seq() {
+        let out = dedupe_scopes(vec![sc("a", 10, None), sc("a", 3, None)]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].after_seq, 3);
+
+        // Order of arrival does not matter; the minimum still wins.
+        let swapped = dedupe_scopes(vec![sc("a", 3, None), sc("a", 10, None)]);
+        assert_eq!(swapped[0].after_seq, 3);
+    }
+
+    #[test]
+    fn two_op_cursors_keep_the_smaller() {
+        let out = dedupe_scopes(vec![sc("a", 5, Some(9)), sc("a", 5, Some(4))]);
+        assert_eq!(out[0].after_op_seq, Some(4));
+    }
+
+    /// One side holding no op cursor must not erase the side that does: a
+    /// present cursor is kept whichever order the two arrive in.
+    #[test]
+    fn a_present_op_cursor_survives_a_missing_one() {
+        assert_eq!(
+            dedupe_scopes(vec![sc("a", 5, None), sc("a", 5, Some(7))])[0].after_op_seq,
+            Some(7)
+        );
+        assert_eq!(
+            dedupe_scopes(vec![sc("a", 5, Some(7)), sc("a", 5, None)])[0].after_op_seq,
+            Some(7)
+        );
+    }
+
+    #[test]
+    fn two_missing_op_cursors_stay_missing() {
+        let out = dedupe_scopes(vec![sc("a", 5, None), sc("a", 8, None)]);
+        assert_eq!(out[0].after_op_seq, None);
+        assert_eq!(out[0].after_seq, 5);
+    }
+}
