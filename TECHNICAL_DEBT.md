@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-46 of them are now accounted for - 44 fixed, and MOD5 plus UX7 decided rather than built - leaving 24 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+47 of them are now accounted for - 45 fixed, and MOD5 plus UX7 decided rather than built - leaving 23 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -104,10 +104,8 @@ Four reported findings did not survive verification and were corrected or reject
   This is the coupling that makes the local-store swap, or the Postgres move CLAUDE.md anticipates, expensive.
   Fix: give `data` plain DTOs that repositories map drift rows into at the boundary, so generated types never leave `lib/src/`. Effort: large.
 
-- **CA2. A widget imports drift directly and bypasses the store API** (`client/packages/app/lib/src/widgets/channel_rail.dart:8`). Medium.
-  It imports `package:drift/drift.dart show Value` and calls `Channel.copyWith(..., categoryId: Value(categoryId))` at line 239 instead of going through `CategoryStore`/`MessageStore`.
-  The widget layer now also has to change if drift is replaced, and category-reorder write logic can drift between here and the store.
-  Fix: add a store method for "move channel to category at position" and call that. Effort: small.
+- ~~**CA2. A widget imports drift directly and bypasses the store API**~~ (`client/packages/app/lib/src/widgets/channel_rail.dart:8`). Medium. Fixed in #752.
+  The widget no longer imports `package:drift/drift.dart`; the drift `Value` wrap a nullable `categoryId` needs now lives behind a `Channel.repositioned({categoryId, position})` extension in the data layer, and the rail calls that. In practice this was not a store *write* the entry implied but the pure in-memory overlay `_withPendingOrder` builds to render a reorder before the server confirms it (the store is untouched until then), so the fix is the boundary extraction rather than a new store method. The existing reorder test still passes and a data-layer test pins the transform.
 
 - **CA3. `rtc` reaches into `livekit_client`'s private `src/`** (`client/packages/rtc/lib/src/broadcast_bridge.dart:26`). Medium.
   An `// ignore: implementation_imports` pulls in `src/managers/broadcast_manager.dart`, inside the one package whose own doc says it exists to contain the livekit dependency.
