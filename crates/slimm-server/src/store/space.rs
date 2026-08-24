@@ -80,3 +80,37 @@ impl Store {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::JoinPolicy;
+
+    /// The security-critical branch. The CHECK constraint makes junk
+    /// unreachable through the write path, so this fallback is the only thing
+    /// between a row that somehow holds garbage and a Space open to the
+    /// internet: anything unrecognised must read closed, never Open.
+    #[test]
+    fn unrecognised_text_reads_as_invite_never_open() {
+        for junk in ["", "OPEN", "Open", "public", "invite ", "open\n", "yes"] {
+            assert_eq!(
+                JoinPolicy::parse(junk),
+                JoinPolicy::Invite,
+                "{junk:?} must fail closed"
+            );
+        }
+    }
+
+    #[test]
+    fn exactly_open_reads_as_open() {
+        assert_eq!(JoinPolicy::parse("open"), JoinPolicy::Open);
+        assert_eq!(JoinPolicy::parse("invite"), JoinPolicy::Invite);
+    }
+
+    /// The two halves cannot drift: whatever `as_str` writes, `parse` reads back.
+    #[test]
+    fn as_str_round_trips_through_parse() {
+        for policy in [JoinPolicy::Invite, JoinPolicy::Open] {
+            assert_eq!(JoinPolicy::parse(policy.as_str()), policy);
+        }
+    }
+}
