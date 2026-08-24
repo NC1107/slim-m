@@ -61,8 +61,8 @@ Future<void> _teardown(
   SlimmDatabase db,
 ) async {
   await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(milliseconds: 1));
   container.dispose();
+  await tester.pump(const Duration(milliseconds: 1));
   await db.close();
 }
 

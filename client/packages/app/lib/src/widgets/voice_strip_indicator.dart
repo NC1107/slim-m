@@ -20,10 +20,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_data/data.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/providers.dart';
+import '../providers/channel_by_id_provider.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart';
@@ -123,22 +122,13 @@ class CallChannelName extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = channelId;
-    final store = ref.watch(storeProvider).valueOrNull;
-    if (id == null || store == null) return Text('In a call', style: style);
+    if (id == null) return Text('In a call', style: style);
 
-    return StreamBuilder<List<Channel>>(
-      stream: store.watchChannels(),
-      builder: (context, snapshot) {
-        final name = snapshot.data
-            ?.where((c) => c.id == id)
-            .map((c) => c.name)
-            .firstOrNull;
-        return Text(
-          name ?? 'In a call',
-          overflow: TextOverflow.ellipsis,
-          style: style,
-        );
-      },
+    final name = ref.watch(channelByIdProvider(id)).valueOrNull?.name;
+    return Text(
+      name ?? 'In a call',
+      overflow: TextOverflow.ellipsis,
+      style: style,
     );
   }
 }

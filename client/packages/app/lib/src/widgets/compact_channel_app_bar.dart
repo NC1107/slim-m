@@ -15,9 +15,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/channel_by_id_provider.dart';
 import '../providers/channel_search_controller.dart';
 import '../providers/pins_controller.dart';
-import '../providers/providers.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
 import 'pinned_messages_sheet.dart';
@@ -51,20 +51,8 @@ class CompactChannelAppBar extends ConsumerWidget
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final storeAsync = ref.watch(storeProvider);
-    return storeAsync.maybeWhen(
-      orElse: () => _bar(null, tokens),
-      data: (store) => StreamBuilder<List<Channel>>(
-        stream: store.watchChannels(),
-        builder: (context, snapshot) => _bar(
-          snapshot.data
-              ?.where((c) => c.id == channelId)
-              .cast<Channel?>()
-              .firstOrNull,
-          tokens,
-        ),
-      ),
-    );
+    final channel = ref.watch(channelByIdProvider(channelId)).valueOrNull;
+    return _bar(channel, tokens);
   }
 
   // `ChannelHeader` and the wide voice header draw this hairline on a `Container`; a Material `AppBar` needs its own.

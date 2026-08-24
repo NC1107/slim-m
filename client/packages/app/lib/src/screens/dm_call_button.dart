@@ -9,10 +9,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-import '../providers/providers.dart';
+import '../providers/channel_by_id_provider.dart';
 import 'dm_call_pane.dart';
 
 class DmCallButton extends ConsumerWidget {
@@ -22,33 +21,18 @@ class DmCallButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final storeAsync = ref.watch(storeProvider);
-    return storeAsync.maybeWhen(
-      orElse: () => const SizedBox.shrink(),
-      data: (store) => StreamBuilder<List<Channel>>(
-        stream: store.watchChannels(),
-        builder: (context, snapshot) {
-          final channel = snapshot.data
-              ?.where((c) => c.id == channelId)
-              .cast<Channel?>()
-              .firstOrNull;
-          if (channel == null ||
-              channel.kind != 'dm' ||
-              channel.isPersonalSpace) {
-            return const SizedBox.shrink();
-          }
-          final open = ref.watch(dmCallOpenProvider) == channelId;
-          return AppIconButton(
-            icon: AppIcons.startCall,
-            semanticLabel: 'Call',
-            tooltip: 'Call',
-            active: open,
-            onPressed: () => ref.read(dmCallOpenProvider.notifier).state = open
-                ? null
-                : channelId,
-          );
-        },
-      ),
+    final channel = ref.watch(channelByIdProvider(channelId)).valueOrNull;
+    if (channel == null || channel.kind != 'dm' || channel.isPersonalSpace) {
+      return const SizedBox.shrink();
+    }
+    final open = ref.watch(dmCallOpenProvider) == channelId;
+    return AppIconButton(
+      icon: AppIcons.startCall,
+      semanticLabel: 'Call',
+      tooltip: 'Call',
+      active: open,
+      onPressed: () =>
+          ref.read(dmCallOpenProvider.notifier).state = open ? null : channelId,
     );
   }
 }
