@@ -22,6 +22,7 @@ mod attachments;
 mod bootstrap;
 mod canvas;
 mod canvas_audit;
+mod canvas_geometry;
 mod canvas_media_slots;
 mod canvas_move;
 mod canvas_op_clock;
