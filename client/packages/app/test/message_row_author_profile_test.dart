@@ -199,10 +199,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final owner = tester
-            .binding
-            // ignore: deprecated_member_use
-            .pipelineOwner;
+        final owner = tester.binding.renderViews.first.owner!;
         final dump = owner.semanticsOwner!.rootSemanticsNode!.toStringDeep();
 
         final avatarNode = tester.getSemantics(

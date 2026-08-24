@@ -116,10 +116,7 @@ void main() {
       );
       expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
 
-      final owner = tester
-          .binding
-          // ignore: deprecated_member_use
-          .pipelineOwner;
+      final owner = tester.binding.renderViews.first.owner!;
       final dump = owner.semanticsOwner!.rootSemanticsNode!.toStringDeep();
       expect(
         dump.contains('Microphone input level'),
