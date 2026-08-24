@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
+import '../providers/threads.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/categories_screen.dart';
 import 'package:slimm_data/data.dart' show Channel;
@@ -28,6 +29,7 @@ import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
 import '../screens/thread_screen.dart';
 import '../widgets/mobile_boot_gate.dart';
+import 'breakpoints.dart';
 import 'modal_page.dart';
 import 'page_transitions.dart';
 import 'routes.dart';
@@ -154,10 +156,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.threadPattern,
-        pageBuilder: (context, state) => modalPage(
-          context,
-          ThreadScreen(channelId: state.pathParameters['channelId']!),
-        ),
+        pageBuilder: (context, state) {
+          final threadId = state.pathParameters['channelId']!;
+          final width = MediaQuery.sizeOf(context).width;
+          // A cold-opened thread - deep link, reload, notification - docks beside its parent at widths that fit the pane, the same as an in-app open (UX1); below that it stays the modal.
+          if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
+            return NoTransitionPage<void>(
+              child: _ThreadDockRedirect(threadId: threadId),
+            );
+          }
+          return modalPage(context, ThreadScreen(channelId: threadId));
+        },
       ),
       // The shell keeps the channel list alive across conversation changes;
       // the child pages fade through so switching one for another reads as a
@@ -212,4 +221,45 @@ class _SessionListenable extends ChangeNotifier {
   }
 
   late final dynamic _subscription;
+}
+
+/// The wide-width landing for a cold-opened `/thread/:id`: resolve its parent
+/// channel, then hand off to the shell with the thread docked rather than
+/// showing the modal (UX1). A spinner covers the one-frame resolve; if the
+/// parent cannot be resolved (offline, or a thread whose parent is gone) it
+/// falls back to the thread on its own, exactly what the modal route showed.
+class _ThreadDockRedirect extends ConsumerWidget {
+  const _ThreadDockRedirect({required this.threadId});
+
+  final String threadId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref
+        .watch(threadParentProvider(threadId))
+        .when(
+          loading: () => const _RedirectSpinner(),
+          error: (_, _) => ThreadScreen(channelId: threadId),
+          data: (parent) {
+            final parentChannelId = parent.parentChannelId;
+            if (parentChannelId == null) {
+              return ThreadScreen(channelId: threadId);
+            }
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              ref.read(openThreadProvider.notifier).state = threadId;
+              context.go(Routes.channel(parentChannelId));
+            });
+            return const _RedirectSpinner();
+          },
+        );
+  }
+}
+
+class _RedirectSpinner extends StatelessWidget {
+  const _RedirectSpinner();
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: CircularProgressIndicator()));
 }
