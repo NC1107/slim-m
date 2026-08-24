@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-47 of them are now accounted for - 45 fixed, and MOD5 plus UX7 decided rather than built - leaving 23 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+48 of them are now accounted for - 46 fixed, and MOD5 plus UX7 decided rather than built - leaving 22 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -193,10 +193,8 @@ Four reported findings did not survive verification and were corrected or reject
   Every delete path fires only on a server-signalled reset, a delete, or sign-out; nothing evicts by age or count, so the local sqlite or OPFS store grows for the life of an account as history pagination pages older messages in.
   Fix: cap cached rows per channel, or evict channels not opened recently, the way the avatar and attachment byte caches already bound themselves. Effort: large.
 
-- **CD3. The seq-adjacency rule is implemented twice** (`client/packages/app/lib/src/providers/message_ops_sync.dart:84`). Low.
-  `liveOpDecision` and `CanvasSync.applyLive` (`canvas_sync.dart:251`) independently implement the identical three comparisons, and `liveOpDecision`'s own doc comment says it "should read as identical" to the other.
-  A future change to the gap-detection rule has to land in both by hand.
-  Fix: extract one shared helper both call. Effort: small.
+- ~~**CD3. The seq-adjacency rule is implemented twice**~~ (`client/packages/app/lib/src/providers/message_ops_sync.dart:84`). Low. Fixed in #753.
+  `liveOpDecision` and `LiveOpOutcome` moved to a neutral `op_adjacency.dart`; `CanvasSync.applyLive` now switches on `liveOpDecision(seq, cursor)` instead of reimplementing the three comparisons, so a future change to the gap-detection rule lands in one place. Behaviour is preserved: the canvas convergence property tests (out-of-order delivery, the exact gap path) and `liveOpDecision`'s own unit tests both stay green.
 
 ## Client: code quality and platform
 

@@ -13,6 +13,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/message_ops_sync.dart';
+import 'package:slimm_app/src/providers/op_adjacency.dart';
 import 'package:slimm_data/data.dart';
 
 api.Message _message(String id, {int seq = 1, String content = 'original'}) =>
