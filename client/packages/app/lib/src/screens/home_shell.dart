@@ -116,10 +116,12 @@ class HomeShell extends ConsumerWidget {
       );
     } else if (selected != null) {
       // No rail here to carry the strip, so a call elsewhere gets its own row.
-      final voice = ref.watch(voiceControllerProvider);
+      final (voiceState, voiceChannelId) = ref.watch(
+        voiceControllerProvider.select((s) => (s.state, s.channelId)),
+      );
       final showVoiceStrip =
-          voice.state == VoiceSessionState.connected &&
-          voice.channelId != selected;
+          voiceState == VoiceSessionState.connected &&
+          voiceChannelId != selected;
       // Compact: the conversation replaces the list, with a way back.
       final replacesHeader = canvasOpen || dmCallOpen;
       final channelId = selected;
