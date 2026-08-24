@@ -209,6 +209,22 @@ mod tests {
         }
     }
 
+    /// The masking that stops a channel being an existence oracle (decision
+    /// 0011): without VIEW_CHANNEL every other bit is hidden, so a caller who
+    /// cannot see the channel cannot read one permission off it; with it, the
+    /// set passes through unchanged.
+    #[test]
+    fn mask_unless_viewable_hides_everything_without_view() {
+        // A rich set still collapses to nothing when VIEW_CHANNEL is absent.
+        let rich = SEND.union(Permissions::MANAGE_MESSAGES);
+        assert_eq!(mask_unless_viewable(rich), Permissions::NONE);
+        assert_eq!(mask_unless_viewable(Permissions::NONE), Permissions::NONE);
+        // With VIEW_CHANNEL present, the whole set is visible unchanged.
+        let viewable = VIEW.union(SEND);
+        assert_eq!(mask_unless_viewable(viewable), viewable);
+        assert_eq!(mask_unless_viewable(VIEW), VIEW);
+    }
+
     #[test]
     fn nothing_is_granted_by_default() {
         let result = evaluate(Permissions::NONE, &[], None, &[], None);
