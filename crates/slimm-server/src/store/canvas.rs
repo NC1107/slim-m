@@ -29,28 +29,9 @@ use super::canvas_ops::insert_place_op;
 use super::{Store, now_ms};
 use crate::ids::{CanvasObjectId, ChannelId, Seq, UserId};
 
-/// Half-width of the bounded world. The canvas is large but finite (owner
-/// decision), and an object outside it could never be reached by panning.
-pub const WORLD_LIMIT: f64 = 5_000_000.0;
-
-/// Longest side one object may declare.
-///
-/// The world alone is not a bound worth having here: a single object legally
-/// spanning it is written into every cell of the client's uniform grid, which
-/// at a 1024px cell is 95 million buckets and hangs whoever opens the canvas
-/// next. Nothing this slice can draw is wider than a few screens, and the
-/// ceiling has to be on the server or the row is still there for every other
-/// client build.
-pub const MAX_OBJECT_EXTENT: f64 = 8_192.0;
-
-/// Most live objects one channel's canvas may hold.
-///
-/// A canvas is a broadly-granted unbounded write with no removal path in this
-/// slice, which is the one combination that cannot be walked back, so the
-/// ceiling is refused inside the same transaction that counts - the shape
-/// `MAX_PINS_PER_CHANNEL` already uses. It also keeps a whole-canvas read
-/// inside what the viewport limit can answer.
-pub const MAX_OBJECTS_PER_CHANNEL: i64 = 20_000;
+// Geometry lives in `canvas_geometry`; re-exported so every existing path holds.
+pub use super::canvas_geometry::{MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, WORLD_LIMIT};
+pub(crate) use super::canvas_geometry::{channel_key, valid_bounds};
 
 /// A placed canvas object.
 #[derive(Debug, Clone)]
@@ -142,30 +123,6 @@ impl From<super::attachments::LinkError> for PlaceError {
             super::attachments::LinkError::Internal(e) => PlaceError::Internal(e),
         }
     }
-}
-
-/// A 24-bit discriminant of a channel id, stored on every object and used as
-/// the R-Tree's third dimension. Drawn from the UUIDv7's random tail, not its
-/// timestamp prefix, which channels created in the same millisecond share.
-pub(crate) fn channel_key(channel_id: ChannelId) -> i64 {
-    let bytes = channel_id.0.as_bytes();
-    i64::from(bytes[13]) << 16 | i64::from(bytes[14]) << 8 | i64::from(bytes[15])
-}
-
-/// Whether a bounding box is finite, non-negative, within
-/// [`MAX_OBJECT_EXTENT`] and inside the bounded world. Shared with
-/// `canvas_ops_write`'s `move`, which is the same shape check a placement
-/// already makes.
-pub(crate) fn valid_bounds(x: f64, y: f64, w: f64, h: f64) -> bool {
-    [x, y, w, h].iter().all(|v| v.is_finite())
-        && w >= 0.0
-        && h >= 0.0
-        && w <= MAX_OBJECT_EXTENT
-        && h <= MAX_OBJECT_EXTENT
-        && x >= -WORLD_LIMIT
-        && y >= -WORLD_LIMIT
-        && x + w <= WORLD_LIMIT
-        && y + h <= WORLD_LIMIT
 }
 
 /// What [`Store::place_canvas_object`] needs beyond the caller and the
