@@ -247,3 +247,63 @@ fn is_foreground_and_recent(target: &crate::store::PushTarget, now: i64) -> bool
     };
     state == "foreground" && now - reported_at < FOREGROUND_FRESHNESS_MS
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{FOREGROUND_FRESHNESS_MS, is_foreground_and_recent};
+    use crate::ids::{DeviceId, UserId};
+    use crate::store::PushTarget;
+
+    fn target(state: Option<&str>, reported_at: Option<i64>) -> PushTarget {
+        PushTarget {
+            user_id: UserId::generate(),
+            device_id: DeviceId::generate(),
+            platform: "ios".to_owned(),
+            push_token: "t".to_owned(),
+            voip_push_token: None,
+            push_public_key: Vec::new(),
+            lifecycle_state: state.map(str::to_owned),
+            lifecycle_reported_at: reported_at,
+            include_content: false,
+        }
+    }
+
+    /// A device that reported itself foreground within the freshness window is
+    /// suppressed; one whose report has aged past the window is not, since it
+    /// may well be backgrounded by now.
+    #[test]
+    fn freshness_is_a_half_open_window() {
+        let base = 1_000_000;
+        let fresh = target(Some("foreground"), Some(base));
+        assert!(is_foreground_and_recent(
+            &fresh,
+            base + FOREGROUND_FRESHNESS_MS - 1
+        ));
+        // Exactly at the window is already stale: the bound is strict.
+        assert!(!is_foreground_and_recent(
+            &fresh,
+            base + FOREGROUND_FRESHNESS_MS
+        ));
+    }
+
+    #[test]
+    fn only_the_foreground_state_suppresses() {
+        let now = 1_000_000;
+        assert!(!is_foreground_and_recent(
+            &target(Some("background"), Some(now)),
+            now
+        ));
+    }
+
+    /// Missing lifecycle data defaults to *not* suppressing, so an absent or
+    /// never-reported state can never silence a push that should fire.
+    #[test]
+    fn missing_lifecycle_data_never_suppresses() {
+        let now = 1_000_000;
+        assert!(!is_foreground_and_recent(&target(None, Some(now)), now));
+        assert!(!is_foreground_and_recent(
+            &target(Some("foreground"), None),
+            now
+        ));
+    }
+}
