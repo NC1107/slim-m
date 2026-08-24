@@ -359,6 +359,7 @@ class _CanvasSurfaceState extends State<CanvasSurface>
   @override
   void dispose() {
     widget.cursors?.removeListener(_onCursorsChanged);
+    _cursorPainter?.disposeLabels();
     // Before super: the ticker mixin asserts nothing is still ticking.
     _glideTicker.dispose();
     _cursorGlideTick.dispose();
