@@ -16,7 +16,7 @@ import 'package:flutter/rendering.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_stroke_drafts.dart';
-import 'cursor_label_contrast.dart';
+import 'cursor_label_cache.dart';
 
 export 'cursor_label_contrast.dart' show cursorLabelColorFor;
 
@@ -215,12 +215,17 @@ class CursorPainter extends CustomPainter {
   /// at all, since its glyph and label would be fully off-canvas anyway.
   static const double _cullMargin = 48;
 
+  late final CursorLabelCache _labels = CursorLabelCache(
+    fontFamily: labelFontFamily,
+  );
+
   @override
   void paint(Canvas canvas, Size size) {
     if (colors.isEmpty) return;
     final camera = document.camera;
     final paintedAt = now();
-    for (final cursor in cursors.all) {
+    final all = cursors.all;
+    for (final cursor in all) {
       final world = cursor.positionAt(paintedAt, glide);
       final at = Offset(
         (world.dx - camera.x) * camera.zoom,
@@ -234,9 +239,18 @@ class CursorPainter extends CustomPainter {
       }
       final color = colors[cursor.colorIndex % colors.length];
       _paintGlyph(canvas, at, color);
-      _paintLabel(canvas, at, cursor.label, color);
+      _paintLabel(canvas, at, cursor.id, cursor.label, color);
     }
+    // Reconcile every frame, since a size check misses a departed cursor whose slot an off-screen (uncached) one took.
+    _labels.retain({for (final c in all) c.id});
   }
+
+  /// Frees the label cache; a [CustomPainter] has no teardown hook of its own,
+  /// so the owning surface calls this from its own `dispose`.
+  void disposeLabels() => _labels.dispose();
+
+  @visibleForTesting
+  int get debugLabelCacheSize => _labels.size;
 
   /// A white rim behind the fill, not a second identical fill: the same path
   /// drawn twice with no stroke and no inset (the shape this replaces) paints
@@ -263,20 +277,15 @@ class CursorPainter extends CustomPainter {
     canvas.drawPath(path, Paint()..color = color);
   }
 
-  void _paintLabel(Canvas canvas, Offset at, String label, Color color) {
+  void _paintLabel(
+    Canvas canvas,
+    Offset at,
+    String id,
+    String label,
+    Color color,
+  ) {
     if (label.isEmpty) return;
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          fontFamily: labelFontFamily,
-          fontSize: 11,
-          color: cursorLabelColorFor(color),
-          height: 1,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: 160);
+    final painter = _labels.painterFor(id, label, color);
     final origin = Offset(at.dx + 14, at.dy + 12);
     final chip = RRect.fromRectAndRadius(
       Rect.fromLTWH(
