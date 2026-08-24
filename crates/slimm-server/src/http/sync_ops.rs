@@ -192,3 +192,65 @@ fn trim_to_budget(ops: &mut Vec<MessageOpDto>, budget: &mut usize) -> bool {
     ops.truncate(kept);
     trimmed
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{MessageOpDto, collapse_repeated_content};
+
+    fn edit(id: &str, seq: i64, content: &str) -> MessageOpDto {
+        MessageOpDto {
+            seq,
+            kind: "edit",
+            message_id: id.to_owned(),
+            created_at: 0,
+            content: Some(content.to_owned()),
+            edited_at: Some(seq),
+        }
+    }
+
+    fn delete(id: &str, seq: i64) -> MessageOpDto {
+        MessageOpDto {
+            seq,
+            kind: "delete",
+            message_id: id.to_owned(),
+            created_at: 0,
+            content: None,
+            edited_at: None,
+        }
+    }
+
+    /// Several edits of one message in a batch collapse to only the last one
+    /// carrying content: the client applies them in order, so every earlier
+    /// body is about to be overwritten anyway and need not ride the wire.
+    #[test]
+    fn only_the_latest_edit_of_a_message_keeps_its_content() {
+        let mut ops = vec![
+            edit("m1", 1, "v1"),
+            edit("m1", 2, "v2"),
+            edit("m1", 3, "v3"),
+        ];
+        collapse_repeated_content(&mut ops);
+        assert_eq!(ops[0].content, None);
+        assert_eq!(ops[0].edited_at, None);
+        assert_eq!(ops[1].content, None);
+        assert_eq!(ops[2].content.as_deref(), Some("v3"));
+    }
+
+    #[test]
+    fn edits_of_different_messages_are_all_kept() {
+        let mut ops = vec![edit("m1", 1, "a"), edit("m2", 2, "b")];
+        collapse_repeated_content(&mut ops);
+        assert_eq!(ops[0].content.as_deref(), Some("a"));
+        assert_eq!(ops[1].content.as_deref(), Some("b"));
+    }
+
+    /// A delete carries no content, so it is skipped rather than counted as a
+    /// sighting of the message - a later delete must not blank the body of an
+    /// edit the client still has to apply first.
+    #[test]
+    fn a_delete_does_not_collapse_an_earlier_edit() {
+        let mut ops = vec![edit("m1", 1, "keep"), delete("m1", 2)];
+        collapse_repeated_content(&mut ops);
+        assert_eq!(ops[0].content.as_deref(), Some("keep"));
+    }
+}
