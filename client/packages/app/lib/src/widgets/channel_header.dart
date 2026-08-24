@@ -26,6 +26,7 @@ class ChannelHeader extends ConsumerWidget {
     required this.name,
     required this.isVoice,
     this.isDm = false,
+    this.isPersonalSpace = false,
     this.topic,
     required this.searchOpen,
     required this.onToggleSearch,
@@ -34,6 +35,11 @@ class ChannelHeader extends ConsumerWidget {
   final String channelId;
   final String name;
   final bool isVoice;
+
+  /// The self-DM. Its name is "You" (`personalSpaceName`), so it takes the same
+  /// notebook glyph the rail's `PersonalSpaceRow` shows rather than an avatar
+  /// of those initials. Defaults false; a real DM sets [isDm] instead.
+  final bool isPersonalSpace;
 
   /// A DM has exactly two participants by construction, never the
   /// deployment's roster `membersProvider` answers with, so the toggle for
@@ -74,14 +80,21 @@ class ChannelHeader extends ConsumerWidget {
           Expanded(
             child: Row(
               children: [
-                Icon(
-                  // A DM is a person, not a public channel named after one; distinct from the hash a text channel gets.
-                  isVoice
-                      ? AppIcons.voice
-                      : (isDm ? AppIcons.account : AppIcons.hash),
-                  size: AppSizes.icon16,
-                  color: tokens.textSecondary,
-                ),
+                // A DM is a person: show their avatar like every other member-naming surface. The personal space keeps its notebook, and a text or voice channel its own icon.
+                if (isPersonalSpace)
+                  Icon(
+                    AppIcons.notebook,
+                    size: AppSizes.icon16,
+                    color: tokens.textSecondary,
+                  )
+                else if (isDm)
+                  AppAvatar(name: name, size: 24)
+                else
+                  Icon(
+                    isVoice ? AppIcons.voice : AppIcons.hash,
+                    size: AppSizes.icon16,
+                    color: tokens.textSecondary,
+                  ),
                 const SizedBox(width: AppSpacing.s8),
                 // See the library doc comment above for why flex is 2 here.
                 Flexible(

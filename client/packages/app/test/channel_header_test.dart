@@ -206,9 +206,10 @@ void main() {
     expect(find.bySemanticsLabel('Toggle member list'), findsNothing);
   });
 
-  /// shell.md: a DM reused the text-channel "#" glyph even though the code
-  /// already branches on `isDm` two lines away for the member toggle.
-  testWidgets('a DM carries a person glyph, not the channel hash', (
+  /// UX5: a DM identifies a person, so its header shows that person's avatar -
+  /// the same identity every other member-naming surface shows - rather than
+  /// the text-channel hash or a generic person glyph.
+  testWidgets('a DM shows the correspondent avatar, not a hash or a glyph', (
     tester,
   ) async {
     final container = _containerWithPins([]);
@@ -235,7 +236,46 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(AppIcons.hash), findsNothing);
-    expect(find.byIcon(AppIcons.account), findsOneWidget);
+    expect(find.byIcon(AppIcons.account), findsNothing);
+    final avatar = tester.widget<AppAvatar>(find.byType(AppAvatar));
+    expect(
+      avatar.name,
+      'Alice',
+      reason: "the avatar carries the correspondent's name for its initials",
+    );
+  });
+
+  /// UX5: the personal space is a self-DM named "You", but it is not a person -
+  /// it keeps the rail's notebook glyph rather than a "YO" initials avatar.
+  testWidgets('the personal space keeps its notebook glyph, not an avatar', (
+    tester,
+  ) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'c1',
+              name: 'You',
+              isVoice: false,
+              isDm: true,
+              isPersonalSpace: true,
+              searchOpen: false,
+              onToggleSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(AppIcons.notebook), findsOneWidget);
+    expect(find.byType(AppAvatar), findsNothing);
   });
 
   /// shell.md: at the one width where the name and the topic compete for

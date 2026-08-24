@@ -290,6 +290,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           // Only a real named channel gets "#name"; shared so the transcript and composer cannot drift.
           final hashChannelName = channel?.kind == 'text' ? channelName : null;
           final isDm = channel?.kind == 'dm';
+          final isPersonalSpace = channel?.isPersonalSpace ?? false;
 
           return Column(
             children: [
@@ -301,6 +302,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   topic: channel?.topic,
                   isVoice: false,
                   isDm: isDm,
+                  isPersonalSpace: isPersonalSpace,
                   searchOpen: search.open,
                   onToggleSearch: _toggleSearch,
                 ),
