@@ -212,9 +212,14 @@ class CheckE2eRedStreakTest(unittest.TestCase):
         the script would have built instead - the one thing that decides
         which history is read.
         """
-        script = SCRIPT.read_text()
-        self.assertIn("actions/workflows/${WORKFLOW}/runs", script)
-        self.assertNotIn("actions/workflows/e2e.yml/runs", script)
+        # Read the code, not the comments: a stale comment naming the wrong workflow must neither satisfy nor break this (the source-reading-gate rule).
+        code = "\n".join(
+            line
+            for line in SCRIPT.read_text().splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        self.assertIn("actions/workflows/${WORKFLOW}/runs", code)
+        self.assertNotIn("actions/workflows/e2e.yml/runs", code)
 
     def test_cancelled_runs_neither_count_nor_break_the_streak(self):
         rows = [
