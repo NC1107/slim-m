@@ -411,8 +411,7 @@ class _ChannelTitle extends ConsumerWidget {
         builder: (context, snapshot) {
           final channel = snapshot.data
               ?.where((c) => c.id == channelId)
-              .cast<Channel?>()
-              .firstWhere((c) => true, orElse: () => null);
+              .firstOrNull;
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
