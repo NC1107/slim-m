@@ -28,6 +28,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'support/reduced_motion_harness.dart';
 import 'voice_controller_harness.dart' show FakeSession, tokens;
 
 const _channelId = 'channel-shared';
@@ -146,28 +147,14 @@ Widget _body() => MemberProfileBody(
   onDone: () {},
 );
 
-/// Reduce motion is forced on: [MemberProfileHeader] renders the shared
-/// avatar with `speaking: inCallTogether`, which mounts a perpetually
-/// pulsing `AppSpeakingRing` the moment a call is joined, and a real
-/// repeating ticker never lets `pumpAndSettle` settle.
-Widget _harness(ProviderContainer container, Widget child) =>
-    UncontrolledProviderScope(
-      container: container,
-      child: MediaQuery(
-        data: const MediaQueryData(disableAnimations: true),
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(body: child),
-        ),
-      ),
-    );
-
 void main() {
   testWidgets('absent without KICK_MEMBERS, even while sharing the call', (
     tester,
   ) async {
     final wired = _wire();
-    await tester.pumpWidget(_harness(wired.container, _body()));
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
     await _joinShared(tester, wired.container, wired.session);
 
     expect(
@@ -186,7 +173,9 @@ void main() {
     tester,
   ) async {
     final wired = _wire(permissions: Perm.kickMembers);
-    await tester.pumpWidget(_harness(wired.container, _body()));
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
     await tester.pump();
 
     expect(find.text('Eject from call...'), findsNothing);
@@ -203,7 +192,9 @@ void main() {
         permissions: Perm.kickMembers,
       ),
     );
-    await tester.pumpWidget(_harness(wired.container, _body()));
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
     await _joinShared(tester, wired.container, wired.session);
 
     expect(find.text('Eject from call...'), findsNothing);
@@ -214,7 +205,9 @@ void main() {
     tester,
   ) async {
     final wired = _wire(permissions: Perm.kickMembers);
-    await tester.pumpWidget(_harness(wired.container, _body()));
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
     await _joinShared(tester, wired.container, wired.session);
 
     expect(find.text('Eject from call...'), findsOneWidget);
@@ -225,7 +218,9 @@ void main() {
     tester,
   ) async {
     final wired = _wire(permissions: Perm.kickMembers);
-    await tester.pumpWidget(_harness(wired.container, _body()));
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
     await _joinShared(tester, wired.container, wired.session);
 
     await tester.tap(find.text('Eject from call...'));
@@ -249,7 +244,9 @@ void main() {
 
   testWidgets('cancelling sends nothing', (tester) async {
     final wired = _wire(permissions: Perm.kickMembers);
-    await tester.pumpWidget(_harness(wired.container, _body()));
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
     await _joinShared(tester, wired.container, wired.session);
 
     await tester.tap(find.text('Eject from call...'));
