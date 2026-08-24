@@ -292,9 +292,8 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   Both are two-column layouts whose left column is flat background carrying only the wordmark, roughly 540 of 2800px, on the first screens a new self-host operator or invited teammate ever sees.
   Fix: use the column to orient a first-time user, or narrow it so the pane does not read as unfinished. Effort: medium.
 
-- **UX5. The DM header shows a generic glyph instead of the correspondent's avatar** (`dm-desktop-light.png`). Low, both.
-  Every other surface naming a specific member shows their real initials avatar; the DM header is the one place that identifies a person by name and declines to show their face.
-  Fix: use the correspondent's `AppAvatar`. Effort: small.
+- ~~**UX5. The DM header shows a generic glyph instead of the correspondent's avatar**~~ (`dm-desktop-light.png`). Low, both. Fixed in #748.
+  The DM header now shows the correspondent's `AppAvatar` (their initials, keyed on the DM's name), the same identity every other member-naming surface shows; a text or voice channel keeps its hash or speaker icon.
 
 - **UX6. A fresh account reads its own presence as "Status: Unknown"** (`settings-desktop-light.png`). Low, desktop.
   "Unknown" reads as an uninitialised or error value against the online, away, dnd and offline vocabulary used everywhere else, and it is the first thing a new admin sees about their own account after onboarding.
