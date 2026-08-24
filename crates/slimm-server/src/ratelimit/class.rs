@@ -196,4 +196,35 @@ mod all_tests {
         }
         assert_eq!(seen.len(), Class::ALL.len());
     }
+
+    /// The label is a Prometheus dimension, so two classes sharing one would
+    /// silently merge their counters. Each must also be the lowercase snake_case
+    /// the doc promises a dashboard can key on.
+    #[test]
+    fn every_label_is_unique_and_snake_case() {
+        let mut seen = std::collections::HashSet::new();
+        for class in Class::ALL {
+            let label = class.label();
+            assert!(!label.is_empty(), "{class:?} has an empty label");
+            assert!(
+                label
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "{class:?} label {label:?} is not lowercase snake_case"
+            );
+            assert!(seen.insert(label), "two classes share the label {label:?}");
+        }
+    }
+
+    /// A bucket with a non-positive burst can never admit a request, and a
+    /// non-positive refill never recovers one; either is a budget typo that
+    /// would wedge every caller of that class.
+    #[test]
+    fn every_budget_is_positive() {
+        for class in Class::ALL {
+            let (burst, refill) = class.budget();
+            assert!(burst > 0.0, "{class:?} has a non-positive burst {burst}");
+            assert!(refill > 0.0, "{class:?} has a non-positive refill {refill}");
+        }
+    }
 }
