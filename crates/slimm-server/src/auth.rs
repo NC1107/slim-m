@@ -157,3 +157,30 @@ pub(crate) fn hash_secret(secret: &str) -> String {
     }
     hex
 }
+
+#[cfg(test)]
+mod tests {
+    use super::hash_secret;
+
+    /// Pinned against the published SHA-256 vectors, lowercase hex: the stored
+    /// hash of an invite or reset code is looked up by exact string, so the
+    /// algorithm and the encoding can never drift without every existing code
+    /// silently ceasing to match.
+    #[test]
+    fn hash_secret_is_lowercase_hex_sha256() {
+        assert_eq!(
+            hash_secret(""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            hash_secret("abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn hash_secret_is_deterministic_and_separates_inputs() {
+        assert_eq!(hash_secret("code-1"), hash_secret("code-1"));
+        assert_ne!(hash_secret("code-1"), hash_secret("code-2"));
+    }
+}
