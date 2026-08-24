@@ -178,10 +178,10 @@ class _TileChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    // AppRadii.window and AppShadows.float: reserved, by their own docs, for exactly a floating canvas object.
+    // AppRadii.window with AppShadows.canvasTile: a tile floats over the grid, but permanently, so it takes the resting-tile lift rather than float's picked-up one.
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(AppRadii.window),
-      boxShadow: AppShadows.float,
+      boxShadow: AppShadows.canvasTile,
     ),
     child: ClipRRect(
       borderRadius: BorderRadius.circular(AppRadii.window),

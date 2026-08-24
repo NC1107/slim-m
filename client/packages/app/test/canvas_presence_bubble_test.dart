@@ -190,11 +190,13 @@ void main() {
           .map((c) => c.decoration)
           .whereType<BoxDecoration>();
       expect(
-        decorated.any((d) => d.boxShadow == AppShadows.float),
+        decorated.any((d) => d.boxShadow == AppShadows.canvasTile),
         isTrue,
         reason:
             'a live tile is never merely part of the plane, unlike an '
-            'image or a stroke, so it carries the shadow unconditionally',
+            'image or a stroke, so it carries the resting-tile lift '
+            'unconditionally - lighter than float, which reads as a hard '
+            'dark band under a permanent tile',
       );
       expect(
         decorated.any(
@@ -236,7 +238,10 @@ void main() {
           )
           .map((c) => c.decoration)
           .whereType<BoxDecoration>();
-      expect(decorated.any((d) => d.boxShadow == AppShadows.float), isFalse);
+      expect(
+        decorated.any((d) => d.boxShadow == AppShadows.canvasTile),
+        isFalse,
+      );
       expect(find.byType(UserAvatar), findsOneWidget);
       expect(
         find.text('Noor'),

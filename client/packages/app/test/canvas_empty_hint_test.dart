@@ -6,8 +6,11 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import 'canvas_pane_harness.dart';
+import 'voice_controller_harness.dart';
 
 void main() {
   testWidgets('a fresh canvas invites a first mark', (tester) async {
@@ -20,6 +23,48 @@ void main() {
 
     expect(find.text('Nothing on this canvas yet'), findsOneWidget);
   });
+
+  testWidgets(
+    "a call's participant tiles suppress the hint, where \"nothing here "
+    'yet" would contradict the video feeds already on the canvas',
+    (tester) async {
+      final fixture = CanvasPaneFixture();
+      final container = fixture.container(
+        extraOverrides: [
+          voiceControllerProvider.overrideWith(
+            (ref) => FixedVoiceController(
+              ref,
+              const VoiceState(
+                channelId: 'c1',
+                participants: [
+                  VoiceParticipant(
+                    identity: 'ada',
+                    name: 'Ada',
+                    isSpeaking: false,
+                    isMuted: false,
+                    isLocal: false,
+                    isScreenSharing: false,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+
+      await pumpCanvasPane(tester, container);
+
+      expect(
+        find.text('Nothing on this canvas yet'),
+        findsNothing,
+        reason:
+            'the canvas has no drawings but is full of participant tiles; '
+            'the empty prompt would read as a broken/contradictory state',
+      );
+    },
+  );
 
   testWidgets('the hint is gone once a stroke lands', (tester) async {
     final fixture = CanvasPaneFixture();
