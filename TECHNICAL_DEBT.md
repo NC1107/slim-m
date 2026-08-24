@@ -286,9 +286,8 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
 - ~~**UX5. The DM header shows a generic glyph instead of the correspondent's avatar**~~ (`dm-desktop-light.png`). Low, both. Fixed in #748.
   The DM header now shows the correspondent's `AppAvatar` (their initials, keyed on the DM's name), the same identity every other member-naming surface shows; a text or voice channel keeps its hash or speaker icon.
 
-- **UX6. A fresh account reads its own presence as "Status: Unknown"** (`settings-desktop-light.png`). Low, desktop.
-  "Unknown" reads as an uninitialised or error value against the online, away, dnd and offline vocabulary used everywhere else, and it is the first thing a new admin sees about their own account after onboarding.
-  Fix: default a freshly created account's presence to whatever bootstrap actually intends, or give "Unknown" a friendlier rendering. Effort: small.
+- ~~**UX6. A fresh account reads its own presence as "Status: Unknown"**~~ (`settings-desktop-light.png`). Low, desktop. Fixed in #815.
+  The presence row's value is a deliberately-null session echo (there is no read-back endpoint, and seeding a default could tell a hidden user they are visible), so option 1 - seeding a default - was ruled out. The row's `unknownLabel` now renders that null as "Not set", a deliberate "no choice yet" rather than the default "Unknown" that read as an error against the online/away/dnd/offline vocabulary.
 
 - ~~**UX7. `textDisabled` sits below the AA text floor**~~ (`design_system/lib/src/app_tokens.dart:173`). Low. Won't fix (see #733): disabled text is deliberately WCAG 1.4.3-exempt - `contrast_test.dart` reports its ratio rather than gating it.
 
