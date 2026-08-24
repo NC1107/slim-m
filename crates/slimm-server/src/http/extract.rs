@@ -244,3 +244,71 @@ impl FromRequest<AppState> for Bytes {
         Ok(Bytes(bytes))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::forwarded_for;
+    use axum::http::Request;
+    use axum::http::request::Parts;
+
+    fn parts(xff: Option<&str>) -> Parts {
+        let mut builder = Request::builder();
+        if let Some(value) = xff {
+            builder = builder.header("x-forwarded-for", value);
+        }
+        builder.body(()).unwrap().into_parts().0
+    }
+
+    #[test]
+    fn a_missing_header_selects_nothing() {
+        assert_eq!(forwarded_for(&parts(None), 1), None);
+    }
+
+    /// The client is counted `hops` from the right, so entries a caller
+    /// prepends can never reach the selected slot - the whole reason the count
+    /// is from the right and not the left.
+    #[test]
+    fn a_prepended_entry_cannot_change_the_selected_address() {
+        assert_eq!(
+            forwarded_for(&parts(Some("2.2.2.2")), 1).as_deref(),
+            Some("2.2.2.2")
+        );
+        assert_eq!(
+            forwarded_for(&parts(Some("spoofed, 2.2.2.2")), 1).as_deref(),
+            Some("2.2.2.2")
+        );
+    }
+
+    #[test]
+    fn the_hop_count_is_taken_from_the_right() {
+        // Two trusted hops over "a, b, c" is two from the right: "b".
+        assert_eq!(
+            forwarded_for(&parts(Some("a, b, c")), 2).as_deref(),
+            Some("b")
+        );
+    }
+
+    /// A header with fewer entries than trusted hops selects nothing rather
+    /// than wrapping to the leftmost, so a short forged header falls back to
+    /// the socket peer instead of being believed.
+    #[test]
+    fn fewer_entries_than_hops_selects_nothing() {
+        assert_eq!(forwarded_for(&parts(Some("only")), 2), None);
+        assert_eq!(forwarded_for(&parts(Some("only")), 0), None);
+    }
+
+    /// A trailing comma is dropped, not counted: without that, one trusted hop
+    /// over `"2.2.2.2, "` would select the empty entry and key everyone who
+    /// sends a trailing comma into one bucket.
+    #[test]
+    fn empty_and_whitespace_entries_are_dropped_before_counting() {
+        assert_eq!(
+            forwarded_for(&parts(Some("2.2.2.2, ")), 1).as_deref(),
+            Some("2.2.2.2")
+        );
+        assert_eq!(
+            forwarded_for(&parts(Some("a,, b")), 1).as_deref(),
+            Some("b")
+        );
+    }
+}
