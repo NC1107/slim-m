@@ -237,6 +237,38 @@ void main() {
     });
   });
 
+  group('Me timeout and status fields', () {
+    // These back the timed-out banner (MOD6) and the status line.
+    test('a timed-out account carries its deadline, reason and status', () {
+      final me = Me.fromJson({
+        'id': 'u',
+        'username': 'bob',
+        'display_name': 'Bob',
+        'created_at': 1,
+        'permissions': 0,
+        'timed_out_until': 1712345678,
+        'timeout_reason': 'spamming',
+        'status_text': 'brb',
+      });
+      expect(me.timedOutUntil, 1712345678);
+      expect(me.timeoutReason, 'spamming');
+      expect(me.statusText, 'brb');
+    });
+
+    test('an account with none set, or an older server, reads them null', () {
+      final me = Me.fromJson({
+        'id': 'u',
+        'username': 'bob',
+        'display_name': 'Bob',
+        'created_at': 1,
+        'permissions': 0,
+      });
+      expect(me.timedOutUntil, isNull);
+      expect(me.timeoutReason, isNull);
+      expect(me.statusText, isNull);
+    });
+  });
+
   group('presence', () {
     test('listPresence sends a comma-joined id batch and parses statuses',
         () async {
