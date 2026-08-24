@@ -22,7 +22,7 @@ The security and frontend-lifecycle passes returned no findings.
 ## Summary
 
 70 items as found: 10 high, 43 medium, 17 low.
-50 of them are now accounted for - 48 fixed, and MOD5 plus UX7 decided rather than built - leaving 20 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
+51 of them are now accounted for - 49 fixed, and MOD5 plus UX7 decided rather than built - leaving 19 of the original 70 open, none of them high: CP2 was the last, and was downgraded to Medium on 2026-08-16 when its own numbers refused its recorded fix.
 MOD1's own work opened three follow-ups (MOD10 to MOD12), of which MOD11 is already closed by the same decision that closed MOD5. MOD2's opened one, MOD13.
 
 Closed on 2026-08-14, in order: DB1 to DB4 in #663, TEST3 to TEST10 in #667, and CP3, CI1 and CI2 in #668.
@@ -343,9 +343,8 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
   Not failing today because the seed is fixed.
   Fix: assert the Counter is non-empty first. Effort: small.
 
-- **TEST13. `test_check_workflow_red_streak.py:215` matches against unstripped source.** Low.
-  It asserts over the whole script text including comments, the shape the source-reading-gate rule forbids; harmless today only because no comment contains either literal.
-  Fix: strip comment lines, or anchor to the `gh api` line. Effort: small.
+- ~~**TEST13. `test_check_workflow_red_streak.py:215` matches against unstripped source.**~~ Low. Fixed in #756.
+  The workflow-URL assertion now strips comment-only lines from the script before matching, so a stale comment naming the wrong workflow can neither satisfy the `assertIn` nor break the `assertNotIn`. Verified by adding such a comment and confirming it is ignored.
 
 - **TEST14. The infinite-animation `pumpAndSettle` trap is a convention, not a harness** (`client/packages/app/test/member_profile_eject_test.dart:149`). Low.
   `AppSpeakingRing` starts an unbounded `repeat(reverse: true)` on call join, which hangs `pumpAndSettle` forever unless the test sets `disableAnimations: true` first.
