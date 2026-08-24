@@ -128,9 +128,14 @@ import '../widgets/compact_channel_app_bar.dart' show ChannelSearchAction;
 import 'channel_screen.dart';
 
 class ThreadScreen extends ConsumerStatefulWidget {
-  const ThreadScreen({required this.channelId, super.key});
+  const ThreadScreen({required this.channelId, this.onClose, super.key});
 
   final String channelId;
+
+  /// Set when this screen is a docked side pane rather than the pushed modal
+  /// route: there is no navigator entry to pop, so the leading control closes
+  /// the pane through this instead of the route's own back affordance.
+  final VoidCallback? onClose;
 
   @override
   ConsumerState<ThreadScreen> createState() => _ThreadScreenState();
@@ -185,11 +190,17 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
         : 'Thread in #$parentName';
     return Scaffold(
       appBar: AppBar(
-        // The automatic back button is a Material glyph; BackToButton's is the Lucide one every other screen uses.
-        leading: const BackToButton(
-          tooltip: 'Back to the conversation',
-          fallback: Routes.channels,
-        ),
+        // Docked: a close, since the parent sits beside it, not behind. Routed: the automatic back button is a Material glyph; BackToButton's is the Lucide one every other screen uses.
+        leading: widget.onClose != null
+            ? IconButton(
+                icon: const Icon(AppIcons.dismiss),
+                tooltip: 'Close thread',
+                onPressed: widget.onClose,
+              )
+            : const BackToButton(
+                tooltip: 'Back to the conversation',
+                fallback: Routes.channels,
+              ),
         // container: true gives the title its own semantics node; see the doc comment above.
         title: Semantics(header: true, container: true, child: Text(title)),
         shape: Border(bottom: BorderSide(color: tokens.borderSubtle)),

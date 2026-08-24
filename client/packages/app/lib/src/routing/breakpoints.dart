@@ -43,14 +43,28 @@ enum LayoutClass {
   /// transcript: that boundary minus the medium rail's own width and its
   /// handle, the same arithmetic the compact/medium switch already rests on,
   /// reused here rather than a fresh number picked by feel.
-  bool fitsMemberPane(double width) {
+  bool fitsMemberPane(double width) => _fitsThirdPane(width, AppMemberPane.width);
+
+  /// Whether a docked thread pane fits, the same test as [fitsMemberPane] with
+  /// the thread pane's own wider width. The thread pane and the member pane are
+  /// mutually exclusive at the third-pane slot (opening a thread replaces the
+  /// roster, the way Discord and Slack dock a thread), so only one third pane
+  /// ever competes with the transcript at a time and this stays a single-pane
+  /// fit test rather than a two-pane one.
+  bool fitsThreadPane(double width) => _fitsThirdPane(width, kThreadPaneWidth);
+
+  bool _fitsThirdPane(double width, double paneWidth) {
     if (this == LayoutClass.compact) return false;
     const minTranscript =
         kCompactWidth - ChannelRail.mediumWidth - AppSizes.rowPointer;
     final railWidth = this == LayoutClass.expanded
         ? ChannelRail.expandedWidth
         : ChannelRail.mediumWidth;
-    return width - railWidth - AppSizes.rowPointer - AppMemberPane.width >=
-        minTranscript;
+    return width - railWidth - AppSizes.rowPointer - paneWidth >= minTranscript;
   }
 }
+
+/// The docked thread pane's width: wider than the member pane because it holds
+/// a transcript and composer, not a list, but still narrow enough to leave the
+/// parent transcript above [_fitsThirdPane]'s minimum at the expanded boundary.
+const double kThreadPaneWidth = 360;

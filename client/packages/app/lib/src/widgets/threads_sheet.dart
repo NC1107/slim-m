@@ -17,6 +17,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/threads.dart';
+import '../routing/breakpoints.dart';
 import '../providers/user_profiles.dart';
 import '../routing/routes.dart';
 import 'author_label.dart';
@@ -163,8 +164,18 @@ class _Body extends ConsumerWidget {
             );
             return ListTile(
               onTap: () {
+                // Captured before the pop disposes this sheet's ref: the app container and router outlive it, so the thread can dock (expanded) or push its modal route (compact) after.
+                final container = ProviderScope.containerOf(
+                  context,
+                  listen: false,
+                );
+                final width = MediaQuery.sizeOf(context).width;
                 Navigator.of(context).pop();
-                router.push(Routes.thread(thread.id));
+                if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
+                  container.read(openThreadProvider.notifier).state = thread.id;
+                } else {
+                  router.push(Routes.thread(thread.id));
+                }
               },
               leading: AuthorAvatar(
                 userId: thread.parentAuthorId,

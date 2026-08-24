@@ -21,6 +21,7 @@ import 'package:slimm_app/src/providers/admin_providers.dart'
     show spaceAnalyticsProvider;
 import 'package:slimm_app/src/providers/sync_controller.dart'
     show SyncStatus, initialSyncCompleteProvider, syncControllerProvider;
+import 'package:slimm_app/src/providers/threads.dart' show openThreadProvider;
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
     show canvasOpenProvider;
@@ -240,6 +241,12 @@ final _shellStateSurfaces =
         overrides: () => [
           channelRailVisibleProvider.overrideWith((ref) => false),
         ],
+      ),
+      // The thread docked beside the transcript, the presentation an in-app open now takes at expanded widths (UX1); the `thread` surface's pushed route still covers the compact modal.
+      'thread-docked': (
+        route: '/channels/c-general',
+        viewports: const ['expanded-999', 'expanded-1000'],
+        overrides: () => [openThreadProvider.overrideWith((ref) => 'c-thread')],
       ),
       'channel-day-divider': (
         route: '/channels/c-general',

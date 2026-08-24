@@ -21,6 +21,7 @@ import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
 import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
+import '../providers/threads.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
@@ -41,7 +42,10 @@ import 'canvas/canvas_open_button.dart';
 import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
 import 'dm_call_pane.dart';
+import 'thread_screen.dart';
 import 'voice_screen.dart';
+
+part 'home_shell_pane_slots.dart';
 
 /// The shell. One widget handles every width: at compact widths it shows one
 /// pane at a time, and above that both at once. The panes themselves are the
@@ -77,8 +81,18 @@ class HomeShell extends ConsumerWidget {
     // Whatever the header toggle says: it can only hide the pane, not summon
     // room for it that is not there (see LayoutClass.fitsMemberPane's doc).
     final membersFit = layout.fitsMemberPane(width);
+    // The thread pane and the roster share the one third-pane slot; a docked
+    // thread takes it, so the roster yields while a thread is open (UX1, and
+    // see fitsThreadPane's doc). Below the width that fits a docked pane the
+    // thread stays the pushed modal route instead.
+    final openThread = ref.watch(openThreadProvider);
+    final threadFits = layout.fitsThreadPane(width);
+    final showThread = openThread != null && threadFits && !canvasFullscreen;
     final showMembers =
-        membersFit && !canvasFullscreen && ref.watch(memberPaneVisibleProvider);
+        membersFit &&
+        !canvasFullscreen &&
+        !showThread &&
+        ref.watch(memberPaneVisibleProvider);
     final showRail = !canvasFullscreen && ref.watch(channelRailVisibleProvider);
 
     final railWidth = layout == LayoutClass.expanded
@@ -103,6 +117,9 @@ class HomeShell extends ConsumerWidget {
             // screen reader at all. The member pane paints after it and so
             // was never affected, which is what made this look like a rail bug.
             Expanded(child: Semantics(container: true, child: child)),
+            // Between the transcript and the roster (the Discord/Slack order); it and the roster never both take width, so the transcript loses at most one third pane.
+            if (threadFits)
+              _ThreadPaneSlot(channelId: openThread, requested: showThread),
             // The pane comes from the edge it lives on: the slot's width
             // animates while the content slides in and fades (motion spec
             // 05). Hidden, the pane itself unmounts rather than sitting at
@@ -244,55 +261,6 @@ class _LayoutBridge extends StatelessWidget {
     duration: AppMotion.fast,
     offset: 0,
     child: child,
-  );
-}
-
-/// The wide-layout member pane's slot: width-animated, and withheld for a
-/// DM regardless of [requested] (the header toggle's own answer, already
-/// `memberPaneVisibleProvider`-gated) - that provider defaults open, so
-/// hiding only the toggle would still leave the deployment roster showing
-/// by default for a two-person conversation, the exact bug `ChannelHeader.isDm`
-/// exists to name. [channelId] null (nothing selected) or a store not yet
-/// resolved both read as "show": only a confirmed DM withholds it.
-class _MemberPaneSlot extends ConsumerWidget {
-  const _MemberPaneSlot({required this.channelId, required this.requested});
-
-  final String? channelId;
-  final bool requested;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!requested) return _animated(context, false);
-    final channelId = this.channelId;
-    if (channelId == null) return _animated(context, true);
-    final storeAsync = ref.watch(storeProvider);
-    return storeAsync.maybeWhen(
-      orElse: () => _animated(context, true),
-      data: (store) => StreamBuilder<Channel?>(
-        stream: store.watchChannelRow(channelId),
-        builder: (context, snapshot) =>
-            _animated(context, snapshot.data?.kind != 'dm'),
-      ),
-    );
-  }
-
-  Widget _animated(BuildContext context, bool show) => ClipRect(
-    child: AnimatedContainer(
-      duration: AppMotion.reduced(context, AppMotion.base),
-      curve: AppMotion.entrance,
-      width: show ? AppMemberPane.width : 0,
-      child: show
-          ? OverflowBox(
-              minWidth: AppMemberPane.width,
-              maxWidth: AppMemberPane.width,
-              alignment: Alignment.centerLeft,
-              child: const AppPanelReveal(
-                fromLeft: false,
-                child: AppMemberPane(),
-              ),
-            )
-          : const SizedBox.shrink(),
-    ),
   );
 }
 
