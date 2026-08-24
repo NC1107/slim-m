@@ -270,3 +270,41 @@ impl Store {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{HistoryCursor, cursor_tie_key};
+    use uuid::Uuid;
+
+    /// The audit key is zero-padded so a plain string comparison matches the
+    /// numeric order of the id: without it "A9" would sort after "A10" and
+    /// pagination would skip or repeat rows at the boundary.
+    #[test]
+    fn an_audit_tie_key_is_zero_padded_for_string_order() {
+        let nine = cursor_tie_key(HistoryCursor::Audit {
+            created_at: 0,
+            id: 9,
+        });
+        let ten = cursor_tie_key(HistoryCursor::Audit {
+            created_at: 0,
+            id: 10,
+        });
+        assert!(nine < ten, "{nine} should sort before {ten}");
+        assert_eq!(nine, "A00000000000000000009");
+    }
+
+    /// A report key carries the uuid, and its prefix keeps it from ever
+    /// colliding with an audit key at the same event time.
+    #[test]
+    fn a_report_tie_key_carries_the_uuid_under_a_distinct_prefix() {
+        let id = Uuid::from_u128(0x1234_5678);
+        let report = cursor_tie_key(HistoryCursor::Report { resolved_at: 0, id });
+        assert_eq!(report, format!("R{}", id.simple()));
+
+        let audit = cursor_tie_key(HistoryCursor::Audit {
+            created_at: 0,
+            id: 0,
+        });
+        assert_ne!(report.chars().next(), audit.chars().next());
+    }
+}
