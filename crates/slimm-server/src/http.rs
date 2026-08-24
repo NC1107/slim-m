@@ -67,6 +67,7 @@ mod space;
 mod sync;
 mod sync_ops;
 mod threads;
+mod user_status;
 mod users;
 mod voice;
 mod ws;

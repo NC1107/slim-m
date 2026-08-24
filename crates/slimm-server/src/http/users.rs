@@ -20,10 +20,11 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::attachments::serve;
-use super::auth::{is_disallowed_label_char, validate_label};
+use super::auth::validate_label;
 use super::error::ApiError;
 use super::extract::{ASSET, Authed, AuthedLimited, Bytes, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
+use super::user_status::validate_status_text;
 use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
 use crate::media;
@@ -38,9 +39,6 @@ const BODY_LIMIT: usize = 4 * 1024;
 /// single image, never a document or a large photo, so there is nothing here
 /// a self-host operator would need to tune.
 const AVATAR_MAX_BYTES: u64 = 2 * 1024 * 1024;
-
-/// Longest a status line may be, in characters, once trimmed.
-const STATUS_TEXT_MAX_CHARS: usize = 80;
 
 /// Most ids `GET /users` may be asked about in one request.
 const MAX_USER_BATCH: usize = 100;
@@ -466,29 +464,4 @@ async fn get_avatar(
         ApiError::Internal
     })?;
     Ok(serve(bytes, content_type, "avatar"))
-}
-
-// --- Validation ---
-
-/// Normalizes a status-text edit: a blank (or whitespace-only) value clears
-/// it back to `None` rather than being stored as an empty string, the same
-/// convention `channels::validate_channel_topic` uses for a channel's topic -
-/// a status with nothing visible in it is not meaningfully different from
-/// having none. Rejects the same control and text-direction characters a
-/// display name refuses, since a status renders beside a name the same way.
-fn validate_status_text(status_text: &str) -> Result<Option<String>, ApiError> {
-    let trimmed = status_text.trim();
-    if trimmed.chars().count() > STATUS_TEXT_MAX_CHARS {
-        return Err(ApiError::BadRequest("status must be at most 80 characters"));
-    }
-    if trimmed.chars().any(is_disallowed_label_char) {
-        return Err(ApiError::BadRequest(
-            "status must not contain control or text-direction characters",
-        ));
-    }
-    Ok(if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_owned())
-    })
 }
