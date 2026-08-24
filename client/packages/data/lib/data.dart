@@ -8,6 +8,7 @@
 library;
 
 export 'src/category_store.dart' show CategoryStore;
+export 'src/channel_reposition.dart' show ChannelReposition;
 export 'src/connection/connection.dart' show openSlimmDatabase;
 export 'src/database.dart'
     show SlimmDatabase, Channel, Message, ChannelCategoryRow;

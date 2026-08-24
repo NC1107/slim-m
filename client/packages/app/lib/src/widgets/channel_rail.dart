@@ -5,7 +5,6 @@ library;
 
 import 'dart:async';
 
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -231,7 +230,9 @@ List<Channel> _withPendingOrder(
       final original = byId[group.channelIds[i]];
       if (original == null) continue;
       named.add(original.id);
-      overridden.add(_repositioned(original, group.categoryId, i));
+      overridden.add(
+        original.repositioned(categoryId: group.categoryId, position: i),
+      );
     }
   }
   return [
@@ -240,6 +241,3 @@ List<Channel> _withPendingOrder(
       if (!named.contains(channel.id)) channel,
   ];
 }
-
-Channel _repositioned(Channel channel, String? categoryId, int position) =>
-    channel.copyWith(position: position, categoryId: Value(categoryId));
