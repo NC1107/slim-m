@@ -18,7 +18,10 @@
 /// this client must not try to fix). [applyMessage] merges rather than
 /// overwrites, so that omission can only ever fail to add new information -
 /// it can never erase a better answer this cache already has cached from a
-/// REST fetch. A thread opening, or gaining a reply, reaches an already-open
+/// REST fetch. The one field a REST fetch is authoritative enough to shrink is
+/// reactions, so [applyMessages] alone lets an empty reaction list win - that
+/// is what lets a reaction removed back to zero actually clear. A thread
+/// opening, or gaining a reply, reaches an already-open
 /// channel live through `Event::ThreadUpdated` instead - see
 /// [_applyThreadUpdated] - which closes the gap
 /// `docs/decisions/0005-threads.md` once named for `thread_channel_id`.
@@ -141,8 +144,19 @@ class MessageExtrasController
   void applyMessage(api.Message message) =>
       _set(message.id, _merged(message, state[message.id]));
 
-  /// For a REST fetch's whole page at once (search, catch-up, a channel screen
-  /// hydrating its visible window on open, or a page of older history).
+  /// For a REST fetch's whole page at once (a channel screen hydrating its
+  /// visible window on open, or a page of older history).
+  ///
+  /// This fetch is authoritative for reactions - it enriches them in full and
+  /// per-viewer - so unlike [applyMessage] it lets an empty reaction list win,
+  /// clearing a reaction that was removed back to zero while this client was
+  /// away. Without that, a live frame's merge could never fall through to an
+  /// empty list and the stale tally would show forever (CQ3). The other fields
+  /// still merge: a poll and an attachment set are fixed once a message
+  /// exists, and a thread's reply count only climbs, so `??` on those can only
+  /// ever add - and, unlike a blanket replace, a slower fetch that predates a
+  /// live `ThreadUpdated` cannot null a freshly-opened thread's affordance back
+  /// out again (it would not reappear until the next reply or reload).
   ///
   /// One state write for the whole page, deliberately: this used to call
   /// [applyMessage] in a loop, so hydrating a 50-message window published 50
@@ -152,7 +166,11 @@ class MessageExtrasController
     final next = {...state};
     var changed = false;
     for (final message in messages) {
-      next[message.id] = _merged(message, next[message.id]);
+      next[message.id] = _merged(
+        message,
+        next[message.id],
+        authoritative: true,
+      );
       changed = true;
     }
     if (changed) state = next;
@@ -162,11 +180,16 @@ class MessageExtrasController
   /// doc comment for why this can only ever add information; the three
   /// thread fields follow [poll]'s own rule for the same reason - a bare live
   /// frame carries none of them, so `??` can only add, never clobber.
+  ///
+  /// [authoritative] is set only by [applyMessages]: a REST fetch's empty
+  /// reaction list means every reaction is gone and must replace, where a live
+  /// frame's empty one only means the frame omitted them.
   MessageExtras _merged(
     api.Message message,
-    MessageExtras? existing,
-  ) => MessageExtras(
-    reactions: message.reactions.isNotEmpty
+    MessageExtras? existing, {
+    bool authoritative = false,
+  }) => MessageExtras(
+    reactions: authoritative || message.reactions.isNotEmpty
         ? message.reactions
         : existing?.reactions ?? const [],
     attachments: message.attachments.isNotEmpty
