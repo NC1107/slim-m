@@ -211,7 +211,7 @@ fn extract_method_handlers(chain: &str) -> Vec<(Method, String)> {
             from = end;
         }
     }
-    methods.sort_by(|a, b| a.0.cmp(&b.0));
+    methods.sort_by_key(|a| a.0);
     methods.dedup_by(|a, b| a.0 == b.0);
     methods
 }
