@@ -24,6 +24,7 @@ use error::ApiError;
 use extract::{Json, READ, RateLimited};
 
 mod analytics;
+mod attachment_ids;
 mod attachments;
 mod auth;
 mod canvas;
