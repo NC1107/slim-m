@@ -58,6 +58,7 @@ mod push;
 mod reactions;
 mod recovery;
 mod reports;
+mod reports_cursor;
 mod roles;
 mod safety;
 mod search;
