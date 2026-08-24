@@ -247,9 +247,50 @@ impl FromRequest<AppState> for Bytes {
 
 #[cfg(test)]
 mod tests {
-    use super::forwarded_for;
+    use super::{
+        ASSET, CANVAS, GIF, INVITE_CHECK, PASSWORD, READ, REFRESH, UPLOAD, WRITE, class_of,
+        forwarded_for,
+    };
+    use crate::ratelimit::Class;
     use axum::http::Request;
     use axum::http::request::Parts;
+
+    /// Each code maps to its own class, and none share one - a swap here would
+    /// silently charge a route the wrong budget, which is exactly the bug the
+    /// old `_ => Refresh` fallback caused before this match went exhaustive.
+    #[test]
+    fn every_rate_limit_code_maps_to_its_own_class() {
+        let pairs = [
+            (PASSWORD, Class::Password),
+            (REFRESH, Class::Refresh),
+            (INVITE_CHECK, Class::InviteCheck),
+            (WRITE, Class::Write),
+            (READ, Class::Read),
+            (UPLOAD, Class::Upload),
+            (CANVAS, Class::Canvas),
+            (ASSET, Class::Asset),
+            (GIF, Class::Gif),
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for (code, class) in pairs {
+            assert_eq!(class_of(code), class, "code {code} maps to the wrong class");
+            assert!(seen.insert(class), "two codes share {class:?}");
+        }
+    }
+
+    /// An unrecognised code panics rather than defaulting: a new code must be
+    /// named here, not silently charged some other class's budget.
+    #[test]
+    fn an_unknown_code_panics_rather_than_defaulting() {
+        let prior = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let result = std::panic::catch_unwind(|| class_of(200));
+        std::panic::set_hook(prior);
+        assert!(
+            result.is_err(),
+            "an undefined code must not resolve to a class"
+        );
+    }
 
     fn parts(xff: Option<&str>) -> Parts {
         let mut builder = Request::builder();
