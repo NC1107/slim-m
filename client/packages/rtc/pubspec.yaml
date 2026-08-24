@@ -9,7 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  livekit_client: ^2.10.0
+  # Pinned exactly: broadcast_bridge.dart reaches into its unversioned `src/`
+  # BroadcastManager, so a point release could break iOS screen sharing with no
+  # API change. broadcast_bridge_test.dart guards that surface; bump both together.
+  livekit_client: 2.10.0
   flutter_webrtc: ^1.6.0
 dev_dependencies:
   flutter_test:
