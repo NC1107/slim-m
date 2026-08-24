@@ -346,3 +346,36 @@ fn validate_role_name(name: &str) -> Result<&str, ApiError> {
     }
     Ok(trimmed)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_caller_may_grant_a_subset_of_their_own_permissions() {
+        let caller = Permissions::MANAGE_ROLES.union(Permissions::SEND_MESSAGES);
+        let result = grantable(caller, Permissions::SEND_MESSAGES.bits());
+        assert!(matches!(result, Ok(p) if p == Permissions::SEND_MESSAGES));
+    }
+
+    /// A caller cannot grant a permission they do not themselves hold - the
+    /// check that stops a role editor minting themselves, or anyone else, more
+    /// than they have.
+    #[test]
+    fn a_caller_cannot_grant_a_permission_they_lack() {
+        let result = grantable(
+            Permissions::SEND_MESSAGES,
+            Permissions::MANAGE_MESSAGES.bits(),
+        );
+        assert!(matches!(result, Err(ApiError::Forbidden)));
+    }
+
+    /// Unknown bits are refused before the caller check, so even an all-powerful
+    /// caller cannot grant a permission the server does not define.
+    #[test]
+    fn unknown_permission_bits_are_refused_even_for_a_full_caller() {
+        let undefined = 1i64 << 20;
+        let result = grantable(Permissions::ALL, undefined);
+        assert!(matches!(result, Err(ApiError::BadRequest(_))));
+    }
+}
