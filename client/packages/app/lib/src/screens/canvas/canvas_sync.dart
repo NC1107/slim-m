@@ -24,6 +24,8 @@ import 'package:flutter/foundation.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+import '../../providers/op_adjacency.dart';
+
 /// Past this many pages, replaying the feed costs no less than a cold
 /// viewport re-read, and the re-read is strictly better: it also drops
 /// everything outside the caller's own region.
@@ -249,14 +251,15 @@ class CanvasSync {
   /// trusted alone: the frame's own payload is not applied in that case,
   /// since the catch-up page that follows carries the same op in order.
   void applyLive(int seq, void Function() apply) {
-    final cursor = _asOfSeq;
-    if (cursor != null && seq <= cursor) return;
-    if (cursor == null || seq == cursor + 1) {
-      apply();
-      _asOfSeq = seq;
-      return;
+    switch (liveOpDecision(seq, _asOfSeq)) {
+      case LiveOpOutcome.ignored:
+        return;
+      case LiveOpOutcome.applied:
+        apply();
+        _asOfSeq = seq;
+      case LiveOpOutcome.needsReconcile:
+        unawaited(catchUp());
     }
-    unawaited(catchUp());
   }
 
   /// Reconciles an op the live frame could not carry, without advancing the

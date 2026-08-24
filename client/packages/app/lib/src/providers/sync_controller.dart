@@ -14,6 +14,7 @@ import 'channel_refresher.dart';
 import 'dm_call_activity.dart';
 import 'failed_send_retry.dart';
 import 'message_ops_sync.dart';
+import 'op_adjacency.dart';
 import 'message_extras.dart';
 import 'providers.dart';
 import 'user_profiles.dart';

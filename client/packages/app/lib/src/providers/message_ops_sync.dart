@@ -57,33 +57,4 @@ Future<OpsOutcome> applyOps(
   return OpsOutcome.applied;
 }
 
-/// What a live op frame asks the caller to do.
-enum LiveOpOutcome {
-  /// Already applied, or older than the cursor. Nothing to do.
-  ignored,
-
-  /// Exactly the next op: applied and the cursor advanced.
-  applied,
-
-  /// A gap, so the payload was deliberately not applied. Reconcile instead.
-  needsReconcile,
-}
-
-/// Decides what to do with one live op, by the `+1` adjacency test.
-///
-/// Identical in shape to `CanvasSync.applyLive`, and it should read as
-/// identical, because a reader who has learned one should recognise the other.
-///
-/// A frame arriving out of order is the reason this exists: delivery order
-/// across concurrent writers is best-effort, so an op two ahead of the cursor
-/// means something in between has not been seen, and applying it anyway would
-/// move the cursor past that gap forever.
-///
-/// A null [opSeq] is an old server with no op stream. The frame is applied the
-/// way it always was and no cursor moves, because there is none to move.
-LiveOpOutcome liveOpDecision(int? opSeq, int? cursor) {
-  if (opSeq == null || cursor == null) return LiveOpOutcome.applied;
-  if (opSeq <= cursor) return LiveOpOutcome.ignored;
-  if (opSeq == cursor + 1) return LiveOpOutcome.applied;
-  return LiveOpOutcome.needsReconcile;
-}
+// The live-op adjacency rule (liveOpDecision, LiveOpOutcome) moved to op_adjacency.dart so the canvas op stream shares the one copy (CD3).
