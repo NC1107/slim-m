@@ -108,7 +108,11 @@ class OnboardingShell extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 380,
+              // A slim brand rail, not a third of the viewport: below the
+              // wordmark this column is deliberately empty (see [_BrandPanel]),
+              // and at 380 that emptiness read as an unfinished half rather
+              // than a margin. Narrow enough to frame the form, not host one.
+              width: 260,
               decoration: BoxDecoration(
                 color: tokens.surfaceSunken,
                 border: Border(right: BorderSide(color: tokens.borderSubtle)),
