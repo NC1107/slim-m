@@ -19,11 +19,12 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
+use super::reports_cursor::parse_history_cursor;
 use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{HistoryCursor, ModerationHistoryItem, Report};
+use crate::store::{ModerationHistoryItem, Report};
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -271,30 +272,6 @@ impl From<ModerationHistoryItem> for ModerationHistoryItemDto {
                 created_at: entry.created_at,
             },
         }
-    }
-}
-
-/// Parses a history cursor's `after_kind`/`after_id` pair against the
-/// `after` event time. `after_kind` says which id shape `after_id` must be:
-/// a UUID for a resolved report, a plain integer for an audit row's rowid.
-fn parse_history_cursor(event_time: i64, kind: &str, id: &str) -> Result<HistoryCursor, ApiError> {
-    match kind {
-        "resolved_report" => Ok(HistoryCursor::Report {
-            resolved_at: event_time,
-            id: parse_uuid(id)?,
-        }),
-        "audit_log" => {
-            let id: i64 = id.parse().map_err(|_| {
-                ApiError::BadRequest("after_id must be an integer for an audit_log cursor")
-            })?;
-            Ok(HistoryCursor::Audit {
-                created_at: event_time,
-                id,
-            })
-        }
-        _ => Err(ApiError::BadRequest(
-            "after_kind must be resolved_report or audit_log",
-        )),
     }
 }
 
