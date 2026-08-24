@@ -23,6 +23,16 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'camera_switching.dart';
+import 'track_event_filter.dart';
+
+/// Test-only: how many times each identity's [CameraView] has run `build`,
+/// so a rebuild-scoping test can tell a real rebuild from a repaint that
+/// looks identical on screen. Same shape as `debugMemberRowBuildCounts`.
+@visibleForTesting
+final Map<String, int> debugCameraViewBuildCounts = {};
+
+@visibleForTesting
+void debugResetCameraViewBuildCounts() => debugCameraViewBuildCounts.clear();
 
 /// One participant's camera video, tracking the room live: a published track
 /// routinely arrives a beat after the roster learns a camera is on, the same
@@ -57,8 +67,10 @@ class _CameraViewState extends State<CameraView> {
   @override
   void initState() {
     super.initState();
-    _cancel = widget.room.events.listen((_) {
-      if (mounted) setState(() {});
+    _cancel = widget.room.events.listen((event) {
+      if (mounted && trackEventAffectsIdentity(event, widget.identity)) {
+        setState(() {});
+      }
     });
     // A flip fires no room event at all, so the mirror needs its own listener.
     widget.facing.addListener(_onFacingChanged);
@@ -107,6 +119,11 @@ class _CameraViewState extends State<CameraView> {
 
   @override
   Widget build(BuildContext context) {
+    assert(() {
+      debugCameraViewBuildCounts[widget.identity] =
+          (debugCameraViewBuildCounts[widget.identity] ?? 0) + 1;
+      return true;
+    }());
     final track = _cameraTrack();
     // Unlike a screen share, no placeholder text for a camera not here yet.
     if (track == null) return const SizedBox.shrink();

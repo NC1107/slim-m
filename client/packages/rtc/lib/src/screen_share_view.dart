@@ -20,6 +20,17 @@ library;
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
+import 'track_event_filter.dart';
+
+/// Test-only build counter, keyed by identity; see the twin in
+/// `camera_view.dart` for why a rebuild-scoping test needs it.
+@visibleForTesting
+final Map<String, int> debugScreenShareViewBuildCounts = {};
+
+@visibleForTesting
+void debugResetScreenShareViewBuildCounts() =>
+    debugScreenShareViewBuildCounts.clear();
+
 /// One participant's screen share video, tracking the room live.
 ///
 /// Listens to the room's own event stream rather than trusting the state at
@@ -48,9 +59,11 @@ class _ScreenShareViewState extends State<ScreenShareView> {
   @override
   void initState() {
     super.initState();
-    // Any room event can change track availability; a rebuild is cheap next to decoding video.
-    _cancel = widget.room.events.listen((_) {
-      if (mounted) setState(() {});
+    // Only this participant's own track changes can alter what we render; every other room event is noise.
+    _cancel = widget.room.events.listen((event) {
+      if (mounted && trackEventAffectsIdentity(event, widget.identity)) {
+        setState(() {});
+      }
     });
   }
 
@@ -87,6 +100,11 @@ class _ScreenShareViewState extends State<ScreenShareView> {
 
   @override
   Widget build(BuildContext context) {
+    assert(() {
+      debugScreenShareViewBuildCounts[widget.identity] =
+          (debugScreenShareViewBuildCounts[widget.identity] ?? 0) + 1;
+      return true;
+    }());
     final track = _shareTrack();
     if (track == null) {
       // Honest about the beat between "sharing" and the track arriving.
