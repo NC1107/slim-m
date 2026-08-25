@@ -99,9 +99,11 @@ void main() {
     final image = tester.widget<Image>(find.byType(Image));
     final resized = image.image as ResizeImage;
     expect((resized.imageProvider as MemoryImage).bytes, bytes);
-    // A 40dp avatar decodes at 2x even on a 1x display: the minRatio floor for a window-scaled desktop that under-reports its ratio.
-    expect(resized.width, 80);
-    expect(resized.height, 80);
+    // A 40dp avatar decodes at 3x even on a 1x display: the minRatio floor for a window-scaled desktop that under-reports its ratio.
+    expect(resized.width, 120);
+    expect(resized.height, 120);
+    // Scaling a photo down to a small circle wants better than the default low.
+    expect(image.filterQuality, FilterQuality.medium);
   });
 
   testWidgets('the decode cap scales with the device pixel ratio', (
