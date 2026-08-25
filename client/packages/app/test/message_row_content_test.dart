@@ -226,8 +226,7 @@ void main() {
     final first = tester.getRect(chips.at(0));
     final second = tester.getRect(chips.at(1));
 
-    // The regression: FocusableTapTarget gave its hit box an Align with no
-    // size factor, so every chip expanded to the full column width.
+    // The regression: FocusableTapTarget's hit box had an Align with no size factor, so every chip expanded to the full column width.
     expect(
       first.width,
       lessThan(120),
