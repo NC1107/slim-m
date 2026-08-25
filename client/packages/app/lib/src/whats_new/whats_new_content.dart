@@ -323,6 +323,29 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.48.0',
+    headline: 'Threads, replies, and a smoother start',
+    points: [
+      WhatsNewPoint(
+        'Opening a thread from a link, a notification, or a reload now docks '
+        'it beside the channel on a wide window - the same place tapping into '
+        'one in the app puts it - instead of covering the conversation with a '
+        'sheet.',
+      ),
+      WhatsNewPoint(
+        'The reply bar above the composer is rounder and more compact, and '
+        'when you reply to a message that was only a photo or a file it names '
+        'that now, rather than showing a blank line.',
+      ),
+      WhatsNewPoint(
+        'On a phone a fresh launch shows a brief boot screen while it '
+        'connects, so you no longer land on an empty home for a moment. The '
+        'join screen also leads with a plain line about what this is, on a '
+        'tidier, narrower panel.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
