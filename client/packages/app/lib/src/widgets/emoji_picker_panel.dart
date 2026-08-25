@@ -34,6 +34,10 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
     this.width = pickerWidth,
   });
 
+  /// Exposed so a test can find this exact node rather than any other
+  /// `Semantics` widget an ancestor happens to build.
+  static const Key liveRegionKey = Key('emoji_picker_announcer');
+
   /// Called with the picked emoji's token: the character itself for a unicode
   /// emoji, `:name:` for one of the deployment's own.
   final ValueChanged<String> onSelect;
@@ -107,6 +111,20 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
     _pick(_visible[_highlighted]);
   }
 
+  /// What a screen reader should hear once the grid settles: which category
+  /// it is now looking at, or a search's own result count / "no matches".
+  String _announcement(
+    bool searching,
+    EmojiCategory category,
+    List<PickerEmoji> results,
+  ) {
+    if (!searching) return '${category.label} emoji.';
+    final count = results.length;
+    return count == 0
+        ? 'No matches.'
+        : '$count ${count == 1 ? 'result' : 'results'} found.';
+  }
+
   Map<ShortcutActivator, VoidCallback> _bindings() {
     final close = activatorFor(AppAction.escape);
     return {
@@ -146,6 +164,13 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
         child: AppMenu(
           width: widget.width,
           children: [
+            // Invisible live region: announces a category switch or a search's result count / "no matches", which the silently-repainting grid below never voices on its own.
+            Semantics(
+              key: EmojiPickerPanel.liveRegionKey,
+              liveRegion: true,
+              label: _announcement(searching, category, results),
+              child: const SizedBox.shrink(),
+            ),
             Padding(
               padding: const EdgeInsets.all(AppSpacing.s8),
               child: AppInput(
