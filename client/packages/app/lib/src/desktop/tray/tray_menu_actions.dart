@@ -5,16 +5,30 @@
 /// code that builds the real native menu.
 library;
 
-enum TrayMenuActionKind { showHide, muteMicrophone, leaveCall, quit }
+enum TrayMenuActionKind {
+  showHide,
+  presenceStatus,
+  muteMicrophone,
+  toggleDeafen,
+  leaveCall,
+  settings,
+  quit,
+}
 
-/// Show/Hide and Quit always appear; Mute microphone and Leave call only
-/// while a call is actually live, per the owner's own answer to decision
+/// Show/Hide, the status submenu, Settings and Quit always appear: the
+/// window spends most of a session hidden, so setting a status and reaching
+/// preferences are the only rows a chat app's tray is useful for without a
+/// call live. Mute microphone, deafen and Leave call only surface while a
+/// call is actually in progress, per the owner's own answer to decision
 /// 0012's open question about menu contents.
 List<TrayMenuActionKind> trayMenuActions({required bool inCall}) => [
   TrayMenuActionKind.showHide,
+  TrayMenuActionKind.presenceStatus,
   if (inCall) ...[
     TrayMenuActionKind.muteMicrophone,
+    TrayMenuActionKind.toggleDeafen,
     TrayMenuActionKind.leaveCall,
   ],
+  TrayMenuActionKind.settings,
   TrayMenuActionKind.quit,
 ];
