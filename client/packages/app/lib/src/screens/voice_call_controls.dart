@@ -42,6 +42,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/providers.dart' show apiProvider;
 import '../providers/voice_controller.dart';
 import '../providers/voice_settings_controller.dart'
     show voiceSettingsControllerProvider;
@@ -175,9 +176,28 @@ class _CallControlsState extends ConsumerState<CallControls> {
         quality: quality,
         sourceId: sourceId,
         includeAudio: settings.screenShareIncludeAudio,
+        maxHeight: await _screenShareCeiling(),
       );
     } finally {
       if (mounted) setState(() => _shareRequestInFlight = false);
+    }
+  }
+
+  /// The space-wide screen-share ceiling, or `null` on any failure to fetch
+  /// it, or on a server too old to report one. Read from `GET /version`,
+  /// unauthenticated, rather than the MANAGE_SERVER-gated
+  /// `GET /space/screen-share` the admin screen uses: every device sharing a
+  /// screen has to know this, not only one with an admin bit. This is a
+  /// client-advertised courtesy cap, not a security boundary, so a Space
+  /// this device cannot reach right now must not be the reason a share never
+  /// starts: failing open publishes at the quality already chosen, exactly
+  /// what happened before this setting existed.
+  Future<int?> _screenShareCeiling() async {
+    try {
+      final version = await ref.read(apiProvider).version();
+      return version.screenShareMaxHeight;
+    } catch (_) {
+      return null;
     }
   }
 

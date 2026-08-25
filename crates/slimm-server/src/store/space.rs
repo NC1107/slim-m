@@ -10,6 +10,22 @@ use sqlx::SqliteExecutor;
 use super::Store;
 use super::now_ms;
 
+/// The highest resolution `ScreenShareQuality.crisp` already asks a desktop
+/// to publish (see `client/packages/rtc/lib/src/screen_share.dart`). The
+/// default, and what every deployment that predates this setting keeps on
+/// upgrade, so behaviour is unchanged until an admin lowers it.
+pub const DEFAULT_SCREEN_SHARE_MAX_HEIGHT: i64 = 2160;
+
+/// The range a deployment may set its screen-share height ceiling to
+/// (`Store::set_screen_share_max_height`). The floor keeps a share legible;
+/// the ceiling is the same [`DEFAULT_SCREEN_SHARE_MAX_HEIGHT`] a deployment
+/// already allows today, so raising it further would only ever loosen
+/// behaviour nothing here has ever enforced. Enforced in Rust, not as a
+/// CHECK, so the range can move without a migration - the same split
+/// `MAX_MESSAGE_RETENTION_DAYS` and `MAX_CANVAS_OBJECT_CAP` use.
+pub const MIN_SCREEN_SHARE_MAX_HEIGHT: i64 = 360;
+pub const MAX_SCREEN_SHARE_MAX_HEIGHT: i64 = DEFAULT_SCREEN_SHARE_MAX_HEIGHT;
+
 /// Who may create an account on this deployment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinPolicy {
@@ -79,6 +95,23 @@ where
     Ok(cap.unwrap_or(super::MAX_OBJECTS_PER_CHANNEL))
 }
 
+/// The effective screen-share height ceiling, read inside a caller's
+/// transaction for the same reason [`read_canvas_object_cap`] is. Falls back
+/// to [`DEFAULT_SCREEN_SHARE_MAX_HEIGHT`] for a row written before this
+/// column existed.
+pub(super) async fn read_screen_share_max_height<'e, E>(executor: E) -> anyhow::Result<i64>
+where
+    E: SqliteExecutor<'e>,
+{
+    let height = sqlx::query_scalar!(
+        r#"SELECT screen_share_max_height AS "h!: i64" FROM space_settings WHERE id = 1"#
+    )
+    .fetch_optional(executor)
+    .await
+    .context("read screen share max height")?;
+    Ok(height.unwrap_or(DEFAULT_SCREEN_SHARE_MAX_HEIGHT))
+}
+
 impl Store {
     pub async fn join_policy(&self) -> anyhow::Result<JoinPolicy> {
         read_join_policy(&self.pool).await
@@ -87,6 +120,30 @@ impl Store {
     /// The per-channel canvas object cap in force for this deployment.
     pub async fn canvas_object_cap(&self) -> anyhow::Result<i64> {
         read_canvas_object_cap(&self.pool).await
+    }
+
+    /// The screen-share height ceiling in force for this deployment. A client
+    /// reads this and caps its own capture/publish parameters before starting
+    /// a share; there is no server-side enforcement.
+    pub async fn screen_share_max_height(&self) -> anyhow::Result<i64> {
+        read_screen_share_max_height(&self.pool).await
+    }
+
+    /// Sets the screen-share height ceiling. The caller is responsible for
+    /// range-checking against `MIN_SCREEN_SHARE_MAX_HEIGHT` and
+    /// `MAX_SCREEN_SHARE_MAX_HEIGHT`; the DB CHECK only guards the `>= 1`
+    /// invariant.
+    pub async fn set_screen_share_max_height(&self, height: i64) -> anyhow::Result<()> {
+        let now = now_ms();
+        sqlx::query!(
+            "UPDATE space_settings SET screen_share_max_height = ?, updated_at = ? WHERE id = 1",
+            height,
+            now
+        )
+        .execute(&self.pool)
+        .await
+        .context("set screen share max height")?;
+        Ok(())
     }
 
     /// Sets the per-channel canvas object cap. The caller is responsible for

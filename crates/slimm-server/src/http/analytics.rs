@@ -16,20 +16,24 @@ use crate::permissions::Permissions;
 use crate::process_metrics::current_rss_bytes;
 use crate::ratelimit::Class;
 use crate::store::{
-    AnalyticsStats, MAX_CANVAS_OBJECT_CAP, MAX_MESSAGE_RETENTION_DAYS, MIN_CANVAS_OBJECT_CAP,
-    MemberAttachmentUsage,
+    AnalyticsStats, MAX_CANVAS_OBJECT_CAP, MAX_MESSAGE_RETENTION_DAYS, MAX_SCREEN_SHARE_MAX_HEIGHT,
+    MIN_CANVAS_OBJECT_CAP, MIN_SCREEN_SHARE_MAX_HEIGHT, MemberAttachmentUsage,
 };
 
 const BODY_LIMIT: usize = 256;
 
 /// The Space analytics and retention routes, mounted by [`super::router`].
 ///
-/// Retention and the canvas object cap live here rather than under
-/// `/space/settings`: all three are operator-facing resource-pressure tooling
-/// gated identically on MANAGE_SERVER, so this keeps them together rather than
-/// splitting them across files that would otherwise carry no other
-/// relationship. Retention bounds disk; the canvas cap bounds every client's
-/// memory and paint on a busy canvas.
+/// Retention, the canvas object cap, and the screen-share height ceiling all
+/// live here rather than under `/space/settings`: all four are
+/// operator-facing resource-pressure tooling gated identically on
+/// MANAGE_SERVER, so this keeps them together rather than splitting them
+/// across files that would otherwise carry no other relationship. Retention
+/// bounds disk; the canvas cap bounds every client's memory and paint on a
+/// busy canvas; the screen-share ceiling bounds the load a share puts on
+/// every client and the SFU. The last is client-advertised only - see
+/// [`ScreenShareCapDto`] - so unlike the other two it has no server-side
+/// enforcement of its own.
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/space/analytics", get(read).patch(update))
@@ -40,6 +44,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/space/canvas-cap",
             get(read_canvas_cap).patch(update_canvas_cap),
+        )
+        .route(
+            "/space/screen-share",
+            get(read_screen_share_cap).patch(update_screen_share_cap),
         )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
@@ -252,6 +260,50 @@ async fn update_canvas_cap(
     state.store.set_canvas_object_cap(body.object_cap).await?;
     Ok(Json(CanvasCapDto {
         object_cap: body.object_cap,
+    }))
+}
+
+#[derive(Serialize, Deserialize)]
+struct ScreenShareCapDto {
+    /// The tallest resolution a screen share may publish at. Applies to
+    /// every client: enforcement is client-advertised, not a server-side
+    /// track inspection, so a client caps its own capture parameters before
+    /// starting a share.
+    max_height: i64,
+}
+
+async fn read_screen_share_cap(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+) -> Result<Json<ScreenShareCapDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    require_manage_server(&state, &ctx).await?;
+    Ok(Json(ScreenShareCapDto {
+        max_height: state.store.screen_share_max_height().await?,
+    }))
+}
+
+/// A height outside the settable range is refused rather than clamped, so a
+/// typo cannot silently land on whichever bound the code happens to pick -
+/// the same rule [`update_canvas_cap`] follows.
+async fn update_screen_share_cap(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+    Json(body): Json<ScreenShareCapDto>,
+) -> Result<Json<ScreenShareCapDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    require_manage_server(&state, &ctx).await?;
+    if !(MIN_SCREEN_SHARE_MAX_HEIGHT..=MAX_SCREEN_SHARE_MAX_HEIGHT).contains(&body.max_height) {
+        return Err(ApiError::BadRequest("max_height out of range"));
+    }
+    state
+        .store
+        .set_screen_share_max_height(body.max_height)
+        .await?;
+    Ok(Json(ScreenShareCapDto {
+        max_height: body.max_height,
     }))
 }
 

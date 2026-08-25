@@ -124,6 +124,43 @@ void main() {
     },
   );
 
+  testWidgets(
+    "sharing reads the space's screen-share ceiling and passes it on",
+    (tester) async {
+      final session = InertSession();
+      await pumpControls(
+        tester,
+        const VoiceState(state: VoiceSessionState.connected),
+        session: session,
+        screenShareMaxHeight: 720,
+      );
+
+      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.pumpAndSettle();
+
+      expect(session.screenShareCalls.single.maxHeight, 720);
+    },
+  );
+
+  testWidgets(
+    'a server too old to report a ceiling shares with no cap rather than '
+    'refusing',
+    (tester) async {
+      final session = InertSession();
+      await pumpControls(
+        tester,
+        const VoiceState(state: VoiceSessionState.connected),
+        session: session,
+        screenShareMaxHeight: null,
+      );
+
+      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.pumpAndSettle();
+
+      expect(session.screenShareCalls.single.maxHeight, isNull);
+    },
+  );
+
   testWidgets("sharing defaults to not sharing this device's audio", (
     tester,
   ) async {

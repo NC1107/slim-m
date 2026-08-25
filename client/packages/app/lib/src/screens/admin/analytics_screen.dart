@@ -25,6 +25,7 @@ import '../../widgets/settings_toggle_row.dart';
 import '../../widgets/success_flash.dart';
 import '../settings_screen_scaffold.dart';
 import 'analytics_charts.dart';
+import 'screen_share_cap_section.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
@@ -117,6 +118,8 @@ class _AnalyticsPaneState extends ConsumerState<AnalyticsPane>
         const _RetentionSection(),
         const SizedBox(height: AppSpacing.s16),
         const _CanvasCapSection(),
+        const SizedBox(height: AppSpacing.s16),
+        const ScreenShareCapSection(),
       ],
     );
   }

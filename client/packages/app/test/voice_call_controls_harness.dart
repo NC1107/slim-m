@@ -10,10 +10,14 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/voice_call_controls.dart';
@@ -70,6 +74,7 @@ class InertSession implements VoiceSession {
       ScreenShareQuality quality,
       String? sourceId,
       bool includeAudio,
+      int? maxHeight,
     })
   >
   screenShareCalls = [];
@@ -203,12 +208,14 @@ class InertSession implements VoiceSession {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
   }) async {
     screenShareCalls.add((
       enabled: enabled,
       quality: quality,
       sourceId: sourceId,
       includeAudio: includeAudio,
+      maxHeight: maxHeight,
     ));
     return _outcome;
   }
@@ -220,12 +227,43 @@ class InertSession implements VoiceSession {
   }
 }
 
+/// A fake `SlimmApi` whose only wired route is `GET /version`, answering
+/// with [screenShareMaxHeight] (or nothing for that field, at all, when it is
+/// `null` - a server too old to report one, not one reporting no ceiling).
+/// `_share`'s own fetch of it is what [pumpControls] wires this into.
+api.SlimmApi _fakeVersionApi(int? screenShareMaxHeight) {
+  final client = MockClient((request) async {
+    final body = <String, Object?>{
+      'name': 'slim-m',
+      'version': '0.0.0',
+      'protocol': 1,
+      if (screenShareMaxHeight != null)
+        'screen_share_max_height': screenShareMaxHeight,
+    };
+    return http.Response(
+      jsonEncode(body),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  });
+  return api.SlimmApi(
+    baseUrl: Uri.parse('http://localhost:8080'),
+    httpClient: client,
+  );
+}
+
 /// Pumps [CallControls] over a fresh, disposed-on-teardown provider
 /// container, wired to [session] (a fresh [InertSession] if none is given).
+///
+/// [screenShareMaxHeight] feeds [_fakeVersionApi]: the ceiling `_share` reads
+/// over `GET /version` before starting a share. Defaults to a value no
+/// `ScreenShareQuality` tier exceeds, so a test not about the ceiling itself
+/// sees it pass through unchanged.
 Future<ProviderContainer> pumpControls(
   WidgetTester tester,
   VoiceState voice, {
   InertSession? session,
+  int? screenShareMaxHeight = 2160,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -233,6 +271,11 @@ Future<ProviderContainer> pumpControls(
       voiceControllerProvider.overrideWith(
         (ref) => VoiceController(ref, session: session ?? InertSession()),
       ),
+      apiProvider.overrideWith((ref) {
+        final built = _fakeVersionApi(screenShareMaxHeight);
+        ref.onDispose(built.close);
+        return built;
+      }),
     ],
   );
   addTearDown(container.dispose);

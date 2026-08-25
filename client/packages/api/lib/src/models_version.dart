@@ -26,6 +26,7 @@ class Version {
     this.pushEnabled,
     this.inviteRequired,
     this.gifSearchEnabled,
+    this.screenShareMaxHeight,
     this.capabilities,
     this.identity,
   });
@@ -50,6 +51,13 @@ class Version {
   /// `false`: unlike push or invites there is nothing to warn anyone about
   /// either way, so the picker is simply absent - no button, no request.
   final bool? gifSearchEnabled;
+
+  /// The tallest resolution a screen share may publish at. Null on servers
+  /// older than this field, which a client must treat as no ceiling: this
+  /// rides on `/version`, unauthenticated, so every client can cap its own
+  /// screen-share capture before starting a share, not only one that could
+  /// reach the MANAGE_SERVER-gated `GET /space/screen-share`.
+  final int? screenShareMaxHeight;
 
   /// The optional features the server serves, by name. Null on servers older
   /// than 0.17.0, which is "unknown", not "none".
@@ -84,6 +92,7 @@ class Version {
         pushEnabled: json['push_enabled'] as bool?,
         inviteRequired: json['invite_required'] as bool?,
         gifSearchEnabled: json['gif_search_enabled'] as bool?,
+        screenShareMaxHeight: json['screen_share_max_height'] as int?,
         // A non-list here is a foreign or broken server, which is unknown
         // rather than a reason to crash sign-in.
         capabilities: switch (json['capabilities']) {

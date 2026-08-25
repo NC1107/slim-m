@@ -181,6 +181,26 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
 
+    c.bare("getSpaceScreenShareCap", "GET", "/space/screen-share", root)
+        .await;
+    // Change it and set it back, so the rest of the pass keeps the default.
+    c.json(
+        "updateSpaceScreenShareCap",
+        "PATCH",
+        "/space/screen-share",
+        root,
+        json!({"max_height": 720}),
+    )
+    .await;
+    c.json(
+        "updateSpaceScreenShareCap",
+        "PATCH",
+        "/space/screen-share",
+        root,
+        json!({"max_height": 2160}),
+    )
+    .await;
+
     profile_calls(c, root, &admin_id, &bob_id).await;
     safety_calls(c, root, bob_token, &bob_id).await;
 

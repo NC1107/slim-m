@@ -14,7 +14,7 @@ use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{MAX_SCREEN_SHARE_MAX_HEIGHT, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -112,4 +112,14 @@ async fn version_reports_gif_search_enabled_with_a_provider() {
     let (store, _guard) = new_store().await;
     let body = get_version(app(store, PushSender::disabled(), gifs)).await;
     assert_eq!(body["gif_search_enabled"], true);
+}
+
+/// Rides here unauthenticated, not behind `/space/screen-share`'s
+/// MANAGE_SERVER gate, precisely so a member with no admin bit can still cap
+/// their own screen share against it.
+#[tokio::test]
+async fn version_reports_the_screen_share_ceiling_with_no_auth_required() {
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
+    assert_eq!(body["screen_share_max_height"], MAX_SCREEN_SHARE_MAX_HEIGHT);
 }

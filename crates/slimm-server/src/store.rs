@@ -111,7 +111,7 @@ pub use safety::Device;
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };
-pub use space::JoinPolicy;
+pub use space::{JoinPolicy, MAX_SCREEN_SHARE_MAX_HEIGHT, MIN_SCREEN_SHARE_MAX_HEIGHT};
 pub use thread_listing::ThreadListItem;
 pub use threads::{
     MAX_THREADS_PER_CHANNEL, OpenThreadError, OpenedThread, ThreadParent, ThreadSummary,

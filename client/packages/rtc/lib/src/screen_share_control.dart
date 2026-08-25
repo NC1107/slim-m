@@ -85,6 +85,7 @@ class ScreenShareControl {
     required ScreenShareQuality quality,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
     required ScreenSharePublish publish,
     required bool Function() isSharing,
     required void Function(Object? error) onSettled,
@@ -100,6 +101,7 @@ class ScreenShareControl {
           quality: quality,
           sourceId: sourceId,
           includeAudio: includeAudio,
+          maxHeight: maxHeight,
           publish: publish,
           isSharing: isSharing,
           onSettled: onSettled,
@@ -107,7 +109,14 @@ class ScreenShareControl {
       }
       await publish(
         enabled,
-        enabled ? captureOptionsFor(quality, sourceId, isIOS: onIOS) : null,
+        enabled
+            ? captureOptionsFor(
+                quality,
+                sourceId,
+                isIOS: onIOS,
+                maxHeight: maxHeight,
+              )
+            : null,
         includeAudio,
       );
       if (!enabled) await _broadcast.requestStop();
@@ -128,12 +137,18 @@ class ScreenShareControl {
     required ScreenShareQuality quality,
     required String? sourceId,
     required bool includeAudio,
+    required int? maxHeight,
     required ScreenSharePublish publish,
     required bool Function() isSharing,
     required void Function(Object? error) onSettled,
   }) async {
     _broadcast.autoPublishEnabled = false;
-    final options = captureOptionsFor(quality, sourceId, isIOS: true);
+    final options = captureOptionsFor(
+      quality,
+      sourceId,
+      isIOS: true,
+      maxHeight: maxHeight,
+    );
     try {
       await publish(true, options, includeAudio);
     } catch (e) {
@@ -244,16 +259,25 @@ class ScreenShareControl {
   /// `broadcast-manual` device id is set here, on [isIOS], rather than left to
   /// LiveKit's own downstream substitution, which re-asks the real platform
   /// and so cannot be driven by a fake.
+  ///
+  /// [maxHeight] is the space-wide screen-share ceiling (see
+  /// `Store::screen_share_max_height` on the server); `null` leaves every
+  /// tier's own dimensions untouched. Enforcement is entirely client-side:
+  /// this is the one place a chosen quality's height is actually bounded
+  /// before publish, on every platform including iOS, whose own capture is
+  /// otherwise a fixed size unrelated to the tier picked.
   @visibleForTesting
   static lk.ScreenShareCaptureOptions captureOptionsFor(
     ScreenShareQuality quality,
     String? sourceId, {
     bool? isIOS,
+    int? maxHeight,
   }) {
     final onIOS = isIOS ?? lk.lkPlatformIs(lk.PlatformType.iOS);
     final dimensions = onIOS
-        ? const lk.VideoDimensions(_iosCaptureShortEdge, _iosCaptureLongEdge)
-        : lk.VideoDimensions(quality.width, quality.height);
+        ? _boundedDimensions(
+            _iosCaptureShortEdge, _iosCaptureLongEdge, maxHeight)
+        : _boundedDimensions(quality.width, quality.height, maxHeight);
     return lk.ScreenShareCaptureOptions(
       useiOSBroadcastExtension: onIOS,
       sourceId: onIOS ? _iosBroadcastManualDeviceId : sourceId,
@@ -291,4 +315,21 @@ class ScreenShareControl {
   /// choice made in the share dialog still changes what is published.
   static const _iosCaptureShortEdge = 720;
   static const _iosCaptureLongEdge = 1280;
+
+  /// [height] clamped to [maxHeight], scaling [width] to hold the same
+  /// aspect ratio. Returns the pair unchanged whenever there is no ceiling or
+  /// [height] is already inside it, so a deployment that never lowers the
+  /// ceiling below [ScreenShareQuality.crisp]'s own height publishes exactly
+  /// what it always has.
+  static lk.VideoDimensions _boundedDimensions(
+    int width,
+    int height,
+    int? maxHeight,
+  ) {
+    if (maxHeight == null || height <= maxHeight) {
+      return lk.VideoDimensions(width, height);
+    }
+    final scaledWidth = (width * maxHeight / height).round();
+    return lk.VideoDimensions(scaledWidth, maxHeight);
+  }
 }
