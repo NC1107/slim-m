@@ -118,6 +118,8 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
                 semanticLabel: 'Manage ${widget.channel.name}',
                 size: AppIconButtonSize.sm,
                 onPressed: () => _menuKey.currentState?.open(),
+                // The row's own tint already covers this kebab; see the param's own doc.
+                suppressOwnHoverFill: true,
               ),
             ),
           ),

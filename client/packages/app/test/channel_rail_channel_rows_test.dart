@@ -11,6 +11,8 @@
 /// slot would have silently dropped the dot on every unread channel.
 library;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -272,4 +274,109 @@ void main() {
           'a reorderable rail must not take that gesture away',
     );
   });
+
+  testWidgets(
+    'the kebab occupies the same rect hidden or revealed, so a hover never '
+    'reflows the row (backlog 131)',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final rowFinder = find.byType(AppListRow);
+      final kebabFinder = find.byIcon(AppIcons.moreVertical);
+      final rowSizeBefore = tester.getSize(rowFinder);
+      final kebabRectBefore = tester.getRect(kebabFinder);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(rowFinder));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSize(rowFinder),
+        rowSizeBefore,
+        reason: 'hovering must never resize the row itself',
+      );
+      expect(
+        tester.getRect(kebabFinder),
+        kebabRectBefore,
+        reason:
+            "the kebab's slot is reserved up front; a hover only "
+            'animates its opacity, never its geometry',
+      );
+
+      await gesture.removePointer();
+    },
+  );
+
+  testWidgets(
+    "hovering a selected row's kebab shows only the row's own selection "
+    'tint, not a second, mismatched fill painted by the button itself '
+    '(backlog 131)',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [],
+            selectedId: 'c1',
+            canManage: true,
+            onReorder: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final kebabFinder = find.byIcon(AppIcons.moreVertical);
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(kebabFinder));
+      await tester.pumpAndSettle();
+
+      final buttonFill = tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byType(AppIconButton),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      expect(
+        (buttonFill.decoration as BoxDecoration).color,
+        Colors.transparent,
+        reason:
+            "the kebab must not paint its own surfaceRaised fill on top of "
+            "the row's accentSoft selection tint",
+      );
+
+      final rowTint = tester.widget<AnimatedContainer>(
+        find
+            .descendant(
+              of: find.byType(AppListRow),
+              matching: find.byType(AnimatedContainer),
+            )
+            .first,
+      );
+      expect(
+        (rowTint.decoration as BoxDecoration).color,
+        AppTokens.light.accentSoft,
+        reason: 'the row keeps its single selection tint under the kebab',
+      );
+
+      await gesture.removePointer();
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 }
