@@ -188,34 +188,32 @@ Finder _footerBackground() => find
     .first;
 
 void main() {
-  testWidgets('tapping the footer avatar opens a status menu offering '
+  testWidgets('tapping the footer avatar opens a status sheet offering '
       'every visibility, appear-offline included', (tester) async {
     final setup = _setup(SyncStatus.live);
     addTearDown(setup.container.dispose);
+    // This file's default width (430) is phone-sized, so this is the sheet; presence_visibility_test.dart covers the wide-window AppMenu case.
     await _pumpFooter(tester, setup.container);
 
-    expect(find.byType(AppMenu), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
 
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
     expect(
-      find.byType(AppMenu),
+      find.byType(BottomSheet),
       findsOneWidget,
-      reason: 'the avatar had no gesture wrapper at all before this',
+      reason: 'an anchored surface under a thumb is the bug this avoids',
     );
     for (final (_, label, _) in presenceOptions) {
       expect(
-        find.descendant(of: find.byType(AppMenu), matching: find.text(label)),
+        find.text(label),
         findsOneWidget,
         reason: '$label must be offered',
       );
     }
     expect(
-      find.descendant(
-        of: find.byType(AppMenu),
-        matching: find.text('Appear offline'),
-      ),
+      find.text('Appear offline'),
       findsOneWidget,
       reason:
           'appear-offline is the whole point of putting this on the '

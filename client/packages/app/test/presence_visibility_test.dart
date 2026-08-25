@@ -68,6 +68,14 @@ ProviderContainer _container() => ProviderContainer(
               headers: {'content-type': 'application/json'},
             );
           }
+          if (request.method == 'PATCH' && request.url.path == '/presence') {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            return http.Response(
+              jsonEncode({'visibility': body['visibility']}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
           return http.Response(
             '{}',
             404,
@@ -126,10 +134,20 @@ ProviderContainer _containerFailingPresence() => ProviderContainer(
   ],
 );
 
+/// Wide by default, matching every test below that never mentions width:
+/// this is the anchored-`AppMenu` case per `docs/design/desktop-vs-mobile.md`.
+/// [compact] drops under `kCompactWidth` for the bottom-sheet case instead.
 Future<void> _pumpFooter(
   WidgetTester tester,
-  ProviderContainer container,
-) async {
+  ProviderContainer container, {
+  bool compact = false,
+}) async {
+  tester.view.physicalSize = compact
+      ? const Size(390, 800)
+      : const Size(1200, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -252,4 +270,108 @@ void main() {
     // Still open: closing it now would hide the one place showing the error.
     expect(find.byType(AppMenu), findsOneWidget);
   });
+
+  testWidgets('the status menu stays an anchored AppMenu on a wide window', (
+    tester,
+  ) async {
+    final container = _container();
+    addTearDown(container.dispose);
+    await _pumpFooter(tester, container);
+
+    await tester.tap(find.byType(UserAvatar));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppMenu), findsOneWidget);
+    expect(
+      find.byType(BottomSheet),
+      findsNothing,
+      reason: 'a wide window has room for the anchored menu it always had',
+    );
+  });
+
+  testWidgets(
+    'the status menu opens as a bottom sheet under kCompactWidth, with the '
+    'same items',
+    (tester) async {
+      final container = _container();
+      addTearDown(container.dispose);
+      await _pumpFooter(tester, container, compact: true);
+
+      await tester.tap(find.byType(UserAvatar));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(BottomSheet),
+        findsOneWidget,
+        reason: 'an anchored surface under a thumb is the exact bug this fixes',
+      );
+      expect(
+        find.byType(AppMenu),
+        findsNothing,
+        reason: 'the sheet renders the bare AppSheetMenu column, not a card',
+      );
+      expect(find.text('Set a status'), findsOneWidget);
+      expect(find.byType(AppMenuDivider), findsOneWidget);
+      final items = tester
+          .widgetList<AppMenuItem>(find.byType(AppMenuItem))
+          .where((item) => presenceOptions.any((o) => o.$2 == item.label));
+      expect(items, hasLength(presenceOptions.length));
+    },
+  );
+
+  testWidgets(
+    'selecting a status from the compact sheet still updates presence and '
+    'closes it',
+    (tester) async {
+      final container = _container();
+      addTearDown(container.dispose);
+      await _pumpFooter(tester, container, compact: true);
+
+      await tester.tap(find.byType(UserAvatar));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Appear offline'));
+      await tester.pumpAndSettle();
+
+      expect(
+        container.read(presenceVisibilityDisplayProvider),
+        api.PresenceVisibility.hidden,
+      );
+      expect(find.byType(BottomSheet), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a refused change from the compact sheet shows why, without closing it',
+    (tester) async {
+      final container = _containerFailingPresence();
+      addTearDown(container.dispose);
+      await _pumpFooter(tester, container, compact: true);
+
+      await tester.tap(find.byType(UserAvatar));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Appear offline'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.byType(BottomSheet), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'opening the status editor from the compact sheet closes the sheet and '
+    'opens the editor',
+    (tester) async {
+      final container = _container();
+      addTearDown(container.dispose);
+      await _pumpFooter(tester, container, compact: true);
+
+      await tester.tap(find.byType(UserAvatar));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Set a status'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.text('What are you up to?'), findsOneWidget);
+    },
+  );
 }
