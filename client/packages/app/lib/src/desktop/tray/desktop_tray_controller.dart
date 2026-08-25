@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Builds and rebuilds the tray icon's context menu, and routes its three
-/// kinds of item to the window port or the running call.
+/// Builds and rebuilds the tray icon's context menu, and routes its items to
+/// the window port, the running call, the caller's own presence, or the
+/// settings route.
 ///
 /// This is the one file in the desktop shell that talks to `tray_manager`'s
 /// real singleton directly rather than through a seam: the icon and menu are
@@ -9,11 +10,20 @@
 /// this that is worth testing headlessly - which rows appear at all.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
 import 'package:tray_manager/tray_manager.dart';
 
+import '../../providers/presence_controller.dart';
+import '../../providers/providers.dart';
 import '../../providers/voice_controller.dart';
+import '../../routing/router.dart';
+import '../../routing/routes.dart';
+import '../../widgets/presence_menu.dart' show presenceOptions;
+import '../../widgets/run_guarded.dart';
 import '../desktop_window_port.dart';
 import 'tray_menu_actions.dart';
 
@@ -26,59 +36,94 @@ class DesktopTrayController {
   final ProviderContainer container;
 
   ProviderSubscription<VoiceState>? _voiceSubscription;
+  ProviderSubscription<api.PresenceVisibility?>? _presenceSubscription;
 
   Future<void> start() async {
     await TrayManager.instance.setIcon(trayIconAssetPath);
     await TrayManager.instance.setToolTip('slim-m');
-    await _rebuildMenu(container.read(voiceControllerProvider));
+    await _rebuildMenu();
     _voiceSubscription = container.listen<VoiceState>(voiceControllerProvider, (
       previous,
       next,
     ) {
       if (previous?.state == next.state &&
-          previous?.microphoneEnabled == next.microphoneEnabled) {
+          previous?.microphoneEnabled == next.microphoneEnabled &&
+          previous?.deafened == next.deafened) {
         return;
       }
-      _rebuildMenu(next);
+      _rebuildMenu();
     });
+    _presenceSubscription = container.listen<api.PresenceVisibility?>(
+      presenceVisibilityDisplayProvider,
+      (previous, next) {
+        if (previous == next) return;
+        _rebuildMenu();
+      },
+    );
   }
 
   void dispose() {
     _voiceSubscription?.close();
+    _presenceSubscription?.close();
   }
 
-  Future<void> _rebuildMenu(VoiceState voiceState) async {
+  Future<void> _rebuildMenu() async {
+    final voiceState = container.read(voiceControllerProvider);
     final inCall = voiceState.state == VoiceSessionState.connected;
-    final items = trayMenuActions(
-      inCall: inCall,
-    ).map((kind) => _itemFor(kind, voiceState)).toList(growable: false);
+    final selected = container.read(presenceVisibilityDisplayProvider);
+    final items = trayMenuActions(inCall: inCall)
+        .map((kind) => _itemFor(kind, voiceState, selected))
+        .toList(growable: false);
     await TrayManager.instance.setContextMenu(Menu(items: items));
   }
 
-  MenuItem _itemFor(TrayMenuActionKind kind, VoiceState voiceState) =>
-      switch (kind) {
-        TrayMenuActionKind.showHide => MenuItem(
-          label: 'Show/Hide slim-m',
-          onClick: (_) => _toggleVisibility(),
-        ),
-        TrayMenuActionKind.muteMicrophone => MenuItem(
-          label: voiceState.microphoneEnabled
-              ? 'Mute microphone'
-              : 'Unmute microphone',
-          onClick: (_) => container
-              .read(voiceControllerProvider.notifier)
-              .toggleMicrophone(),
-        ),
-        TrayMenuActionKind.leaveCall => MenuItem(
-          label: 'Leave call',
-          onClick: (_) =>
-              container.read(voiceControllerProvider.notifier).leave(),
-        ),
-        TrayMenuActionKind.quit => MenuItem(
-          label: 'Quit slim-m',
-          onClick: (_) => port.destroy(),
-        ),
-      };
+  MenuItem _itemFor(
+    TrayMenuActionKind kind,
+    VoiceState voiceState,
+    api.PresenceVisibility? selected,
+  ) => switch (kind) {
+    TrayMenuActionKind.showHide => MenuItem(
+      label: 'Show/Hide slim-m',
+      onClick: (_) => _toggleVisibility(),
+    ),
+    TrayMenuActionKind.presenceStatus => MenuItem.submenu(
+      label: 'Status',
+      submenu: Menu(
+        items: [
+          for (final (visibility, label, _) in presenceOptions)
+            MenuItem.checkbox(
+              label: label,
+              checked: visibility == selected,
+              onClick: (_) => _setPresence(visibility),
+            ),
+        ],
+      ),
+    ),
+    TrayMenuActionKind.muteMicrophone => MenuItem(
+      label: voiceState.microphoneEnabled
+          ? 'Mute microphone'
+          : 'Unmute microphone',
+      onClick: (_) =>
+          container.read(voiceControllerProvider.notifier).toggleMicrophone(),
+    ),
+    TrayMenuActionKind.toggleDeafen => MenuItem(
+      label: voiceState.deafened ? 'Undeafen' : 'Deafen',
+      onClick: (_) =>
+          container.read(voiceControllerProvider.notifier).toggleDeafen(),
+    ),
+    TrayMenuActionKind.leaveCall => MenuItem(
+      label: 'Leave call',
+      onClick: (_) => container.read(voiceControllerProvider.notifier).leave(),
+    ),
+    TrayMenuActionKind.settings => MenuItem(
+      label: 'Preferences',
+      onClick: (_) => _openSettings(),
+    ),
+    TrayMenuActionKind.quit => MenuItem(
+      label: 'Quit slim-m',
+      onClick: (_) => port.destroy(),
+    ),
+  };
 
   Future<void> _toggleVisibility() async {
     if (await port.isVisible()) {
@@ -86,5 +131,27 @@ class DesktopTrayController {
     } else {
       await port.show();
     }
+  }
+
+  Future<void> _openSettings() async {
+    await port.show();
+    unawaited(container.read(routerProvider).push(Routes.personalSettings));
+  }
+
+  /// Sets the caller's own visibility from the tray, echoing it locally and
+  /// putting that echo back on a refusal - the same shape as the rail
+  /// footer's own status menu, minus its widget-bound error state: the tray
+  /// has no surface to render a failure on, so a refusal is corrected
+  /// silently, the way a failed presence refresh already is elsewhere.
+  Future<void> _setPresence(api.PresenceVisibility visibility) async {
+    final notifier = container.read(presenceVisibilityDisplayProvider.notifier);
+    final previous = notifier.state;
+    notifier.state = visibility;
+    final failure = await runGuarded(
+      whatFailed: 'update your status',
+      action: () =>
+          container.read(apiProvider).setPresenceVisibility(visibility),
+    );
+    if (failure != null) notifier.state = previous;
   }
 }
