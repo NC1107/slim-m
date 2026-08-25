@@ -52,6 +52,7 @@ class AppIconButton extends StatefulWidget {
     this.iconSize = AppSizes.icon20,
     this.tooltip,
     this.focusNode,
+    this.suppressOwnHoverFill = false,
   });
 
   final IconData icon;
@@ -70,6 +71,18 @@ class AppIconButton extends StatefulWidget {
   final double iconSize;
   final String? tooltip;
   final FocusNode? focusNode;
+
+  /// True when an enclosing control already paints its own hover tint that
+  /// covers this button (a list row's kebab, say). Left false this button's
+  /// own hover fill can sit on top of that enclosing tint at a colour it
+  /// never accounted for - a channel row's selection fill, for one, which
+  /// this button's plain `surfaceRaised` visibly clashed against on hover.
+  /// True keeps the focus ring and press scale, which still read as this
+  /// button's own feedback, and drops only the redundant/conflicting colour
+  /// change so the enclosing highlight stays the one source of truth for
+  /// hover, the same "share one mechanism" call `MessageRow.hoverFillKey`
+  /// already made for its own hover fill.
+  final bool suppressOwnHoverFill;
 
   @override
   State<AppIconButton> createState() => _AppIconButtonState();
@@ -113,7 +126,7 @@ class _AppIconButtonState extends State<AppIconButton> {
         border = tokens.dangerBorder;
     }
 
-    if (_hovered && enabled && !widget.active) {
+    if (_hovered && enabled && !widget.active && !widget.suppressOwnHoverFill) {
       fill = tokens.surfaceRaised;
     }
 
