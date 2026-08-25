@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Every SnackBar this app shows, in one place.
 ///
+/// Only for failures now: a genuine success confirmation goes through
+/// `toastsProvider` instead (see `providers/toasts.dart`), per
+/// `docs/design/desktop-vs-mobile.md`'s "never a toast for an error" rule.
+/// The sites left here all pass a failure sentence, sometimes alongside a
+/// success one picked by the same call (`failure ?? succeeded`), which stays
+/// on this path rather than being split, since routing only the failure half
+/// through here while its sibling success goes through a toast would leave
+/// one call site with two different confirmation mechanisms for the same
+/// action.
+///
 /// `ScaffoldMessengerState.showSnackBar` drives its own entrance and exit
 /// with a plain `AnimationController` the messenger creates once and keys to
 /// nothing this app controls - the identical gap the motion pass already
@@ -67,24 +77,6 @@ ProviderContainer? _containerOf(BuildContext context) {
     return null;
   }
 }
-
-/// The same show, for a caller that has already resolved its own
-/// [messenger], [reduceMotion] and [container] before an `await` that
-/// leaves its `BuildContext` unsafe to read again - `personal_space_menu.dart`'s
-/// own shape, where the row this menu belongs to can be gone by the time the
-/// request it is awaiting on answers. A `ProviderContainer` stays valid
-/// across that gap even though the `BuildContext` it was read from does not.
-void showResolvedSnackbar(
-  ScaffoldMessengerState? messenger, {
-  required bool reduceMotion,
-  required String message,
-  ProviderContainer? container,
-}) => _showAndTrack(
-  container,
-  messenger,
-  reduceMotion: reduceMotion,
-  message: message,
-);
 
 /// Matches the framework's own floating default (`EdgeInsets.fromLTRB(15, 5,
 /// 15, 10)`) whenever nothing needs reserving, and only departs from it on

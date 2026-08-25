@@ -19,6 +19,7 @@ import 'package:slimm_api/api.dart' as api show Channel;
 import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
+import 'package:slimm_app/src/widgets/toast_overlay.dart';
 import 'package:slimm_data/data.dart' show MessageStore, SlimmDatabase;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -77,44 +78,53 @@ Future<void> pumpToTargetPicker(
     api.Channel(id: 'c1', name: 'general', kind: 'text', createdAt: 0),
   ]);
 
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      sessionProvider.overrideWithValue(
+        SessionStore(tokens: channelOverwritesTokens),
+      ),
+      meProvider.overrideWith((ref) async => channelOverwritesMe),
+      apiProvider.overrideWith((ref) {
+        final api = SlimmApi(
+          baseUrl: Uri.parse('http://localhost:8080'),
+          session: ref.watch(sessionProvider),
+          httpClient: MockClient((request) async {
+            // Answered here rather than by each test's own handler.
+            if (request.method == 'GET' &&
+                request.url.path == '/channels/c1/permissions') {
+              return http.Response(
+                jsonEncode({'permissions': channelPermissions}),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            return handler(request);
+          }),
+        );
+        ref.onDispose(api.close);
+        return api;
+      }),
+      storeProvider.overrideWith((ref) async {
+        ref.onDispose(db.close);
+        return MessageStore(db);
+      }),
+    ],
+  );
+  addTearDown(container.dispose);
+
   await tester.pumpWidget(
     UncontrolledProviderScope(
-      container: ProviderContainer(
-        overrides: [
-          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-          sessionProvider.overrideWithValue(
-            SessionStore(tokens: channelOverwritesTokens),
-          ),
-          meProvider.overrideWith((ref) async => channelOverwritesMe),
-          apiProvider.overrideWith((ref) {
-            final api = SlimmApi(
-              baseUrl: Uri.parse('http://localhost:8080'),
-              session: ref.watch(sessionProvider),
-              httpClient: MockClient((request) async {
-                // Answered here rather than by each test's own handler.
-                if (request.method == 'GET' &&
-                    request.url.path == '/channels/c1/permissions') {
-                  return http.Response(
-                    jsonEncode({'permissions': channelPermissions}),
-                    200,
-                    headers: {'content-type': 'application/json'},
-                  );
-                }
-                return handler(request);
-              }),
-            );
-            ref.onDispose(api.close);
-            return api;
-          }),
-          storeProvider.overrideWith((ref) async {
-            ref.onDispose(db.close);
-            return MessageStore(db);
-          }),
-        ],
-      ),
+      container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: ChannelOverwritesScreen(initialChannel: initialChannel),
+        builder: (context, child) => Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const Positioned.fill(child: ToastOverlay()),
+          ],
+        ),
       ),
     ),
   );

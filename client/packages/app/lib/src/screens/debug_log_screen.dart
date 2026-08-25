@@ -16,8 +16,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../diagnostics/debug_log.dart';
+import '../providers/toasts.dart';
 import '../routing/routes.dart';
-import '../widgets/app_snackbar.dart';
 import '../widgets/settings_notice.dart';
 import '../widgets/memory_diagnostics.dart';
 import '../widgets/settings_section_header.dart';
@@ -44,7 +44,12 @@ class DebugLogScreen extends ConsumerWidget {
               : () async {
                   await Clipboard.setData(ClipboardData(text: log.asReport()));
                   if (!context.mounted) return;
-                  showAppSnackbar(context, 'Debug log copied');
+                  ref
+                      .read(toastsProvider.notifier)
+                      .show(
+                        'Debug log copied',
+                        severity: AppToastSeverity.success,
+                      );
                 },
         ),
         IconButton(

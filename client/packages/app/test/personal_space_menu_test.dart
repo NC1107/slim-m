@@ -15,6 +15,7 @@ import 'package:slimm_app/src/providers/dms.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_app/src/widgets/personal_space_menu.dart';
+import 'package:slimm_app/src/widgets/toast_overlay.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -58,6 +59,12 @@ Widget _harness(ProviderContainer container, List<Channel> channels) =>
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: Scaffold(
           body: DirectMessagesSection(channels: channels, selectedId: null),
+        ),
+        builder: (context, child) => Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const Positioned.fill(child: ToastOverlay()),
+          ],
         ),
       ),
     );
@@ -125,6 +132,8 @@ void main() {
         reason: 'the row itself must be gone, not merely its menu closed',
       );
       expect(find.text(personalSpaceHiddenNotice), findsOneWidget);
+      // Drains the toast's own dismiss timer so it is not still pending once this test tears down.
+      await tester.pump(const Duration(seconds: 5));
 
       await tester.pumpWidget(const SizedBox());
     },
