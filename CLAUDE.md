@@ -38,6 +38,7 @@ Read first when starting substantial work:
 - Read receipts are deferred.
 - UI uses Lucide icons, never emoji as interface chrome.
 - Follow the design system in `docs/design/design-language.md`; read the relevant decision record before changing locked design tokens.
+- Any UI that differs between desktop and mobile follows `docs/design/desktop-vs-mobile.md`: layout responds to window width, never to platform; pick the surface with its decision guide and note the rule number in the PR.
 
 ## Code map
 
@@ -274,6 +275,7 @@ Useful references:
 - `docs/BACKLOG.md` - accepted/parked work
 - `docs/os_backlog/README.md` - platform-specific known issues
 - `docs/design/design-language.md` - visual system
+- `docs/design/desktop-vs-mobile.md` - responsive layout and which-surface rules (width, not platform)
 - `docs/decisions/` - architectural/product decisions
 - `docs/research/README.md` - research index and superseded findings
 - `docs/ci.md` - CI details
