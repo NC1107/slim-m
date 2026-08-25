@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A settings row that states its current value and opens a sheet to change it.
+/// A settings row that states its current value and, to change it, drops a
+/// dropdown down from the row on desktop or lifts a sheet on a phone.
 library;
 
 import 'package:flutter/material.dart';
@@ -101,19 +102,101 @@ class SettingsSelectRow<T> extends StatelessWidget {
     if (chosen != null && chosen != value) onChanged(chosen);
   }
 
+  /// The desktop presentation: the choices drop down from the row, anchored to
+  /// it, rather than a centred dialog taking focus for a choice this small. The
+  /// sheet stays on a phone, where a value dropped over a 48dp row would be
+  /// unmissable-adjacent and there is no pointer to dismiss it by clicking away.
+  Future<void> _openDropdown(BuildContext context) async {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final anchor = context.findRenderObject()! as RenderBox;
+    final overlay =
+        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    final rect = Rect.fromPoints(
+      anchor.localToGlobal(Offset.zero, ancestor: overlay),
+      anchor.localToGlobal(
+        anchor.size.bottomRight(Offset.zero),
+        ancestor: overlay,
+      ),
+    );
+
+    final chosen = await showMenu<T>(
+      context: context,
+      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+      color: tokens.surfaceRaised,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: BorderSide(color: tokens.borderStrong),
+      ),
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 300),
+      items: [
+        for (final choice in choices)
+          PopupMenuItem<T>(
+            value: choice.value,
+            child: _DropdownItem(
+              label: choice.label,
+              selected: choice.value == value,
+            ),
+          ),
+        if (sheetFootnote != null)
+          PopupMenuItem<T>(
+            enabled: false,
+            child: AppMenuFootnote(sheetFootnote!),
+          ),
+      ],
+    );
+    if (chosen != null && chosen != value) onChanged(chosen);
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final desktop = MediaQuery.sizeOf(context).width >= kCompactWidth;
     return AppListRow(
       label: label,
       meta: _currentLabel,
       semanticLabel: '$label, currently $_currentLabel',
+      // Down on desktop for a dropdown, right on a phone for a sheet.
       trailing: Icon(
-        AppIcons.chevronRight,
+        desktop ? AppIcons.chevronDown : AppIcons.chevronRight,
         size: AppSizes.icon16,
         color: tokens.textSecondary,
       ),
-      onTap: () => _open(context),
+      onTap: () => desktop ? _openDropdown(context) : _open(context),
+    );
+  }
+}
+
+/// One value in [SettingsSelectRow]'s desktop dropdown: a leading check on the
+/// current choice, aligned so the labels line up whether ticked or not.
+class _DropdownItem extends StatelessWidget {
+  const _DropdownItem({required this.label, required this.selected});
+
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Row(
+      children: [
+        SizedBox(
+          width: AppSizes.icon16 + AppSpacing.s8,
+          child: selected
+              ? Icon(
+                  AppIcons.check,
+                  size: AppSizes.icon16,
+                  color: tokens.textPrimary,
+                )
+              : null,
+        ),
+        Expanded(
+          child: Text(
+            label,
+            style: AppText.body.copyWith(color: tokens.textPrimary),
+          ),
+        ),
+      ],
     );
   }
 }
