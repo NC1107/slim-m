@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 /// Narrowest width that still gets the brand panel. Above this there is room
-/// for a 380px panel and a 440px form with gutters; below it, there is not.
+/// for a 260px brand rail and a 440px form with gutters; below it, there is not.
 const double _panelFloor = 900;
 
 /// One step in the join flow, and how far along it the caller is.
@@ -108,7 +108,8 @@ class OnboardingShell extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 380,
+              // A slim brand rail, not a third of the viewport; see [_BrandPanel].
+              width: 260,
               decoration: BoxDecoration(
                 color: tokens.surfaceSunken,
                 border: Border(right: BorderSide(color: tokens.borderSubtle)),
@@ -162,7 +163,9 @@ class _Wordmark extends StatelessWidget {
 /// because this is the screen where somebody decides whether to trust one.
 ///
 /// The layout is kept rather than collapsed so there is a place to put real
-/// words when there are some.
+/// words when there are some - but the rail is narrow (its container's width),
+/// because at a third of the viewport this emptiness read as an unfinished
+/// half rather than a margin.
 class _BrandPanel extends StatelessWidget {
   const _BrandPanel();
 
