@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/default_server.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/onboarding_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -368,11 +369,11 @@ void main() {
 
       expect(
         find.text('Confirm this server'),
-        findsOneWidget,
-        reason: 'nothing was pinned for the official server before this',
+        findsNothing,
+        reason:
+            'the official server has no admin to read a fingerprint to, so '
+            'first connect pins silently instead of asking',
       );
-      await _tapButton(tester, 'It matches - continue');
-
       expect(chosen, Uri.parse(officialServer));
       expect(
         await keyStore.read('server_identity:$officialServer'),
