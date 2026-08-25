@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The caller's own status: the four choices, the call that applies one, and
-/// the rail footer's avatar button that opens them as a menu.
+/// the rail footer's avatar button that opens them as a menu or a sheet.
 ///
 /// Lives beside the rail rather than inside `channel_rail_frame.dart` so that
 /// file stays under this repo's 300-line review budget.
@@ -79,7 +79,10 @@ Future<bool> applyPresenceVisibility(
 }
 
 /// The rail footer's avatar, as a tap target that opens the status menu
-/// upward off the bottom bar.
+/// upward off the bottom bar on a pointer layout, or as a bottom sheet under
+/// `kCompactWidth` - the same anchored-vs-sheet split `member_profile.dart`
+/// uses, per `docs/design/desktop-vs-mobile.md`: an anchored surface under a
+/// thumb is a review defect.
 class PresenceMenuButton extends ConsumerStatefulWidget {
   const PresenceMenuButton({super.key, required this.presence});
 
@@ -91,8 +94,7 @@ class PresenceMenuButton extends ConsumerStatefulWidget {
   ConsumerState<PresenceMenuButton> createState() => _PresenceMenuButtonState();
 }
 
-class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
-    with GuardedActionState<PresenceMenuButton> {
+class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
 
@@ -100,44 +102,69 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
   /// here draws a hover fill for a tap to interrupt.
   bool _pressed = false;
 
-  /// Applies [visibility] and closes the menu once the server has agreed to
-  /// it. A refusal leaves the menu open with [actionError] rendered inline,
-  /// rather than closing over a change that never happened.
-  Future<void> _select(api.PresenceVisibility visibility) async {
-    final ok = await applyPresenceVisibility(ref, visibility, guard: guard);
-    if (ok && mounted) _controller.hide();
+  /// Opens the sheet on a compact width. A fresh [_PresenceMenuItems] owns
+  /// this presentation's own guarded-action state, the same reason
+  /// `member_profile.dart` gives `MemberProfileBody` a fresh instance per
+  /// presentation: this content lives in the sheet route's own subtree, not
+  /// this button's, so a refusal here cannot be shown by setting state on the
+  /// button.
+  Future<void> _openSheet(BuildContext context) {
+    return showAppSheet<void>(
+      context,
+      bare: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: _PresenceMenuItems(
+          onDone: () => Navigator.of(sheetContext).pop(),
+        ),
+      ),
+    );
   }
 
-  /// Opens the free-text status editor (backlog item 128), leaving this menu
-  /// closed behind it the same way [SpaceMenuButton] hides itself before
-  /// opening the create-channel sheet: the overlay's own `context` still
-  /// reaches the enclosing `Navigator` once hidden, since hiding an
-  /// `OverlayPortal` unmounts its child rather than the tree above it.
-  void _openStatusEditor(BuildContext context, String current) {
-    _controller.hide();
-    unawaited(showStatusEditorSheet(context, current));
+  void _open(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < kCompactWidth) {
+      unawaited(_openSheet(context));
+    } else {
+      _controller.toggle();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider);
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final selected = ref.watch(presenceVisibilityDisplayProvider);
 
     return CompositedTransformTarget(
       link: _link,
       child: OverlayPortal(
         controller: _controller,
-        // Read here rather than in the builder: the overlay child builds
-        // under its own element, outside this widget's build phase.
-        overlayChildBuilder: (context) =>
-            _buildMenu(context, tokens, selected, me.valueOrNull?.statusText),
+        // Positioned so the follower sizes to its content: an overlay child
+        // is otherwise laid out against the whole screen, which a Column
+        // fills. Only ever shown on a pointer layout; see [_open].
+        overlayChildBuilder: (context) => Positioned(
+          left: 0,
+          top: 0,
+          child: CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topLeft,
+            followerAnchor: Alignment.bottomLeft,
+            offset: const Offset(0, -4),
+            child: TapRegion(
+              onTapOutside: (_) => _controller.hide(),
+              // Escape closes it and Tab reaches every item once open.
+              child: ContextMenuKeyboardScope(
+                onDismiss: _controller.hide,
+                child: _PresenceMenuItems(onDone: _controller.hide),
+              ),
+            ),
+          ),
+        ),
         // A 28pt avatar is well under the touch minimum, so the tap area is
         // grown around it rather than the glyph being grown to match.
         child: Semantics(
           button: true,
           label: 'Change your status',
-          onTap: _controller.toggle,
+          onTap: () => _open(context),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (_) => setState(() => _pressed = true),
@@ -145,7 +172,7 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
             onTapCancel: () => setState(() => _pressed = false),
             onTap: () {
               AppHaptics.selection();
-              _controller.toggle();
+              _open(context);
             },
             child: ConstrainedBox(
               constraints: const BoxConstraints(
@@ -172,68 +199,89 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
       ),
     );
   }
+}
 
-  /// [selected] is null until a choice is made in this session, and then no
-  /// item is marked current: ticking one would assert a stored value this
-  /// client has no way to read back. [currentStatus] seeds the status editor
-  /// opened from the "Set a status" item below.
-  Widget _buildMenu(
-    BuildContext context,
-    AppTokens tokens,
-    api.PresenceVisibility? selected,
-    String? currentStatus,
-  ) {
-    // Positioned so the follower sizes to its content: an overlay child is
-    // otherwise laid out against the whole screen, which a Column fills.
-    return Positioned(
-      left: 0,
-      top: 0,
-      child: CompositedTransformFollower(
-        link: _link,
-        showWhenUnlinked: false,
-        targetAnchor: Alignment.topLeft,
-        followerAnchor: Alignment.bottomLeft,
-        offset: const Offset(0, -4),
-        child: TapRegion(
-          onTapOutside: (_) => _controller.hide(),
-          // Escape closes it and Tab reaches every item once open.
-          child: ContextMenuKeyboardScope(
-            onDismiss: _controller.hide,
-            child: AppMenu(
-              width: 220,
-              children: [
-                AppMenuItem(
-                  label: 'Set a status',
-                  leading: AppIcons.smile,
-                  onTap: () => _openStatusEditor(context, currentStatus ?? ''),
-                ),
-                const AppMenuDivider(),
-                const AppMenuLabel('Status'),
-                for (final (visibility, label, presence) in presenceOptions)
-                  AppMenuItem(
-                    label: label,
-                    selected: visibility == selected,
-                    // surfaceRaised, not the default, because the dnd notch
-                    // and the appear-offline slash punch their mark here.
-                    trailing: AppStatusDot(
-                      status: presence,
-                      backgroundColor: tokens.surfaceRaised,
-                    ),
-                    onTap: () => unawaited(_select(visibility)),
-                  ),
-                if (actionError != null)
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s8),
-                    child: AppErrorState(
-                      message: actionError!,
-                      onDismiss: clearActionError,
-                    ),
-                  ),
-              ],
+/// The status choices themselves: an [AppMenu] anchored beside the avatar on
+/// a pointer layout, or a bare column filling a bottom sheet on a compact
+/// one - [AppSheetMenu] picks between the two off the live window width, so
+/// this same widget is what both [_PresenceMenuButtonState] presentations
+/// wrap.
+///
+/// A fresh instance per presentation, so [GuardedActionState.actionError]
+/// belongs to whichever surface is open rather than to the button that
+/// opened it.
+class _PresenceMenuItems extends ConsumerStatefulWidget {
+  const _PresenceMenuItems({required this.onDone});
+
+  /// Closes whichever surface this is presented in: the overlay's
+  /// `OverlayPortalController.hide` on a pointer layout, `Navigator.pop` in
+  /// the sheet.
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<_PresenceMenuItems> createState() => _PresenceMenuItemsState();
+}
+
+class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
+    with GuardedActionState<_PresenceMenuItems> {
+  /// Applies [visibility] and closes the menu once the server has agreed to
+  /// it. A refusal leaves the menu open with [actionError] rendered inline,
+  /// rather than closing over a change that never happened.
+  Future<void> _select(api.PresenceVisibility visibility) async {
+    final ok = await applyPresenceVisibility(ref, visibility, guard: guard);
+    if (ok && mounted) widget.onDone();
+  }
+
+  /// Opens the free-text status editor (backlog item 128), leaving this menu
+  /// closed behind it the same way [SpaceMenuButton] hides itself before
+  /// opening the create-channel sheet: this widget's own `context` still
+  /// reaches the enclosing `Navigator` once closed, since closing either
+  /// presentation unmounts this subtree rather than the tree above it.
+  void _openStatusEditor(BuildContext context, String current) {
+    widget.onDone();
+    unawaited(showStatusEditorSheet(context, current));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final selected = ref.watch(presenceVisibilityDisplayProvider);
+    final currentStatus = ref.watch(meProvider).valueOrNull?.statusText;
+
+    // [selected] is null until a choice is made in this session, and then no
+    // item is marked current: ticking one would assert a stored value this
+    // client has no way to read back.
+    return AppSheetMenu(
+      width: 220,
+      children: [
+        AppMenuItem(
+          label: 'Set a status',
+          leading: AppIcons.smile,
+          onTap: () => _openStatusEditor(context, currentStatus ?? ''),
+        ),
+        const AppMenuDivider(),
+        const AppMenuLabel('Status'),
+        for (final (visibility, label, presence) in presenceOptions)
+          AppMenuItem(
+            label: label,
+            selected: visibility == selected,
+            // surfaceRaised, not the default, because the dnd notch and the
+            // appear-offline slash punch their mark here.
+            trailing: AppStatusDot(
+              status: presence,
+              backgroundColor: tokens.surfaceRaised,
+            ),
+            onTap: () => unawaited(_select(visibility)),
+          ),
+        if (actionError != null)
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.s8),
+            child: AppErrorState(
+              message: actionError!,
+              onDismiss: clearActionError,
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 }
