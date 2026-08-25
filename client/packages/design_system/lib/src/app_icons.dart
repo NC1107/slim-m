@@ -16,6 +16,10 @@ abstract final class AppIcons {
   static const IconData settings = LucideIcons.settings300;
   static const IconData members = LucideIcons.users300;
 
+  /// The performance settings pane: image cache and preview quality, the
+  /// memory-and-speed dials. A gauge, distinct from [settings]'s gear.
+  static const IconData performance = LucideIcons.gauge300;
+
   /// The collapsible channel rail, drawn as a panel rather than a hamburger:
   /// it toggles one region of a visible layout rather than opening a drawer.
   /// Also the collapsed rail's own edge handle (backlog item 54): a panel

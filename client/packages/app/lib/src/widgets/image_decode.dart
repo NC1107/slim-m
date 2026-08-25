@@ -23,11 +23,16 @@ import 'package:flutter/widgets.dart';
 /// image with a large source (an avatar re-encoded to 512) can afford to
 /// decode past its reported need to stay crisp when that happens; a large
 /// image cannot, so the floor is opt-in per call site rather than global.
+/// [scale] trades preview sharpness for memory, 1 being the full decode this
+/// picks by default. A caller behind the attachment-preview-quality setting
+/// passes it below 1 to decode fewer pixels; memory falls with its square.
+/// Floored at one pixel so a tiny image at a low scale still decodes.
 int decodeEdge(
   BuildContext context,
   double logicalSize, {
   double minRatio = 1,
+  double scale = 1,
 }) {
   final ratio = math.max(MediaQuery.devicePixelRatioOf(context), minRatio);
-  return (logicalSize * ratio).round();
+  return math.max(1, (logicalSize * ratio * scale).round());
 }
