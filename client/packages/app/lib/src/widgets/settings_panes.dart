@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/breakpoints.dart';
 import '../routing/close_screen.dart';
 
 /// One entry in the nav, and the pane it opens.
@@ -83,9 +84,6 @@ class SettingsPaneGroup {
   final List<SettingsPane> panes;
 }
 
-/// Widest a nav column gets. Below this the nav is the whole screen.
-const double _twoPaneFloor = 800;
-
 class SettingsPanesScaffold extends StatefulWidget {
   const SettingsPanesScaffold({
     super.key,
@@ -128,7 +126,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final wide = MediaQuery.sizeOf(context).width >= _twoPaneFloor;
+    final wide = MediaQuery.sizeOf(context).width >= kSettingsTwoPaneWidth;
     final panes = _allPanes;
 
     // Wide always shows something: an empty pane beside a nav is a hole.

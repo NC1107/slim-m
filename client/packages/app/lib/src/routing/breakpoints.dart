@@ -69,3 +69,11 @@ enum LayoutClass {
 /// a transcript and composer, not a list, but still narrow enough to leave the
 /// parent transcript above [_fitsThirdPane]'s minimum at the expanded boundary.
 const double kThreadPaneWidth = 360;
+
+/// The width at which settings and admin show their nav list beside the open
+/// pane rather than drilling in. Higher than [LayoutClass]'s medium boundary
+/// on purpose: a settings pane holds forms and prose, not a message list, so
+/// it needs more room beside the nav than the channel rail does beside the
+/// transcript. Named here beside [kCompactWidth] so the app's width thresholds
+/// live in one place rather than as a literal buried in the settings widget.
+const double kSettingsTwoPaneWidth = 800;
