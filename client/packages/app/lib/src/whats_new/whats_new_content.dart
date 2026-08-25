@@ -368,6 +368,26 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.51.0',
+    headline: 'A status, bulk emoji, and one menu everywhere',
+    points: [
+      WhatsNewPoint(
+        'Tap your own avatar in the sidebar to set a custom status - a short '
+        'line under your name, cleared as easily as it is set.',
+      ),
+      WhatsNewPoint(
+        'Admins can add custom emoji in bulk from a zip file: each image '
+        'becomes an emoji named after its file, so party_blob.gif arrives as '
+        ':party_blob:.',
+      ),
+      WhatsNewPoint(
+        'A channel\'s menu is the same however you open it. The three-dot '
+        'button, a right-click and a long-press now all show one menu, with '
+        'the same actions in the same order.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
