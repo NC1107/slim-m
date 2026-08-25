@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The sheet the rail's per-section "+" opens: a name and a text/voice
-/// choice, sent through `POST /channels` ([api.SlimmApi.createChannel]).
+/// The sheet the rail's Space menu "Add channel" item opens: a name and a
+/// text/voice choice, sent through `POST /channels`
+/// ([api.SlimmApi.createChannel]).
 library;
 
 import 'package:flutter/material.dart';
@@ -13,10 +14,14 @@ import '../api_failure.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 
-/// Opens the sheet, defaulting the kind picker to [initialKind] (the section
-/// whose "+" was tapped): still changeable inside the sheet, since the
-/// section is only a hint about intent, not a hard constraint the server
-/// enforces.
+/// The server's own ceiling (`validate_channel_name` in
+/// `crates/slimm-server/src/http/channels.rs`), so a name that is already
+/// too long is refused here rather than round-tripping to the server first.
+const int _nameMaxChars = 64;
+
+/// Opens the sheet, defaulting the kind picker to [initialKind]: still
+/// changeable inside the sheet, since it is only a starting guess, not a
+/// hard constraint the server enforces.
 Future<void> showCreateChannelSheet(
   BuildContext context, {
   required String initialKind,
@@ -49,7 +54,20 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
     super.dispose();
   }
 
-  bool get _canSubmit => !_submitting && _name.text.trim().isNotEmpty;
+  bool get _nameValid =>
+      _name.text.trim().isNotEmpty && _name.text.trim().length <= _nameMaxChars;
+
+  bool get _canSubmit => !_submitting && _nameValid;
+
+  /// Names what is missing rather than sitting disabled with no explanation
+  /// - the same "say why" treatment `poll_composer_sheet.dart`'s own button
+  /// label gives an incomplete poll.
+  String get _buttonLabel {
+    if (_submitting) return 'Creating...';
+    if (_name.text.trim().isEmpty) return 'Add a channel name';
+    if (!_nameValid) return 'Name is too long';
+    return 'Create channel';
+  }
 
   Future<void> _submit() async {
     setState(() {
@@ -127,7 +145,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
             ],
             const SizedBox(height: AppSpacing.s12),
             AppButton(
-              label: _submitting ? 'Creating...' : 'Create channel',
+              label: _buttonLabel,
               variant: AppButtonVariant.primary,
               full: true,
               disabled: !_canSubmit,
