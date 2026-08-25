@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.52.0](https://github.com/NC1107/slim-m/compare/client-v0.51.0...client-v0.52.0) (2026-08-25)
+
+
+### Features
+
+* **client:** a softer, level-normalized notification sound ([#857](https://github.com/NC1107/slim-m/issues/857)) ([94843cd](https://github.com/NC1107/slim-m/commit/94843cde64a170e70863531e2568c1507c9f8490))
+* **client:** command palette becomes a full-width pull-down on a phone ([#860](https://github.com/NC1107/slim-m/issues/860)) ([e56ff8b](https://github.com/NC1107/slim-m/commit/e56ff8b08841762c5aa5c8251d4fd25495b9867d))
+* **client:** show success confirmations as toasts ([#859](https://github.com/NC1107/slim-m/issues/859)) ([335c5c1](https://github.com/NC1107/slim-m/commit/335c5c104e6a0098f06aed83995d4fcf86d0f626))
+* **client:** skip the server-address step when a default server is configured ([#858](https://github.com/NC1107/slim-m/issues/858)) ([879cff5](https://github.com/NC1107/slim-m/commit/879cff5853b232858664263a7411e6071cccc691))
+
+
+### Bug Fixes
+
+* **design:** light-theme menu edge clears WCAG 3:1 ([#855](https://github.com/NC1107/slim-m/issues/855)) ([b92acf5](https://github.com/NC1107/slim-m/commit/b92acf58662666a077582a905d5e6a16e95e9920))
+
 ## [0.51.0](https://github.com/NC1107/slim-m/compare/client-v0.50.0...client-v0.51.0) (2026-08-25)
 
 
