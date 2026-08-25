@@ -346,6 +346,28 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.50.0',
+    headline: 'Performance settings, and room for bigger files',
+    points: [
+      WhatsNewPoint(
+        'Settings has a Performance section now. Choose whether images and '
+        'GIFs load on their own or wait for a tap, how sharply inline '
+        'previews decode, how much memory the image cache keeps, and how '
+        'many older messages a scroll back through history loads at a time.',
+      ),
+      WhatsNewPoint(
+        'Attachments can be much larger - up to 1 GB by default - and the '
+        'server streams an upload to disk as it arrives rather than holding '
+        'the whole file in memory.',
+      ),
+      WhatsNewPoint(
+        'A space admin can set the per-channel canvas object limit for '
+        'everyone, trading how much a board can hold against how heavy a busy '
+        'canvas is to load and draw.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
