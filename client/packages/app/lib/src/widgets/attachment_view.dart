@@ -16,6 +16,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/attachment_bytes.dart';
+import '../providers/attachment_preview_quality.dart';
 import 'fullscreen_image_viewer.dart';
 import 'image_decode.dart';
 import 'message_row_parts.dart' show AttachmentPlaceholder;
@@ -119,6 +120,9 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
     }
 
     final bytesAsync = ref.watch(attachmentBytesProvider(attachment.id));
+    final previewScale = ref
+        .watch(attachmentPreviewQualityControllerProvider)
+        .decodeScale;
     return bytesAsync.when(
       loading: () => const AttachmentPlaceholder(),
       error: (error, _) => _tappable(
@@ -165,7 +169,11 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
                       bytes,
                       fit: BoxFit.contain,
                       semanticLabel: attachment.filename,
-                      cacheWidth: decodeEdge(context, kInlineImageMax),
+                      cacheWidth: decodeEdge(
+                        context,
+                        kInlineImageMax,
+                        scale: previewScale,
+                      ),
                       // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
                       errorBuilder: (context, error, stackTrace) => _FailureBox(
                         tokens: tokens,

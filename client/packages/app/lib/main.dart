@@ -13,6 +13,7 @@ import 'package:slimm_platform/platform.dart';
 import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
+import 'src/providers/attachment_preview_quality.dart';
 import 'src/providers/image_cache_preference.dart';
 import 'src/desktop/startup_screen.dart';
 import 'src/diagnostics/debug_log.dart';
@@ -81,6 +82,9 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   await container.read(motionPreferenceControllerProvider.notifier).restore();
   await container.read(highContrastControllerProvider.notifier).restore();
   await container.read(imageCacheLimitControllerProvider.notifier).restore();
+  await container
+      .read(attachmentPreviewQualityControllerProvider.notifier)
+      .restore();
   await container
       .read(voiceControllerProvider.notifier)
       .restoreCameraPreference();
