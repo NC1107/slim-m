@@ -15,6 +15,7 @@
 library;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 /// Which chime to play.
 enum NotificationSound {
@@ -55,6 +56,17 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
 
   final AudioPlayer _player;
 
+  /// Backlog #134: the wav family is already level with itself (see
+  /// `assets/audio/synth.py`'s `TARGET_LUFS`), but `audioplayers` defaults a
+  /// player to full scale on top of that, so every chime still played at the
+  /// device's whole notification volume with no headroom of its own. This is
+  /// the app's own attenuation on top of that OS level, not a replacement
+  /// for it - the "grab system levels" half of the ask is what the OS
+  /// volume control already does, since `AudioContext` above asks for no
+  /// audio focus and never touches the system volume itself.
+  @visibleForTesting
+  static const double playbackVolume = 0.6;
+
   /// iOS `.ambient`: the platform's own category for a short sound that must
   /// never interrupt or duck whatever else is playing, which is why it is
   /// used here rather than `.playback` with `mixWithOthers` added by hand -
@@ -76,7 +88,11 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
   Future<void> play(NotificationSound sound) async {
     // Stopped first, or two overlapping `play()` calls would race.
     await _player.stop();
-    await _player.play(AssetSource(sound._playerPath), ctx: _context);
+    await _player.play(
+      AssetSource(sound._playerPath),
+      volume: playbackVolume,
+      ctx: _context,
+    );
   }
 
   @override
