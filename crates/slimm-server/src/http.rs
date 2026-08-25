@@ -25,6 +25,7 @@ use extract::{Json, READ, RateLimited};
 
 mod analytics;
 mod attachment_ids;
+mod attachment_range;
 mod attachments;
 mod auth;
 mod canvas;
@@ -155,7 +156,7 @@ pub fn router(state: AppState) -> Router {
         .merge(polls::routes())
         .merge(users::routes())
         .merge(gifs::routes())
-        .merge(attachments::routes(state.media.max_attachment_bytes()))
+        .merge(attachments::routes())
         // Bounded, and the socket is deliberately outside this: see below.
         .layer(ConcurrencyLimitLayer::new(MAX_INFLIGHT_REQUESTS))
         .layer(TimeoutLayer::with_status_code(

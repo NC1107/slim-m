@@ -53,12 +53,17 @@ fn app(store: Store, media: Media) -> Router {
     })
 }
 
-/// A member with a session and a channel they may post in.
+/// A member with a session and a channel they may post in. Holds ATTACH_FILES
+/// so the oversized-upload case reaches the size check: the upload handler
+/// refuses a caller lacking it before reading the body at all, which is a 403,
+/// not the 413 this file's malformed-body test means to exercise.
 async fn registered_member(store: &Store) -> (String, String) {
     store
         .create_role(
             "everyone",
-            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            Permissions::VIEW_CHANNEL
+                .union(Permissions::SEND_MESSAGES)
+                .union(Permissions::ATTACH_FILES),
             true,
         )
         .await

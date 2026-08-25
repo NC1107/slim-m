@@ -26,15 +26,18 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use futures_util::Stream;
 use uuid::Uuid;
 
 mod content_type;
+mod stream;
 pub use content_type::{is_inline, sniff_content_type};
+pub use stream::{PendingAttachment, StreamError};
 
 /// Largest attachment a single upload may store, for [`Media::for_tests`],
 /// which builds a handle without a `Config` to read the real default from.
 /// Matches `default_attachment_max_bytes` in `src/config.rs`.
-const DEFAULT_ATTACHMENT_MAX_BYTES: u64 = 100 * 1024 * 1024;
+const DEFAULT_ATTACHMENT_MAX_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// Longest a sanitized filename may be, in characters.
 const FILENAME_MAX_CHARS: usize = 200;
@@ -193,6 +196,37 @@ impl Media {
         write_atomic(self.attachment_path(sha256_hex), bytes).await
     }
 
+    /// Streams `body` to a temp file under the attachments directory, hashing
+    /// it as it goes and refusing at `max_bytes` so an oversized upload is
+    /// abandoned mid-stream rather than buffered whole in memory - the whole
+    /// point of this path over [`write_attachment`], which takes a `Vec` the
+    /// caller already holds.
+    ///
+    /// The returned [`PendingAttachment`] carries the temp file, its
+    /// content-hash id, its byte count, and a [`SNIFF_PREFIX_BYTES`] prefix for
+    /// the caller to decide the content type from - a stream already written to
+    /// disk cannot be re-read to sniff. The caller then
+    /// [`commit`](PendingAttachment::commit)s or
+    /// [`abandon`](PendingAttachment::abandon)s it; dropping it uncommitted
+    /// removes the temp file, so any refusal past this point leaves nothing on
+    /// disk, the same guarantee the size and ceiling checks upstream already
+    /// promise.
+    ///
+    /// Generic over the chunk type so this module keeps no dependency on axum's
+    /// body types; the HTTP layer passes its request body's data stream. The
+    /// streaming machinery lives in [`stream`].
+    pub async fn stream_attachment<S, B, E>(
+        &self,
+        body: S,
+        max_bytes: u64,
+    ) -> Result<PendingAttachment, StreamError>
+    where
+        S: Stream<Item = Result<B, E>>,
+        B: AsRef<[u8]>,
+    {
+        stream::stream_attachment(&self.attachments_dir, body, max_bytes).await
+    }
+
     pub async fn read_attachment(&self, sha256_hex: &str) -> io::Result<Vec<u8>> {
         read(self.attachment_path(sha256_hex)).await
     }
@@ -227,9 +261,9 @@ impl Media {
 }
 
 /// Writes `bytes` to `path` via a same-directory temp file plus rename, so a
-/// concurrent reader of `path` never observes a partial write. Runs on the
-/// blocking pool: this crate's `tokio` features do not include `fs`, and
-/// `spawn_blocking` is the same mechanism `tokio::fs` itself is built on.
+/// concurrent reader of `path` never observes a partial write. The write and
+/// the rename run together on the blocking pool so the pair is one hop off the
+/// runtime rather than two, which is the same mechanism `tokio::fs` is built on.
 async fn write_atomic(path: PathBuf, bytes: Vec<u8>) -> io::Result<()> {
     tokio::task::spawn_blocking(move || {
         let dir = path

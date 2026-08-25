@@ -41,6 +41,70 @@ async fn an_oversized_upload_is_refused() {
     );
 }
 
+/// The over-ceiling refusal is specifically a 413, not a generic 400: a
+/// caller needs to tell "make it smaller" apart from a malformed request. A
+/// declared Content-Length over the ceiling is refused before a byte streams.
+#[tokio::test]
+async fn an_oversized_upload_is_refused_as_413() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request_bytes(
+            "POST",
+            "/attachments?filename=big.png",
+            &token,
+            png(TEST_MAX_ATTACHMENT_BYTES as usize + 1),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+/// A chunked upload sends no Content-Length, so the declared-length fast-fail
+/// cannot catch it - only the running byte count as the body streams to disk
+/// can, which is the guard that keeps a 1 GiB ceiling from meaning a 1 GiB
+/// buffer. Mutating `stream_attachment` to drop its `size > max_bytes` check
+/// turns this red (the upload would be accepted).
+#[tokio::test]
+async fn a_chunked_upload_over_the_ceiling_is_still_refused() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let (token, _id) = register(&store, "alice").await;
+
+    // A stream body carries no Content-Length, so only the running total refuses.
+    let oversized = png(TEST_MAX_ATTACHMENT_BYTES as usize + 1);
+    let chunks: Vec<Result<Vec<u8>, std::io::Error>> =
+        oversized.chunks(256).map(|c| Ok(c.to_vec())).collect();
+    let request = Request::builder()
+        .method("POST")
+        .uri("/attachments?filename=streamed.png")
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::from_stream(futures_util::stream::iter(chunks)))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
 /// The filename and an explicit Content-Type header both claim an image, but
 /// the bytes are HTML. Neither signal is trusted - only the bytes are
 /// sniffed - so the stored type is whatever the bytes actually are

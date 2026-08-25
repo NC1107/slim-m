@@ -146,11 +146,14 @@ fn default_attachments_dir() -> String {
     "data/media".to_owned()
 }
 
-/// 100 MiB, four times Discord's free 25 MiB. Safe as a default because a
+/// 1 GiB, forty times Discord's free 25 MiB. Safe as a default because a
 /// self-hosted operator owns the disk, can bound total use with
-/// `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES`, and can lower this per instance.
+/// `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES`, and can lower this per instance. The
+/// upload path streams the body to disk while hashing it (see
+/// `http::attachments::upload`), so a ceiling this high costs a bounded amount
+/// of memory per upload rather than one that scales with the file's size.
 fn default_attachment_max_bytes() -> u64 {
-    100 * 1024 * 1024
+    1024 * 1024 * 1024
 }
 
 impl Default for Config {
