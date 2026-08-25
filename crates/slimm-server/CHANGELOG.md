@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.44.0](https://github.com/NC1107/slim-m/compare/server-v0.43.0...server-v0.44.0) (2026-08-25)
+
+
+### Features
+
+* **api:** make channel, category and role creation idempotent ([#726](https://github.com/NC1107/slim-m/issues/726)) ([48bd8ab](https://github.com/NC1107/slim-m/commit/48bd8ab377889ca4f71f6c48e08967c810172faa))
+* make the per-channel canvas object cap a space setting ([#844](https://github.com/NC1107/slim-m/issues/844)) ([55b123a](https://github.com/NC1107/slim-m/commit/55b123a30c0a80e230c2216d56438bd668b34162))
+* **moderation:** server foundation for report history and live sync (MOD4, MOD7) ([#732](https://github.com/NC1107/slim-m/issues/732)) ([882ebcd](https://github.com/NC1107/slim-m/commit/882ebcd32ed44c2aee9d047cc5c9dcc996071a6b))
+* **moderation:** show a timed-out member the reason and expiry (MOD6) ([#736](https://github.com/NC1107/slim-m/issues/736)) ([d0ef529](https://github.com/NC1107/slim-m/commit/d0ef5299a1c2ef5a476b2c9c61ed2ea521d94805))
+* **moderation:** surface the registration invite to moderators (MOD9) ([#727](https://github.com/NC1107/slim-m/issues/727)) ([ef48f30](https://github.com/NC1107/slim-m/commit/ef48f306654cba0627a4585f2231ba6de13e2deb))
+* **server:** stream attachment uploads to disk and raise the cap to 1 GiB ([#843](https://github.com/NC1107/slim-m/issues/843)) ([8f9b872](https://github.com/NC1107/slim-m/commit/8f9b872810f3575aca8760820ec8015f5a71c16e))
+
+
+### Bug Fixes
+
+* **server:** make invite redemption idempotent per user ([#721](https://github.com/NC1107/slim-m/issues/721)) ([8088d23](https://github.com/NC1107/slim-m/commit/8088d23f881a2c33e1c5affe41f1ca37474e31c4))
+* **server:** publish unpin and thread update on message delete (MOD12) ([#731](https://github.com/NC1107/slim-m/issues/731)) ([0ed7a0f](https://github.com/NC1107/slim-m/commit/0ed7a0f1d5f7ade7f00f1453beb3b7726ce76080))
+
+
+### Performance Improvements
+
+* **server:** batch the message-retention prune ([#719](https://github.com/NC1107/slim-m/issues/719)) ([86a57d9](https://github.com/NC1107/slim-m/commit/86a57d9866cd042af5d63b955728419a8262966f))
+* **server:** compute the reaction summary once per event (SRV1) ([#729](https://github.com/NC1107/slim-m/issues/729)) ([75d91b6](https://github.com/NC1107/slim-m/commit/75d91b6c98debbefb98c69d3cf7222438257ee3f))
+* **server:** fan out the stale-voice-call sweep (SRV6) ([#761](https://github.com/NC1107/slim-m/issues/761)) ([6bd8a1d](https://github.com/NC1107/slim-m/commit/6bd8a1d951811651d5dbd00c9ad29137bb7d88e0))
+
 ## [0.43.0](https://github.com/NC1107/slim-m/compare/server-v0.42.0...server-v0.43.0) (2026-08-19)
 
 
