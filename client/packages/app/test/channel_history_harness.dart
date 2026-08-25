@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/message_page_size.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/routes.dart';
@@ -169,6 +170,7 @@ Future<HistoryHarness> mountChannel(
   SyncStatus syncStatus = SyncStatus.offline,
   MessageStore Function(SlimmDatabase db)? storeFactory,
   List<Map<String, dynamic>> searchHits = const [],
+  MessagePageSize messagePageSize = defaultMessagePageSize,
 }) async {
   tester.view.physicalSize = const Size(500, 800);
   tester.view.devicePixelRatio = 1;
@@ -190,6 +192,9 @@ Future<HistoryHarness> mountChannel(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+      messagePageSizeControllerProvider.overrideWith(
+        (ref) => MessagePageSizeController(ref, messagePageSize),
+      ),
       storeProvider.overrideWith((ref) async => store),
       syncControllerProvider.overrideWith(
         (ref) => _NoopSyncController(ref, syncStatus),

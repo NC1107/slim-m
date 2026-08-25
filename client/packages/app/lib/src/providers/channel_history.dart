@@ -42,15 +42,8 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 
 import 'message_extras.dart';
+import 'message_page_size.dart';
 import 'providers.dart';
-
-/// How many older messages one backwards page asks for.
-///
-/// Comfortably under the server's own `MAX_LIMIT` of 100, which matters: a
-/// page shorter than this is read as the end of the channel's history, and a
-/// server that clamped the request below what was asked for would turn that
-/// into a false claim.
-const _pageSize = 50;
 
 /// The transcript's opening window, matching [MessageStore.watchChannel]'s
 /// own default so a channel that has never been paged reads exactly as it
@@ -132,15 +125,21 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
   /// been reached, while a page is in flight, and after a failure. A null or
   /// zero cursor means nothing delivered is loaded yet, so there is no keyset
   /// to page from.
+  ///
+  /// The page size is the user's [messagePageSizeControllerProvider] choice,
+  /// read once here so the number asked for and the number that decides
+  /// [ChannelHistory.atStart] are the same: a page shorter than requested is
+  /// the only evidence the channel's start has been reached.
   Future<void> loadOlder() async {
     if (state.atStart || state.loading || state.failed) return;
     final oldest = _oldest;
     if (oldest == null || oldest <= 0) return;
+    final pageSize = _ref.read(messagePageSizeControllerProvider).rows;
     state = state.copyWith(loading: true);
     try {
       final older = await _ref
           .read(apiProvider)
-          .listMessages(_channelId, before: oldest, limit: _pageSize);
+          .listMessages(_channelId, before: oldest, limit: pageSize);
       final store = await _ref.read(storeProvider.future);
       await store.applyMessages(older);
       if (!mounted) return;
@@ -149,7 +148,7 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
       if (older.isNotEmpty) _oldest = older.last.seq;
       state = state.copyWith(
         loading: false,
-        atStart: older.length < _pageSize,
+        atStart: older.length < pageSize,
         window: state.window + older.length,
       );
     } catch (_) {

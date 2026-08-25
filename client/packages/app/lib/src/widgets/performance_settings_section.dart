@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The performance pane: the local dials for what media does on its own.
+/// The performance pane: the local dials for what media does on its own, plus
+/// how much history a scroll-back fetches.
 ///
 /// Auto-download decides whether images fetch on sight (data); autoplay decides
 /// whether gifs animate on sight (battery/CPU); preview quality decides how
 /// sharply each inline preview decodes (memory); and the image-cache cap bounds
-/// how much decoded-image memory is kept for reuse (memory). They are paired
-/// here on purpose - a data-saver preview and a large cache together hold far
+/// how much decoded-image memory is kept for reuse (memory). The media four are
+/// paired on purpose - a data-saver preview and a large cache together hold far
 /// more attachments ready to scroll back to than either does alone, since each
-/// one resident costs a fraction as much.
+/// one resident costs a fraction as much. Message page size is the odd one out:
+/// a network lever, how many older messages one backwards page asks for.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/attachment_preview_quality.dart';
 import '../providers/image_cache_preference.dart';
 import '../providers/media_preferences.dart';
+import '../providers/message_page_size.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
 
@@ -92,6 +95,21 @@ class PerformanceSettingsSection extends ConsumerWidget {
               'back to redraw a moment slower, and are never re-downloaded.',
           onChanged: (next) =>
               ref.read(imageCacheLimitControllerProvider.notifier).select(next),
+        ),
+        SettingsSelectRow<MessagePageSize>(
+          label: 'Message page size',
+          sheetTitle: 'Message page size',
+          value: ref.watch(messagePageSizeControllerProvider),
+          choices: [
+            for (final value in MessagePageSize.values)
+              SettingsChoice(value: value, label: value.label),
+          ],
+          sheetFootnote:
+              'How many older messages to load each time you scroll back. A '
+              'smaller page is a lighter, snappier request; a larger one reads '
+              'a long history in fewer steps.',
+          onChanged: (next) =>
+              ref.read(messagePageSizeControllerProvider.notifier).select(next),
         ),
       ],
     );

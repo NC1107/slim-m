@@ -11,6 +11,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/message_page_size.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/message_transcript_widgets.dart';
 import 'package:slimm_data/data.dart';
@@ -128,6 +129,29 @@ void main() {
       await _storedIds(harness.db),
       contains('m150'),
       reason: 'an older page has to land in the local store, not just be read',
+    );
+
+    await _unmount(tester);
+  });
+
+  testWidgets('the message page size setting is what a backwards page asks '
+      'for', (tester) async {
+    final harness = await mountChannel(
+      tester,
+      serverSeqs: _range(1, 200),
+      seededSeqs: _range(151, 200),
+      messagePageSize: MessagePageSize.small,
+    );
+
+    await scrollToOldest(tester);
+
+    final backwardsPage = harness.historyRequests.firstWhere(
+      (u) => u.queryParameters.containsKey('before'),
+    );
+    expect(
+      backwardsPage.queryParameters['limit'],
+      MessagePageSize.small.rows.toString(),
+      reason: 'the configured page size, not a constant, sizes the fetch',
     );
 
     await _unmount(tester);
