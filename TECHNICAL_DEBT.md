@@ -106,14 +106,11 @@ Four reported findings did not survive verification and were corrected or reject
 - ~~**CA2. A widget imports drift directly and bypasses the store API**~~ (`client/packages/app/lib/src/widgets/channel_rail.dart:8`). Medium. Fixed in #752.
   The widget no longer imports `package:drift/drift.dart`; the drift `Value` wrap a nullable `categoryId` needs now lives behind a `Channel.repositioned({categoryId, position})` extension in the data layer, and the rail calls that. In practice this was not a store *write* the entry implied but the pure in-memory overlay `_withPendingOrder` builds to render a reorder before the server confirms it (the store is untouched until then), so the fix is the boundary extraction rather than a new store method. The existing reorder test still passes and a data-layer test pins the transform.
 
-- **CA3. `rtc` reaches into `livekit_client`'s private `src/`** (`client/packages/rtc/lib/src/broadcast_bridge.dart:26`). Medium.
-  An `// ignore: implementation_imports` pulls in `src/managers/broadcast_manager.dart`, inside the one package whose own doc says it exists to contain the livekit dependency.
-  `src/` carries no semver contract, and this project has already moved livekit_client once, so a point release can silently break iOS screen sharing.
-  Fix: pin livekit_client exactly and add a targeted test against the internal API's shape so a change fails loudly rather than silently. Effort: medium.
+- ~~**CA3. `rtc` reaches into `livekit_client`'s private `src/`**~~ (`client/packages/rtc/lib/src/broadcast_bridge.dart:26`). Medium. Fixed in #835.
+  `livekit_client` is pinned exactly (`2.10.0`, no caret) in `client/packages/rtc/pubspec.yaml`, with a comment tying the pin to `broadcast_bridge_test.dart` and instructing both to move together. That test imports `livekit_client`'s own `src/managers/broadcast_manager.dart` and exercises the real `MethodChannelBroadcastBridge` against it, so a livekit_client bump that changes the internal shape fails the suite rather than silently breaking iOS screen sharing at runtime.
 
-- **CA4. Firebase is initialised in two places** (`client/packages/app/lib/main.dart:125`). Low.
-  `main.dart` calls `Firebase.initializeApp()` directly, duplicating the guarded call in `platform/lib/src/fcm_token_channel.dart:47`, in the package whose doc says it exists to keep the app off platform-specific mechanisms.
-  Fix: move it behind the same `platform` seam so there is one initialisation call site. Effort: small.
+- ~~**CA4. Firebase is initialised in two places**~~ (`client/packages/app/lib/main.dart:125`). Low. Fixed in #834.
+  `main.dart` no longer imports `firebase_core` or calls `Firebase.initializeApp()`; `_initAndroidPush` calls `ensureFirebaseInitialized()` from `platform/lib/src/fcm_token_channel.dart`, which is now the single idempotent call site its own doc comment claims, shared with `FirebaseFcmTokenSource`.
 
 - **CA5. The canvas sync engine lives as widget State** (`client/packages/app/lib/src/screens/canvas/canvas_pane.dart:78`). Medium.
   `_CanvasPaneState` owns the document model, cursor relay, remote stroke drafts, media-slot sync and activity log as plain fields rather than behind a provider, unlike `SyncController`'s message and channel sync.
@@ -278,9 +275,8 @@ Deliberately excluded: everything in `ui-review.md` (accepted motion and feel wo
 
 - ~~**UX3. The mention pill and search operator chip miss AA contrast**~~ (`design_system/lib/src/components/forms/chip.dart:101`, `message_text.dart:339`). Medium, both. Fixed in #733.
 
-- **UX4. Onboarding and sign-in waste a fifth of the desktop viewport** (`onboarding-desktop-light.png`). Medium, desktop.
-  Both are two-column layouts whose left column is flat background carrying only the wordmark, roughly 540 of 2800px, on the first screens a new self-host operator or invited teammate ever sees.
-  Fix: use the column to orient a first-time user, or narrow it so the pane does not read as unfinished. Effort: medium.
+- ~~**UX4. Onboarding and sign-in waste a fifth of the desktop viewport**~~ (`onboarding-desktop-light.png`). Medium, desktop. Fixed in #831 and #833.
+  Both halves of the recorded fix shipped rather than a choice between them: #831 added a plain orienting subtitle, "Chat and voice you host yourself.", under the first panel's heading, and #833 narrowed the brand rail from 380px to 260px (`onboarding_shell.dart:112`), giving the freed width to the form column. Sign-in shares the same shell and narrows with it.
 
 - ~~**UX5. The DM header shows a generic glyph instead of the correspondent's avatar**~~ (`dm-desktop-light.png`). Low, both. Fixed in #748.
   The DM header now shows the correspondent's `AppAvatar` (their initials, keyed on the DM's name), the same identity every other member-naming surface shows; a text or voice channel keeps its hash or speaker icon.
