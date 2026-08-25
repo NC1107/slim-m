@@ -15,7 +15,8 @@
 /// in true black from 1.62:1 to 4.48:1. A menu is unambiguously a UI component
 /// rather than an incidental separator, so unlike the in-pane hairlines
 /// discussed in `contrast_test.dart` it is not exempt from the 3:1 of WCAG
-/// 1.4.11 - though light still does not reach it, at 1.55:1.
+/// 1.4.11 - light did not reach it either, at 1.55:1, until 2026-08-25
+/// darkened [AppTokens.borderStrong] to reach 3.11:1 against the same surface.
 library;
 
 import 'package:flutter/material.dart';
