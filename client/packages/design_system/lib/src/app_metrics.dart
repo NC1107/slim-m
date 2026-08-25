@@ -53,6 +53,13 @@ abstract final class AppSizes {
   static const double rowPointer = 30;
   static const double rowTouch = 44;
 
+  /// A touch-density menu row, a step above [rowTouch]. A menu is a dense
+  /// column of discrete choices with no gaps between them, so the tap target
+  /// is grown past the 44 minimum to widen the margin for a mis-tap onto the
+  /// neighbouring row. Its own named step so the value stops being a literal
+  /// nobody could place on the scale.
+  static const double rowTouchMenu = 48;
+
   /// The conversation pane's side gutter: the header, every message row and
   /// the composer share it, or their left and right edges visibly disagree.
   ///

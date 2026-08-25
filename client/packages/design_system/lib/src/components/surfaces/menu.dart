@@ -175,10 +175,10 @@ enum AppMenuItemTone { normal, warn, danger }
 /// One row inside an [AppMenu]: an optional leading icon, a label, and
 /// optional trailing content (a shortcut hint, a chevron for [submenu]).
 ///
-/// [touch] raises the row to a literal 48px (the source's own value; no
-/// [AppSizes] step matches it, the nearest being `rowTouch` at 44) and widens
-/// the leading gap to `space-12`; the pointer row is 34px, which does match
-/// [AppSizes.controlMd] exactly. Left unset it follows [AppTouchTargets.of].
+/// [touch] raises the row to [AppSizes.rowTouchMenu] (48, a step above the 44
+/// touch minimum for a gapless menu column) and widens the leading gap to
+/// `space-12`; the pointer row is 34px, which matches [AppSizes.controlMd]
+/// exactly. Left unset it follows [AppTouchTargets.of].
 class AppMenuItem extends StatefulWidget {
   const AppMenuItem({
     super.key,
@@ -249,7 +249,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
     final content = AnimatedContainer(
       duration: AppMotion.reduced(context, AppMotion.fast),
       curve: AppMotion.entrance,
-      height: touch ? 48 : AppSizes.controlMd,
+      height: touch ? AppSizes.rowTouchMenu : AppSizes.controlMd,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: widget.selected
