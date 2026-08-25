@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.0](https://github.com/NC1107/slim-m/compare/server-v0.44.0...server-v0.45.0) (2026-08-25)
+
+
+### Features
+
+* a space-wide screen-share quality ceiling ([#874](https://github.com/NC1107/slim-m/issues/874)) ([22292e2](https://github.com/NC1107/slim-m/commit/22292e2ff54f6e7f26a42033cde726b8155de440))
+
 ## [0.44.0](https://github.com/NC1107/slim-m/compare/server-v0.43.0...server-v0.44.0) (2026-08-25)
 
 
