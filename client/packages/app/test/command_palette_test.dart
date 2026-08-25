@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/widgets/command_palette.dart';
+import 'package:slimm_app/src/widgets/command_palette_compact.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -279,10 +280,12 @@ void main() {
     await teardown(tester, setup.container, setup.db);
   });
 
-  /// overlays.md: the palette's fixed 480-wide `AppMenu` overflowed a
+  /// overlays.md: the palette's fixed 480-wide `AppMenu` used to overflow a
   /// 390-wide phone symmetrically by 45px a side, cropping the leading edge
   /// of every row - the one overlay in the set that never adopted
-  /// `showAppSheet`'s own phone/desktop split.
+  /// `showAppSheet`'s own phone/desktop split. It now drops the floating
+  /// card at compact widths entirely; the width-driven shell split itself
+  /// lives in `command_palette_responsive_test.dart`.
   testWidgets('the palette never grows wider than the phone viewport', (
     tester,
   ) async {
@@ -291,12 +294,12 @@ void main() {
 
     await pressCtrlK(tester);
 
-    final menu = tester.widget<AppMenu>(find.byType(AppMenu));
     expect(
-      menu.width,
-      lessThanOrEqualTo(390),
-      reason: 'a menu wider than the viewport crops on both edges',
+      find.byType(AppMenu),
+      findsNothing,
+      reason: 'compact drops the floating card for the full-bleed shell',
     );
+    expect(find.byType(CommandPaletteCompactShell), findsOneWidget);
 
     await teardown(tester, setup.container, setup.db);
   });

@@ -25,6 +25,7 @@ import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
+import 'package:slimm_app/src/widgets/command_palette_compact.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -195,3 +196,10 @@ Future<void> pressCtrlK(WidgetTester tester) async {
 /// palette's own floating card rather than matching either copy.
 Finder inPalette(String text) =>
     find.descendant(of: find.byType(AppMenu), matching: find.text(text));
+
+/// [inPalette]'s own equivalent for the compact shell, which never builds an
+/// [AppMenu] at all.
+Finder inCompactPalette(String text) => find.descendant(
+  of: find.byType(CommandPaletteCompactShell),
+  matching: find.text(text),
+);
