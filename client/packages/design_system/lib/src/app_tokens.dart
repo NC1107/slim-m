@@ -81,6 +81,13 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// this token was declared, valued in three themes, copied and lerped, and
   /// referenced by no widget - which meant a system with two border weights
   /// only ever drew the weaker one.
+  ///
+  /// [light]'s value was darkened from #C4CAD1 on 2026-08-25: that cleared
+  /// only 1.55:1 against [surfaceBase], the surface a floating menu sits over,
+  /// against the 3:1 WCAG 1.4.11 asks of a UI component boundary. The new
+  /// value is the same blue-grey hue scaled down, reaching 3.11:1 against
+  /// [surfaceBase] and 3.31:1 against [surfaceRaised]. [dark] and [trueBlack]
+  /// already cleared 3:1 and were left alone.
   final Color borderStrong;
 
   final Color textPrimary;
@@ -167,7 +174,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
     surfaceBase: Color(0xFFF7F8F9),
     surfaceRaised: Color(0xFFFFFFFF),
     borderSubtle: Color(0xFFDCE0E5),
-    borderStrong: Color(0xFFC4CAD1),
+    // Was #C4CAD1 until 2026-08-25; see this token's own doc for the ratio.
+    borderStrong: Color(0xFF898E93),
     textPrimary: Color(0xFF1B1E22),
     textSecondary: Color(0xFF5B6169),
     textDisabled: Color(0xFF8A929B),
