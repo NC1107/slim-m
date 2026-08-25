@@ -91,6 +91,9 @@ abstract final class AppIcons {
   /// `composer_clipboard_paste.dart`.
   static const IconData clipboardPaste = LucideIcons.clipboardPaste300;
 
+  /// Picking a `.zip` for bulk emoji import; see `emoji_bulk_upload_card.dart`.
+  static const IconData fileArchive = LucideIcons.fileArchive300;
+
   /// The GIF picker; see `gif_picker.dart`. Distinct from [image], which
   /// opens a device's own photo library rather than a search.
   static const IconData gif = LucideIcons.clapperboard300;

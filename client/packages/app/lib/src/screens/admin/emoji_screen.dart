@@ -24,6 +24,7 @@ import '../../widgets/custom_emoji_image.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
+import 'emoji_bulk_upload_card.dart';
 import 'emoji_upload_card.dart';
 
 class EmojiScreen extends StatelessWidget {
@@ -51,6 +52,8 @@ class EmojiPane extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const EmojiUploadCard(),
+        const SizedBox(height: AppSpacing.s16),
+        const EmojiBulkUploadCard(),
         const SizedBox(height: AppSpacing.s16),
         AppAsyncView<List<api.CustomEmoji>>(
           value: AppAsyncState(data: emoji.valueOrNull, error: emoji.error),

@@ -277,6 +277,9 @@ void main() {
     final server = _Server(emoji: [_emojiJson('emoji-1', 'party_parrot')]);
     await _pump(tester, server);
 
+    // The bulk-import card above can push this row below the test viewport.
+    await tester.ensureVisible(find.byIcon(AppIcons.delete));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(AppIcons.delete));
     await tester.pumpAndSettle();
     expect(find.text('Remove :party_parrot:?'), findsOneWidget);
@@ -285,6 +288,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(server.seen.where((r) => r.method == 'DELETE'), isEmpty);
 
+    await tester.ensureVisible(find.byIcon(AppIcons.delete));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(AppIcons.delete));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
@@ -308,6 +313,8 @@ void main() {
       );
       await _pump(tester, server);
 
+      await tester.ensureVisible(find.byIcon(AppIcons.delete));
+      await tester.pumpAndSettle();
       await tester.tap(find.byIcon(AppIcons.delete));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove'));
