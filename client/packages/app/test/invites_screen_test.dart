@@ -16,6 +16,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
+import 'package:slimm_app/src/widgets/toast_overlay.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -72,6 +73,12 @@ Future<ProviderContainer> _pump(
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: const InvitesScreen(),
+        builder: (context, child) => Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const Positioned.fill(child: ToastOverlay()),
+          ],
+        ),
       ),
     ),
   );
@@ -429,5 +436,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Invite code copied.'), findsOneWidget);
+    // Drains the toast's own dismiss timer so it is not still pending once this test tears down.
+    await tester.pump(const Duration(seconds: 5));
   });
 }

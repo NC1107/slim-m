@@ -14,8 +14,8 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/display_preferences.dart';
 import '../../providers/providers.dart';
+import '../../providers/toasts.dart';
 import '../../routing/routes.dart';
-import '../../widgets/app_snackbar.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
@@ -214,7 +214,12 @@ class _CreatedInviteCallout extends StatelessWidget {
             size: AppIconButtonSize.sm,
             onPressed: () {
               Clipboard.setData(ClipboardData(text: invite.code));
-              showAppSnackbar(context, 'Invite code copied.');
+              ProviderScope.containerOf(context, listen: false)
+                  .read(toastsProvider.notifier)
+                  .show(
+                    'Invite code copied.',
+                    severity: AppToastSeverity.success,
+                  );
             },
           ),
           AppIconButton(
@@ -334,7 +339,12 @@ class _InviteRowState extends ConsumerState<_InviteRow>
           semanticLabel: 'Copy invite code',
           onPressed: () {
             Clipboard.setData(ClipboardData(text: invite.code));
-            showAppSnackbar(context, 'Invite code copied.');
+            ref
+                .read(toastsProvider.notifier)
+                .show(
+                  'Invite code copied.',
+                  severity: AppToastSeverity.success,
+                );
           },
         ),
         if (!invite.revoked)

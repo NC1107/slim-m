@@ -166,6 +166,8 @@ void main() {
         find.textContaining('now inherits every permission'),
         findsOneWidget,
       );
+      // Drains the toast's own dismiss timer so it is not still pending once this test tears down.
+      await tester.pump(const Duration(seconds: 5));
     },
   );
 
@@ -262,61 +264,62 @@ void main() {
     },
   );
 
-  testWidgets(
-    'setting an overwrite asks for confirmation before replacing it',
-    (tester) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
+  testWidgets('setting an overwrite asks for confirmation before replacing it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
-      var putCount = 0;
-      await pumpToTargetPicker(
-        tester,
-        handler: (request) {
-          if (request.url.path == '/roles') {
-            return http.Response(
-              jsonEncode([
-                {
-                  'id': 'r1',
-                  'name': 'Moderators',
-                  'permissions': 0,
-                  'is_everyone': false,
-                  'created_at': 0,
-                },
-              ]),
-              200,
-            );
-          }
-          if (request.method == 'PUT' &&
-              request.url.path == '/channels/c1/overwrites/role/r1') {
-            putCount++;
-            return http.Response('', 204);
-          }
-          return http.Response('{}', 200);
-        },
-      );
+    var putCount = 0;
+    await pumpToTargetPicker(
+      tester,
+      handler: (request) {
+        if (request.url.path == '/roles') {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 'r1',
+                'name': 'Moderators',
+                'permissions': 0,
+                'is_everyone': false,
+                'created_at': 0,
+              },
+            ]),
+            200,
+          );
+        }
+        if (request.method == 'PUT' &&
+            request.url.path == '/channels/c1/overwrites/role/r1') {
+          putCount++;
+          return http.Response('', 204);
+        }
+        return http.Response('{}', 200);
+      },
+    );
 
-      await tester.tap(find.text('Choose a role'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Moderators'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose a role'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Moderators'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(AppButton, 'Set overwrite'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(AppButton, 'Set overwrite'));
+    await tester.pumpAndSettle();
 
-      expect(
-        putCount,
-        0,
-        reason: 'the request must wait on the confirmation, not fire on tap',
-      );
-      expect(find.text('Replace this overwrite?'), findsOneWidget);
+    expect(
+      putCount,
+      0,
+      reason: 'the request must wait on the confirmation, not fire on tap',
+    );
+    expect(find.text('Replace this overwrite?'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(AppButton, 'Set overwrite').last);
-      await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(AppButton, 'Set overwrite').last);
+    await tester.pumpAndSettle();
 
-      expect(putCount, 1);
-    },
-  );
+    expect(putCount, 1);
+    // Drains the toast's own dismiss timer so it is not still pending once this test tears down.
+    await tester.pump(const Duration(seconds: 5));
+  });
 
   /// This screen used to catch its own `ApiException` and show it with a
   /// `SnackBar`; see `check-error-surface.py` for the gate that now catches

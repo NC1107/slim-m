@@ -18,9 +18,9 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../permissions.dart';
 import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
+import '../../providers/toasts.dart';
 import '../../routing/routes.dart';
 import '../settings_screen_scaffold.dart';
-import '../../widgets/app_snackbar.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
@@ -179,7 +179,12 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) {
-      showAppSnackbar(context, 'Overwrite set for $_targetLabel.');
+      ref
+          .read(toastsProvider.notifier)
+          .show(
+            'Overwrite set for $_targetLabel.',
+            severity: AppToastSeverity.success,
+          );
     }
   }
 
@@ -210,11 +215,13 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
     if (ok) {
       setState(_resetState);
       // States the result the idempotent DELETE guarantees, not a "cleared" this screen can never know happened.
-      showAppSnackbar(
-        context,
-        '$_targetLabel now inherits every permission in '
-        '"${_channel!.name}" from their roles.',
-      );
+      ref
+          .read(toastsProvider.notifier)
+          .show(
+            '$_targetLabel now inherits every permission in '
+            '"${_channel!.name}" from their roles.',
+            severity: AppToastSeverity.success,
+          );
     }
   }
 
