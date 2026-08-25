@@ -184,12 +184,15 @@ void main() {
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
-    final items = tester.widgetList<AppMenuItem>(
-      find.descendant(
-        of: find.byType(AppMenu),
-        matching: find.byType(AppMenuItem),
-      ),
-    );
+    // Filtered to the presence choices: the menu also carries a "Set a status" item now.
+    final items = tester
+        .widgetList<AppMenuItem>(
+          find.descendant(
+            of: find.byType(AppMenu),
+            matching: find.byType(AppMenuItem),
+          ),
+        )
+        .where((item) => presenceOptions.any((o) => o.$2 == item.label));
     expect(items, hasLength(presenceOptions.length));
     expect(
       items.where((item) => item.selected),

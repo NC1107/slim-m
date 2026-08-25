@@ -17,6 +17,7 @@ import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import 'context_menu_focus.dart';
 import 'run_guarded.dart';
+import 'status_editor_sheet.dart';
 import 'user_avatar.dart';
 
 /// Every visibility a caller may choose, each with the label it is offered
@@ -107,6 +108,16 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
     if (ok && mounted) _controller.hide();
   }
 
+  /// Opens the free-text status editor (backlog item 128), leaving this menu
+  /// closed behind it the same way [SpaceMenuButton] hides itself before
+  /// opening the create-channel sheet: the overlay's own `context` still
+  /// reaches the enclosing `Navigator` once hidden, since hiding an
+  /// `OverlayPortal` unmounts its child rather than the tree above it.
+  void _openStatusEditor(BuildContext context, String current) {
+    _controller.hide();
+    unawaited(showStatusEditorSheet(context, current));
+  }
+
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider);
@@ -119,7 +130,8 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
         controller: _controller,
         // Read here rather than in the builder: the overlay child builds
         // under its own element, outside this widget's build phase.
-        overlayChildBuilder: (_) => _buildMenu(tokens, selected),
+        overlayChildBuilder: (context) =>
+            _buildMenu(context, tokens, selected, me.valueOrNull?.statusText),
         // A 28pt avatar is well under the touch minimum, so the tap area is
         // grown around it rather than the glyph being grown to match.
         child: Semantics(
@@ -163,8 +175,14 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
 
   /// [selected] is null until a choice is made in this session, and then no
   /// item is marked current: ticking one would assert a stored value this
-  /// client has no way to read back.
-  Widget _buildMenu(AppTokens tokens, api.PresenceVisibility? selected) {
+  /// client has no way to read back. [currentStatus] seeds the status editor
+  /// opened from the "Set a status" item below.
+  Widget _buildMenu(
+    BuildContext context,
+    AppTokens tokens,
+    api.PresenceVisibility? selected,
+    String? currentStatus,
+  ) {
     // Positioned so the follower sizes to its content: an overlay child is
     // otherwise laid out against the whole screen, which a Column fills.
     return Positioned(
@@ -184,6 +202,12 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton>
             child: AppMenu(
               width: 220,
               children: [
+                AppMenuItem(
+                  label: 'Set a status',
+                  leading: AppIcons.smile,
+                  onTap: () => _openStatusEditor(context, currentStatus ?? ''),
+                ),
+                const AppMenuDivider(),
                 const AppMenuLabel('Status'),
                 for (final (visibility, label, presence) in presenceOptions)
                   AppMenuItem(
