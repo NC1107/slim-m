@@ -17,6 +17,20 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'host_platform.dart';
 
+bool _firebaseReady = false;
+
+/// Initializes the default Firebase app exactly once - the single call site for
+/// `Firebase.initializeApp()` in the whole client, so the background handler
+/// wiring in `main.dart` and this file's token source cannot drift into two
+/// separate initialisations of the same app. Idempotent: later calls return at
+/// once. Throws on a build with no `google-services.json`, which every caller
+/// already treats as an ordinary "push unavailable" outcome, never a crash.
+Future<void> ensureFirebaseInitialized() async {
+  if (_firebaseReady) return;
+  await Firebase.initializeApp();
+  _firebaseReady = true;
+}
+
 /// The minimal FCM surface [FcmTokenChannel] needs, factored out so a test
 /// can supply one that never touches Firebase or a real Android device.
 abstract interface class FcmTokenSource {
@@ -40,17 +54,9 @@ abstract interface class FcmTokenSource {
 /// catches and reports as an ordinary registration failure rather than a
 /// crash.
 class FirebaseFcmTokenSource implements FcmTokenSource {
-  bool _initialized = false;
-
-  Future<void> _ensureInitialized() async {
-    if (_initialized) return;
-    await Firebase.initializeApp();
-    _initialized = true;
-  }
-
   @override
   Future<String?> getToken() async {
-    await _ensureInitialized();
+    await ensureFirebaseInitialized();
     return FirebaseMessaging.instance.getToken();
   }
 

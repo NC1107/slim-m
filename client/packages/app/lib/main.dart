@@ -4,7 +4,6 @@ library;
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -127,7 +126,7 @@ final appReadyProvider = StateProvider<bool>((ref) => true);
 Future<void> _initAndroidPush() async {
   if (!isAndroidHost) return;
   try {
-    await Firebase.initializeApp();
+    await ensureFirebaseInitialized();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (_) {
     // No Firebase credentials or no Play Services: push degrades either way.
