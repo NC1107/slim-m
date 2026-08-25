@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.48.0](https://github.com/NC1107/slim-m/compare/client-v0.47.0...client-v0.48.0) (2026-08-25)
+
+
+### Features
+
+* **client:** cover a phone's first connect with a boot splash ([#832](https://github.com/NC1107/slim-m/issues/832)) ([db8acaf](https://github.com/NC1107/slim-m/commit/db8acafe976b1d09f8c4784b87fd0ec9688688f5))
+* **client:** dock a cold-opened thread too, not only an in-app one ([#829](https://github.com/NC1107/slim-m/issues/829)) ([9a0dcc2](https://github.com/NC1107/slim-m/commit/9a0dcc205a0856c4d9d6d1127d4277cfa597bd06))
+* **client:** dock a thread beside the transcript on desktop instead of over it ([#824](https://github.com/NC1107/slim-m/issues/824)) ([7d151fc](https://github.com/NC1107/slim-m/commit/7d151fc3c23d7472faac8e5023cd67b6feb580d0))
+* **client:** keep mic, deafen and settings reachable on a collapsed rail (UX2) ([#738](https://github.com/NC1107/slim-m/issues/738)) ([901fed8](https://github.com/NC1107/slim-m/commit/901fed808302772a117b932eb75eaf45afac71c7))
+* **client:** orient the onboarding panel with one honest value line ([#831](https://github.com/NC1107/slim-m/issues/831)) ([85b2498](https://github.com/NC1107/slim-m/commit/85b24984f7ffec0cb2e6671d956829dc419beca5))
+* **client:** round and compact the reply banner, name attachment-only parents ([#830](https://github.com/NC1107/slim-m/issues/830)) ([d06666a](https://github.com/NC1107/slim-m/commit/d06666a49e44a99c57eb975f0bd551c21ec9cf6e))
+* **client:** show the correspondent's avatar in a DM header ([#748](https://github.com/NC1107/slim-m/issues/748)) ([38fcf6d](https://github.com/NC1107/slim-m/commit/38fcf6d7107fde19f6db5cff881ea501fb542b7a))
+* **moderation:** server foundation for report history and live sync (MOD4, MOD7) ([#732](https://github.com/NC1107/slim-m/issues/732)) ([882ebcd](https://github.com/NC1107/slim-m/commit/882ebcd32ed44c2aee9d047cc5c9dcc996071a6b))
+* **moderation:** show a timed-out member the reason and expiry (MOD6) ([#736](https://github.com/NC1107/slim-m/issues/736)) ([d0ef529](https://github.com/NC1107/slim-m/commit/d0ef5299a1c2ef5a476b2c9c61ed2ea521d94805))
+
+
+### Bug Fixes
+
+* address SonarQube security and code-quality findings ([#722](https://github.com/NC1107/slim-m/issues/722)) ([d6bdbc5](https://github.com/NC1107/slim-m/commit/d6bdbc59398ae02e1fb898cc578be316e1d0c0ab))
+* **canvas:** stop the empty hint contradicting live tiles, soften the tile lift ([#823](https://github.com/NC1107/slim-m/issues/823)) ([e5d82c0](https://github.com/NC1107/slim-m/commit/e5d82c0d0372fd5cdc5ad329c91317d30b1d207c))
+* **client:** guard the incoming-call notification channel call ([#751](https://github.com/NC1107/slim-m/issues/751)) ([80b38c0](https://github.com/NC1107/slim-m/commit/80b38c0acd72344be79c5357bd9cfe48b29e9232))
+* **client:** let a REST refetch clear a reaction removed to zero (CQ3) ([#759](https://github.com/NC1107/slim-m/issues/759)) ([f999dba](https://github.com/NC1107/slim-m/commit/f999dbaa068177ec9ed304b8f3cf21a0c04f872f))
+* **client:** narrow the onboarding brand rail so it stops reading as unfinished ([#833](https://github.com/NC1107/slim-m/issues/833)) ([5202d7a](https://github.com/NC1107/slim-m/commit/5202d7a33d79da800afe62fc66b2bc8d4b8e5761))
+* **client:** re-hydrate channel extras on an in-place channel switch ([#750](https://github.com/NC1107/slim-m/issues/750)) ([6c5060c](https://github.com/NC1107/slim-m/commit/6c5060c365165ae9a100f98a89e0eb7b9a918746))
+* **client:** render an unset presence status as "Not set", not "Unknown" ([#815](https://github.com/NC1107/slim-m/issues/815)) ([071f5c1](https://github.com/NC1107/slim-m/commit/071f5c1a0bb8ad461b285493d0986e73c7d6ca71))
+* **design:** clear AA contrast on the mention pill and operator chip (UX3) ([#733](https://github.com/NC1107/slim-m/issues/733)) ([1df51b0](https://github.com/NC1107/slim-m/commit/1df51b0f023f3c9322d63d0d40ea691b5f61d352))
+
+
+### Performance Improvements
+
+* **client:** batch catch-up message writes into one transaction ([#747](https://github.com/NC1107/slim-m/issues/747)) ([7aa0000](https://github.com/NC1107/slim-m/commit/7aa0000be0d30bfba1ef138cae0f7b2d18d5d658))
+* **client:** cache a cursor's laid-out name label across frames ([#744](https://github.com/NC1107/slim-m/issues/744)) ([e2b360b](https://github.com/NC1107/slim-m/commit/e2b360b2212fe0fab077a0dc07cd9bc66debe8e7))
+* **client:** cache a note's laid-out text across frames ([#746](https://github.com/NC1107/slim-m/issues/746)) ([4bac46b](https://github.com/NC1107/slim-m/commit/4bac46beaf66e8c1ffc7d75c040f86cc8f1bf694))
+* **client:** rebuild a video tile only for its own participant's events ([#742](https://github.com/NC1107/slim-m/issues/742)) ([29d1afe](https://github.com/NC1107/slim-m/commit/29d1afee514cd6386ce1f9cc3b2937536b8d864f))
+* **client:** scope HomeShell's voice watch so a call's churn stops rebuilding it ([#817](https://github.com/NC1107/slim-m/issues/817)) ([ec0d146](https://github.com/NC1107/slim-m/commit/ec0d14637545d95afd534d1a826f7f52e2562d7d))
+* **client:** scope the member pane's presence watch per row (CS1) ([#734](https://github.com/NC1107/slim-m/issues/734)) ([823e01d](https://github.com/NC1107/slim-m/commit/823e01d4f42b21acf980754f9a3a62a5721fdcd7))
+* **client:** split a finished stroke without re-encoding it each probe ([#743](https://github.com/NC1107/slim-m/issues/743)) ([a3bada6](https://github.com/NC1107/slim-m/commit/a3bada6a28860493b928852be041ff400c8f9c57))
+* **client:** stop rebuilding the channel rail on every message (CP8) ([#735](https://github.com/NC1107/slim-m/issues/735)) ([d554cf5](https://github.com/NC1107/slim-m/commit/d554cf5b981af978c3864e02ff32789044389ac4))
+* **client:** watch one channel row by id, not the whole table ([#749](https://github.com/NC1107/slim-m/issues/749)) ([327a6fb](https://github.com/NC1107/slim-m/commit/327a6fbdbe81f312fd65daad3b193935f1a0a2e4))
+
 ## [0.47.0](https://github.com/NC1107/slim-m/compare/client-v0.46.1...client-v0.47.0) (2026-08-19)
 
 
