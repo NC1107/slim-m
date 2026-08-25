@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.49.0](https://github.com/NC1107/slim-m/compare/client-v0.48.0...client-v0.49.0) (2026-08-25)
+
+
+### Features
+
+* **client:** add an attachment preview quality setting, in a Performance pane ([#840](https://github.com/NC1107/slim-m/issues/840)) ([a06947c](https://github.com/NC1107/slim-m/commit/a06947cb2bef86958a767c72bd650d5338fc9ede))
+* **client:** add Auto-download media and Autoplay GIFs to the Performance pane ([#841](https://github.com/NC1107/slim-m/issues/841)) ([010e37f](https://github.com/NC1107/slim-m/commit/010e37fe3845e9a5a1e14de2cbbe37f08ebd994b))
+* **client:** desktop dropdown for settings pickers, and readable footnotes ([#839](https://github.com/NC1107/slim-m/issues/839)) ([9b7d2b2](https://github.com/NC1107/slim-m/commit/9b7d2b2fad95fe63612a17019b41feae45757a55))
+
+
+### Bug Fixes
+
+* **client:** render profile photos crisp, not soft, when scaled to an avatar ([#838](https://github.com/NC1107/slim-m/issues/838)) ([ba091ba](https://github.com/NC1107/slim-m/commit/ba091ba67dc99c4d40d2d1a639d9a98bf0e65f6a))
+
 ## [0.48.0](https://github.com/NC1107/slim-m/compare/client-v0.47.0...client-v0.48.0) (2026-08-25)
 
 
