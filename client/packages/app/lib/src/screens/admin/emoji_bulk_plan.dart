@@ -1,0 +1,198 @@
+// SPDX-License-Identifier: Apache-2.0
+/// Turning a picked zip's decoded entries into the emoji uploads they plan,
+/// before any network request happens.
+///
+/// Split from the widget that drives it (`emoji_bulk_upload_card.dart`) so
+/// the derivation is checkable on its own: directories and non-images
+/// skipped, a name taken from the file's stem and sanitized through the same
+/// [normalizeEmojiName]/[isUsableEmojiName] rules typing one by one already
+/// goes through, and a collision refused rather than silently overwriting an
+/// earlier entry in the same zip.
+library;
+
+import 'package:archive/archive.dart';
+
+import 'emoji_name.dart';
+import 'emoji_upload_card.dart' show acceptedEmojiExtensions;
+
+/// One entry decoded from a zip, narrowed from `archive`'s own `ArchiveFile`
+/// to the three fields [planEmojiZip] needs, so a test can hand it a
+/// synthetic list without decoding real zip bytes.
+class ZipEntryData {
+  const ZipEntryData({
+    required this.path,
+    required this.bytes,
+    this.isFile = true,
+  });
+
+  /// The entry's full path inside the archive, `/`-separated regardless of
+  /// the platform that wrote it.
+  final String path;
+  final List<int> bytes;
+
+  /// False for a directory entry, which carries no bytes worth planning.
+  final bool isFile;
+}
+
+/// Decodes [zipBytes] into its entries.
+///
+/// `ZipDecoder` is lenient: bytes that are not a zip at all decode to an
+/// empty list rather than throwing, which [planEmojiZip] then reports as
+/// "nothing to upload" - still a refusal, never a crash. A handful of
+/// malformed-but-zip-shaped inputs can still throw (an [ArchiveException] or
+/// a [FormatException]); callers catch those the same way.
+List<ZipEntryData> decodeEmojiZipEntries(List<int> zipBytes) {
+  final archive = ZipDecoder().decodeBytes(zipBytes);
+  return [
+    for (final file in archive)
+      ZipEntryData(path: file.name, bytes: file.content, isFile: file.isFile),
+  ];
+}
+
+/// One image [planEmojiZip] queues for upload.
+class PlannedEmojiUpload {
+  const PlannedEmojiUpload({
+    required this.fileName,
+    required this.name,
+    required this.bytes,
+  });
+
+  /// The entry's own file name (no directory), shown in progress and in any
+  /// failure the server later reports against it.
+  final String fileName;
+
+  /// The sanitized name the upload will ask the server for.
+  final String name;
+  final List<int> bytes;
+}
+
+/// One entry [planEmojiZip] refused before any request was made, and why.
+class SkippedZipEntry {
+  const SkippedZipEntry({required this.fileName, required this.reason});
+  final String fileName;
+  final String reason;
+}
+
+/// What a zip turned into: what will be uploaded, and what already could
+/// not be, without a single request having been made yet.
+class EmojiZipPlan {
+  const EmojiZipPlan({required this.uploads, required this.skipped});
+  final List<PlannedEmojiUpload> uploads;
+  final List<SkippedZipEntry> skipped;
+}
+
+/// The largest single image this plans to upload, matching the server's own
+/// `MAX_IMAGE_BYTES` (`crates/slimm-server/src/emoji.rs`) so an oversized
+/// file is refused here rather than after a wasted round trip.
+const int maxPlannedEmojiBytes = 1024 * 1024;
+
+/// The most images one zip will queue, so a pathological archive cannot turn
+/// one pick into thousands of sequential uploads.
+const int maxPlannedEmojiCount = 200;
+
+/// Turns decoded zip [entries] into what will be uploaded and what is
+/// already refused, without making any request.
+///
+/// [existingNames] seeds the collision check with names the deployment
+/// already holds - already-normalised, the same shape [PlannedEmojiUpload.name]
+/// is in - so a zip that repeats an existing emoji's name is reported once
+/// here rather than failing with a 409 partway through the sequential
+/// upload.
+EmojiZipPlan planEmojiZip(
+  List<ZipEntryData> entries, {
+  Set<String> existingNames = const {},
+}) {
+  final uploads = <PlannedEmojiUpload>[];
+  final skipped = <SkippedZipEntry>[];
+  final usedNames = {...existingNames};
+
+  for (final entry in entries) {
+    if (!entry.isFile) continue;
+    if (_isMacosJunk(entry.path)) continue;
+
+    final fileName = _baseName(entry.path);
+    if (fileName.isEmpty || fileName.startsWith('.')) continue;
+
+    final ext = _extension(fileName);
+    if (!acceptedEmojiExtensions.contains(ext)) continue;
+
+    if (uploads.length >= maxPlannedEmojiCount) {
+      skipped.add(
+        SkippedZipEntry(
+          fileName: fileName,
+          reason: 'more than $maxPlannedEmojiCount images in one zip',
+        ),
+      );
+      continue;
+    }
+    if (entry.bytes.isEmpty) {
+      skipped.add(
+        SkippedZipEntry(fileName: fileName, reason: 'the file is empty'),
+      );
+      continue;
+    }
+    if (entry.bytes.length > maxPlannedEmojiBytes) {
+      skipped.add(
+        SkippedZipEntry(fileName: fileName, reason: 'larger than 1 MB'),
+      );
+      continue;
+    }
+
+    final name = normalizeEmojiName(_stem(fileName));
+    if (!isUsableEmojiName(name)) {
+      skipped.add(
+        SkippedZipEntry(
+          fileName: fileName,
+          reason: 'no usable name after sanitizing',
+        ),
+      );
+      continue;
+    }
+    if (!usedNames.add(name)) {
+      skipped.add(
+        SkippedZipEntry(
+          fileName: fileName,
+          reason: '${emojiShortcode(name)} is already used',
+        ),
+      );
+      continue;
+    }
+
+    uploads.add(
+      PlannedEmojiUpload(fileName: fileName, name: name, bytes: entry.bytes),
+    );
+  }
+  return EmojiZipPlan(uploads: uploads, skipped: skipped);
+}
+
+/// Whether [path] is macOS's own AppleDouble sidecar junk (`__MACOSX/` and
+/// its `._name` shadow files), which a zip built on macOS carries alongside
+/// every real entry and which decode as garbage if sniffed as images.
+bool _isMacosJunk(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  return normalized.startsWith('__MACOSX/') ||
+      normalized.contains('/__MACOSX/');
+}
+
+/// The path's final segment: a zip entry may sit inside a folder
+/// (`icons/party_blob.gif`), and only the file name names the emoji.
+String _baseName(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  final slash = normalized.lastIndexOf('/');
+  return slash == -1 ? normalized : normalized.substring(slash + 1);
+}
+
+/// The lowercase extension without its dot, or the empty string if there is
+/// none.
+String _extension(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  if (dot <= 0 || dot == fileName.length - 1) return '';
+  return fileName.substring(dot + 1).toLowerCase();
+}
+
+/// The file name with its extension stripped: the part Discord-style naming
+/// takes the emoji's name from (`party_blob.gif` -> `party_blob`).
+String _stem(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  return dot <= 0 ? fileName : fileName.substring(0, dot);
+}

@@ -9,6 +9,9 @@ environment:
   sdk: ^3.10.0
   flutter: ">=3.38.1"
 dependencies:
+  # Pure-Dart zip decode/encode for bulk emoji import; see
+  # emoji_bulk_plan.dart and docs/dependencies.md.
+  archive: ^4.2.0
   # Cross-platform including Linux (its own GStreamer plugin, not a bundled
   # native compile) and lets a caller set iOS's .ambient session category -
   # see notification_sound.dart and docs/dependencies.md.
