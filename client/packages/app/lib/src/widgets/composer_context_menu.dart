@@ -95,9 +95,36 @@ List<IOSSystemContextMenuItem> systemContextMenuItemsWithForcedPaste(
   return items;
 }
 
-/// Matches `TextField`'s own default builder except for one addition: see
+/// [defaults] with the system's Live Text ("Scan Text" / capture-from-camera)
+/// item dropped - backlog #129: the composer never wants the camera-capture
+/// shortcut. Pure for the same reason as
+/// [systemContextMenuItemsWithForcedPaste].
+@visibleForTesting
+List<IOSSystemContextMenuItem> systemContextMenuItemsWithoutScanText(
+  List<IOSSystemContextMenuItem> defaults,
+) {
+  return defaults
+      .where((item) => item is! IOSSystemContextMenuItemLiveText)
+      .toList();
+}
+
+/// [defaults] with the toolbar's Live Text button dropped - the
+/// non-iOS-system-menu counterpart of
+/// [systemContextMenuItemsWithoutScanText]. Pure for the same reason.
+@visibleForTesting
+List<ContextMenuButtonItem> contextMenuButtonItemsWithoutScanText(
+  List<ContextMenuButtonItem> defaults,
+) {
+  return defaults
+      .where((item) => item.type != ContextMenuButtonType.liveTextInput)
+      .toList();
+}
+
+/// Matches `TextField`'s own default builder except for two changes: see
 /// this file's doc comment for why forcing Paste in is enough, and why a
-/// custom item would not be.
+/// custom item would not be; and backlog #129 for why the Live Text /
+/// "Scan Text" item is dropped from both the iOS system menu and the
+/// adaptive toolbar it falls back to elsewhere.
 Widget composerContextMenuBuilder(
   BuildContext context,
   EditableTextState editableTextState, {
@@ -107,12 +134,17 @@ Widget composerContextMenuBuilder(
     return SystemContextMenu.editableText(
       editableTextState: editableTextState,
       items: systemContextMenuItemsWithForcedPaste(
-        SystemContextMenu.getDefaultItems(editableTextState),
+        systemContextMenuItemsWithoutScanText(
+          SystemContextMenu.getDefaultItems(editableTextState),
+        ),
         clipboardHasImage: clipboardHasImage,
       ),
     );
   }
-  return AdaptiveTextSelectionToolbar.editableText(
-    editableTextState: editableTextState,
+  return AdaptiveTextSelectionToolbar.buttonItems(
+    buttonItems: contextMenuButtonItemsWithoutScanText(
+      editableTextState.contextMenuButtonItems,
+    ),
+    anchors: editableTextState.contextMenuAnchors,
   );
 }
