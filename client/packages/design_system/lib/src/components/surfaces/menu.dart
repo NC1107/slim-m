@@ -131,6 +131,28 @@ class AppMenuLabel extends StatelessWidget {
   }
 }
 
+/// A sentence-case caveat under a menu's choices - a readable line or two, not
+/// the caps micro-label [AppMenuLabel] is. Kept a separate widget because a
+/// whole explanation set in caps with tracking is a wall, not a footnote.
+class AppMenuFootnote extends StatelessWidget {
+  const AppMenuFootnote(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+      child: Text(
+        text,
+        style: AppText.caption.copyWith(color: tokens.textSecondary),
+      ),
+    );
+  }
+}
+
 /// A hairline divider between groups of [AppMenuItem]s.
 class AppMenuDivider extends StatelessWidget {
   const AppMenuDivider({super.key});

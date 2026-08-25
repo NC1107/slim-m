@@ -93,9 +93,9 @@ class AppearanceSettingsSection extends ConsumerWidget {
               ),
           ],
           sheetFootnote:
-              'How much decoded-image memory to keep for reuse. A lower cap '
-              'frees memory and re-decodes images as you scroll back to them; '
-              'it never re-downloads.',
+              'How much memory to spend keeping recently-seen images ready to '
+              'show instantly. A lower limit saves memory; images you scroll '
+              'back to redraw a moment slower, and are never re-downloaded.',
           onChanged: (next) =>
               ref.read(imageCacheLimitControllerProvider.notifier).select(next),
         ),

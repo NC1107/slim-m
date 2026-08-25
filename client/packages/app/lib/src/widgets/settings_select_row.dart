@@ -83,7 +83,7 @@ class SettingsSelectRow<T> extends StatelessWidget {
                 leading: choice.value == value ? AppIcons.check : null,
                 onTap: () => Navigator.of(sheetContext).pop(choice.value),
               ),
-            if (footnote != null) AppMenuLabel(footnote),
+            if (footnote != null) AppMenuFootnote(footnote),
           ],
         ),
       ),
