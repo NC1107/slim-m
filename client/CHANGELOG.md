@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.50.0](https://github.com/NC1107/slim-m/compare/client-v0.49.0...client-v0.50.0) (2026-08-25)
+
+
+### Features
+
+* **client:** let a reader choose the channel history page size ([#845](https://github.com/NC1107/slim-m/issues/845)) ([9d4504e](https://github.com/NC1107/slim-m/commit/9d4504e7c3d1b04c097bf898023df5b5941719c5))
+* make the per-channel canvas object cap a space setting ([#844](https://github.com/NC1107/slim-m/issues/844)) ([55b123a](https://github.com/NC1107/slim-m/commit/55b123a30c0a80e230c2216d56438bd668b34162))
+
 ## [0.49.0](https://github.com/NC1107/slim-m/compare/client-v0.48.0...client-v0.49.0) (2026-08-25)
 
 
