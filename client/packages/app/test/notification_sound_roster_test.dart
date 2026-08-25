@@ -96,6 +96,7 @@ class _FakeSession implements VoiceSession {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
   }) async => ScreenShareOutcome.stopped;
   @override
   Future<bool> setDeafened(bool value) async => true;

@@ -4068,6 +4068,61 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /space/screen-share:
+    get:
+      operationId: getSpaceScreenShareCap
+      tags: [space]
+      summary: Read the screen-share resolution ceiling.
+      description: >
+        Gated on MANAGE_SERVER, the same bit as `/space/analytics`. The
+        ceiling is client-advertised: a client reads it and caps its own
+        screen-share capture and publish parameters before starting a share.
+        There is no server-side track inspection. The default a deployment
+        keeps on upgrade is 2160.
+      responses:
+        "200":
+          description: The current ceiling.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceScreenShareCap"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    patch:
+      operationId: updateSpaceScreenShareCap
+      tags: [space]
+      summary: Change the screen-share resolution ceiling.
+      description: >
+        Lower it to keep a screen share light on every client's bandwidth and
+        the SFU, raise it to allow a sharper share at that cost. A value
+        outside the settable range (360 to 2160) is refused rather than
+        clamped. The new ceiling applies to the next share a client starts;
+        a share already in progress is unaffected until it is restarted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpaceScreenShareCap"
+      responses:
+        "200":
+          description: The ceiling after the change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceScreenShareCap"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -4398,6 +4453,16 @@ components:
             expected to check this before ever showing a GIF picker button,
             so a disabled deployment costs it nothing: no button, no
             request.
+        screen_share_max_height:
+          type: integer
+          description: >
+            The tallest resolution a screen share may publish at. Follows
+            the deployment's screen-share ceiling. Rides on `/version`,
+            unauthenticated, rather than staying behind
+            `GET /space/screen-share` (which is MANAGE_SERVER-gated): every
+            client caps its own capture parameters before starting a share,
+            not only one with MANAGE_SERVER. Absent on servers older than
+            this field, which a client must treat as no ceiling.
         capabilities:
           type: array
           items:
@@ -4891,6 +4956,17 @@ components:
             Most live objects one channel's canvas may hold before a placement
             is refused. Applies to every client. Settable range is 100 to
             100000; the default is 20000.
+    SpaceScreenShareCap:
+      type: object
+      required: [max_height]
+      properties:
+        max_height:
+          type: integer
+          description: >
+            The tallest resolution a screen share may publish at.
+            Client-advertised: a client reads this and caps its own capture
+            parameters, rather than the server inspecting published tracks.
+            Settable range is 360 to 2160; the default is 2160.
     PresenceStatus:
       type: object
       required: [user_id, status]

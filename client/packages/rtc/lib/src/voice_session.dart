@@ -316,7 +316,9 @@ class VoiceSession {
   /// reachable while already in the call.
   Future<bool> setCameraEnabled(bool enabled) => _trySetCamera(enabled);
 
-  /// Starts or stops sharing a screen, bounded by [quality].
+  /// Starts or stops sharing a screen, bounded by [quality] and, if given,
+  /// [maxHeight] - the space-wide screen-share ceiling, applied on top of
+  /// whatever [quality] itself already asked for.
   ///
   /// Reports what happened rather than what was asked for, because on iOS
   /// those differ: see [ScreenShareOutcome]. Stopping asks the platform to end
@@ -329,6 +331,7 @@ class VoiceSession {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
   }) async {
     final room = _room;
     if (room == null) return ScreenShareOutcome.failed;
@@ -337,6 +340,7 @@ class VoiceSession {
       quality: quality,
       sourceId: sourceId,
       includeAudio: includeAudio,
+      maxHeight: maxHeight,
       publish: (enabled, options, audio) async {
         // `captureScreenAudio` here, not on `options`, is the flag that actually publishes audio.
         await room.localParticipant?.setScreenShareEnabled(

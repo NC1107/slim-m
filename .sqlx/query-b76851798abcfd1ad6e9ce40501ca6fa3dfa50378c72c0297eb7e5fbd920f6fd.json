@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE space_settings SET screen_share_max_height = ?, updated_at = ? WHERE id = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b76851798abcfd1ad6e9ce40501ca6fa3dfa50378c72c0297eb7e5fbd920f6fd"
+}

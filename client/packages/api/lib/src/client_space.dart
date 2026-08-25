@@ -78,6 +78,20 @@ extension SlimmApiSpace on SlimmApi {
     );
     return (json as Map<String, dynamic>)['object_cap'] as int;
   }
+
+  Future<int> spaceScreenShareMaxHeight() async {
+    final json = await _send('GET', '/space/screen-share');
+    return (json as Map<String, dynamic>)['max_height'] as int;
+  }
+
+  Future<int> setSpaceScreenShareMaxHeight(int maxHeight) async {
+    final json = await _send(
+      'PATCH',
+      '/space/screen-share',
+      body: {'max_height': maxHeight},
+    );
+    return (json as Map<String, dynamic>)['max_height'] as int;
+  }
 }
 
 /// One calendar day's Space-wide message count, UTC, zero-filled for a day

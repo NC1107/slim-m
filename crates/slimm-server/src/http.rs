@@ -197,6 +197,13 @@ struct Version {
     /// this field always exists, so a client reads `false` as "no GIF picker
     /// on this deployment" rather than needing a third "unknown" state.
     gif_search_enabled: bool,
+    /// The tallest resolution a screen share may publish at. Enforcement is
+    /// entirely client-side (see `client/packages/rtc/lib/src/screen_share_control.dart`),
+    /// so every client - not only one with MANAGE_SERVER, which is all
+    /// `GET /space/screen-share` allows - needs this before it can cap its
+    /// own capture, the same reason `invite_required` rides on `/version`
+    /// rather than staying behind `/space/settings`.
+    screen_share_max_height: i64,
     /// The optional features this build serves, read off the router itself.
     /// See [`capability`] for why it is not a list kept by hand.
     capabilities: Vec<&'static str>,
@@ -277,6 +284,7 @@ async fn version(
         push_enabled: state.push.is_enabled(),
         invite_required: state.store.join_policy().await? == JoinPolicy::Invite,
         gif_search_enabled: state.gifs.is_enabled(),
+        screen_share_max_height: state.store.screen_share_max_height().await?,
         capabilities: capabilities(state).await,
         identity: ServerIdentityDto {
             public_key: BASE64.encode(identity.public_key()),

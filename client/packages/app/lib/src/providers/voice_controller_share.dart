@@ -20,6 +20,7 @@ mixin VoiceControllerShareMixin on StateNotifier<VoiceState> {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
   }) async {
     _cancelBroadcastDeadline();
     final outcome = await _shareSession.setScreenShareEnabled(
@@ -28,6 +29,7 @@ mixin VoiceControllerShareMixin on StateNotifier<VoiceState> {
       sourceId: sourceId,
       // Defended here too, not only in the UI: a settings value can outlive a platform switch.
       includeAudio: includeAudio && supportsScreenShareAudio,
+      maxHeight: maxHeight,
     );
     switch (outcome) {
       case ScreenShareOutcome.started:

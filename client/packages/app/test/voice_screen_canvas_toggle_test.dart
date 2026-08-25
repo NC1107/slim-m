@@ -145,6 +145,7 @@ class _ConnectedSession implements VoiceSession {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
   }) async => ScreenShareOutcome.started;
 
   @override

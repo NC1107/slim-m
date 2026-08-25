@@ -188,6 +188,7 @@ class FakeSession implements VoiceSession {
     ScreenShareQuality quality = ScreenShareQuality.balanced,
     String? sourceId,
     bool includeAudio = false,
+    int? maxHeight,
   }) async {
     screenShareAudioCalls.add(includeAudio);
     return enabled ? ScreenShareOutcome.started : ScreenShareOutcome.stopped;
