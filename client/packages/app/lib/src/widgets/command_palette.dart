@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The command palette: a floating search over channels, members, messages
-/// and actions, opened by `Ctrl K` or by tapping the rail's search field.
+/// The command palette: a search over channels, members, messages and
+/// actions, opened by `Ctrl K` or by tapping the rail's search field.
+///
+/// Renders differently by window width, per `docs/design/desktop-vs-mobile.md`
+/// pattern pair 3 ("Command palette -> pull-down"): a floating card above
+/// `kCompactWidth`, and below it `CommandPaletteCompactShell`'s full-bleed
+/// panel pinned to the top of the window, with an on-screen Cancel button
+/// standing in for Escape - a touch device has no key for that at all. The
+/// search field, the result ranking and every row are the one shared
+/// implementation in this file; only the shell around them differs, chosen
+/// live off `MediaQuery` rather than off `Platform`.
 library;
-
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,14 +28,15 @@ import '../providers/personal_space_visibility.dart';
 import '../providers/providers.dart';
 import '../providers/user_profiles.dart';
 import 'channel_rail.dart' show selectedChannelId;
+import 'command_palette_compact.dart';
 import 'command_palette_items.dart';
 
 /// The design's floating card width; not on the spacing grid because it is
-/// the palette's own measured size, like the rail widths beside it. Clamped
-/// per build against the viewport (see [_CommandPaletteContentState.build])
-/// - this is the one overlay in the app that never adopted `showAppSheet`'s
-/// phone/desktop split, so the fixed 480 overflowed a 390-wide phone
-/// symmetrically by 45px a side, cropping the leading edge of every row.
+/// the palette's own measured size, like the rail widths beside it. Never
+/// clamped against the viewport: [_CommandPaletteContentState.build] only
+/// reaches this width at or above `kCompactWidth` (600), where `width - 48`
+/// is always past it, and below that width the compact shell replaces the
+/// card outright rather than shrinking it.
 const double _paletteWidth = 480;
 const double _resultsMaxHeight = 360;
 
@@ -44,7 +52,8 @@ Future<void> openCommandPalette(BuildContext context) async {
     barrierLabel: 'Command palette',
     barrierDismissible: true,
     barrierColor: kScrimColor,
-    transitionDuration: AppMotion.reduced(context, AppMotion.fast),
+    // The same 180ms AppMotion.base `modalPage` and `showAppSheet` use.
+    transitionDuration: AppMotion.reduced(context, AppMotion.base),
     pageBuilder: (context, animation, secondaryAnimation) =>
         _CommandPaletteContent(currentChannelId: channelId),
     // member_profile.dart's authored entrance: a curved fade with an 8px rise.
@@ -192,77 +201,86 @@ class _CommandPaletteContentState
     final me = ref.watch(meProvider).valueOrNull;
     final permissions = ref.watch(myPermissionsProvider);
     final personalSpaceHidden = ref.watch(personalSpaceVisibilityProvider);
-    // Clamped against the viewport; see the doc comment on _paletteWidth.
-    final paletteWidth = math.min(
-      _paletteWidth,
-      MediaQuery.sizeOf(context).width - 2 * AppSpacing.s24,
+    // Re-read every build, so a resize crossing it while open swaps shells live.
+    final compact = MediaQuery.sizeOf(context).width < kCompactWidth;
+
+    final searchField = AppInput(
+      key: const Key('command-palette-input'),
+      controller: _controller,
+      focusNode: _focusNode,
+      autofocus: true,
+      size: compact ? AppInputSize.lg : AppInputSize.md,
+      placeholder: 'Search channels, members and messages',
+      icon: Icon(
+        AppIcons.search,
+        size: AppSizes.icon16,
+        color: tokens.textSecondary,
+      ),
+      onChanged: _onQueryChanged,
+      onSubmitted: (_) => _runHighlighted(),
+      semanticLabel: 'Search channels, members and messages',
     );
 
-    return Align(
-      alignment: const Alignment(0, -0.5),
-      child: CallbackShortcuts(
-        bindings: _bindings(),
-        child: Material(
-          type: MaterialType.transparency,
-          child: AppMenu(
-            width: paletteWidth,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.s8),
-                child: AppInput(
-                  key: const Key('command-palette-input'),
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  autofocus: true,
-                  placeholder: 'Search channels, members and messages',
-                  icon: Icon(
-                    AppIcons.search,
-                    size: AppSizes.icon16,
-                    color: tokens.textSecondary,
-                  ),
-                  onChanged: _onQueryChanged,
-                  onSubmitted: (_) => _runHighlighted(),
-                  semanticLabel: 'Search channels, members and messages',
+    final results = storeAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (store) => StreamBuilder<List<Channel>>(
+        stream: store.watchChannels(),
+        builder: (context, snapshot) {
+          final channels = snapshot.data ?? const <Channel>[];
+          // Keyed on the query alone: arrow keys and late-arriving message hits update in place, only typing crossfades.
+          return MaybeAnimatedSize(
+            duration: AppMotion.fast,
+            curve: AppMotion.entrance,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: AppMotion.reduced(context, AppMotion.fast),
+              switchInCurve: AppMotion.entrance,
+              switchOutCurve: AppMotion.exit,
+              child: KeyedSubtree(
+                key: ValueKey(_query),
+                child: _buildResults(
+                  tokens,
+                  channels,
+                  members,
+                  me,
+                  permissions,
+                  personalSpaceHidden,
                 ),
               ),
-              const AppMenuDivider(),
-              storeAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (e, _) => const SizedBox.shrink(),
-                data: (store) => StreamBuilder<List<Channel>>(
-                  stream: store.watchChannels(),
-                  builder: (context, snapshot) {
-                    final channels = snapshot.data ?? const <Channel>[];
-                    // Keyed on the query alone: arrow keys and late-arriving message hits update in place, only typing crossfades.
-                    return MaybeAnimatedSize(
-                      duration: AppMotion.fast,
-                      curve: AppMotion.entrance,
-                      alignment: Alignment.topCenter,
-                      child: AnimatedSwitcher(
-                        duration: AppMotion.reduced(context, AppMotion.fast),
-                        switchInCurve: AppMotion.entrance,
-                        switchOutCurve: AppMotion.exit,
-                        child: KeyedSubtree(
-                          key: ValueKey(_query),
-                          child: _buildResults(
-                            tokens,
-                            channels,
-                            members,
-                            me,
-                            permissions,
-                            personalSpaceHidden,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
+
+    final shell = compact
+        ? CommandPaletteCompactShell(
+            searchField: searchField,
+            results: results,
+            onCancel: () => Navigator.of(context).pop(),
+          )
+        : Align(
+            alignment: const Alignment(0, -0.5),
+            child: Material(
+              type: MaterialType.transparency,
+              child: AppMenu(
+                width: _paletteWidth,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.s8),
+                    child: searchField,
+                  ),
+                  const AppMenuDivider(),
+                  results,
+                  const AppMenuDivider(),
+                  _paletteKbdFooter(tokens),
+                ],
+              ),
+            ),
+          );
+
+    return CallbackShortcuts(bindings: _bindings(), child: shell);
   }
 
   Widget _buildResults(
@@ -363,4 +381,35 @@ class _CommandPaletteContentState
       ),
     );
   }
+}
+
+/// The floating card's own footer: arrow/Enter hints and a nudge that typing
+/// narrows the list. Desktop-only - `CommandPaletteCompactShell` never builds
+/// this, matching `channel_rail.dart`'s own "keycaps only where a keyboard
+/// is" rule for the Ctrl+K hint beside it.
+Widget _paletteKbdFooter(AppTokens tokens) {
+  Widget hint(List<String> keys, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
+    spacing: AppSpacing.s4,
+    children: [
+      for (final key in keys) AppKbd(key),
+      Text(label, style: AppText.micro.copyWith(color: tokens.textSecondary)),
+    ],
+  );
+
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(10, 4, 10, 2),
+    child: Wrap(
+      spacing: AppSpacing.s16,
+      runSpacing: AppSpacing.s4,
+      children: [
+        hint(const ['↑', '↓'], 'to navigate'),
+        hint(const ['Enter'], 'to select'),
+        Text(
+          'Type to filter',
+          style: AppText.micro.copyWith(color: tokens.textSecondary),
+        ),
+      ],
+    ),
+  );
 }
