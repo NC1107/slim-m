@@ -17,6 +17,46 @@ Widget _harness(Widget child) => MaterialApp(
 );
 
 void main() {
+  testWidgets('the search field has an accessible name', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        ChannelSearchBar(
+          controller: TextEditingController(),
+          onChanged: (_) {},
+        ),
+      ),
+    );
+
+    // Substring, not equality: AppInput also exposes its placeholder as the field's own hint, which merges into the same node.
+    expect(
+      find.bySemanticsLabel(RegExp('Search this channel')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a genuinely empty result announces "No matches." as a live '
+      'region', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        const ChannelSearchResults(
+          results: [],
+          knownUsernames: {},
+          loading: false,
+          failed: false,
+          forbidden: false,
+          onRetry: _noop,
+          onSelect: _noopMessage,
+        ),
+      ),
+    );
+
+    final region = tester.widget<Semantics>(
+      find.byKey(ChannelSearchResults.liveRegionKey),
+    );
+    expect(region.properties.liveRegion, isTrue);
+    expect(region.properties.label, 'No matches.');
+  });
+
   testWidgets('a search in flight shows a spinner, not "no matches"', (
     tester,
   ) async {
