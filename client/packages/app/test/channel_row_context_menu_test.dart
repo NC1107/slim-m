@@ -1,8 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A channel row's right-click/long-press menu: opening it always, and
-/// managing it (the same sheet the kebab already opens) only for a caller
-/// who holds MANAGE_CHANNELS - the identical gate `ManagedChannelRow`'s own
-/// kebab already uses, reused rather than a second permission check.
+/// A channel row's context menu: opening it always, and managing it (the
+/// same sheet the menu already opens) only for a caller who holds
+/// MANAGE_CHANNELS.
+///
+/// The row's kebab is a third way into this exact menu, alongside a
+/// right-click and a long-press - backlog item 135, "the kebab on a channel
+/// should just expose the context menu; currently outdated code". The kebab
+/// used to call `showManageChannelSheet` directly, so a manager's kebab
+/// skipped straight past "Open channel" and the mute toggles into the sheet,
+/// unlike the identical row's own right-click, and offered no route to
+/// "Channel permissions..." at all. The `'the kebab...'` tests below pin
+/// that it now reaches the same `channelRowMenuItems` build the other two
+/// gestures do.
 ///
 /// The trailing group covers the regression `channel_rail_reorder.dart`'s
 /// own doc comment names: with two or more channels a manager's row is also
@@ -12,11 +21,15 @@
 /// row; a right-click must still reach the menu regardless.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
@@ -110,6 +123,17 @@ Future<void> _openMenu(WidgetTester tester) => tester.tapAt(
   buttons: kSecondaryButton,
   kind: PointerDeviceKind.mouse,
 );
+
+/// A phone width so `AppTouchTargets.of` reports touch mode and the kebab
+/// renders unconditionally, the same way `channel_rail_channel_rows_test.dart`'s
+/// own long-press test does - a pointer-width test would instead need a real
+/// hover to reveal it first.
+void _usePhoneWidth(WidgetTester tester) {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
 
 void main() {
   testWidgets(
@@ -234,6 +258,129 @@ void main() {
 
     expect(find.text('channel:c1'), findsOneWidget);
   });
+
+  testWidgets(
+    'the kebab opens the same menu a right-click does, not the manage sheet '
+    'directly',
+    (tester) async {
+      _usePhoneWidth(tester);
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(_harness(_router(channel, canManage: true)));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(AppIcons.moreVertical));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open channel'), findsOneWidget);
+      expect(find.text('Mute channel'), findsOneWidget);
+      expect(find.text('Mentions only'), findsOneWidget);
+      expect(find.text('Manage channel...'), findsOneWidget);
+      expect(
+        find.text('Delete channel'),
+        findsNothing,
+        reason:
+            'the kebab must open the menu first, not jump straight into '
+            'the sheet its "Manage channel..." item leads to',
+      );
+    },
+  );
+
+  testWidgets(
+    'the kebab menu respects the same MANAGE_ROLES gate the right-click '
+    'menu does',
+    (tester) async {
+      _usePhoneWidth(tester);
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(
+        _harness(
+          _router(channel, canManage: true),
+          overrides: [meProvider.overrideWith((ref) async => me(0))],
+        ),
+      );
+      await _resolveMe(tester);
+
+      await tester.tap(find.byIcon(AppIcons.moreVertical));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Manage channel...'), findsOneWidget);
+      expect(find.text('Channel permissions...'), findsNothing);
+    },
+  );
+
+  testWidgets('Manage channel from the kebab menu opens the same sheet the '
+      'right-click menu does', (tester) async {
+    _usePhoneWidth(tester);
+    final channel = _channel('c1', 'general');
+    await tester.pumpWidget(_harness(_router(channel, canManage: true)));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(AppIcons.moreVertical));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage channel...'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Manage channel'), findsOneWidget);
+    expect(find.text('Delete channel'), findsOneWidget);
+  });
+
+  testWidgets(
+    "Mute channel from the kebab menu runs the same action the right-click "
+    "menu's own item does",
+    (tester) async {
+      _usePhoneWidth(tester);
+      final channel = _channel('c1', 'general');
+      const tokens = api.TokenPair(
+        userId: 'u-me',
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        accessExpiresAt: 4102444800000,
+      );
+      await tester.pumpWidget(
+        _harness(
+          _router(channel, canManage: true),
+          overrides: [
+            sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
+            apiProvider.overrideWith((ref) {
+              final client = api.SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((request) async {
+                  if (request.url.path.startsWith(
+                        '/notification-preferences/channels/',
+                      ) &&
+                      request.method == 'PUT') {
+                    return http.Response(
+                      jsonEncode({
+                        'channel_id': request.url.pathSegments.last,
+                        'preference': 'nothing',
+                      }),
+                      200,
+                      headers: {'content-type': 'application/json'},
+                    );
+                  }
+                  return http.Response(
+                    jsonEncode(const <Object>[]),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  );
+                }),
+              );
+              ref.onDispose(client.close);
+              return client;
+            }),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(AppIcons.moreVertical));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mute channel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(AppIcons.notificationsOff), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'a held press on a reorderable row starts a drag rather than opening '

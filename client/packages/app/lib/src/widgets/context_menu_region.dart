@@ -95,10 +95,15 @@ class ContextMenuRegion extends StatefulWidget {
   final bool enableLongPress;
 
   @override
-  State<ContextMenuRegion> createState() => _ContextMenuRegionState();
+  State<ContextMenuRegion> createState() => ContextMenuRegionState();
 }
 
-class _ContextMenuRegionState extends State<ContextMenuRegion> {
+/// Public so a caller that needs a second way into the same menu - a row's
+/// own kebab, say - can reach it through a `GlobalKey<ContextMenuRegionState>`
+/// and call [open] rather than keeping a second, divergent menu of its own.
+/// See `channel_row_menu.dart`'s own doc comment for the concrete case this
+/// exists for.
+class ContextMenuRegionState extends State<ContextMenuRegion> {
   final _controller = AnimatedMenuController();
   Offset _anchor = Offset.zero;
   bool _sheetOpen = false;
@@ -114,6 +119,11 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
     _watched?.removeListener(_closeOnScroll);
     super.dispose();
   }
+
+  /// Opens the same menu a right-click or long-press would, for a caller
+  /// with no pointer position of its own to anchor to - a kebab button, like
+  /// the context-menu key [ContextMenuFocus] already handles the same way.
+  void open() => _setOpen(true);
 
   /// [pinRow] mirrors [onOpenChanged]'s own doc: true (the default) for a
   /// right-click and every close, false for a long press, which has nothing
