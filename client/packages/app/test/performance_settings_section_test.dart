@@ -27,10 +27,12 @@ void main() {
     expect(find.text('Autoplay GIFs'), findsOneWidget);
     expect(find.text('Attachment preview quality'), findsOneWidget);
     expect(find.text('Image cache'), findsOneWidget);
+    expect(find.text('Message page size'), findsOneWidget);
     // Each row states its current value, and every current is the default.
     expect(find.text('Always (default)'), findsOneWidget);
     expect(find.text('On (default)'), findsOneWidget);
     expect(find.text('Sharp (default)'), findsOneWidget);
     expect(find.text('100 MB (default)'), findsOneWidget);
+    expect(find.text('Standard (50, default)'), findsOneWidget);
   });
 }
