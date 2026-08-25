@@ -14,24 +14,19 @@
 //! belongs to - an unguessable hex id is not access control on its own, and
 //! this never treats it as such.
 
-use std::io::SeekFrom;
-
 use axum::Router;
 use axum::body::Body;
-use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
-use tokio_util::io::ReaderStream;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{ASSET, AuthedLimited, Bytes, Json, Query, UPLOAD};
+use super::extract::{ASSET, AuthedLimited, Json, Query, UPLOAD};
 use super::message_dto::AttachmentDto;
-use crate::media;
+use crate::media::{self, StreamError};
 use crate::permissions::Permissions;
 use crate::store::AttachmentSummary;
 
@@ -40,15 +35,18 @@ use crate::store::AttachmentSummary;
 const IMMUTABLE_CACHE: &str = "private, max-age=31536000, immutable";
 
 /// The attachment routes, mounted by [`super::router`] right after
-/// `users::routes()`. `max_attachment_bytes` comes from `state.media`
-/// at router-build time (see `http::router`), so the axum-level body-size
-/// safety net always matches the operator-configured ceiling rather than a
-/// separate hardcoded constant that could quietly diverge from it.
-pub fn routes(max_attachment_bytes: u64) -> Router<AppState> {
+/// `users::routes()`.
+///
+/// No `DefaultBodyLimit` layer: [`upload`] takes the raw request body and
+/// streams it, which bypasses that layer (it only bounds the buffering
+/// extractors), so the per-upload ceiling is enforced inside the handler as it
+/// reads, against `state.media.max_attachment_bytes()`. That is stricter than a
+/// layer would be - the body is never buffered whole to measure it - and reads
+/// the same operator-configured ceiling.
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/attachments", post(upload))
         .route("/attachments/{attachment_id}", get(fetch))
-        .layer(DefaultBodyLimit::max(max_attachment_bytes as usize))
 }
 
 // --- Wire types ---
@@ -63,29 +61,37 @@ struct UploadParams {
 /// Stores uploaded bytes under their own sha256 and returns the hex id a
 /// message can then reference.
 ///
-/// The file is written before the metadata row on purpose: a crash between
-/// the two leaves an orphaned file (harmless, eventually swept) rather than a
-/// row that promises bytes which were never actually written.
+/// The body is streamed to disk while being hashed rather than buffered into a
+/// `Vec` first, so a 1 GiB upload costs a bounded amount of memory instead of
+/// holding the whole file (and a copy of it) in RAM. That is why this takes the
+/// raw [`Body`] rather than the `Bytes` extractor: `Bytes` would buffer the
+/// whole request before the handler ran.
 ///
-/// The rate limit is charged in the signature rather than in the body, and that
-/// ordering is the point: `Bytes` is a `FromRequest` extractor, so it resolves
-/// last and the whole body was buffered before the old `enforce` call ever ran.
-/// A caller over budget, or holding no ATTACH_FILES bit at all, still cost the
-/// process the memory and the bandwidth of the upload.
+/// The order the checks run in is the point. `AuthedLimited` authenticates and
+/// charges the rate limit before the body is touched at all; then the
+/// ATTACH_FILES check and the declared-length check run before a single byte is
+/// streamed, so a caller with no permission, or one announcing an oversized
+/// upload, never costs the process the disk write. Only then is the body
+/// consumed. A lying or chunked client that under-declares its length is still
+/// caught, by the running byte count inside [`media::Media::stream_attachment`].
+///
+/// The file is placed before the metadata row on purpose: a crash between the
+/// two leaves an orphaned file (harmless, eventually swept) rather than a row
+/// that promises bytes which were never written.
 ///
 /// Requires ATTACH_FILES deployment-wide. An upload names no channel, so the
 /// per-channel check still happens when the resulting id is attached to a
-/// message; this is the half that was missing entirely. Until it existed the
-/// handler asked for no permission of any kind, so a member denied
-/// attachments everywhere - or one currently timed out - could still write
-/// bytes into media storage.
+/// message; until this bit was checked at all a member denied attachments
+/// everywhere - or one currently timed out - could still write bytes into
+/// media storage.
 async fn upload(
     AuthedLimited(ctx): AuthedLimited<UPLOAD>,
     Query(params): Query<UploadParams>,
+    headers: HeaderMap,
     State(state): State<AppState>,
-    Bytes(body): Bytes,
+    body: Body,
 ) -> Result<(StatusCode, Json<AttachmentDto>), ApiError> {
-    // Deployment-wide because an upload names no channel; see the note above.
+    // Before the body streams, so no permission means no disk write.
     if !state
         .store
         .base_permissions(ctx.user_id)
@@ -95,33 +101,46 @@ async fn upload(
         return Err(ApiError::Forbidden);
     }
 
-    if body.is_empty() {
+    let max_bytes = state.media.max_attachment_bytes();
+    // A fast-fail on a declared oversize; the true size is re-checked below.
+    if let Some(declared) = content_length(&headers) {
+        if declared > max_bytes {
+            return Err(ApiError::PayloadTooLarge);
+        }
+        room_for(&state, declared as i64).await?;
+    }
+
+    let pending = state
+        .media
+        .stream_attachment(body.into_data_stream(), max_bytes)
+        .await
+        .map_err(upload_stream_error)?;
+
+    if pending.size() == 0 {
+        pending.abandon().await.ok();
         return Err(ApiError::BadRequest("attachment is empty"));
     }
-    if body.len() as u64 > state.media.max_attachment_bytes() {
-        return Err(ApiError::BadRequest("attachment is too large"));
+    // Decided from the bytes only; `sniffable` guards the streamed-prefix seam.
+    let Some(content_type) = media::sniff_content_type(sniffable(pending.sniff_prefix())) else {
+        pending.abandon().await.ok();
+        return Err(ApiError::BadRequest("unsupported attachment type"));
+    };
+    // The true streamed size no Content-Length can hide; a refusal drops the temp.
+    if let Err(err) = room_for(&state, pending.size() as i64).await {
+        pending.abandon().await.ok();
+        return Err(err);
     }
-    room_for(&state, body.len() as i64).await?;
-    // Decided from the bytes only - see the module doc for why this is the
-    // whole security boundary here.
-    let content_type = media::sniff_content_type(&body)
-        .ok_or(ApiError::BadRequest("unsupported attachment type"))?;
+
     let filename = media::sanitize_filename(params.filename.as_deref().unwrap_or("file"));
+    let hex_id = pending.hex_id().to_owned();
+    let size = pending.size() as i64;
+    let sha256 = media::from_hex(&hex_id).expect("a hex id from sha256 is well-formed hex");
 
-    let sha256 = Sha256::digest(&body).to_vec();
-    let hex_id = media::to_hex(&sha256);
-    let size = body.len() as i64;
-
-    // Bytes before the metadata row, never the other way round; see the
-    // ordering note on this function.
-    state
-        .media
-        .write_attachment(&hex_id, body.to_vec())
-        .await
-        .map_err(|err| {
-            tracing::error!(error = %err, "failed to write an uploaded attachment");
-            ApiError::Internal
-        })?;
+    // Bytes before the metadata row; see the ordering note on this function.
+    pending.commit().await.map_err(|err| {
+        tracing::error!(error = %err, "failed to store a streamed attachment");
+        ApiError::Internal
+    })?;
     state
         .store
         .store_attachment(&sha256, size, content_type, &filename, Some(ctx.user_id))
@@ -136,6 +155,49 @@ async fn upload(
             size,
         })),
     ))
+}
+
+/// The `Content-Length` a client declared, when it sent a well-formed one. A
+/// fast-fail hint only: the running byte count during the stream is what
+/// actually bounds an upload, since this header is absent on a chunked body and
+/// a client controls it regardless.
+fn content_length(headers: &HeaderMap) -> Option<u64> {
+    headers
+        .get(header::CONTENT_LENGTH)?
+        .to_str()
+        .ok()?
+        .parse()
+        .ok()
+}
+
+/// The prefix bytes to sniff, given the type is decided from a captured prefix
+/// rather than the whole file (see [`media::Media::stream_attachment`]). Every
+/// magic-number type decides on bytes at the very start, so trimming the end
+/// changes none of them; the `text/plain` fallback runs `str::from_utf8` over
+/// the whole slice, which a prefix cut mid multi-byte character would fail
+/// spuriously. Only a trailing incomplete sequence is trimmed - a genuinely
+/// invalid byte earlier leaves the slice intact so the text check still
+/// (correctly) refuses it.
+fn sniffable(prefix: &[u8]) -> &[u8] {
+    match std::str::from_utf8(prefix) {
+        Ok(_) => prefix,
+        Err(err) if err.error_len().is_none() => &prefix[..err.valid_up_to()],
+        Err(_) => prefix,
+    }
+}
+
+/// Maps a stream failure to the status a caller sees: too big is a 413, a
+/// severed or malformed client stream is a 400, and a disk fault is a 500 that
+/// says nothing about why.
+fn upload_stream_error(err: StreamError) -> ApiError {
+    match err {
+        StreamError::TooLarge => ApiError::PayloadTooLarge,
+        StreamError::Body => ApiError::BadRequest("upload stream ended early"),
+        StreamError::Io(err) => {
+            tracing::error!(error = %err, "failed to stream an uploaded attachment");
+            ApiError::Internal
+        }
+    }
 }
 
 /// Serves stored bytes back, gated on the same VIEW_CHANNEL a caller needs to
@@ -200,7 +262,7 @@ async fn fetch(
         })?;
 
     let range_header = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
-    serve_ranged(
+    super::attachment_range::serve_ranged(
         file,
         total_len,
         range_header,
@@ -210,130 +272,11 @@ async fn fetch(
     .await
 }
 
-/// The byte range a `Range` header resolves to against a known total length.
-enum ByteRange {
-    /// No usable range: serve the whole body as `200`. Covers an absent header
-    /// and, per RFC 9110, a header this server chooses not to honour (a
-    /// multi-range request, or a syntactically invalid one), which a client
-    /// must accept as a full response.
-    Full,
-    /// A single satisfiable range, both bounds inclusive: serve `206`.
-    Partial { start: u64, end: u64 },
-    /// A syntactically valid range that no part of the body can satisfy: serve
-    /// `416` so the client learns the length rather than retrying blindly.
-    Unsatisfiable,
-}
-
-/// Resolves a `Range` request-header value against `total`, following RFC 9110:
-/// only `bytes` units, a single range, and anything malformed or multi-range
-/// falls back to a full response rather than an error.
-fn parse_range(header: Option<&str>, total: u64) -> ByteRange {
-    let Some(spec) = header.and_then(|h| h.trim().strip_prefix("bytes=")) else {
-        return ByteRange::Full;
-    };
-    // A comma means multiple ranges; serve the whole body, not a multipart/byteranges response.
-    if spec.contains(',') {
-        return ByteRange::Full;
-    }
-    let Some((raw_start, raw_end)) = spec.split_once('-') else {
-        return ByteRange::Full;
-    };
-    let (start, end) = match (raw_start.trim(), raw_end.trim()) {
-        ("", "") => return ByteRange::Full,
-        // `-N`: the final N bytes. N == 0 requests nothing satisfiable.
-        ("", suffix) => {
-            let Ok(len) = suffix.parse::<u64>() else {
-                return ByteRange::Full;
-            };
-            if len == 0 || total == 0 {
-                return ByteRange::Unsatisfiable;
-            }
-            (total.saturating_sub(len), total - 1)
-        }
-        // `start-`: from start to the end of the body.
-        (start, "") => {
-            let Ok(start) = start.parse::<u64>() else {
-                return ByteRange::Full;
-            };
-            (start, total.saturating_sub(1))
-        }
-        // `start-end`, end clamped into the body.
-        (start, end) => {
-            let (Ok(start), Ok(end)) = (start.parse::<u64>(), end.parse::<u64>()) else {
-                return ByteRange::Full;
-            };
-            (start, end.min(total.saturating_sub(1)))
-        }
-    };
-    if total == 0 || start >= total || start > end {
-        return ByteRange::Unsatisfiable;
-    }
-    ByteRange::Partial { start, end }
-}
-
-/// Streams an open attachment file as the response, honouring a single
-/// `Range`. Always advertises `Accept-Ranges: bytes` and sets an explicit
-/// `Content-Length`, neither of which a streamed body carries on its own.
-async fn serve_ranged(
-    mut file: tokio::fs::File,
-    total_len: u64,
-    range_header: Option<&str>,
-    content_type: &str,
-    filename: &str,
-) -> Result<Response, ApiError> {
-    let response = match parse_range(range_header, total_len) {
-        ByteRange::Unsatisfiable => {
-            let mut response = StatusCode::RANGE_NOT_SATISFIABLE.into_response();
-            response.headers_mut().insert(
-                header::CONTENT_RANGE,
-                HeaderValue::from_str(&format!("bytes */{total_len}"))
-                    .unwrap_or_else(|_| HeaderValue::from_static("bytes */0")),
-            );
-            response
-        }
-        ByteRange::Full => {
-            let body = Body::from_stream(ReaderStream::new(file));
-            let mut response = body.into_response();
-            set_content_length(response.headers_mut(), total_len);
-            response
-        }
-        ByteRange::Partial { start, end } => {
-            file.seek(SeekFrom::Start(start)).await.map_err(|err| {
-                tracing::error!(error = %err, "failed to seek within a stored attachment");
-                ApiError::Internal
-            })?;
-            let span = end - start + 1;
-            let body = Body::from_stream(ReaderStream::new(file.take(span)));
-            let mut response = body.into_response();
-            *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-            let headers = response.headers_mut();
-            set_content_length(headers, span);
-            headers.insert(
-                header::CONTENT_RANGE,
-                HeaderValue::from_str(&format!("bytes {start}-{end}/{total_len}"))
-                    .unwrap_or_else(|_| HeaderValue::from_static("bytes */0")),
-            );
-            response
-        }
-    };
-    let mut response = response;
-    let headers = response.headers_mut();
-    headers.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
-    apply_asset_headers(headers, content_type, filename);
-    Ok(response)
-}
-
-fn set_content_length(headers: &mut HeaderMap, len: u64) {
-    if let Ok(value) = HeaderValue::from_str(&len.to_string()) {
-        headers.insert(header::CONTENT_LENGTH, value);
-    }
-}
-
 /// Serves already-buffered bytes, for the small assets that are read whole
 /// anyway: avatars (`super::users`) and custom emoji (`super::emoji`). Large
-/// attachments stream instead, through [`serve_ranged`]; both share
-/// [`apply_asset_headers`], so every asset response carries identical
-/// security headers.
+/// attachments stream instead, through [`super::attachment_range::serve_ranged`];
+/// both share [`apply_asset_headers`], so every asset response carries
+/// identical security headers.
 pub(crate) fn serve(bytes: Vec<u8>, content_type: &str, filename: &str) -> Response {
     let mut response = Body::from(bytes).into_response();
     apply_asset_headers(response.headers_mut(), content_type, filename);
@@ -349,7 +292,7 @@ pub(crate) fn serve(bytes: Vec<u8>, content_type: &str, filename: &str) -> Respo
 /// serves an allowlisted type. The filename is re-sanitized here even though
 /// the stored value already was: it is cheap and idempotent, and it means the
 /// response never depends on every future write path having remembered to.
-fn apply_asset_headers(headers: &mut HeaderMap, content_type: &str, filename: &str) {
+pub(super) fn apply_asset_headers(headers: &mut HeaderMap, content_type: &str, filename: &str) {
     let disposition_kind = if media::is_inline(content_type) {
         "inline"
     } else {

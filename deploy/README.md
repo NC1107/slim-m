@@ -268,16 +268,17 @@ SLIMM_MAX_TOTAL_ATTACHMENT_BYTES=2147483648
 
 That is 2 GiB, which the `.env.example` in this directory ships with.
 
-**A single attachment has its own, separate ceiling, and the default is too small for video.**
+**A single attachment has its own, separate ceiling.**
 The message-attachment allowlist covers images, PDF, mp4 and webm video, mpeg/ogg/wav audio, zip and gzip archives, and plain text (source files, logs, csv, json, yaml, sniffed by content rather than by extension - see `crates/slimm-server/src/media/content_type.rs` for the exact rules).
-`SLIMM_ATTACHMENT_MAX_BYTES` bounds any one of those, and it defaults to 10 MiB, which most real video and a lot of real audio is already over.
-Raise it if you want people to attach video or long recordings:
+`SLIMM_ATTACHMENT_MAX_BYTES` bounds any one of those, and it defaults to 1 GiB, which covers most video and long recordings.
+Lower it if you want a tighter per-upload cap:
 
 ```
 SLIMM_ATTACHMENT_MAX_BYTES=104857600
 ```
 
-That is 100 MiB, an example rather than a recommendation - the same "the right number is your disk, not a guess" reasoning as the total ceiling above applies here too, and this one also bounds how much memory one upload buffers in the server process before it is written to disk.
+That is 100 MiB, an example rather than a recommendation - the same "the right number is your disk, not a guess" reasoning as the total ceiling above applies here too.
+The server streams each upload to disk as it arrives rather than buffering it whole, so this ceiling bounds disk use, not the memory one upload costs the process.
 Raising it does not raise `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES`; the two are independent, and a single-upload ceiling large enough for video with no deployment-wide ceiling at all is a real, if unusual, choice.
 Set it from the volume you actually gave the stack, leaving room for the database to grow.
 
