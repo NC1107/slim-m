@@ -139,7 +139,8 @@ void main() {
           widget is DecoratedBox &&
           (widget.decoration as BoxDecoration).color == tokens.surfaceSunken,
     );
-    final decoration = tester.widget<DecoratedBox>(chip).decoration as BoxDecoration;
+    final decoration =
+        tester.widget<DecoratedBox>(chip).decoration as BoxDecoration;
     expect(decoration.borderRadius, BorderRadius.circular(AppRadii.control));
     // Compact: one caption line plus padding, not the full-height strip this used to be.
     final size = tester.getSize(chip);
