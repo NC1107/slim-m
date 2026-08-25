@@ -253,6 +253,7 @@ class MessageRow extends StatelessWidget {
                             grouped: grouped,
                             isWebhook: isWebhook,
                             message: message,
+                            hovered: hovered,
                           ),
                           const SizedBox(width: AppSpacing.s12),
                           Expanded(

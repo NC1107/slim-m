@@ -138,23 +138,34 @@ class MessageRowLeading extends ConsumerWidget {
     required this.grouped,
     required this.isWebhook,
     required this.message,
+    required this.hovered,
   });
 
   final bool grouped;
   final bool isWebhook;
   final Message message;
 
+  /// The row's own hover state (mouse only - touch never sets this). Gates
+  /// the continuation gutter's plain sent timestamp: Discord shows it only
+  /// while hovering rather than pinning it to the left edge of every grouped
+  /// line, and a finger that never hovers simply never shows it, which is the
+  /// header time's job on the group's first message.
+  final bool hovered;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
     if (grouped) {
-      // The continuation gutter: no avatar, just the time, right-aligned to match the avatar it replaces.
+      // The continuation gutter: no avatar; a delivery mark always shows, a plain sent time only on hover (see [hovered]).
+      final showMark = message.pending || message.failed || hovered;
       return SizedBox(
         width: _avatarSize,
         child: Padding(
           padding: const EdgeInsets.only(top: 3),
-          child: MessageTimeMark(message: message, compact: true),
+          child: showMark
+              ? MessageTimeMark(message: message, compact: true)
+              : const SizedBox.shrink(),
         ),
       );
     }

@@ -47,33 +47,163 @@ void main() {
     expect(find.text('Priya'), findsOneWidget);
   });
 
-  testWidgets('a grouped continuation drops the avatar and the name, and keeps '
-      'the timestamp in the gutter instead', (tester) async {
-    await tester.pumpWidget(
-      harness(
-        MessageRow(
-          message: message(),
-          grouped: true,
-          showNewDivider: false,
-          knownUsernames: const {},
-          onRetry: () {},
-          onDiscard: () {},
-          onPickReaction: (_) {},
-          onReactionTap: (_) {},
-          onVote: (_) {},
-          actions: noActions,
-          editing: false,
-          onSubmitEdit: (_) {},
-          onCancelEdit: () {},
+  testWidgets(
+    'a grouped continuation drops the avatar and the name, and shows no '
+    'gutter timestamp at rest',
+    (tester) async {
+      await tester.pumpWidget(
+        harness(
+          MessageRow(
+            message: message(),
+            grouped: true,
+            showNewDivider: false,
+            knownUsernames: const {},
+            onRetry: () {},
+            onDiscard: () {},
+            onPickReaction: (_) {},
+            onReactionTap: (_) {},
+            onVote: (_) {},
+            actions: noActions,
+            editing: false,
+            onSubmitEdit: (_) {},
+            onCancelEdit: () {},
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(find.byType(AppAvatar), findsNothing);
-    expect(find.text('Priya'), findsNothing);
-    // The exact text is message_row_time_format_test.dart's job.
-    expect(find.byType(MessageTimeMark), findsOneWidget);
-  });
+      expect(find.byType(AppAvatar), findsNothing);
+      expect(find.text('Priya'), findsNothing);
+      // The owner's ask: not a persistent left-gutter timestamp. Hovering to
+      // reveal it is message_row_time_format_test.dart's job.
+      expect(find.byType(MessageTimeMark), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a pending grouped continuation still shows its gutter mark at rest',
+    (tester) async {
+      await tester.pumpWidget(
+        harness(
+          MessageRow(
+            message: message(pending: true),
+            grouped: true,
+            showNewDivider: false,
+            knownUsernames: const {},
+            onRetry: () {},
+            onDiscard: () {},
+            onPickReaction: (_) {},
+            onReactionTap: (_) {},
+            onVote: (_) {},
+            actions: noActions,
+            editing: false,
+            onSubmitEdit: (_) {},
+            onCancelEdit: () {},
+          ),
+        ),
+      );
+
+      // Delivery state, not decoration - never hover-gated.
+      expect(find.byType(MessageTimeMark), findsOneWidget);
+      expect(find.byIcon(AppIcons.clock), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a failed grouped continuation still shows its gutter mark at rest',
+    (tester) async {
+      await tester.pumpWidget(
+        harness(
+          MessageRow(
+            message: message(failed: true),
+            grouped: true,
+            showNewDivider: false,
+            knownUsernames: const {},
+            onRetry: () {},
+            onDiscard: () {},
+            onPickReaction: (_) {},
+            onReactionTap: (_) {},
+            onVote: (_) {},
+            actions: noActions,
+            editing: false,
+            onSubmitEdit: (_) {},
+            onCancelEdit: () {},
+          ),
+        ),
+      );
+
+      expect(find.byType(MessageTimeMark), findsOneWidget);
+      expect(find.byIcon(AppIcons.failed), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'hovering a grouped continuation reveals the gutter timestamp, and '
+    'leaving hides it again',
+    (tester) async {
+      await tester.pumpWidget(
+        harness(
+          MessageRow(
+            message: message(),
+            grouped: true,
+            showNewDivider: false,
+            knownUsernames: const {},
+            onRetry: () {},
+            onDiscard: () {},
+            onPickReaction: (_) {},
+            onReactionTap: (_) {},
+            onVote: (_) {},
+            actions: noActions,
+            editing: false,
+            onSubmitEdit: (_) {},
+            onCancelEdit: () {},
+          ),
+        ),
+      );
+
+      expect(find.byType(MessageTimeMark), findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(find.byType(MessageRow)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MessageTimeMark), findsOneWidget);
+
+      await mouse.moveTo(const Offset(2000, 2000));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MessageTimeMark), findsNothing);
+    },
+  );
+
+  testWidgets(
+    "the group's first message still shows the header time after the name, "
+    'unhovered',
+    (tester) async {
+      await tester.pumpWidget(
+        harness(
+          MessageRow(
+            message: message(),
+            grouped: false,
+            showNewDivider: false,
+            knownUsernames: const {},
+            onRetry: () {},
+            onDiscard: () {},
+            onPickReaction: (_) {},
+            onReactionTap: (_) {},
+            onVote: (_) {},
+            actions: noActions,
+            editing: false,
+            onSubmitEdit: (_) {},
+            onCancelEdit: () {},
+          ),
+        ),
+      );
+
+      expect(find.byType(MessageTimeMark), findsOneWidget);
+    },
+  );
 
   testWidgets('the "New" divider only appears when asked for', (tester) async {
     await tester.pumpWidget(
