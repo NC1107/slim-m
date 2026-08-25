@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.51.0](https://github.com/NC1107/slim-m/compare/client-v0.50.0...client-v0.51.0) (2026-08-25)
+
+
+### Features
+
+* **client:** a toast layer for transient confirmations ([#851](https://github.com/NC1107/slim-m/issues/851)) ([7cfb1db](https://github.com/NC1107/slim-m/commit/7cfb1db3772cf2e8ffa61d7973bb8e8d16425093))
+* **client:** bulk-upload emoji from a zip ([#850](https://github.com/NC1107/slim-m/issues/850)) ([8a1b270](https://github.com/NC1107/slim-m/commit/8a1b2701f0e8a7d19b064e9b84e5f0e2012f0811))
+* **client:** set a custom status from the sidebar avatar ([#849](https://github.com/NC1107/slim-m/issues/849)) ([a54b468](https://github.com/NC1107/slim-m/commit/a54b4683ae1b31fb1a3ab40d635939998dde6519))
+
 ## [0.50.0](https://github.com/NC1107/slim-m/compare/client-v0.49.0...client-v0.50.0) (2026-08-25)
 
 
