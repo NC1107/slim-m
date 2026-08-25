@@ -95,4 +95,62 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString(lastSeenWhatsNewVersionKey), '0.17.2');
   });
+
+  testWidgets(
+    'at a desktop width the sheet is a centered dialog, and dismissing it '
+    'still marks it seen',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final container = await _pumpGate(tester, fresh: false);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text("What's new"), findsOneWidget);
+      expect(find.textContaining('newest 50 messages'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Got it'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's new"), findsNothing);
+      expect(container.read(whatsNewControllerProvider), isEmpty);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(lastSeenWhatsNewVersionKey), '0.17.2');
+    },
+  );
+
+  testWidgets(
+    'at a phone width the sheet is a bottom sheet with the same content, '
+    'and dismissing it still marks it seen',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final container = await _pumpGate(tester, fresh: false);
+      await tester.pump();
+      await tester.pump();
+      // Let the sheet's own slide-up animation settle before tapping its button.
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.text("What's new"), findsOneWidget);
+      expect(find.textContaining('newest 50 messages'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Got it'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("What's new"), findsNothing);
+      expect(container.read(whatsNewControllerProvider), isEmpty);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(lastSeenWhatsNewVersionKey), '0.17.2');
+    },
+  );
 }
