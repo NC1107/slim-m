@@ -118,3 +118,10 @@ final spaceAnalyticsProvider = FutureProvider.autoDispose<api.SpaceAnalytics>(
 final spaceRetentionProvider = FutureProvider.autoDispose<int>(
   (ref) => ref.watch(apiProvider).spaceMessageRetentionDays(),
 );
+
+/// The per-channel canvas object cap, applied to every client. The default a
+/// deployment keeps until an admin sets one is 20000; see
+/// `screens/admin/analytics_screen.dart`.
+final spaceCanvasCapProvider = FutureProvider.autoDispose<int>(
+  (ref) => ref.watch(apiProvider).spaceCanvasObjectCap(),
+);

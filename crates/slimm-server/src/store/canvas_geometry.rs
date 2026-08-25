@@ -20,14 +20,25 @@ pub const WORLD_LIMIT: f64 = 5_000_000.0;
 /// client build.
 pub const MAX_OBJECT_EXTENT: f64 = 8_192.0;
 
-/// Most live objects one channel's canvas may hold.
+/// The default cap on live objects one channel's canvas may hold, applied
+/// when a deployment has not set its own (see `Store::canvas_object_cap`).
 ///
 /// A canvas is a broadly-granted unbounded write with no removal path in this
 /// slice, which is the one combination that cannot be walked back, so the
 /// ceiling is refused inside the same transaction that counts - the shape
 /// `MAX_PINS_PER_CHANNEL` already uses. It also keeps a whole-canvas read
-/// inside what the viewport limit can answer.
+/// inside what the viewport limit can answer. This value is the DEFAULT in
+/// `0052_canvas_object_cap.sql`; a test pins the two together.
 pub const MAX_OBJECTS_PER_CHANNEL: i64 = 20_000;
+
+/// The range a deployment may set its per-channel canvas cap to
+/// (`Store::set_canvas_object_cap`). The floor keeps a canvas usable; the
+/// ceiling keeps one admin from raising the cap high enough that a full canvas
+/// tanks every client's memory and paint, which is the very load this setting
+/// exists to bound. Enforced in Rust, not as a CHECK, so the range can move
+/// without a migration - the same split `MAX_MESSAGE_RETENTION_DAYS` uses.
+pub const MIN_CANVAS_OBJECT_CAP: i64 = 100;
+pub const MAX_CANVAS_OBJECT_CAP: i64 = 100_000;
 
 /// A 24-bit discriminant of a channel id, stored on every object and used as
 /// the R-Tree's third dimension. Drawn from the UUIDv7's random tail, not its

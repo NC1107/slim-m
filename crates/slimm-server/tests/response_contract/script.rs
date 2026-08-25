@@ -161,6 +161,26 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
 
+    c.bare("getSpaceCanvasCap", "GET", "/space/canvas-cap", root)
+        .await;
+    // Change it and set it back, so the rest of the pass keeps the default.
+    c.json(
+        "updateSpaceCanvasCap",
+        "PATCH",
+        "/space/canvas-cap",
+        root,
+        json!({"object_cap": 5000}),
+    )
+    .await;
+    c.json(
+        "updateSpaceCanvasCap",
+        "PATCH",
+        "/space/canvas-cap",
+        root,
+        json!({"object_cap": 20000}),
+    )
+    .await;
+
     profile_calls(c, root, &admin_id, &bob_id).await;
     safety_calls(c, root, bob_token, &bob_id).await;
 

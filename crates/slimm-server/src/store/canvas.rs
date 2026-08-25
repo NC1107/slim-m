@@ -30,7 +30,10 @@ use super::{Store, now_ms};
 use crate::ids::{CanvasObjectId, ChannelId, Seq, UserId};
 
 // Geometry lives in `canvas_geometry`; re-exported so every existing path holds.
-pub use super::canvas_geometry::{MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, WORLD_LIMIT};
+pub use super::canvas_geometry::{
+    MAX_CANVAS_OBJECT_CAP, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, MIN_CANVAS_OBJECT_CAP,
+    WORLD_LIMIT,
+};
 pub(crate) use super::canvas_geometry::{channel_key, valid_bounds};
 
 /// A placed canvas object.
@@ -192,7 +195,9 @@ impl Store {
         )
         .fetch_one(&mut *tx)
         .await?;
-        if live >= MAX_OBJECTS_PER_CHANNEL {
+        // Read in this same write transaction as the count above it.
+        let cap = super::space::read_canvas_object_cap(&mut *tx).await?;
+        if live >= cap {
             tx.commit().await?;
             return Err(PlaceError::ChannelFull);
         }

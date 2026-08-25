@@ -115,6 +115,8 @@ class _AnalyticsPaneState extends ConsumerState<AnalyticsPane>
         ),
         const SizedBox(height: AppSpacing.s16),
         const _RetentionSection(),
+        const SizedBox(height: AppSpacing.s16),
+        const _CanvasCapSection(),
       ],
     );
   }
@@ -314,6 +316,89 @@ class _RetentionSectionState extends ConsumerState<_RetentionSection>
           ],
           selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
           onSegmentSelected: (i) => _setDays(_retentionDayOptions[i].$2),
+        ),
+        SuccessFlash(tick: successTick),
+        if (actionError != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppErrorState(message: actionError!, onDismiss: clearActionError),
+        ],
+      ],
+    );
+  }
+}
+
+/// The per-channel canvas object cap; index-matched to the segmented options
+/// below. All lie inside the server's settable range (100 to 100000), and
+/// 20000 is the default a deployment keeps until an admin sets one.
+const _canvasCapOptions = <(String, int)>[
+  ('5,000', 5000),
+  ('10,000', 10000),
+  ('20,000', 20000),
+  ('50,000', 50000),
+];
+
+/// The per-channel canvas object cap: a client-performance control that
+/// applies to every viewer, independent of the analytics toggle above, so it
+/// stays visible and usable whether or not Space analytics recording is on.
+class _CanvasCapSection extends ConsumerStatefulWidget {
+  const _CanvasCapSection();
+
+  @override
+  ConsumerState<_CanvasCapSection> createState() => _CanvasCapSectionState();
+}
+
+class _CanvasCapSectionState extends ConsumerState<_CanvasCapSection>
+    with GuardedActionState<_CanvasCapSection> {
+  bool _saving = false;
+  int? _optimisticCap;
+
+  Future<void> _setCap(int cap) async {
+    setState(() {
+      _saving = true;
+      _optimisticCap = cap;
+    });
+    final ok = await guard(
+      whatFailed: 'change the canvas object cap',
+      action: () => ref.read(apiProvider).setSpaceCanvasObjectCap(cap),
+    );
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (!ok) _optimisticCap = null;
+    });
+    if (ok) ref.invalidate(spaceCanvasCapProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final cap = ref.watch(spaceCanvasCapProvider);
+    ref.listen(spaceCanvasCapProvider, (previous, next) {
+      if (next.hasValue && !next.isLoading && _optimisticCap != null) {
+        setState(() => _optimisticCap = null);
+      }
+    });
+    final current = _optimisticCap ?? cap.valueOrNull ?? 20000;
+    final selectedIndex = _canvasCapOptions.indexWhere((o) => o.$2 == current);
+
+    return SettingsSectionCard(
+      title: 'Canvas object cap',
+      children: [
+        Text(
+          'The most objects one channel\'s canvas may hold before a new one is '
+          'refused. Applies to every client: a lower cap keeps a busy canvas '
+          'lighter to load and draw.',
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        AppSegmentedControl.inline(
+          semanticLabel: 'Canvas object cap',
+          options: [
+            for (final option in _canvasCapOptions)
+              AppSegmentedOption(label: option.$1, disabled: _saving),
+          ],
+          selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+          onSegmentSelected: (i) => _setCap(_canvasCapOptions[i].$2),
         ),
         SuccessFlash(tick: successTick),
         if (actionError != null) ...[

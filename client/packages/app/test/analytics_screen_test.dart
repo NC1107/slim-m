@@ -76,6 +76,15 @@ http.Response _retentionResponse() => http.Response(
   headers: {'content-type': 'application/json'},
 );
 
+/// [_CanvasCapSection] fires its own `GET /space/canvas-cap` on mount, for the
+/// same reason [_retentionResponse] exists: the analytics body it would fall
+/// through to has no `object_cap` key and the parse would throw.
+http.Response _canvasCapResponse() => http.Response(
+  jsonEncode({'object_cap': 20000}),
+  200,
+  headers: {'content-type': 'application/json'},
+);
+
 Widget _app(ProviderContainer container) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp(
@@ -90,6 +99,7 @@ void main() {
   ) async {
     final client = MockClient((request) async {
       if (request.url.path == '/space/retention') return _retentionResponse();
+      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       return http.Response(
         jsonEncode({'enabled': false}),
         200,
@@ -115,6 +125,7 @@ void main() {
 
     final client = MockClient((request) async {
       if (request.url.path == '/space/retention') return _retentionResponse();
+      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       if (request.method == 'PATCH') {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         patchedBodies.add(body);
@@ -150,6 +161,9 @@ void main() {
       final client = MockClient((request) async {
         if (request.url.path == '/space/retention') {
           return _retentionResponse();
+        }
+        if (request.url.path == '/space/canvas-cap') {
+          return _canvasCapResponse();
         }
         if (request.method == 'PATCH') {
           await gate.future;
@@ -189,6 +203,7 @@ void main() {
     final gate = Completer<void>();
     final client = MockClient((request) async {
       if (request.url.path == '/space/retention') return _retentionResponse();
+      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       if (request.method == 'PATCH') {
         await gate.future;
         return http.Response('', 500);
@@ -220,6 +235,7 @@ void main() {
     var enabled = false;
     final client = MockClient((request) async {
       if (request.url.path == '/space/retention') return _retentionResponse();
+      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       if (request.method == 'PATCH') {
         enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
       }
@@ -252,6 +268,9 @@ void main() {
       final client = MockClient((request) async {
         if (request.url.path == '/space/retention') {
           return _retentionResponse();
+        }
+        if (request.url.path == '/space/canvas-cap') {
+          return _canvasCapResponse();
         }
         return http.Response(
           jsonEncode(_enabledBody),
@@ -289,6 +308,9 @@ void main() {
         if (request.url.path == '/space/retention') {
           return _retentionResponse();
         }
+        if (request.url.path == '/space/canvas-cap') {
+          return _canvasCapResponse();
+        }
         requests++;
         // First answer succeeds; the retry (second GET) fails.
         if (requests > 1) return http.Response('', 500);
@@ -321,6 +343,9 @@ void main() {
       final client = MockClient((request) async {
         if (request.url.path == '/space/retention') {
           return _retentionResponse();
+        }
+        if (request.url.path == '/space/canvas-cap') {
+          return _canvasCapResponse();
         }
         if (request.url.path == '/users') {
           return http.Response(
@@ -368,6 +393,9 @@ void main() {
         if (request.url.path == '/space/retention') {
           return _retentionResponse();
         }
+        if (request.url.path == '/space/canvas-cap') {
+          return _canvasCapResponse();
+        }
         return http.Response(
           jsonEncode(_enabledBody),
           200,
@@ -395,6 +423,9 @@ void main() {
       var retentionDays = 0;
       final patchedRetention = <int>[];
       final client = MockClient((request) async {
+        if (request.url.path == '/space/canvas-cap') {
+          return _canvasCapResponse();
+        }
         if (request.url.path == '/space/retention') {
           if (request.method == 'PATCH') {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
