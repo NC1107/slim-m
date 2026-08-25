@@ -37,8 +37,10 @@ TARGET_LUFS = -20.0
 MIN_GATED_SECONDS = 0.4
 
 # The two inharmonic partials, as multiples of the fundamental, with the
-# amplitude each contributes.
-_PARTIALS = ((1.0, 1.00), (2.02, 0.42), (3.05, 0.17))
+# amplitude each contributes. Kept low relative to the fundamental (backlog
+# #134: the original 0.42/0.17 pair read as a bright, jarring clang) so the
+# family stays a soft, simple chime rather than a struck-metal blast.
+_PARTIALS = ((1.0, 1.00), (2.02, 0.24), (3.05, 0.08))
 
 
 @dataclass(frozen=True)
@@ -52,14 +54,16 @@ class Note:
 
 
 def _envelope(samples: int, seconds: float) -> np.ndarray:
-    """A struck envelope: near-instant attack, exponential decay.
+    """A soft-struck envelope: gentle attack, exponential decay.
 
-    The short attack is what makes it a strike rather than a swell, and the
-    exponential tail is what a real bell does. A linear fade sounds like
-    someone turning a knob.
+    Backlog #134 asked for something closer to an OS boot chime than the
+    click the previous 4ms attack produced. 12ms is inside this family's own
+    original 10-15ms target (docs/research/audio.md) and is still short
+    enough to read as a strike rather than a swell; the exponential tail is
+    what a real bell does. A linear fade sounds like someone turning a knob.
     """
     t = np.linspace(0.0, seconds, samples, endpoint=False)
-    attack = np.clip(t / 0.004, 0.0, 1.0)
+    attack = np.clip(t / 0.012, 0.0, 1.0)
     decay = np.exp(-t * (4.6 / seconds))
     return attack * decay
 
