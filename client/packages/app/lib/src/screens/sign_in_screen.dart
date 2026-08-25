@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import '../api_failure.dart';
+import '../default_server.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
 import '../routing/routes.dart';
@@ -25,7 +26,11 @@ import '../widgets/server_notice.dart';
 ///
 /// The server address is part of this screen rather than buried in settings,
 /// because self-hosting is the normal case: which server you are on is a
-/// first-class choice, not an advanced option.
+/// first-class choice, not an advanced option. The one exception is the
+/// compiled-in official server, where that choice was already made by
+/// picking "Join the official Space" in onboarding: the field starts
+/// collapsed behind "Use a different server" so joining it is username and
+/// password, nothing else.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -40,6 +45,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   late final TextEditingController _server = TextEditingController(
     text: ref.read(serverUrlProvider).toString(),
   );
+
+  /// Whether the address field is on screen. Starts collapsed for the
+  /// compiled-in official server, where an address is not a decision anyone
+  /// joining it needs to make; "Use a different server" below reveals it for
+  /// the self-hoster this build was not necessarily built for.
+  late bool _addressExpanded = !isOfficialServer(ref.read(serverUrlProvider));
   final _username = TextEditingController();
   final _password = TextEditingController();
   final _displayName = TextEditingController();
@@ -322,26 +333,36 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.s8),
-          // Only once it has answered; a typed address says nothing yet.
-          if (_probed case final version?)
-            ServerIdentityChip(
-              spaceName: version.name,
-              host: Uri.tryParse(_server.text)?.host ?? _server.text,
-              status: _identityStatus ?? ServerIdentityStatus.unknown,
+          if (_addressExpanded) ...[
+            // Only once it has answered; a typed address says nothing yet.
+            if (_probed case final version?)
+              ServerIdentityChip(
+                spaceName: version.name,
+                host: Uri.tryParse(_server.text)?.host ?? _server.text,
+                status: _identityStatus ?? ServerIdentityStatus.unknown,
+              ),
+            const SizedBox(height: AppSpacing.s8),
+            TextField(
+              controller: _server,
+              decoration: InputDecoration(
+                labelText: 'Server',
+                helperText: "The Space you're joining - its server address.",
+                errorText: _errorFor(_ErrorField.server),
+                errorMaxLines: 3,
+              ),
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              onChanged: _onServerEdited,
             ),
-          const SizedBox(height: AppSpacing.s8),
-          TextField(
-            controller: _server,
-            decoration: InputDecoration(
-              labelText: 'Server',
-              helperText: "The Space you're joining - its server address.",
-              errorText: _errorFor(_ErrorField.server),
-              errorMaxLines: 3,
+            const SizedBox(height: AppSpacing.s8),
+          ] else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() => _addressExpanded = true),
+                child: const Text('Use a different server'),
+              ),
             ),
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            onChanged: _onServerEdited,
-          ),
           // First of the three: the other two are about convenience,
           // this one is about whether you have any recourse here.
           if (_probed case final version?) ServerSafetyNotice(version: version),

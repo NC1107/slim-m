@@ -40,11 +40,19 @@ String identityHandleFor(Uri address) => 'server_identity:${address.origin}';
 /// report an identity, or unreachable here, is treated as unknown rather than
 /// blocked: sign-in surfaces a real connection failure with more authority
 /// than a probe run during onboarding ever could.
+///
+/// [silentFirstConnect] skips the fingerprint screen on a first connect and
+/// pins whatever answered without asking - only correct for an address
+/// nobody typed, such as the compiled-in official server, where there is no
+/// out-of-band admin to compare the code with. A key that later changes is
+/// never silent, with or without this flag: that is the one case
+/// trust-on-first-use exists to make visible.
 Future<bool> confirmServerIdentity(
   BuildContext context,
   WidgetRef ref,
-  Uri server,
-) async {
+  Uri server, {
+  bool silentFirstConnect = false,
+}) async {
   final client = ref.read(probeApiProvider)(server);
   api.ServerIdentity? identity;
   try {
@@ -63,6 +71,11 @@ Future<bool> confirmServerIdentity(
 
   if (pinned == identity.publicKey) return true;
   if (!context.mounted) return false;
+
+  if (pinned == null && silentFirstConnect) {
+    await keyStore.put(handle, identity.publicKey);
+    return true;
+  }
 
   final trusted = pinned == null
       ? await Navigator.of(context).push<bool>(

@@ -13,15 +13,12 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
+import '../default_server.dart';
 import '../providers/providers.dart';
 import '../server_address_reduction.dart';
 import '../server_scheme_policy.dart';
 import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
-
-/// The official instance. Someone with no invite and no server of their own
-/// still needs somewhere to land.
-const officialServer = 'https://slim.npc-server.top';
 
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({required this.onServerChosen, super.key});
@@ -116,11 +113,21 @@ class OnboardingScreen extends ConsumerWidget {
   }
 
   /// The official address is a compile-time constant, never user input, so
-  /// there is nothing to validate here beyond confirming its identity - the
-  /// same pin-on-first-connect every other entry point now goes through.
+  /// there is nothing to validate here. First connect pins its identity
+  /// silently rather than asking someone to read a fingerprint aloud to an
+  /// admin that, for this address, does not exist - the app and the server
+  /// are published by the same source. A later mismatch still stops the
+  /// flow: that would mean this well-known address answered with a
+  /// different key than the one already pinned, which is worth a hard stop
+  /// regardless of how the address was chosen.
   Future<void> _officialFlow(BuildContext context, WidgetRef ref) async {
     final server = Uri.parse(officialServer);
-    if (await confirmServerIdentity(context, ref, server)) {
+    if (await confirmServerIdentity(
+      context,
+      ref,
+      server,
+      silentFirstConnect: true,
+    )) {
       onServerChosen(server, null);
     }
   }
