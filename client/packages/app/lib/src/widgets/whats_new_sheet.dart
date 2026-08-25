@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The sheet shown once after an update: what changed since whichever
 /// version was last seen on this install.
+///
+/// This is `desktop-vs-mobile.md` rule 4, a short task with a single
+/// dismiss: [showAppSheet] renders it as a bottom sheet under the compact
+/// breakpoint and a centered dialog above it, with the same [entries]
+/// content either way.
 library;
 
 import 'package:flutter/material.dart';
