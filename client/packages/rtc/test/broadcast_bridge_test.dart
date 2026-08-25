@@ -167,4 +167,21 @@ void main() {
       await sub.cancel();
     });
   });
+
+  // Trips on any change to the livekit `src/` surface the bridge reaches into.
+  test('BroadcastManager still exposes the internal surface the bridge uses',
+      () {
+    addTearDown(
+        () => lk_broadcast.BroadcastManager().shouldPublishTrack = true);
+    final manager = lk_broadcast.BroadcastManager();
+
+    manager.shouldPublishTrack = false;
+    expect(manager.shouldPublishTrack, isFalse);
+
+    void listener() {}
+    manager.addListener(listener);
+    manager.removeListener(listener);
+
+    expect(manager.isBroadcasting, isA<bool>());
+  });
 }
