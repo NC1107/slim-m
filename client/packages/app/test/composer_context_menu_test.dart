@@ -65,6 +65,73 @@ void main() {
     });
   });
 
+  group('systemContextMenuItemsWithoutScanText', () {
+    test('drops the Live Text (scan text) item', () {
+      final items = systemContextMenuItemsWithoutScanText(const [
+        IOSSystemContextMenuItemCopy(),
+        IOSSystemContextMenuItemLiveText(),
+        IOSSystemContextMenuItemPaste(),
+      ]);
+      expect(items, [
+        isA<IOSSystemContextMenuItemCopy>(),
+        isA<IOSSystemContextMenuItemPaste>(),
+      ]);
+    });
+
+    test('leaves the list untouched when Live Text is not offered', () {
+      final items = systemContextMenuItemsWithoutScanText(const [
+        IOSSystemContextMenuItemCopy(),
+      ]);
+      expect(items, [isA<IOSSystemContextMenuItemCopy>()]);
+    });
+
+    test(
+      'composes with forced paste: scan text stays gone, paste is added',
+      () {
+        final items = systemContextMenuItemsWithForcedPaste(
+          systemContextMenuItemsWithoutScanText(const [
+            IOSSystemContextMenuItemLiveText(),
+          ]),
+          clipboardHasImage: true,
+        );
+        expect(items, [isA<IOSSystemContextMenuItemPaste>()]);
+      },
+    );
+  });
+
+  group('contextMenuButtonItemsWithoutScanText', () {
+    test('drops the liveTextInput button', () {
+      final items = contextMenuButtonItemsWithoutScanText([
+        const ContextMenuButtonItem(
+          onPressed: null,
+          type: ContextMenuButtonType.copy,
+        ),
+        const ContextMenuButtonItem(
+          onPressed: null,
+          type: ContextMenuButtonType.liveTextInput,
+        ),
+      ]);
+      expect(items, [
+        isA<ContextMenuButtonItem>().having(
+          (item) => item.type,
+          'type',
+          ContextMenuButtonType.copy,
+        ),
+      ]);
+    });
+
+    test('leaves the list untouched when liveTextInput is not offered', () {
+      final items = contextMenuButtonItemsWithoutScanText([
+        const ContextMenuButtonItem(
+          onPressed: null,
+          type: ContextMenuButtonType.paste,
+        ),
+      ]);
+      expect(items, hasLength(1));
+      expect(items.single.type, ContextMenuButtonType.paste);
+    });
+  });
+
   group('ClipboardImageStatusNotifier', () {
     late List<String> calledMethods;
 
