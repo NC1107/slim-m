@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The rail's channel rows: the manage-sheet pairing, the voice row and the
-/// participant strip beneath it.
+/// The rail's channel rows: the kebab pairing (see `channel_row_menu.dart`
+/// for the menu it and the row's own right-click/long-press both open), the
+/// voice row and the participant strip beneath it.
 ///
 /// Split out of `channel_rail_sections.dart` when that file crossed the
 /// 300-line review budget; the sections there own layout and permissions,
 /// these own one row each.
 library;
-
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,109 +16,15 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
-import '../permissions.dart';
-import '../providers/channel_notification_overrides_controller.dart';
-import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
+import 'channel_row_menu.dart';
 import 'context_menu_region.dart';
-import 'manage_channel_sheet.dart';
 import 'user_avatar.dart';
 import 'voice_channel_tap.dart';
 
-/// The right-click/long-press menu every channel row gets: opening it
-/// always, muting it or narrowing it to mentions only (the same two toggles
-/// the header used to duplicate until 2026-08-13, tapping
-/// the active one clears back to the account default), and managing it
-/// (rename, topic, delete) only for the caller [canManage] already lets use
-/// the row's own kebab - that gate, reused rather than repeated.
-///
-/// Read fresh every time the menu opens rather than watched, the same choice
-/// `DmRow._menuItems`'s own doc comment makes: the row itself already
-/// rebuilds on a live mute change (see [_TextChannelRow]), and a menu that
-/// is already open does not need to react to one landing mid-look.
-List<Widget> _channelMenuItems(
-  BuildContext context,
-  VoidCallback close,
-  Channel channel,
-  bool canManage,
-) {
-  final container = ProviderScope.containerOf(context, listen: false);
-  final current = container
-      .read(channelNotificationOverridesProvider)
-      .overrideFor(channel.id);
-  // Coarse deployment-wide gate like the channel-manage one; the overwrite screen re-checks this channel's own MANAGE_ROLES on open.
-  final canManageRoles =
-      container
-          .read(meProvider)
-          .valueOrNull
-          ?.permissions
-          .hasPermission(Perm.manageRoles) ??
-      false;
-
-  void toggle(api.NotificationPreference preference) {
-    close();
-    final notifier = container.read(
-      channelNotificationOverridesProvider.notifier,
-    );
-    unawaited(
-      current == preference
-          ? notifier.clear(channel.id)
-          : preference == api.NotificationPreference.nothing
-          ? notifier.mute(channel.id)
-          : notifier.mentionsOnly(channel.id),
-    );
-  }
-
-  return [
-    AppMenuItem(
-      label: 'Open channel',
-      leading: AppIcons.hash,
-      onTap: () {
-        close();
-        context.go(Routes.channel(channel.id));
-      },
-    ),
-    const AppMenuDivider(),
-    AppMenuItem(
-      label: 'Mute channel',
-      leading: AppIcons.notificationsOff,
-      selected: current == api.NotificationPreference.nothing,
-      onTap: () => toggle(api.NotificationPreference.nothing),
-    ),
-    AppMenuItem(
-      label: 'Mentions only',
-      leading: AppIcons.mentions,
-      selected: current == api.NotificationPreference.mentions,
-      onTap: () => toggle(api.NotificationPreference.mentions),
-    ),
-    if (canManage) ...[
-      const AppMenuDivider(),
-      AppMenuItem(
-        label: 'Manage channel...',
-        leading: AppIcons.settings,
-        onTap: () {
-          close();
-          showManageChannelSheet(context, channel);
-        },
-      ),
-    ],
-    if (canManageRoles) ...[
-      if (!canManage) const AppMenuDivider(),
-      AppMenuItem(
-        label: 'Channel permissions...',
-        leading: AppIcons.permissions,
-        onTap: () {
-          close();
-          context.push(Routes.adminOverwrites, extra: channel);
-        },
-      ),
-    ],
-  ];
-}
-
-/// Pairs a channel row with its manage-sheet trigger, handed to
+/// Pairs a channel row with its kebab, handed to
 /// [AppListRow.trailingExtra] (via [row]'s own builder) rather than composed
 /// as a plain sibling: a sibling sits outside the tinted container the row's
 /// hover and press highlight paints into, so the highlight visibly stopped
@@ -164,8 +69,13 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
   bool _hovered = false;
   bool _kebabFocused = false;
 
+  /// Reached by the kebab too (see [build]'s `onPressed`), so a tap there
+  /// opens the exact same menu a right-click or long-press would rather than
+  /// the separate "manage" sheet the kebab used to jump to directly.
+  final _menuKey = GlobalKey<ContextMenuRegionState>();
+
   List<Widget> _menuItems(BuildContext context, VoidCallback close) =>
-      _channelMenuItems(context, close, widget.channel, widget.canManage);
+      channelRowMenuItems(context, close, widget.channel, widget.canManage);
 
   @override
   Widget build(BuildContext context) {
@@ -207,8 +117,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
                 icon: AppIcons.moreVertical,
                 semanticLabel: 'Manage ${widget.channel.name}',
                 size: AppIconButtonSize.sm,
-                onPressed: () =>
-                    showManageChannelSheet(context, widget.channel),
+                onPressed: () => _menuKey.currentState?.open(),
               ),
             ),
           ),
@@ -223,6 +132,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
           );
     // Inside the row's trailing slot, so no combined height to float against.
     return ContextMenuRegion(
+      key: _menuKey,
       itemsBuilder: _menuItems,
       ownsFocusNode: false,
       enableLongPress: enableLongPress,

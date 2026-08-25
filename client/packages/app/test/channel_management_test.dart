@@ -262,6 +262,8 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Manage general'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage channel...'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete permanently'));
@@ -300,6 +302,8 @@ void main() {
       expect(find.text('channel:c1'), findsOneWidget);
 
       await tester.tap(find.bySemanticsLabel('Manage general'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage channel...'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
@@ -344,6 +348,8 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Manage general'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage channel...'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
 
@@ -387,6 +393,8 @@ void main() {
       );
 
       await tester.tap(find.bySemanticsLabel('Manage random'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage channel...'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
