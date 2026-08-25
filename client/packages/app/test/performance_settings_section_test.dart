@@ -23,9 +23,13 @@ void main() {
       ),
     );
 
+    expect(find.text('Auto-download media'), findsOneWidget);
+    expect(find.text('Autoplay GIFs'), findsOneWidget);
     expect(find.text('Attachment preview quality'), findsOneWidget);
     expect(find.text('Image cache'), findsOneWidget);
-    // Each row states its current value, and both currents are the default.
+    // Each row states its current value, and every current is the default.
+    expect(find.text('Always (default)'), findsOneWidget);
+    expect(find.text('On (default)'), findsOneWidget);
     expect(find.text('Sharp (default)'), findsOneWidget);
     expect(find.text('100 MB (default)'), findsOneWidget);
   });

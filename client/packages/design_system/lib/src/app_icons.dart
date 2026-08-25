@@ -80,6 +80,9 @@ abstract final class AppIcons {
   /// A picked image, once there is one to replace rather than choose fresh.
   static const IconData image = LucideIcons.image300;
 
+  /// Overlaid on a held gif or a not-yet-loaded media preview: tap to reveal.
+  static const IconData play = LucideIcons.play300;
+
   /// The document-browser route onto an attachment, distinct from [image]'s
   /// Photos-backed one; see `attachment_picker.dart`.
   static const IconData attachFile = LucideIcons.paperclip300;

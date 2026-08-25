@@ -17,6 +17,8 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/attachment_bytes.dart';
 import '../providers/attachment_preview_quality.dart';
+import '../providers/media_preferences.dart';
+import 'attachment_reveal.dart';
 import 'fullscreen_image_viewer.dart';
 import 'image_decode.dart';
 import 'message_row_parts.dart' show AttachmentPlaceholder;
@@ -78,9 +80,16 @@ class AttachmentView extends ConsumerStatefulWidget {
 class _AttachmentViewState extends ConsumerState<AttachmentView> {
   final Object _heroTag = Object();
 
+  /// Set once the reader taps a gated preview, opening both gates at once: a
+  /// gif held for autoplay, an image held for download, or both, reveal on the
+  /// one tap and stay revealed for the life of this row.
+  bool _revealed = false;
+
   api.Attachment get attachment => widget.attachment;
 
   bool get _isImage => isInlineImage(attachment.contentType);
+
+  bool get _isGif => attachment.contentType == 'image/gif';
 
   @override
   Widget build(BuildContext context) {
@@ -119,10 +128,35 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
       );
     }
 
-    final bytesAsync = ref.watch(attachmentBytesProvider(attachment.id));
+    final autoDownload = ref.watch(mediaAutoDownloadControllerProvider);
+    final gifAutoplay = ref.watch(gifAutoplayControllerProvider);
+    final downloadGated =
+        autoDownload == MediaAutoDownload.manual && !_revealed;
+    final playGated =
+        _isGif && gifAutoplay == GifAutoplay.tapToPlay && !_revealed;
+    final caption =
+        '${attachment.filename} · ${formatByteSize(attachment.size)}';
+
+    // Held for download: nothing fetches until the tap, the point when metered.
+    if (downloadGated) {
+      return AttachmentRevealTile(
+        icon: AppIcons.image,
+        line: 'Tap to load',
+        caption: caption,
+        maxEdge: kInlineImageMax,
+        onReveal: () => setState(() => _revealed = true),
+      );
+    }
+
     final previewScale = ref
         .watch(attachmentPreviewQualityControllerProvider)
         .decodeScale;
+    final decodeWidth = decodeEdge(
+      context,
+      kInlineImageMax,
+      scale: previewScale,
+    );
+    final bytesAsync = ref.watch(attachmentBytesProvider(attachment.id));
     return bytesAsync.when(
       loading: () => const AttachmentPlaceholder(),
       error: (error, _) => _tappable(
@@ -135,66 +169,77 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
           height: 168,
         ),
       ),
-      data: (bytes) => _tappable(
-        label: 'Open ${attachment.filename} fullscreen',
-        onTap: () => showFullscreenImage(
-          context,
-          filename: attachment.filename,
-          bytes: bytes,
-          heroTag: _heroTag,
-        ),
-        // Bordered like the chip and error states beside it (border-first
-        // elevation), and captioned: a bare rectangle with no name or size
-        // read as decoration rather than a file anyone could open.
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Hero(
-              tag: _heroTag,
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: tokens.borderSubtle),
-                  borderRadius: BorderRadius.circular(AppRadii.control),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.control),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: kInlineImageMax,
-                      maxHeight: kInlineImageMax,
-                    ),
-                    // Never decodes wider than the transcript can draw it.
-                    child: Image.memory(
-                      bytes,
-                      fit: BoxFit.contain,
-                      semanticLabel: attachment.filename,
-                      cacheWidth: decodeEdge(
-                        context,
-                        kInlineImageMax,
-                        scale: previewScale,
+      data: (bytes) {
+        // A gif held from autoplay shows its first frame, animating on tap.
+        if (playGated) {
+          return AttachmentRevealTile(
+            caption: caption,
+            maxEdge: kInlineImageMax,
+            onReveal: () => setState(() => _revealed = true),
+            preview: AttachmentFirstFrame(
+              bytes: bytes,
+              cacheWidth: decodeWidth,
+            ),
+          );
+        }
+        return _tappable(
+          label: 'Open ${attachment.filename} fullscreen',
+          onTap: () => showFullscreenImage(
+            context,
+            filename: attachment.filename,
+            bytes: bytes,
+            heroTag: _heroTag,
+          ),
+          // Bordered like the chip and error states beside it (border-first
+          // elevation), and captioned: a bare rectangle with no name or size
+          // read as decoration rather than a file anyone could open.
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Hero(
+                tag: _heroTag,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: tokens.borderSubtle),
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: kInlineImageMax,
+                        maxHeight: kInlineImageMax,
                       ),
-                      // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
-                      errorBuilder: (context, error, stackTrace) => _FailureBox(
-                        tokens: tokens,
-                        message: 'Could not open ${attachment.filename}.',
-                        width: kInlineImageMax,
-                        height: 168,
+                      // Never decodes wider than the transcript can draw it.
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.contain,
+                        semanticLabel: attachment.filename,
+                        cacheWidth: decodeWidth,
+                        // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
+                        errorBuilder: (context, error, stackTrace) =>
+                            _FailureBox(
+                              tokens: tokens,
+                              message: 'Could not open ${attachment.filename}.',
+                              width: kInlineImageMax,
+                              height: 168,
+                            ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              '${attachment.filename} · ${formatByteSize(attachment.size)}',
-              overflow: TextOverflow.ellipsis,
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-          ],
-        ),
-      ),
+              const SizedBox(height: AppSpacing.s4),
+              Text(
+                caption,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
