@@ -4014,6 +4014,60 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /space/canvas-cap:
+    get:
+      operationId: getSpaceCanvasCap
+      tags: [space]
+      summary: Read the per-channel canvas object cap.
+      description: >
+        Gated on MANAGE_SERVER, the same bit as `/space/analytics`. The cap is
+        the most live objects one channel's canvas may hold before a placement
+        is refused; it applies to every client. The default a deployment keeps
+        on upgrade is 20000.
+      responses:
+        "200":
+          description: The current cap.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceCanvasCap"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    patch:
+      operationId: updateSpaceCanvasCap
+      tags: [space]
+      summary: Change the per-channel canvas object cap.
+      description: >
+        Lower it to keep a busy canvas light on every client's memory and
+        paint, raise it to allow denser boards at that cost. A value outside
+        the settable range (100 to 100000) is refused rather than clamped.
+        The new cap governs the next placement; objects already on a canvas
+        over a freshly-lowered cap are not removed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpaceCanvasCap"
+      responses:
+        "200":
+          description: The cap after the change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceCanvasCap"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -4827,6 +4881,16 @@ components:
           description: >
             Days a message is kept before the sweep prunes it. `0` means
             disabled - keep forever - and is the default.
+    SpaceCanvasCap:
+      type: object
+      required: [object_cap]
+      properties:
+        object_cap:
+          type: integer
+          description: >
+            Most live objects one channel's canvas may hold before a placement
+            is refused. Applies to every client. Settable range is 100 to
+            100000; the default is 20000.
     PresenceStatus:
       type: object
       required: [user_id, status]

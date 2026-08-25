@@ -64,6 +64,20 @@ extension SlimmApiSpace on SlimmApi {
     );
     return (json as Map<String, dynamic>)['retention_days'] as int;
   }
+
+  Future<int> spaceCanvasObjectCap() async {
+    final json = await _send('GET', '/space/canvas-cap');
+    return (json as Map<String, dynamic>)['object_cap'] as int;
+  }
+
+  Future<int> setSpaceCanvasObjectCap(int cap) async {
+    final json = await _send(
+      'PATCH',
+      '/space/canvas-cap',
+      body: {'object_cap': cap},
+    );
+    return (json as Map<String, dynamic>)['object_cap'] as int;
+  }
 }
 
 /// One calendar day's Space-wide message count, UTC, zero-filled for a day

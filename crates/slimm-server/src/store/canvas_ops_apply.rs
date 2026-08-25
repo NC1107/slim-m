@@ -9,7 +9,6 @@
 
 use sqlx::QueryBuilder;
 
-use super::canvas::MAX_OBJECTS_PER_CHANNEL;
 use super::canvas_move::move_canvas_object_query;
 use super::canvas_ops_write::SubmitOpError;
 use crate::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
@@ -249,7 +248,9 @@ pub(super) async fn apply_restore(
     )
     .fetch_one(&mut **tx)
     .await?;
-    if live + dead.len() as i64 > MAX_OBJECTS_PER_CHANNEL {
+    // The effective cap, read in this same transaction as the count above it.
+    let cap = super::space::read_canvas_object_cap(&mut **tx).await?;
+    if live + dead.len() as i64 > cap {
         return Err(SubmitOpError::ChannelFull);
     }
 

@@ -441,3 +441,35 @@ async fn a_full_canvas_refuses_the_next_object() {
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(body["error"], "this canvas is full");
 }
+
+/// The ceiling is the deployment's configured cap, not the compile-time
+/// default. A cap of three refuses the fourth object even though the default is
+/// twenty thousand: mutating the placement check to read `MAX_OBJECTS_PER_CHANNEL`
+/// instead of the stored cap lets the fourth through and turns this red. Three
+/// rows are inserted raw, since what is under test is the refusal, not the
+/// placement round trip.
+#[tokio::test]
+async fn a_lowered_cap_refuses_the_next_object() {
+    let (store, pool, _guard) = new_store_and_pool().await;
+    let (token, author) = register(&store, "root").await;
+    let channel = general(&store).await;
+    store.set_canvas_object_cap(3).await.expect("set a low cap");
+
+    sqlx::query(
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+         INSERT INTO canvas_objects
+             (id, channel_id, channel_key, kind, z_index, x, y, w, h, props,
+              author_id, seq, created_at)
+         SELECT randomblob(16), ?, 0, 'stroke', i, 0, 0, 1, 1, '{}', ?, i, 0 FROM n",
+    )
+    .bind(3_i64)
+    .bind(channel)
+    .bind(author)
+    .execute(&pool)
+    .await
+    .expect("filled the canvas to the low cap");
+
+    let (status, body) = post(&app(store), channel, &token, stroke(&id())).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(body["error"], "this canvas is full");
+}

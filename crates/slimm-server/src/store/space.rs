@@ -61,9 +61,48 @@ where
         .unwrap_or(JoinPolicy::Invite))
 }
 
+/// The effective per-channel canvas object cap, read inside a caller's
+/// transaction so an enforcement count sees a cap change that lands
+/// concurrently rather than a snapshot from before it - the same reasoning
+/// [`read_join_policy`] gives. Falls back to `MAX_OBJECTS_PER_CHANNEL` for a
+/// row written before this column existed.
+pub(super) async fn read_canvas_object_cap<'e, E>(executor: E) -> anyhow::Result<i64>
+where
+    E: SqliteExecutor<'e>,
+{
+    let cap = sqlx::query_scalar!(
+        r#"SELECT canvas_object_cap AS "c!: i64" FROM space_settings WHERE id = 1"#
+    )
+    .fetch_optional(executor)
+    .await
+    .context("read canvas object cap")?;
+    Ok(cap.unwrap_or(super::MAX_OBJECTS_PER_CHANNEL))
+}
+
 impl Store {
     pub async fn join_policy(&self) -> anyhow::Result<JoinPolicy> {
         read_join_policy(&self.pool).await
+    }
+
+    /// The per-channel canvas object cap in force for this deployment.
+    pub async fn canvas_object_cap(&self) -> anyhow::Result<i64> {
+        read_canvas_object_cap(&self.pool).await
+    }
+
+    /// Sets the per-channel canvas object cap. The caller is responsible for
+    /// range-checking against `MIN_CANVAS_OBJECT_CAP` and
+    /// `MAX_CANVAS_OBJECT_CAP`; the DB CHECK only guards the `>= 1` invariant.
+    pub async fn set_canvas_object_cap(&self, cap: i64) -> anyhow::Result<()> {
+        let now = now_ms();
+        sqlx::query!(
+            "UPDATE space_settings SET canvas_object_cap = ?, updated_at = ? WHERE id = 1",
+            cap,
+            now
+        )
+        .execute(&self.pool)
+        .await
+        .context("set canvas object cap")?;
+        Ok(())
     }
 
     pub async fn set_join_policy(&self, policy: JoinPolicy) -> anyhow::Result<()> {

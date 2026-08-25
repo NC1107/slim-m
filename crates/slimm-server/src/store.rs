@@ -73,8 +73,8 @@ pub use analytics::{
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use canvas::{
-    CanvasObject, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL, PlaceError, PlaceRequest, Placement,
-    Rect, ViewportQuery, WORLD_LIMIT,
+    CanvasObject, MAX_CANVAS_OBJECT_CAP, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL,
+    MIN_CANVAS_OBJECT_CAP, PlaceError, PlaceRequest, Placement, Rect, ViewportQuery, WORLD_LIMIT,
 };
 pub use canvas_media_slots::{CanvasMediaSlot, MediaSlotError, MediaSlotKind};
 pub use canvas_ops::{

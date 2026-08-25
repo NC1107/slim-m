@@ -15,22 +15,31 @@ use super::extract::{Authed, Json, enforce};
 use crate::permissions::Permissions;
 use crate::process_metrics::current_rss_bytes;
 use crate::ratelimit::Class;
-use crate::store::{AnalyticsStats, MAX_MESSAGE_RETENTION_DAYS, MemberAttachmentUsage};
+use crate::store::{
+    AnalyticsStats, MAX_CANVAS_OBJECT_CAP, MAX_MESSAGE_RETENTION_DAYS, MIN_CANVAS_OBJECT_CAP,
+    MemberAttachmentUsage,
+};
 
 const BODY_LIMIT: usize = 256;
 
 /// The Space analytics and retention routes, mounted by [`super::router`].
 ///
-/// Retention lives here rather than under `/space/settings`: both are
-/// operator-facing disk-pressure tooling and both are gated identically, so
-/// this keeps the two together rather than splitting them across files that
-/// would otherwise carry no other relationship.
+/// Retention and the canvas object cap live here rather than under
+/// `/space/settings`: all three are operator-facing resource-pressure tooling
+/// gated identically on MANAGE_SERVER, so this keeps them together rather than
+/// splitting them across files that would otherwise carry no other
+/// relationship. Retention bounds disk; the canvas cap bounds every client's
+/// memory and paint on a busy canvas.
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/space/analytics", get(read).patch(update))
         .route(
             "/space/retention",
             get(read_retention).patch(update_retention),
+        )
+        .route(
+            "/space/canvas-cap",
+            get(read_canvas_cap).patch(update_canvas_cap),
         )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
@@ -203,6 +212,46 @@ async fn update_retention(
         .await?;
     Ok(Json(RetentionDto {
         retention_days: body.retention_days,
+    }))
+}
+
+#[derive(Serialize, Deserialize)]
+struct CanvasCapDto {
+    /// Most live objects one channel's canvas may hold before a placement is
+    /// refused. Applies to every client; lower it to keep a busy canvas light,
+    /// raise it to allow denser boards at a memory-and-paint cost.
+    object_cap: i64,
+}
+
+async fn read_canvas_cap(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+) -> Result<Json<CanvasCapDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    require_manage_server(&state, &ctx).await?;
+    Ok(Json(CanvasCapDto {
+        object_cap: state.store.canvas_object_cap().await?,
+    }))
+}
+
+/// A cap outside the settable range is refused rather than clamped, so a typo
+/// cannot silently land on whichever bound the code happens to pick - the same
+/// rule [`update_retention`] follows.
+async fn update_canvas_cap(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+    Json(body): Json<CanvasCapDto>,
+) -> Result<Json<CanvasCapDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    require_manage_server(&state, &ctx).await?;
+    if !(MIN_CANVAS_OBJECT_CAP..=MAX_CANVAS_OBJECT_CAP).contains(&body.object_cap) {
+        return Err(ApiError::BadRequest("object_cap out of range"));
+    }
+    state.store.set_canvas_object_cap(body.object_cap).await?;
+    Ok(Json(CanvasCapDto {
+        object_cap: body.object_cap,
     }))
 }
 
