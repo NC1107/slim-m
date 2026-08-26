@@ -199,7 +199,7 @@ void main() {
     expect(await _lastReadSeqOf(store, 'chan-1'), 2);
   });
 
-  test('reset clears the channel but keeps unsent work', () async {
+  test('reset clears the channel but keeps unsent and failed work', () async {
     await store.applyMessages([
       _message(id: 'm1', seq: 1),
       _message(id: 'm2', seq: 2),
@@ -210,12 +210,20 @@ void main() {
       authorId: 'user-1',
       content: 'still typing',
     );
+    // markFailed also sets pending:false, so survival must key off failed too.
+    await store.addPending(
+      id: 'local-2',
+      channelId: 'chan-1',
+      authorId: 'user-1',
+      content: 'never sent',
+    );
+    await store.markFailed('local-2', reason: 'the server refused it');
 
     await store.resetChannel('chan-1');
 
     final rows = await store.watchChannel('chan-1').first;
-    expect(rows, hasLength(1));
-    expect(rows.single.id, 'local-1', reason: 'the unsent message survives');
+    expect(rows.map((m) => m.id).toSet(), {'local-1', 'local-2'},
+        reason: 'the unsent message and the failed one both survive');
     expect(await _cursorOf(store, 'chan-1'), 0,
         reason: 'refetch from the start');
   });
