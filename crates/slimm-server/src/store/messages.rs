@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The message write and read paths: send, edit, delete and list, over
-//! embedded SQLite. Full-text search is [`super::message_search`].
+//! The message write paths: send, edit and delete, over embedded SQLite. The
+//! read paths (list, fetch by id) are [`super::message_reads`], split out to
+//! stay under the file budget. Full-text search is [`super::message_search`].
 //!
 //! Two invariants live here and are covered by tests:
 //!
@@ -12,15 +13,16 @@
 //!   retry with the same id returns the stored message and consumes no new
 //!   sequence, so an at-least-once client never duplicates or reorders.
 //!
-//! Delete is soft: `deleted_at` is set, and every read here filters on it
-//! except [`Store::message_including_deleted`], which a delete handler needs
-//! so it can authorize against an already-gone row and stay idempotent.
+//! Delete is soft: `deleted_at` is set, and every read filters on it except
+//! [`Store::message_including_deleted`], which a delete handler needs so it
+//! can authorize against an already-gone row and stay idempotent.
 
 use anyhow::Context;
-use sqlx::SqliteExecutor;
 
 use super::attachments::{LinkError, link_attachments, release_message_attachments};
 use super::message_ops::insert_message_op;
+use super::message_reads::{fetch_message, fetch_message_including_deleted};
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
@@ -322,6 +324,14 @@ impl Store {
     /// that deleted it. Releasing the attachment links happens in the same
     /// transaction, so a message can never end up soft-deleted while still
     /// holding live attachment references.
+    ///
+    /// When `actor_id` differs from the message's author, this is a
+    /// moderator reaching for someone else's message rather than an author
+    /// deleting their own, so it is recorded under the same `messages_deleted`
+    /// action [`Self::bulk_delete_messages`] writes - the single-message and
+    /// bulk paths must not diverge on what an act of the same shape produces.
+    /// A self-delete, and a message whose author no longer resolves (mirroring
+    /// how the bulk path skips a `None` author), write no row.
     pub async fn delete_message(
         &self,
         id: MessageId,
@@ -336,22 +346,39 @@ impl Store {
         )
         .fetch_one(&mut *tx)
         .await?;
-        let channel_id = sqlx::query_scalar!(
+        let claimed = sqlx::query!(
             r#"UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL
-               RETURNING channel_id AS "channel_id!: ChannelId""#,
+               RETURNING channel_id AS "channel_id!: ChannelId", author_id AS "author_id: UserId""#,
             now,
             id
         )
         .fetch_optional(&mut *tx)
         .await?;
-        let Some(channel_id) = channel_id else {
+        let Some(claimed) = claimed else {
             tx.commit().await?;
             return Ok(MessageDeletion::default());
         };
+        let channel_id = claimed.channel_id;
 
         let op_seq =
             insert_message_op(&mut tx, channel_id, id, "delete", Some(actor_id), now).await?;
         let freed_attachments = release_message_attachments(&mut tx, id).await?;
+        if let Some(author_id) = claimed.author_id
+            && author_id != actor_id
+        {
+            record_moderation_audit(
+                &mut tx,
+                ModerationAudit {
+                    actor_id,
+                    subject_id: author_id,
+                    action: "messages_deleted",
+                    reason: None,
+                    until: None,
+                    created_at: now,
+                },
+            )
+            .await?;
+        }
         tx.commit().await?;
         Ok(MessageDeletion {
             deleted: true,
@@ -360,121 +387,4 @@ impl Store {
             op_seq: Some(op_seq),
         })
     }
-
-    /// Lists a channel's live messages newest-first, using keyset pagination on
-    /// `seq` (never OFFSET). Pass the smallest `seq` seen so far as `before_seq`
-    /// to page backwards.
-    pub async fn list_messages(
-        &self,
-        channel_id: ChannelId,
-        before_seq: Option<i64>,
-        limit: i64,
-    ) -> anyhow::Result<Vec<Message>> {
-        let before = before_seq.unwrap_or(i64::MAX);
-        let rows = sqlx::query_as!(
-            Message,
-            r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
-                      m.author_id AS "author_id: UserId",
-                      u.display_name AS "author_display_name?: String",
-                      m.seq AS "seq!: Seq",
-                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
-                      m.reply_to_id AS "reply_to_id: MessageId"
-               FROM messages m
-               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
-               WHERE m.channel_id = ? AND m.deleted_at IS NULL AND m.seq < ?
-               ORDER BY m.seq DESC
-               LIMIT ?"#,
-            channel_id,
-            before,
-            limit
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows)
-    }
-
-    /// Fetches a live message by id, or `None` if it is missing or deleted.
-    pub async fn message(&self, id: MessageId) -> anyhow::Result<Option<Message>> {
-        fetch_message(&self.pool, id).await
-    }
-
-    /// Fetches a message by id whether or not it is deleted. A delete handler
-    /// needs this rather than [`Store::message`] so it can authorize against
-    /// an already-deleted row and tell "already gone" apart from "never
-    /// existed here", which a `deleted_at`-filtered read cannot distinguish.
-    pub async fn message_including_deleted(
-        &self,
-        id: MessageId,
-    ) -> anyhow::Result<Option<Message>> {
-        let message = sqlx::query_as!(
-            Message,
-            r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
-                      m.author_id AS "author_id: UserId",
-                      u.display_name AS "author_display_name?: String",
-                      m.seq AS "seq!: Seq",
-                      m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
-                      m.reply_to_id AS "reply_to_id: MessageId"
-               FROM messages m
-               LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
-               WHERE m.id = ?"#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(message)
-    }
-}
-
-/// Fetches one live message by id against any executor (pool or transaction).
-/// Like [`fetch_message`] but sees a deleted row too, for the send
-/// idempotency probe: a retried id must match whether or not the first send's
-/// message has since been deleted.
-pub(super) async fn fetch_message_including_deleted<'e, E>(
-    executor: E,
-    id: MessageId,
-) -> anyhow::Result<Option<Message>>
-where
-    E: SqliteExecutor<'e>,
-{
-    let message = sqlx::query_as!(
-        Message,
-        r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
-                  m.author_id AS "author_id: UserId",
-                  u.display_name AS "author_display_name?: String",
-                  m.seq AS "seq!: Seq",
-                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
-                  m.reply_to_id AS "reply_to_id: MessageId"
-           FROM messages m
-           LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
-           WHERE m.id = ?"#,
-        id
-    )
-    .fetch_optional(executor)
-    .await?;
-    Ok(message)
-}
-
-pub(super) async fn fetch_message<'e, E>(
-    executor: E,
-    id: MessageId,
-) -> anyhow::Result<Option<Message>>
-where
-    E: SqliteExecutor<'e>,
-{
-    let message = sqlx::query_as!(
-        Message,
-        r#"SELECT m.id AS "id!: MessageId", m.channel_id AS "channel_id!: ChannelId",
-                  m.author_id AS "author_id: UserId",
-                  u.display_name AS "author_display_name?: String",
-                  m.seq AS "seq!: Seq",
-                  m.content AS "content!", m.created_at AS "created_at!", m.edited_at,
-                  m.reply_to_id AS "reply_to_id: MessageId"
-           FROM messages m
-           LEFT JOIN users u ON u.id = m.author_id AND u.deleted_at IS NULL
-           WHERE m.id = ? AND m.deleted_at IS NULL"#,
-        id
-    )
-    .fetch_optional(executor)
-    .await?;
-    Ok(message)
 }
