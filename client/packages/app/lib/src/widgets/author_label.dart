@@ -24,10 +24,41 @@ String authorLabel({
   required String? authorId,
   required String? cachedDisplayName,
   required Map<String, api.UserProfile?> profiles,
+}) => _label(
+  authorId: authorId,
+  cachedDisplayName: cachedDisplayName,
+  present: authorId != null && profiles.containsKey(authorId),
+  profile: authorId == null ? null : profiles[authorId],
+);
+
+/// One id's slice of the batch map: whether it has been asked about at all,
+/// and what it resolved to. See `providers/user_profiles.dart`'s
+/// `authorResolution`, which selects this out of the map without depending
+/// on the map's own identity.
+typedef AuthorResolution = ({bool present, api.UserProfile? profile});
+
+/// Equivalent to [authorLabel], for a caller that already selected its own
+/// author's [AuthorResolution] out of the batch map via a `.select` (a row
+/// watching the whole map rebuilt on every other author's resolve, not only
+/// its own).
+String authorLabelResolved({
+  required String? authorId,
+  required String? cachedDisplayName,
+  required AuthorResolution resolution,
+}) => _label(
+  authorId: authorId,
+  cachedDisplayName: cachedDisplayName,
+  present: resolution.present,
+  profile: resolution.profile,
+);
+
+String _label({
+  required String? authorId,
+  required String? cachedDisplayName,
+  required bool present,
+  required api.UserProfile? profile,
 }) {
   if (authorId == null) return 'Deleted user';
-  if (profiles.containsKey(authorId)) {
-    return profiles[authorId]?.displayName ?? 'Deleted user';
-  }
+  if (present) return profile?.displayName ?? 'Deleted user';
   return cachedDisplayName ?? 'Unknown';
 }

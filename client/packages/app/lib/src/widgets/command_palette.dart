@@ -291,7 +291,6 @@ class _CommandPaletteContentState
     int permissions,
     bool personalSpaceHidden,
   ) {
-    final profiles = ref.watch(batchProfilesControllerProvider);
     resolveAuthorProfiles(ref, _messageResults.map((m) => m.authorId));
     final groups = <(String, List<PaletteResultItem>)>[
       (
@@ -309,9 +308,7 @@ class _CommandPaletteContentState
           'Messages',
           buildMessageItems(
             _messageResults,
-            tokens,
             currentChannelId: widget.currentChannelId,
-            profiles: profiles,
           ),
         ),
       ('Actions', buildActionItems(_query, permissions)),

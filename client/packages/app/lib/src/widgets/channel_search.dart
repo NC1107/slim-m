@@ -174,58 +174,87 @@ class ChannelSearchResults extends ConsumerWidget {
         ),
       );
     }
-    final profiles = ref.watch(batchProfilesControllerProvider);
     resolveAuthorProfiles(ref, list.map((m) => m.authorId));
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.s16),
       itemCount: list.length,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s12),
-      itemBuilder: (context, i) {
-        final message = list[i];
-        final name = authorLabel(
-          authorId: message.authorId,
-          cachedDisplayName: message.authorDisplayName,
-          profiles: profiles,
-        );
-        return Semantics(
-          button: true,
-          label: 'Message from $name: ${message.content}',
-          onTap: () => onSelect(message),
-          child: ExcludeSemantics(
-            child: AppFocusRing(
-              radius: AppRadii.control,
-              builder: (context, onFocusChange) => InkWell(
-                onTap: () => onSelect(message),
-                // AppFocusRing replaces this overlay; see its own doc comment.
-                focusColor: Colors.transparent,
-                onFocusChange: onFocusChange,
-                borderRadius: BorderRadius.circular(AppRadii.control),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: AppText.ui.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.semi,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.s4),
-                      MessageBody(
-                        content: message.content,
-                        knownUsernames: knownUsernames,
-                        customEmoji: customEmoji,
-                      ),
-                    ],
+      itemBuilder: (context, i) => SearchResultRow(
+        message: list[i],
+        knownUsernames: knownUsernames,
+        customEmoji: customEmoji,
+        onSelect: onSelect,
+      ),
+    );
+  }
+}
+
+/// One search hit: selects only its own author's slice of
+/// [batchProfilesControllerProvider], so an unrelated author resolving does
+/// not rebuild every row in the list - see `message_row_identity.dart`.
+class SearchResultRow extends ConsumerWidget {
+  const SearchResultRow({
+    super.key,
+    required this.message,
+    required this.knownUsernames,
+    required this.customEmoji,
+    required this.onSelect,
+  });
+
+  final api.Message message;
+  final Set<String> knownUsernames;
+  final Map<String, String> customEmoji;
+  final ValueChanged<api.Message> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final name = authorLabelResolved(
+      authorId: message.authorId,
+      cachedDisplayName: message.authorDisplayName,
+      resolution: ref.watch(
+        batchProfilesControllerProvider.select(
+          (m) => authorResolution(m, message.authorId ?? ''),
+        ),
+      ),
+    );
+    return Semantics(
+      button: true,
+      label: 'Message from $name: ${message.content}',
+      onTap: () => onSelect(message),
+      child: ExcludeSemantics(
+        child: AppFocusRing(
+          radius: AppRadii.control,
+          builder: (context, onFocusChange) => InkWell(
+            onTap: () => onSelect(message),
+            // AppFocusRing replaces this overlay; see its own doc comment.
+            focusColor: Colors.transparent,
+            onFocusChange: onFocusChange,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.s4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: AppText.ui.copyWith(
+                      color: tokens.textPrimary,
+                      fontWeight: AppWeights.semi,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: AppSpacing.s4),
+                  MessageBody(
+                    content: message.content,
+                    knownUsernames: knownUsernames,
+                    customEmoji: customEmoji,
+                  ),
+                ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

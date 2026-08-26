@@ -4,7 +4,7 @@
 /// plain top-level functions a test can call without pumping a tree.
 library;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -13,6 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dms.dart';
 import '../providers/personal_space_visibility.dart';
+import '../providers/user_profiles.dart';
 import '../routing/routes.dart';
 import 'author_label.dart';
 import 'message_jump.dart';
@@ -142,7 +143,6 @@ List<PaletteResultItem> buildMemberItems(
 
 /// Messages already matched server-side by full-text search, scoped to
 /// whichever channel is open (there is no cross-channel search endpoint).
-/// [tokens] styles the author trailing label.
 ///
 /// [currentChannelId] is the palette's own `widget.currentChannelId`, taken
 /// from the caller rather than read here with `selectedChannelId(context)`:
@@ -150,21 +150,15 @@ List<PaletteResultItem> buildMemberItems(
 /// builder subtree, and the palette's context is a dialog sitting outside
 /// all of them.
 List<PaletteResultItem> buildMessageItems(
-  List<api.Message> messages,
-  AppTokens tokens, {
+  List<api.Message> messages, {
   required String? currentChannelId,
-  Map<String, api.UserProfile?> profiles = const {},
 }) => [
   for (final message in messages)
     PaletteResultItem(
       label: message.content,
-      trailing: Text(
-        authorLabel(
-          authorId: message.authorId,
-          cachedDisplayName: message.authorDisplayName,
-          profiles: profiles,
-        ),
-        style: AppText.micro.copyWith(color: tokens.textSecondary),
+      trailing: PaletteMessageAuthor(
+        authorId: message.authorId,
+        cachedDisplayName: message.authorDisplayName,
       ),
       onSelect: (context, ref) async => jumpToMessage(
         GoRouter.of(context),
@@ -175,6 +169,39 @@ List<PaletteResultItem> buildMessageItems(
       ),
     ),
 ];
+
+/// A message hit's trailing author label: selects only its own author's
+/// slice of [batchProfilesControllerProvider], so an unrelated author
+/// resolving does not rebuild every row in the palette's result list - see
+/// `message_row_identity.dart`.
+class PaletteMessageAuthor extends ConsumerWidget {
+  const PaletteMessageAuthor({
+    super.key,
+    required this.authorId,
+    required this.cachedDisplayName,
+  });
+
+  final String? authorId;
+  final String? cachedDisplayName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final name = authorLabelResolved(
+      authorId: authorId,
+      cachedDisplayName: cachedDisplayName,
+      resolution: ref.watch(
+        batchProfilesControllerProvider.select(
+          (m) => authorResolution(m, authorId ?? ''),
+        ),
+      ),
+    );
+    return Text(
+      name,
+      style: AppText.micro.copyWith(color: tokens.textSecondary),
+    );
+  }
+}
 
 /// The palette's static actions, filtered by [query] like everything else.
 /// The Space settings action is gated on [permissions] the same way the

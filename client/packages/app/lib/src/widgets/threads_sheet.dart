@@ -154,58 +154,69 @@ class _Body extends ConsumerWidget {
           );
         }
 
-        final profiles = ref.watch(batchProfilesControllerProvider);
         resolveAuthorProfiles(ref, list.map((t) => t.parentAuthorId));
 
         return ListView.builder(
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
           itemCount: list.length,
-          itemBuilder: (context, i) {
-            final thread = list[i];
-            final name = authorLabel(
-              authorId: thread.parentAuthorId,
-              cachedDisplayName: thread.parentAuthorDisplayName,
-              profiles: profiles,
-            );
-            return ListTile(
-              onTap: () {
-                // Captured before the pop disposes this sheet's ref: the app container and router outlive it, so the thread can dock (expanded) or push its modal route (compact) after.
-                final container = ProviderScope.containerOf(
-                  context,
-                  listen: false,
-                );
-                final width = MediaQuery.sizeOf(context).width;
-                Navigator.of(context).pop();
-                if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
-                  container.read(openThreadProvider.notifier).state = thread.id;
-                } else {
-                  router.push(Routes.thread(thread.id));
-                }
-              },
-              leading: AuthorAvatar(
-                userId: thread.parentAuthorId,
-                name: name,
-                size: AppSizes.icon28,
-              ),
-              title: Text(
-                name,
-                style: TextStyle(
-                  fontWeight: thread.isUnread
-                      ? AppWeights.medium
-                      : AppWeights.regular,
-                ),
-              ),
-              subtitle: Text(
-                thread.parentContent,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: _ReplyCount(thread: thread),
-            );
-          },
+          itemBuilder: (context, i) =>
+              ThreadRow(thread: list[i], router: router),
         );
       },
+    );
+  }
+}
+
+/// One thread row: selects only its own parent author's slice of
+/// [batchProfilesControllerProvider], so an unrelated author resolving does
+/// not rebuild every row in the list - see `message_row_identity.dart`.
+class ThreadRow extends ConsumerWidget {
+  const ThreadRow({super.key, required this.thread, required this.router});
+
+  final api.ThreadListItem thread;
+  final GoRouter router;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = authorLabelResolved(
+      authorId: thread.parentAuthorId,
+      cachedDisplayName: thread.parentAuthorDisplayName,
+      resolution: ref.watch(
+        batchProfilesControllerProvider.select(
+          (m) => authorResolution(m, thread.parentAuthorId ?? ''),
+        ),
+      ),
+    );
+    return ListTile(
+      onTap: () {
+        // Captured before the pop disposes this sheet's ref: the app container and router outlive it, so the thread can dock (expanded) or push its modal route (compact) after.
+        final container = ProviderScope.containerOf(context, listen: false);
+        final width = MediaQuery.sizeOf(context).width;
+        Navigator.of(context).pop();
+        if (LayoutClass.fromWidth(width).fitsThreadPane(width)) {
+          container.read(openThreadProvider.notifier).state = thread.id;
+        } else {
+          router.push(Routes.thread(thread.id));
+        }
+      },
+      leading: AuthorAvatar(
+        userId: thread.parentAuthorId,
+        name: name,
+        size: AppSizes.icon28,
+      ),
+      title: Text(
+        name,
+        style: TextStyle(
+          fontWeight: thread.isUnread ? AppWeights.medium : AppWeights.regular,
+        ),
+      ),
+      subtitle: Text(
+        thread.parentContent,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: _ReplyCount(thread: thread),
     );
   }
 }
