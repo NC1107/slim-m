@@ -92,8 +92,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     // address - which skips onboarding entirely - always starts on "Sign in".
     final assumedNew = ref.read(assumeNewAccountProvider);
     if (assumedNew) {
-      // A provider cannot be written mid-build; this runs right after it.
-      Future(() => ref.read(assumeNewAccountProvider.notifier).state = false);
+      // A provider cannot be written mid-build; this runs right after it, guarded because a screen disposed before that turn leaves the flag stale true, at worst opening a later visit on "Create an account" - recoverable via the toggle below.
+      Future(() {
+        if (!mounted) return;
+        ref.read(assumeNewAccountProvider.notifier).state = false;
+      });
     }
     _creatingAccount = ref.read(pendingInviteProvider) != null || assumedNew;
     _probeServer();
