@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Tests for the compiled-in official server collapsing the address field on
 /// sign-in: skipped entirely by default, revealed by "Use a different
-/// server", and never collapsed for any other address.
+/// server", and never collapsed for any other address. Also covers the
+/// related default mode: creating an account, when onboarding signals a
+/// fresh join, versus signing in otherwise.
 ///
 /// Split out of sign_in_screen_test.dart to stay under the file budget.
 library;
@@ -45,12 +47,14 @@ Future<ProviderContainer> _pumpSignIn(
   WidgetTester tester, {
   required Uri server,
   http.Client? httpClient,
+  bool assumeNewAccount = false,
 }) async {
   final client = httpClient ?? _quietProbe();
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       serverUrlProvider.overrideWith((ref) => server),
+      assumeNewAccountProvider.overrideWith((ref) => assumeNewAccount),
       probeApiProvider.overrideWithValue(
         (baseUrl) => SlimmApi(baseUrl: baseUrl, httpClient: client),
       ),
@@ -167,6 +171,40 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(loggedInHost, Uri.parse(officialServer).host);
+    },
+  );
+
+  testWidgets(
+    'arriving at the official server with no invite still opens on signing '
+    'in, absent the onboarding flag that means a fresh join',
+    (tester) async {
+      await _pumpSignIn(tester, server: Uri.parse(officialServer));
+
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('Create an account instead'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'choosing "Join the official Space" in onboarding opens sign-in on '
+    'creating an account, skipping the extra tap a newcomer has no use for',
+    (tester) async {
+      final container = await _pumpSignIn(
+        tester,
+        server: Uri.parse(officialServer),
+        assumeNewAccount: true,
+      );
+
+      expect(find.text('Create an account'), findsOneWidget);
+      expect(find.text('I already have an account'), findsOneWidget);
+      expect(
+        container.read(assumeNewAccountProvider),
+        isFalse,
+        reason:
+            'consumed on the first read, so a later sign-out on this same '
+            'address - which skips onboarding - is not mistaken for another '
+            'fresh join',
+      );
     },
   );
 }
