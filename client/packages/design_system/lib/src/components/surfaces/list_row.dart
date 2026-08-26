@@ -60,6 +60,7 @@ class AppListRow extends StatefulWidget {
     this.focusNode,
     this.semanticLabel,
     this.stateDescription,
+    this.subtitle,
   });
 
   final String label;
@@ -69,6 +70,13 @@ class AppListRow extends StatefulWidget {
   /// `text-secondary` regardless of the row's other states.
   final String? meta;
   final Widget? trailing;
+
+  /// A second line under [label] (a custom status), in a smaller, dimmer
+  /// style, single line with its own ellipsis. Turns this row from one line
+  /// into two: the leading avatar stays vertically centred across both, per
+  /// the Discord/Slack pattern this replaces a detached caption block with.
+  /// Null keeps the row exactly as single-line as it always was.
+  final String? subtitle;
 
   /// A control rendered after [trailing] (or the unread dot it falls back
   /// to), still inside the same tinted [AnimatedContainer] the row's hover
@@ -127,16 +135,34 @@ class AppListRow extends StatefulWidget {
   /// still a plain, non-animated value read fresh on every build. Never
   /// shrinks below the fixed height, which stays the floor at the
   /// platform's default text size.
-  static double heightFor(BuildContext context, {bool? touch, double? min}) {
+  ///
+  /// [hasSubtitle] adds room for the second line [subtitle] renders, the same
+  /// way Dynamic Type adds room for a taller label: a static value, read
+  /// fresh on every build, never animated in.
+  static double heightFor(
+    BuildContext context, {
+    bool? touch,
+    double? min,
+    bool hasSubtitle = false,
+  }) {
     final density = touch ?? AppTouchTargets.of(context);
     final base = math.max(
       density ? AppSizes.rowTouch : AppSizes.rowPointer,
       min ?? 0,
     );
+    final textScaler = MediaQuery.textScalerOf(context);
     final scaledLabelHeight =
-        MediaQuery.textScalerOf(context).scale(AppText.ui.fontSize!) *
-            AppText.ui.height!;
-    return math.max(base, scaledLabelHeight + AppSpacing.s8);
+        textScaler.scale(AppText.ui.fontSize!) * AppText.ui.height!;
+    if (!hasSubtitle) {
+      return math.max(base, scaledLabelHeight + AppSpacing.s8);
+    }
+    final scaledSubtitleHeight =
+        textScaler.scale(AppText.caption.fontSize!) * AppText.caption.height!;
+    final twoLineHeight = scaledLabelHeight +
+        AppSpacing.s4 +
+        scaledSubtitleHeight +
+        AppSpacing.s8;
+    return math.max(base, twoLineHeight);
   }
 
   @override
@@ -156,8 +182,12 @@ class _AppListRowState extends State<AppListRow> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final touch = widget.touch ?? AppTouchTargets.of(context);
-    final rowHeight =
-        AppListRow.heightFor(context, touch: touch, min: widget.height);
+    final rowHeight = AppListRow.heightFor(
+      context,
+      touch: touch,
+      min: widget.height,
+      hasSubtitle: widget.subtitle != null,
+    );
 
     // The source lifts colour and weight together for `selected || unread`, so
     // the dot below is what keeps unread legible when both are set at once.
@@ -208,8 +238,25 @@ class _AppListRowState extends State<AppListRow> {
             // Excluded because the Semantics wrapper below already names this
             // row; without it a screen reader announces "general, general".
             child: ExcludeSemantics(
-              child: Text(widget.label,
-                  overflow: TextOverflow.ellipsis, style: labelStyle),
+              child: widget.subtitle == null
+                  ? Text(widget.label,
+                      overflow: TextOverflow.ellipsis, style: labelStyle)
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.label,
+                            overflow: TextOverflow.ellipsis, style: labelStyle),
+                        Text(
+                          widget.subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption
+                              .copyWith(color: tokens.textSecondary),
+                        ),
+                      ],
+                    ),
             ),
           ),
           if (widget.meta != null)
@@ -304,6 +351,7 @@ class _AppListRowState extends State<AppListRow> {
 
     final semanticParts = <String>[
       widget.semanticLabel ?? widget.label,
+      if (widget.subtitle != null) widget.subtitle!,
       if (widget.unread) 'unread',
       if (widget.stateDescription != null) widget.stateDescription!,
     ];
