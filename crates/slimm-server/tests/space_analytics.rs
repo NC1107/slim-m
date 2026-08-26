@@ -24,6 +24,16 @@ use tower::ServiceExt;
 
 mod support;
 
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
+
+fn now_ms() -> i64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock before epoch")
+        .as_millis() as i64
+}
+
 /// Also returns a clone of the pool, since `Store` does not expose its own:
 /// a couple of tests below reach past the store's public API to backdate a
 /// row directly, the only way to exercise the retention prune without
@@ -371,6 +381,47 @@ async fn a_second_sample_within_the_minimum_gap_is_not_recorded() {
     let stats = s.analytics_stats().await.unwrap();
     assert_eq!(stats.memory_samples.len(), 1);
     assert_eq!(stats.memory_samples[0].rss_bytes, 1_000);
+}
+
+/// `active_hours` and `memory_samples` filter a raw `>= window_start`
+/// timestamp rather than group by calendar date the way `messages_by_day`
+/// does, so they must not reuse that series's `-1`-adjusted start: a message
+/// and a memory sample dated 30 days ago plus an hour - inside the true
+/// window, but outside a 29-day one - must both still be counted. Mutation-
+/// tested by restoring the single shared `window_start` in
+/// `Store::analytics_stats`, which drops both counts to zero.
+#[tokio::test]
+async fn active_hours_and_memory_samples_cover_the_full_thirtieth_day() {
+    let (s, pool, _guard) = store("slimm-analytics-full-window").await;
+    let (_admin, member) = deployment(&s).await;
+    let channel = s.create_channel("general", "text").await.unwrap();
+    s.set_analytics_enabled(true).await.unwrap();
+
+    let just_inside_day_30 = now_ms() - 30 * DAY_MS + 60 * 60 * 1000;
+
+    let msg_id = MessageId::generate();
+    s.send_message(channel.id, member.id, msg_id, "old", &[], None)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE messages SET created_at = ? WHERE id = ?")
+        .bind(just_inside_day_30)
+        .bind(msg_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    s.maybe_record_metrics_sample(12_345).await.unwrap();
+    sqlx::query("UPDATE space_metrics_samples SET sampled_at = ?")
+        .bind(just_inside_day_30)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let stats = s.analytics_stats().await.unwrap();
+    let hours_sum: i64 = stats.active_hours.iter().sum();
+    assert_eq!(hours_sum, 1);
+    assert_eq!(stats.memory_samples.len(), 1);
+    assert_eq!(stats.memory_samples[0].rss_bytes, 12_345);
 }
 
 /// A sample older than the retention window is pruned on the next write,

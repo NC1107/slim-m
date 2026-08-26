@@ -66,6 +66,8 @@ Future<void> pickGif({
         final bytes = await ref
             .read(apiProvider)
             .fetchAttachment(attachment.id);
+        // The composer may have been torn down while this awaited.
+        if (!context.mounted) return;
         attachments.addResolved(attachment, bytes.bytes);
       } on api.ApiException catch (e) {
         onError(describeApiFailure('attach that gif', e));

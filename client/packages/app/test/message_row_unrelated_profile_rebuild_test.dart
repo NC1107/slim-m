@@ -92,6 +92,72 @@ void main() {
   );
 
   testWidgets(
+    'after a reconnect re-resolves this row, a second overlapping resolve '
+    "landing with a field-identical profile rebuilds neither this row's "
+    'header nor its leading avatar',
+    (tester) async {
+      late BatchProfilesController controller;
+
+      // A fresh instance each parse, unlike a canonicalized `const` literal.
+      api.UserProfile parsedProfile() => api.UserProfile.fromJson({
+        'id': 'author-1',
+        'username': 'priya',
+        'display_name': 'Priya',
+        'created_at': 0,
+        'roles': ['Member'],
+        'role_ids': ['role-1'],
+      });
+
+      await tester.pumpWidget(
+        harness(
+          MessageRow(
+            message: message(authorId: 'author-1', authorDisplayName: 'Priya'),
+            grouped: false,
+            showNewDivider: false,
+            knownUsernames: const {},
+            onRetry: () {},
+            onDiscard: () {},
+            onPickReaction: (_) {},
+            onReactionTap: (_) {},
+            onVote: (_) {},
+            actions: noActions,
+            editing: false,
+            onSubmitEdit: (_) {},
+            onCancelEdit: () {},
+          ),
+          overrides: [
+            batchProfilesControllerProvider.overrideWith((ref) {
+              controller = BatchProfilesController(ref);
+              return controller;
+            }),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      // A reconnect clear() and the first of two racing resolves; not measured.
+      controller.clear();
+      controller.state = {...controller.state, 'author-1': parsedProfile()};
+      await tester.pump();
+
+      final headerRebuilds = await _rebuildsOf<MessageRowHeader>(() async {
+        // The second, overlapping resolve() lands: same fields, fresh instance.
+        controller.state = {...controller.state, 'author-1': parsedProfile()};
+        await tester.pump();
+      });
+
+      expect(
+        headerRebuilds,
+        0,
+        reason:
+            'a second, overlapping resolve landing with a field-identical '
+            'profile must not rebuild a row whose author did not actually '
+            'change',
+      );
+    },
+  );
+
+  testWidgets(
     "authorLabel output survives the .select unchanged: absent, present-null "
     'and present-value all still read the way they did before',
     (tester) async {

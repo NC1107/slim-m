@@ -274,6 +274,37 @@ void main() {
     });
   });
 
+  testWidgets('a screen popped before its deferred provider write runs is left '
+      'stale, never thrown into', (tester) async {
+    final container = ProviderContainer(
+      overrides: [keyStoreProvider.overrideWithValue(InMemoryKeyStore())],
+    );
+    addTearDown(container.dispose);
+    container.read(assumeNewAccountProvider.notifier).state = true;
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const SignInScreen(),
+        ),
+      ),
+    );
+
+    // Unmount before the real zero-duration Timer `Future(() {...})` scheduled fires - a bare `pumpWidget` never elapses time, so nothing has fired it yet.
+    await tester.pumpWidget(const SizedBox.shrink());
+    // Now let it fire.
+    await tester.pump(const Duration(milliseconds: 1));
+
+    expect(tester.takeException(), isNull);
+    expect(
+      container.read(assumeNewAccountProvider),
+      isTrue,
+      reason: 'a disposed screen must not write into the provider',
+    );
+  });
+
   testWidgets(
     'the server field starts from the onboarding choice, not a hardcoded '
     'address',

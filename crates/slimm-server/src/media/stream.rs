@@ -77,13 +77,36 @@ impl PendingAttachment {
     /// means an identical upload is one stored copy, not a second. Atomic
     /// within the attachments directory (a same-directory rename), the same
     /// guarantee `write_atomic` relies on.
+    ///
+    /// `commit` takes `self` by value, so [`Drop`] still runs when this
+    /// returns - on the error path too. The rename is attempted before
+    /// `committed` is ever set to true, and only a successful rename sets it,
+    /// so a mid-rename failure (full disk, permissions, cross-device) is
+    /// never mistaken for a stored upload. That failure is handled right
+    /// here rather than by the `Drop` backstop: `temp_path` has already been
+    /// taken out of `self` to move into `commit_temp`, so by the time
+    /// `Drop::drop` runs on the returned `self`, `self.temp_path` is empty
+    /// and the backstop finds nothing to clean up. This function therefore
+    /// owns removing the temp file itself on a failed rename, best-effort,
+    /// so the failure cannot leave an orphaned temp file behind.
     pub async fn commit(mut self) -> io::Result<()> {
-        self.committed = true;
-        commit_temp(
-            std::mem::take(&mut self.temp_path),
-            std::mem::take(&mut self.final_path),
-        )
-        .await
+        let temp_path = std::mem::take(&mut self.temp_path);
+        let final_path = std::mem::take(&mut self.final_path);
+        match commit_temp(temp_path.clone(), final_path).await {
+            Ok(()) => {
+                self.committed = true;
+                Ok(())
+            }
+            Err(err) => {
+                if let Err(remove_err) = remove(temp_path).await {
+                    tracing::warn!(
+                        error = %remove_err,
+                        "failed to remove temp file after a failed attachment commit",
+                    );
+                }
+                Err(err)
+            }
+        }
     }
 
     /// Removes the temp file without storing it, for a caller refusing the
@@ -275,6 +298,42 @@ mod tests {
             entries,
             vec![std::ffi::OsString::from(&hex)],
             "one file, no temp"
+        );
+    }
+
+    /// A commit whose rename fails must not orphan the temp file: the old
+    /// code set `committed` and took the path out of `self` before ever
+    /// attempting the rename, so the `Drop` backstop found nothing to clean
+    /// up and the failed-to-place bytes sat on disk forever. Reverting
+    /// `commit` to mark `committed` before calling `commit_temp`, or to drop
+    /// the explicit `remove` on the error path, reds this.
+    ///
+    /// `final_path`'s parent does not exist, so `commit_temp` reaches and
+    /// fails the actual rename rather than the already-stored dedup shortcut
+    /// (which only fires when `final_path` itself already exists).
+    #[tokio::test]
+    async fn a_failed_commit_does_not_orphan_the_temp_file() {
+        let media = Media::for_tests();
+        let temp_path = media.attachments_dir.join(".tmp-failed-commit-test");
+        tokio::fs::write(&temp_path, b"unplaceable")
+            .await
+            .expect("write the temp file the pending upload will point at");
+        let final_path = media.attachments_dir.join("no-such-dir").join("final-name");
+        let pending = PendingAttachment {
+            final_path,
+            temp_path: temp_path.clone(),
+            hex_id: "deadbeef".to_string(),
+            size: 11,
+            sniff_prefix: Vec::new(),
+            committed: false,
+        };
+
+        let result = pending.commit().await;
+
+        assert!(result.is_err(), "the rename failure surfaces as an error");
+        assert!(
+            !temp_path.exists(),
+            "a failed commit must not leave the temp file behind"
         );
     }
 
