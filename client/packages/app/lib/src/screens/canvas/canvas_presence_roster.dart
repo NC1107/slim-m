@@ -177,7 +177,7 @@ class _FacePile extends StatelessWidget {
       container: true,
       label: 'On this canvas: ${present.map((p) => p.name).join(', ')}',
       child: Container(
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(AppSpacing.s4),
         decoration: BoxDecoration(
           color: tokens.surfaceRaised,
           borderRadius: BorderRadius.circular(AppRadii.full),
@@ -216,7 +216,9 @@ class _FacePile extends StatelessWidget {
               ),
               if (overflow > 0)
                 Padding(
-                  padding: const EdgeInsets.only(left: 4, right: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s4,
+                  ),
                   child: Text(
                     '+$overflow',
                     style: AppText.caption.copyWith(

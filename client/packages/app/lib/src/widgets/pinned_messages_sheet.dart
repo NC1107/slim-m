@@ -93,9 +93,14 @@ class _PinnedMessagesSheet extends ConsumerWidget {
             ],
           ),
         ),
-        SizedBox(
+        ConstrainedBox(
           key: pinnedMessagesBodyBoxKey,
-          height: hasList ? MediaQuery.of(context).size.height * 0.6 : 160,
+          // A ceiling for a real list, via `body`'s own shrinkWrap ListView; an empty or loading state keeps a modest fixed box instead.
+          constraints: hasList
+              ? BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                )
+              : const BoxConstraints.tightFor(height: 160),
           child: body,
         ),
       ],
@@ -167,6 +172,7 @@ class _Body extends ConsumerWidget {
     resolveAuthorProfiles(ref, list.map((p) => p.message.authorId));
 
     return ListView.builder(
+      shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
       itemCount: list.length,
       itemBuilder: (context, i) {
@@ -191,7 +197,7 @@ class _Body extends ConsumerWidget {
           leading: AuthorAvatar(
             userId: pin.message.authorId,
             name: name,
-            size: AppSizes.icon20 + 8,
+            size: AppSizes.icon28,
           ),
           title: Text(name),
           subtitle: Text(

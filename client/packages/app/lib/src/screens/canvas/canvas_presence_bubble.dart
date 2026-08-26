@@ -95,6 +95,7 @@ class _AvatarMarker extends StatelessWidget {
                   right: -2,
                   bottom: -2,
                   child: Container(
+                    // Off-grid on purpose: rounding to 4 would grow this corner badge past the avatar it sits on.
                     padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
                       color: tokens.surfaceRaised,

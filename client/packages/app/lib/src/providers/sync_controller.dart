@@ -3,7 +3,6 @@
 library;
 
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -422,8 +421,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     if (_disposed) return;
     _attempt = (_attempt + 1).clamp(1, 6);
     final seconds = (1 << (_attempt - 1)).clamp(1, 32);
-    // Random, not DateTime.now().microsecond: web's Date is ms-resolution, so that was always zero.
-    final jitter = Duration(milliseconds: Random().nextInt(1000));
+    final jitter = Duration(milliseconds: DateTime.now().microsecond % 1000);
     _retry?.cancel();
     _retry = Timer(Duration(seconds: seconds) + jitter, start);
   }

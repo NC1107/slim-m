@@ -250,9 +250,6 @@ async fn delete_account(
     for session_id in revoked {
         state.hub.publish(Event::SessionRevoked(session_id));
     }
-    if let Err(err) = state.media.delete_avatar(&ctx.user_id.to_string()).await {
-        tracing::warn!(error = %err, "failed to delete an account's avatar file");
-    }
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -89,13 +89,13 @@ class _Row extends StatelessWidget {
       leading = CustomEmojiImage(
         emojiId: suggestion.imageEmoji!.id,
         label: suggestion.imageEmoji!.shortcode,
-        size: 18,
+        size: AppSizes.icon16,
       );
     } else if (suggestion.userId != null) {
       leading = UserAvatar(
         userId: suggestion.userId!,
         name: suggestion.label,
-        size: 18,
+        size: AppSizes.icon16,
       );
     } else if (suggestion.glyph != null) {
       leading = Text(

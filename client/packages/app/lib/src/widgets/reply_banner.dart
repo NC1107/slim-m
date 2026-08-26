@@ -43,14 +43,10 @@ class ReplyBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final label = authorLabelResolved(
+    final label = authorLabel(
       authorId: message.authorId,
       cachedDisplayName: message.authorDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, message.authorId ?? ''),
-        ),
-      ),
+      profiles: ref.watch(batchProfilesControllerProvider),
     );
     final attachments = ref.watch(
       messageExtrasProvider.select(

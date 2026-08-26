@@ -62,7 +62,15 @@ class CategoriesPane extends ConsumerWidget {
 
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => const Center(child: Text('Could not load categories.')),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          child: AppErrorState(
+            message: 'Could not load categories.',
+            onRetry: () => ref.invalidate(storeProvider),
+          ),
+        ),
+      ),
       data: (store) => StreamBuilder<List<ChannelCategoryRow>>(
         stream: store.watchCategories(),
         builder: (context, snapshot) {

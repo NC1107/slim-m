@@ -39,21 +39,6 @@ class CanvasDocument extends ChangeNotifier {
   final Map<String, int> _slotById = <String, int>{};
   final List<int> _order = <int>[];
 
-  /// [paintOrder]'s cache: every alive slot, sorted by `zIndex`, valid across
-  /// a camera-only repaint and rebuilt only when [_orderDirty]. A pan or zoom
-  /// changes which of these are on screen but never their relative order, so
-  /// [paintOrder] only needs to filter this down to [scene.visible] each
-  /// call, not re-sort - see [_resortAlive] and [paintOrder] themselves.
-  final List<int> _sortedAlive = <int>[];
-  bool _orderDirty = true;
-
-  /// Whether slot `i` was in the cull [paintOrder] last filtered against, so
-  /// that filter is one array lookup per candidate rather than a scan of
-  /// [scene.visible] per candidate. [_markedSlots] is what lets the next call
-  /// clear only the slots this one actually set, instead of the whole array.
-  final List<bool> _visibleMark = <bool>[];
-  final List<int> _markedSlots = <int>[];
-
   /// Ids the server has told this document to drop, so a viewport read still
   /// in flight when the removal landed cannot resurrect them. The order
   /// queue is what makes eviction FIFO once [maxRemovedIdsTracked] is
@@ -102,48 +87,11 @@ class CanvasDocument extends ChangeNotifier {
   /// server pays a sort for `(z_index, seq)` and this is where that answer is
   /// honoured rather than thrown away.
   List<int> get paintOrder {
-    if (_orderDirty) _resortAlive();
-    _markVisible();
     _order
       ..clear()
-      ..addAll(
-        _sortedAlive.where(
-          (slot) => slot < _visibleMark.length && _visibleMark[slot],
-        ),
-      );
+      ..addAll(scene.visible.where((slot) => _strokes[slot]?.alive ?? false));
+    _order.sort((a, b) => _strokes[a]!.zIndex.compareTo(_strokes[b]!.zIndex));
     return _order;
-  }
-
-  /// Rebuilds [_sortedAlive] from every currently alive slot. Only [_strokes]
-  /// membership and `zIndex` can move a slot within this order, which is
-  /// exactly what [applyPlaced], [kill], [_freeSlot], [reset] and
-  /// `CanvasDocumentSelection.setZIndex` mark [_orderDirty] for.
-  void _resortAlive() {
-    _sortedAlive
-      ..clear()
-      ..addAll([
-        for (var slot = 0; slot < _strokes.length; slot++)
-          if (_strokes[slot]?.alive ?? false) slot,
-      ]);
-    _sortedAlive.sort(
-      (a, b) => _strokes[a]!.zIndex.compareTo(_strokes[b]!.zIndex),
-    );
-    _orderDirty = false;
-  }
-
-  /// Refreshes [_visibleMark] from [scene.visible] for [paintOrder]'s filter.
-  void _markVisible() {
-    for (final slot in _markedSlots) {
-      _visibleMark[slot] = false;
-    }
-    _markedSlots.clear();
-    for (final slot in scene.visible) {
-      while (_visibleMark.length <= slot) {
-        _visibleMark.add(false);
-      }
-      _visibleMark[slot] = true;
-      _markedSlots.add(slot);
-    }
   }
 
   /// Adds a stroke, or returns the slot it already occupies, or refuses one
@@ -165,7 +113,6 @@ class CanvasDocument extends ChangeNotifier {
       existing
         ..zIndex = input.zIndex
         ..seq = input.seq;
-      _orderDirty = true;
       return known;
     }
     final path = Path();
@@ -213,7 +160,6 @@ class CanvasDocument extends ChangeNotifier {
     );
     _slotById[input.id] = slot;
     objectCount.value = objectCount.value + 1;
-    _orderDirty = true;
     return slot;
   }
 
@@ -326,7 +272,6 @@ class CanvasDocument extends ChangeNotifier {
     if (stroke == null || !stroke.alive) return;
     stroke.alive = false;
     objectCount.value = objectCount.value - 1;
-    _orderDirty = true;
   }
 
   /// Removes a placed object by id, or records the id as removed even if
@@ -384,10 +329,6 @@ class CanvasDocument extends ChangeNotifier {
     _strokes.clear();
     _slotById.clear();
     _order.clear();
-    _sortedAlive.clear();
-    _orderDirty = false;
-    _visibleMark.clear();
-    _markedSlots.clear();
     _removedIds.clear();
     _removedOrder.clear();
     scene.reset();
@@ -412,7 +353,6 @@ class CanvasDocument extends ChangeNotifier {
     stroke.image?.dispose();
     _strokes[slot] = null;
     objectCount.value = objectCount.value - 1;
-    _orderDirty = true;
   }
 
   void _disposeImages() {

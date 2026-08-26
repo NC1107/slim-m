@@ -15,12 +15,12 @@ enum AppIconButtonVariant { ghost, outline, danger }
 
 /// Visual diameter. `sm`/`lg`/`touch` land exactly on [AppSizes.controlSm]/
 /// [AppSizes.controlMd]/[AppSizes.controlLg] (26/34/38); `md`, the default,
-/// is 28, a size the current token set has no step for.
+/// is [AppSizes.icon28].
 enum AppIconButtonSize { sm, md, lg, touch }
 
 double _diameterFor(AppIconButtonSize size) => switch (size) {
       AppIconButtonSize.sm => AppSizes.controlSm,
-      AppIconButtonSize.md => 28,
+      AppIconButtonSize.md => AppSizes.icon28,
       AppIconButtonSize.lg => AppSizes.controlMd,
       AppIconButtonSize.touch => AppSizes.controlLg,
     };
