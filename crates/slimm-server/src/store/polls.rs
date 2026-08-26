@@ -140,7 +140,7 @@ impl Store {
         let mut tx = self.begin_write().await?;
 
         if let Some(existing) =
-            super::messages::fetch_message_including_deleted(&mut *tx, id).await?
+            super::message_reads::fetch_message_including_deleted(&mut *tx, id).await?
         {
             tx.commit().await?;
             if existing.channel_id == channel_id && existing.author_id == Some(author_id) {

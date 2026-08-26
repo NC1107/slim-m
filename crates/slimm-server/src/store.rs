@@ -39,6 +39,7 @@ mod emoji;
 mod invites;
 mod message_history;
 mod message_ops;
+mod message_reads;
 mod message_retention;
 mod message_search;
 mod messages;
