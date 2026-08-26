@@ -13,7 +13,7 @@ The canvas had solved this exact problem a migration earlier.
 `canvas_audit_log` (0037) exists because a compacting op stream was destroying "who removed what", and it kept the fact in a separate append-only table.
 Moderation had nothing equivalent - it was the only part of the product where an act could be erased by the act that reversed it.
 
-Recorded as MOD3 in `TECHNICAL_DEBT.md`, High.
+Recorded as MOD3 in the technical-debt register of the time (since retired; open work is tracked on the Planka board), High.
 
 ## The fix that was recorded, and why it is not the one shipped
 
@@ -81,4 +81,4 @@ The deadline is already on the issue row, so the history is not missing anything
 There is no sweep. `canvas_audit_log` carries none either, for the same reason: outliving the thing that gets deleted is the point of the table.
 One row per moderation act on a deployment sized for a friend group is not a growth problem, and a retention policy is a decision to make when somebody has a reason for one rather than now.
 
-`MOD3`'s entry in `TECHNICAL_DEBT.md` was corrected in the same change, so it stops prescribing the design that was rejected here.
+`MOD3`'s entry in the then-current technical-debt register was corrected in the same change, so it stops prescribing the design that was rejected here.

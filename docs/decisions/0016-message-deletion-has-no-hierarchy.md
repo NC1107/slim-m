@@ -26,7 +26,7 @@ A removed member cannot sign in at all - `open_session` refuses to create a sess
 
 That stays as it is. No appeal route, no exemption for DMs to a moderator, no read-only mode for a removed account.
 
-Recorded as MOD5 in `TECHNICAL_DEBT.md`, where its own entry said the question was a product decision rather than a defect: "Whether an in-product appeal path is wanted at all is a product decision, not a defect; recorded because 'no route back' is currently implicit rather than chosen." It is now chosen.
+Recorded as MOD5 in the technical-debt register of the time (since retired; see the Planka board), where its own entry said the question was a product decision rather than a defect: "Whether an in-product appeal path is wanted at all is a product decision, not a defect; recorded because 'no route back' is currently implicit rather than chosen." It is now chosen.
 
 The reasoning is the shape of the product rather than a judgement about appeals in general. One deployment is one community, usually a group who know each other; the operator and the moderators are reachable by whatever means the group already uses, and building a channel back into a space somebody has been removed from means keeping a door open in exactly the place a removal is meant to close one. A raid is the case moderation here is sized for, and an appeal inbox reachable by removed accounts is a surface a raid can use.
 
