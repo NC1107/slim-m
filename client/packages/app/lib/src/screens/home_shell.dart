@@ -61,10 +61,10 @@ class HomeShell extends ConsumerWidget {
     final layout = LayoutClass.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final selected = selectedChannelId(context);
-    // With the shell, or the first surface to consult it filters against none.
-    ref.watch(blocksProvider);
-    // Same reasoning: the rail glyph, header menu and sound gate all need this loaded first.
-    ref.watch(channelNotificationOverridesProvider);
+    // Loaded with the shell so the first surface to consult it filters against none; selecting a constant keeps this mounted without rebuilding the whole shell on every block/unblock.
+    ref.watch(blocksProvider.select((_) => null));
+    // Same reasoning, including the constant select: a channel mute must not rebuild the whole shell either.
+    ref.watch(channelNotificationOverridesProvider.select((_) => null));
     // Session-lifetime, or permission invalidation only ran with RolesScreen open.
     ref.watch(roleChangeWatcherProvider);
     // Forces creation for the session; nothing here reads its own state.
