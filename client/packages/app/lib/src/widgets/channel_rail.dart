@@ -150,8 +150,15 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
           Expanded(
             child: storeAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  const Center(child: Text('Could not load channels.')),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  child: AppErrorState(
+                    message: 'Could not load channels.',
+                    onRetry: () => ref.invalidate(storeProvider),
+                  ),
+                ),
+              ),
               data: (store) => StreamBuilder<List<Channel>>(
                 // Deduped to what the rail draws; see MessageStore.watchRailChannels.
                 stream: store.watchRailChannels(),

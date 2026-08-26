@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/pins_controller.dart';
@@ -168,53 +169,81 @@ class _Body extends ConsumerWidget {
       );
     }
 
-    final profiles = ref.watch(batchProfilesControllerProvider);
     resolveAuthorProfiles(ref, list.map((p) => p.message.authorId));
 
     return ListView.builder(
       shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
       itemCount: list.length,
-      itemBuilder: (context, i) {
-        final pin = list[i];
-        final name = authorLabel(
-          authorId: pin.message.authorId,
-          cachedDisplayName: pin.message.authorDisplayName,
-          profiles: profiles,
-        );
-        return ListTile(
-          onTap: () {
-            final read = ref.read;
-            Navigator.of(context).pop();
-            jumpToMessage(
-              router,
-              read,
-              currentChannelId: currentChannelId,
-              channelId: pin.message.channelId,
-              messageId: pin.message.id,
-            );
-          },
-          leading: AuthorAvatar(
-            userId: pin.message.authorId,
-            name: name,
-            size: AppSizes.icon28,
-          ),
-          title: Text(name),
-          subtitle: Text(
-            pin.message.content,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: AppIconButton(
-            icon: AppIcons.pin,
-            semanticLabel: 'Unpin this message',
-            tooltip: 'Unpin',
-            onPressed: () => ref
-                .read(pinsControllerProvider(channelId).notifier)
-                .unpin(pin.message.id),
-          ),
+      itemBuilder: (context, i) => PinnedMessageRow(
+        channelId: channelId,
+        pin: list[i],
+        router: router,
+        currentChannelId: currentChannelId,
+      ),
+    );
+  }
+}
+
+/// One pinned-message row: selects only its own author's slice of
+/// [batchProfilesControllerProvider], so an unrelated author resolving does
+/// not rebuild every row in the list - see `message_row_identity.dart`.
+class PinnedMessageRow extends ConsumerWidget {
+  const PinnedMessageRow({
+    super.key,
+    required this.channelId,
+    required this.pin,
+    required this.router,
+    required this.currentChannelId,
+  });
+
+  final String channelId;
+  final api.PinnedMessage pin;
+  final GoRouter router;
+  final String? currentChannelId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = authorLabelResolved(
+      authorId: pin.message.authorId,
+      cachedDisplayName: pin.message.authorDisplayName,
+      resolution: ref.watch(
+        batchProfilesControllerProvider.select(
+          (m) => authorResolution(m, pin.message.authorId ?? ''),
+        ),
+      ),
+    );
+    return ListTile(
+      onTap: () {
+        final read = ref.read;
+        Navigator.of(context).pop();
+        jumpToMessage(
+          router,
+          read,
+          currentChannelId: currentChannelId,
+          channelId: pin.message.channelId,
+          messageId: pin.message.id,
         );
       },
+      leading: AuthorAvatar(
+        userId: pin.message.authorId,
+        name: name,
+        size: AppSizes.icon28,
+      ),
+      title: Text(name),
+      subtitle: Text(
+        pin.message.content,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: AppIconButton(
+        icon: AppIcons.pin,
+        semanticLabel: 'Unpin this message',
+        tooltip: 'Unpin',
+        onPressed: () => ref
+            .read(pinsControllerProvider(channelId).notifier)
+            .unpin(pin.message.id),
+      ),
     );
   }
 }
