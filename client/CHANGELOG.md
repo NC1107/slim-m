@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.53.0](https://github.com/NC1107/slim-m/compare/client-v0.52.0...client-v0.53.0) (2026-08-25)
+
+
+### Features
+
+* a space-wide screen-share quality ceiling ([#874](https://github.com/NC1107/slim-m/issues/874)) ([22292e2](https://github.com/NC1107/slim-m/commit/22292e2ff54f6e7f26a42033cde726b8155de440))
+* **a11y:** name search hits, emoji tiles, and announce result counts ([#875](https://github.com/NC1107/slim-m/issues/875)) ([d00016d](https://github.com/NC1107/slim-m/commit/d00016d14d6d6afb055447160d1c6aba3930f553))
+* **client:** a useful tray menu - presence, call controls, settings ([#870](https://github.com/NC1107/slim-m/issues/870)) ([82e5016](https://github.com/NC1107/slim-m/commit/82e50162ba86b868a99e1ad04b45d634ebf56dd9))
+* **client:** continuation-line time shows on hover, not in the left gutter ([#864](https://github.com/NC1107/slim-m/issues/864)) ([a84419e](https://github.com/NC1107/slim-m/commit/a84419e8c1c60b22c09f06933d59a2f45f08e964))
+
+
+### Bug Fixes
+
+* **client:** a cleaner create-channel form ([#867](https://github.com/NC1107/slim-m/issues/867)) ([2cd699c](https://github.com/NC1107/slim-m/commit/2cd699ccbeae97310913f96d4d273f68576c358d))
+* **client:** a rounder, tighter reply bar that handles attachment replies ([#873](https://github.com/NC1107/slim-m/issues/873)) ([b9b027c](https://github.com/NC1107/slim-m/commit/b9b027cae5cd9ca70493d1ec85d9620845596cad))
+* **client:** drop the scan-text item from the composer selection menu ([#863](https://github.com/NC1107/slim-m/issues/863)) ([7869a1f](https://github.com/NC1107/slim-m/commit/7869a1fd66128b4ac9d65a7cf96b529c49fe5d30))
+* **client:** presence menu becomes a bottom sheet on a phone ([#869](https://github.com/NC1107/slim-m/issues/869)) ([4382f2f](https://github.com/NC1107/slim-m/commit/4382f2fca3a5851d38622f62cf8092a852c8725e))
+* **client:** stable kebab padding and continuous row highlight on hover ([#872](https://github.com/NC1107/slim-m/issues/872)) ([ed38f2f](https://github.com/NC1107/slim-m/commit/ed38f2f71cc72e18c01ac925bc2f5e4ac3dfdd32))
+
 ## [0.52.0](https://github.com/NC1107/slim-m/compare/client-v0.51.0...client-v0.52.0) (2026-08-25)
 
 
