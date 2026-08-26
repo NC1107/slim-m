@@ -77,12 +77,14 @@ async fn list(
         ids.push(UserId(parse_uuid(part)?));
     }
 
+    // One batched lookup rather than one per id; see `Store::presence_visibility_many`.
+    let visibilities = state.store.presence_visibility_many(&ids).await?;
+    let tracker = state.hub.presence();
     let mut dtos = Vec::with_capacity(ids.len());
     for target in ids {
-        let Some(visibility) = state.store.presence_visibility(target).await? else {
+        let Some(&visibility) = visibilities.get(&target) else {
             continue;
         };
-        let tracker = state.hub.presence();
         let status = presence::status_for(
             ctx.user_id,
             target,

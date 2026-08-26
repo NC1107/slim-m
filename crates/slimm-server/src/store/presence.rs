@@ -3,6 +3,10 @@
 //! visibility. Everything else about presence (whether they are actually
 //! connected right now) is in-memory only; see [`crate::presence`].
 
+use std::collections::HashMap;
+
+use sqlx::{QueryBuilder, Row};
+
 use super::Store;
 use crate::ids::UserId;
 use crate::presence::Visibility;
@@ -27,6 +31,42 @@ impl Store {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| Visibility::parse(&r.presence_visibility).unwrap_or_default()))
+    }
+
+    /// [`Self::presence_visibility`] for several users in one query, mirroring
+    /// [`Self::reactions_for_messages`](super::Store::reactions_for_messages)'s
+    /// built `IN (...)` for the same "one round trip per page, not one per
+    /// row" shape.
+    ///
+    /// An id with no live row (deleted or never existed) is simply absent
+    /// from the map, the same "skip it" contract the per-id callers already
+    /// had: `GET /presence` drops it from the response, and voice roster
+    /// treats it as visible since there is nothing to hide.
+    pub async fn presence_visibility_many(
+        &self,
+        ids: &[UserId],
+    ) -> anyhow::Result<HashMap<UserId, Visibility>> {
+        let mut result = HashMap::with_capacity(ids.len());
+        if ids.is_empty() {
+            return Ok(result);
+        }
+
+        let mut builder = QueryBuilder::new(
+            "SELECT id, presence_visibility FROM users WHERE deleted_at IS NULL AND id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in ids {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+
+        let rows = builder.build().fetch_all(&self.pool).await?;
+        for row in rows {
+            let id: UserId = row.try_get("id")?;
+            let raw: String = row.try_get("presence_visibility")?;
+            result.insert(id, Visibility::parse(&raw).unwrap_or_default());
+        }
+        Ok(result)
     }
 
     /// Sets the caller's visibility preference. Returns `false` if the
