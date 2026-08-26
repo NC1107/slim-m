@@ -62,4 +62,58 @@ void main() {
       'Deleted user',
     );
   });
+
+  /// [authorLabelResolved] is [authorLabel]'s twin for a caller that already
+  /// selected one author's own [AuthorResolution] out of the batch map
+  /// (`message_row_identity.dart`, `reply_quote.dart`, `reply_banner.dart`) -
+  /// each case here mirrors one of [authorLabel]'s own above it, so the two
+  /// entry points cannot silently drift.
+  group('authorLabelResolved matches authorLabel for the same inputs', () {
+    test('an author never resolved falls back to the cached name', () {
+      expect(
+        authorLabelResolved(
+          authorId: 'u1',
+          cachedDisplayName: 'Old Name',
+          resolution: (present: false, profile: null),
+        ),
+        'Old Name',
+      );
+    });
+
+    test('a resolved profile wins over a stale cached name', () {
+      expect(
+        authorLabelResolved(
+          authorId: 'u1',
+          cachedDisplayName: 'Old Name',
+          resolution: (present: true, profile: _profile('u1', 'New Name')),
+        ),
+        'New Name',
+      );
+    });
+
+    test(
+      'a confirmed-gone id reads as deleted, never the stale cached name',
+      () {
+        expect(
+          authorLabelResolved(
+            authorId: 'u1',
+            cachedDisplayName: 'Old Name',
+            resolution: (present: true, profile: null),
+          ),
+          'Deleted user',
+        );
+      },
+    );
+
+    test('a null author id is always Deleted user, resolved or not', () {
+      expect(
+        authorLabelResolved(
+          authorId: null,
+          cachedDisplayName: 'Whoever cached this',
+          resolution: (present: false, profile: null),
+        ),
+        'Deleted user',
+      );
+    });
+  });
 }
