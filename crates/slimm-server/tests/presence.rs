@@ -257,6 +257,75 @@ async fn presence_flips_to_offline_when_the_last_socket_closes() {
     );
 }
 
+/// One `GET /presence` request naming a hidden user, a plainly visible one,
+/// and an id that never existed, all at once: the shape a moderator page or
+/// a member list actually sends, and the case a batched visibility lookup
+/// could get wrong in a way a single-id test never would (returning the
+/// wrong visibility for one id because of how the batch query grouped rows,
+/// or dropping a real id when only some in the page have a live row).
+#[tokio::test]
+async fn a_batch_mixes_hidden_visible_and_absent_ids_correctly() {
+    let (store, _guard) = new_store().await;
+    let state = state_for(&store, Hub::new());
+    let (alice_access, alice_ticket, alice_id) = user_ticket(&store, "alice").await;
+    let (_bob_access, bob_ticket, bob_id) = user_ticket(&store, "bob").await;
+    let (carol_access, carol_ticket, _carol_id) = user_ticket(&store, "carol").await;
+    let alice_id_str = alice_id.to_string();
+    let bob_id_str = bob_id.to_string();
+    let missing = uuid::Uuid::now_v7();
+
+    let addr = serve(state.clone()).await;
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let _ = next_presence_for(&mut alice_ws, &alice_id_str).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+    let _ = next_presence_for(&mut bob_ws, &bob_id_str).await;
+    let mut carol_ws = connect(addr, &carol_ticket).await;
+    let _ = next_presence_for(&mut carol_ws, &_carol_id.to_string()).await;
+
+    let response = http::router(state.clone())
+        .oneshot(patch_request(
+            "/presence",
+            &alice_access,
+            json!({ "visibility": "hidden" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let uri = format!("/presence?ids={alice_id_str},{bob_id_str},{missing}");
+    let response = http::router(state.clone())
+        .oneshot(get_request(&uri, &carol_access))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let entries: Vec<Value> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(
+        entries.len(),
+        2,
+        "the never-existed id must be absent, not a third entry"
+    );
+    let by_id = |id: &str| {
+        entries
+            .iter()
+            .find(|e| e["user_id"] == id)
+            .unwrap_or_else(|| panic!("no entry for {id}"))
+    };
+    assert_eq!(
+        by_id(&alice_id_str)["status"],
+        "offline",
+        "hidden to a third-party viewer, even while connected"
+    );
+    assert_eq!(
+        by_id(&bob_id_str)["status"],
+        "online",
+        "a plainly visible connected user reads through the same batch"
+    );
+}
+
 /// A user missing from the batch lookup (never existed) is simply absent,
 /// the same contract `GET /users` has, rather than an error or a synthesized
 /// "offline" entry.

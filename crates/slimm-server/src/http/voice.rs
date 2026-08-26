@@ -281,13 +281,20 @@ async fn roster(
         }
     };
 
+    // One batched lookup rather than one per participant; see `Store::presence_visibility_many`.
+    let other_ids: Vec<UserId> = connected
+        .iter()
+        .map(|p| p.user_id)
+        .filter(|&id| id != ctx.user_id)
+        .collect();
+    let visibilities = state.store.presence_visibility_many(&other_ids).await?;
+
     let mut participants = Vec::with_capacity(connected.len());
     for participant in connected {
-        if participant.user_id != ctx.user_id {
-            let visibility = state.store.presence_visibility(participant.user_id).await?;
-            if visibility == Some(Visibility::Hidden) {
-                continue;
-            }
+        if participant.user_id != ctx.user_id
+            && visibilities.get(&participant.user_id) == Some(&Visibility::Hidden)
+        {
+            continue;
         }
         participants.push(RosterParticipantDto {
             user_id: participant.user_id.to_string(),

@@ -131,16 +131,19 @@ async fn search(
     let channel_ids = match params.in_channel.as_deref() {
         Some(name) => {
             let candidates = state.store.search_channel_ids_by_name(name).await?;
-            let mut viewable = Vec::with_capacity(candidates.len());
-            for candidate in candidates {
-                if state
-                    .store
-                    .has_permission(ctx.user_id, candidate, Permissions::VIEW_CHANNEL)
-                    .await?
-                {
-                    viewable.push(candidate);
-                }
-            }
+            // One batched check for every candidate, not one `has_permission` call each.
+            let permissions = state
+                .store
+                .permissions_in_channels(ctx.user_id, &candidates)
+                .await?;
+            let viewable: Vec<ChannelId> = candidates
+                .into_iter()
+                .filter(|candidate| {
+                    permissions
+                        .get(candidate)
+                        .is_some_and(|p| p.contains(Permissions::VIEW_CHANNEL))
+                })
+                .collect();
             if viewable.is_empty() {
                 // No such channel, or none viewable - both answer empty; see this fn's own doc.
                 return Ok(Json(Vec::new()));

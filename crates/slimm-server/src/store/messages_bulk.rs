@@ -85,25 +85,50 @@ impl Store {
     /// A message already soft-deleted still resolves. Deleting one again has to
     /// succeed rather than 404, the same reason the single path fetches
     /// including deleted, and its author is still the author.
+    ///
+    /// One batched `IN`-query rather than one `SELECT` per id, mirroring the
+    /// `pinned_ids` lookup in [`Self::bulk_delete_messages`] below: `ids` is
+    /// caller-supplied but capped by `MAX_BULK_DELETE_IDS`, so the built
+    /// `IN (...)` stays bounded. Which of the requested ids came back is
+    /// diffed against `ids` itself to find the first missing one, so the
+    /// `NotFound` this returns still names whichever id the per-id loop would
+    /// have hit first.
     pub async fn message_authors_in(
         &self,
         channel_id: ChannelId,
         ids: &[MessageId],
     ) -> Result<Vec<(MessageId, Option<UserId>)>, BulkDeleteError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut builder =
+            QueryBuilder::new("SELECT id, author_id FROM messages WHERE channel_id = ");
+        builder.push_bind(channel_id);
+        builder.push(" AND id IN (");
+        let mut separated = builder.separated(", ");
+        for id in ids {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+
+        use sqlx::Row;
+        let rows = builder.build().fetch_all(&self.pool).await?;
+        let mut by_id: std::collections::HashMap<MessageId, Option<UserId>> =
+            std::collections::HashMap::with_capacity(rows.len());
+        for row in rows {
+            let id: MessageId = row.try_get("id")?;
+            let author_id: Option<UserId> = row.try_get("author_id")?;
+            by_id.insert(id, author_id);
+        }
+
+        // `.get`, not `.remove`: a repeated id must resolve every time it appears.
         let mut found: Vec<(MessageId, Option<UserId>)> = Vec::with_capacity(ids.len());
         for id in ids {
-            let row = sqlx::query!(
-                r#"SELECT author_id AS "author_id?: UserId" FROM messages
-               WHERE id = ? AND channel_id = ?"#,
-                id,
-                channel_id
-            )
-            .fetch_optional(&self.pool)
-            .await?;
-            let Some(row) = row else {
+            let Some(author_id) = by_id.get(id).copied() else {
                 return Err(BulkDeleteError::NotFound(*id));
             };
-            found.push((*id, row.author_id));
+            found.push((*id, author_id));
         }
         Ok(found)
     }

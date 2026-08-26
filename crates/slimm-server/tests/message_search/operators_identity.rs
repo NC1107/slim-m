@@ -278,3 +278,75 @@ async fn in_naming_an_unviewable_or_nonexistent_channel_answers_empty_either_way
          answer identically"
     );
 }
+
+/// Channel names are not unique (`Store::search_channel_ids_by_name`'s own
+/// doc), so `in:` can resolve to several candidates at once; each is checked
+/// for `VIEW_CHANNEL` on its own, and only the viewable ones are searched.
+/// This is the batched permission check's own test: a per-candidate loop and
+/// a batched `permissions_in_channels` call must agree on exactly which
+/// candidates survive, or this mixes in a channel the caller cannot see.
+#[tokio::test]
+async fn in_naming_two_same_named_channels_searches_only_the_viewable_one() {
+    let (store, _guard) = new_store().await;
+    let everyone = store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let viewable = store.create_channel("standup", "text").await.unwrap();
+    let hidden = store.create_channel("standup", "text").await.unwrap();
+    store
+        .set_role_overwrite(
+            hidden.id,
+            everyone,
+            Permissions::NONE,
+            Permissions::VIEW_CHANNEL,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    send(&app, &viewable.id.to_string(), &token, "narwhals visible").await;
+    let planter = store
+        .create_account("ghost", "ghost", "not-a-real-hash")
+        .await
+        .unwrap();
+    store
+        .send_message(
+            hidden.id,
+            planter.id,
+            MessageId::generate(),
+            "narwhals hidden",
+            &[],
+            None,
+        )
+        .await
+        .unwrap();
+
+    let results = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                &format!(
+                    "/channels/{}/messages/search?q=narwhals&in=standup",
+                    viewable.id
+                ),
+                Some(&token),
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let results = results.as_array().unwrap();
+    assert_eq!(
+        results.len(),
+        1,
+        "only the same-named channel the caller may view should match"
+    );
+    assert_eq!(results[0]["content"], "narwhals visible");
+}
