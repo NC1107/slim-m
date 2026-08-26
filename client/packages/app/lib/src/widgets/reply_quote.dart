@@ -43,10 +43,14 @@ class ReplyQuote extends ConsumerWidget {
     final resolved = this.resolved;
     final label = resolved == null
         ? null
-        : authorLabel(
+        : authorLabelResolved(
             authorId: resolved.authorId,
             cachedDisplayName: resolved.authorDisplayName,
-            profiles: ref.watch(batchProfilesControllerProvider),
+            resolution: ref.watch(
+              batchProfilesControllerProvider.select(
+                (m) => authorResolution(m, resolved.authorId ?? ''),
+              ),
+            ),
           );
     final snippet = resolved == null
         ? 'Message unavailable'

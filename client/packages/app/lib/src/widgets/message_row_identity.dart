@@ -203,10 +203,14 @@ class MessageRowLeading extends ConsumerWidget {
     );
   }
 
-  String _label(WidgetRef ref) => authorLabel(
+  String _label(WidgetRef ref) => authorLabelResolved(
     authorId: message.authorId,
     cachedDisplayName: message.authorDisplayName,
-    profiles: ref.watch(batchProfilesControllerProvider),
+    resolution: ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, message.authorId ?? ''),
+      ),
+    ),
   );
 }
 
@@ -223,10 +227,14 @@ class MessageRowHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final name = authorLabel(
+    final name = authorLabelResolved(
       authorId: message.authorId,
       cachedDisplayName: message.authorDisplayName,
-      profiles: ref.watch(batchProfilesControllerProvider),
+      resolution: ref.watch(
+        batchProfilesControllerProvider.select(
+          (m) => authorResolution(m, message.authorId ?? ''),
+        ),
+      ),
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s4),
