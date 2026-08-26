@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.45.1](https://github.com/NC1107/slim-m/compare/server-v0.45.0...server-v0.45.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **client:** size sheets to content on desktop, use AppErrorState, close token drift ([#880](https://github.com/NC1107/slim-m/issues/880)) ([b2c7080](https://github.com/NC1107/slim-m/commit/b2c70803c643c84c99273b45e1724eb8d928f6bc))
+* prevent reset from deleting failed sends, purge avatar on account delete, real reconnect jitter ([#877](https://github.com/NC1107/slim-m/issues/877)) ([f6895f4](https://github.com/NC1107/slim-m/commit/f6895f494c1ad3558470345ba88a93b36f0810f0))
+* restore the avatar purge, failed-send-safe reset, and real jitter ([#889](https://github.com/NC1107/slim-m/issues/889)) ([1548449](https://github.com/NC1107/slim-m/commit/154844900d1e3f8d6e14824047ce43c926fc95cb))
+
+
+### Performance Improvements
+
+* **server:** batch presence/author/roster lookups that ran per-id ([#878](https://github.com/NC1107/slim-m/issues/878)) ([92ac305](https://github.com/NC1107/slim-m/commit/92ac3058c1128dd9c4cfa07735371939fd9ef1b2))
+
 ## [0.45.0](https://github.com/NC1107/slim-m/compare/server-v0.44.0...server-v0.45.0) (2026-08-25)
 
 
