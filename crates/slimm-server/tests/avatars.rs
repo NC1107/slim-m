@@ -199,6 +199,59 @@ async fn deleting_an_avatar_clears_it() {
     assert!(me["avatar_updated_at"].is_null());
 }
 
+/// `DELETE /account` used to purge everything about a user except the avatar
+/// file itself: only the self-service `DELETE /me/avatar` path removed it, so
+/// a deleted account left its picture behind on disk forever.
+#[tokio::test]
+async fn deleting_an_account_removes_its_avatar_file() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let (root, _media_guard) = support::TestDirGuard::new("slimm-avatars-account-delete");
+    let media = Media::new(&root, 10 * 1024 * 1024).expect("create temp media directories");
+    let app = http::router(AppState {
+        store: store.clone(),
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media,
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
+    });
+    let token = register(&store, "alice").await;
+
+    let me = json_body(
+        app.clone()
+            .oneshot(request_plain("GET", "/me", &token))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let user_id = me["id"].as_str().unwrap().to_owned();
+
+    app.clone()
+        .oneshot(request_bytes("POST", "/me/avatar", &token, png(8)))
+        .await
+        .unwrap();
+    let avatar_file = root.join("avatars").join(&user_id);
+    assert!(avatar_file.exists(), "the upload landed on disk");
+
+    let deleted = app
+        .clone()
+        .oneshot(request_plain("DELETE", "/account", &token))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    assert!(
+        !avatar_file.exists(),
+        "the avatar file must not outlive the account"
+    );
+}
+
 #[tokio::test]
 async fn a_non_image_avatar_is_refused() {
     let (store, _guard) = new_store().await;
