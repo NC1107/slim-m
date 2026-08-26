@@ -8,12 +8,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/threads.dart';
 import 'composer_extras.dart';
 import 'poll_composer_sheet.dart';
 
-class ComposerActionBar extends StatelessWidget {
+class ComposerActionBar extends ConsumerWidget {
   const ComposerActionBar({
     super.key,
     required this.touch,
@@ -59,8 +61,10 @@ class ComposerActionBar extends StatelessWidget {
   final VoidCallback onPickEmoji;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // True only for the docked thread pane's own copy (`home_shell_pane_slots.dart`), where the parent channel's identical controls are also on screen.
+    final isThread = ref.watch(openThreadProvider) == channelId;
     // A line break grows the bar over a beat, earlier lines holding still.
     return MaybeAnimatedSize(
       duration: AppMotion.fast,
@@ -93,6 +97,7 @@ class ComposerActionBar extends StatelessWidget {
                 hasText: hasText,
                 onSend: onSend,
                 onTyping: onTyping,
+                isThread: isThread,
               ),
             ),
             const SizedBox(width: AppSpacing.s8),
@@ -127,8 +132,8 @@ class ComposerActionBar extends StatelessWidget {
             // Always rendered, only disabled when empty or over the limit.
             AppIconButton(
               icon: AppIcons.send,
-              semanticLabel: 'Send message',
-              tooltip: 'Send message',
+              semanticLabel: isThread ? 'Send reply' : 'Send message',
+              tooltip: isThread ? 'Send reply' : 'Send message',
               onPressed: canSend ? onSendPressed : null,
             ),
           ],

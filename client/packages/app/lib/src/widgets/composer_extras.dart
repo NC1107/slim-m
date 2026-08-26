@@ -87,6 +87,7 @@ class ComposerField extends StatefulWidget {
     required this.hasText,
     required this.onSend,
     required this.onTyping,
+    this.isThread = false,
   });
 
   final TextEditingController controller;
@@ -95,6 +96,16 @@ class ComposerField extends StatefulWidget {
   final bool hasText;
   final Future<void> Function() onSend;
   final ValueChanged<String> onTyping;
+
+  /// Whether this field is the docked thread's own copy rather than the
+  /// channel's. A docked thread pane sits beside its parent channel
+  /// (`home_shell_pane_slots.dart`'s `_ThreadPaneSlot`), so both composers are
+  /// on screen at once; [channelName] cannot tell them apart (a thread's is
+  /// always blank, same as a DM's - see this file's own note below), so this
+  /// flag gives the thread's field a distinct accessible name of its own
+  /// instead of the two reading identically to a screen reader or to
+  /// anything else that finds a control by name rather than by position.
+  final bool isThread;
 
   @override
   State<ComposerField> createState() => _ComposerFieldState();
@@ -215,9 +226,9 @@ class _ComposerFieldState extends State<ComposerField> {
                   ),
                 ),
               ),
-            // A stable name, unlike the hint above: that text vanishes once typed, and is bare for a thread or DM.
+            // A stable name, unlike the hint above: it survives typing, and only isThread (not channelName) ever changes it - see the field's own doc comment.
             Semantics(
-              label: 'Message composer',
+              label: widget.isThread ? 'Thread composer' : 'Message composer',
               child: TextField(
                 controller: widget.controller,
                 focusNode: widget.focusNode,
