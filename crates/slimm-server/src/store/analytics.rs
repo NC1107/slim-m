@@ -142,9 +142,17 @@ impl Store {
     /// The full derived-plus-recorded answer. Callers gate this on
     /// [`Store::analytics_enabled`] themselves; this always computes, so it
     /// must never be reached for a deployment that has the toggle off.
+    ///
+    /// Two window starts, not one: `messages_by_day` groups by calendar date,
+    /// an inclusive range that needs the `-1` to land on exactly
+    /// [`ANALYTICS_WINDOW_DAYS`] rows, while `active_hours` and
+    /// `memory_samples` filter a raw timestamp with `>=`, where the
+    /// unadjusted start already covers the full window and the `-1` would
+    /// instead drop them to 29 days.
     pub async fn analytics_stats(&self) -> anyhow::Result<AnalyticsStats> {
         let now = now_ms();
-        let window_start = now - (ANALYTICS_WINDOW_DAYS - 1) * DAY_MS;
+        let day_window_start = now - (ANALYTICS_WINDOW_DAYS - 1) * DAY_MS;
+        let window_start = now - ANALYTICS_WINDOW_DAYS * DAY_MS;
 
         let total_messages = sqlx::query_scalar!(
             r#"SELECT COUNT(*) AS "c!: i64" FROM messages WHERE deleted_at IS NULL"#
@@ -164,7 +172,7 @@ impl Store {
         .context("count channels")?;
 
         let attachment_bytes = self.total_attachment_bytes().await?;
-        let messages_by_day = self.messages_by_day(window_start, now).await?;
+        let messages_by_day = self.messages_by_day(day_window_start, now).await?;
         let active_hours = self.active_hours(window_start).await?;
         let memory_samples = self.memory_samples(window_start).await?;
 
