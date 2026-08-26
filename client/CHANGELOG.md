@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.54.0](https://github.com/NC1107/slim-m/compare/client-v0.53.0...client-v0.54.0) (2026-08-26)
+
+
+### Features
+
+* **client:** skip the sign-in toggle for a first official-space join ([#885](https://github.com/NC1107/slim-m/issues/885)) ([2ac2135](https://github.com/NC1107/slim-m/commit/2ac21352598041873fb83e6a2eb1a3ccd43863c7))
+
+
+### Bug Fixes
+
+* **client:** render a member's custom status as a two-line row ([#882](https://github.com/NC1107/slim-m/issues/882)) ([1e688e6](https://github.com/NC1107/slim-m/commit/1e688e66f09f38b6f6c3aa6485d638639efc9704))
+* **client:** size sheets to content on desktop, use AppErrorState, close token drift ([#880](https://github.com/NC1107/slim-m/issues/880)) ([b2c7080](https://github.com/NC1107/slim-m/commit/b2c70803c643c84c99273b45e1724eb8d928f6bc))
+* **client:** theme native launch screens to the dark surface color ([#881](https://github.com/NC1107/slim-m/issues/881)) ([bd7d776](https://github.com/NC1107/slim-m/commit/bd7d7766bcea737c4a08f03af0aaed3b1a06477c))
+* prevent reset from deleting failed sends, purge avatar on account delete, real reconnect jitter ([#877](https://github.com/NC1107/slim-m/issues/877)) ([f6895f4](https://github.com/NC1107/slim-m/commit/f6895f494c1ad3558470345ba88a93b36f0810f0))
+* restore the avatar purge, failed-send-safe reset, and real jitter ([#889](https://github.com/NC1107/slim-m/issues/889)) ([1548449](https://github.com/NC1107/slim-m/commit/154844900d1e3f8d6e14824047ce43c926fc95cb))
+
+
+### Performance Improvements
+
+* **client:** restore per-author select on message rows and reply chrome ([#887](https://github.com/NC1107/slim-m/issues/887)) ([f9855b0](https://github.com/NC1107/slim-m/commit/f9855b0d52c3f344ddcf44611615392fae88eee0))
+* **client:** restore the stream cache, shell keep-alive, and canvas order cache ([#890](https://github.com/NC1107/slim-m/issues/890)) ([4ed2521](https://github.com/NC1107/slim-m/commit/4ed25211aade1279ea47d4da728334b1bd34f7ac))
+* **client:** scope transcript/shell rebuilds and cache channel streams ([#879](https://github.com/NC1107/slim-m/issues/879)) ([72a38c8](https://github.com/NC1107/slim-m/commit/72a38c8a0f5484118dfe48f35a975a0139360109))
+
 ## [0.53.0](https://github.com/NC1107/slim-m/compare/client-v0.52.0...client-v0.53.0) (2026-08-25)
 
 
