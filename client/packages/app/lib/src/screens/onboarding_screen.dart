@@ -120,6 +120,11 @@ class OnboardingScreen extends ConsumerWidget {
   /// flow: that would mean this well-known address answered with a
   /// different key than the one already pinned, which is worth a hard stop
   /// regardless of how the address was chosen.
+  ///
+  /// This screen only ever runs on an install with no server chosen before,
+  /// so tapping this button is itself evidence there is no account here yet
+  /// - the same reasoning [assumeNewAccountProvider] documents - and sign-in
+  /// opens on creating one rather than asking for a tap it does not need.
   Future<void> _officialFlow(BuildContext context, WidgetRef ref) async {
     final server = Uri.parse(officialServer);
     if (await confirmServerIdentity(
@@ -128,6 +133,7 @@ class OnboardingScreen extends ConsumerWidget {
       server,
       silentFirstConnect: true,
     )) {
+      ref.read(assumeNewAccountProvider.notifier).state = true;
       onServerChosen(server, null);
     }
   }

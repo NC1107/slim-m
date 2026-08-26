@@ -30,7 +30,9 @@ import '../widgets/server_notice.dart';
 /// compiled-in official server, where that choice was already made by
 /// picking "Join the official Space" in onboarding: the field starts
 /// collapsed behind "Use a different server" so joining it is username and
-/// password, nothing else.
+/// password, nothing else. It also opens straight on creating an account,
+/// for the same reason an invite does: that button means there is no
+/// account here yet.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -82,10 +84,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   void initState() {
     super.initState();
-    // Somebody arriving with an invite code has no account here yet, so the
-    // screen opens on creating one rather than asserting "Sign in" at the one
-    // person it cannot apply to. The toggle still offers the other mode.
-    _creatingAccount = ref.read(pendingInviteProvider) != null;
+    // Somebody arriving with an invite code, or via "Join the official
+    // Space" with no invite, has no account here yet, so the screen opens on
+    // creating one rather than asserting "Sign in" at someone it cannot
+    // apply to. The toggle still offers the other mode. The provider is
+    // consumed and reset after this build, so a later sign-out on this same
+    // address - which skips onboarding entirely - always starts on "Sign in".
+    final assumedNew = ref.read(assumeNewAccountProvider);
+    if (assumedNew) {
+      // A provider cannot be written mid-build; this runs right after it.
+      Future(() => ref.read(assumeNewAccountProvider.notifier).state = false);
+    }
+    _creatingAccount = ref.read(pendingInviteProvider) != null || assumedNew;
     _probeServer();
   }
 
