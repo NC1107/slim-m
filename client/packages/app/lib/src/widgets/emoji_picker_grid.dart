@@ -30,7 +30,7 @@ class EmojiCategoryTabs extends StatelessWidget {
         children: [
           for (final category in categories)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
               child: AppIconButton(
                 icon: category.icon,
                 semanticLabel: category.label,

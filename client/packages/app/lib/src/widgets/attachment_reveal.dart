@@ -11,6 +11,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../routing/modal_page.dart' show kScrimColor;
 import 'message_row_parts.dart' show AttachmentPlaceholder;
 
 /// The stand-in for a held preview: [icon] + [line] for one not yet downloaded,
@@ -65,7 +66,7 @@ class AttachmentRevealTile extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 28, color: tokens.textSecondary),
+                Icon(icon, size: AppSizes.icon28, color: tokens.textSecondary),
                 const SizedBox(height: AppSpacing.s8),
                 Text(
                   line ?? 'Tap to load',
@@ -112,15 +113,24 @@ class AttachmentRevealTile extends StatelessWidget {
 class _PlayBadge extends StatelessWidget {
   const _PlayBadge();
 
+  /// Opaque white regardless of theme: this sits on an arbitrary decoded
+  /// frame, not a themed surface, so it cannot be one of [AppTokens]'
+  /// contrast-tuned pairs the way chrome on a surface can.
+  static const _glyphOnDark = Color(0xFFFFFFFF);
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.s12),
       decoration: const BoxDecoration(
-        color: Color(0x99000000),
+        color: kScrimColor,
         shape: BoxShape.circle,
       ),
-      child: const Icon(AppIcons.play, size: 28, color: Color(0xFFFFFFFF)),
+      child: const Icon(
+        AppIcons.play,
+        size: AppSizes.icon28,
+        color: _glyphOnDark,
+      ),
     );
   }
 }

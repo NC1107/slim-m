@@ -228,6 +228,7 @@ class _CanvasOverflowMenuState extends State<CanvasOverflowMenu> {
       children: [
         const AppKbd('Ctrl'),
         Padding(
+          // Off-grid on purpose: matches AppKbd's own sub-4dp padding so "Ctrl+V" reads as one shortcut, not two chips with a gap between.
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Text(
             '+',

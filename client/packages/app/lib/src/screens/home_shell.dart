@@ -61,10 +61,10 @@ class HomeShell extends ConsumerWidget {
     final layout = LayoutClass.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final selected = selectedChannelId(context);
-    // Loaded with the shell so the first surface to consult it filters against none; selecting a constant keeps this mounted without rebuilding the whole shell on every block/unblock.
-    ref.watch(blocksProvider.select((_) => null));
-    // Same reasoning, including the constant select: a channel mute must not rebuild the whole shell either.
-    ref.watch(channelNotificationOverridesProvider.select((_) => null));
+    // With the shell, or the first surface to consult it filters against none.
+    ref.watch(blocksProvider);
+    // Same reasoning: the rail glyph, header menu and sound gate all need this loaded first.
+    ref.watch(channelNotificationOverridesProvider);
     // Session-lifetime, or permission invalidation only ran with RolesScreen open.
     ref.watch(roleChangeWatcherProvider);
     // Forces creation for the session; nothing here reads its own state.
@@ -297,7 +297,15 @@ class ConversationPane extends ConsumerWidget {
 
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => const Center(child: Text('Could not load this screen.')),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          child: AppErrorState(
+            message: 'Could not load this screen.',
+            onRetry: () => ref.invalidate(storeProvider),
+          ),
+        ),
+      ),
       data: (store) => StreamBuilder<List<Channel>>(
         stream: store.watchChannels(),
         builder: (context, snapshot) {

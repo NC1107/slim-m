@@ -43,7 +43,6 @@ import '../widgets/message_transcript.dart';
 import 'channel_composer_area.dart';
 import 'channel_message_actions.dart';
 import 'channel_read_marker.dart';
-import 'channel_screen_streams.dart';
 import 'channel_transcript_scroll.dart';
 
 export '../ids.dart' show newMessageId;
@@ -118,11 +117,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// the same trap). The controller itself needs no further `ref` access
   /// once resolved, so holding it plainly is enough.
   late final ChannelDraftsController _drafts = ref.read(channelDraftsProvider);
-
-  /// See `channel_screen_streams.dart`: recreates a channel's drift streams
-  /// only when the store, channel id, or window actually change, rather than
-  /// on every build the way an inline `store.watchChannel(...)` call did.
-  final _streams = ChannelStreamCache();
 
   @override
   void initState() {
@@ -285,7 +279,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       error: (e, _) =>
           const Center(child: Text('Could not open the local store.')),
       data: (store) => StreamBuilder<Channel?>(
-        stream: _streams.channelRow(store, widget.channelId),
+        stream: store.watchChannelRow(widget.channelId),
         builder: (context, channelSnapshot) {
           final channel = channelSnapshot.data;
           final channelName = channel?.name ?? '';
@@ -351,10 +345,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                       : Stack(
                           children: [
                             StreamBuilder<List<Message>>(
-                              stream: _streams.transcript(
-                                store,
+                              stream: store.watchChannel(
                                 widget.channelId,
-                                history.window,
+                                limit: history.window,
                               ),
                               builder: (context, snapshot) {
                                 final rows = snapshot.data ?? const <Message>[];

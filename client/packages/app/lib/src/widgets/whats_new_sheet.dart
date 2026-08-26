@@ -13,6 +13,11 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../whats_new/whats_new_content.dart';
 
+/// Marks the sizing box around the sheet's body, so a test can measure it
+/// directly rather than inferring the fix from a screenshot - the same
+/// technique `pinnedMessagesBodyBoxKey` uses.
+const whatsNewBodyBoxKey = Key('whats_new_body_box');
+
 /// Shows [entries], newest first: someone catching up after skipping a few
 /// releases cares most about the latest, and [entries] itself is kept in the
 /// chronological order it was authored in so this is the one place that
@@ -37,11 +42,16 @@ class _WhatsNewSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.6,
+    // A ceiling, not a fixed size: short entries must not force a dialog tall enough for a maximum-length one.
+    return ConstrainedBox(
+      key: whatsNewBodyBoxKey,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -59,7 +69,7 @@ class _WhatsNewSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.s16),
-            Expanded(
+            Flexible(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

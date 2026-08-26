@@ -16,7 +16,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
-import '../widgets/author_label.dart' show AuthorResolution;
 import 'live_events.dart';
 import 'providers.dart';
 
@@ -95,18 +94,6 @@ final batchProfilesControllerProvider =
       BatchProfilesController,
       Map<String, api.UserProfile?>
     >((ref) => BatchProfilesController(ref));
-
-/// [authorId]'s own slice of [profiles], for a caller that wants to
-/// `.select` [batchProfilesControllerProvider] rather than watch the whole
-/// map: a row watching the map outright rebuilds on every other author's
-/// resolve too, since [BatchProfilesController.resolve] replaces the map's
-/// identity on every call. Selecting this record instead means the row only
-/// rebuilds when its own author's entry actually changes - see
-/// `widgets/author_label.dart`'s [authorLabelResolved], which consumes it.
-AuthorResolution authorResolution(
-  Map<String, api.UserProfile?> profiles,
-  String authorId,
-) => (present: profiles.containsKey(authorId), profile: profiles[authorId]);
 
 /// Kicks off resolving whichever of [authorIds] this session does not
 /// already have cached. Safe to call on every rebuild a message list

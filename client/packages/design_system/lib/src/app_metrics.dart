@@ -76,6 +76,11 @@ abstract final class AppSizes {
   static const double icon16 = 16;
   static const double icon20 = 20;
   static const double icon24 = 24;
+
+  /// A step between [icon24] and [icon32], previously reinvented three ways
+  /// with no name of its own: `icon20 + 8` at two sheet call sites, and an
+  /// unnamed literal for `AppIconButtonSize.md`'s diameter.
+  static const double icon28 = 28;
   static const double icon32 = 32;
 }
 

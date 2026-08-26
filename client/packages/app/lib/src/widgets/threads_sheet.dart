@@ -83,9 +83,14 @@ class _ThreadsSheet extends ConsumerWidget {
             ],
           ),
         ),
-        SizedBox(
+        ConstrainedBox(
           key: threadsBodyBoxKey,
-          height: hasList ? MediaQuery.of(context).size.height * 0.6 : 160,
+          // A ceiling for a real list, via `_Body`'s own shrinkWrap ListView; an empty or loading state keeps a modest fixed box instead.
+          constraints: hasList
+              ? BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                )
+              : const BoxConstraints.tightFor(height: 160),
           child: _Body(channelId: channelId, threads: threads, router: router),
         ),
       ],
@@ -153,6 +158,7 @@ class _Body extends ConsumerWidget {
         resolveAuthorProfiles(ref, list.map((t) => t.parentAuthorId));
 
         return ListView.builder(
+          shrinkWrap: true,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
           itemCount: list.length,
           itemBuilder: (context, i) {
@@ -180,7 +186,7 @@ class _Body extends ConsumerWidget {
               leading: AuthorAvatar(
                 userId: thread.parentAuthorId,
                 name: name,
-                size: AppSizes.icon20 + 8,
+                size: AppSizes.icon28,
               ),
               title: Text(
                 name,

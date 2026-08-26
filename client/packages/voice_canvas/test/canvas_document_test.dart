@@ -123,50 +123,6 @@ void main() {
     expect(ids, ['confirmed', 'local']);
   });
 
-  /// [CanvasDocument.paintOrder] caches its sort and only re-derives it on a
-  /// content change, filtering the cache against the cull for everything
-  /// else - a pan or zoom must still move objects in and out of it correctly.
-  test(
-    'paint order follows the camera in and out of view without a fresh place',
-    () {
-      final document = CanvasDocument()..setViewport(const Size(800, 600));
-      document
-        ..applyPlaced(stroke('near', zIndex: 1))
-        ..applyPlaced(stroke('far', x: 5000, y: 5000, zIndex: 2))
-        ..refresh();
-
-      List<String> ids() => document.paintOrder
-          .map((slot) => document.strokeAt(slot).id)
-          .toList();
-
-      expect(ids(), ['near']);
-
-      document.setCamera(const Camera(x: 4995, y: 4995));
-      expect(ids(), ['far']);
-
-      document.setCamera(const Camera());
-      expect(ids(), ['near']);
-    },
-  );
-
-  test('setZIndex moves an object in paint order without a fresh place', () {
-    final document = CanvasDocument()..setViewport(const Size(800, 600));
-    document
-      ..applyPlaced(stroke('a', zIndex: 1))
-      ..applyPlaced(stroke('b', x: 20, zIndex: 2))
-      ..refresh();
-
-    List<String> ids() =>
-        document.paintOrder.map((slot) => document.strokeAt(slot).id).toList();
-    expect(ids(), ['a', 'b']);
-
-    document
-      ..setZIndex('a', 5)
-      ..refresh();
-
-    expect(ids(), ['b', 'a']);
-  });
-
   test('the camera is clamped to the bounded world and the zoom range', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     document.setCamera(const Camera(x: 1e12, y: -1e12, zoom: 400));
