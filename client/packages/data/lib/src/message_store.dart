@@ -344,12 +344,16 @@ class MessageStore {
 
   /// Drops a channel's cached messages and rewinds its cursor. Used when the
   /// server answers catch-up with `reset`, meaning the gap was too large to
-  /// stream and local state cannot be trusted.
+  /// stream and local state cannot be trusted. Only server-confirmed rows are
+  /// dropped: `markFailed` also sets `pending:false`, so a failed send must be
+  /// excluded here too or it is destroyed instead of kept for retry.
   Future<void> resetChannel(String channelId) async {
     await db.transaction(() async {
       await (db.delete(db.messages)
-            ..where(
-                (m) => m.channelId.equals(channelId) & m.pending.equals(false)))
+            ..where((m) =>
+                m.channelId.equals(channelId) &
+                m.pending.equals(false) &
+                m.failed.equals(false)))
           .go();
       await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
           .write(const ChannelsCompanion(
