@@ -97,7 +97,6 @@ class MemberRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     debugMemberRowBuildCounts[profile.id] =
         (debugMemberRowBuildCounts[profile.id] ?? 0) + 1;
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final status = presenceOf(
       ref.watch(presenceControllerProvider.select((m) => m[profile.id])),
     );
@@ -112,6 +111,8 @@ class MemberRow extends ConsumerWidget {
       // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
       height: 36,
       label: profile.displayName,
+      // Tucked under the name, with the avatar centred across both lines.
+      subtitle: profile.statusText,
       muted: status == AppPresence.offline,
       // On screen presence is only a dot and an opacity; this is how it is spoken.
       stateDescription: _presenceDescription(status),
@@ -129,30 +130,6 @@ class MemberRow extends ConsumerWidget {
       onTap: open,
     );
 
-    // AppListRow is deliberately single-line and fixed-height, so a status is a caption stacked beneath it, not a change to that row.
-    final content = profile.statusText == null
-        ? row
-        : Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              row,
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: AppSpacing.s8 + 26 + AppSpacing.s8,
-                  right: AppSpacing.s8,
-                  bottom: AppSpacing.s4,
-                ),
-                child: Text(
-                  profile.statusText!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.caption.copyWith(color: tokens.textSecondary),
-                ),
-              ),
-            ],
-          );
-
-    return GestureDetector(onSecondaryTapDown: (_) => open(), child: content);
+    return GestureDetector(onSecondaryTapDown: (_) => open(), child: row);
   }
 }

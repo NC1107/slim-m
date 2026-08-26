@@ -222,6 +222,39 @@ void main() {
     });
 
     testWidgets(
+        'a subtitle grows the row as one cohesive, tappable cell; without one '
+        'the row is unchanged', (tester) async {
+      await _pump(
+        tester,
+        const SizedBox(width: 240, child: AppListRow(label: 'general')),
+      );
+      expect(
+          tester.getSize(find.byType(AppListRow)).height, AppSizes.rowPointer);
+      expect(find.byType(Column), findsNothing);
+
+      var tapped = false;
+      await _pump(
+        tester,
+        SizedBox(
+          width: 240,
+          child: AppListRow(
+            label: 'Priya',
+            subtitle: 'in a meeting',
+            onTap: () => tapped = true,
+          ),
+        ),
+      );
+      expect(find.text('Priya'), findsOneWidget);
+      expect(find.text('in a meeting'), findsOneWidget);
+      expect(tester.getSize(find.byType(AppListRow)).height,
+          greaterThan(AppSizes.rowPointer));
+
+      // One cohesive cell: a single tap fires onTap, not a separate untappable block.
+      await tester.tap(find.byType(AppListRow));
+      expect(tapped, isTrue);
+    });
+
+    testWidgets(
         'selected, unread and focused combine without any pair becoming ambiguous',
         (
       tester,
