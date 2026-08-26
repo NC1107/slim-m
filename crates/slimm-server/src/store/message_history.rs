@@ -4,7 +4,7 @@
 //! `messages.rs` to keep that file under the line ceiling.
 
 use super::Store;
-use super::messages::fetch_message;
+use super::message_reads::fetch_message;
 use crate::ids::MessageId;
 
 /// One version a message has held, oldest first in a
