@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE messages SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL\n               RETURNING channel_id AS \"channel_id!: ChannelId\", author_id AS \"author_id: UserId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "author_id: UserId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "fc14e16d15bf3dc5da747c60223fc88a69bdd46d6140f516751e4cbcfb155058"
+}
