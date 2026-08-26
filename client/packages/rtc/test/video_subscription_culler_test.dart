@@ -24,6 +24,12 @@ class _FakeRoom {
   int subscribeCalls = 0;
   int unsubscribeCalls = 0;
 
+  /// Keys whose next subscribe/unsubscribe rejects instead of succeeding,
+  /// the same shape a participant leaving mid-cull produces - consumed on
+  /// first use so a test can assert exactly one rejection happened.
+  final Set<String> failSubscribe = {};
+  final Set<String> failUnsubscribe = {};
+
   /// Rebuilt lazily on every read, so each [VideoSubscriptionCuller.apply]
   /// sees the state the previous one actually left behind.
   Iterable<VideoSubscriptionRef> get refs => keys.map(
@@ -32,10 +38,16 @@ class _FakeRoom {
           subscribed: subscribed.contains(key),
           subscribe: () async {
             subscribeCalls++;
+            if (failSubscribe.remove(key)) {
+              throw StateError('participant left mid-cull');
+            }
             subscribed.add(key);
           },
           unsubscribe: () async {
             unsubscribeCalls++;
+            if (failUnsubscribe.remove(key)) {
+              throw StateError('participant left mid-cull');
+            }
             subscribed.remove(key);
           },
         ),
@@ -231,6 +243,70 @@ void main() {
 
       expect(wired.dueCount(), 0);
       expect(room.subscribed, {'camera:a', 'camera:b'});
+    });
+  });
+
+  test('a rejected subscribe is dropped, not crashed on', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a']);
+      final wired = _wire(room);
+
+      // Cull it out first, so the next interest change actually attempts a real subscribe() rather than finding it already subscribed.
+      wired.culler.setInterest(const <String>{});
+      wired.culler.apply(room.refs);
+      async.elapse(videoSubscriptionDwell);
+      expect(room.subscribed, isEmpty);
+
+      room.failSubscribe.add('camera:a');
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      async.flushMicrotasks();
+
+      expect(room.subscribeCalls, 1);
+      expect(
+        room.subscribed,
+        isEmpty,
+        reason: 'the rejected subscribe never actually landed',
+      );
+
+      // Nothing about the rejection wedges a later reconcile.
+      wired.culler.apply(room.refs);
+      async.flushMicrotasks();
+      expect(room.subscribeCalls, 2);
+      expect(room.subscribed, {'camera:a'});
+      wired.culler.dispose();
+    });
+  });
+
+  test('a rejected unsubscribe is dropped, not crashed on', () {
+    fakeAsync((async) {
+      final room = _FakeRoom(['camera:a', 'camera:b']);
+      final wired = _wire(room);
+      wired.culler.setInterest({'camera:a', 'camera:b'});
+      wired.culler.apply(room.refs);
+
+      room.failUnsubscribe.add('camera:b');
+      wired.culler.setInterest({'camera:a'});
+      wired.culler.apply(room.refs);
+      async.elapse(videoSubscriptionDwell);
+      async.flushMicrotasks();
+
+      expect(wired.dueCount(), 1);
+      expect(room.unsubscribeCalls, 1);
+      expect(
+        room.subscribed,
+        {'camera:a', 'camera:b'},
+        reason: 'the rejected unsubscribe left the track exactly as it was',
+      );
+
+      // A rejection this cycle must not block the next one from trying again.
+      wired.culler.apply(room.refs);
+      async.elapse(videoSubscriptionDwell);
+      async.flushMicrotasks();
+      expect(wired.dueCount(), 2);
+      expect(room.unsubscribeCalls, 2);
+      expect(room.subscribed, {'camera:a'});
+      wired.culler.dispose();
     });
   });
 

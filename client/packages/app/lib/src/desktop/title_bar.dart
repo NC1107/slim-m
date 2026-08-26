@@ -12,6 +12,8 @@
 /// this widget is unreachable on the other two branches in this build.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -122,18 +124,33 @@ class _WindowControlsState extends State<_WindowControls> {
   @override
   void initState() {
     super.initState();
-    widget.port.isMaximized().then((value) {
-      if (mounted) setState(() => _maximized = value);
-    });
+    unawaited(_syncMaximized());
   }
 
-  Future<void> _maximizeOrRestore() async {
-    if (await widget.port.isMaximized()) {
-      await widget.port.unmaximize();
-    } else {
-      await widget.port.maximize();
+  Future<void> _syncMaximized() async {
+    try {
+      final value = await widget.port.isMaximized();
+      if (mounted) setState(() => _maximized = value);
+    } catch (_) {
+      // An early-startup plugin failure leaves the icon at its default.
     }
-    if (mounted) setState(() => _maximized = !_maximized);
+  }
+
+  /// Re-queries [DesktopWindowPort.isMaximized] after acting rather than
+  /// flipping [_maximized] by assumption, so a window manager that refuses
+  /// the maximize/unmaximize request cannot desync the icon from reality.
+  Future<void> _maximizeOrRestore() async {
+    try {
+      if (await widget.port.isMaximized()) {
+        await widget.port.unmaximize();
+      } else {
+        await widget.port.maximize();
+      }
+      final value = await widget.port.isMaximized();
+      if (mounted) setState(() => _maximized = value);
+    } catch (_) {
+      // A WM refusal or plugin error leaves the icon as it was.
+    }
   }
 
   @override
