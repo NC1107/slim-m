@@ -21,6 +21,17 @@ Read first when starting substantial work:
 4. `docs/decisions/`
 5. `docs/OPEN-QUESTIONS.md` when device/account/owner confirmation matters
 
+## Task tracking (Planka)
+
+Planka is the single source of truth for tasks and backlog: `https://planka.npc-server.top`, project `slim-m`, board `Backlog & Delivery`. Drive it through the `planka` MCP server (`mcp__planka__*` tools, configured in the user MCP config). The MCP loads at session start; if its tools are absent, the session predates the config and needs a restart.
+
+Lists are a simple flow: **Backlog** (validated, unscheduled) -> **Ready** (scoped enough to start from the card alone) -> **In Progress** -> **In Review** (PR open) -> **Done** (merged).
+
+- Pull the next task from **Ready**. Move its card to **In Progress** when you start, **In Review** when the PR is open (put the PR link in the card), **Done** when it merges. Keep the board current; do not let it drift.
+- Every card is self-contained: the problem (with the owner's own words where they exist), the relevant files, what already exists so nobody rebuilds it, acceptance criteria, and a gates reminder - enough that a subagent given only the ticket knows what to do.
+- Finding new work: check the live deployment's backlog channel first (see the `prod-account` memory), then for each item **validate it is real and not already shipped** - grep the code and check merged PRs - before creating a card. Many backlog asks are already done; do not re-file them.
+- Labels: area (`client`/`server`), kind (`feature`/`bug`/`perf`/`a11y`/`ui/ux`/`chore`), and `mobile` where a task is phone-specific.
+
 ## Architecture and product decisions
 
 - Server is a single process with HTTP + WebSocket.
