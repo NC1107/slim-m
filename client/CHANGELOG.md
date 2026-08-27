@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.58.0](https://github.com/NC1107/slim-m/compare/client-v0.57.0...client-v0.58.0) (2026-08-27)
+
+
+### Features
+
+* **client:** clear status with an inline x, fix stale member row ([#927](https://github.com/NC1107/slim-m/issues/927)) ([383a5ed](https://github.com/NC1107/slim-m/commit/383a5ed0a50a4536d10589ec98a1f1c94d3ae93f))
+* **client:** drag and drop files onto the composer and the emoji import card ([#931](https://github.com/NC1107/slim-m/issues/931)) ([f82dae3](https://github.com/NC1107/slim-m/commit/f82dae3d31a96eede5716e5adf567f12e1688e52))
+* **client:** enable strict analyzer flags across the workspace ([#921](https://github.com/NC1107/slim-m/issues/921)) ([1f04422](https://github.com/NC1107/slim-m/commit/1f04422c33c125f4b37cbf78e39b47600706b112))
+* **client:** make the desktop splash a real small window ([#934](https://github.com/NC1107/slim-m/issues/934)) ([79b672d](https://github.com/NC1107/slim-m/commit/79b672d1d74ae56d366c3c8bda83460ec5f57e36))
+* **client:** split a Space performance section out of Analytics ([#930](https://github.com/NC1107/slim-m/issues/930)) ([30e77d2](https://github.com/NC1107/slim-m/commit/30e77d2afb17380bb9749a56edf3af278c008cef))
+* **server:** bulk-add custom emoji in one rate-limit charge ([#932](https://github.com/NC1107/slim-m/issues/932)) ([8243bac](https://github.com/NC1107/slim-m/commit/8243bacb1b92d62f55eb18a24f16b617433ea9e0))
+* **server:** bulk-delete a raider's recent messages by author and window ([#922](https://github.com/NC1107/slim-m/issues/922)) ([1b9ee57](https://github.com/NC1107/slim-m/commit/1b9ee57893aeb60f5dcd828b2280f86b51d73728))
+* **server:** let a reporter check their own report's status ([#923](https://github.com/NC1107/slim-m/issues/923)) ([5ebae4d](https://github.com/NC1107/slim-m/commit/5ebae4d74ba5f95ebdf2d5cc6634aa0869c0819c))
+
+
+### Bug Fixes
+
+* **client:** add a right-click menu to canvas presence tiles ([#938](https://github.com/NC1107/slim-m/issues/938)) ([be0271c](https://github.com/NC1107/slim-m/commit/be0271cfed73e6b7a0c0d96e0fd0eb957024f971))
+* **client:** add hand-rolled edge/corner resize to the frameless Linux window ([#939](https://github.com/NC1107/slim-m/issues/939)) ([cf55e6c](https://github.com/NC1107/slim-m/commit/cf55e6c9e104cef8e128dfc77f8a80394dd27da3))
+* **client:** compose the desktop startup screen instead of shrinking the window ([#926](https://github.com/NC1107/slim-m/issues/926)) ([3b40eda](https://github.com/NC1107/slim-m/commit/3b40eda574d4f543ae96f30c326671e8da1883c2))
+* **client:** stop a Linux MissingPluginException from skipping the tray menu build ([#928](https://github.com/NC1107/slim-m/issues/928)) ([ff1fa12](https://github.com/NC1107/slim-m/commit/ff1fa123f1396ee22431621cbe73752a8cc0d84f))
+* **client:** stop faux-bolding avatar initials text ([#929](https://github.com/NC1107/slim-m/issues/929)) ([3a4c2ad](https://github.com/NC1107/slim-m/commit/3a4c2ad9a5a9e29e863f610935f9fd9787132ccb))
+* **client:** stop mipmap blur on photo avatars, keep the low path ([#935](https://github.com/NC1107/slim-m/issues/935)) ([dcf300a](https://github.com/NC1107/slim-m/commit/dcf300ac54d0c5a1a7691b16fb4fc4335fb08778))
+* **client:** stop pinned/threads sheets relaying out the whole backlog ([#936](https://github.com/NC1107/slim-m/issues/936)) ([7b239b8](https://github.com/NC1107/slim-m/commit/7b239b8994b7e2d2e4c32dd951f2b49f739cfdf9))
+
 ## [0.57.0](https://github.com/NC1107/slim-m/compare/client-v0.56.0...client-v0.57.0) (2026-08-27)
 
 
