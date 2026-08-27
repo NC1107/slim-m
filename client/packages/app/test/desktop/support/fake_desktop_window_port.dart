@@ -25,6 +25,12 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   int destroyCalls = 0;
   int showCalls = 0;
   int restoreCalls = 0;
+  int centerCalls = 0;
+  int hideTitleBarCalls = 0;
+
+  WindowSize? lastSize;
+  WindowRect? lastBounds;
+  bool? lastResizable;
 
   void emit(DesktopWindowEventKind kind) => _controller.add(kind);
 
@@ -61,11 +67,15 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   @override
   Future<void> ensureInitialized() async {}
   @override
-  Future<void> setBounds(WindowRect rect) async {}
+  Future<void> setBounds(WindowRect rect) async {
+    lastBounds = rect;
+    bounds = rect;
+  }
+
   @override
-  Future<void> setSize(WindowSize size) async {}
+  Future<void> setSize(WindowSize size) async => lastSize = size;
   @override
-  Future<void> center() async {}
+  Future<void> center() async => centerCalls++;
   @override
   Future<void> setFullScreen(bool value) async {}
   @override
@@ -77,7 +87,9 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   @override
   Future<void> setPreventClose(bool value) async {}
   @override
-  Future<void> hideTitleBar() async {}
+  Future<void> hideTitleBar() async => hideTitleBarCalls++;
+  @override
+  Future<void> setResizable(bool value) async => lastResizable = value;
   @override
   Future<List<DisplayArea>> allDisplays() async => const [];
 }
