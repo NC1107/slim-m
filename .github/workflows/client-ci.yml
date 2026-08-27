@@ -36,6 +36,9 @@ on:
       # timed out, and client 0.47.0 shipped no COPR/TestFlight/Play. server-ci
       # never excluded its own version files, which is why server releases
       # deliver. See docs/ci.md.
+  # By hand only: runs update-golden-references, never anything on a push or
+  # pull request. See docs/ci.md.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -103,7 +106,9 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       # Goldens run inside these suites, not a job of their own, and only ever on
-      # this channel and runner. If they start flaking, see docs/ci.md.
+      # this channel and runner. design_system's pixel comparison turns itself
+      # on once reference PNGs exist under its test/goldens/; see docs/ci.md
+      # and update-golden-references below for how those get there.
       - name: test (every workspace package)
         working-directory: client
         run: |
@@ -112,8 +117,12 @@ jobs:
           for pkg in . packages/*/; do
             dir="${pkg%/}"
             if [ -d "$dir/test" ]; then
+              define=""
+              if [ "$dir" = "packages/design_system" ] && [ -n "$(ls -A "$dir/test/goldens" 2>/dev/null)" ]; then
+                define="--dart-define=SLIMM_GOLDENS=true"
+              fi
               echo "::group::flutter test - $dir"
-              (cd "$dir" && flutter test) || status=$?
+              (cd "$dir" && flutter test $define) || status=$?
               echo "::endgroup::"
             fi
           done
@@ -200,6 +209,40 @@ jobs:
       # pass by accident rather than by exercising the real D-Bus path.
       - name: run the smoke script under a private session bus
         run: dbus-run-session -- scripts/desktop-shell-smoke.sh "$(pwd)/bundle"
+
+  # One-time (or after a real design change) bootstrap for design_system's
+  # golden references: runs only on workflow_dispatch, on the exact channel,
+  # Flutter version and runner the test job above uses, so the PNGs it writes
+  # are the ones that job will actually diff against. It cannot commit them
+  # itself; a human downloads the artifact and commits its contents into
+  # client/packages/design_system/test/goldens/. See docs/ci.md.
+  update-golden-references:
+    name: generate golden references (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
+
+      - name: generate references
+        working-directory: client/packages/design_system
+        run: flutter test --update-goldens --dart-define=SLIMM_GOLDENS=true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: golden-references
+          path: client/packages/design_system/test/goldens
+          if-no-files-found: error
 
   # The iOS half lives in client-ios-ci.yml. It costs 14 minutes on a macOS
   # runner against 5 for everything here, so it is gated on the paths that can

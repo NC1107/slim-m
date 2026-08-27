@@ -99,7 +99,7 @@ class _PinnedMessagesSheet extends ConsumerWidget {
           // A ceiling for a real list, via `body`'s own shrinkWrap ListView; an empty or loading state keeps a modest fixed box instead.
           constraints: hasList
               ? BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.6,
                 )
               : const BoxConstraints.tightFor(height: 160),
           child: body,

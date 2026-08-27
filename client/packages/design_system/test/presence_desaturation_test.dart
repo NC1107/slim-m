@@ -15,8 +15,8 @@
 /// this test exists to remove.
 ///
 /// Machine-independent by default: the arithmetic runs everywhere, and only
-/// the reference image is behind SLIMM_GOLDENS, for the reason
-/// `golden_matrix_test.dart` gives at length.
+/// the reference image is behind `--dart-define=SLIMM_GOLDENS=true`, for the
+/// reason `golden_matrix_test.dart` gives at length.
 library;
 
 import 'dart:typed_data';
