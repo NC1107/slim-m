@@ -45,3 +45,13 @@ class CustomEmoji {
         createdAt: json['created_at'] as int,
       );
 }
+
+/// One image [SlimmApiEmoji.bulkUploadCustomEmoji] queues in a single
+/// request: the raw bytes and the requested name, mirroring the single
+/// [SlimmApiEmoji.uploadCustomEmoji]'s own two inputs.
+class EmojiBulkImage {
+  const EmojiBulkImage({required this.name, required this.bytes});
+
+  final String name;
+  final List<int> bytes;
+}

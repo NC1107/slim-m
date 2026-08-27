@@ -40,6 +40,35 @@ extension SlimmApiEmoji on SlimmApi {
     return CustomEmoji.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Adds several emoji from one request. Requires MANAGE_SERVER.
+  ///
+  /// Charged once against the upload rate limit however many [images] it
+  /// carries, unlike calling [uploadCustomEmoji] once per image - see
+  /// `POST /emoji/bulk` (`crates/slimm-server/src/emoji/bulk.rs`) for why a
+  /// per-image charge made a large pack unimportable. Validated and created
+  /// as a whole: an unusable image or a name colliding with another image in
+  /// [images] or an existing emoji throws for the whole request and creates
+  /// none of it, the same [BadRequestException] or [ConflictException]
+  /// [uploadCustomEmoji] would throw for that one image alone. The returned
+  /// list is in the same order as [images].
+  Future<List<CustomEmoji>> bulkUploadCustomEmoji(
+    List<EmojiBulkImage> images,
+  ) async {
+    final json = await _send(
+      'POST',
+      '/emoji/bulk',
+      body: {
+        'images': [
+          for (final image in images)
+            {'name': image.name, 'data': base64Encode(image.bytes)},
+        ],
+      },
+    );
+    return (json as List<dynamic>)
+        .map((e) => CustomEmoji.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Removes an emoji. Requires MANAGE_SERVER. Idempotent: removing one
   /// already gone succeeds, so a retry never has to tell "gone" from "never
   /// existed".

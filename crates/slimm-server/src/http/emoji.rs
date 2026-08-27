@@ -21,7 +21,9 @@ use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::Response;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
@@ -30,18 +32,28 @@ use super::error::ApiError;
 use super::extract::Authed;
 use super::extract::enforce;
 use super::extract::{ASSET, AuthedLimited, Bytes, Json, Query, READ};
+use crate::emoji::bulk::{self, BulkAddError};
 use crate::emoji::{self, AddError};
 use crate::ids::EmojiId;
 use crate::media;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 
+/// The JSON body of a [`bulk_upload`] request base64-encodes every image, so
+/// the wire body inflates by roughly a third over the decoded bytes
+/// [`bulk::MAX_BULK_TOTAL_BYTES`] bounds; this leaves headroom for that plus
+/// the surrounding JSON structure without letting the route buffer something
+/// unbounded.
+const BULK_BODY_LIMIT_BYTES: usize = (bulk::MAX_BULK_TOTAL_BYTES as usize / 3) * 4 + 65_536;
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/emoji", get(list).post(upload))
+        .route_layer(DefaultBodyLimit::max(emoji::MAX_IMAGE_BYTES as usize))
         .route("/emoji/{emoji_id}", delete(remove))
         .route("/emoji/{emoji_id}/image", get(image))
-        .layer(DefaultBodyLimit::max(emoji::MAX_IMAGE_BYTES as usize))
+        .route("/emoji/bulk", post(bulk_upload))
+        .route_layer(DefaultBodyLimit::max(BULK_BODY_LIMIT_BYTES))
 }
 
 // --- Wire types ---
@@ -57,6 +69,18 @@ pub struct CustomEmojiDto {
 #[derive(Debug, Deserialize)]
 pub struct UploadParams {
     pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BulkUploadImage {
+    name: String,
+    /// Standard base64 of the image's raw bytes.
+    data: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BulkUploadRequest {
+    images: Vec<BulkUploadImage>,
 }
 
 // --- Handlers ---
@@ -113,6 +137,82 @@ async fn upload(
             created_at: created.created_at,
         }),
     ))
+}
+
+/// Adds several emoji from one request, charged once against `Class::Upload`
+/// however many images it carries - see [`bulk`]'s own module doc for why a
+/// per-image charge made a large pack unimportable.
+///
+/// Validated and written as a whole: an unusable image or a name collision
+/// anywhere in the batch refuses the entire request, so a caller can reason
+/// about it as one act rather than a sequence that might stop partway. A
+/// batch too large for one call, or too large to accept in this deployment's
+/// remaining storage, refuses the same way - never truncated to what would
+/// have fit.
+async fn bulk_upload(
+    Authed(ctx): Authed,
+    parts: Parts,
+    State(state): State<AppState>,
+    Json(req): Json<BulkUploadRequest>,
+) -> Result<(StatusCode, Json<Vec<CustomEmojiDto>>), ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Upload)?;
+    require_manage_server(&state, &ctx).await?;
+
+    if req.images.is_empty() {
+        return Err(ApiError::BadRequest("no images given"));
+    }
+    if req.images.len() > bulk::MAX_BULK_IMAGES {
+        return Err(ApiError::BadRequest("too many images in one request"));
+    }
+
+    let mut items = Vec::with_capacity(req.images.len());
+    let mut total_bytes: u64 = 0;
+    for image in req.images {
+        let bytes = BASE64
+            .decode(&image.data)
+            .map_err(|_| ApiError::BadRequest("image data must be base64"))?;
+        total_bytes = total_bytes.saturating_add(bytes.len() as u64);
+        items.push((image.name, bytes));
+    }
+    if total_bytes > bulk::MAX_BULK_TOTAL_BYTES {
+        return Err(ApiError::BadRequest("too much image data in one request"));
+    }
+
+    super::attachments::room_for(&state, total_bytes as i64).await?;
+
+    let created = bulk::add_emoji_bulk(&state.store, &state.media, items, Some(ctx.user_id))
+        .await
+        .map_err(bulk_refusal)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(
+            created
+                .into_iter()
+                .map(|e| CustomEmojiDto {
+                    id: e.id,
+                    name: e.name,
+                    uploader_id: e.uploader_id,
+                    created_at: e.created_at,
+                })
+                .collect(),
+        ),
+    ))
+}
+
+/// Bulk-specific refusals get their own message; anything about one image in
+/// the batch reuses [`refusal`], so a name collision or a bad image answers
+/// exactly the way the single upload would.
+fn bulk_refusal(err: BulkAddError) -> ApiError {
+    match err {
+        BulkAddError::TooMany => ApiError::BadRequest("too many images in one request"),
+        BulkAddError::TooMuchData => ApiError::BadRequest("too much image data in one request"),
+        BulkAddError::Item { error, .. } => refusal(error),
+        BulkAddError::Storage(err) => {
+            tracing::error!(error = %err, "failed to store a bulk-uploaded emoji");
+            ApiError::Internal
+        }
+    }
 }
 
 /// The status code each refusal deserves. Everything up to [`AddError::Full`]

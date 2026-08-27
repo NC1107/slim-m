@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO custom_emoji (id, name, sha256, uploader_id, created_at)\n                 VALUES (?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "84aa29f4f654891cede9ad36b187366722a7df29011aa9c9582141fa9119ece6"
+}

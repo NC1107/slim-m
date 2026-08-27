@@ -17,12 +17,14 @@ use uuid::Uuid;
 use super::world::{Contract, Payload};
 
 mod content;
+mod content_emoji;
 mod content_media_slots;
 mod content_messages_window;
 mod people;
 mod threads;
 
-use content::{channel_calls, emoji_calls, message_calls};
+use content::{channel_calls, message_calls};
+use content_emoji::emoji_calls;
 use content_media_slots::media_slot_calls;
 use content_messages_window::bulk_delete_by_author_call;
 use people::{moderation_calls, profile_calls, safety_calls};

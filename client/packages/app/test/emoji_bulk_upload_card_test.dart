@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /// Widget tests for bulk emoji import (backlog #137): picking a zip drives
-/// one `POST /emoji` per planned image, in order, and the final summary
-/// reflects what the server actually did with each one.
+/// `POST /emoji/bulk` in chunks rather than one `POST /emoji` per image - see
+/// `emoji_bulk_upload_card.dart`'s own module doc for why a per-image request
+/// exhausted the upload rate limit on a large pack - and the final summary
+/// reflects what the server actually did with each chunk.
 library;
 
 import 'dart:convert';
@@ -46,10 +48,24 @@ http.Response _json(Object value, {int status = 200}) => http.Response(
   headers: {'content-type': 'application/json'},
 );
 
+/// The names a `POST /emoji/bulk` request asked for, in order.
+List<String> _requestedNames(http.Request request) {
+  final decoded = jsonDecode(request.body) as Map<String, dynamic>;
+  final images = decoded['images'] as List<dynamic>;
+  return images
+      .map((e) => (e as Map<String, dynamic>)['name'] as String)
+      .toList();
+}
+
+http.Response _bulkCreated(List<String> names) => _json([
+  for (final name in names)
+    {'id': 'e-$name', 'name': name, 'uploader_id': 'admin', 'created_at': 0},
+], status: 201);
+
 Future<ProviderContainer> _pump(
   WidgetTester tester, {
   required List<int> zipBytes,
-  required http.Response Function(http.Request) handleUpload,
+  required http.Response Function(http.Request) handleBulk,
   List<api.CustomEmoji> existing = const [],
 }) async {
   final container = ProviderContainer(
@@ -61,8 +77,8 @@ Future<ProviderContainer> _pump(
           baseUrl: Uri.parse('http://localhost:8080'),
           session: api.SessionStore(tokens: _tokens),
           httpClient: MockClient((request) async {
-            if (request.method == 'POST' && request.url.path == '/emoji') {
-              return handleUpload(request);
+            if (request.method == 'POST' && request.url.path == '/emoji/bulk') {
+              return handleBulk(request);
             }
             return _json(const {});
           }),
@@ -87,19 +103,12 @@ Future<ProviderContainer> _pump(
   return container;
 }
 
-http.Response _created(String name) => _json({
-  'id': 'e-$name',
-  'name': name,
-  'uploader_id': 'admin',
-  'created_at': 0,
-}, status: 201);
-
 void main() {
   testWidgets(
-    'picking a zip uploads each image once, in order, named after its file '
-    'stem, and skips the non-image entry without a request',
+    'picking a zip within the per-request cap uploads every image in one '
+    'POST /emoji/bulk call, named after its file stem',
     (tester) async {
-      final requests = <Uri>[];
+      final requests = <http.Request>[];
       final zip = _buildZip({
         'party_blob.gif': [1, 2, 3],
         'Smile.png': [4, 5, 6],
@@ -109,9 +118,9 @@ void main() {
       await _pump(
         tester,
         zipBytes: zip,
-        handleUpload: (request) {
-          requests.add(request.url);
-          return _created(request.url.queryParameters['name']!);
+        handleBulk: (request) {
+          requests.add(request);
+          return _bulkCreated(_requestedNames(request));
         },
       );
 
@@ -120,11 +129,13 @@ void main() {
 
       expect(
         requests,
-        hasLength(2),
-        reason: 'readme.txt is not an accepted image extension',
+        hasLength(1),
+        reason: 'both images fit in a single bulk request',
       );
-      expect(requests[0].queryParameters['name'], 'party_blob');
-      expect(requests[1].queryParameters['name'], 'smile');
+      expect(_requestedNames(requests.single), [
+        'party_blob',
+        'smile',
+      ], reason: 'readme.txt is not an accepted image extension');
       expect(find.textContaining('Added 2 of 2'), findsOneWidget);
       expect(find.text('Import another zip'), findsOneWidget);
     },
@@ -132,9 +143,9 @@ void main() {
 
   testWidgets(
     'a name colliding with an existing emoji is refused before any request, '
-    'and the rest of the batch still runs',
+    'and the rest of the batch still uploads',
     (tester) async {
-      final requests = <Uri>[];
+      final requests = <http.Request>[];
       final zip = _buildZip({
         'ok.png': [1, 2, 3],
         'taken.png': [4, 5, 6],
@@ -151,21 +162,19 @@ void main() {
             createdAt: 0,
           ),
         ],
-        handleUpload: (request) {
-          requests.add(request.url);
-          return _created(request.url.queryParameters['name']!);
+        handleBulk: (request) {
+          requests.add(request);
+          return _bulkCreated(_requestedNames(request));
         },
       );
 
       await tester.tap(find.text('Choose a zip file'));
       await tester.pumpAndSettle();
 
-      expect(
-        requests,
-        hasLength(1),
-        reason: 'taken.png never reaches the server',
-      );
-      expect(requests.single.queryParameters['name'], 'ok');
+      expect(requests, hasLength(1));
+      expect(_requestedNames(requests.single), [
+        'ok',
+      ], reason: 'taken.png never reaches the server');
       expect(find.textContaining('Added 1 of 2'), findsOneWidget);
       expect(find.textContaining('taken.png'), findsOneWidget);
       expect(find.textContaining(':taken: is already used'), findsOneWidget);
@@ -174,39 +183,57 @@ void main() {
   );
 
   testWidgets(
-    'a 409 the server returns for one file is shown against that file, '
-    'without stopping the rest of the batch or using a SnackBar',
+    'a batch over the per-request cap splits into more than one bulk call, '
+    'and only the failed chunk can be retried without re-uploading the '
+    'chunk that already succeeded',
     (tester) async {
-      final zip = _buildZip({
-        'first.png': [1, 2, 3],
-        'second.png': [4, 5, 6],
-      });
+      final files = {
+        for (var i = 0; i < 60; i++) 'e$i.png': [i, i, i],
+      };
+      final zip = _buildZip(files);
 
+      var bulkCalls = 0;
       await _pump(
         tester,
         zipBytes: zip,
-        handleUpload: (request) {
-          final name = request.url.queryParameters['name']!;
-          if (name == 'second') {
+        handleBulk: (request) {
+          bulkCalls++;
+          final names = _requestedNames(request);
+          // 60 images split 50/10; the 10-image chunk fails then retries ok.
+          if (names.length == 10 && bulkCalls <= 2) {
             return _json({
-              'error': 'an emoji with that name already exists',
-            }, status: 409);
+              'error':
+                  'too many requests just now. Wait a moment and '
+                  'try again.',
+            }, status: 429);
           }
-          return _created(name);
+          return _bulkCreated(names);
         },
       );
 
       await tester.tap(find.text('Choose a zip file'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Added 1 of 2'), findsOneWidget);
       expect(
-        find.textContaining(
-          'second.png: Could not add :second:. An emoji with that name '
-          'already exists.',
-        ),
-        findsOneWidget,
+        bulkCalls,
+        2,
+        reason: '60 images split into a 50-image chunk and a 10-image chunk',
       );
+      expect(find.textContaining('Added 50 of 60'), findsOneWidget);
+      expect(
+        find.textContaining('10 images could not be added:'),
+        findsOneWidget,
+        reason: 'ten failures sharing one cause collapse into one line',
+      );
+      // Not one line per failed file.
+      expect(find.textContaining('e59.png:'), findsNothing);
+
+      await tester.tap(find.text('Retry 10 failed'));
+      await tester.pumpAndSettle();
+
+      expect(bulkCalls, 3, reason: 'only the failed chunk is retried');
+      expect(find.textContaining('Added 60 of 60'), findsOneWidget);
+      expect(find.text('Retry 10 failed'), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
     },
   );
@@ -216,7 +243,7 @@ void main() {
     await _pump(
       tester,
       zipBytes: _buildZip(const {}),
-      handleUpload: (request) => _created('unused'),
+      handleBulk: (request) => _bulkCreated(_requestedNames(request)),
     );
 
     await tester.tap(find.text('Choose a zip file'));
