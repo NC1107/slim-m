@@ -40,7 +40,7 @@ class DesktopTrayController {
 
   Future<void> start() async {
     await TrayManager.instance.setIcon(trayIconAssetPath);
-    await TrayManager.instance.setToolTip('slim-m');
+    await _setToolTip();
     await _rebuildMenu();
     _voiceSubscription = container.listen<VoiceState>(voiceControllerProvider, (
       previous,
@@ -65,6 +65,22 @@ class DesktopTrayController {
   void dispose() {
     _voiceSubscription?.close();
     _presenceSubscription?.close();
+  }
+
+  /// `tray_manager`'s Linux backend (`tray_manager_plugin.cc`) never handles
+  /// the `setToolTip` platform channel call - only `setTitle`, which draws a
+  /// persistent label in the panel rather than a hover tip - so this threw a
+  /// `MissingPluginException` on every Linux launch. Unguarded, that
+  /// exception aborted [start] before [_rebuildMenu] ever ran, leaving the
+  /// tray icon bound to the empty placeholder menu the plugin's own `setIcon`
+  /// handler creates: an icon with no options, for the rest of the session.
+  /// A missing hover tip is a fair trade for a menu that actually works.
+  Future<void> _setToolTip() async {
+    try {
+      await TrayManager.instance.setToolTip('slim-m');
+    } catch (_) {
+      // Best-effort: see the doc comment above.
+    }
   }
 
   Future<void> _rebuildMenu() async {
