@@ -53,6 +53,12 @@ const Map<String, String> _allowlist = {
   'health': 'a liveness probe. Onboarding deliberately probes /version instead, '
       'because that answers push_enabled, invite_required and capabilities in '
       'the same round trip, and /healthz answers none of them',
+  'bulkDeleteMessagesByAuthor': 'the author-plus-window sibling of '
+      'bulkDeleteMessages: the server route and its index exist so a raid '
+      'response is not "select 64 ids by hand", but no transcript UI offers '
+      '"delete this author\'s recent messages" as a single action yet. Same '
+      'shape bulkDeleteMessages itself carried in this allowlist until MOD13 '
+      'built the multi-select that finally called it',
 };
 
 /// Names that are not API surface, so their absence proves nothing.

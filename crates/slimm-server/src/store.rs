@@ -44,6 +44,7 @@ mod message_retention;
 mod message_search;
 mod messages;
 mod messages_bulk;
+mod messages_bulk_window;
 mod moderation_audit;
 mod moderation_history;
 mod notifications;
