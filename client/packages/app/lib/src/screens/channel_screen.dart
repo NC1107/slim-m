@@ -12,7 +12,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -20,31 +19,20 @@ import 'package:slimm_design_system/design_system.dart';
 import '../ids.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_drafts.dart';
-import '../providers/channel_history.dart';
-import '../providers/channel_permissions.dart';
 import '../providers/channel_search_controller.dart';
-import '../providers/emoji_catalog_provider.dart';
-import '../providers/member_presence.dart';
 import '../providers/message_actions.dart';
-import '../providers/message_editing.dart';
 import '../providers/message_extras.dart';
 import '../providers/message_jump.dart';
-import '../providers/pins_controller.dart';
 import '../providers/providers.dart';
-import '../providers/sync_controller.dart';
-import '../providers/user_profiles.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/blocked_dm_notice.dart';
 import '../widgets/channel_attachment_drop_zone.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
-import '../widgets/jump_to_latest_button.dart';
-import '../widgets/message_jump.dart';
-import '../widgets/message_transcript.dart';
 import 'channel_composer_area.dart';
-import 'channel_message_actions.dart';
 import 'channel_read_marker.dart';
 import 'channel_screen_streams.dart';
+import 'channel_transcript_pane.dart';
 import 'channel_transcript_scroll.dart';
 
 export '../ids.dart' show newMessageId;
@@ -206,33 +194,6 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   void _cancelReply() => setState(() => _replyingTo = null);
 
-  Future<void> _pickReaction(Message message, String emoji) => setReaction(
-    ref,
-    message.id,
-    emoji,
-    wasActive: hasReacted(ref, message.id, emoji),
-  );
-
-  Future<void> _toggleReaction(Message message, api.ReactionSummary reaction) =>
-      setReaction(ref, message.id, reaction.emoji, wasActive: reaction.reacted);
-
-  /// Writes only: nothing here watches [editingMessageIdProvider], so
-  /// starting, cancelling or submitting an edit never rebuilds this screen.
-  /// Each row resolves its own `editing` flag with `.select`; see that
-  /// provider's own doc comment.
-  void _startEdit(Message message) =>
-      ref.read(editingMessageIdProvider(widget.channelId).notifier).state =
-          message.id;
-
-  void _cancelEdit() =>
-      ref.read(editingMessageIdProvider(widget.channelId).notifier).state =
-          null;
-
-  void _submitEdit(Message message, String content) {
-    ref.read(editingMessageIdProvider(widget.channelId).notifier).state = null;
-    unawaited(submitMessageEdit(ref, context, message, content));
-  }
-
   /// Both the flag and the query live in [channelSearchProvider] so the
   /// compact layout's app bar, built above this screen, can drive them too.
   void _search(String query) =>
@@ -261,25 +222,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     ) {
       if (!open) _searchController.clear();
     });
-    final jumpArrival = watchMessageJump(ref, context, widget.channelId);
-    final knownUsernames = knownUsernamesFrom(ref.watch(membersProvider));
-    final customEmoji = ref.watch(customEmojiIndexProvider);
     final blocked = ref.watch(blocksProvider.select((state) => state.ids));
-    final history = ref.watch(channelHistoryProvider(widget.channelId));
-    final paging = ref.read(channelHistoryProvider(widget.channelId).notifier);
-    final syncStatus = ref.watch(syncControllerProvider);
-    final historyKnown = ref.watch(initialSyncCompleteProvider);
-    final myId = ref.watch(meProvider).valueOrNull?.id;
-    // Per-channel, not deployment-wide: docs/decisions/0011-per-channel-permissions.md, site 1.
-    final myPermissions = ref.watch(
-      myChannelPermissionsProvider(widget.channelId),
-    );
-    final pinnedIds = <String>{
-      for (final p
-          in ref.watch(pinsControllerProvider(widget.channelId)).pinned ??
-              const <api.PinnedMessage>[])
-        p.message.id,
-    };
 
     return storeAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -324,158 +267,18 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                       )
                     : null,
               ),
-              // Tapping the transcript dismisses the keyboard, which on a phone
-              // is otherwise covering most of what the tap was aiming at.
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () => FocusScope.of(context).unfocus(),
-                  child: search.query != null
-                      ? ChannelSearchResults(
-                          results: search.results,
-                          knownUsernames: knownUsernames,
-                          customEmoji: customEmoji,
-                          loading: search.loading,
-                          failed: search.failed,
-                          forbidden: search.forbidden,
-                          onRetry: () => _search(search.query!),
-                          onSelect: (m) {
-                            _toggleSearch();
-                            jumpToMessage(
-                              GoRouter.of(context),
-                              ref.read,
-                              currentChannelId: widget.channelId,
-                              channelId: m.channelId,
-                              messageId: m.id,
-                            );
-                          },
-                        )
-                      : Stack(
-                          children: [
-                            StreamBuilder<List<Message>>(
-                              stream: _streams.transcript(
-                                store,
-                                widget.channelId,
-                                history.window,
-                              ),
-                              builder: (context, snapshot) {
-                                final rows = snapshot.data ?? const <Message>[];
-                                final transcript = visibleTranscript(
-                                  rows,
-                                  blocked,
-                                );
-                                final oldest = oldestDeliveredSeq(rows);
-                                paging.syncOldest(oldest);
-                                resolveAuthorProfiles(
-                                  ref,
-                                  transcript.messages.map((m) => m.authorId),
-                                );
-                                _scrollTracker.updateKnownSeqs(
-                                  latestSeq: transcript.newestSeq,
-                                  lastReadSeq: lastReadSeq,
-                                );
-                                // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.
-                                if (_scrollTracker.atLatest) {
-                                  _markReadUpToLatest(
-                                    transcript.newestSeq,
-                                    lastReadSeq,
-                                  );
-                                }
-                                return MessageTranscript(
-                                  channelId: widget.channelId,
-                                  selfId: ref
-                                      .read(sessionProvider)
-                                      .tokens
-                                      ?.userId,
-                                  messages: transcript.messages,
-                                  syncStatus: syncStatus,
-                                  historyKnown: historyKnown,
-                                  channelName: hashChannelName,
-                                  channelIsThread: isThread,
-                                  channelTopic: channel?.topic,
-                                  scrollController: _scrollTracker.controller,
-                                  lastReadSeq: lastReadSeq,
-                                  knownUsernames: knownUsernames,
-                                  customEmoji: customEmoji,
-                                  // A channel with nothing delivered has no history to page, so its oldest loaded row is vacuously its first.
-                                  history: history.copyWith(
-                                    atStart:
-                                        history.atStart ||
-                                        (oldest == null &&
-                                            syncStatus == SyncStatus.live),
-                                  ),
-                                  onLoadOlder: () =>
-                                      unawaited(paging.loadOlder()),
-                                  onRetryOlder: () => unawaited(paging.retry()),
-                                  // The policy itself lives in `channel_message_actions.dart`; this only supplies the screen's own state.
-                                  actionsFor: (message, hasExistingThread) =>
-                                      messageActionsFor(
-                                        ref,
-                                        context,
-                                        message,
-                                        channelId: widget.channelId,
-                                        channelIsThread: isThread,
-                                        hasExistingThread: hasExistingThread,
-                                        myId: myId,
-                                        myPermissions: myPermissions,
-                                        pinnedIds: pinnedIds,
-                                        onReply: _startReply,
-                                        onEdit: _startEdit,
-                                      ),
-                                  onRetry: (m) =>
-                                      unawaited(retryMessage(ref.read, m)),
-                                  onDiscard: (m) =>
-                                      unawaited(discardMessage(ref.read, m)),
-                                  // Failed text lands back in the composer to fix
-                                  // and resend; the failed row is then discarded,
-                                  // so nothing the user wrote is ever lost.
-                                  onEditFailed: (m) {
-                                    _composer.text = m.content;
-                                    unawaited(discardMessage(ref.read, m));
-                                  },
-                                  onPickReaction: (m, emoji) =>
-                                      unawaited(_pickReaction(m, emoji)),
-                                  onReactionTap: (m, reaction) =>
-                                      unawaited(_toggleReaction(m, reaction)),
-                                  onVote: (m, option) =>
-                                      unawaited(castVote(ref, m.id, option)),
-                                  onSubmitEdit: _submitEdit,
-                                  onCancelEdit: _cancelEdit,
-                                  onJumpToReply: (replyToId) => jumpToMessage(
-                                    GoRouter.of(context),
-                                    ref.read,
-                                    currentChannelId: widget.channelId,
-                                    channelId: widget.channelId,
-                                    messageId: replyToId,
-                                  ),
-                                  jumpTargetId: jumpArrival?.messageId,
-                                  jumpToken: jumpArrival?.token,
-                                  onJumpArrived: jumpArrival == null
-                                      ? null
-                                      : () => ref
-                                            .read(messageJumpProvider.notifier)
-                                            .consume(jumpArrival.token),
-                                );
-                              },
-                            ),
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              child: Center(
-                                child: ValueListenableBuilder<bool>(
-                                  valueListenable: _scrollTracker.scrolledAway,
-                                  builder: (context, scrolledAway, _) =>
-                                      JumpToLatestButton(
-                                        visible: scrolledAway,
-                                        onTap: _scrollToLatest,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
+              ChannelTranscriptPane(
+                channelId: widget.channelId,
+                store: store,
+                streams: _streams,
+                scrollTracker: _scrollTracker,
+                composer: _composer,
+                hashChannelName: hashChannelName,
+                channelTopic: channel?.topic,
+                isThread: isThread,
+                lastReadSeq: lastReadSeq,
+                onMarkRead: _markReadUpToLatest,
+                onReply: _startReply,
               ),
               if (blockedDm)
                 BlockedDmNotice(userId: dmPartnerId, name: channelName)
