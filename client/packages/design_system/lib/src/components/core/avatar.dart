@@ -136,8 +136,8 @@ class AppAvatar extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.cover,
-            // A photo downsized to a small circle scales rough at the default low.
-            filterQuality: FilterQuality.medium,
+            // medium's mipmap only helps when magnifying; UserAvatar's decode floor almost always shrinks the source instead, where mipmapping visibly blurs a photo.
+            filterQuality: FilterQuality.low,
             errorBuilder: (context, error, stack) => _Face(
               round: round,
               initials: initials,

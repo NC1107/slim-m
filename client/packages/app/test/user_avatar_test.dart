@@ -102,8 +102,8 @@ void main() {
     // A 40dp avatar decodes at 3x even on a 1x display: the minRatio floor for a window-scaled desktop that under-reports its ratio.
     expect(resized.width, 120);
     expect(resized.height, 120);
-    // Scaling a photo down to a small circle wants better than the default low.
-    expect(image.filterQuality, FilterQuality.medium);
+    // low, not medium: the decode floor means this shrinks the source, where medium's mipmap would blur it.
+    expect(image.filterQuality, FilterQuality.low);
   });
 
   testWidgets('the decode cap scales with the device pixel ratio', (
