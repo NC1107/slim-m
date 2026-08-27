@@ -30,6 +30,7 @@ import 'close_behavior.dart';
 import 'desktop_window_shell.dart';
 import 'first_run_tray_notice_banner.dart';
 import 'title_bar.dart';
+import 'window_resize_frame.dart';
 
 class DesktopChrome extends StatelessWidget {
   const DesktopChrome({super.key, required this.child});
@@ -46,17 +47,25 @@ class DesktopChrome extends StatelessWidget {
       child: Overlay(
         initialEntries: [
           OverlayEntry(
-            builder: (context) => Column(
+            // expand: the resize frame below needs the whole window, not just the Column's content size.
+            builder: (context) => Stack(
+              fit: StackFit.expand,
               children: [
-                // frameless is only ever set true on the Linux branch below.
+                Column(
+                  children: [
+                    // frameless is only ever set true on the Linux branch below.
+                    if (DesktopWindowShell.frameless)
+                      TitleBar(
+                        port: DesktopWindowShell.port,
+                        platform: DesktopPlatform.linux,
+                        onRequestClose: DesktopWindowShell.requestClose,
+                      ),
+                    const FirstRunTrayNoticeBanner(),
+                    Expanded(child: child),
+                  ],
+                ),
                 if (DesktopWindowShell.frameless)
-                  TitleBar(
-                    port: DesktopWindowShell.port,
-                    platform: DesktopPlatform.linux,
-                    onRequestClose: DesktopWindowShell.requestClose,
-                  ),
-                const FirstRunTrayNoticeBanner(),
-                Expanded(child: child),
+                  WindowResizeFrame(port: DesktopWindowShell.port),
               ],
             ),
           ),

@@ -28,6 +28,21 @@ enum DesktopWindowEventKind {
   show,
 }
 
+/// The eight edges and corners a hand-rolled resize border can grab, named
+/// after `window_manager`'s own `ResizeEdge` so this port's type maps onto
+/// the real one with no ambiguity - the same shape [DesktopWindowEventKind]
+/// already uses for window events.
+enum ResizeEdge {
+  top,
+  bottom,
+  left,
+  right,
+  topLeft,
+  topRight,
+  bottomLeft,
+  bottomRight,
+}
+
 abstract interface class DesktopWindowPort {
   Future<void> ensureInitialized();
 
@@ -56,6 +71,12 @@ abstract interface class DesktopWindowPort {
   Future<void> hideTitleBar();
   Future<void> setResizable(bool value);
   Future<void> startDragging();
+
+  /// Begins a native edge/corner resize drag, the [ResizeEdge] counterpart
+  /// to [startDragging] - `gtk_window_begin_resize_drag` under the hood on
+  /// Linux, so the compositor drives the resize rather than this app
+  /// repositioning the frame itself from Dart.
+  Future<void> startResizing(ResizeEdge edge);
   Future<List<DisplayArea>> allDisplays();
 
   /// A real quit, bypassing whatever [setPreventClose] currently holds - the
@@ -187,6 +208,10 @@ class WindowManagerDesktopWindowPort
   Future<void> startDragging() => wm.windowManager.startDragging();
 
   @override
+  Future<void> startResizing(ResizeEdge edge) =>
+      wm.windowManager.startResizing(_toPluginEdge(edge));
+
+  @override
   Future<void> destroy() => wm.windowManager.destroy();
 
   @override
@@ -204,6 +229,20 @@ class WindowManagerDesktopWindowPort
         .toList(growable: false);
   }
 }
+
+/// [ResizeEdge] and `window_manager`'s own `ResizeEdge` are deliberately two
+/// separate enums (this port's whole point), so every call site needs this
+/// one explicit mapping rather than a cast.
+wm.ResizeEdge _toPluginEdge(ResizeEdge edge) => switch (edge) {
+  ResizeEdge.top => wm.ResizeEdge.top,
+  ResizeEdge.bottom => wm.ResizeEdge.bottom,
+  ResizeEdge.left => wm.ResizeEdge.left,
+  ResizeEdge.right => wm.ResizeEdge.right,
+  ResizeEdge.topLeft => wm.ResizeEdge.topLeft,
+  ResizeEdge.topRight => wm.ResizeEdge.topRight,
+  ResizeEdge.bottomLeft => wm.ResizeEdge.bottomLeft,
+  ResizeEdge.bottomRight => wm.ResizeEdge.bottomRight,
+};
 
 /// A plain broadcast wrapper so the port's own class does not have to manage
 /// a `StreamController`'s lifecycle inline with everything else it does.

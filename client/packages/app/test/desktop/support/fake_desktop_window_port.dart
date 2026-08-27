@@ -27,6 +27,7 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   int restoreCalls = 0;
   int centerCalls = 0;
   int hideTitleBarCalls = 0;
+  final List<ResizeEdge> startResizingCalls = [];
 
   WindowSize? lastSize;
   WindowRect? lastBounds;
@@ -61,6 +62,9 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
 
   @override
   Future<void> startDragging() async => startDraggingCalls++;
+  @override
+  Future<void> startResizing(ResizeEdge edge) async =>
+      startResizingCalls.add(edge);
   @override
   Future<void> destroy() async => destroyCalls++;
 
