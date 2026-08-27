@@ -96,6 +96,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_presence_geometry.dart' show presenceScreenRect;
+import 'canvas_presence_tile_context_menu.dart';
 import 'canvas_presence_tile_controls.dart';
 
 /// The world-space box a resize may not shrink below or grow past - small
@@ -187,6 +188,11 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
 
 class _CanvasPresenceManipulableTileState
     extends State<CanvasPresenceManipulableTile> {
+  /// The seam a right-click on this tile opens its own context menu
+  /// through - see `canvas_presence_tile_context_menu.dart`'s own library
+  /// doc for why a controller, not a `GlobalKey`, carries that open call.
+  final _menuController = CanvasPresenceTileMenuController();
+
   /// Non-null only while a drag or resize is in flight. Tracking it locally,
   /// rather than trusting [CanvasPresenceManipulableTile.worldRect] to have
   /// already round-tripped through the caller's own state and back by the
@@ -420,12 +426,22 @@ class _CanvasPresenceManipulableTileState
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                CanvasPresenceTileContextMenu(
+                  controller: _menuController,
+                  locked: widget.locked,
+                  sentToBack: widget.sentToBack,
+                  onToggleLocked: widget.onToggleLocked,
+                  onToggleSentToBack: widget.onToggleSentToBack,
+                  onHide: widget.onHide,
+                  onExpand: widget.onExpand,
+                ),
                 IgnorePointer(
                   ignoring: widget.locked,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    // A no-op, not an omission: a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption.
-                    onSecondaryTapUp: (_) {},
+                    // Opens this tile's own menu rather than a no-op now, but still HitTestBehavior.opaque - a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption.
+                    onSecondaryTapUp: (details) =>
+                        _menuController.open(details.globalPosition),
                     onPanUpdate: _drag,
                     onPanEnd: _settle,
                     child: widget.child,
