@@ -2193,6 +2193,61 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/messages/bulk-delete-by-author:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      operationId: bulkDeleteMessagesByAuthor
+      tags: [messages]
+      summary: Soft-delete one author's recent messages in a channel.
+      description: >
+        The sibling of bulkDeleteMessages for the shape a moderator actually
+        reaches for during a raid: naming an author and a time window instead
+        of up to 64 explicit ids. Requires MANAGE_MESSAGES in the channel and
+        reaches every message including an administrator's, the same reach
+        bulkDeleteMessages has and deliberately not a ranked one (see decision
+        0016). Resolves to an id list and then behaves exactly like
+        bulkDeleteMessages from there: nothing is deleted unless the match
+        count is within the cap, one moderation-audit row is written for the
+        author, and each message actually deleted publishes its own
+        `message.deleted` over the WebSocket. window_minutes must be between 1
+        and 1440 (24 hours); a raid is a matter of minutes, and this route is
+        not sized for a longer sweep. If more than 64 messages match, the
+        whole request is refused rather than truncated to the first 64 - narrow
+        the window and try again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [author_id, window_minutes]
+              properties:
+                author_id:
+                  type: string
+                  format: uuid
+                  description: Whose messages to delete, in this channel only.
+                window_minutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                  description: >
+                    How far back to look, in minutes, from now. At most 1440
+                    (24 hours).
+      responses:
+        "204":
+          description: >
+            Every live message from this author in this channel and window
+            has been deleted. A window matching nothing still answers 204.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /attachments:
     post:
       operationId: uploadAttachment

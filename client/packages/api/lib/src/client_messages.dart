@@ -102,6 +102,26 @@ extension SlimmApiMessages on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Soft-deletes one author's recent messages in a channel, requiring
+  /// MANAGE_MESSAGES: the raid-response shape, naming an author and a time
+  /// window instead of up to 64 explicit ids.
+  ///
+  /// [windowMinutes] must be between 1 and 1440 (24 hours). If more than 64
+  /// messages match, the server refuses the whole request rather than
+  /// truncating it, so a caller whose window is too wide has to narrow it and
+  /// retry - the same rule [bulkDeleteMessages] already keeps for its own cap.
+  Future<void> bulkDeleteMessagesByAuthor({
+    required String channelId,
+    required String authorId,
+    required int windowMinutes,
+  }) =>
+      _send(
+        'POST',
+        '/channels/$channelId/messages/bulk-delete-by-author',
+        body: {'author_id': authorId, 'window_minutes': windowMinutes},
+        expectNoContent: true,
+      );
+
   /// Full-text searches a channel's live messages. [q] reaches FTS5 close to
   /// as-is, so its mini query language (`AND`/`OR`/`NOT`, `"phrase"`, a
   /// trailing `*` prefix) is available; it is optional now, since the

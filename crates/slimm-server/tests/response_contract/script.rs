@@ -18,11 +18,13 @@ use super::world::{Contract, Payload};
 
 mod content;
 mod content_media_slots;
+mod content_messages_window;
 mod people;
 mod threads;
 
 use content::{channel_calls, emoji_calls, message_calls};
 use content_media_slots::media_slot_calls;
+use content_messages_window::bulk_delete_by_author_call;
 use people::{moderation_calls, profile_calls, safety_calls};
 use threads::thread_calls;
 
@@ -226,6 +228,7 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
     let message = message_calls(c, root, &channel).await;
+    bulk_delete_by_author_call(c, root, bob_token, &bob_id, &channel).await;
     thread_calls(c, root, &channel, &message).await;
     emoji_calls(c, root).await;
     moderation_calls(c, root, bob_token, &message).await;
