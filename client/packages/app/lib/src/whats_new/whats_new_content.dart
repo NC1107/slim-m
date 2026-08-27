@@ -414,6 +414,34 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.57.0',
+    headline: 'One place for channel settings, and calls that let you leave',
+    points: [
+      WhatsNewPoint(
+        'A channel is configured in one screen now. Its name, description, '
+        'permissions and the delete button live together, rather than a '
+        'sheet holding some of it and a separate page holding the rest.',
+      ),
+      WhatsNewPoint(
+        'Leaving a call while the canvas is open actually leaves it. Closing '
+        'the canvas afterwards no longer drops you back into the call with '
+        'the timer started over.',
+      ),
+      WhatsNewPoint(
+        'On desktop a status is a text box in the menu itself, and a status '
+        'you have set can be cleared in one click.',
+      ),
+      WhatsNewPoint(
+        'Starting a screen share no longer shows a moment of leftover '
+        'picture before the real one arrives.',
+      ),
+      WhatsNewPoint(
+        'The switch-camera button only appears when you have more than one '
+        'camera to switch to.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
