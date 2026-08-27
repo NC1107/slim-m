@@ -27,3 +27,12 @@ String _h12(DateTime dt) {
   final suffix = dt.hour < 12 ? 'AM' : 'PM';
   return '$hour12:$minute $suffix';
 }
+
+/// The hours/minutes/seconds a [Duration] breaks into, shared by
+/// `CallDuration`'s ticking clock and `formatCallDuration`'s fixed recap
+/// string (`widgets/call_participant_tiles.dart` and
+/// `widgets/call_recap_card.dart`), which show that breakdown differently on
+/// purpose - only the arithmetic to get h/m/s out of the same [Duration] was
+/// duplicated.
+({int hours, int minutes, int seconds}) decomposeDuration(Duration d) =>
+    (hours: d.inHours, minutes: d.inMinutes % 60, seconds: d.inSeconds % 60);

@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../format.dart';
 import 'fullscreen_video_overlay.dart';
 import 'user_avatar.dart';
 
@@ -198,10 +199,10 @@ class _CallDurationState extends State<CallDuration> {
   }
 
   static String _format(Duration d) {
-    final h = d.inHours;
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
+    final parts = decomposeDuration(d);
+    final m = parts.minutes.toString().padLeft(2, '0');
+    final s = parts.seconds.toString().padLeft(2, '0');
+    return parts.hours > 0 ? '${parts.hours}:$m:$s' : '$m:$s';
   }
 
   @override
