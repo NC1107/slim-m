@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Dropping onto the emoji import card: a real `.zip` runs the exact same
-/// import `emoji_bulk_upload_card_test.dart` already drives from the
-/// button, and anything else is refused inline rather than silently
-/// swallowed or shown as a SnackBar.
+/// Dropping onto the emoji import card: a real `.zip` drives the exact same
+/// chunked `POST /emoji/bulk` path `emoji_bulk_upload_card_test.dart` already
+/// exercises from the button - never a second, unchunked import route - and
+/// anything else is refused inline rather than silently swallowed or shown
+/// as a SnackBar.
 library;
 
 import 'dart:convert';
@@ -42,20 +43,28 @@ List<int> _buildZip(Map<String, List<int>> files) {
   return ZipEncoder().encodeBytes(archive);
 }
 
-http.Response _created(String name) => http.Response(
-  jsonEncode({
-    'id': 'e-$name',
-    'name': name,
-    'uploader_id': 'admin',
-    'created_at': 0,
-  }),
+/// The names a `POST /emoji/bulk` request asked for, in order - mirrors
+/// `emoji_bulk_upload_card_test.dart`'s own helper of the same name.
+List<String> _requestedNames(http.Request request) {
+  final decoded = jsonDecode(request.body) as Map<String, dynamic>;
+  final images = decoded['images'] as List<dynamic>;
+  return images
+      .map((e) => (e as Map<String, dynamic>)['name'] as String)
+      .toList();
+}
+
+http.Response _bulkCreated(List<String> names) => http.Response(
+  jsonEncode([
+    for (final name in names)
+      {'id': 'e-$name', 'name': name, 'uploader_id': 'admin', 'created_at': 0},
+  ]),
   201,
   headers: {'content-type': 'application/json'},
 );
 
 Future<void> _pump(
   WidgetTester tester, {
-  required http.Response Function(http.Request) handleUpload,
+  required http.Response Function(http.Request) handleBulk,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -65,8 +74,8 @@ Future<void> _pump(
           baseUrl: Uri.parse('http://localhost:8080'),
           session: api.SessionStore(tokens: _tokens),
           httpClient: MockClient((request) async {
-            if (request.method == 'POST' && request.url.path == '/emoji') {
-              return handleUpload(request);
+            if (request.method == 'POST' && request.url.path == '/emoji/bulk') {
+              return handleBulk(request);
             }
             return http.Response('{}', 200);
           }),
@@ -98,16 +107,17 @@ void main() {
     'dropping a real zip runs the same import the picker button does',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      final requests = <Uri>[];
+      final requestedBatches = <List<String>>[];
       final zip = _buildZip({
         'party_blob.gif': [1, 2, 3],
       });
 
       await _pump(
         tester,
-        handleUpload: (request) {
-          requests.add(request.url);
-          return _created(request.url.queryParameters['name']!);
+        handleBulk: (request) {
+          final names = _requestedNames(request);
+          requestedBatches.add(names);
+          return _bulkCreated(names);
         },
       );
 
@@ -124,8 +134,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(requests, hasLength(1));
-      expect(requests.single.queryParameters['name'], 'party_blob');
+      expect(
+        requestedBatches,
+        [
+          ['party_blob'],
+        ],
+        reason:
+            'one chunked POST /emoji/bulk request, the same path the '
+            'button drives',
+      );
       expect(find.textContaining('Added 1 of 1'), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
       debugDefaultTargetPlatformOverride = null;
@@ -136,7 +153,7 @@ void main() {
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-    await _pump(tester, handleUpload: (request) => _created('unused'));
+    await _pump(tester, handleBulk: (request) => _bulkCreated(const []));
 
     final file = DropItemFile.fromData(
       Uint8List.fromList([1, 2, 3]),
@@ -160,7 +177,7 @@ void main() {
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-    await _pump(tester, handleUpload: (request) => _created('unused'));
+    await _pump(tester, handleBulk: (request) => _bulkCreated(const []));
 
     final a = DropItemFile.fromData(Uint8List.fromList([1]), path: 'a.zip');
     final b = DropItemFile.fromData(Uint8List.fromList([2]), path: 'b.zip');
