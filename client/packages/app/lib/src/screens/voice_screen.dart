@@ -211,10 +211,10 @@ class _InCall extends ConsumerWidget {
           child: SafeArea(
             top: false,
             minimum: const EdgeInsets.all(AppSpacing.s12),
-            // Keyed per call so joining another channel replays the rise.
+            // Pure fade: VoiceCallDock owns its own per-call rise now.
             child: AppFadeIn(
               key: ValueKey('call-dock-$channelId'),
-              offset: 12,
+              offset: 0,
               child: VoiceCallDock(
                 controller: controller,
                 voice: voice,

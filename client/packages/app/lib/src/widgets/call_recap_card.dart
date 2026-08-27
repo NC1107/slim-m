@@ -10,18 +10,20 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../format.dart';
 import '../providers/call_recap.dart';
 import 'user_avatar.dart';
 
 /// `1 hr 4 min`-style, for a call that has already ended - unlike
 /// `CallDuration`, a fixed string rather than a ticking clock.
 String formatCallDuration(Duration d) {
-  final hours = d.inHours;
-  final minutes = d.inMinutes % 60;
-  final seconds = d.inSeconds % 60;
-  if (hours > 0) return '$hours hr${hours == 1 ? '' : 's'} $minutes min';
-  if (minutes > 0) return '$minutes min';
-  return '$seconds sec';
+  final parts = decomposeDuration(d);
+  if (parts.hours > 0) {
+    final plural = parts.hours == 1 ? '' : 's';
+    return '${parts.hours} hr$plural ${parts.minutes} min';
+  }
+  if (parts.minutes > 0) return '${parts.minutes} min';
+  return '${parts.seconds} sec';
 }
 
 /// "Your last call" labels the card: without it, the card sat directly

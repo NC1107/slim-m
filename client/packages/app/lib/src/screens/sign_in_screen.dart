@@ -442,13 +442,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           const SizedBox(height: AppSpacing.s24),
           FilledButton(
             onPressed: _busy ? null : _submit,
-            child: _busy
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(_creatingAccount ? 'Create account' : 'Sign in'),
+            // Cross-fades to a spinner rather than swapping in one frame.
+            child: AnimatedSwitcher(
+              duration: AppMotion.reduced(context, AppMotion.fast),
+              child: _busy
+                  ? const SizedBox(
+                      key: ValueKey('busy'),
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      _creatingAccount ? 'Create account' : 'Sign in',
+                      key: const ValueKey('label'),
+                    ),
+            ),
           ),
           const SizedBox(height: AppSpacing.s8),
           TextButton(

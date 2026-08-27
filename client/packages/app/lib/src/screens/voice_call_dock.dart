@@ -38,7 +38,7 @@ import '../widgets/floating_dock_card.dart';
 import 'canvas/canvas_pane.dart';
 import 'voice_call_controls.dart';
 
-class VoiceCallDock extends StatelessWidget {
+class VoiceCallDock extends StatefulWidget {
   const VoiceCallDock({
     super.key,
     required this.controller,
@@ -53,37 +53,113 @@ class VoiceCallDock extends StatelessWidget {
   /// see this file's own doc for the two reasons that happens.
   final String? canvasChannelId;
 
+  /// Exposed so a test can find the entrance's own `SlideTransition`
+  /// directly - `MaterialApp`'s default route transition mounts one of its
+  /// own around every route, so a bare `find.byType` sees two.
+  static const Key slideKey = Key('voice_call_dock_slide');
+
+  @override
+  State<VoiceCallDock> createState() => _VoiceCallDockState();
+}
+
+/// Slides the dock up on first mount for a call, once - not on every rebuild
+/// a mute toggle or a participant change causes while the call goes on.
+///
+/// [VoiceState.channelId] is what identifies "a call" here: it is set once a
+/// call is joined and stays fixed for that call's whole lifetime (this dock
+/// only ever builds while connected, per `_InCall`'s own guard), and only
+/// takes on a new value once a real new call starts. Tracking it directly,
+/// rather than trusting a caller to remount this widget with a fresh key,
+/// keeps the rise correct even pumped in isolation the way
+/// `voice_call_dock_test.dart` does.
+class _VoiceCallDockState extends State<VoiceCallDock>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: AppMotion.base,
+  );
+  late final Animation<double> _curve = CurvedAnimation(
+    parent: _controller,
+    curve: AppMotion.entrance,
+  );
+  late final Animation<Offset> _slide = Tween<Offset>(
+    begin: const Offset(0, 0.15),
+    end: Offset.zero,
+  ).animate(_curve);
+
+  String? _playedFor;
+
+  void _playIfNewCall() {
+    final channelId = widget.voice.channelId;
+    if (channelId == _playedFor) return;
+    _playedFor = channelId;
+    if (AppMotion.isReduced(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _playIfNewCall();
+  }
+
+  @override
+  void didUpdateWidget(covariant VoiceCallDock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _playIfNewCall();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final channelId = canvasChannelId;
-    final callRow = CallControls(controller: controller, voice: voice);
-    if (channelId == null) {
-      return FloatingDockCard(rows: [callRow]);
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final toggle = _CanvasToggleButton(channelId: channelId);
-        if (_fitsOneRow(context, constraints.maxWidth, voice.cameraEnabled)) {
-          return FloatingDockCard(
-            rows: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+    final channelId = widget.canvasChannelId;
+    final callRow = CallControls(
+      controller: widget.controller,
+      voice: widget.voice,
+    );
+    final card = channelId == null
+        ? FloatingDockCard(rows: [callRow])
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              final toggle = _CanvasToggleButton(channelId: channelId);
+              if (_fitsOneRow(
+                context,
+                constraints.maxWidth,
+                widget.voice.cameraEnabled,
+              )) {
+                return FloatingDockCard(
+                  rows: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        callRow,
+                        const SizedBox(width: AppSpacing.s8),
+                        toggle,
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return FloatingDockCard(
+                rows: [
                   callRow,
-                  const SizedBox(width: AppSpacing.s8),
-                  toggle,
+                  Center(child: toggle),
                 ],
-              ),
-            ],
+              );
+            },
           );
-        }
-        return FloatingDockCard(
-          rows: [
-            callRow,
-            Center(child: toggle),
-          ],
-        );
-      },
+    return SlideTransition(
+      key: VoiceCallDock.slideKey,
+      position: _slide,
+      child: card,
     );
   }
 }
