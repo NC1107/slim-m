@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/call_roster_motion.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'support/reduced_motion_harness.dart';
+
 VoiceParticipant _p(String id, {bool cameraOn = false}) => VoiceParticipant(
   identity: id,
   name: 'name-$id',
@@ -28,7 +30,7 @@ Future<void> _pump(
   bool reduceMotion = false,
 }) => tester.pumpWidget(
   MediaQuery(
-    data: MediaQueryData(disableAnimations: reduceMotion),
+    data: reducedMotionData(disableAnimations: reduceMotion),
     child: Directionality(
       textDirection: TextDirection.ltr,
       child: Center(

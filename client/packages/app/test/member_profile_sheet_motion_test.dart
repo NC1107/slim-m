@@ -26,6 +26,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/reduced_motion_harness.dart';
+
 const _tokens = api.TokenPair(
   userId: 'me',
   accessToken: 'access',
@@ -59,10 +61,12 @@ GoRouter _testRouter() => GoRouter(
   routes: [GoRoute(path: '/channels', builder: _openPage)],
 );
 
-/// Pumps the compact popover at a phone width, [reduceMotion] applied the
-/// same way `sheet_test.dart` applies it: `copyWith` on the ambient
-/// `MediaQuery`, not a bare replacement, so the size a phone width already
-/// set is not lost underneath it.
+/// Pumps the compact popover at a phone width. [reduceMotion] goes straight
+/// to [reducedMotionRouterApp]'s own `size:` override, which is a bare
+/// replacement of `MediaQueryData.size` rather than a `copyWith` of the
+/// ambient one - the `tester.view.physicalSize` set below only matters for
+/// the real render surface the sheet actually paints into, not for the
+/// logical width `showMemberProfile` reads to choose this branch.
 Future<void> _openCompact(
   WidgetTester tester, {
   required bool reduceMotion,
@@ -85,19 +89,11 @@ Future<void> _openCompact(
   addTearDown(container.dispose);
 
   await tester.pumpWidget(
-    UncontrolledProviderScope(
+    reducedMotionRouterApp(
       container: container,
-      child: Builder(
-        builder: (context) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(disableAnimations: reduceMotion),
-          child: MaterialApp.router(
-            theme: buildTheme(Brightness.light, AppTokens.light),
-            routerConfig: _testRouter(),
-          ),
-        ),
-      ),
+      router: _testRouter(),
+      disableAnimations: reduceMotion,
+      size: const Size(390, 844),
     ),
   );
   await tester.tap(find.text('open'));

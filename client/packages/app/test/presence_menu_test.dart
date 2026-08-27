@@ -16,6 +16,8 @@ import 'package:slimm_app/src/widgets/presence_menu.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/reduced_motion_harness.dart';
+
 const _tokens = TokenPair(
   userId: 'user-1',
   accessToken: 'access',
@@ -53,18 +55,12 @@ Future<void> _pump(WidgetTester tester, {required bool reduceMotion}) async {
   addTearDown(container.dispose);
 
   await tester.pumpWidget(
-    UncontrolledProviderScope(
+    reducedMotionApp(
       container: container,
-      child: MediaQuery(
-        data: MediaQueryData(disableAnimations: reduceMotion),
-        child: MaterialApp(
-          theme: buildTheme(Brightness.dark, AppTokens.dark),
-          home: const Scaffold(
-            body: Center(
-              child: PresenceMenuButton(presence: AppPresence.online),
-            ),
-          ),
-        ),
+      brightness: Brightness.dark,
+      disableAnimations: reduceMotion,
+      child: const Center(
+        child: PresenceMenuButton(presence: AppPresence.online),
       ),
     ),
   );
