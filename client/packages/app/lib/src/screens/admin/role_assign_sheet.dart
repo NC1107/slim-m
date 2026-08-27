@@ -62,7 +62,7 @@ class _RoleAssignSheetState extends ConsumerState<_RoleAssignSheet>
     final grantable = mine.hasPermission(widget.role.permissions);
 
     // A ceiling, not a fixed size: `member_roles_sheet.dart`'s shrinkWrap list is why a short roster shrinks the sheet instead of claiming the full ceiling.
-    final listCeiling = MediaQuery.of(context).size.height * 0.7;
+    final listCeiling = MediaQuery.sizeOf(context).height * 0.7;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
