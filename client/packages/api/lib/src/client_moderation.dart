@@ -36,6 +36,17 @@ extension SlimmApiModeration on SlimmApi {
         .toList(growable: false);
   }
 
+  /// A reporter's own, narrow view of a report they filed: whether it is
+  /// still open. No permission is required beyond having filed it - scoped
+  /// hard to the caller's own reports server-side, not by anything this
+  /// method checks. Throws [NotFoundException] both for an id that never
+  /// existed and for one somebody else filed; the two are indistinguishable
+  /// by design, so this cannot tell you which.
+  Future<MyReportStatus> myReportStatus(String reportId) async {
+    final json = await _send('GET', '/reports/mine/$reportId');
+    return MyReportStatus.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Resolves or dismisses a report. Requires MANAGE_MESSAGES. The close is a
   /// conditional update server-side, so two moderators racing the same
   /// report cannot both win it.
