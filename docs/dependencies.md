@@ -119,3 +119,12 @@ Pulling in a general-purpose Dart D-Bus package for one boolean is heavier than 
 
 Backlog #137 unzips an admin-picked `.zip` client-side and uploads one custom emoji per image inside it, one `POST /emoji` per file rather than a new server route: see `client/packages/app/lib/src/screens/admin/emoji_bulk_plan.dart`.
 `archive` is the standard pure-Dart zip codec (no FFI, no bundled native decoder), already present transitively through `image` (a `livekit_client` dependency), so this adds no new supply-chain surface, only a direct declaration of a package already in the resolved tree.
+
+### `desktop_drop`, for OS drag-and-drop
+
+Dragging a file onto the composer, or a `.zip` onto the emoji import card, reuses the exact same staging/upload paths the existing pickers already call - see `client/packages/app/lib/src/widgets/app_drop_zone.dart`.
+
+`desktop_drop` (MixinNetwork) was picked over `super_drag_and_drop`: this feature only ever needs "which files landed on this widget", not `super_drag_and_drop`'s own virtual-file and clipboard-reading machinery, which this app has no other use for.
+Its own `pubspec.yaml` declares plugin implementations for macOS, Linux, Windows, Android and web; there is no iOS entry, so `DropTarget` mounts everywhere but only ever receives events on the platforms that generate them.
+Nothing here needs a `dart.library.*` conditional import: the package is a properly federated plugin (a real web implementation registered through the normal plugin registrant, not a `dart:io` shortcut), so `flutter build web --release` links it the same way it already links `file_picker`.
+`app_drop_zone.dart` still gates the target on `kIsWeb` plus a desktop `defaultTargetPlatform`, never `Platform.isX`: a platform check here is about input capability, matching `docs/design/desktop-vs-mobile.md`'s own rule that a platform check is for capability, never for shape - OS drag-and-drop is meaningless on a touch screen regardless of which OS is under it.

@@ -239,6 +239,18 @@ Widget composerHarness({
   List<api.CustomEmoji>? customEmoji,
   FakeClipboardPaste? clipboardPaste,
   api.SlimmApi Function(Ref)? apiBuilder,
+
+  /// A sibling of the real [Composer] in the same `ProviderScope`, for a
+  /// suite that needs to reach provider state the composer registers into
+  /// (`composer_attachment_drop_test.dart`'s own drop-target probe) rather
+  /// than anything visible in the widget tree.
+  Widget extra = const SizedBox.shrink(),
+
+  /// False unmounts [Composer] while keeping [extra] and the rest of this
+  /// tree in place - a second `pumpWidget` with this flipped is how
+  /// `composer_attachment_drop_test.dart` proves the registration a
+  /// composer makes is also the one it clears on its own way out.
+  bool mountComposer = true,
 }) {
   return ProviderScope(
     overrides: [
@@ -258,16 +270,18 @@ Widget composerHarness({
         body: Column(
           children: [
             const Spacer(),
-            Composer(
-              controller: controller,
-              channelId: channelId,
-              channelName: channelName,
-              onSend: sends.call,
-              clipboardPasteStart:
-                  clipboardPaste?.start ?? startClipboardImagePaste,
-              clipboardPasteStop:
-                  clipboardPaste?.stop ?? stopClipboardImagePaste,
-            ),
+            if (mountComposer)
+              Composer(
+                controller: controller,
+                channelId: channelId,
+                channelName: channelName,
+                onSend: sends.call,
+                clipboardPasteStart:
+                    clipboardPaste?.start ?? startClipboardImagePaste,
+                clipboardPasteStop:
+                    clipboardPaste?.stop ?? stopClipboardImagePaste,
+              ),
+            extra,
           ],
         ),
       ),

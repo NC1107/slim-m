@@ -15,6 +15,9 @@
 /// line per image, and never by re-running images that already succeeded.
 library;
 
+import 'dart:async';
+
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +27,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../api_failure.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import '../../widgets/app_drop_zone.dart';
 import '../../widgets/settings_section_header.dart';
 import 'emoji_bulk_plan.dart';
 import 'emoji_name.dart';
@@ -92,7 +96,14 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
       return;
     }
     if (bytes == null || !mounted) return;
+    await _runImport(bytes);
+  }
 
+  /// One dropped or picked zip's own bytes, decoded and planned into the
+  /// same chunked [_runChunks] path: the picker's own `_pickAndRun` and
+  /// [_handleDrop] both land here, so a drop never invents a second,
+  /// unchunked import route with its own failure/retry behaviour.
+  Future<void> _runImport(List<int> bytes) async {
     final List<ZipEntryData> entries;
     try {
       entries = decodeEmojiZipEntries(bytes);
@@ -190,6 +201,24 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
     });
   }
 
+  /// The card's own drop target: exactly one `.zip`, the same shape the
+  /// picker already enforces through `allowedExtensions`. A wrong drop is
+  /// refused through the same [_refuse] the picker's own failures use,
+  /// never a second, differently-worded rejection.
+  Future<void> _handleDrop(List<DropItem> files) async {
+    if (files.length != 1) {
+      _refuse('Drop one zip file at a time.');
+      return;
+    }
+    final file = files.first;
+    if (file is DropItemDirectory ||
+        !file.name.toLowerCase().endsWith('.zip')) {
+      _refuse('Drop a .zip file to import emoji.');
+      return;
+    }
+    await _runImport(await file.readAsBytes());
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -198,59 +227,65 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
         (_succeeded.isNotEmpty || _failed.isNotEmpty || _skipped.isNotEmpty);
     ref.watch(customEmojiProvider); // see the class doc comment for why
 
-    return SettingsSectionCard(
-      title: 'Bulk import from a zip',
-      children: [
-        Text(
-          'Each image inside becomes an emoji named after its file, '
-          'Discord-style: party_blob.gif becomes :party_blob:.',
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        const SizedBox(height: AppSpacing.s12),
-        if (_refusal case final refusal?) ...[
-          AppCallout(tone: AppCalloutTone.warn, child: Text(refusal)),
+    return AppDropZone(
+      enabled: !_running,
+      label: 'Drop to import emoji',
+      icon: AppIcons.fileArchive,
+      onDrop: (files) => unawaited(_handleDrop(files)),
+      child: SettingsSectionCard(
+        title: 'Bulk import from a zip',
+        children: [
+          Text(
+            'Each image inside becomes an emoji named after its file, '
+            'Discord-style: party_blob.gif becomes :party_blob:.',
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
           const SizedBox(height: AppSpacing.s12),
-        ],
-        if (_running) ...[
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              'Uploading $_current of $_total...',
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
+          if (_refusal case final refusal?) ...[
+            AppCallout(tone: AppCalloutTone.warn, child: Text(refusal)),
+            const SizedBox(height: AppSpacing.s12),
+          ],
+          if (_running) ...[
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                'Uploading $_current of $_total...',
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          LinearProgressIndicator(
-            value: _total == 0 ? null : _current / _total,
-          ),
-          const SizedBox(height: AppSpacing.s12),
-        ],
-        if (finished) ...[
-          _BulkSummary(
-            succeeded: _succeeded,
-            failed: _failed,
-            skipped: _skipped,
-          ),
-          const SizedBox(height: AppSpacing.s12),
-        ],
-        if (finished && _failed.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s8),
+            LinearProgressIndicator(
+              value: _total == 0 ? null : _current / _total,
+            ),
+            const SizedBox(height: AppSpacing.s12),
+          ],
+          if (finished) ...[
+            _BulkSummary(
+              succeeded: _succeeded,
+              failed: _failed,
+              skipped: _skipped,
+            ),
+            const SizedBox(height: AppSpacing.s12),
+          ],
+          if (finished && _failed.isNotEmpty) ...[
+            AppButton(
+              label: 'Retry ${_failed.length} failed',
+              icon: AppIcons.retry,
+              full: true,
+              disabled: _running,
+              onPressed: _retryFailed,
+            ),
+            const SizedBox(height: AppSpacing.s12),
+          ],
           AppButton(
-            label: 'Retry ${_failed.length} failed',
-            icon: AppIcons.retry,
+            label: finished ? 'Import another zip' : 'Choose a zip file',
+            icon: AppIcons.fileArchive,
             full: true,
             disabled: _running,
-            onPressed: _retryFailed,
+            onPressed: _pickAndRun,
           ),
-          const SizedBox(height: AppSpacing.s12),
         ],
-        AppButton(
-          label: finished ? 'Import another zip' : 'Choose a zip file',
-          icon: AppIcons.fileArchive,
-          full: true,
-          disabled: _running,
-          onPressed: _pickAndRun,
-        ),
-      ],
+      ),
     );
   }
 }

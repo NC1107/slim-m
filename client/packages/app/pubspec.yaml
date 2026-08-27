@@ -18,6 +18,9 @@ dependencies:
   audioplayers: ^6.8.1
   # Ambient, so a hard-reset floor measures against a test's fake clock rather than real wall time.
   clock: ^1.1.0
+  # OS drag-and-drop of files onto the composer and the emoji import card;
+  # see docs/dependencies.md.
+  desktop_drop: ^0.7.1
   emojis: ^3.2.0
   # Pinned exactly, not a caret. `^12.0.0` matches no version at all (a caret
   # without a prerelease excludes every prerelease), and `^12.0.0-beta.7` would
