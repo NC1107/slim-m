@@ -10,8 +10,6 @@
 //! `(channel, author, since)` predicate into an id list, and hands that
 //! straight to [`Store::bulk_delete_messages`].
 
-use sqlx::Row;
-
 use super::Store;
 use crate::ids::{ChannelId, MessageId, UserId};
 
@@ -38,23 +36,18 @@ impl Store {
         since_ms: i64,
         limit: i64,
     ) -> anyhow::Result<Vec<MessageId>> {
-        let rows = sqlx::query(
-            r#"SELECT id FROM messages
+        let ids = sqlx::query_scalar!(
+            r#"SELECT id AS "id!: MessageId" FROM messages
                WHERE channel_id = ? AND author_id = ? AND created_at >= ?
                  AND deleted_at IS NULL
                LIMIT ?"#,
+            channel_id,
+            author_id,
+            since_ms,
+            limit,
         )
-        .bind(channel_id)
-        .bind(author_id)
-        .bind(since_ms)
-        .bind(limit)
         .fetch_all(&self.pool)
         .await?;
-
-        let mut ids = Vec::with_capacity(rows.len());
-        for row in rows {
-            ids.push(row.try_get::<MessageId, _>("id")?);
-        }
         Ok(ids)
     }
 }
