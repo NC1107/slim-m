@@ -94,7 +94,7 @@ Widget _harness(int permissions) => UncontrolledProviderScope(
 /// A phrase from `ChannelOverwritesPane`'s own always-shown callout, unique
 /// to the permissions section, used as this suite's marker for "the
 /// permissions pane rendered" without depending on its internal structure.
-const _permissionsMarker = 'There is no way to read an existing overwrite back';
+const _permissionsMarker = 'there is no way to read back what is already set';
 
 void main() {
   testWidgets(
