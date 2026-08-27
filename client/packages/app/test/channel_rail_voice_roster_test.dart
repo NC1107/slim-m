@@ -173,7 +173,8 @@ void main() {
     await tester.pumpWidget(
       _harness(
         httpClient: MockClient(
-          (_) async => http.Response(jsonEncode({'participants': []}), 200),
+          (_) async =>
+              http.Response(jsonEncode({'participants': <dynamic>[]}), 200),
         ),
         voice: const VoiceState(),
       ),

@@ -114,8 +114,8 @@ PushAction actionFor(Map<String, dynamic> data) {
       callerName: callerNameFor(data),
     );
   }
-  final text = genericAlertTextFor(data['kind']);
-  final channel = genericAlertChannelFor(data['kind']);
+  final text = genericAlertTextFor(data['kind'] as String?);
+  final channel = genericAlertChannelFor(data['kind'] as String?);
   if (text == null || channel == null) return const PushActionNone();
   return PushActionGenericAlert(text, channel);
 }

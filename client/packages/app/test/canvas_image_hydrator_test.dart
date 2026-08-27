@@ -154,7 +154,7 @@ void main() {
           y: 0,
           w: 20,
           h: 20,
-          props: const {'points': []},
+          props: const {'points': <dynamic>[]},
           authorId: 'someone-else',
           seq: 1,
           createdAt: 0,

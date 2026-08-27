@@ -48,7 +48,9 @@ ProviderContainer _containerWithPins(List<Map<String, dynamic>> pins) {
           session: ref.watch(sessionProvider),
           httpClient: MockClient((request) async {
             // A batch profile lookup for pin authors answers empty here.
-            final body = request.url.path == '/users' ? [] : pins;
+            final body = request.url.path == '/users'
+                ? <Map<String, dynamic>>[]
+                : pins;
             return http.Response(
               jsonEncode(body),
               200,
