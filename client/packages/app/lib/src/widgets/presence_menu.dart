@@ -16,6 +16,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import 'context_menu_focus.dart';
+import 'presence_status_field.dart';
 import 'run_guarded.dart';
 import 'status_editor_sheet.dart';
 import 'user_avatar.dart';
@@ -242,11 +243,28 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
     unawaited(showStatusEditorSheet(context, current));
   }
 
+  /// One-click clear (the owner's own ask): applies an empty status
+  /// directly, with none of the sheet/dialog hop [_openStatusEditor] still
+  /// needs to type a new one. Only ever built once [build]'s `currentStatus`
+  /// is non-empty, so there is nothing to clear when this cannot fire.
+  Future<void> _clearStatus() async {
+    final ok = await guard(
+      whatFailed: 'clear your status',
+      action: () async {
+        await ref.read(apiProvider).updateMe(statusText: '');
+        ref.invalidate(meProvider);
+      },
+    );
+    if (ok && mounted) widget.onDone();
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final selected = ref.watch(presenceVisibilityDisplayProvider);
-    final currentStatus = ref.watch(meProvider).valueOrNull?.statusText;
+    final currentStatus = ref.watch(meProvider).valueOrNull?.statusText ?? '';
+    // Rule 2 of desktop-vs-mobile.md: status is a dropdown everywhere there is room for one, only compact still needs the sheet.
+    final desktop = MediaQuery.sizeOf(context).width >= kCompactWidth;
 
     // [selected] is null until a choice is made in this session, and then no
     // item is marked current: ticking one would assert a stored value this
@@ -254,11 +272,20 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
     return AppSheetMenu(
       width: 220,
       children: [
-        AppMenuItem(
-          label: 'Set a status',
-          leading: AppIcons.smile,
-          onTap: () => _openStatusEditor(context, currentStatus ?? ''),
-        ),
+        if (desktop)
+          PresenceStatusField(current: currentStatus, onDone: widget.onDone)
+        else
+          AppMenuItem(
+            label: 'Set a status',
+            leading: AppIcons.smile,
+            onTap: () => _openStatusEditor(context, currentStatus),
+          ),
+        if (currentStatus.isNotEmpty)
+          AppMenuItem(
+            label: 'Clear status',
+            leading: AppIcons.dismiss,
+            onTap: () => unawaited(_clearStatus()),
+          ),
         const AppMenuDivider(),
         const AppMenuLabel('Status'),
         for (final (visibility, label, presence) in presenceOptions)
