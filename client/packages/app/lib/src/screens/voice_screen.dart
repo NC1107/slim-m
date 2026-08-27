@@ -110,11 +110,24 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
     // Without this, `join`'s own in-flight window (see its own comment) reads as `attemptedThis` and briefly flashes the rejoin screen.
     final joiningHere = inThisChannel && voice.joining;
     final busyElsewhere = _busyElsewhere(voice, channelId);
+    // The same canvas-pane remount that connectedHere guards against also
+    // wipes this memory when the user hung up *before* closing the canvas:
+    // `leave()` nulls `voice.channelId`, so the remounted screen cannot read
+    // connectedHere at all. `justLeftChannelId` is what survives that instead
+    // - see VoiceState.rejoinGuardWindow for how long it is trusted.
+    final justLeftThis =
+        voice.justLeftChannelId == channelId &&
+        voice.justLeftAt != null &&
+        DateTime.now().difference(voice.justLeftAt!) <
+            VoiceState.rejoinGuardWindow;
     // Mounting already connected is not a fresh arrival, and this screen is
     // remounted with an empty [_autoJoinedFor] every time the canvas pane
     // swaps in and back out - without this, hanging up after that round trip
-    // reads as an arrival and auto-joins the call straight back.
-    if (connectedHere) _autoJoinedFor = channelId;
+    // reads as an arrival and auto-joins the call straight back. Latching
+    // justLeftThis in here too means a widget that stays mounted past
+    // VoiceState.rejoinGuardWindow keeps reading as already attempted,
+    // rather than flipping to a fresh arrival once the window lapses under it.
+    if (connectedHere || justLeftThis) _autoJoinedFor = channelId;
     final attemptedThis = _autoJoinedFor == channelId;
 
     // `join` never clears `channelId` on error, so an error only ever belongs here.

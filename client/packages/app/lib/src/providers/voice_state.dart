@@ -25,7 +25,25 @@ class VoiceState {
     this.retryable = true,
     this.connectedAt,
     this.recap,
+    this.justLeftChannelId,
+    this.justLeftAt,
   });
+
+  /// How long [justLeftChannelId] keeps suppressing an automatic rejoin after
+  /// [VoiceController.leave].
+  ///
+  /// Long enough to cover `home_shell.dart`'s canvas-pane swap, which
+  /// destroys and remounts `VoiceScreen` (a fresh `State`, so its own
+  /// `_autoJoinedFor` guard is blank) well within a second of the tap that
+  /// triggered it; short enough that a caller who instead leaves, moves on,
+  /// and comes back to the same channel minutes later still gets the normal
+  /// one-tap auto-join rather than a stale "you left" screen. This is a
+  /// belt-and-braces window, not the whole guard: `voice_screen.dart` also
+  /// latches its own `_autoJoinedFor` the first time this window is read as
+  /// still open, so a widget that stays mounted past [rejoinGuardWindow]
+  /// keeps reading as "already attempted" rather than flipping back to an
+  /// automatic join once the clock runs out from under it.
+  static const rejoinGuardWindow = Duration(seconds: 5);
 
   /// The channel this call belongs to, so a screen can tell "in a call here"
   /// from "in a call somewhere else".
@@ -82,6 +100,18 @@ class VoiceState {
   /// targets, so it never survives to be shown for the wrong call.
   final CallRecap? recap;
 
+  /// The channel an explicit [VoiceController.leave] just walked away from,
+  /// so a `VoiceScreen` remounted by the canvas-pane swap can tell "the user
+  /// just hung up" from "this is a fresh arrival" even though its own
+  /// per-widget memory of having joined was destroyed along with it. See
+  /// [rejoinGuardWindow] for how long this keeps mattering, and
+  /// [VoiceController.join] for where it is cleared again.
+  final String? justLeftChannelId;
+
+  /// When [justLeftChannelId] was recorded, so a reader can tell whether
+  /// [rejoinGuardWindow] has already passed.
+  final DateTime? justLeftAt;
+
   VoiceState copyWith({
     String? channelId,
     VoiceSessionState? state,
@@ -100,6 +130,9 @@ class VoiceState {
     bool clearConnectedAt = false,
     CallRecap? recap,
     bool clearRecap = false,
+    String? justLeftChannelId,
+    DateTime? justLeftAt,
+    bool clearJustLeft = false,
   }) => VoiceState(
     channelId: channelId ?? this.channelId,
     state: state ?? this.state,
@@ -115,5 +148,9 @@ class VoiceState {
     retryable: clearError ? true : (retryable ?? this.retryable),
     connectedAt: clearConnectedAt ? null : (connectedAt ?? this.connectedAt),
     recap: clearRecap ? null : (recap ?? this.recap),
+    justLeftChannelId: clearJustLeft
+        ? null
+        : (justLeftChannelId ?? this.justLeftChannelId),
+    justLeftAt: clearJustLeft ? null : (justLeftAt ?? this.justLeftAt),
   );
 }
