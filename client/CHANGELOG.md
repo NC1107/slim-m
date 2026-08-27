@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.57.0](https://github.com/NC1107/slim-m/compare/client-v0.56.0...client-v0.57.0) (2026-08-27)
+
+
+### Features
+
+* **client:** double the desktop splash floor to 560ms ([#913](https://github.com/NC1107/slim-m/issues/913)) ([1976939](https://github.com/NC1107/slim-m/commit/197693991136ebedc5c7036a6c656704b47fe526))
+* **client:** finish three motion gaps and share the call-duration split ([#918](https://github.com/NC1107/slim-m/issues/918)) ([61c882d](https://github.com/NC1107/slim-m/commit/61c882d080289467983be5fdf6430c03f6177cac))
+* **client:** trim Channel settings copy and rename Topic to Description ([#914](https://github.com/NC1107/slim-m/issues/914)) ([afc0c8d](https://github.com/NC1107/slim-m/commit/afc0c8dc7e10f5ff6ce6f16157eae4325384da97))
+
+
+### Bug Fixes
+
+* **client:** gate bulk-select entry on MANAGE_MESSAGES, not canDeleteMessage ([#916](https://github.com/NC1107/slim-m/issues/916)) ([9738ef8](https://github.com/NC1107/slim-m/commit/9738ef83b624e5667d652cc690972c7f16a3d844))
+
 ## [0.56.0](https://github.com/NC1107/slim-m/compare/client-v0.55.0...client-v0.56.0) (2026-08-27)
 
 
