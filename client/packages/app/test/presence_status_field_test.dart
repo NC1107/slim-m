@@ -5,8 +5,9 @@
 /// a control that stays on screen (status) is a dropdown anchored to the
 /// control, the same body a context menu uses, everywhere there is room for
 /// one. `status_editor_sheet_test.dart` covers the unchanged compact-width
-/// sheet. This also covers the one-click "Clear status" row, which - unlike
-/// the inline field - shows at every width once a status is actually set.
+/// sheet. This also covers the clear affordance built into that field: a
+/// small "Clear status" icon button trailing the input, replacing the
+/// separate always-there-when-set menu row this field used to sit above.
 library;
 
 import 'dart:convert';
@@ -155,16 +156,18 @@ void main() {
     expect(find.text('in a meeting'), findsOneWidget);
   });
 
-  testWidgets('Clear status is absent when no status is set', (tester) async {
+  testWidgets('the clear affordance is absent when no status is set', (
+    tester,
+  ) async {
     final wired = _wire(currentStatus: null);
     await _pump(tester, wired.container);
 
     await _openMenu(tester);
 
-    expect(find.text('Clear status'), findsNothing);
+    expect(find.bySemanticsLabel('Clear status'), findsNothing);
   });
 
-  testWidgets('Clear status is absent for an empty (not null) status', (
+  testWidgets('the clear affordance is absent for an empty (not null) status', (
     tester,
   ) async {
     final wired = _wire(currentStatus: '');
@@ -172,17 +175,31 @@ void main() {
 
     await _openMenu(tester);
 
-    expect(find.text('Clear status'), findsNothing);
+    expect(find.bySemanticsLabel('Clear status'), findsNothing);
   });
 
-  testWidgets('Clear status appears once a status is set', (tester) async {
+  testWidgets('the clear affordance appears once a status is set', (
+    tester,
+  ) async {
     final wired = _wire(currentStatus: 'afk');
     await _pump(tester, wired.container);
 
     await _openMenu(tester);
 
-    expect(find.text('Clear status'), findsOneWidget);
+    expect(find.bySemanticsLabel('Clear status'), findsOneWidget);
   });
+
+  testWidgets(
+    'a separate Clear status menu row no longer exists beside the field',
+    (tester) async {
+      final wired = _wire(currentStatus: 'afk');
+      await _pump(tester, wired.container);
+
+      await _openMenu(tester);
+
+      expect(find.text('Clear status'), findsNothing);
+    },
+  );
 
   testWidgets('typing into the field does not close the menu', (tester) async {
     final wired = _wire();
@@ -211,18 +228,21 @@ void main() {
     expect(find.byType(AppMenu), findsNothing);
   });
 
-  testWidgets('Clear status sends an empty status with one click and closes '
-      'the menu', (tester) async {
-    final wired = _wire(currentStatus: 'afk');
-    await _pump(tester, wired.container);
+  testWidgets(
+    'the clear affordance sends an empty status in one tap and closes the '
+    'menu',
+    (tester) async {
+      final wired = _wire(currentStatus: 'afk');
+      await _pump(tester, wired.container);
 
-    await _openMenu(tester);
-    await tester.tap(find.text('Clear status'));
-    await tester.pumpAndSettle();
+      await _openMenu(tester);
+      await tester.tap(find.bySemanticsLabel('Clear status'));
+      await tester.pumpAndSettle();
 
-    expect(wired.patched, ['']);
-    expect(find.byType(AppMenu), findsNothing);
-  });
+      expect(wired.patched, ['']);
+      expect(find.byType(AppMenu), findsNothing);
+    },
+  );
 
   testWidgets('a refused save is shown honestly and the menu stays open', (
     tester,
@@ -253,7 +273,7 @@ void main() {
     await _pump(tester, wired.container);
 
     await _openMenu(tester);
-    await tester.tap(find.text('Clear status'));
+    await tester.tap(find.bySemanticsLabel('Clear status'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AppErrorState), findsOneWidget);

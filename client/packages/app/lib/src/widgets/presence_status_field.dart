@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/member_presence.dart' show memberProfileOverridesProvider;
 import '../providers/providers.dart';
 import 'run_guarded.dart';
 import 'status_text_row.dart' show statusTextMaxChars;
@@ -56,17 +57,37 @@ class _PresenceStatusFieldState extends ConsumerState<PresenceStatusField>
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    final text = _controller.text.trim();
-    if (text.length > statusTextMaxChars) return;
+  /// Applies [text] to the server, then patches the member pane's own copy
+  /// of this profile with the response - not a blanket `ref.invalidate` of
+  /// the whole roster - so the caller's own row updates the moment this
+  /// resolves rather than waiting on the next unrelated roster refetch. See
+  /// `memberProfileOverridesProvider`'s own doc comment for why the roster
+  /// provider itself cannot just be patched in place.
+  Future<void> _apply(String text) async {
     final ok = await guard(
-      whatFailed: 'update your status',
+      whatFailed: text.isEmpty ? 'clear your status' : 'update your status',
       action: () async {
-        await ref.read(apiProvider).updateMe(statusText: text);
+        final profile = await ref.read(apiProvider).updateMe(statusText: text);
         ref.invalidate(meProvider);
+        ref.read(memberProfileOverridesProvider.notifier).applyKnown(profile);
       },
     );
     if (ok && mounted) widget.onDone();
+  }
+
+  Future<void> _submit() {
+    final text = _controller.text.trim();
+    if (text.length > statusTextMaxChars) return Future.value();
+    return _apply(text);
+  }
+
+  /// The owner's own ask: a small clear affordance inline in the field
+  /// itself rather than a separate always-there-when-set "Clear status" menu
+  /// row below it, the standard clearable-field pattern this app's other
+  /// search inputs do not need only because none of them writes anywhere.
+  Future<void> _clear() {
+    setState(_controller.clear);
+    return _apply('');
   }
 
   @override
@@ -86,6 +107,14 @@ class _PresenceStatusFieldState extends ConsumerState<PresenceStatusField>
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => unawaited(_submit()),
             semanticLabel: 'Status text',
+            trailing: length == 0
+                ? null
+                : AppIconButton(
+                    icon: AppIcons.dismiss,
+                    semanticLabel: 'Clear status',
+                    size: AppIconButtonSize.sm,
+                    onPressed: () => unawaited(_clear()),
+                  ),
           ),
           const SizedBox(height: AppSpacing.s4),
           Align(

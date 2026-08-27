@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/member_presence.dart' show memberProfileOverridesProvider;
 import '../providers/providers.dart';
 import 'run_guarded.dart';
 import 'status_text_row.dart' show statusTextMaxChars;
@@ -67,8 +68,9 @@ class _StatusEditorSheetState extends ConsumerState<_StatusEditorSheet>
     final ok = await guard(
       whatFailed: 'update your status',
       action: () async {
-        await ref.read(apiProvider).updateMe(statusText: text);
+        final profile = await ref.read(apiProvider).updateMe(statusText: text);
         ref.invalidate(meProvider);
+        ref.read(memberProfileOverridesProvider.notifier).applyKnown(profile);
       },
     );
     if (!mounted) return;

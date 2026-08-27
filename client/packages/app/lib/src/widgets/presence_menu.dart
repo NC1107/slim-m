@@ -243,21 +243,6 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
     unawaited(showStatusEditorSheet(context, current));
   }
 
-  /// One-click clear (the owner's own ask): applies an empty status
-  /// directly, with none of the sheet/dialog hop [_openStatusEditor] still
-  /// needs to type a new one. Only ever built once [build]'s `currentStatus`
-  /// is non-empty, so there is nothing to clear when this cannot fire.
-  Future<void> _clearStatus() async {
-    final ok = await guard(
-      whatFailed: 'clear your status',
-      action: () async {
-        await ref.read(apiProvider).updateMe(statusText: '');
-        ref.invalidate(meProvider);
-      },
-    );
-    if (ok && mounted) widget.onDone();
-  }
-
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -279,12 +264,6 @@ class _PresenceMenuItemsState extends ConsumerState<_PresenceMenuItems>
             label: 'Set a status',
             leading: AppIcons.smile,
             onTap: () => _openStatusEditor(context, currentStatus),
-          ),
-        if (currentStatus.isNotEmpty)
-          AppMenuItem(
-            label: 'Clear status',
-            leading: AppIcons.dismiss,
-            onTap: () => unawaited(_clearStatus()),
           ),
         const AppMenuDivider(),
         const AppMenuLabel('Status'),

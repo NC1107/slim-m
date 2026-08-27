@@ -100,19 +100,25 @@ class MemberRow extends ConsumerWidget {
     final status = presenceOf(
       ref.watch(presenceControllerProvider.select((m) => m[profile.id])),
     );
+    // The roster snapshot, patched by memberProfileOverridesProvider if a live edit has since landed.
+    final displayed =
+        ref.watch(
+          memberProfileOverridesProvider.select((m) => m[profile.id]),
+        ) ??
+        profile;
     // Only the first: a row that grew with role count would push the name out of a 236px pane.
-    final badge = profile.roles.isEmpty ? null : profile.roles.first;
+    final badge = displayed.roles.isEmpty ? null : displayed.roles.first;
 
     void open() => unawaited(
-      showMemberProfile(context, ref, profile: profile, status: status),
+      showMemberProfile(context, ref, profile: displayed, status: status),
     );
 
     final row = AppListRow(
       // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
       height: 36,
-      label: profile.displayName,
+      label: displayed.displayName,
       // Tucked under the name, with the avatar centred across both lines.
-      subtitle: profile.statusText,
+      subtitle: displayed.statusText,
       muted: status == AppPresence.offline,
       // On screen presence is only a dot and an opacity; this is how it is spoken.
       stateDescription: _presenceDescription(status),
@@ -121,8 +127,8 @@ class MemberRow extends ConsumerWidget {
           : AppBadge(variant: AppBadgeVariant.role, label: badge),
       leading: UserAvatar(
         userId: profile.id,
-        avatarUpdatedAt: profile.avatarUpdatedAt,
-        name: profile.displayName,
+        avatarUpdatedAt: displayed.avatarUpdatedAt,
+        name: displayed.displayName,
         size: 26,
         status: status,
       ),
