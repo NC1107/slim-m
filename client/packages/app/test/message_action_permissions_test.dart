@@ -79,6 +79,41 @@ void main() {
     });
   });
 
+  group(
+    'canStartSelectingMessages: MANAGE_MESSAGES only, unlike canDeleteMessage',
+    () {
+      test('a moderator may start selecting from another author', () {
+        expect(
+          canStartSelectingMessages(message(authorId: 'other'), _mod),
+          isTrue,
+        );
+      });
+      test('the author may not start selecting their own without the '
+          'permission, even though canDeleteMessage allows it', () {
+        expect(canDeleteMessage(message(authorId: _me), _me, _none), isTrue);
+        expect(
+          canStartSelectingMessages(message(authorId: _me), _none),
+          isFalse,
+        );
+      });
+      test('a plain member gets it on no message at all', () {
+        expect(
+          canStartSelectingMessages(message(authorId: 'other'), _none),
+          isFalse,
+        );
+      });
+      test('a pending send cannot be selected even by a moderator', () {
+        expect(
+          canStartSelectingMessages(
+            message(authorId: _me, pending: true),
+            _mod,
+          ),
+          isFalse,
+        );
+      });
+    },
+  );
+
   group('canReportMessage: any live message not your own', () {
     test('another author may be reported', () {
       expect(canReportMessage(message(authorId: 'other'), _me), isTrue);
