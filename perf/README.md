@@ -142,6 +142,14 @@ Take this measurement by hand, on real hardware, at each release.
    and the four RSS entries the script printed.
 6. Commit the new baseline file alongside the release.
 
+This step lapsed silently for nine releases (0.38.0 through 0.45.2) because
+nothing noticed a skipped one.
+`scripts/lib/test_perf_baseline_freshness.py` now fails once the newest
+committed baseline falls more than a few releases behind the newest
+`server-v*` tag, so a skipped release surfaces instead of going unnoticed
+again; its own module docstring has the reasoning for a bounded lag instead
+of exact equality.
+
 ## Measuring client cold start and idle memory
 
 `scripts/measure-client-startup.sh` (repo root) times how long the client
