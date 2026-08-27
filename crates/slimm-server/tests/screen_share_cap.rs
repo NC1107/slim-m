@@ -171,3 +171,33 @@ async fn an_out_of_range_cap_is_refused() {
         );
     }
 }
+
+/// The other side of the same boundary: exactly `MIN_SCREEN_SHARE_MAX_HEIGHT`
+/// and exactly `MAX_SCREEN_SHARE_MAX_HEIGHT` must both be accepted, or a `<`
+/// that drifted to `<=` on one edge would pass `an_out_of_range_cap_is_refused`
+/// while still refusing a value the range is supposed to allow.
+#[tokio::test]
+async fn the_range_boundaries_themselves_are_accepted() {
+    let (s, _guard) = harness("slimm-screen-share-cap-boundaries").await;
+    let admin = register(&s, "root").await;
+    let session = s.open_session(admin, "laptop").await.unwrap();
+    let router = app(s);
+
+    for good in [MIN_SCREEN_SHARE_MAX_HEIGHT, MAX_SCREEN_SHARE_MAX_HEIGHT] {
+        let response = router
+            .clone()
+            .oneshot(request(
+                "PATCH",
+                "/space/screen-share",
+                &session.access_token,
+                Some(json!({ "max_height": good })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "a max_height of {good} is exactly at the boundary and must be accepted"
+        );
+    }
+}

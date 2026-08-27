@@ -292,8 +292,36 @@ Future<http.Response> _answer(
   if (request.method == 'PUT' && path == '/channels/c1/read') {
     return _jsonBody({'last_read_seq': 0, 'unread': 0});
   }
-  // Members, pins and the rest answer empty; none of them are what these tests are about.
-  return _jsonBody(const <Object>[]);
+  if (_answersEmpty(request.method, path)) {
+    return _jsonBody(const <Object>[]);
+  }
+  throw StateError(
+    'channel_history_harness._answer has no route for ${request.method} '
+    '$path - add it to _answersEmpty if an empty body is legitimate, or '
+    'answer it explicitly if a test now depends on its content',
+  );
+}
+
+/// Routes this harness legitimately answers empty for: side-channel lookups
+/// (permissions, pins, members, the emoji/user directories, avatars,
+/// `/version`) that none of the tests built on this harness inspect the
+/// content of.
+///
+/// An explicit allowlist rather than a silent catch-all, so a route string
+/// drifting out from under a future test that *does* assert on one of these
+/// - pins or members content, say - fails loudly here instead of passing
+/// vacuously against an empty list.
+bool _answersEmpty(String method, String path) {
+  const exact = {
+    'GET /channels/c1/permissions',
+    'GET /channels/c1/pins',
+    'GET /emoji',
+    'GET /members',
+    'GET /users',
+    'GET /version',
+  };
+  if (exact.contains('$method $path')) return true;
+  return method == 'GET' && RegExp(r'^/users/[^/]+(/avatar)?$').hasMatch(path);
 }
 
 /// The server's own contract: live messages with `seq` below `before`,
