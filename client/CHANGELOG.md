@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.54.1](https://github.com/NC1107/slim-m/compare/client-v0.54.0...client-v0.54.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **client:** add value equality to UserProfile ([#893](https://github.com/NC1107/slim-m/issues/893)) ([65a5914](https://github.com/NC1107/slim-m/commit/65a59146775d8ae236078882e40eabdb76b47d0f))
+* **client:** guard four unhandled-future races in desktop/composer/rtc/sign-in ([#896](https://github.com/NC1107/slim-m/issues/896)) ([494d821](https://github.com/NC1107/slim-m/commit/494d8215a2766e1ec15a95d6cacfa559d76a60fd))
+
 ## [0.54.0](https://github.com/NC1107/slim-m/compare/client-v0.53.0...client-v0.54.0) (2026-08-26)
 
 
