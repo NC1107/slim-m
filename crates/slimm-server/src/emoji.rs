@@ -11,6 +11,7 @@
 //! slim-m ships no emoji of its own. Nothing here bundles, fetches or seeds a
 //! set; it only takes what an operator supplies.
 
+pub mod bulk;
 pub mod import;
 
 use sha2::{Digest, Sha256};
@@ -94,6 +95,50 @@ pub fn normalize_name(raw: &str) -> Result<String, NameProblem> {
     Ok(name)
 }
 
+/// One image that has passed every check [`add_emoji`] and [`bulk`] apply
+/// before a single byte reaches the store: a usable name, non-empty, under
+/// [`MAX_IMAGE_BYTES`], and sniffed as an inline image type.
+///
+/// Split out of [`add_emoji`] so the bulk path can validate a whole batch
+/// before writing any of it without re-deriving these rules a second time -
+/// two normalisers or two size checks that drift is exactly how `:shortcode:`
+/// stopped matching itself for the single upload and the CLI importer, and
+/// this is the same fix applied one level up.
+pub struct ValidatedImage {
+    pub name: String,
+    pub content_type: &'static str,
+    pub bytes: Vec<u8>,
+    pub sha256: Vec<u8>,
+}
+
+/// Runs every check on `bytes` and `raw_name` that costs no I/O: normalising
+/// the name, the empty and [`MAX_IMAGE_BYTES`] checks, and sniffing the
+/// content type against the inline allowlist. What this does not check is
+/// whether the name collides with an existing emoji or the deployment is at
+/// its cap - those need the store, and [`add_emoji`] and [`bulk::add_emoji_bulk`]
+/// each ask it at the point that makes sense for their own shape.
+pub fn validate_image(raw_name: &str, bytes: Vec<u8>) -> Result<ValidatedImage, AddError> {
+    let name = normalize_name(raw_name).map_err(|_| AddError::UnusableName)?;
+    if bytes.is_empty() {
+        return Err(AddError::Empty);
+    }
+    if bytes.len() as u64 > MAX_IMAGE_BYTES {
+        return Err(AddError::TooLarge);
+    }
+    // The inline (image) subset of the allowlist only, since an emoji is
+    // drawn rather than downloaded.
+    let content_type = media::sniff_content_type(&bytes)
+        .filter(|ct| media::is_inline(ct))
+        .ok_or(AddError::UnsupportedType)?;
+    let sha256 = Sha256::digest(&bytes).to_vec();
+    Ok(ValidatedImage {
+        name,
+        content_type,
+        bytes,
+        sha256,
+    })
+}
+
 /// Stores `bytes` and records an emoji named after `raw_name`.
 ///
 /// `raw_name` is normalised here rather than by the caller, so `:Big Smile:`
@@ -124,50 +169,38 @@ pub async fn add_emoji(
     bytes: Vec<u8>,
     uploader: Option<UserId>,
 ) -> Result<CustomEmoji, AddError> {
-    let name = normalize_name(raw_name).map_err(|_| AddError::UnusableName)?;
-    if bytes.is_empty() {
-        return Err(AddError::Empty);
-    }
-    if bytes.len() as u64 > MAX_IMAGE_BYTES {
-        return Err(AddError::TooLarge);
-    }
-    // The inline (image) subset of the allowlist only, since an emoji is
-    // drawn rather than downloaded.
-    let content_type = media::sniff_content_type(&bytes)
-        .filter(|ct| media::is_inline(ct))
-        .ok_or(AddError::UnsupportedType)?;
+    let image = validate_image(raw_name, bytes)?;
 
     if let Some(refusal) = store
-        .custom_emoji_refusal(&name)
+        .custom_emoji_refusal(&image.name)
         .await
         .map_err(AddError::Storage)?
     {
         return Err(refused(refusal));
     }
 
-    let sha256 = Sha256::digest(&bytes).to_vec();
-    let hex_id = media::to_hex(&sha256);
-    let size = bytes.len() as i64;
+    let hex_id = media::to_hex(&image.sha256);
+    let size = image.bytes.len() as i64;
 
     // Bytes before the metadata row, the same ordering attachments uses: a
     // row pointing at bytes that are not there yet is the worse failure.
     media
-        .write_attachment(&hex_id, bytes)
+        .write_attachment(&hex_id, image.bytes)
         .await
         .map_err(|err| AddError::Storage(err.into()))?;
     store
         .store_attachment(
-            &sha256,
+            &image.sha256,
             size,
-            content_type,
-            &format!("{name}.img"),
+            image.content_type,
+            &format!("{}.img", image.name),
             uploader,
         )
         .await
         .map_err(AddError::Storage)?;
 
     let created = store
-        .create_custom_emoji(EmojiId::generate(), &name, &sha256, uploader)
+        .create_custom_emoji(EmojiId::generate(), &image.name, &image.sha256, uploader)
         .await
         .map_err(AddError::Storage)?;
 
@@ -177,7 +210,7 @@ pub async fn add_emoji(
 /// The one place a store-level refusal becomes an [`AddError`], so the check
 /// made before the bytes are written and the check the transaction makes
 /// cannot answer the same refusal differently.
-fn refused(err: CreateEmojiError) -> AddError {
+pub(crate) fn refused(err: CreateEmojiError) -> AddError {
     match err {
         CreateEmojiError::NameTaken => AddError::NameTaken,
         CreateEmojiError::Full => AddError::Full,

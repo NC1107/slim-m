@@ -142,6 +142,74 @@ impl Store {
         }))
     }
 
+    /// Creates every emoji in `rows` as one transaction: either the whole
+    /// batch lands or none of it does.
+    ///
+    /// Reuses [`Self::create_custom_emoji`]'s own cap-and-name check, but runs
+    /// it once against the whole batch rather than once per row: the cap is
+    /// checked against `rows.len()` all at once, and each name is checked
+    /// against both the existing table and the rows already inserted earlier
+    /// in this same transaction, so two rows in one batch that share a name
+    /// cannot both read a count below the cap and both go on to write, the
+    /// same race the single insert closes for one row at a time. A row that
+    /// fails either check rolls the whole transaction back (dropping it
+    /// uncommitted, same as the single path's own early return), naming which
+    /// index and why so the caller can report it the way [`refused`] already
+    /// reports a single refusal.
+    ///
+    /// [`refused`]: crate::emoji::refused
+    pub async fn create_custom_emoji_batch(
+        &self,
+        rows: Vec<(EmojiId, String, Vec<u8>)>,
+        uploader: Option<UserId>,
+    ) -> anyhow::Result<Result<Vec<CustomEmoji>, (usize, CreateEmojiError)>> {
+        if rows.is_empty() {
+            return Ok(Ok(Vec::new()));
+        }
+        let mut tx = self.begin_write().await?;
+        let now = now_ms();
+
+        let count = sqlx::query_scalar!("SELECT COUNT(*) FROM custom_emoji")
+            .fetch_one(&mut *tx)
+            .await?;
+        if count as i64 + rows.len() as i64 > MAX_CUSTOM_EMOJI {
+            return Ok(Err((0, CreateEmojiError::Full)));
+        }
+
+        for (index, (id, name, sha256)) in rows.iter().enumerate() {
+            let taken =
+                sqlx::query_scalar!("SELECT COUNT(*) FROM custom_emoji WHERE name = ?", name)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            if taken > 0 {
+                return Ok(Err((index, CreateEmojiError::NameTaken)));
+            }
+            sqlx::query!(
+                "INSERT INTO custom_emoji (id, name, sha256, uploader_id, created_at)
+                 VALUES (?, ?, ?, ?, ?)",
+                id,
+                name,
+                sha256,
+                uploader,
+                now
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+
+        Ok(Ok(rows
+            .into_iter()
+            .map(|(id, name, sha256)| CustomEmoji {
+                id: id.to_string(),
+                name,
+                sha256: hex_of(&sha256),
+                uploader_id: uploader.map(|id| id.to_string()),
+                created_at: now,
+            })
+            .collect()))
+    }
+
     /// The bytes the emoji of this name points at, or None if no emoji
     /// answers to it. The bulk import asks this to tell "already imported"
     /// from "this name belongs to a different image".

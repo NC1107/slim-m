@@ -4387,6 +4387,75 @@ paths:
           $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /emoji/bulk:
+    post:
+      operationId: bulkUploadCustomEmoji
+      tags: [emoji]
+      summary: Add several emoji in one request.
+      description: >
+        Requires MANAGE_SERVER. Exists so importing a pack of images is not
+        one `POST /emoji` per image: that charges the upload rate limit once
+        per image, which exhausts it long before a large pack finishes. This
+        route charges the limit once for the whole request, however many
+        images it carries.
+
+
+        Validated and written as a whole: an unusable name, an unsupported
+        image, or a name colliding with another image in the same request or
+        an existing emoji, refuses the entire request rather than the one
+        image at fault, so none of it is written. At most 50 images and 20
+        MiB of decoded image data per request; a larger pack is split into
+        more than one call. Each image is otherwise checked exactly as
+        `uploadCustomEmoji` checks its own: normalised name, non-empty, at
+        most 1 MiB, and sniffed as an inline image type.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  description: At most 50 images, in the order they are created.
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [name, data]
+                    properties:
+                      name:
+                        type: string
+                        description: >
+                          The emoji's requested name; normalised the same way
+                          uploadCustomEmoji's own `name` is.
+                      data:
+                        type: string
+                        format: byte
+                        description: Standard base64 of the image's raw bytes.
+      responses:
+        "201":
+          description: >
+            Every image was added, in the same order as the request.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomEmoji"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "507":
+          $ref: "#/components/responses/InsufficientStorage"
 
 components:
   securitySchemes:

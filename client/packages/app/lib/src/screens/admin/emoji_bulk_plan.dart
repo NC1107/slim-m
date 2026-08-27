@@ -90,6 +90,48 @@ const int maxPlannedEmojiBytes = 1024 * 1024;
 /// one pick into thousands of sequential uploads.
 const int maxPlannedEmojiCount = 200;
 
+/// Most images one `POST /emoji/bulk` request may carry, matching the
+/// server's own `MAX_BULK_IMAGES` (`crates/slimm-server/src/emoji/bulk.rs`).
+const int maxBulkRequestCount = 50;
+
+/// Most decoded bytes one `POST /emoji/bulk` request's images may total,
+/// matching the server's own `MAX_BULK_TOTAL_BYTES`.
+const int maxBulkRequestBytes = 20 * 1024 * 1024;
+
+/// Splits [uploads] into the requests the server will accept: at most
+/// [maxBulkRequestCount] images and at most [maxBulkRequestBytes] decoded
+/// bytes in any one chunk.
+///
+/// This is why a 200-image pack (over [maxBulkRequestCount]) still imports:
+/// it becomes a handful of `POST /emoji/bulk` calls instead of one call per
+/// image, each charged once against the upload rate limit rather than once
+/// per image - the actual defect a 200-image pack used to hit. Every planned
+/// upload already passed [maxPlannedEmojiBytes] (1 MB, well under the 20 MB
+/// per-chunk cap), so no image is ever dropped by this split, only grouped.
+List<List<PlannedEmojiUpload>> chunkPlannedEmojiUploads(
+  List<PlannedEmojiUpload> uploads,
+) {
+  final chunks = <List<PlannedEmojiUpload>>[];
+  var current = <PlannedEmojiUpload>[];
+  var currentBytes = 0;
+
+  for (final upload in uploads) {
+    final size = upload.bytes.length;
+    final overCount = current.length >= maxBulkRequestCount;
+    final overBytes =
+        current.isNotEmpty && currentBytes + size > maxBulkRequestBytes;
+    if (overCount || overBytes) {
+      chunks.add(current);
+      current = <PlannedEmojiUpload>[];
+      currentBytes = 0;
+    }
+    current.add(upload);
+    currentBytes += size;
+  }
+  if (current.isNotEmpty) chunks.add(current);
+  return chunks;
+}
+
 /// Turns decoded zip [entries] into what will be uploaded and what is
 /// already refused, without making any request.
 ///

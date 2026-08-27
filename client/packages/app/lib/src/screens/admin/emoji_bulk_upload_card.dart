@@ -6,12 +6,13 @@
 /// name rules `EmojiUploadCard` applies one at a time; see
 /// `emoji_bulk_plan.dart` for the pure derivation this widget only drives.
 ///
-/// Uploads run one at a time rather than concurrently: `POST /emoji` is rate
-/// limited per caller (`Class::Upload` on the server), and a burst of
-/// parallel requests would just turn into a burst of 429s the sequential
-/// order avoids for free. Each result is kept and shown in a final summary
-/// rather than stopping at the first failure, since one bad file in a
-/// hundred should not cost the other ninety-nine.
+/// Images upload in chunks through `POST /emoji/bulk`
+/// ([chunkPlannedEmojiUploads]), not one `POST /emoji` per image: the single
+/// upload charges the rate limit once per call, so importing a 200-image pack
+/// one image at a time burned the whole budget after ten and refused the
+/// other hundred and ninety. A chunk either lands whole or refuses whole, so
+/// a failure is reported and retried at the chunk it happened in - never one
+/// line per image, and never by re-running images that already succeeded.
 library;
 
 import 'package:file_picker/file_picker.dart';
@@ -48,9 +49,9 @@ Future<List<int>?> _pickZipBytes() async {
 enum _Outcome { uploaded, failed }
 
 class _Result {
-  const _Result({required this.fileName, required this.outcome, this.reason});
+  const _Result({required this.upload, required this.outcome, this.reason});
 
-  final String fileName;
+  final PlannedEmojiUpload upload;
   final _Outcome outcome;
   final String? reason;
 }
@@ -73,7 +74,14 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
   int _total = 0;
   String? _refusal;
   List<SkippedZipEntry> _skipped = const [];
-  List<_Result> _results = const [];
+
+  /// Every image this run (across a first pass and any retries) has actually
+  /// created, so a retry never re-sends one that already succeeded.
+  List<_Result> _succeeded = const [];
+
+  /// The most recent pass's own failures: what the "Retry failed" button
+  /// retries, and what `_BulkSummary` reports.
+  List<_Result> _failed = const [];
 
   Future<void> _pickAndRun() async {
     final List<int>? bytes;
@@ -104,43 +112,74 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
     }
 
     setState(() {
-      _running = true;
       _refusal = null;
       _skipped = plan.skipped;
-      _results = const [];
+      _succeeded = const [];
+      _failed = const [];
+    });
+    await _runChunks(plan.uploads);
+  }
+
+  Future<void> _retryFailed() async {
+    final retrying = _failed.map((r) => r.upload).toList(growable: false);
+    if (retrying.isEmpty) return;
+    await _runChunks(retrying);
+  }
+
+  /// Uploads [uploads] in chunks sized to what `POST /emoji/bulk` accepts
+  /// ([chunkPlannedEmojiUploads]). A chunk that fails marks every image in it
+  /// failed with the one reason the server gave, rather than guessing which
+  /// image in the chunk was actually at fault - the same all-or-nothing
+  /// contract the server itself keeps for one request.
+  Future<void> _runChunks(List<PlannedEmojiUpload> uploads) async {
+    setState(() {
+      _running = true;
       _current = 0;
-      _total = plan.uploads.length;
+      _total = uploads.length;
+      _failed = const [];
     });
 
-    final results = <_Result>[];
-    for (final upload in plan.uploads) {
+    final newlyFailed = <_Result>[];
+    var anySucceeded = false;
+    for (final chunk in chunkPlannedEmojiUploads(uploads)) {
       if (!mounted) return;
-      setState(() => _current++);
       try {
-        await ref
-            .read(apiProvider)
-            .uploadCustomEmoji(upload.bytes, name: upload.name);
-        results.add(
-          _Result(fileName: upload.fileName, outcome: _Outcome.uploaded),
-        );
+        await ref.read(apiProvider).bulkUploadCustomEmoji([
+          for (final upload in chunk)
+            api.EmojiBulkImage(name: upload.name, bytes: upload.bytes),
+        ]);
+        anySucceeded = true;
+        if (!mounted) return;
+        setState(() {
+          _succeeded = [
+            ..._succeeded,
+            for (final upload in chunk)
+              _Result(upload: upload, outcome: _Outcome.uploaded),
+          ];
+          _current += chunk.length;
+        });
       } on api.ApiException catch (e) {
-        results.add(
-          _Result(
-            fileName: upload.fileName,
-            outcome: _Outcome.failed,
-            reason: describeApiFailure('add ${emojiShortcode(upload.name)}', e),
-          ),
-        );
+        final what = chunk.length == 1
+            ? 'add ${emojiShortcode(chunk.single.name)}'
+            : 'add ${chunk.length} emoji';
+        final reason = describeApiFailure(what, e);
+        newlyFailed.addAll([
+          for (final upload in chunk)
+            _Result(upload: upload, outcome: _Outcome.failed, reason: reason),
+        ]);
+        if (!mounted) return;
+        setState(() => _current += chunk.length);
       }
-      if (!mounted) return;
-      setState(() => _results = List.of(results));
     }
 
-    if (results.any((r) => r.outcome == _Outcome.uploaded)) {
+    if (anySucceeded) {
       ref.invalidate(customEmojiProvider);
     }
     if (!mounted) return;
-    setState(() => _running = false);
+    setState(() {
+      _failed = newlyFailed;
+      _running = false;
+    });
   }
 
   void _refuse(String message) {
@@ -154,7 +193,9 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final finished = !_running && (_results.isNotEmpty || _skipped.isNotEmpty);
+    final finished =
+        !_running &&
+        (_succeeded.isNotEmpty || _failed.isNotEmpty || _skipped.isNotEmpty);
     ref.watch(customEmojiProvider); // see the class doc comment for why
 
     return SettingsSectionCard(
@@ -180,12 +221,26 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
           ),
           const SizedBox(height: AppSpacing.s8),
           LinearProgressIndicator(
-            value: _total == 0 ? null : (_current - 1) / _total,
+            value: _total == 0 ? null : _current / _total,
           ),
           const SizedBox(height: AppSpacing.s12),
         ],
         if (finished) ...[
-          _BulkSummary(results: _results, skipped: _skipped),
+          _BulkSummary(
+            succeeded: _succeeded,
+            failed: _failed,
+            skipped: _skipped,
+          ),
+          const SizedBox(height: AppSpacing.s12),
+        ],
+        if (finished && _failed.isNotEmpty) ...[
+          AppButton(
+            label: 'Retry ${_failed.length} failed',
+            icon: AppIcons.retry,
+            full: true,
+            disabled: _running,
+            onPressed: _retryFailed,
+          ),
           const SizedBox(height: AppSpacing.s12),
         ],
         AppButton(
@@ -200,24 +255,37 @@ class _EmojiBulkUploadCardState extends ConsumerState<EmojiBulkUploadCard> {
   }
 }
 
-/// The finished (or partly finished) run's own report: how many of the
-/// planned uploads succeeded, and every failure or pre-upload skip with its
-/// reason, so a shorter list than the zip held is explained rather than
-/// silently swallowed.
+/// The finished (or partly finished) run's own report.
+///
+/// Failures and pre-upload skips are grouped by their own reason rather than
+/// listed one line per file: a rate-limit refusal or a shared cause behind a
+/// whole `POST /emoji/bulk` chunk otherwise repeats itself once per image in
+/// that chunk, which is exactly the wall of near-identical lines a 200-image
+/// pack used to produce. A cause only one file hit still names that file, so
+/// nothing about the ordinary "one image was bad" case gets vaguer.
 class _BulkSummary extends StatelessWidget {
-  const _BulkSummary({required this.results, required this.skipped});
+  const _BulkSummary({
+    required this.succeeded,
+    required this.failed,
+    required this.skipped,
+  });
 
-  final List<_Result> results;
+  final List<_Result> succeeded;
+  final List<_Result> failed;
   final List<SkippedZipEntry> skipped;
 
   @override
   Widget build(BuildContext context) {
-    final succeeded = results
-        .where((r) => r.outcome == _Outcome.uploaded)
-        .length;
-    final failed = results.where((r) => r.outcome == _Outcome.failed);
-    final total = results.length + skipped.length;
-    final allGood = succeeded == total;
+    final total = succeeded.length + failed.length + skipped.length;
+    final allGood = succeeded.length == total;
+
+    final groups = <String, List<String>>{};
+    for (final r in failed) {
+      (groups[r.reason ?? 'failed'] ??= []).add(r.upload.fileName);
+    }
+    for (final s in skipped) {
+      (groups[s.reason] ??= []).add(s.fileName);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,31 +293,35 @@ class _BulkSummary extends StatelessWidget {
         AppCallout(
           tone: allGood ? AppCalloutTone.accent : AppCalloutTone.warn,
           child: Text(
-            'Added $succeeded of $total image${total == 1 ? '' : 's'}.',
+            'Added ${succeeded.length} of $total '
+            'image${total == 1 ? '' : 's'}.',
           ),
         ),
-        for (final r in failed)
-          _FailureLine(fileName: r.fileName, reason: r.reason ?? 'failed'),
-        for (final s in skipped)
-          _FailureLine(fileName: s.fileName, reason: s.reason),
+        for (final entry in groups.entries)
+          _FailureLine(fileNames: entry.value, reason: entry.key),
       ],
     );
   }
 }
 
+/// One grouped failure line: a single file names itself, and more than one
+/// sharing a reason collapse into a count rather than repeating the line.
 class _FailureLine extends StatelessWidget {
-  const _FailureLine({required this.fileName, required this.reason});
+  const _FailureLine({required this.fileNames, required this.reason});
 
-  final String fileName;
+  final List<String> fileNames;
   final String reason;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final label = fileNames.length == 1
+        ? '${fileNames.single}: $reason'
+        : '${fileNames.length} images could not be added: $reason';
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s8),
       child: Text(
-        '$fileName: $reason',
+        label,
         style: AppText.caption.copyWith(color: tokens.dangerText),
       ),
     );
