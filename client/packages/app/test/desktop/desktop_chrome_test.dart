@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/desktop/desktop_chrome.dart';
 import 'package:slimm_app/src/desktop/desktop_window_shell.dart';
+import 'package:slimm_app/src/desktop/window_resize_frame.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'support/fake_desktop_window_port.dart';
@@ -66,8 +67,34 @@ void main() {
       );
       expect(DesktopChrome, isNotNull);
       expect(find.byType(Material), findsWidgets);
+      expect(
+        find.byType(WindowResizeFrame),
+        findsOneWidget,
+        reason: 'the frameless shell must offer edge/corner resize',
+      );
     },
   );
+
+  testWidgets('mounts no resize frame while active but not yet frameless', (
+    tester,
+  ) async {
+    // Mirrors the macOS/Windows branch: active without frameless draws no title bar either, so nothing needs a resize frame on a window the OS still frames.
+    DesktopWindowShell.debugPort = FakeDesktopWindowPort();
+    DesktopWindowShell.debugActivate();
+    addTearDown(DesktopWindowShell.debugReset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          builder: (context, child) => DesktopChrome(child: child!),
+          home: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    expect(find.byType(WindowResizeFrame), findsNothing);
+  });
 
   testWidgets("the title bar's window menu opens - the chrome carries an Overlay", (
     tester,
