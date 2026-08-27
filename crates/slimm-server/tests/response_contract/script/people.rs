@@ -87,6 +87,12 @@ pub(super) async fn moderation_calls(c: &mut Contract, root: &str, bob_token: &s
         )
         .await;
     c.get("listOpenReports", "/reports", root).await;
+    c.get(
+        "myReportStatus",
+        &format!("/reports/mine/{}", text(&filed, "id")),
+        bob_token,
+    )
+    .await;
     c.json(
         "resolveReport",
         "PATCH",

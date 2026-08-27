@@ -4,9 +4,17 @@
 //!
 //! Gated on MANAGE_MESSAGES at the deployment level. A report carries a
 //! snapshot of the reported content (see [`crate::store::Report`]), so this
-//! surface must never answer to anyone below that bar; every handler here
-//! checks it before touching the store, the same as the rest of this file's
-//! sibling admin surfaces do.
+//! surface must never answer to anyone below that bar; every moderation
+//! handler here checks it before touching the store, the same as the rest of
+//! this file's sibling admin surfaces do.
+//!
+//! [`super::reports_mine::my_report_status`] is the one exception, split into
+//! its own file rather than added here, and deliberately so: it is not a
+//! smaller version of the moderation queue, it is a different question
+//! altogether ("is my own report still open", not "what is in the queue"),
+//! scoped by `reporter_id` rather than by permission. It never carries a
+//! snapshot, a reporter's identity beyond their own, or anything about who
+//! moderated a report or how.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -20,6 +28,7 @@ use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
 use super::messages::parse_uuid;
 use super::reports_cursor::parse_history_cursor;
+use super::reports_mine::my_report_status;
 use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
@@ -40,6 +49,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/reports", get(list))
         .route("/reports/history", get(history))
+        .route("/reports/mine/{report_id}", get(my_report_status))
         .route("/reports/{report_id}", patch(resolve))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
