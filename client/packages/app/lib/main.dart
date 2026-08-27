@@ -17,6 +17,7 @@ import 'src/providers/attachment_preview_quality.dart';
 import 'src/providers/media_preferences.dart';
 import 'src/providers/message_page_size.dart';
 import 'src/providers/image_cache_preference.dart';
+import 'src/desktop/splash_floor.dart';
 import 'src/desktop/startup_screen.dart';
 import 'src/diagnostics/debug_log.dart';
 import 'src/providers/display_preferences.dart';
@@ -78,7 +79,17 @@ Future<void> main() async {
 /// left to whichever screen wants them first: they react to session changes
 /// for their whole lives, and a restored session never passes through the
 /// sign-in screen that would otherwise have touched them.
+///
+/// Wrapped in [awaitBootstrapWithSplashFloor] rather than flipping
+/// [appReadyProvider] the instant this resolves: on desktop that sequence
+/// can finish in a frame or two on a warm start, which is the exact reason
+/// the startup screen went unnoticed - see `src/desktop/splash_floor.dart`.
 Future<void> _bootstrapApp(ProviderContainer container) async {
+  await awaitBootstrapWithSplashFloor(() => _runBootstrapSequence(container));
+  container.read(appReadyProvider.notifier).state = true;
+}
+
+Future<void> _runBootstrapSequence(ProviderContainer container) async {
   await restoreSession(container);
   await container.read(themeControllerProvider.notifier).restore();
   await container.read(timeFormatControllerProvider.notifier).restore();
@@ -103,7 +114,6 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
-  container.read(appReadyProvider.notifier).state = true;
 }
 
 /// Whether [_bootstrapApp] has finished. Defaults to true rather than false:
