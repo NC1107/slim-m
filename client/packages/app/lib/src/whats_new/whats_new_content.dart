@@ -388,6 +388,32 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.54.0',
+    headline: 'Statuses under names, a calmer launch, faster joining',
+    points: [
+      WhatsNewPoint(
+        'A custom status now sits neatly under its owner\'s name in the '
+        'member list, with the picture centred across both lines instead of '
+        'the status floating below the row.',
+      ),
+      WhatsNewPoint(
+        'Opening the app no longer flashes a white screen before the dark '
+        'interface arrives - the very first frame matches the app\'s own '
+        'surface.',
+      ),
+      WhatsNewPoint(
+        'Joining the official Space skips a step: the sign-in screen opens '
+        'straight on creating an account, since arriving there means you do '
+        'not have one yet.',
+      ),
+      WhatsNewPoint(
+        'On desktop the tray icon earned its keep - presence, call controls '
+        'and settings live in its menu - and replies to a photo now show a '
+        'small thumbnail instead of a bare label.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

@@ -9,8 +9,8 @@
 //! tables has to grow a soft-delete every in-force query would then have to
 //! learn to skip. See the migration's own comment for that reasoning.
 //!
-//! Nothing reads it over HTTP yet, the same shape [`super::canvas_audit`]
-//! started in.
+//! `/reports/history` (`store/moderation_history.rs`) reads it over HTTP,
+//! merged with resolved reports into one feed.
 
 use crate::ids::UserId;
 

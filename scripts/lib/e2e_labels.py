@@ -58,8 +58,11 @@ REPLY_UNAVAILABLE = "Message unavailable"
 REPLY_UNAVAILABLE_QUOTE = "Reply to a message that is not available"
 JUMP_FAILED = "Could not find that message."
 
-# Threads: the reply-count affordance and the back tooltip, never the bar's own title (see e2e_threads.py).
-THREAD_HEADER = "Back to the conversation"
+# Threads: the reply-count affordance and the header's close tooltip, never the bar's own title (see e2e_threads.py).
+THREAD_HEADER = "Close thread"
+# The docked thread's own composer/send, distinct from COMPOSER/SEND because both are on screen at once (see e2e_threads.py).
+THREAD_COMPOSER = "Thread composer"
+THREAD_SEND = "Send reply"
 
 # Canvas
 OPEN_CANVAS = "Open canvas"

@@ -74,6 +74,49 @@ class UserProfile {
         timedOutUntil: json['timed_out_until'] as int?,
         statusText: json['status_text'] as String?,
       );
+
+  /// Value equality so a `.select`ed [UserProfile] (see
+  /// `providers/user_profiles.dart`'s `AuthorResolution`) compares by field,
+  /// not by the fresh instance a re-resolve constructs even when the server
+  /// sent back the exact same fields.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserProfile &&
+          id == other.id &&
+          username == other.username &&
+          displayName == other.displayName &&
+          createdAt == other.createdAt &&
+          avatarUpdatedAt == other.avatarUpdatedAt &&
+          timedOutUntil == other.timedOutUntil &&
+          statusText == other.statusText &&
+          _listEquals(roles, other.roles) &&
+          _listEquals(roleIds, other.roleIds));
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        username,
+        displayName,
+        createdAt,
+        avatarUpdatedAt,
+        timedOutUntil,
+        statusText,
+        Object.hashAll(roles),
+        Object.hashAll(roleIds),
+      );
+}
+
+/// Element-wise list equality, since `List` itself only compares by
+/// reference; kept minimal here rather than pulling in `package:collection`
+/// for one call site.
+bool _listEquals(List<String> a, List<String> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// The caller's own profile plus their effective base (deployment-level)

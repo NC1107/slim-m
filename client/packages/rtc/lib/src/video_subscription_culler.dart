@@ -34,6 +34,8 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 /// How long a track stays subscribed after nothing wants it any more.
 ///
 /// Three seconds, chosen against two real numbers rather than picked. It is
@@ -90,6 +92,13 @@ String videoSubscriptionKind(String key) {
   final colon = key.indexOf(':');
   return colon < 0 ? key : key.substring(0, colon);
 }
+
+/// A rejected subscribe/unsubscribe - a participant leaving mid-cull is the
+/// ordinary case here - is logged and dropped, never left unhandled for the
+/// zone to report as a crash.
+void Function(Object error) _logRejection(String key, String action) =>
+    (error) => debugPrint(
+        'video subscription culler: $action rejected for $key: $error');
 
 /// Decides which remote video tracks stay subscribed, given what some
 /// surface says it currently wants on screen.
@@ -154,7 +163,11 @@ class VideoSubscriptionCuller {
       final interest = _interest;
       if (interest == null || interest.contains(track.key)) {
         _cancel(track.key);
-        if (!track.subscribed) unawaited(track.subscribe());
+        if (!track.subscribed) {
+          unawaited(track
+              .subscribe()
+              .catchError(_logRejection(track.key, 'subscribe')));
+        }
         continue;
       }
       if (!track.subscribed) {
@@ -162,7 +175,11 @@ class VideoSubscriptionCuller {
         continue;
       }
       if (_due.remove(track.key)) {
-        unawaited(track.unsubscribe());
+        unawaited(
+          track
+              .unsubscribe()
+              .catchError(_logRejection(track.key, 'unsubscribe')),
+        );
         continue;
       }
       _pending[track.key] ??= Timer(dwell, () => _elapsed(track.key));
