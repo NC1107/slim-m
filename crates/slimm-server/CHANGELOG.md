@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.45.2](https://github.com/NC1107/slim-m/compare/server-v0.45.1...server-v0.45.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* **server:** give active_hours and memory_samples their own analytics window start ([#892](https://github.com/NC1107/slim-m/issues/892)) ([90b8503](https://github.com/NC1107/slim-m/commit/90b8503191247cb111da27973410b183324ad69c))
+* **server:** record a moderation audit row for a single message delete ([#897](https://github.com/NC1107/slim-m/issues/897)) ([52875d5](https://github.com/NC1107/slim-m/commit/52875d5e8917002ce6059c75ec15ee58ae144006))
+* **server:** stop a failed attachment commit from orphaning its temp file ([#894](https://github.com/NC1107/slim-m/issues/894)) ([d1f25cf](https://github.com/NC1107/slim-m/commit/d1f25cf10af59333dcd31ce9d4c0c480ba8e3617))
+
 ## [0.45.1](https://github.com/NC1107/slim-m/compare/server-v0.45.0...server-v0.45.1) (2026-08-26)
 
 
