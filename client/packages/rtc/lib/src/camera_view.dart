@@ -18,11 +18,14 @@
 /// `mirrorModeFor` in `camera_switching.dart` for the decision itself.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
 
 import 'camera_switching.dart';
+import 'first_frame_gate.dart';
 import 'track_event_filter.dart';
 
 /// Test-only: how many times each identity's [CameraView] has run `build`,
@@ -63,27 +66,58 @@ class CameraView extends StatefulWidget {
 
 class _CameraViewState extends State<CameraView> {
   lk.CancelListenFunc? _cancel;
+  lk.VideoTrack? _renderedTrack;
+  OwnedVideoRenderer? _ownedRenderer;
 
   @override
   void initState() {
     super.initState();
     _cancel = widget.room.events.listen((event) {
       if (mounted && trackEventAffectsIdentity(event, widget.identity)) {
+        _syncRenderer();
         setState(() {});
       }
     });
     // A flip fires no room event at all, so the mirror needs its own listener.
     widget.facing.addListener(_onFacingChanged);
+    _syncRenderer();
   }
 
   void _onFacingChanged() {
     if (mounted) setState(() {});
   }
 
+  /// Swaps in a fresh [OwnedVideoRenderer] whenever the camera track this
+  /// tile renders changes, so a track that appears after one has already
+  /// gone away gets its own first-frame warm-up rather than inheriting a
+  /// stale renderer's already-latched [FirstFrameTracker].
+  void _syncRenderer() {
+    final track = _cameraTrack();
+    if (identical(track, _renderedTrack)) return;
+    _renderedTrack = track;
+    final stale = _ownedRenderer;
+    _ownedRenderer = null;
+    if (stale != null) unawaited(stale.dispose());
+    if (track != null) unawaited(_attachRenderer(track));
+  }
+
+  Future<void> _attachRenderer(lk.VideoTrack track) async {
+    final owned = OwnedVideoRenderer();
+    await owned.initialize();
+    if (!mounted || !identical(track, _renderedTrack)) {
+      unawaited(owned.dispose());
+      return;
+    }
+    setState(() => _ownedRenderer = owned);
+  }
+
   @override
   void dispose() {
     _cancel?.call();
     widget.facing.removeListener(_onFacingChanged);
+    final owned = _ownedRenderer;
+    _ownedRenderer = null;
+    if (owned != null) unawaited(owned.dispose());
     super.dispose();
   }
 
@@ -127,10 +161,21 @@ class _CameraViewState extends State<CameraView> {
     final track = _cameraTrack();
     // Unlike a screen share, no placeholder text for a camera not here yet.
     if (track == null) return const SizedBox.shrink();
-    return lk.VideoTrackRenderer(
-      track,
-      fit: lk.VideoViewFit.cover,
-      mirrorMode: mirrorModeFor(isLocal: _isLocal, facing: widget.facing.value),
+    final owned = _ownedRenderer;
+    // The renderer's own initialize() is still pending; same nothing as above.
+    if (owned == null) return const SizedBox.shrink();
+    return FirstFrameReveal(
+      tracker: owned.tracker,
+      // No placeholder graphic for a camera either, same as the branch above.
+      placeholder: const SizedBox.expand(),
+      child: lk.VideoTrackRenderer(
+        track,
+        fit: lk.VideoViewFit.cover,
+        mirrorMode:
+            mirrorModeFor(isLocal: _isLocal, facing: widget.facing.value),
+        cachedRenderer: owned.renderer,
+        autoDisposeRenderer: false,
+      ),
     );
   }
 }
