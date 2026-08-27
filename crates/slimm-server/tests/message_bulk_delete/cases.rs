@@ -1,168 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Deleting several messages as one act, and the four ways that can go wrong
-//! quietly.
-//!
-//! A bulk path that does less than the single one is the failure this file
-//! exists for. It cannot be caught by "did the messages disappear" alone, so
-//! every case here also checks the thing that is easy to drop and invisible
-//! from the transcript: one op per message and no gaps in the sequence, the
-//! attachment links released, the audit row written, and nothing at all
-//! written when the request is refused.
-//!
-//! The op-density case is the one worth understanding. Clients apply an op only
-//! when its seq is exactly one past their cursor and fall back to a full REST
-//! reconcile otherwise, so a batch that allocated one seq for N deletions would
-//! be correct in the database and make every connected client resync - the
-//! opposite of what a purge is for.
+//! The tests themselves. See `harness.rs` for the store, router, and request
+//! helpers they all share.
 
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use serde_json::{Value, json};
-use slimm_server::auth::Auth;
-use slimm_server::config::Config;
-use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
-use slimm_server::ids::{ChannelId, UserId};
+use axum::http::StatusCode;
 use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
-use sqlx::SqlitePool;
-use tower::ServiceExt;
 use uuid::Uuid;
 
-mod support;
-
-async fn harness() -> (Store, SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-bulk-delete");
-    let config = Config {
-        port: 0,
-        database_path: path,
-        hash_concurrency: 2,
-        ..Config::default()
-    };
-    let pool = db::connect(&config).await.expect("connect + migrate");
-    (Store::new(pool.clone()), pool, guard)
-}
-
-fn app(store: Store) -> Router {
-    http::router(AppState {
-        store,
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: slimm_server::voice::VoiceService::disabled(),
-        media: slimm_server::media::Media::for_tests(),
-        gifs: slimm_server::http::gifs::GifSearch::disabled(),
-    })
-}
-
-fn request(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
-    let mut builder = Request::builder().method(method).uri(uri);
-    if let Some(token) = token {
-        builder = builder.header("authorization", format!("Bearer {token}"));
-    }
-    match body {
-        Some(value) => builder
-            .header("content-type", "application/json")
-            .body(Body::from(value.to_string()))
-            .unwrap(),
-        None => builder.body(Body::empty()).unwrap(),
-    }
-}
-
-async fn json_body(response: axum::response::Response) -> Value {
-    let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
-        .await
-        .unwrap();
-    serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-}
-
-async fn account(store: &Store, username: &str) -> (String, UserId) {
-    let user = store
-        .create_account(username, username, "not-a-real-hash")
-        .await
-        .unwrap();
-    let tokens = store.open_session(user.id, "cli").await.unwrap();
-    (tokens.access_token, user.id)
-}
-
-/// An administrator who owns the deployment, a moderator holding only
-/// MANAGE_MESSAGES, and an ordinary member to be moderated.
-async fn people(store: &Store) -> ((String, UserId), (String, UserId), (String, UserId)) {
-    let admin = account(store, "root").await;
-    store.bootstrap_deployment(admin.1).await.unwrap();
-    let moderator = account(store, "mod").await;
-    let member = account(store, "nia").await;
-    let role = store
-        .create_role("mods", Permissions::MANAGE_MESSAGES, false)
-        .await
-        .unwrap();
-    store.assign_role(moderator.1, role).await.unwrap();
-    (admin, moderator, member)
-}
-
-async fn channel_id(store: &Store) -> String {
-    store.list_channels().await.unwrap()[0].id.0.to_string()
-}
-
-async fn send(app: &Router, channel: &str, token: &str, content: &str) -> String {
-    let body = json_body(
-        app.clone()
-            .oneshot(request(
-                "POST",
-                &format!("/channels/{channel}/messages"),
-                Some(token),
-                Some(json!({ "id": Uuid::now_v7().to_string(), "content": content })),
-            ))
-            .await
-            .unwrap(),
-    )
-    .await;
-    body["id"].as_str().unwrap().to_owned()
-}
-
-async fn bulk_delete(app: &Router, channel: &str, token: &str, ids: &[String]) -> StatusCode {
-    app.clone()
-        .oneshot(request(
-            "POST",
-            &format!("/channels/{channel}/messages/bulk-delete"),
-            Some(token),
-            Some(json!({ "message_ids": ids })),
-        ))
-        .await
-        .unwrap()
-        .status()
-}
-
-async fn live_count(store: &Store, channel: &str) -> usize {
-    let id = ChannelId(Uuid::parse_str(channel).unwrap());
-    store.list_messages(id, None, 100).await.unwrap().len()
-}
-
-/// Every delete op this channel has, oldest first, as `(seq, kind)`.
-async fn ops(pool: &SqlitePool, channel: &str) -> Vec<(i64, String)> {
-    let id = ChannelId(Uuid::parse_str(channel).unwrap());
-    sqlx::query_as("SELECT seq, kind FROM message_ops WHERE channel_id = ? ORDER BY seq")
-        .bind(id)
-        .fetch_all(pool)
-        .await
-        .expect("read the op stream")
-}
-
-async fn audit(pool: &SqlitePool) -> Vec<(String, Option<Vec<u8>>, Option<Vec<u8>>)> {
-    sqlx::query_as("SELECT action, actor_id, subject_id FROM moderation_audit_log ORDER BY id")
-        .fetch_all(pool)
-        .await
-        .expect("read the audit log")
-}
+use crate::harness::{
+    app, audit, bulk_delete, channel_id, live_count, new_store, ops, people, send,
+};
 
 #[tokio::test]
 async fn a_moderator_deletes_several_messages_in_one_request() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (_admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -200,7 +50,7 @@ async fn a_moderator_deletes_several_messages_in_one_request() {
 /// falling back to a full REST reconcile.
 #[tokio::test]
 async fn each_deleted_message_takes_its_own_consecutive_seq() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (_admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -227,7 +77,7 @@ async fn each_deleted_message_takes_its_own_consecutive_seq() {
 /// the single delete's own idempotence carried over.
 #[tokio::test]
 async fn an_already_deleted_id_is_skipped_rather_than_re_deleted() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (_admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -256,7 +106,7 @@ async fn an_already_deleted_id_is_skipped_rather_than_re_deleted() {
 /// from another channel leaves the rest of the batch alone.
 #[tokio::test]
 async fn an_id_from_another_channel_refuses_the_whole_batch() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let other = store
@@ -294,7 +144,7 @@ async fn an_id_from_another_channel_refuses_the_whole_batch() {
 /// permission - see docs/decisions/0016.
 #[tokio::test]
 async fn manage_messages_reaches_an_administrators_message_too() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -315,7 +165,7 @@ async fn manage_messages_reaches_an_administrators_message_too() {
 
 #[tokio::test]
 async fn more_ids_than_the_cap_is_refused_rather_than_truncated() {
-    let (store, _pool, _guard) = harness().await;
+    let (store, _pool, _guard) = new_store().await;
     let (_admin, moderator, _member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -328,11 +178,42 @@ async fn more_ids_than_the_cap_is_refused_rather_than_truncated() {
     );
 }
 
+/// The other side of the same boundary: exactly `MAX_BULK_DELETE_IDS` (64,
+/// see `http/messages_bulk.rs`) must succeed rather than be refused, or the
+/// guard has drifted from `>` to `>=` without either test noticing.
+#[tokio::test]
+async fn exactly_the_cap_succeeds() {
+    let (store, _pool, _guard) = new_store().await;
+    let (admin, moderator, member) = people(&store).await;
+    let channel = channel_id(&store).await;
+    let app = app(store.clone());
+
+    // Round-robin across all three accounts: each has its own per-user Class::Write bucket (30-request burst), so sending all 64 from one would rate-limit before the batch is even built - a limit this test has no interest in exercising.
+    let senders = [&admin.0, &moderator.0, &member.0];
+    let mut ids = Vec::new();
+    for i in 0..64 {
+        ids.push(
+            send(
+                &app,
+                &channel,
+                senders[i % senders.len()],
+                &format!("spam {i}"),
+            )
+            .await,
+        );
+    }
+    assert_eq!(
+        bulk_delete(&app, &channel, &moderator.0, &ids).await,
+        StatusCode::NO_CONTENT,
+        "exactly the cap must be honored, not refused as if it were over it"
+    );
+}
+
 /// The act is recorded, one row per author whose messages were removed, naming
 /// the moderator who did it - which is the whole point of 0049.
 #[tokio::test]
 async fn the_act_is_recorded_against_each_author() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (_admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -355,7 +236,7 @@ async fn the_act_is_recorded_against_each_author() {
 
 #[tokio::test]
 async fn a_refused_batch_records_no_act() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let other = store
@@ -382,7 +263,7 @@ async fn a_refused_batch_records_no_act() {
 /// still there for an author deleting their own.
 #[tokio::test]
 async fn bulk_delete_needs_manage_messages_even_for_your_own_messages() {
-    let (store, _pool, _guard) = harness().await;
+    let (store, _pool, _guard) = new_store().await;
     let (_admin, _moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -395,6 +276,29 @@ async fn bulk_delete_needs_manage_messages_even_for_your_own_messages() {
     assert_eq!(live_count(&store, &channel).await, 1);
 }
 
+/// The realistic abuse shape this file's header describes: a member without
+/// MANAGE_MESSAGES cannot launder deleting somebody else's messages by mixing
+/// them into a batch with their own.
+#[tokio::test]
+async fn bulk_delete_needs_manage_messages_even_mixed_with_your_own_messages() {
+    let (store, _pool, _guard) = new_store().await;
+    let (admin, _moderator, member) = people(&store).await;
+    let channel = channel_id(&store).await;
+    let app = app(store.clone());
+
+    let mine = send(&app, &channel, &member.0, "my own message").await;
+    let theirs = send(&app, &channel, &admin.0, "not mine to delete").await;
+    assert_eq!(
+        bulk_delete(&app, &channel, &member.0, &[mine, theirs]).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        live_count(&store, &channel).await,
+        2,
+        "the batch must be refused whole, not partially applied to the caller's own message"
+    );
+}
+
 /// Deleting a message has to let go of its attachments, or a purge leaves the
 /// rows that keep those files alive and nothing ever reclaims them.
 ///
@@ -402,7 +306,7 @@ async fn bulk_delete_needs_manage_messages_even_for_your_own_messages() {
 /// release, and the upload path has its own tests.
 #[tokio::test]
 async fn deleting_releases_the_attachments_the_messages_held() {
-    let (store, pool, _guard) = harness().await;
+    let (store, pool, _guard) = new_store().await;
     let (_admin, moderator, member) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
@@ -445,7 +349,7 @@ async fn deleting_releases_the_attachments_the_messages_held() {
 /// lookup ahead of the permission checks passed every other test in this file.
 #[tokio::test]
 async fn a_caller_who_cannot_see_the_channel_learns_nothing_from_the_answer() {
-    let (store, _pool, _guard) = harness().await;
+    let (store, _pool, _guard) = new_store().await;
     let (admin, _moderator, outsider) = people(&store).await;
     let channel = channel_id(&store).await;
     let app = app(store.clone());
