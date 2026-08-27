@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Backlog item 128: a status editor reached by tapping your own avatar in
-/// the sidebar. Under `kCompactWidth` the avatar menu still routes free-text
-/// editing through this bottom sheet; `presence_status_field_test.dart`
-/// covers the wide-window case, which per `docs/design/desktop-vs-mobile.md`
-/// rule 2 types directly into the anchored menu instead of escalating to a
-/// sheet. Drives it the way `space_menu_button_test.dart` drives its own
-/// avatar-adjacent menu - tap the avatar, tap the item, drive the sheet -
-/// and mirrors `status_text_row_test.dart`'s `PATCH /me` wiring, since both
-/// ultimately call the same `SlimmApi.updateMe`.
+/// On a wide window the avatar menu's free-text status editor is an inline
+/// `AppInput` in the anchored `AppMenu` itself, not a dialog hop through
+/// `status_editor_sheet.dart` - `docs/design/desktop-vs-mobile.md` rule 2:
+/// a control that stays on screen (status) is a dropdown anchored to the
+/// control, the same body a context menu uses, everywhere there is room for
+/// one. `status_editor_sheet_test.dart` covers the unchanged compact-width
+/// sheet. This also covers the one-click "Clear status" row, which - unlike
+/// the inline field - shows at every width once a status is actually set.
 library;
 
 import 'dart:convert';
@@ -93,10 +92,11 @@ const _tokens = TokenPair(
   return (container: container, patched: patched);
 }
 
-/// Under `kCompactWidth`, so the avatar opens the bottom sheet rather than
-/// the anchored menu - the case this file covers.
+/// Wide, so the avatar opens the anchored `AppMenu` rather than the sheet -
+/// the case this file covers. Taller than the default 600 so the menu
+/// opening upward off the avatar has room.
 Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
-  tester.view.physicalSize = const Size(390, 900);
+  tester.view.physicalSize = const Size(800, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
@@ -121,70 +121,110 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
   await tester.pumpAndSettle();
 }
 
-/// Opens the avatar sheet and taps "Set a status", landing on the editor.
-Future<void> _openEditor(WidgetTester tester) async {
+Future<void> _openMenu(WidgetTester tester) async {
   await tester.tap(find.bySemanticsLabel('Change your status'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Set a status'));
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('the avatar sheet offers Set a status alongside the presence '
-      'choices', (tester) async {
+  testWidgets('the menu offers an inline field instead of Set a status', (
+    tester,
+  ) async {
     final wired = _wire();
     await _pump(tester, wired.container);
 
-    await tester.tap(find.bySemanticsLabel('Change your status'));
-    await tester.pumpAndSettle();
+    await _openMenu(tester);
 
-    expect(find.text('Set a status'), findsOneWidget);
-    expect(find.text('Online'), findsOneWidget);
-    expect(find.text('Appear offline'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('What are you up to?'), findsOneWidget);
+    expect(
+      find.text('Set a status'),
+      findsNothing,
+      reason: 'a wide window has room to edit in place, not to open a dialog',
+    );
   });
 
-  testWidgets('the editor opens prefilled with the current status', (
+  testWidgets('the inline field opens prefilled with the current status', (
     tester,
   ) async {
     final wired = _wire(currentStatus: 'in a meeting');
     await _pump(tester, wired.container);
 
-    await _openEditor(tester);
+    await _openMenu(tester);
 
     expect(find.text('in a meeting'), findsOneWidget);
   });
 
-  testWidgets('Save sends the trimmed status and closes the editor', (
-    tester,
-  ) async {
+  testWidgets('Clear status is absent when no status is set', (tester) async {
     final wired = _wire(currentStatus: null);
     await _pump(tester, wired.container);
 
-    await _openEditor(tester);
-    await tester.enterText(find.byType(TextField), '  at lunch  ');
-    await tester.pump();
-    await tester.tap(find.widgetWithText(AppButton, 'Save'));
-    await tester.pumpAndSettle();
+    await _openMenu(tester);
 
-    expect(wired.patched, ['at lunch']);
-    expect(find.text('Set a status'), findsNothing);
+    expect(find.text('Clear status'), findsNothing);
   });
 
-  testWidgets('Clear sends an empty status and closes the editor', (
+  testWidgets('Clear status is absent for an empty (not null) status', (
     tester,
   ) async {
+    final wired = _wire(currentStatus: '');
+    await _pump(tester, wired.container);
+
+    await _openMenu(tester);
+
+    expect(find.text('Clear status'), findsNothing);
+  });
+
+  testWidgets('Clear status appears once a status is set', (tester) async {
     final wired = _wire(currentStatus: 'afk');
     await _pump(tester, wired.container);
 
-    await _openEditor(tester);
-    await tester.tap(find.widgetWithText(AppButton, 'Clear'));
+    await _openMenu(tester);
+
+    expect(find.text('Clear status'), findsOneWidget);
+  });
+
+  testWidgets('typing into the field does not close the menu', (tester) async {
+    final wired = _wire();
+    await _pump(tester, wired.container);
+
+    await _openMenu(tester);
+    await tester.enterText(find.byType(TextField), 'at lunch');
+    await tester.pump();
+
+    expect(find.byType(AppMenu), findsOneWidget);
+    expect(wired.patched, isEmpty);
+  });
+
+  testWidgets('pressing Enter sends the trimmed status and closes the menu', (
+    tester,
+  ) async {
+    final wired = _wire();
+    await _pump(tester, wired.container);
+
+    await _openMenu(tester);
+    await tester.enterText(find.byType(TextField), '  at lunch  ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(wired.patched, ['at lunch']);
+    expect(find.byType(AppMenu), findsNothing);
+  });
+
+  testWidgets('Clear status sends an empty status with one click and closes '
+      'the menu', (tester) async {
+    final wired = _wire(currentStatus: 'afk');
+    await _pump(tester, wired.container);
+
+    await _openMenu(tester);
+    await tester.tap(find.text('Clear status'));
     await tester.pumpAndSettle();
 
     expect(wired.patched, ['']);
-    expect(find.text('Set a status'), findsNothing);
+    expect(find.byType(AppMenu), findsNothing);
   });
 
-  testWidgets('a server refusal is shown honestly and the editor stays open', (
+  testWidgets('a refused save is shown honestly and the menu stays open', (
     tester,
   ) async {
     final wired = _wire(
@@ -194,16 +234,29 @@ void main() {
     );
     await _pump(tester, wired.container);
 
-    await _openEditor(tester);
+    await _openMenu(tester);
     await tester.enterText(find.byType(TextField), 'a new status');
-    await tester.pump();
-    await tester.tap(find.widgetWithText(AppButton, 'Save'));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
     expect(
       find.textContaining('Status must not contain control characters'),
       findsOneWidget,
     );
-    expect(find.text('Set a status'), findsOneWidget);
+    expect(find.byType(AppMenu), findsOneWidget);
+  });
+
+  testWidgets('a refused clear is shown honestly and the menu stays open', (
+    tester,
+  ) async {
+    final wired = _wire(currentStatus: 'afk', patchStatus: 500);
+    await _pump(tester, wired.container);
+
+    await _openMenu(tester);
+    await tester.tap(find.text('Clear status'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppErrorState), findsOneWidget);
+    expect(find.byType(AppMenu), findsOneWidget);
   });
 }

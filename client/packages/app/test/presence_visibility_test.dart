@@ -202,7 +202,7 @@ void main() {
     await tester.tap(find.byType(UserAvatar));
     await tester.pumpAndSettle();
 
-    // Filtered to the presence choices: the menu also carries a "Set a status" item now.
+    // Filtered to the presence choices: this wide window's menu also carries the inline PresenceStatusField.
     final items = tester
         .widgetList<AppMenuItem>(
           find.descendant(
