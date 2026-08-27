@@ -10,10 +10,11 @@ import 'package:slimm_app/src/desktop/startup_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 void main() {
-  testWidgets('renders the brand mark', (tester) async {
+  testWidgets('renders the brand mark and wordmark', (tester) async {
     await tester.pumpWidget(const StartupApp());
 
     expect(find.byType(AppBrandMark), findsOneWidget);
+    expect(find.text('slim-m'), findsOneWidget);
   });
 
   testWidgets('fades in by default and holds no running animation once '
