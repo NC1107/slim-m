@@ -21,6 +21,7 @@ import '../routing/breakpoints.dart';
 import '../providers/user_profiles.dart';
 import '../routing/routes.dart';
 import 'author_label.dart';
+import 'sheet_item_list.dart';
 import 'user_avatar.dart';
 
 /// Marks the sizing box around the sheet's body, so a test can measure it
@@ -156,9 +157,7 @@ class _Body extends ConsumerWidget {
 
         resolveAuthorProfiles(ref, list.map((t) => t.parentAuthorId));
 
-        return ListView.builder(
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+        return SheetItemList(
           itemCount: list.length,
           itemBuilder: (context, i) =>
               ThreadRow(thread: list[i], router: router),
