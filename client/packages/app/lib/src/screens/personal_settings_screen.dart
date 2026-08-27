@@ -50,6 +50,7 @@ import '../widgets/performance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
 import '../widgets/personal_account_sections.dart';
 import '../widgets/personal_status_sections.dart';
+import '../widgets/report_status_section.dart';
 import '../widgets/settings_panes.dart';
 import 'voice_settings_screen.dart';
 
@@ -120,6 +121,12 @@ class PersonalSettingsScreen extends StatelessWidget {
               label: 'Blocked',
               icon: AppIcons.revoke,
               builder: (context) => const BlockedSection(),
+            ),
+            SettingsPane(
+              id: 'report-status',
+              label: 'Report status',
+              icon: AppIcons.report,
+              builder: (context) => const ReportStatusSection(),
             ),
           ],
         ),

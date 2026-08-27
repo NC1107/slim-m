@@ -62,6 +62,7 @@ mod reactions;
 mod recovery;
 mod reports;
 mod reports_cursor;
+mod reports_mine;
 mod roles;
 mod safety;
 mod search;

@@ -214,6 +214,14 @@ class AppAvatar extends StatelessWidget {
   }
 }
 
+/// The initials disc. Its text weight is [AppWeights.medium], not
+/// [AppWeights.semi]: IBM Plex Mono only ships regular and medium weight
+/// files (`design_system/pubspec.yaml`), and this used to be the one call
+/// site in the app asking mono for the semibold it never had. With no
+/// 600-weight face to match, Skia faked one by thickening medium's strokes,
+/// which reads as coarse, blocky glyphs at the small sizes initials render
+/// at - most visible on a low-density desktop display, but present on every
+/// platform this renders on.
 class _Face extends StatelessWidget {
   const _Face({
     required this.round,
@@ -253,7 +261,7 @@ class _Face extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: AppFonts.mono,
                   fontSize: fontSize,
-                  fontWeight: AppWeights.semi,
+                  fontWeight: AppWeights.medium,
                   color: _avatarTintInk,
                 ),
               ),

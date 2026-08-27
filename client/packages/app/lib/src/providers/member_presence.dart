@@ -173,6 +173,69 @@ groupMembersByPresence(
   return (online: online, offline: offline);
 }
 
+/// Live per-member profile edits [membersProvider]'s roster snapshot does not
+/// pick up on its own: that provider only refetches on an inferred join or a
+/// moderation event, never on a plain `PATCH /me` (a display name or status
+/// text edit), so a member pane row kept showing whatever it last paged in
+/// until one of those unrelated events happened to also invalidate it -
+/// including for the caller's own edit. `status_text_row.dart`'s own doc
+/// comment
+/// already assumed a rename or a status edit "goes through the one event
+/// that already tells every other client to re-ask"
+/// ([api.ProfileChanged]); nothing had actually wired that event to the
+/// roster until this did.
+///
+/// Mirrors [PresenceController]'s live-overlay shape rather than patching
+/// [membersProvider]'s list in place: that provider is a plain
+/// `FutureProvider.autoDispose` with no settable state of its own, and a
+/// blanket `ref.invalidate` on every status-text submit would re-page a
+/// possibly large roster for a one-row change.
+class MemberProfileOverridesController
+    extends StateNotifier<Map<String, api.UserProfile>> {
+  MemberProfileOverridesController(this._ref) : super(const {}) {
+    _sub = _ref.read(liveEventsProvider).listen((event) {
+      if (event is api.ProfileChanged) unawaited(_refetch(event.userId));
+    });
+  }
+
+  final Ref _ref;
+  late final StreamSubscription<api.ServerEvent> _sub;
+
+  /// Applies a profile the caller already knows is current - the response of
+  /// its own successful `PATCH /me` - without waiting on that same edit's
+  /// [api.ProfileChanged] echo to round-trip back down this connection.
+  void applyKnown(api.UserProfile profile) {
+    state = {...state, profile.id: profile};
+  }
+
+  /// [api.ProfileChanged] carries only an id (see its own doc comment), so
+  /// this is what "re-ask" means in practice: fetch that one profile and
+  /// merge it in, rather than a refetch of the whole roster.
+  Future<void> _refetch(String userId) async {
+    try {
+      final profile = await _ref.read(apiProvider).getUser(userId);
+      state = {...state, userId: profile};
+    } on api.ApiException {
+      // Left stale; the next ProfileChanged (or a roster refetch) corrects it.
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_sub.cancel());
+    super.dispose();
+  }
+}
+
+/// Kept alive for the session, matching [presenceControllerProvider]: cheap
+/// to hold, and reused across the member pane closing and reopening rather
+/// than refetched every time it does.
+final memberProfileOverridesProvider =
+    StateNotifierProvider<
+      MemberProfileOverridesController,
+      Map<String, api.UserProfile>
+    >((ref) => MemberProfileOverridesController(ref));
+
 /// A stable, order-independent summary of who currently reads as reachable
 /// (online/away/dnd), meant for `presenceControllerProvider.select`. `Map`
 /// has no structural `==`, so selecting the raw map can never detect "no

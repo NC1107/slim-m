@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.46.0](https://github.com/NC1107/slim-m/compare/server-v0.45.2...server-v0.46.0) (2026-08-27)
+
+
+### Features
+
+* **server:** bulk-delete a raider's recent messages by author and window ([#922](https://github.com/NC1107/slim-m/issues/922)) ([1b9ee57](https://github.com/NC1107/slim-m/commit/1b9ee57893aeb60f5dcd828b2280f86b51d73728))
+* **server:** let a reporter check their own report's status ([#923](https://github.com/NC1107/slim-m/issues/923)) ([5ebae4d](https://github.com/NC1107/slim-m/commit/5ebae4d74ba5f95ebdf2d5cc6634aa0869c0819c))
+
 ## [0.45.2](https://github.com/NC1107/slim-m/compare/server-v0.45.1...server-v0.45.2) (2026-08-27)
 
 

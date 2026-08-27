@@ -11,6 +11,14 @@
 /// window already sized to its last known bounds - nothing resizes visibly
 /// when the real UI swaps in.
 ///
+/// The mark alone, at the size [BootSplashScreen] uses for a phone, read as
+/// an accidental placeholder rather than a designed screen once it sat in a
+/// full desktop window rather than a phone's - the owner's own "looks
+/// buggy" report. Pairing it with the wordmark `OnboardingShell`'s brand
+/// rail already carries gives the same content the weight a full-window
+/// splash needs to read as deliberate, without inventing a new visual
+/// language for one screen.
+///
 /// Always dark, regardless of the stored theme choice: that choice is
 /// itself part of the async sequence this screen exists to mask, so there
 /// is nothing else to render it in yet. Discord's own splash does the same.
@@ -42,7 +50,22 @@ class StartupScreen extends StatelessWidget {
       body: Center(
         child: AppFadeIn(
           offset: 0,
-          child: AppBrandMark(size: 56, color: tokens.accent),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppBrandMark(size: 64, color: tokens.accent),
+              const SizedBox(height: AppSpacing.s16),
+              Text(
+                'slim-m',
+                style: AppText.heading.copyWith(
+                  color: tokens.textPrimary,
+                  fontFamily: AppFonts.mono,
+                  fontWeight: AppWeights.medium,
+                  letterSpacing: 20 * AppTracking.mono,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

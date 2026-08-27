@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT subject_kind, subject_id AS \"subject_id!: Uuid\",\n                      channel_id AS \"channel_id: ChannelId\", created_at,\n                      (resolved_at IS NOT NULL) AS \"resolved!: bool\"\n               FROM reports WHERE id = ? AND reporter_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "subject_kind",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "subject_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "channel_id: ChannelId",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "resolved!: bool",
+        "ordinal": 4,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "b8d80d6729c769a2e97096f429a1d1d0b22f225f08aaee87936f8082d4ccbae6"
+}

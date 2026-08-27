@@ -78,6 +78,20 @@ pub struct Report {
     pub resolution: Option<String>,
 }
 
+/// A reporter's own view of one report they filed: enough to know it was
+/// received and whether it has since been closed, and nothing about who
+/// looked at it or what they did about it. See
+/// [`Store::reporter_own_report`] for how this stays scoped to its owner.
+#[derive(Debug, Clone)]
+pub struct ReporterOwnReport {
+    pub id: Uuid,
+    pub subject_kind: String,
+    pub subject_id: Uuid,
+    pub channel_id: Option<ChannelId>,
+    pub created_at: i64,
+    pub resolved: bool,
+}
+
 impl Store {
     /// Files a report for a human to review.
     ///
@@ -300,5 +314,44 @@ impl Store {
         .await?
         .rows_affected();
         Ok(affected > 0)
+    }
+
+    /// A report by id, scoped to the reporter who filed it - `http::reports`'s
+    /// narrow, status-only read for someone checking on their own filing.
+    ///
+    /// Filters on `reporter_id` in the query itself rather than fetching by id
+    /// and checking ownership in Rust afterward, so there is no code path that
+    /// ever holds a row this reporter does not own. `Ok(None)` covers both a
+    /// report that does not exist and one that exists but was filed by someone
+    /// else - the caller must answer both with the same 404, per decision
+    /// 0011's status-code masking rule, and cannot do that correctly unless
+    /// this function has already made the two indistinguishable.
+    ///
+    /// Once the reporter's account is anonymized, `reports.reporter_id` is set
+    /// to NULL (0005's `ON DELETE SET NULL`), so this stops matching on its
+    /// own; there is nobody left to ask for it anyway.
+    pub async fn reporter_own_report(
+        &self,
+        reporter_id: UserId,
+        report_id: Uuid,
+    ) -> anyhow::Result<Option<ReporterOwnReport>> {
+        let row = sqlx::query!(
+            r#"SELECT subject_kind, subject_id AS "subject_id!: Uuid",
+                      channel_id AS "channel_id: ChannelId", created_at,
+                      (resolved_at IS NOT NULL) AS "resolved!: bool"
+               FROM reports WHERE id = ? AND reporter_id = ?"#,
+            report_id,
+            reporter_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| ReporterOwnReport {
+            id: report_id,
+            subject_kind: r.subject_kind,
+            subject_id: r.subject_id,
+            channel_id: r.channel_id,
+            created_at: r.created_at,
+            resolved: r.resolved,
+        }))
     }
 }

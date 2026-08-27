@@ -107,7 +107,7 @@ pub use push::{PushError, PushRegistration, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use removals::{RemoveMemberError, SpaceRemoval};
-pub use reports::{Report, ReportError, ReportSubject};
+pub use reports::{Report, ReportError, ReportSubject, ReporterOwnReport};
 pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};
 pub use safety::Device;
 pub use sessions::{

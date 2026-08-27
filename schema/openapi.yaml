@@ -33,7 +33,7 @@
 openapi: 3.1.0
 info:
   title: slim-m API
-  version: 0.45.2
+  version: 0.46.0 # x-release-please-version
   description: >
     The server surface: liveness, auth with opaque rotating tokens, channel
     management, text messaging with reactions, polls, deletion, and full-text
@@ -966,6 +966,48 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /reports/mine/{reportId}:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        description: The report's UUID.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: myReportStatus
+      tags: [safety]
+      summary: A reporter's own view of a report they filed - whether it is still open.
+      description: >
+        Scoped hard to reports the caller themselves filed: the query itself
+        filters on the caller's own id, not a check applied after the row is
+        fetched. A report id that exists but was filed by someone else
+        answers identically to one that never existed at all - both a plain
+        404 - per docs/decisions/0011-per-channel-permissions.md's
+        status-code masking rule.
+
+
+        Carries only what the reporter already gave when they filed it (what
+        they reported, and when) plus whether it has since been closed.
+        Nothing about which moderator looked at it, what action was taken, or
+        any other reporter's report is ever in this response; see
+        `listOpenReports` and `moderationHistory` for that, both gated on
+        MANAGE_MESSAGES.
+      responses:
+        "200":
+          description: The reporter's own view of the report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyReportStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -5144,6 +5186,36 @@ components:
             since no one holds that permission in a DM. Absent on servers
             older than this field, which a client must treat as unknown
             rather than assuming zero.
+
+    MyReportStatus:
+      type: object
+      required: [id, subject_kind, subject_id, created_at, status]
+      description: >
+        A reporter's own, narrow view of a report they filed, from
+        `myReportStatus`. Deliberately smaller than `Report`: no `reporter_id`
+        (it is always the caller), no `snapshot`, no `subject_author_id`, and
+        no `resolved_by` or the finer `resolved`/`dismissed` resolution label
+        - none of that is the reporter's to see.
+      properties:
+        id:
+          type: string
+          format: uuid
+        subject_kind:
+          type: string
+          enum: [message, user]
+        subject_id:
+          type: string
+          format: uuid
+        channel_id:
+          type: [string, "null"]
+          format: uuid
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds; when the reporter filed it.
+        status:
+          type: string
+          enum: [open, resolved]
 
     ResolveReportRequest:
       type: object

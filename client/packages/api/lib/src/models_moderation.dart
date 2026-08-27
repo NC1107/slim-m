@@ -77,6 +77,46 @@ enum ReportResolution {
   String get wire => name;
 }
 
+/// A reporter's own, narrow view of a report they filed - what
+/// [SlimmApiModeration.myReportStatus] returns.
+///
+/// Deliberately smaller than [Report]: no `reporterId` (it is always the
+/// caller), no `snapshot`, no `subjectAuthorId`, and no moderator identity or
+/// resolution detail. See that method's own doc for why.
+class MyReportStatus {
+  const MyReportStatus({
+    required this.id,
+    required this.subjectKind,
+    required this.subjectId,
+    required this.channelId,
+    required this.createdAt,
+    required this.resolved,
+  });
+
+  final String id;
+  final ReportSubject subjectKind;
+  final String subjectId;
+
+  /// Null for a user report, which has no channel of its own.
+  final String? channelId;
+
+  /// Unix milliseconds; when the reporter filed it.
+  final int createdAt;
+
+  /// Whether a moderator has closed it. Never which one, or what they
+  /// decided - see [MyReportStatus]'s own doc.
+  final bool resolved;
+
+  factory MyReportStatus.fromJson(Map<String, dynamic> json) => MyReportStatus(
+        id: json['id'] as String,
+        subjectKind: ReportSubject.parse(json['subject_kind'] as String),
+        subjectId: json['subject_id'] as String,
+        channelId: json['channel_id'] as String?,
+        createdAt: json['created_at'] as int,
+        resolved: (json['status'] as String) == 'resolved',
+      );
+}
+
 /// An invite code.
 class Invite {
   const Invite({
