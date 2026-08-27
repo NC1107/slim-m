@@ -27,7 +27,6 @@ import 'package:slimm_app/src/widgets/composer_extras.dart';
 import 'package:slimm_app/src/widgets/confirm_dialog.dart';
 import 'package:slimm_app/src/widgets/create_channel_sheet.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
-import 'package:slimm_app/src/widgets/manage_channel_sheet.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
 import 'package:slimm_app/src/widgets/member_roles_sheet.dart';
 import 'package:slimm_app/src/widgets/pinned_messages_sheet.dart';
@@ -108,8 +107,6 @@ final _overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
       promptReportReason(context, subjectLabel: 'this message'),
   'create-channel-sheet': (context, ref) =>
       showCreateChannelSheet(context, initialKind: 'text'),
-  'manage-channel-sheet': (context, ref) =>
-      showManageChannelSheet(context, _localChannel),
   'pinned-messages-sheet': (context, ref) =>
       showPinnedMessagesSheet(context, 'c-general'),
   'poll-composer-sheet': (context, ref) =>

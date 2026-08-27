@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A channel row's context menu: opening it always, and managing it (the
-/// same sheet the menu already opens) only for a caller who holds
-/// MANAGE_CHANNELS.
+/// A channel row's context menu: opening it always, and reaching "Channel
+/// settings..." (name, topic, permissions, delete - `channel_settings_screen.dart`)
+/// only for a caller who holds MANAGE_CHANNELS, MANAGE_ROLES, or both.
 ///
 /// The row's kebab is a third way into this exact menu, alongside a
 /// right-click and a long-press - backlog item 135, "the kebab on a channel
 /// should just expose the context menu; currently outdated code". The kebab
 /// used to call `showManageChannelSheet` directly, so a manager's kebab
 /// skipped straight past "Open channel" and the mute toggles into the sheet,
-/// unlike the identical row's own right-click, and offered no route to
-/// "Channel permissions..." at all. The `'the kebab...'` tests below pin
-/// that it now reaches the same `channelRowMenuItems` build the other two
-/// gestures do.
+/// unlike the identical row's own right-click. The `'the kebab...'` tests
+/// below pin that it now reaches the same `channelRowMenuItems` build the
+/// other two gestures do.
+///
+/// "Manage channel..." and "Channel permissions..." used to be two separate
+/// entries, each gated on its own bit; they are now one "Channel
+/// settings..." entry gated on either bit, which the tests below cover
+/// directly (`'either capability...'` group).
 ///
 /// The trailing group covers the regression `channel_rail_reorder.dart`'s
 /// own doc comment names: with two or more channels a manager's row is also
@@ -33,6 +37,8 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/screens/channel_settings_screen.dart';
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -81,6 +87,16 @@ GoRouter _router(Channel channel, {required bool canManage}) => GoRouter(
       path: '/channels/:channelId',
       builder: (context, state) =>
           Scaffold(body: Text('channel:${state.pathParameters['channelId']}')),
+    ),
+    // A marker, not the real screen: this suite only checks the menu navigated there with the right args.
+    GoRoute(
+      path: Routes.channelSettings,
+      builder: (context, state) {
+        final args = state.extra as ChannelSettingsRouteArgs?;
+        return Scaffold(
+          body: Text('channel-settings:${args?.channel.id}:${args?.wasOpen}'),
+        );
+      },
     ),
   ],
 );
@@ -137,7 +153,7 @@ void _usePhoneWidth(WidgetTester tester) {
 
 void main() {
   testWidgets(
-    'a manager sees both Open channel and Manage channel on a right-click',
+    'a manager sees both Open channel and Channel settings on a right-click',
     (tester) async {
       final channel = _channel('c1', 'general');
       await tester.pumpWidget(_harness(_router(channel, canManage: true)));
@@ -147,7 +163,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Open channel'), findsOneWidget);
-      expect(find.text('Manage channel...'), findsOneWidget);
+      expect(find.text('Channel settings...'), findsOneWidget);
     },
   );
 
@@ -170,43 +186,63 @@ void main() {
     },
   );
 
-  testWidgets('a caller with MANAGE_ROLES also sees Channel permissions', (
-    tester,
-  ) async {
-    final channel = _channel('c1', 'general');
-    await tester.pumpWidget(
-      _harness(
-        _router(channel, canManage: true),
-        overrides: [
-          meProvider.overrideWith((ref) async => me(Perm.manageRoles)),
-        ],
-      ),
-    );
-    await _resolveMe(tester);
+  group('either capability is enough for Channel settings', () {
+    testWidgets('MANAGE_CHANNELS alone shows it, even without MANAGE_ROLES', (
+      tester,
+    ) async {
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(
+        _harness(
+          _router(channel, canManage: true),
+          overrides: [meProvider.overrideWith((ref) async => me(0))],
+        ),
+      );
+      await _resolveMe(tester);
 
-    await _openMenu(tester);
-    await tester.pumpAndSettle();
+      await _openMenu(tester);
+      await tester.pumpAndSettle();
 
-    expect(find.text('Channel permissions...'), findsOneWidget);
-  });
+      expect(find.text('Channel settings...'), findsOneWidget);
+    });
 
-  testWidgets('without MANAGE_ROLES there is no Channel permissions item', (
-    tester,
-  ) async {
-    final channel = _channel('c1', 'general');
-    await tester.pumpWidget(
-      _harness(
-        _router(channel, canManage: true),
-        overrides: [meProvider.overrideWith((ref) async => me(0))],
-      ),
-    );
-    await _resolveMe(tester);
+    testWidgets('MANAGE_ROLES alone shows it, even without MANAGE_CHANNELS', (
+      tester,
+    ) async {
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(
+        _harness(
+          _router(channel, canManage: false),
+          overrides: [
+            meProvider.overrideWith((ref) async => me(Perm.manageRoles)),
+          ],
+        ),
+      );
+      await _resolveMe(tester);
 
-    await _openMenu(tester);
-    await tester.pumpAndSettle();
+      await _openMenu(tester);
+      await tester.pumpAndSettle();
 
-    expect(find.text('Manage channel...'), findsOneWidget);
-    expect(find.text('Channel permissions...'), findsNothing);
+      expect(find.text('Channel settings...'), findsOneWidget);
+    });
+
+    testWidgets('neither capability leaves no Channel settings entry', (
+      tester,
+    ) async {
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(
+        _harness(
+          _router(channel, canManage: false),
+          overrides: [meProvider.overrideWith((ref) async => me(0))],
+        ),
+      );
+      await _resolveMe(tester);
+
+      await _openMenu(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Open channel'), findsOneWidget);
+      expect(find.text('Channel settings...'), findsNothing);
+    });
   });
 
   testWidgets(
@@ -221,30 +257,32 @@ void main() {
 
       expect(find.text('Open channel'), findsOneWidget);
       expect(
-        find.text('Manage channel...'),
+        find.text('Channel settings...'),
         findsNothing,
         reason:
-            'MANAGE_CHANNELS is what gates the kebab; the menu must not '
-            'offer a route around that',
+            'MANAGE_CHANNELS/MANAGE_ROLES is what gates the kebab; the menu '
+            'must not offer a route around that',
       );
     },
   );
 
-  testWidgets('Manage channel opens the same sheet the kebab does', (
-    tester,
-  ) async {
-    final channel = _channel('c1', 'general');
-    await tester.pumpWidget(_harness(_router(channel, canManage: true)));
-    await tester.pump();
+  testWidgets(
+    'Channel settings navigates with the channel and whether it was open',
+    (tester) async {
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(
+        _harness(_router(channel, canManage: true), overrides: []),
+      );
+      await tester.pump();
 
-    await _openMenu(tester);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Manage channel...'));
-    await tester.pumpAndSettle();
+      await _openMenu(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Channel settings...'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Manage channel'), findsOneWidget);
-    expect(find.text('Delete channel'), findsOneWidget);
-  });
+      expect(find.text('channel-settings:c1:false'), findsOneWidget);
+    },
+  );
 
   testWidgets('Open channel navigates to the channel route', (tester) async {
     final channel = _channel('c1', 'general');
@@ -260,8 +298,8 @@ void main() {
   });
 
   testWidgets(
-    'the kebab opens the same menu a right-click does, not the manage sheet '
-    'directly',
+    'the kebab opens the same menu a right-click does, not the settings '
+    'route directly',
     (tester) async {
       _usePhoneWidth(tester);
       final channel = _channel('c1', 'general');
@@ -274,20 +312,20 @@ void main() {
       expect(find.text('Open channel'), findsOneWidget);
       expect(find.text('Mute channel'), findsOneWidget);
       expect(find.text('Mentions only'), findsOneWidget);
-      expect(find.text('Manage channel...'), findsOneWidget);
+      expect(find.text('Channel settings...'), findsOneWidget);
       expect(
-        find.text('Delete channel'),
+        find.textContaining('channel-settings:'),
         findsNothing,
         reason:
             'the kebab must open the menu first, not jump straight into '
-            'the sheet its "Manage channel..." item leads to',
+            'the route its "Channel settings..." item leads to',
       );
     },
   );
 
   testWidgets(
-    'the kebab menu respects the same MANAGE_ROLES gate the right-click '
-    'menu does',
+    'the kebab menu shows Channel settings from MANAGE_CHANNELS alone, even '
+    'without MANAGE_ROLES',
     (tester) async {
       _usePhoneWidth(tester);
       final channel = _channel('c1', 'general');
@@ -302,26 +340,27 @@ void main() {
       await tester.tap(find.byIcon(AppIcons.moreVertical));
       await tester.pumpAndSettle();
 
-      expect(find.text('Manage channel...'), findsOneWidget);
-      expect(find.text('Channel permissions...'), findsNothing);
+      expect(find.text('Channel settings...'), findsOneWidget);
     },
   );
 
-  testWidgets('Manage channel from the kebab menu opens the same sheet the '
-      'right-click menu does', (tester) async {
-    _usePhoneWidth(tester);
-    final channel = _channel('c1', 'general');
-    await tester.pumpWidget(_harness(_router(channel, canManage: true)));
-    await tester.pump();
+  testWidgets(
+    'Channel settings from the kebab menu navigates the same route the '
+    'right-click menu does',
+    (tester) async {
+      _usePhoneWidth(tester);
+      final channel = _channel('c1', 'general');
+      await tester.pumpWidget(_harness(_router(channel, canManage: true)));
+      await tester.pump();
 
-    await tester.tap(find.byIcon(AppIcons.moreVertical));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Manage channel...'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(AppIcons.moreVertical));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Channel settings...'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Manage channel'), findsOneWidget);
-    expect(find.text('Delete channel'), findsOneWidget);
-  });
+      expect(find.text('channel-settings:c1:false'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     "Mute channel from the kebab menu runs the same action the right-click "
@@ -427,7 +466,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Open channel'), findsOneWidget);
-    expect(find.text('Manage channel...'), findsOneWidget);
+    expect(find.text('Channel settings...'), findsOneWidget);
   });
 
   testWidgets(
