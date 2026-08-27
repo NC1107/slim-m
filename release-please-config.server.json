@@ -8,7 +8,13 @@
     "crates/slimm-server": {
       "release-type": "rust",
       "component": "server",
-      "package-name": "slimm-server"
+      "package-name": "slimm-server",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "../../schema/openapi.yaml"
+        }
+      ]
     }
   }
 }
