@@ -36,10 +36,16 @@ import 'package:slimm_platform/platform.dart' show isDesktopHost;
 /// the screen still read as a flicker rather than a splash (owner, after
 /// running it).
 ///
-/// Twice that lands it where a splash is legible without becoming a toll on
-/// every launch. It stays a floor, never an added delay: a bootstrap slower
-/// than this is still the only thing anyone waits on.
-const Duration minSplashDuration = Duration(milliseconds: 560);
+/// Doubled to 560ms next, which still was not enough (owner, again, after a
+/// second real run) - the mark alone, adrift in a full desktop window, gave
+/// the eye nothing to land on before it was gone. [StartupScreen] now pairs
+/// the mark with the wordmark so there is a real composition to register,
+/// and this floor moves again, to 900ms: past the 560ms result that still
+/// read as a glitch, short of a second doubling that would tax every warm
+/// launch for a screen that only needs to be *seen*, not read. It stays a
+/// floor, never an added delay: a bootstrap slower than this is still the
+/// only thing anyone waits on.
+const Duration minSplashDuration = Duration(milliseconds: 900);
 
 /// Runs [bootstrap] to completion, and on [desktop] also waits out
 /// [minSplashDuration] - whichever finishes later.
