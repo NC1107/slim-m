@@ -23,6 +23,9 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+/// Camera on: an avatar-only tile has no lock control at all for this suite
+/// to reveal - see `canvas_presence_tile_kind_test.dart`'s own coverage of
+/// that.
 const _noor = VoiceParticipant(
   identity: 'user-noor',
   name: 'Noor',
@@ -30,6 +33,7 @@ const _noor = VoiceParticipant(
   isMuted: false,
   isLocal: false,
   isScreenSharing: false,
+  isCameraOn: true,
 );
 
 Widget _wrapLayer(Widget child) => ProviderScope(

@@ -36,6 +36,8 @@ class _NoFetchBlocks extends BlocksController {
   Future<void> refresh() async {}
 }
 
+/// Camera on: this suite drives the depth control, which an avatar-only
+/// tile no longer exposes - see `canvas_presence_tile_kind_test.dart`.
 const _here = VoiceParticipant(
   identity: 'user-noor',
   name: 'Noor',
@@ -43,6 +45,7 @@ const _here = VoiceParticipant(
   isMuted: false,
   isLocal: false,
   isScreenSharing: false,
+  isCameraOn: true,
 );
 
 /// Sends Noor's tile to the back through its own corner control, the same

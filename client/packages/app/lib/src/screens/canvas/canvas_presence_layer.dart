@@ -99,9 +99,11 @@ export 'canvas_presence_geometry.dart'
     show CameraViewBuilder, ScreenShareViewBuilder;
 
 /// Every call participant's tiles, world-anchored and individually
-/// draggable, resizable, lockable and hideable through [overrides]. Renders
-/// nothing when [participants] is empty, so a canvas opened on a channel
-/// with no active call pays for none of this.
+/// draggable, resizable, lockable and hideable through [overrides] - except
+/// an avatar-only tile (camera off, no screen share), which only gets the
+/// drag and the hide; see `canvas_presence_tile.dart`'s own doc on
+/// `fixedRenderSize`. Renders nothing when [participants] is empty, so a
+/// canvas opened on a channel with no active call pays for none of this.
 class CanvasPresenceLayer extends StatefulWidget {
   const CanvasPresenceLayer({
     super.key,
@@ -246,7 +248,7 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     final painted = presencePaintOrder(
       visibleIds,
       widget.overrides.zFor,
-      widget.overrides.sentToBackFor,
+      (key) => presenceEffectiveSentToBack(key, widget.overrides, byIdentity),
     );
     return Stack(
       clipBehavior: Clip.none,
@@ -324,9 +326,15 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
     final identity = presenceTileIdentity(key);
     final participant = byIdentity[identity];
     if (participant == null) return null;
+    final avatarOnly = presenceTileIsAvatarOnly(key, byIdentity);
     final state = widget.overrides.stateFor(key);
-    final locked = state.locked;
-    final sentToBack = state.sentToBack;
+    // Forced false, never the raw override, for an avatar-only tile - see canvas_presence_geometry.dart's own doc on presenceEffectiveSentToBack for why a stale value from before this camera turned off must not resurface here.
+    final locked = !avatarOnly && state.locked;
+    final sentToBack = presenceEffectiveSentToBack(
+      key,
+      widget.overrides,
+      byIdentity,
+    );
     // Never null: the override's own rect once set, this build's resolved default otherwise.
     void commit() =>
         widget.onCommit(key, widget.overrides.stateFor(key).rect ?? rect);
@@ -336,17 +344,22 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       camera: camera,
       locked: locked,
       sentToBack: sentToBack,
+      fixedRenderSize: avatarOnly ? canvasAvatarMarkerSize : null,
       document: widget.document,
       onRectChanged: (next) => widget.overrides.setRect(key, next),
       onRectCommitted: commit,
-      onToggleLocked: () {
-        widget.overrides.setLocked(key, !locked);
-        commit();
-      },
-      onToggleSentToBack: () {
-        widget.overrides.setSentToBack(key, !sentToBack);
-        commit();
-      },
+      onToggleLocked: avatarOnly
+          ? null
+          : () {
+              widget.overrides.setLocked(key, !locked);
+              commit();
+            },
+      onToggleSentToBack: avatarOnly
+          ? null
+          : () {
+              widget.overrides.setSentToBack(key, !sentToBack);
+              commit();
+            },
       onHide: () => widget.overrides.setHidden(key, true),
       // A camera tile showing the avatar fallback has no feed to fill a screen with; a screen-share tile always does, since its key only exists while the share is up.
       onExpand: isScreen || participant.isCameraOn

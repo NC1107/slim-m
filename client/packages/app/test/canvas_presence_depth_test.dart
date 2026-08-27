@@ -31,6 +31,10 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
+/// Camera on: depth is a video-tile verb - an avatar-only tile forces
+/// `sentToBack` to `false` regardless of what overrides says, so this suite
+/// needs a real video tile to exercise the toggle at all. See
+/// `canvas_presence_tile_kind_test.dart` for the avatar side of that.
 const _noor = VoiceParticipant(
   identity: 'user-noor',
   name: 'Noor',
@@ -38,6 +42,7 @@ const _noor = VoiceParticipant(
   isMuted: false,
   isLocal: false,
   isScreenSharing: false,
+  isCameraOn: true,
 );
 
 Widget _wrapLayer(Widget child) => ProviderScope(
