@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The Space analytics screen: the toggle, the off notice, and that the
 /// headline numbers are visible text rather than only pixels in a chart.
+///
+/// Retention, the canvas object cap and the screen-share resolution ceiling
+/// used to live on this same screen and so used to be exercised here; they
+/// moved to their own Space performance screen (`performance_screen_test.dart`
+/// and its own two split-out section tests), which is why this file no
+/// longer answers `/space/retention`, `/space/canvas-cap` or
+/// `/space/screen-share`.
 library;
 
 import 'dart:async';
@@ -66,25 +73,6 @@ ProviderContainer _containerFor(MockClient client) {
   return container;
 }
 
-/// [_RetentionSection] fires its own `GET /space/retention` alongside every
-/// analytics fetch, so every mock client below has to answer it too, or the
-/// analytics-shaped body it would otherwise fall through to has no
-/// `retention_days` key and the parse throws.
-http.Response _retentionResponse() => http.Response(
-  jsonEncode({'retention_days': 0}),
-  200,
-  headers: {'content-type': 'application/json'},
-);
-
-/// [_CanvasCapSection] fires its own `GET /space/canvas-cap` on mount, for the
-/// same reason [_retentionResponse] exists: the analytics body it would fall
-/// through to has no `object_cap` key and the parse would throw.
-http.Response _canvasCapResponse() => http.Response(
-  jsonEncode({'object_cap': 20000}),
-  200,
-  headers: {'content-type': 'application/json'},
-);
-
 Widget _app(ProviderContainer container) => UncontrolledProviderScope(
   container: container,
   child: MaterialApp(
@@ -98,8 +86,6 @@ void main() {
     tester,
   ) async {
     final client = MockClient((request) async {
-      if (request.url.path == '/space/retention') return _retentionResponse();
-      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       return http.Response(
         jsonEncode({'enabled': false}),
         200,
@@ -124,8 +110,6 @@ void main() {
     final patchedBodies = <Map<String, dynamic>>[];
 
     final client = MockClient((request) async {
-      if (request.url.path == '/space/retention') return _retentionResponse();
-      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       if (request.method == 'PATCH') {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         patchedBodies.add(body);
@@ -159,12 +143,6 @@ void main() {
       final gate = Completer<void>();
       var enabled = false;
       final client = MockClient((request) async {
-        if (request.url.path == '/space/retention') {
-          return _retentionResponse();
-        }
-        if (request.url.path == '/space/canvas-cap') {
-          return _canvasCapResponse();
-        }
         if (request.method == 'PATCH') {
           await gate.future;
           enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
@@ -202,8 +180,6 @@ void main() {
     // Gated so the refusal cannot land inside the tap's own microtasks.
     final gate = Completer<void>();
     final client = MockClient((request) async {
-      if (request.url.path == '/space/retention') return _retentionResponse();
-      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       if (request.method == 'PATCH') {
         await gate.future;
         return http.Response('', 500);
@@ -234,8 +210,6 @@ void main() {
   testWidgets('a successful write flashes a transient Saved', (tester) async {
     var enabled = false;
     final client = MockClient((request) async {
-      if (request.url.path == '/space/retention') return _retentionResponse();
-      if (request.url.path == '/space/canvas-cap') return _canvasCapResponse();
       if (request.method == 'PATCH') {
         enabled = (jsonDecode(request.body) as Map)['enabled'] as bool;
       }
@@ -266,12 +240,6 @@ void main() {
     'an enabled deployment shows the numbers as text, not only a chart',
     (tester) async {
       final client = MockClient((request) async {
-        if (request.url.path == '/space/retention') {
-          return _retentionResponse();
-        }
-        if (request.url.path == '/space/canvas-cap') {
-          return _canvasCapResponse();
-        }
         return http.Response(
           jsonEncode(_enabledBody),
           200,
@@ -305,12 +273,6 @@ void main() {
     (tester) async {
       var requests = 0;
       final client = MockClient((request) async {
-        if (request.url.path == '/space/retention') {
-          return _retentionResponse();
-        }
-        if (request.url.path == '/space/canvas-cap') {
-          return _canvasCapResponse();
-        }
         requests++;
         // First answer succeeds; the retry (second GET) fails.
         if (requests > 1) return http.Response('', 500);
@@ -341,12 +303,6 @@ void main() {
     'never inside the aggregate stats',
     (tester) async {
       final client = MockClient((request) async {
-        if (request.url.path == '/space/retention') {
-          return _retentionResponse();
-        }
-        if (request.url.path == '/space/canvas-cap') {
-          return _canvasCapResponse();
-        }
         if (request.url.path == '/users') {
           return http.Response(
             jsonEncode([
@@ -390,12 +346,6 @@ void main() {
     'no attachment uploader shows the empty notice, not a blank card',
     (tester) async {
       final client = MockClient((request) async {
-        if (request.url.path == '/space/retention') {
-          return _retentionResponse();
-        }
-        if (request.url.path == '/space/canvas-cap') {
-          return _canvasCapResponse();
-        }
         return http.Response(
           jsonEncode(_enabledBody),
           200,
@@ -413,50 +363,6 @@ void main() {
         find.text('Nobody has uploaded an attachment yet.'),
         findsOneWidget,
       );
-    },
-  );
-
-  testWidgets(
-    'the retention section stays visible while analytics itself is off, '
-    'and tapping an option patches the window',
-    (tester) async {
-      var retentionDays = 0;
-      final patchedRetention = <int>[];
-      final client = MockClient((request) async {
-        if (request.url.path == '/space/canvas-cap') {
-          return _canvasCapResponse();
-        }
-        if (request.url.path == '/space/retention') {
-          if (request.method == 'PATCH') {
-            final body = jsonDecode(request.body) as Map<String, dynamic>;
-            retentionDays = body['retention_days'] as int;
-            patchedRetention.add(retentionDays);
-          }
-          return http.Response(
-            jsonEncode({'retention_days': retentionDays}),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }
-        return http.Response(
-          jsonEncode({'enabled': false}),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      });
-      final container = _containerFor(client);
-      addTearDown(container.dispose);
-
-      await tester.pumpWidget(_app(container));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Message retention'), findsOneWidget);
-      expect(find.textContaining('Analytics is off'), findsOneWidget);
-
-      await tester.tap(find.text('30 days'));
-      await tester.pumpAndSettle();
-
-      expect(patchedRetention, [30]);
     },
   );
 }

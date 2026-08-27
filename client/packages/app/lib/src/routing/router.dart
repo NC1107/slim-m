@@ -18,6 +18,7 @@ import 'package:slimm_data/data.dart' show Channel;
 import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
+import '../screens/admin/performance_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/roles_screen.dart';
@@ -157,6 +158,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminAnalytics,
         pageBuilder: (context, state) =>
             modalPage(context, const AnalyticsScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminPerformance,
+        pageBuilder: (context, state) =>
+            modalPage(context, const PerformanceScreen()),
       ),
       GoRoute(
         path: Routes.debugLog,

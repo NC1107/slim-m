@@ -20,6 +20,7 @@ abstract final class Routes {
   static const adminCategories = '/settings/categories';
   static const adminEmoji = '/settings/emoji';
   static const adminAnalytics = '/settings/analytics';
+  static const adminPerformance = '/settings/performance';
   static const debugLog = '/settings/debug-log';
 
   /// The messages of one channel.

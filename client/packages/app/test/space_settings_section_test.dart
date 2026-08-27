@@ -118,6 +118,7 @@ void main() {
       'Channel permissions',
       'Channel categories',
       'Emoji',
+      'Performance',
       'Analytics',
     ]) {
       expect(find.text(label), findsWidgets, reason: '$label missing');
