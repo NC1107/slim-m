@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.55.0](https://github.com/NC1107/slim-m/compare/client-v0.54.1...client-v0.55.0) (2026-08-27)
+
+
+### Features
+
+* **client:** clear status in one click, edit inline on desktop ([#903](https://github.com/NC1107/slim-m/issues/903)) ([884903c](https://github.com/NC1107/slim-m/commit/884903c94ee88d9f6415b8bd9078598c0f007d5d))
+* **client:** give the desktop startup screen a minimum visible duration ([#901](https://github.com/NC1107/slim-m/issues/901)) ([559457c](https://github.com/NC1107/slim-m/commit/559457c3179051c0cf56653c6e6a1e487d46b77b))
+
+
+### Bug Fixes
+
+* **client:** stop a hang-up made while the canvas is open from rejoining the call ([#902](https://github.com/NC1107/slim-m/issues/902)) ([624bdb3](https://github.com/NC1107/slim-m/commit/624bdb3b4472517975f29ab4adbc2a66417222ba))
+
 ## [0.54.1](https://github.com/NC1107/slim-m/compare/client-v0.54.0...client-v0.54.1) (2026-08-26)
 
 
