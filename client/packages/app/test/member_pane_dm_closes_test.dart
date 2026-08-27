@@ -27,8 +27,9 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
 import 'package:slimm_data/data.dart';
-import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+
+import 'support/reduced_motion_harness.dart';
 
 const _tokens = api.TokenPair(
   userId: 'me',
@@ -155,18 +156,10 @@ Future<ScaffoldState> _openDrawer(
   ProviderContainer container,
 ) async {
   await tester.pumpWidget(
-    UncontrolledProviderScope(
+    reducedMotionRouterApp(
       container: container,
-      child: MediaQuery(
-        data: const MediaQueryData(
-          size: Size(390, 844),
-          disableAnimations: true,
-        ),
-        child: MaterialApp.router(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          routerConfig: _testRouter(),
-        ),
-      ),
+      router: _testRouter(),
+      size: const Size(390, 844),
     ),
   );
   await tester.pumpAndSettle();

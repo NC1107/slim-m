@@ -49,6 +49,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/reduced_motion_harness.dart';
+
 const _tokens = api.TokenPair(
   userId: 'me',
   accessToken: 'access',
@@ -160,16 +162,7 @@ GoRouter _testRouter() => GoRouter(
 /// gamble a fast fake server could win by luck.
 Future<void> _open(WidgetTester tester, ProviderContainer container) async {
   await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: MediaQuery(
-        data: const MediaQueryData(disableAnimations: true),
-        child: MaterialApp.router(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          routerConfig: _testRouter(),
-        ),
-      ),
-    ),
+    reducedMotionRouterApp(container: container, router: _testRouter()),
   );
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
