@@ -106,7 +106,11 @@ class CameraSwitching {
   /// indistinguishable to whatever camera the OS opens by default.
   bool get needsSelection => !lk.lkPlatformIsMobile();
 
-  Future<List<CameraDevice>> devices() => _devices.list();
+  /// The cameras this platform offers, collapsed to one entry per physical
+  /// device; see [dedupeCameraDevices] for why the raw enumeration cannot be
+  /// trusted as-is.
+  Future<List<CameraDevice>> devices() async =>
+      dedupeCameraDevices(await _devices.list());
 
   /// Enables or disables [local]'s camera, classifying the failure when
   /// enabling does not work.
