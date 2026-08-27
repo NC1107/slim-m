@@ -335,6 +335,13 @@ jobs:
       - name: no migration collides or changes under a deployed database
         run: python3 scripts/check-migration-versions.py
 
+      # The unscoped MediaQuery.of(context) rebuilds on every MediaQueryData
+      # field; a 2026-08 audit found a dozen keyboard-avoidance call sites
+      # copy-pasted with it instead of the scoped accessor. See the script
+      # header and scripts/media-query-of-allow.txt.
+      - name: no unscoped MediaQuery.of(context) outside the allowlist
+        run: python3 scripts/check-media-query-scope.py
+
       # CLAUDE.md sends reviewers to docs/ci.md as the authoritative workflow
       # list, and an undocumented workflow is invisible there rather than
       # wrong-looking. See the script header.

@@ -127,7 +127,7 @@ class _ManageCategorySheetState extends ConsumerState<_ManageCategorySheet> {
         AppSpacing.s16,
         0,
         AppSpacing.s16,
-        MediaQuery.of(context).viewInsets.bottom + AppSpacing.s16,
+        MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
       child: SingleChildScrollView(
         child: Column(

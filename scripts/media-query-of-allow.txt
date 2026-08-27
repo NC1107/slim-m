@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Files allowed to call the unscoped `MediaQuery.of(context)` rather than a
+# scoped accessor (`MediaQuery.sizeOf`, `MediaQuery.viewInsetsOf`, and so on).
+# One path per line, relative to the repo root, with a one-line why.
+#
+# The scoped accessors exist precisely so a widget rebuilds only when the
+# one field it reads changes; `MediaQuery.of(context)` subscribes to every
+# field (text scale, brightness, padding, orientation, ...). Every entry
+# here needs the whole `MediaQueryData`, not just one field of it - usually
+# to `copyWith` an override on top of the ambient value - so there is no
+# narrower accessor that would do.
+
+client/packages/app/lib/main.dart # overrideMotion copies the ambient MediaQueryData with one field replaced; it needs the whole object to copy.
+client/packages/app/test/app_snackbar_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
+client/packages/app/test/member_profile_sheet_motion_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
+client/packages/design_system/test/components/sheet_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
+client/packages/design_system/test/components/surfaces_test.dart # test harness copies the ambient MediaQueryData with textScaler overridden.

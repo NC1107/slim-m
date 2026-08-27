@@ -127,57 +127,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+
+from dart_source import strip_block_comments  # noqa: E402
+
 EXCEPTIONS: dict[tuple[str, int], str] = {}
 
 EXCEPTIONS_SOURCE = "client/packages/api/lib/src/exceptions.dart"
 # Falls back to this alone when EXCEPTIONS_SOURCE is unreadable, e.g. a test's own synthetic repo.
 FALLBACK_EXCEPTION_NAMES = ("ApiException",)
-
-def strip_block_comments(text: str) -> str:
-    """Blanks `/* ... */` regions to spaces, keeping every line and column
-    where it was so line numbers downstream stay accurate.
-
-    String-aware: a `/*` or `*/` inside a `'...'` or `"..."` literal (like
-    `message_code_langs.dart`'s own `blockComment: ('/*', '*/')` tuple) is
-    left alone rather than misread as a comment boundary, which would blank
-    real code sitting between two such string literals.
-    """
-    out: list[str] = []
-    i, n = 0, len(text)
-    quote: str | None = None
-    while i < n:
-        c = text[i]
-        if quote:
-            out.append(c)
-            if c == "\\" and i + 1 < n:
-                out.append(text[i + 1])
-                i += 2
-                continue
-            if c == quote:
-                quote = None
-            i += 1
-            continue
-        if c in "'\"":
-            quote = c
-            out.append(c)
-            i += 1
-            continue
-        if text[i : i + 2] == "//":
-            end = text.find("\n", i)
-            end = n if end == -1 else end
-            out.append(text[i:end])
-            i = end
-            continue
-        if text[i : i + 2] == "/*":
-            end = text.find("*/", i + 2)
-            end = n if end == -1 else end + 2
-            out.append("".join("\n" if ch == "\n" else " " for ch in text[i:end]))
-            i = end
-            continue
-        out.append(c)
-        i += 1
-    return "".join(out)
-
 
 BARE_CATCH_HEADER = re.compile(
     r"^(?P<indent>[ \t]*)(?:\}[ \t]*)?catch[ \t]*\([^)]*\)[ \t]*\{[ \t]*$"

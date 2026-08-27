@@ -86,7 +86,7 @@ Future<void> _sheet(
       padding: EdgeInsets.only(
         left: _sheetInset,
         right: _sheetInset,
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
       ),
       // Inside the keyboard inset, cancelling the route's own top padding.
       child: SafeArea(
