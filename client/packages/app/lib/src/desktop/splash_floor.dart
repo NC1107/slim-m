@@ -27,13 +27,19 @@ import 'package:slimm_platform/platform.dart' show isDesktopHost;
 /// [awaitBootstrapWithSplashFloor] lets readiness flip, even when bootstrap
 /// itself finishes sooner.
 ///
-/// Reuses [AppMotion.slow] rather than a new constant: it is already this
-/// design language's own ceiling ("nothing in the chrome runs longer than
-/// 280ms", `docs/design/design-language.md`), so the splash floor never asks
-/// for more patience than the app already asks elsewhere - long enough on a
-/// warm start to register as a deliberate screen, short enough that a cold
-/// start already slower than it never feels padded on top.
-const Duration minSplashDuration = AppMotion.slow;
+/// Deliberately its own value rather than an [AppMotion] token. This first
+/// shipped as [AppMotion.slow] on the reasoning that the floor should never
+/// ask for more patience than the chrome's own 280ms ceiling - but that
+/// ceiling governs how long a thing may take to *move*, and this governs how
+/// long a finished screen simply *sits there*. A dwell is not an animation,
+/// so borrowing the animation ceiling was the wrong yardstick, and at 280ms
+/// the screen still read as a flicker rather than a splash (owner, after
+/// running it).
+///
+/// Twice that lands it where a splash is legible without becoming a toll on
+/// every launch. It stays a floor, never an added delay: a bootstrap slower
+/// than this is still the only thing anyone waits on.
+const Duration minSplashDuration = Duration(milliseconds: 560);
 
 /// Runs [bootstrap] to completion, and on [desktop] also waits out
 /// [minSplashDuration] - whichever finishes later.
