@@ -103,12 +103,14 @@ void main() {
     'the toggle folds into its own row, rather than overflowing the first '
     'one, once the camera is on at the narrowest supported width',
     (tester) async {
+      // A bare-flip platform: this test is about the row's fold width, not the picker platform's async device count.
       await pumpVoiceCallDock(
         tester,
         _connectedWithCamera,
         canvasChannelId: 'c1',
         width: 320,
         touch: true,
+        session: InertSession()..canFlipCamera = true,
       );
 
       expect(

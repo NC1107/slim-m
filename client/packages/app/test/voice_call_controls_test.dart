@@ -269,15 +269,62 @@ void main() {
     await pumpControls(
       tester,
       const VoiceState(state: VoiceSessionState.connected),
+      session: InertSession()..canFlipCamera = true,
     );
     expect(find.byTooltip('Switch camera'), findsNothing);
 
     await pumpControls(
       tester,
       const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      session: InertSession()..canFlipCamera = true,
     );
     expect(find.byTooltip('Switch camera'), findsOneWidget);
   });
+
+  testWidgets(
+    'the switch-camera control stays hidden on a picker platform with '
+    'only one camera',
+    (tester) async {
+      final session = InertSession()
+        ..cameraNeedsSelection = true
+        ..cameraDeviceList = const [
+          CameraDevice(id: 'cam-1', label: 'Built-in webcam'),
+        ];
+      await pumpControls(
+        tester,
+        const VoiceState(
+          state: VoiceSessionState.connected,
+          cameraEnabled: true,
+        ),
+        session: session,
+      );
+
+      expect(find.byTooltip('Switch camera'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the switch-camera control appears on a picker platform with more '
+    'than one camera',
+    (tester) async {
+      final session = InertSession()
+        ..cameraNeedsSelection = true
+        ..cameraDeviceList = const [
+          CameraDevice(id: 'cam-1', label: 'Built-in webcam'),
+          CameraDevice(id: 'cam-2', label: 'USB webcam'),
+        ];
+      await pumpControls(
+        tester,
+        const VoiceState(
+          state: VoiceSessionState.connected,
+          cameraEnabled: true,
+        ),
+        session: session,
+      );
+
+      expect(find.byTooltip('Switch camera'), findsOneWidget);
+    },
+  );
 
   testWidgets('switching cameras flips directly on a platform with no picker', (
     tester,
@@ -322,5 +369,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(session.cameraSwitchCalls, ['select:cam-2']);
+  });
+
+  testWidgets('switching cameras selects the only device directly rather than '
+      'opening a picker for a single entry', (tester) async {
+    final session = InertSession()
+      ..cameraNeedsSelection = true
+      ..cameraDeviceList = const [
+        CameraDevice(id: 'cam-1', label: 'Built-in webcam'),
+        CameraDevice(id: 'cam-2', label: 'USB webcam'),
+      ];
+    await pumpControls(
+      tester,
+      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      session: session,
+    );
+    expect(find.byTooltip('Switch camera'), findsOneWidget);
+
+    // A camera unplugged mid-call: the button still reflects the count at mount, but the next enumeration finds only one.
+    session.cameraDeviceList = const [
+      CameraDevice(id: 'cam-1', label: 'Built-in webcam'),
+    ];
+    await tester.tap(find.byTooltip('Switch camera'));
+    await tester.pumpAndSettle();
+
+    expect(session.cameraSwitchCalls, ['select:cam-1']);
+    expect(find.text('Choose a camera'), findsNothing);
   });
 }

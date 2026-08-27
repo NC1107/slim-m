@@ -114,11 +114,17 @@ class VoiceParticipant {
 /// necessary. Mobile never lists these: the OS owns which camera answers
 /// "the camera", and flipping it is [VoiceSession.flipCamera]'s job.
 class CameraDevice {
-  const CameraDevice({required this.id, required this.label});
+  const CameraDevice({required this.id, required this.label, this.groupId});
 
   /// Opaque to us, and the only thing a device switch matches on.
   final String id;
 
   /// The platform's own device label.
   final String label;
+
+  /// The platform's own grouping of devices that share one piece of
+  /// hardware, when it reports one at all; see `dedupeCameraDevices`. Null
+  /// on a platform that never populates it for cameras, this app's own
+  /// desktop backend included.
+  final String? groupId;
 }

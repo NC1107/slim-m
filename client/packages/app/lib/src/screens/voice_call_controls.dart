@@ -12,7 +12,10 @@
 /// Switching cameras once one is on is a bare flip on mobile
 /// (`VoiceController.flipCamera`, no device list to show) and a picker on
 /// desktop (`camera_source_sheet.dart`), the same fork `screenShareNeedsSource`
-/// already draws for sharing.
+/// already draws for sharing. The switch button itself only shows on a
+/// picker platform once `cameraDevices()` has resolved to more than one
+/// deduplicated entry, so a desktop with one physical webcam that happens to
+/// enumerate several V4L2 nodes never offers a choice there is none of.
 ///
 /// This widget is a bare row now, not a bar: it used to paint its own
 /// full-width, edge-anchored strip, which is exactly what made opening the
@@ -73,6 +76,34 @@ class _CallControlsState extends ConsumerState<CallControls> {
   /// The same guard as [_shareRequestInFlight], for [_switchCamera].
   bool _cameraSwitchInFlight = false;
 
+  /// The deduplicated camera count a picker platform found on mount, once
+  /// [_loadCameraCount] resolves; unused on a platform that flips instead
+  /// (see [_canSwitchCamera]). Null until then, which reads as "cannot
+  /// switch" rather than flashing the button on and immediately off: a
+  /// picker platform is exactly the one where duplicate device nodes
+  /// (`camera_devices.dart`'s `dedupeCameraDevices`) made an unresolved
+  /// count worse than a briefly-late one.
+  int? _desktopCameraCount;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.controller.canFlipCamera) unawaited(_loadCameraCount());
+  }
+
+  Future<void> _loadCameraCount() async {
+    final devices = await widget.controller.cameraDevices();
+    if (!mounted) return;
+    setState(() => _desktopCameraCount = devices.length);
+  }
+
+  /// Whether there is actually another camera to switch to: a bare flip
+  /// needs no device list, since mobile's own OS decides "front" or "back";
+  /// a picker platform needs its enumerated, deduplicated count above one,
+  /// or the button offers a choice that does not exist.
+  bool get _canSwitchCamera =>
+      widget.controller.canFlipCamera || (_desktopCameraCount ?? 0) > 1;
+
   @override
   Widget build(BuildContext context) {
     final voice = widget.voice;
@@ -95,7 +126,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
           active: voice.cameraEnabled,
           onPressed: () => unawaited(widget.controller.toggleCamera()),
         ),
-        if (voice.cameraEnabled) ...[
+        if (voice.cameraEnabled && _canSwitchCamera) ...[
           const SizedBox(width: AppSpacing.s8),
           CallDockButton(
             icon: AppIcons.switchCamera,
@@ -215,6 +246,11 @@ class _CallControlsState extends ConsumerState<CallControls> {
       final devices = await controller.cameraDevices();
       if (devices.isEmpty) return;
       if (!context.mounted) return;
+      // A single-entry list has nothing to choose between, mirroring _share.
+      if (devices.length == 1) {
+        await controller.selectCameraDevice(devices.first);
+        return;
+      }
       final chosen = await showCameraDeviceSheet(context, devices);
       if (chosen == null) return;
       await controller.selectCameraDevice(chosen);
