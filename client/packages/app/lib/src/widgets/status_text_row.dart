@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/member_presence.dart' show memberProfileOverridesProvider;
 import '../providers/providers.dart';
 import 'run_guarded.dart';
 
@@ -77,10 +78,11 @@ class _StatusTextFieldState extends ConsumerState<_StatusTextField>
     final ok = await guard(
       whatFailed: 'update your status',
       action: () async {
-        await ref
+        final profile = await ref
             .read(apiProvider)
             .updateMe(statusText: _controller.text.trim());
         ref.invalidate(meProvider);
+        ref.read(memberProfileOverridesProvider.notifier).applyKnown(profile);
       },
     );
     // A failure leaves the field as typed; a success gets its reconciliation from [meProvider] resolving, not from here.
