@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The small-splash-then-handoff sequence added by decision 0012's
-/// superseding section: [DesktopWindowShell.applyInitialGeometry] puts the
-/// window into the fixed splash shape before the very first frame, and
+/// superseding section: [DesktopWindowShell.applyInitialGeometry] sizes and
+/// centers the window before the very first frame, [DesktopWindowShell.lockSplashChrome]
+/// disables resize and hides the Linux title bar once that frame is up, and
 /// [DesktopWindowShell.prepareHandoff]/[DesktopWindowShell.revealAfterHandoff]
-/// swap it to the real saved geometry once bootstrap finishes - all driven
-/// against a fake port, per decision 0012's own rule that this class of
-/// logic stays automatable with no real display involved.
+/// swap the window to the real saved geometry once bootstrap finishes - all
+/// driven against a fake port, per decision 0012's own rule that this class
+/// of logic stays automatable with no real display involved.
+///
+/// [applyInitialGeometry] and [lockSplashChrome] are deliberately two
+/// methods, not one, and this file tests them separately for that reason:
+/// an Xvfb+fluxbox reproduction showed the window mapping at the native
+/// 1280x720 default instead of the splash size when resizing-off and the
+/// title bar hide ran before the window was ever shown - see both methods'
+/// own doc comments and `main.dart`'s.
 library;
 
 import 'dart:convert';
@@ -30,7 +38,7 @@ void main() {
   tearDown(DesktopWindowShell.debugReset);
 
   testWidgets('applyInitialGeometry sizes and centers the window at the '
-      'fixed splash size, locks resizing, and hides the Linux title bar', (
+      'fixed splash size, and touches neither resizing nor the title bar', (
     tester,
   ) async {
     final port = FakeDesktopWindowPort();
@@ -40,6 +48,18 @@ void main() {
 
     expect(port.lastSize, DesktopWindowShell.splashWindowSize);
     expect(port.centerCalls, 1);
+    expect(port.lastResizable, isNull);
+    expect(port.hideTitleBarCalls, 0);
+    expect(DesktopWindowShell.frameless, isFalse);
+  });
+
+  testWidgets('lockSplashChrome locks resizing and hides the Linux title '
+      'bar, once the splash is already up', (tester) async {
+    final port = FakeDesktopWindowPort();
+    DesktopWindowShell.debugPort = port;
+
+    await DesktopWindowShell.lockSplashChrome();
+
     expect(port.lastResizable, isFalse);
     expect(port.hideTitleBarCalls, 1);
     expect(DesktopWindowShell.frameless, isTrue);

@@ -106,18 +106,18 @@ class DesktopWindowShell {
   static bool get active => _active;
 
   /// True only once the native frame has actually been hidden - on Linux,
-  /// set by [applyInitialGeometry] itself, before the splash's own first
-  /// frame, so there is no native frame to see even during the splash. Stays
-  /// true (or false, on a failure) for the rest of the run: nothing resets
-  /// it back at handoff, since the splash and the ready app share the one
-  /// real window and its one frame state throughout.
+  /// set by [lockSplashChrome], right after the splash's own first frame is
+  /// confirmed rasterized, so the splash reads as frameless for all but that
+  /// first instant. Stays true (or false, on a failure) for the rest of the
+  /// run: nothing resets it back at handoff, since the splash and the ready
+  /// app share the one real window and its one frame state throughout.
   static bool get frameless => _framelessApplied;
 
   /// The close button drawn inside [TitleBar] has no native close event of
   /// its own to reach [DesktopWindowController.requestClose] through, so it
   /// calls this instead - a no-op if the shell was never started. [frameless]
   /// no longer guarantees this is non-null the way it once did: it is now set
-  /// during [applyInitialGeometry], before [registerListenersAndTray] ever
+  /// during [lockSplashChrome], before [registerListenersAndTray] ever
   /// creates the controller, so a native/tray failure in between can leave
   /// the window frameless with a close button that does nothing. `Ctrl+Q`
   /// (`desktop_quit_shortcut.dart`) is the deliberate, unconditional
@@ -131,6 +131,9 @@ class DesktopWindowShell {
   /// The real, saved geometry is not read here at all: it is applied later,
   /// by [prepareHandoff], once bootstrap actually finishes.
   ///
+  /// Only size and centering happen here - see [lockSplashChrome] for why
+  /// resizing-off and the Linux title bar deliberately do not.
+  ///
   /// Bounded by [_setupTimeout] and never throws, for the same reason
   /// [registerListenersAndTray] is not allowed to: this runs before `runApp`,
   /// so a native window or display call that hangs (a portal or compositor
@@ -141,22 +144,48 @@ class DesktopWindowShell {
   /// [ProviderContainer] exists this early, so the breadcrumb goes to
   /// [debugPrint] rather than the app log this file uses elsewhere.
   static Future<void> applyInitialGeometry() async {
-    final platform = currentDesktopPlatform();
-    if (platform == null) return;
+    if (currentDesktopPlatform() == null) return;
     try {
-      await _applySplashGeometry(platform).timeout(_setupTimeout);
+      await _applySplashGeometry().timeout(_setupTimeout);
     } catch (error) {
       debugPrint('desktop: initial splash geometry failed: $error');
     }
   }
 
-  static Future<void> _applySplashGeometry(DesktopPlatform platform) async {
+  static Future<void> _applySplashGeometry() async {
     await _port.ensureInitialized();
-    await _port.setResizable(false);
     await _port.setSize(splashWindowSize);
     await _port.center();
-    // Linux ships the frameless bar first, hidden ahead of the splash's own first frame; see decision 0012.
-    if (platform == DesktopPlatform.linux) {
+  }
+
+  /// Locks the splash's chrome once the window is actually visible:
+  /// resizing off everywhere, and on Linux the native title bar hidden in
+  /// favor of the frameless bar `DesktopChrome` draws once the app is
+  /// ready. `main.dart` calls this once, right after the first frame is
+  /// confirmed rasterized (`WidgetsBinding.waitUntilFirstFrameRasterized`).
+  ///
+  /// Deliberately not folded into [applyInitialGeometry], despite both
+  /// running once and early: an Xvfb+fluxbox reproduction of this exact
+  /// sequence showed the window mapping at the native 1280x720 default
+  /// instead of [splashWindowSize] whenever `setResizable`/`hideTitleBar`
+  /// ran before the window was ever shown - GTK's own resize-before-map
+  /// requests are documented as unreliable, and here they raced the still
+  /// -pending splash resize and won. Waiting for the real first frame,
+  /// after which the window is already realized at the intended size, is
+  /// the same ordering the original (pre-splash) title-bar hide already
+  /// relied on safely.
+  static Future<void> lockSplashChrome() async {
+    if (currentDesktopPlatform() == null) return;
+    try {
+      await _lockSplashChrome().timeout(_setupTimeout);
+    } catch (error) {
+      debugPrint('desktop: splash chrome lock failed: $error');
+    }
+  }
+
+  static Future<void> _lockSplashChrome() async {
+    await _port.setResizable(false);
+    if (currentDesktopPlatform() == DesktopPlatform.linux) {
       await _port.hideTitleBar();
       _framelessApplied = true;
     }
@@ -322,7 +351,7 @@ class DesktopWindowShell {
     )..start();
 
     await _port.setPreventClose(true);
-    // The Linux title bar is already hidden by applyInitialGeometry; see decision 0012's superseding section.
+    // The Linux title bar is hidden by lockSplashChrome, not here; see decision 0012's superseding section.
 
     _trayController = DesktopTrayController(port: _port, container: container);
     await _trayController!.start();

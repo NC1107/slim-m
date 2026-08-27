@@ -51,6 +51,14 @@ import 'src/widgets/toast_overlay.dart';
 /// ever builds - the same "no sign-in-then-jump" guarantee this file always
 /// carried, just realised by a watched provider instead of an await ahead
 /// of [runApp].
+///
+/// [DesktopWindowShell.lockSplashChrome] runs after [runApp], once the first
+/// frame is confirmed rasterized, rather than alongside [applyInitialGeometry]
+/// above. An Xvfb+fluxbox reproduction of this exact sequence showed why:
+/// disabling resize and hiding the Linux title bar before the window had
+/// ever been shown raced the still-pending splash resize and won, so the
+/// window mapped at the native 1280x720 default instead of the small splash
+/// size. Waiting for the real first frame avoids that race entirely.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _initAndroidPush();
@@ -68,6 +76,9 @@ Future<void> main() async {
   runApp(
     UncontrolledProviderScope(container: container, child: const SlimMApp()),
   );
+
+  await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+  await DesktopWindowShell.lockSplashChrome();
 }
 
 /// The async sequence [StartupApp] masks: session restore (so the router's
