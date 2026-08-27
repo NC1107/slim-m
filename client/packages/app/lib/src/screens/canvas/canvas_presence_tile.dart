@@ -3,6 +3,14 @@
 /// screen-share tile you can drag anywhere in the canvas's own world space,
 /// resize with a grip, lock so a drawing tool reaches through it, or hide.
 ///
+/// An avatar-only tile - a camera key whose participant's camera is off -
+/// gets only the drag and the hide; report 4's own line, "the pfp should not
+/// be broken or resizeable," is [fixedRenderSize] (no grip, a fixed paint
+/// box regardless of any stale resize) plus null [onToggleLocked] and
+/// [onToggleSentToBack] (no lock or depth row at all): resize exists for a
+/// video tile's own aspect ratio, and lock/depth exist so a drawing tool
+/// reaches through or over a video track, none of which a bare avatar has.
+///
 /// Deliberately not built on the drag-and-resize state machine
 /// `canvas_ops_controller_select.dart` already drives for a real
 /// [CanvasObjectKind] - a presence tile is not one of those (see
@@ -110,13 +118,14 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
     required this.sentToBack,
     required this.onRectChanged,
     required this.onRectCommitted,
-    required this.onToggleLocked,
-    required this.onToggleSentToBack,
+    this.onToggleLocked,
+    this.onToggleSentToBack,
     required this.onHide,
     required this.semanticLabel,
     required this.document,
     required this.child,
     this.onExpand,
+    this.fixedRenderSize,
   });
 
   final Rect worldRect;
@@ -143,8 +152,14 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   /// the now-final rect onward to the server (`CanvasPresenceLayer.onCommit`),
   /// since every intermediate [onRectChanged] frame stays purely local.
   final VoidCallback onRectCommitted;
-  final VoidCallback onToggleLocked;
-  final VoidCallback onToggleSentToBack;
+
+  /// Null renders no lock button at all, the same shape [onExpand] already
+  /// uses - see [fixedRenderSize]'s own doc for why an avatar-only tile
+  /// passes null here.
+  final VoidCallback? onToggleLocked;
+
+  /// Null renders no depth button at all - see [onToggleLocked]'s own doc.
+  final VoidCallback? onToggleSentToBack;
   final VoidCallback onHide;
 
   /// Forwarded straight to [TileControls.onExpand] - see its own doc for why
@@ -152,6 +167,18 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   final VoidCallback? onExpand;
   final String semanticLabel;
   final Widget child;
+
+  /// This tile's own paint and hit-test box, in world units, when it is not
+  /// [worldRect]'s size at all - the avatar-only case, whose fixed footprint
+  /// is `canvasAvatarMarkerSize`. [worldRect] itself is left completely
+  /// alone: [_drag] still shifts it by the pointer's own delta and hands the
+  /// *unshrunk* result to [onRectChanged], so a size this widget merely
+  /// paints smaller than never overwrites the size a video tile sharing this
+  /// same server-side slot would need back the moment its camera comes on.
+  /// Null keeps every existing camera and screen-share tile pixel-identical
+  /// to before this field existed - painted at [worldRect] itself, resizable
+  /// via [TileResizeGrip], lockable, and depth-toggleable.
+  final Size? fixedRenderSize;
 
   @override
   State<CanvasPresenceManipulableTile> createState() =>
@@ -168,6 +195,17 @@ class _CanvasPresenceManipulableTileState
   Rect? _liveRect;
 
   Rect get _rect => _liveRect ?? widget.worldRect;
+
+  /// [_rect], with its size swapped for [CanvasPresenceManipulableTile
+  /// .fixedRenderSize] when one is given - the box this widget actually
+  /// paints and hit-tests at, kept separate from [_rect] itself so [_drag]
+  /// can go on reporting [_rect]'s own, unshrunk size to [_settle]'s caller.
+  Rect get _paintRect {
+    final fixed = widget.fixedRenderSize;
+    return fixed == null
+        ? _rect
+        : Rect.fromLTWH(_rect.left, _rect.top, fixed.width, fixed.height);
+  }
 
   void _drag(DragUpdateDetails details) {
     final next = _rect.shift(details.delta / widget.camera.zoom);
@@ -293,7 +331,7 @@ class _CanvasPresenceManipulableTileState
   /// before being handed to the same pure math `CanvasSurface` reads.
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
-    final screen = presenceScreenRect(_rect, widget.camera);
+    final screen = presenceScreenRect(_paintRect, widget.camera);
     final focal = screen.topLeft + event.localPosition;
     final keys = HardwareKeyboard.instance;
     widget.document.setCamera(
@@ -359,8 +397,7 @@ class _CanvasPresenceManipulableTileState
 
   @override
   Widget build(BuildContext context) {
-    final rect = _rect;
-    final screen = presenceScreenRect(rect, widget.camera);
+    final screen = presenceScreenRect(_paintRect, widget.camera);
     return Positioned(
       left: screen.left,
       top: screen.top,
@@ -394,7 +431,7 @@ class _CanvasPresenceManipulableTileState
                     child: widget.child,
                   ),
                 ),
-                if (!widget.locked)
+                if (!widget.locked && widget.fixedRenderSize == null)
                   Positioned(
                     right: -4,
                     bottom: -4,

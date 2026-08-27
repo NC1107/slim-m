@@ -97,7 +97,7 @@ void main() {
         _wrap(document: document, requests: requests, overrides: overrides),
       );
 
-      // The default camera-off tile sits at world (24,24)-(164,164) (margin 24, 140x140): well inside it, away from the resize grip and lock/hide controls.
+      // The default avatar-only tile sits at world (24,24)-(136,120) (margin 24, canvasAvatarMarkerSize): well inside it.
       await tester.tapAt(const Offset(90, 90), buttons: kSecondaryButton);
       await tester.pumpAndSettle();
 

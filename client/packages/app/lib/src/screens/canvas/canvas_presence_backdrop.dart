@@ -108,14 +108,17 @@ class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
     // The full onCanvas map, not a pre-filtered one - the two widgets' separate CanvasPresenceVisibility instances would drift apart otherwise.
     final visibleIds = _visibility.update(widget.document.worldView, onCanvas);
     final backKeys = visibleIds
-        .where((key) => widget.overrides.stateFor(key).sentToBack)
+        .where(
+          (key) =>
+              presenceEffectiveSentToBack(key, widget.overrides, byIdentity),
+        )
         .toSet();
     if (backKeys.isEmpty) return const SizedBox.shrink();
     final camera = widget.document.camera;
     final painted = presencePaintOrder(
       backKeys,
       widget.overrides.zFor,
-      widget.overrides.sentToBackFor,
+      (key) => presenceEffectiveSentToBack(key, widget.overrides, byIdentity),
     );
     return IgnorePointer(
       key: canvasPresenceBackdropIgnorePointerKey,

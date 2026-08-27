@@ -56,6 +56,17 @@ class CanvasPresenceBubble extends StatelessWidget {
   }
 }
 
+/// The whole footprint an avatar-only tile ever paints at - see
+/// `canvas_presence_tile.dart`'s own `fixedRenderSize`, which is what reads
+/// this. Not just [_AvatarMarker._avatarSize]: the avatar circle sits above
+/// its own `AppSpacing.s4` gap and a name pill (one caption line inside its
+/// own vertical padding), and a box exactly avatar-sized would clip that
+/// pill's layout rather than merely crop its paint. Fixed regardless of
+/// zoom or of whatever size a video tile sharing this same server-side slot
+/// was once resized to - report 4's own ask, "the pfp should not be broken
+/// or resizeable," taken literally.
+const canvasAvatarMarkerSize = Size(112, 96);
+
 /// No card, no border, no shadow, no fixed-colour background: just the
 /// avatar this participant already has everywhere else in the app (the
 /// member list, a message row), a small muted glyph over its own corner

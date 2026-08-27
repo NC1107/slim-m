@@ -30,6 +30,19 @@ const _cameraOff = VoiceParticipant(
   isScreenSharing: false,
 );
 
+/// Lock is a video-tile verb now - an avatar-only tile forces it to `false`
+/// regardless of overrides, so the lock test below needs a real video tile.
+/// See `canvas_presence_tile_kind_test.dart` for the avatar side of that.
+const _cameraOn = VoiceParticipant(
+  identity: 'user-noor',
+  name: 'Noor',
+  isSpeaking: true,
+  isMuted: true,
+  isLocal: false,
+  isScreenSharing: false,
+  isCameraOn: true,
+);
+
 const _localSharing = VoiceParticipant(
   identity: 'me',
   name: 'Me',
@@ -166,7 +179,7 @@ void main() {
     final overrides = CanvasPresenceTileOverrides();
 
     await tester.pumpWidget(
-      _wrap(_layer(document, const [_cameraOff], overrides)),
+      _wrap(_layer(document, const [_cameraOn], overrides)),
     );
     await tester.pump();
 

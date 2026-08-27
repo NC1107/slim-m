@@ -52,6 +52,35 @@ Size presenceTileSize(String key, Map<String, VoiceParticipant> byIdentity) {
       : presenceCameraOffSize;
 }
 
+/// Whether [key] has nothing but [CanvasPresenceBubble]'s avatar fallback to
+/// show right now - always false for a screen-share tile (which only ever
+/// exists while a real share is live), true for a camera tile whose
+/// participant's camera is off. The one predicate `canvas_presence_layer
+/// .dart` and `canvas_presence_backdrop.dart` both consult before deciding
+/// whether resize, lock and depth even apply to a tile, so the two widgets
+/// can never disagree about which kind a key currently is.
+bool presenceTileIsAvatarOnly(
+  String key,
+  Map<String, VoiceParticipant> byIdentity,
+) {
+  if (presenceTileKind(key) == screenTrackKind) return false;
+  return !(byIdentity[presenceTileIdentity(key)]?.isCameraOn ?? false);
+}
+
+/// [overrides]'s own answer for whether [key] is sent to back, forced to
+/// `false` for an avatar-only tile: depth exists so ink can land over or
+/// under a video track, and an avatar-only tile has no video to draw
+/// relative to - see `canvas_presence_bubble.dart`'s own doc on
+/// [canvasAvatarMarkerSize]. Consulting this everywhere `sentToBack` is read
+/// keeps a legacy `true` from a since-turned-off camera from either
+/// resurrecting the depth toggle or, worse, letting the layer and the
+/// backdrop both paint the same tile's real content at once.
+bool presenceEffectiveSentToBack(
+  String key,
+  CanvasPresenceTileOverrides overrides,
+  Map<String, VoiceParticipant> byIdentity,
+) => !presenceTileIsAvatarOnly(key, byIdentity) && overrides.sentToBackFor(key);
+
 /// Every tile's current world rect - an override's own drag or resize if it
 /// has one, [layout]'s default arrangement otherwise - excluding whatever is
 /// hidden this call. The one place both widgets read a rect from, so a
