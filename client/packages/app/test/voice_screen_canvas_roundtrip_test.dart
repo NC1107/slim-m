@@ -9,10 +9,14 @@
 /// back in, showing "connecting" - reported from real device use on
 /// 2026-08-13.
 ///
-/// The screen is mounted here while the controller is already connected,
-/// which is exactly the state a canvas close leaves behind, rather than
-/// driving the pane swap itself: the swap is `home_shell.dart`'s behaviour
-/// and is not what this is about.
+/// The first test mounts the screen while the controller is already
+/// connected, which is exactly the state a canvas close leaves behind if the
+/// user hangs up only after it reopens; the second instead hangs up while
+/// the canvas is still open (`VoiceScreen` unmounted throughout), which
+/// leaves `voice.channelId` null rather than merely stale on remount and so
+/// exercises `VoiceState.justLeftChannelId` rather than `connectedHere`.
+/// Neither drives the pane swap itself: that is `home_shell.dart`'s own
+/// behaviour and not what this is about.
 library;
 
 import 'dart:async';
@@ -243,4 +247,44 @@ void main() {
     );
     expect(find.text('You left this call.'), findsOneWidget);
   });
+
+  testWidgets(
+    'hanging up while the canvas is open, then closing it, does not rejoin',
+    (tester) async {
+      final session = _ConnectableSession();
+      final container = _container(session);
+      addTearDown(container.dispose);
+
+      final controller = container.read(voiceControllerProvider.notifier);
+      await controller.join('channel-1');
+      await tester.pump();
+      expect(session.joinCount, 1);
+
+      // The explicit hang-up itself, with no `VoiceScreen` mounted: `_autoJoinedFor` does not exist yet for this remount to inherit.
+      await controller.leave();
+
+      // Closing the canvas: a brand new `VoiceScreen` `State`, but now `voice.channelId` is null so `connectedHere` cannot be what saves it.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: VoiceScreen(channelId: 'channel-1')),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        session.joinCount,
+        1,
+        reason:
+            'an explicit hang-up made before the canvas even closes must '
+            'still land on the left-this-call screen, not a silent rejoin',
+      );
+      expect(find.text('You left this call.'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    },
+  );
 }

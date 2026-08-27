@@ -182,12 +182,13 @@ class VoiceController extends StateNotifier<VoiceState>
     // See this method's own doc comment for what generation/superseded guard.
     final generation = ++_callGeneration;
     bool superseded() => generation != _callGeneration;
-    // Set before the first await, so an arrival elsewhere reads this as busy; see VoiceState.joining.
+    // Set before the first await, so an arrival elsewhere reads this as busy (VoiceState.joining); clearJustLeft because any real join attempt is never a stale rejoin to suppress.
     state = state.copyWith(
       channelId: channelId,
       clearError: true,
       clearRecap: true,
       joining: true,
+      clearJustLeft: true,
     );
     try {
       final token = await _ref.read(apiProvider).voiceToken(channelId);
@@ -290,11 +291,13 @@ class VoiceController extends StateNotifier<VoiceState>
     if (generation != _callGeneration) return;
     // Best-effort and fire-and-forget: this client already disconnected.
     if (channelId != null) unawaited(_heartbeat.forget(channelId));
-    // The mic/camera preference survives the reset: there is no lobby left to re-set them on.
+    // The mic/camera preference survives the reset (no lobby left to re-set them on); justLeftChannelId/justLeftAt are set only here, see VoiceState.rejoinGuardWindow.
     state = VoiceState(
       microphoneEnabled: state.microphoneEnabled,
       cameraEnabled: state.cameraEnabled,
       recap: recap,
+      justLeftChannelId: channelId,
+      justLeftAt: channelId == null ? null : _now(),
     );
   }
 
