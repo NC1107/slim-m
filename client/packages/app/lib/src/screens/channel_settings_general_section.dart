@@ -113,9 +113,9 @@ class _ChannelGeneralSectionState extends ConsumerState<ChannelGeneralSection> {
         const SizedBox(height: AppSpacing.s8),
         AppInput(
           controller: _topic,
-          placeholder: 'Topic - leave blank to clear',
+          placeholder: 'Description',
           onChanged: (_) => setState(() {}),
-          semanticLabel: 'Channel topic',
+          semanticLabel: 'Channel description',
         ),
         const SizedBox(height: AppSpacing.s4),
         Align(

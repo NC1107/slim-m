@@ -259,11 +259,9 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
         const AppCallout(
           tone: AppCalloutTone.info,
           child: Text(
-            'There is no way to read an existing overwrite back, so this '
-            'always starts from "inherit". Setting one replaces whatever '
-            'was there for every permission at once, and asks you to '
-            'confirm before it does. Administrator is not listed here: it '
-            'bypasses channel overwrites entirely, so one would do nothing.',
+            'This always starts from "Inherit": there is no way to read '
+            'back what is already set. Setting an overwrite replaces every '
+            'permission at once.',
           ),
         ),
         const SizedBox(height: AppSpacing.s8),
@@ -271,11 +269,9 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
         const AppCallout(
           tone: AppCalloutTone.warn,
           child: Text(
-            'Leaving a permission at "Inherit", or using Clear, can still '
-            'be refused. Un-denying a permission counts as granting it, so '
-            'if this role or member was already denied something you do '
-            'not hold yourself, the whole change comes back refused. This '
-            'screen cannot show which permissions that applies to.',
+            'A change can still be refused: un-denying a permission counts '
+            'as granting it, so if you do not hold that permission '
+            'yourself, the whole change comes back refused.',
           ),
         ),
         if (!widget.lockChannel)
