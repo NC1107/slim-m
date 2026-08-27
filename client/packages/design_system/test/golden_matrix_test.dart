@@ -10,12 +10,16 @@
 /// The layout assertions (no overflow at any scale) run everywhere and are the
 /// part that catches real regressions.
 ///
-/// The pixel comparison is gated behind SLIMM_GOLDENS=1 and its reference images
-/// are deliberately NOT committed yet. Skia and font rendering differ between
-/// machines, so images generated on a contributor's box would never match CI's
-/// runner, and committing them would mean a permanently red build that everyone
-/// learns to ignore. Generate them on the CI runner
-/// (`flutter test --update-goldens`), commit those, then enable the flag there.
+/// The pixel comparison is gated behind the compile-time flag
+/// `--dart-define=SLIMM_GOLDENS=true`. Skia and font rendering differ between
+/// machines, so images generated on a contributor's box would never match
+/// CI's runner, and committing them would mean a permanently red build that
+/// everyone learns to ignore. Reference images must come from the pinned
+/// runner client-ci.yml itself uses: trigger its `update-golden-references`
+/// job by hand (workflow_dispatch), download the `golden-references`
+/// artifact it produces, and commit its contents into this directory's
+/// `goldens/`. `client-ci.yml`'s own test step then turns the flag on by
+/// itself, once it finds PNGs there; no further workflow edit is needed.
 ///
 /// What these actually guard is the thing that breaks silently: text at 200%
 /// overflowing its container. A layout that looks right at 100% and clips at

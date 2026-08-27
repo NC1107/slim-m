@@ -11,7 +11,7 @@ Each section below is named for its workflow file.
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
-| `client-ci` | changes under `client/`, or to `schema/openapi.yaml` | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen |
+| `client-ci` | changes under `client/`, or to `schema/openapi.yaml`; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
@@ -64,6 +64,13 @@ Path-gated so a server-only or schema-only change never triggers the Flutter cli
 Golden-file assertions (`matchesGoldenFile`) live inside each package's ordinary `flutter test` suite, not in a job of their own.
 Golden PNGs are sensitive to the exact Flutter engine and Skia build and to font rendering, so goldens are generated and verified on the same `stable` channel on `ubuntu-latest`.
 If goldens start flaking across runs, pin an exact Flutter version in the workflow instead of floating on `stable`, and regenerate the goldens with `flutter test --update-goldens` on that same pinned version so both sides render identically.
+
+design_system's two golden-bearing suites (`golden_matrix_test.dart`, `presence_desaturation_test.dart`) gate their pixel comparisons behind the compile-time flag `--dart-define=SLIMM_GOLDENS=true`, checked with `const bool.fromEnvironment('SLIMM_GOLDENS')`.
+Nothing generated that flag's references on a contributor's own machine: doing so would diff against a Skia and font build CI does not use, which is a permanently red build in the making rather than a real gate.
+The `test (every workspace package)` step in `client-ci`'s `test-web` job passes the flag itself, but only when `client/packages/design_system/test/goldens/` already holds PNGs; with the directory empty or absent it runs the same suites with the flag off, exactly as before this existed.
+That makes the reference images, not a second workflow edit, the only thing standing between here and a real pixel gate: `update-golden-references` (workflow_dispatch only, so it never runs on a push or pull request) builds on the identical channel, Flutter version and runner as the test job, runs `flutter test --update-goldens --dart-define=SLIMM_GOLDENS=true` inside `design_system`, and uploads the resulting `goldens/` directory as a build artifact.
+A human downloads that artifact and commits its PNGs into `client/packages/design_system/test/goldens/`; the very next `client-ci` run finds them and starts diffing, with no further edit to this workflow.
+The same job is how a deliberate design change gets new references later: run it again, review the diff, commit the replacement PNGs.
 
 ### The iOS unit-test job, and why it is its own workflow
 
