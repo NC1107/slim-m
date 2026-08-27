@@ -16,6 +16,7 @@ import '../providers/user_profiles.dart';
 import 'author_label.dart';
 import 'channel_rail.dart' show selectedChannelId;
 import 'message_jump.dart';
+import 'sheet_item_list.dart';
 import 'user_avatar.dart';
 
 /// Marks the sizing box around the sheet's body, so a test can measure it
@@ -171,9 +172,7 @@ class _Body extends ConsumerWidget {
 
     resolveAuthorProfiles(ref, list.map((p) => p.message.authorId));
 
-    return ListView.builder(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+    return SheetItemList(
       itemCount: list.length,
       itemBuilder: (context, i) => PinnedMessageRow(
         channelId: channelId,
