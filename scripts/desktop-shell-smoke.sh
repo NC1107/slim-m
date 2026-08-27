@@ -87,7 +87,8 @@ wait_for_window() {
 }
 
 window_id() {
-  wmctrl -l | grep "$APP_NAME" | head -1 | awk '{print $1}'
+  # wait_for_geometry assigns this bare, so a "not listed yet" grep miss during a hide must not trip set -e via pipefail.
+  wmctrl -l | grep "$APP_NAME" | head -1 | awk '{print $1}' || true
 }
 
 assert_geometry() {

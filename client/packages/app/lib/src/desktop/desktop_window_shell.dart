@@ -58,6 +58,15 @@ class DesktopWindowShell {
   /// [WindowGeometry]: the splash is always this size, regardless of what
   /// the real window's own saved geometry turns out to be. See the startup
   /// screen (`startup_screen.dart`) and decision 0012's superseding section.
+  ///
+  /// On Linux this value must also match the hardcoded
+  /// `gtk_window_set_default_size` in `linux/runner/my_application.cc`: the
+  /// GTK/Impeller embedder only completes a resize once a rendered frame at
+  /// the new size exists, so [applyInitialGeometry]'s own `setSize` call
+  /// below cannot shrink the window before `runApp` - the window must be
+  /// born at this size instead. `splash_native_default_size_test.dart`
+  /// checks the two stay in sync. macOS and Windows have no such embedder
+  /// constraint and are expected to size correctly from `setSize` alone.
   static const splashWindowSize = WindowSize(width: 380, height: 460);
 
   static DesktopWindowController? _controller;
