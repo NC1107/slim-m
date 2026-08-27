@@ -20,4 +20,5 @@ crates/slimm-server/tests/polls.rs 602 # create, vote, close and the permission 
 crates/slimm-server/tests/dms.rs 591 # pair membership, the deliberately skipped ADMINISTRATOR bypass, and fan-out
 client/packages/app/test/session_persistence_test.dart 588 # restore, refresh and revocation paths
 crates/slimm-server/tests/message_endpoints.rs 534 # send, list, edit and delete with their permission cases
-client/packages/app/lib/src/widgets/composer.dart 514 # autocomplete, focus and paste handling together, load-bearing and not safe to split under an unrelated change
+client/packages/app/lib/src/widgets/composer.dart 550 # autocomplete, focus, paste and drop-target registration together, load-bearing and not safe to split under an unrelated change
+client/packages/app/lib/src/screens/channel_screen.dart 502 # wraps the transcript and composer in a drop zone for OS drag-and-drop; a new split is a separate change, not this one

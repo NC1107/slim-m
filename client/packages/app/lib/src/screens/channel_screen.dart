@@ -35,6 +35,7 @@ import '../providers/sync_controller.dart';
 import '../providers/user_profiles.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/blocked_dm_notice.dart';
+import '../widgets/channel_attachment_drop_zone.dart';
 import '../widgets/channel_header.dart';
 import '../widgets/channel_search.dart';
 import '../widgets/jump_to_latest_button.dart';
@@ -300,7 +301,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           final isDm = channel?.kind == 'dm';
           final isPersonalSpace = channel?.isPersonalSpace ?? false;
 
-          return Column(
+          // Local fn, not an inline wrapper, so the transcript keeps its indentation.
+          Widget content() => Column(
             children: [
               // A thread supplies its own bar at every width; see thread_screen.dart.
               if (layout.showsBothPanes && !isThread)
@@ -487,6 +489,11 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   onCancelReply: _cancelReply,
                 ),
             ],
+          );
+          return ChannelAttachmentDropZone(
+            channelId: widget.channelId,
+            blockedDm: blockedDm,
+            child: content(),
           );
         },
       ),

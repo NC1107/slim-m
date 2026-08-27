@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../providers/channel_permissions.dart';
+import '../providers/composer_attachment_drop.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
@@ -107,6 +108,12 @@ class _ComposerState extends ConsumerState<Composer> {
   /// is a build-time mutation, which Riverpod rejects outside tests too.
   StateController<FocusNode?>? _focusRegistry;
 
+  /// Mirrors [_focusRegistry] one level indirected: a channel's drop target
+  /// (`channel_attachment_drop_zone.dart`) reaches this composer's own
+  /// staging through here, keyed by [Composer.channelId] rather than a
+  /// widget reference nothing passes down the tree.
+  StateController<ComposerAttachmentDropTarget?>? _dropRegistry;
+
   /// The trigger the caret is inside, and which of its offers is current.
   ///
   /// Held here rather than in the panel because all three act on the text
@@ -148,6 +155,7 @@ class _ComposerState extends ConsumerState<Composer> {
       registry.state = _focus;
       _focusRegistry = registry;
     });
+    _rebindDropTarget();
   }
 
   @override
@@ -157,7 +165,31 @@ class _ComposerState extends ConsumerState<Composer> {
     if (oldWidget.channelId != widget.channelId) {
       _attachments.resetForChannelSwitch();
       if (mounted) setState(() => _attachmentError = null);
+      _rebindDropTarget();
     }
+  }
+
+  /// Unregisters whatever [_dropRegistry] currently points at (null on the
+  /// very first call, from [initState]) and registers this composer under
+  /// [Composer.channelId] instead - the same post-frame timing
+  /// [_focusRegistry] uses and for the same reason, since this can run as
+  /// part of the very build that mounts or moves this widget.
+  void _rebindDropTarget() {
+    final oldRegistry = _dropRegistry;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (oldRegistry != null && oldRegistry.mounted) {
+        oldRegistry.state = null;
+      }
+      if (!mounted) return;
+      final registry = ref.read(
+        composerAttachmentDropProvider(widget.channelId).notifier,
+      );
+      registry.state = ComposerAttachmentDropTarget(
+        stage: _stageAttachment,
+        setError: _setAttachmentError,
+      );
+      _dropRegistry = registry;
+    });
   }
 
   @override
@@ -165,9 +197,13 @@ class _ComposerState extends ConsumerState<Composer> {
     // Guards mounted too: the whole container can be gone by this frame.
     final registry = _focusRegistry;
     final focus = _focus;
+    final dropRegistry = _dropRegistry;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (registry != null && registry.mounted && registry.state == focus) {
         registry.state = null;
+      }
+      if (dropRegistry != null && dropRegistry.mounted) {
+        dropRegistry.state = null;
       }
     });
     widget.controller.removeListener(_handleChange);
