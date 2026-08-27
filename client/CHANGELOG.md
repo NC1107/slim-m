@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.56.0](https://github.com/NC1107/slim-m/compare/client-v0.55.0...client-v0.56.0) (2026-08-27)
+
+
+### Features
+
+* **client:** make design_system golden diffing real in CI ([#908](https://github.com/NC1107/slim-m/issues/908)) ([9d75d7e](https://github.com/NC1107/slim-m/commit/9d75d7e88e69f35f350799b077c2528000ce5888))
+
+
+### Performance Improvements
+
+* **client:** use scoped MediaQuery accessors for keyboard avoidance ([#909](https://github.com/NC1107/slim-m/issues/909)) ([66bdbfc](https://github.com/NC1107/slim-m/commit/66bdbfc6f6cf2a467e564846cff796a0706cb080))
+
 ## [0.55.0](https://github.com/NC1107/slim-m/compare/client-v0.54.1...client-v0.55.0) (2026-08-27)
 
 
