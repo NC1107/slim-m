@@ -21,6 +21,7 @@ import '../screens/admin/invites_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/roles_screen.dart';
+import '../screens/channel_settings_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/debug_log_screen.dart';
 import '../screens/personal_settings_screen.dart';
@@ -132,6 +133,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => modalPage(
           context,
           ChannelOverwritesScreen(initialChannel: state.extra as Channel?),
+        ),
+      ),
+      GoRoute(
+        path: Routes.channelSettings,
+        // `extra` carries the channel and whether it was open; null on a cold pasted URL.
+        pageBuilder: (context, state) => modalPage(
+          context,
+          ChannelSettingsScreen(args: state.extra as ChannelSettingsRouteArgs?),
         ),
       ),
       GoRoute(

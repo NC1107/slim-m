@@ -74,8 +74,18 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
   /// the separate "manage" sheet the kebab used to jump to directly.
   final _menuKey = GlobalKey<ContextMenuRegionState>();
 
+  /// This row's own context, not the one `itemsBuilder` hands in: on a
+  /// compact width the menu is a sheet pushed straight onto the root
+  /// navigator, so its context cannot resolve `GoRouterState.of` (the same
+  /// cause `pinned_messages_sheet.dart`'s own doc comment names), while this
+  /// row's `context` sits in the routed tree either way.
   List<Widget> _menuItems(BuildContext context, VoidCallback close) =>
-      channelRowMenuItems(context, close, widget.channel, widget.canManage);
+      channelRowMenuItems(
+        this.context,
+        close,
+        widget.channel,
+        widget.canManage,
+      );
 
   @override
   Widget build(BuildContext context) {

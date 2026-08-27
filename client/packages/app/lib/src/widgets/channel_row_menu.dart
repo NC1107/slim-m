@@ -7,6 +7,12 @@
 /// [ContextMenuRegion] programmatically (see `ContextMenuRegionState.open`)
 /// rather than keeping a second, divergent affordance.
 ///
+/// "Manage channel..." (rename, topic, delete) and "Channel permissions..."
+/// used to be two separate entries into two disconnected surfaces; they are
+/// now one "Channel settings..." entry into one screen
+/// (`channel_settings_screen.dart`) that gates its own sections on the same
+/// two bits this menu used to gate the two entries on.
+///
 /// Split out of `channel_rail_channel_rows.dart` to keep that file inside
 /// the review budget once it also carried the kebab's own `GlobalKey` wiring.
 library;
@@ -24,13 +30,15 @@ import '../permissions.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
-import 'manage_channel_sheet.dart';
+import '../screens/channel_settings_screen.dart';
+import 'channel_rail.dart' show selectedChannelId;
 
 /// Opening it always, muting it or narrowing it to mentions only (the same
 /// two toggles the header used to duplicate until 2026-08-13, tapping the
-/// active one clears back to the account default), and managing it (rename,
-/// topic, delete) or its permissions only for a caller [canManage] or the
-/// deployment-wide MANAGE_ROLES bit already gate.
+/// active one clears back to the account default), and "Channel
+/// settings..." for a caller who holds [canManage], the deployment-wide
+/// MANAGE_ROLES bit, or both - the settings screen itself decides which
+/// sections a holder of only one of the two actually sees.
 ///
 /// Read fresh every time the menu opens rather than watched, the same choice
 /// `DmRow._menuItems`'s own doc comment makes: the row itself already
@@ -91,25 +99,19 @@ List<Widget> channelRowMenuItems(
       selected: current == api.NotificationPreference.mentions,
       onTap: () => toggle(api.NotificationPreference.mentions),
     ),
-    if (canManage) ...[
+    if (canManage || canManageRoles) ...[
       const AppMenuDivider(),
       AppMenuItem(
-        label: 'Manage channel...',
+        label: 'Channel settings...',
         leading: AppIcons.settings,
         onTap: () {
+          // Captured before push() moves the router's own location; see ChannelSettingsRouteArgs.
+          final wasOpen = selectedChannelId(context) == channel.id;
           close();
-          showManageChannelSheet(context, channel);
-        },
-      ),
-    ],
-    if (canManageRoles) ...[
-      if (!canManage) const AppMenuDivider(),
-      AppMenuItem(
-        label: 'Channel permissions...',
-        leading: AppIcons.permissions,
-        onTap: () {
-          close();
-          context.push(Routes.adminOverwrites, extra: channel);
+          context.push(
+            Routes.channelSettings,
+            extra: ChannelSettingsRouteArgs(channel: channel, wasOpen: wasOpen),
+          );
         },
       ),
     ],

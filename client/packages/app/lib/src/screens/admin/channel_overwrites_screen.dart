@@ -47,9 +47,23 @@ class ChannelOverwritesScreen extends StatelessWidget {
 /// The overwrite editor itself, embeddable as a Space settings pane as well
 /// as routed.
 class ChannelOverwritesPane extends ConsumerStatefulWidget {
-  const ChannelOverwritesPane({super.key, this.initialChannel});
+  const ChannelOverwritesPane({
+    super.key,
+    this.initialChannel,
+    this.lockChannel = false,
+  }) : assert(
+         !lockChannel || initialChannel != null,
+         'lockChannel requires an initialChannel',
+       );
 
   final Channel? initialChannel;
+
+  /// True when embedded in a specific channel's own "Channel settings"
+  /// screen, where the channel is fixed by context and a "change channel"
+  /// row would contradict the screen it sits in. False (the default) keeps
+  /// the picker for the Space settings entry point, where choosing a
+  /// channel is the point.
+  final bool lockChannel;
 
   @override
   ConsumerState<ChannelOverwritesPane> createState() =>
@@ -264,20 +278,21 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
             'screen cannot show which permissions that applies to.',
           ),
         ),
-        SettingsSectionCard(
-          title: 'Channel',
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppListRow(
-              label: _channel?.name ?? 'Choose a channel',
-              trailing: const Icon(
-                AppIcons.chevronRight,
-                size: AppSizes.icon16,
+        if (!widget.lockChannel)
+          SettingsSectionCard(
+            title: 'Channel',
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppListRow(
+                label: _channel?.name ?? 'Choose a channel',
+                trailing: const Icon(
+                  AppIcons.chevronRight,
+                  size: AppSizes.icon16,
+                ),
+                onTap: _pickChannel,
               ),
-              onTap: _pickChannel,
-            ),
-          ],
-        ),
+            ],
+          ),
         if (_channel != null) ...[
           const SizedBox(height: AppSpacing.s12),
           AppSegmentedControl.inline(
