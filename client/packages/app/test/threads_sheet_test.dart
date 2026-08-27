@@ -167,7 +167,7 @@ void main() {
     final container = _containerAnswering((request) async {
       // The row's batch profile lookup answers empty; it falls back to the cached name.
       final body = request.url.path == '/users'
-          ? []
+          ? <Map<String, dynamic>>[]
           : [
               {
                 'id': 't1',

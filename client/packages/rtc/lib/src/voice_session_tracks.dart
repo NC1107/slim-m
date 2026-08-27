@@ -62,12 +62,18 @@ extension VoiceSessionTracks on VoiceSession {
   /// `_room` is cleared before anything else, and synchronously: a join
   /// racing this teardown reads it to tell whether it is still the current
   /// attempt, and that answer has to be final the instant a teardown starts.
+  ///
+  /// The room event listener's own cancellation is awaited before the room
+  /// disconnects below: a straggling `RoomDisconnectedEvent` on an
+  /// uncancelled listener would still reach `_onDisconnected` mid-teardown,
+  /// which `_onDisconnected`'s own doc says a `leave()` must never do.
   Future<void> _teardown() async {
     // Synchronously, and before anything else; see this method's own doc.
     final room = _room;
     _room = null;
-    _cancelEvents?.call();
+    final cancelEvents = _cancelEvents;
     _cancelEvents = null;
+    if (cancelEvents != null) await _step(cancelEvents);
     // Not every call-ending path resets it; this one covers all of them.
     _cameraSwitching.resetFacing();
     // Awaited before the room disconnects below: the SFU has no bearing on iOS.

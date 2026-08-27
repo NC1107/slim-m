@@ -65,7 +65,10 @@ void main() {
     ).copyWithPrevious(AsyncData<List<api.UserProfile>>([_member('ada')]));
 
     expect(
-      offline.maybeWhen(data: (v) => v, orElse: () => const []),
+      offline.maybeWhen(
+        data: (v) => v,
+        orElse: () => const <api.UserProfile>[],
+      ),
       isEmpty,
       reason: 'the reading this fix replaced, kept here so the why survives',
     );

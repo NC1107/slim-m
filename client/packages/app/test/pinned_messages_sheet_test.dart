@@ -233,7 +233,7 @@ void main() {
             httpClient: MockClient((request) async {
               // A batch profile lookup for the pin's author answers empty.
               final body = request.url.path == '/users'
-                  ? []
+                  ? <Map<String, dynamic>>[]
                   : [
                       {
                         'id': 'm1',

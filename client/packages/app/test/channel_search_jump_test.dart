@@ -48,7 +48,7 @@ void main() {
 
       harness.container.read(channelSearchProvider('c1').notifier).toggle();
       await flush(tester);
-      harness.container
+      await harness.container
           .read(channelSearchProvider('c1').notifier)
           .run('message 50');
       await flush(tester);

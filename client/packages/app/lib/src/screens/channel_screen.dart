@@ -276,7 +276,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     final pinnedIds = <String>{
       for (final p
           in ref.watch(pinsControllerProvider(widget.channelId)).pinned ??
-              const [])
+              const <api.PinnedMessage>[])
         p.message.id,
     };
 

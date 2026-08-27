@@ -45,7 +45,7 @@ void main() {
 
       harness.container.read(channelSearchProvider('c1').notifier).toggle();
       await flush(tester);
-      harness.container
+      await harness.container
           .read(channelSearchProvider('c1').notifier)
           .run('findable');
       await flush(tester);
@@ -83,7 +83,9 @@ void main() {
 
     harness.container.read(channelSearchProvider('c1').notifier).toggle();
     await flush(tester);
-    harness.container.read(channelSearchProvider('c1').notifier).run('match');
+    await harness.container
+        .read(channelSearchProvider('c1').notifier)
+        .run('match');
     await flush(tester);
 
     final region = tester.widget<Semantics>(

@@ -32,6 +32,8 @@
 /// route a real viewer's own Personal-settings choice takes.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,7 +84,7 @@ Future<void> _renderReduced(WidgetTester tester, String route) async {
   );
   if (isModalFixtureRoute(route)) {
     await tester.pump();
-    router.push(route);
+    unawaited(router.push(route));
   }
   await tester.pump();
   // See this file's own library doc for why 5ms, not zero and not a settle.
