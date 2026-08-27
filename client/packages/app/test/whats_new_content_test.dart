@@ -91,4 +91,27 @@ void main() {
       },
     );
   });
+
+  group('whatsNewEntries assembly', () {
+    // Guards the archive split (two archive files plus this one) against a move that drops, duplicates, or reorders an entry.
+    test('every entry sorts strictly after the one before it', () {
+      for (var i = 1; i < whatsNewEntries.length; i++) {
+        final previous = whatsNewEntries[i - 1].version;
+        final current = whatsNewEntries[i].version;
+        expect(
+          compareVersions(current, previous),
+          greaterThan(0),
+          reason:
+              'entry $current at index $i must sort strictly after $previous; '
+              'this fails on a duplicated version, a version out of order, '
+              'or the same entry appearing in two of the split files',
+        );
+      }
+    });
+
+    test('has every entry from both archives plus the live file', () {
+      // Bump alongside every new entry; a move across the archive split must never change this on its own.
+      expect(whatsNewEntries.length, 39);
+    });
+  });
 }
