@@ -35,8 +35,8 @@ import 'src/widgets/toast_overlay.dart';
 /// [DesktopWindowShell.applyInitialGeometry] runs before [runApp] on purpose:
 /// it is the one step that has to land before the very first Flutter frame
 /// paints, or the startup screen below would flash at the OS default size
-/// and then visibly jump to the last known one - a no-op on every platform
-/// but a real desktop build. [DesktopWindowShell.registerSecondInstanceHandler]
+/// before visibly shrinking to the small splash shape - a no-op on every
+/// platform but a real desktop build. [DesktopWindowShell.registerSecondInstanceHandler]
 /// runs right after it for the same reason: a launcher click racing this
 /// process's own startup has to find a listener already in place.
 /// [DesktopQuitShortcut.register] joins them here rather than waiting for
@@ -84,13 +84,27 @@ Future<void> main() async {
 /// [appReadyProvider] the instant this resolves: on desktop that sequence
 /// can finish in a frame or two on a warm start, which is the exact reason
 /// the startup screen went unnoticed - see `src/desktop/splash_floor.dart`.
+///
+/// [DesktopWindowShell.prepareHandoff] and [DesktopWindowShell.revealAfterHandoff]
+/// bracket the ready flip rather than running before or after it: the window
+/// has to already be hidden and resized to its real geometry before the real
+/// UI swaps in, and has to stay hidden until that swapped-in UI has actually
+/// painted, or the handoff would show a stale splash frame, an empty one, or
+/// the real content briefly stretched across the splash's small bounds. See
+/// decision 0012's superseding section for why this hide/resize/show
+/// sequence is the traded-off stand-in for a genuine second window.
 Future<void> _bootstrapApp(ProviderContainer container) async {
   await awaitBootstrapWithSplashFloor(() => _runBootstrapSequence(container));
+  await DesktopWindowShell.prepareHandoff(container);
   container.read(appReadyProvider.notifier).state = true;
+  await DesktopWindowShell.revealAfterHandoff();
 }
 
 Future<void> _runBootstrapSequence(ProviderContainer container) async {
+  container.read(startupStatusProvider.notifier).state = 'Restoring session';
   await restoreSession(container);
+
+  container.read(startupStatusProvider.notifier).state = 'Loading preferences';
   await container.read(themeControllerProvider.notifier).restore();
   await container.read(timeFormatControllerProvider.notifier).restore();
   await container.read(motionPreferenceControllerProvider.notifier).restore();
@@ -111,6 +125,8 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   await container
       .read(voiceControllerProvider.notifier)
       .restorePushToTalkPreference();
+
+  container.read(startupStatusProvider.notifier).state = 'Connecting';
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
@@ -122,6 +138,15 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
 /// test's assumption - only the real entry point above ever sets it false
 /// first.
 final appReadyProvider = StateProvider<bool>((ref) => true);
+
+/// The startup screen's status line, updated at each phase boundary in
+/// [_runBootstrapSequence]. Deliberately plain text today rather than an enum
+/// of phases: the structure this exists for is the provider itself, so a
+/// later update flow ("Checking for updates", "Downloading update",
+/// "Installing update") is copy at the call sites above, not new plumbing.
+final startupStatusProvider = StateProvider<String>(
+  (ref) => defaultStartupStatus,
+);
 
 /// Wires Firebase and the FCM background message handler Android needs to
 /// ever show a notification while backgrounded or killed - the relay sends
@@ -162,7 +187,9 @@ class SlimMApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(appReadyProvider)) return const StartupApp();
+    if (!ref.watch(appReadyProvider)) {
+      return StartupApp(status: ref.watch(startupStatusProvider));
+    }
 
     final choice = ref.watch(themeControllerProvider);
     final highContrast = ref.watch(highContrastControllerProvider);

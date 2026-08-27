@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A real render of [StartupScreen] at the sizes it actually launches into:
-/// [WindowGeometry.fallback]'s cold-start default, and a larger restored
-/// window, so a change here can be looked at rather than guessed about - the
-/// owner's own complaint (`docs/decisions/0012-desktop-window-shell.md`) was
-/// that the small mark alone read as a glitch stretched across a full
-/// desktop window, which no widget test asserting the mark merely exists
-/// would have caught.
+/// A real render of [StartupScreen] at the one size it now actually launches
+/// into: [DesktopWindowShell.splashWindowSize], the small splash window
+/// decision 0012's superseding section describes - so a change here can be
+/// looked at rather than guessed about. This screen no longer renders inside
+/// the full desktop window (that was the pre-superseding design this file
+/// used to snapshot at 1280x720 and 1920x1080): the splash is now a fixed
+/// small size regardless of the real window's own saved geometry, so there
+/// is exactly one size to check, plus a longer status string to confirm the
+/// line this record adds room for does not overflow that small window.
 ///
 /// Rendered through `flutter test`'s software rasteriser, never a real
 /// window - the same "no display involved" category decision 0012 itself
@@ -15,6 +17,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/desktop/desktop_window_shell.dart';
 import 'package:slimm_app/src/desktop/startup_screen.dart';
 
 import '../ui_snapshot_support.dart';
@@ -22,17 +25,24 @@ import '../ui_snapshot_support.dart';
 void main() {
   setUpAll(loadRealFonts);
 
-  for (final entry in const {
-    'startup-screen-cold-default': Size(1280, 720),
-    'startup-screen-large-desktop': Size(1920, 1080),
+  final splashSize = Size(
+    DesktopWindowShell.splashWindowSize.width,
+    DesktopWindowShell.splashWindowSize.height,
+  );
+
+  for (final entry in {
+    'startup-screen-splash': const StartupApp(),
+    'startup-screen-splash-update-status': const StartupApp(
+      status: 'Downloading update',
+    ),
   }.entries) {
     testWidgets('startup screen at ${entry.key}', (tester) async {
-      tester.view.physicalSize = entry.value;
+      tester.view.physicalSize = splashSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(
-        RepaintBoundary(key: snapshotBoundary, child: const StartupApp()),
+        RepaintBoundary(key: snapshotBoundary, child: entry.value),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));

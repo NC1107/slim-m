@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 # Drives the built Linux release bundle under Xvfb (a virtual, off-screen X
 # server on a CI runner - never this developer's own display) and checks
-# decision 0012's own claims: the window appears, a fresh launch matches the
-# documented default size, a saved geometry changes the next launch's size,
-# a close request no longer terminates the process, a second launch hands
-# off to the first rather than spawning its own window, and - see below -
-# a real quit still exists and works even though this bus has no tray host
-# at all. See docs/decisions/0012-desktop-window-shell.md for what this can
-# and cannot prove; the caller must run this under a real D-Bus session bus
-# (see client-ci.yml's dbus-run-session wrapper) or the last two checks
-# below are meaningless, since GApplication's own single-instance activation
-# needs one.
+# decision 0012's own claims: the window appears at the small splash size,
+# settles into the documented default once bootstrap hands off, a saved
+# geometry changes the next launch's settled size, a close request no longer
+# terminates the process, a second launch hands off to the first rather than
+# spawning its own window, and - see below - a real quit still exists and
+# works even though this bus has no tray host at all. See
+# docs/decisions/0012-desktop-window-shell.md for what this can and cannot
+# prove; the caller must run this under a real D-Bus session bus (see
+# client-ci.yml's dbus-run-session wrapper) or the last two checks below are
+# meaningless, since GApplication's own single-instance activation needs one.
+#
+# The window appears at DesktopWindowShell.splashWindowSize (380x460) before
+# bootstrap finishes, then DesktopWindowShell.prepareHandoff hides it, applies
+# the real geometry, and DesktopWindowShell.revealAfterHandoff shows it again -
+# see that decision record's superseding section. wmctrl briefly stops
+# listing the window during that hide, so every check below that needs the
+# settled geometry polls rather than asserting once.
 #
 # There is no org.kde.StatusNotifierWatcher on this bus - fluxbox is a plain
 # window manager, not a full desktop shell - so the close path here always
@@ -91,11 +98,37 @@ assert_geometry() {
   echo "$actual" | grep -q "^HEIGHT=${expected_height}\$"
 }
 
-echo "::group::fresh launch matches the documented default size"
+# Polls rather than asserting once: prepareHandoff hides the window while it
+# applies the real geometry, so window_id/xdotool can see nothing at all for
+# part of this wait, and a single immediate check would be racing that hide.
+wait_for_geometry() {
+  local expected_width="$1" expected_height="$2" timeout_s="$3"
+  local waited=0 id actual=""
+  while true; do
+    id="$(window_id)"
+    if [[ -n "$id" ]]; then
+      actual="$(xdotool getwindowgeometry --shell "$id" 2>/dev/null || true)"
+      if echo "$actual" | grep -q "^WIDTH=${expected_width}\$" && echo "$actual" | grep -q "^HEIGHT=${expected_height}\$"; then
+        echo "$actual"
+        return 0
+      fi
+    fi
+    sleep 0.5
+    waited=$((waited + 1))
+    if [[ "$waited" -ge "$((timeout_s * 2))" ]]; then
+      echo "::error::window never settled at ${expected_width}x${expected_height} within ${timeout_s}s (last seen: ${actual:-nothing})" >&2
+      exit 1
+    fi
+  done
+}
+
+echo "::group::fresh launch starts in the small splash shape, then settles into the documented default size"
 "$BIN" &
 APP_PID=$!
 wait_for_window 30
-assert_geometry 1280 720
+# 380x460 must match DesktopWindowShell.splashWindowSize.
+assert_geometry 380 460
+wait_for_geometry 1280 720 20
 echo "::endgroup::"
 
 echo "::group::resize past the debounce, then kill mid-session"
@@ -106,11 +139,12 @@ kill -9 "$APP_PID"
 wait "$APP_PID" 2>/dev/null || true
 echo "::endgroup::"
 
-echo "::group::relaunch applies the geometry saved mid-session, not the default"
+echo "::group::relaunch starts in the splash shape again, then settles into the geometry saved mid-session, not the default"
 "$BIN" &
 APP_PID=$!
 wait_for_window 30
-assert_geometry 900 650
+assert_geometry 380 460
+wait_for_geometry 900 650 20
 echo "::endgroup::"
 
 echo "::group::a close request no longer terminates the process, and the window stays reachable"

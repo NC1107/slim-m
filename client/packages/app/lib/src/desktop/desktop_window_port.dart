@@ -54,6 +54,7 @@ abstract interface class DesktopWindowPort {
   Future<void> restore();
   Future<void> setPreventClose(bool value);
   Future<void> hideTitleBar();
+  Future<void> setResizable(bool value);
   Future<void> startDragging();
   Future<List<DisplayArea>> allDisplays();
 
@@ -178,6 +179,9 @@ class WindowManagerDesktopWindowPort
     wm.TitleBarStyle.hidden,
     windowButtonVisibility: false,
   );
+
+  @override
+  Future<void> setResizable(bool value) => wm.windowManager.setResizable(value);
 
   @override
   Future<void> startDragging() => wm.windowManager.startDragging();

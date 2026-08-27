@@ -52,4 +52,23 @@ void main() {
 
     expect(find.byType(StartupScreen), findsNothing);
   });
+
+  testWidgets('the startup screen shows startupStatusProvider\'s live value, '
+      'the seam a future update-progress flow reuses', (tester) async {
+    final container = _container();
+    container.read(appReadyProvider.notifier).state = false;
+    container.read(startupStatusProvider.notifier).state = 'Connecting';
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SlimMApp()),
+    );
+    await tester.pump();
+
+    expect(find.text('Connecting'), findsOneWidget);
+
+    container.read(startupStatusProvider.notifier).state = 'Downloading update';
+    await tester.pump();
+
+    expect(find.text('Downloading update'), findsOneWidget);
+  });
 }
