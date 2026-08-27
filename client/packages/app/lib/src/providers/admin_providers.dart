@@ -121,7 +121,7 @@ final spaceRetentionProvider = FutureProvider.autoDispose<int>(
 
 /// The per-channel canvas object cap, applied to every client. The default a
 /// deployment keeps until an admin sets one is 20000; see
-/// `screens/admin/analytics_screen.dart`.
+/// `screens/admin/canvas_cap_section.dart`.
 final spaceCanvasCapProvider = FutureProvider.autoDispose<int>(
   (ref) => ref.watch(apiProvider).spaceCanvasObjectCap(),
 );
@@ -129,7 +129,7 @@ final spaceCanvasCapProvider = FutureProvider.autoDispose<int>(
 /// The screen-share resolution ceiling, applied to every client's own
 /// capture and publish parameters - see `screen_share_control.dart`. The
 /// default a deployment keeps until an admin sets one is 2160; see
-/// `screens/admin/analytics_screen.dart`.
+/// `screens/admin/screen_share_cap_section.dart`.
 final spaceScreenShareCeilingProvider = FutureProvider.autoDispose<int>(
   (ref) => ref.watch(apiProvider).spaceScreenShareMaxHeight(),
 );

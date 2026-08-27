@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The screen-share resolution ceiling control on the Space analytics
-/// screen. Split from `analytics_screen.dart`, which is at its file-size
+/// The screen-share resolution ceiling control on the Space performance
+/// screen. Split from `performance_screen.dart`, which is at its file-size
 /// ceiling; the two share the screen but not a file, the same split
-/// `analytics_charts.dart` already uses.
+/// `canvas_cap_section.dart` already uses.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart' show ScreenShareQuality;
 
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
@@ -25,6 +26,33 @@ const _screenShareCapOptions = <(String, int)>[
   ('1440p', 1440),
   ('Source', 2160),
 ];
+
+/// What choosing [maxHeight] actually bounds, grounded in
+/// [ScreenShareQuality] (the real per-tier bitrate ceilings a sharer's own
+/// quality choice already carries) and `screen_share_control.dart`'s own
+/// doc: this setting scales the captured dimensions down, but leaves a
+/// tier's bitrate ceiling alone - only the pixels that ceiling has to cover
+/// change.
+String screenShareCapConsequence(int maxHeight) {
+  final tier = ScreenShareQuality.values.cast<ScreenShareQuality?>().firstWhere(
+    (q) => q!.height == maxHeight,
+    orElse: () => null,
+  );
+  if (tier != null) {
+    final mbps = (tier.maxBitrate / 1000000).toStringAsFixed(1);
+    return 'Bounds a share to ${tier.width}x${tier.height}. That does not '
+        'lower the bandwidth ceiling by itself - whichever quality tier a '
+        'sharer picks still governs bitrate, up to $mbps Mbps at this one - '
+        'only how many pixels that budget has to cover, which is what keeps '
+        'a share legible on a slow link instead of soft.';
+  }
+  final maxTierHeight = ScreenShareQuality.values
+      .map((q) => q.height)
+      .reduce((a, b) => a > b ? a : b);
+  return 'No resolution ceiling. Every quality tier this build can publish '
+      'already tops out at ${maxTierHeight}p, so this currently behaves the '
+      'same as no cap at all.';
+}
 
 /// The screen-share resolution ceiling: client-advertised, so this is the
 /// only enforcement there is - a client reads it and caps its own capture
@@ -96,6 +124,11 @@ class _ScreenShareCapSectionState extends ConsumerState<ScreenShareCapSection>
           ],
           selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
           onSegmentSelected: (i) => _setMaxHeight(_screenShareCapOptions[i].$2),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        AppCallout(
+          tone: AppCalloutTone.info,
+          child: Text(screenShareCapConsequence(current)),
         ),
         SuccessFlash(tick: successTick),
         if (actionError != null) ...[

@@ -25,6 +25,7 @@ import '../screens/admin/categories_screen.dart';
 import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
+import '../screens/admin/performance_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
@@ -150,6 +151,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.smile,
             compactRoute: Routes.adminEmoji,
             builder: (_) => const EmojiPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'performance',
+            label: 'Performance',
+            icon: AppIcons.performance,
+            compactRoute: Routes.adminPerformance,
+            builder: (_) => const PerformancePane(),
           ),
         if (canManageServer)
           SettingsPane(
