@@ -248,8 +248,10 @@ MessageActions messageActionsFor(
     hasExistingThread: hasExistingThread,
     canForward: canForwardMessage(message),
     onForward: () => unawaited(forwardMessage(context, ref, message)),
-    onStartSelecting: () => ref
-        .read(messageSelectionProvider(channelId).notifier)
-        .start(message.id),
+    onStartSelecting: canStartSelectingMessages(message, myPermissions)
+        ? () => ref
+              .read(messageSelectionProvider(channelId).notifier)
+              .start(message.id)
+        : null,
   );
 }

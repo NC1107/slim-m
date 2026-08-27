@@ -41,10 +41,13 @@ class MessageActions {
   /// Enters the transcript's selection mode with this message picked, for
   /// deleting several at once.
   ///
-  /// Optional because only a channel transcript has a selection mode to
-  /// enter; the reported-message viewer builds these actions too and has no
-  /// list to select within. Paired with [canDelete] at the menu, since
-  /// selecting messages is only ever a prelude to removing them.
+  /// Optional for two reasons: only a channel transcript has a selection
+  /// mode to enter (the reported-message viewer builds these actions too and
+  /// has no list to select within), and even there it needs MANAGE_MESSAGES
+  /// specifically - null whenever [canDelete] is true only through
+  /// authorship, since selection mode would then let a plain member reach
+  /// past their own message to somebody else's. Rendered inside the same
+  /// [canDelete] group at the menu, since it never appears on its own.
   final VoidCallback? onStartSelecting;
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:

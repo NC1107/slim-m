@@ -120,6 +120,15 @@ bool canManageMessagePin(Message message, int myPermissions) =>
     !message.failed &&
     myPermissions.hasPermission(Perm.manageMessages);
 
+/// MANAGE_MESSAGES only, matching bulk-delete's own server-side gate with no
+/// author exception - unlike [canDeleteMessage], which a plain member also
+/// satisfies for their own message. That gap matters here specifically:
+/// selection mode lets any visible message be added once it starts, so
+/// keying the entry point off [canDeleteMessage] would let a plain member
+/// open the mode from their own message and then pick someone else's.
+bool canStartSelectingMessages(Message message, int myPermissions) =>
+    canManageMessagePin(message, myPermissions);
+
 /// Any live message not your own. The server enforces no authorship rule
 /// on `/reports`; this is purely a client-side UX gate.
 bool canReportMessage(Message message, String? myUserId) =>
