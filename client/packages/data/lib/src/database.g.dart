@@ -697,7 +697,8 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   }
 }
 
-class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
+class $MessagesTable extends Messages
+    with TableInfo<$MessagesTable, MessageRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -802,7 +803,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   String get actualTableName => $name;
   static const String $name = 'messages';
   @override
-  VerificationContext validateIntegrity(Insertable<Message> instance,
+  VerificationContext validateIntegrity(Insertable<MessageRow> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -873,9 +874,9 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Message map(Map<String, dynamic> data, {String? tablePrefix}) {
+  MessageRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Message(
+    return MessageRow(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
       channelId: attachedDatabase.typeMapping
@@ -909,7 +910,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   }
 }
 
-class Message extends DataClass implements Insertable<Message> {
+class MessageRow extends DataClass implements Insertable<MessageRow> {
   final String id;
   final String channelId;
   final String? authorId;
@@ -942,7 +943,7 @@ class Message extends DataClass implements Insertable<Message> {
   /// transport failure's own message) - never a generic "send failed" with
   /// nothing behind it. Null whenever [failed] is false.
   final String? failureReason;
-  const Message(
+  const MessageRow(
       {required this.id,
       required this.channelId,
       this.authorId,
@@ -1010,10 +1011,10 @@ class Message extends DataClass implements Insertable<Message> {
     );
   }
 
-  factory Message.fromJson(Map<String, dynamic> json,
+  factory MessageRow.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Message(
+    return MessageRow(
       id: serializer.fromJson<String>(json['id']),
       channelId: serializer.fromJson<String>(json['channelId']),
       authorId: serializer.fromJson<String?>(json['authorId']),
@@ -1048,7 +1049,7 @@ class Message extends DataClass implements Insertable<Message> {
     };
   }
 
-  Message copyWith(
+  MessageRow copyWith(
           {String? id,
           String? channelId,
           Value<String?> authorId = const Value.absent(),
@@ -1061,7 +1062,7 @@ class Message extends DataClass implements Insertable<Message> {
           bool? pending,
           bool? failed,
           Value<String?> failureReason = const Value.absent()}) =>
-      Message(
+      MessageRow(
         id: id ?? this.id,
         channelId: channelId ?? this.channelId,
         authorId: authorId.present ? authorId.value : this.authorId,
@@ -1078,8 +1079,8 @@ class Message extends DataClass implements Insertable<Message> {
         failureReason:
             failureReason.present ? failureReason.value : this.failureReason,
       );
-  Message copyWithCompanion(MessagesCompanion data) {
-    return Message(
+  MessageRow copyWithCompanion(MessagesCompanion data) {
+    return MessageRow(
       id: data.id.present ? data.id.value : this.id,
       channelId: data.channelId.present ? data.channelId.value : this.channelId,
       authorId: data.authorId.present ? data.authorId.value : this.authorId,
@@ -1101,7 +1102,7 @@ class Message extends DataClass implements Insertable<Message> {
 
   @override
   String toString() {
-    return (StringBuffer('Message(')
+    return (StringBuffer('MessageRow(')
           ..write('id: $id, ')
           ..write('channelId: $channelId, ')
           ..write('authorId: $authorId, ')
@@ -1135,7 +1136,7 @@ class Message extends DataClass implements Insertable<Message> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Message &&
+      (other is MessageRow &&
           other.id == this.id &&
           other.channelId == this.channelId &&
           other.authorId == this.authorId &&
@@ -1150,7 +1151,7 @@ class Message extends DataClass implements Insertable<Message> {
           other.failureReason == this.failureReason);
 }
 
-class MessagesCompanion extends UpdateCompanion<Message> {
+class MessagesCompanion extends UpdateCompanion<MessageRow> {
   final Value<String> id;
   final Value<String> channelId;
   final Value<String?> authorId;
@@ -1197,7 +1198,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
         channelId = Value(channelId),
         content = Value(content),
         createdAt = Value(createdAt);
-  static Insertable<Message> custom({
+  static Insertable<MessageRow> custom({
     Expression<String>? id,
     Expression<String>? channelId,
     Expression<String>? authorId,
@@ -2037,14 +2038,14 @@ class $$MessagesTableAnnotationComposer
 class $$MessagesTableTableManager extends RootTableManager<
     _$SlimmDatabase,
     $MessagesTable,
-    Message,
+    MessageRow,
     $$MessagesTableFilterComposer,
     $$MessagesTableOrderingComposer,
     $$MessagesTableAnnotationComposer,
     $$MessagesTableCreateCompanionBuilder,
     $$MessagesTableUpdateCompanionBuilder,
-    (Message, BaseReferences<_$SlimmDatabase, $MessagesTable, Message>),
-    Message,
+    (MessageRow, BaseReferences<_$SlimmDatabase, $MessagesTable, MessageRow>),
+    MessageRow,
     PrefetchHooks Function()> {
   $$MessagesTableTableManager(_$SlimmDatabase db, $MessagesTable table)
       : super(TableManagerState(
@@ -2126,14 +2127,14 @@ class $$MessagesTableTableManager extends RootTableManager<
 typedef $$MessagesTableProcessedTableManager = ProcessedTableManager<
     _$SlimmDatabase,
     $MessagesTable,
-    Message,
+    MessageRow,
     $$MessagesTableFilterComposer,
     $$MessagesTableOrderingComposer,
     $$MessagesTableAnnotationComposer,
     $$MessagesTableCreateCompanionBuilder,
     $$MessagesTableUpdateCompanionBuilder,
-    (Message, BaseReferences<_$SlimmDatabase, $MessagesTable, Message>),
-    Message,
+    (MessageRow, BaseReferences<_$SlimmDatabase, $MessagesTable, MessageRow>),
+    MessageRow,
     PrefetchHooks Function()>;
 typedef $$ChannelCategoriesTableCreateCompanionBuilder
     = ChannelCategoriesCompanion Function({

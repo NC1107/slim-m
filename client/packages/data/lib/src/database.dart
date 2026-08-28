@@ -18,6 +18,8 @@ library;
 
 import 'package:drift/drift.dart';
 
+import 'message_dto.dart';
+
 part 'database.g.dart';
 
 /// Locally cached channels.
@@ -108,6 +110,13 @@ class ChannelCategories extends Table {
 }
 
 /// Locally cached messages.
+///
+/// `@DataClassName('MessageRow')`: the same collision `ChannelCategories`
+/// renames around above, this time with `message_dto.dart`'s own `Message` -
+/// the plain DTO that is the only shape of a message anything outside this
+/// package ever sees. See [MessageRowMapping] below for the one place a row
+/// becomes one.
+@DataClassName('MessageRow')
 class Messages extends Table {
   TextColumn get id => text()();
   TextColumn get channelId => text()();
@@ -144,6 +153,25 @@ class Messages extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Maps a locally stored row to the DTO everything outside this package
+/// reads instead, so nothing beyond here needs drift at all.
+extension MessageRowMapping on MessageRow {
+  Message toDto() => Message(
+        id: id,
+        channelId: channelId,
+        authorId: authorId,
+        authorDisplayName: authorDisplayName,
+        seq: seq,
+        content: content,
+        createdAt: createdAt,
+        editedAt: editedAt,
+        replyToId: replyToId,
+        pending: pending,
+        failed: failed,
+        failureReason: failureReason,
+      );
 }
 
 @DriftDatabase(tables: [Channels, Messages, ChannelCategories])
