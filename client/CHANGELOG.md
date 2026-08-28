@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.60.0](https://github.com/NC1107/slim-m/compare/client-v0.59.0...client-v0.60.0) (2026-08-28)
+
+
+### Features
+
+* **client:** make every attachment actionable and play video inline ([#957](https://github.com/NC1107/slim-m/issues/957)) ([25a0fbb](https://github.com/NC1107/slim-m/commit/25a0fbb733510baf01ad62b6510bc189db7179b1))
+
+
+### Bug Fixes
+
+* **client:** cache emoji images on disk and bound picker fetch concurrency ([#958](https://github.com/NC1107/slim-m/issues/958)) ([51d17cf](https://github.com/NC1107/slim-m/commit/51d17cfc17aaeb842d1cf3fa615b5318aee8240d))
+
 ## [0.59.0](https://github.com/NC1107/slim-m/compare/client-v0.58.1...client-v0.59.0) (2026-08-28)
 
 
