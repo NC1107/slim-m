@@ -15,9 +15,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/emoji_catalog_provider.dart';
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/custom_emoji_image.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -179,5 +182,106 @@ void main() {
       );
       expect(find.byType(Image), findsOneWidget);
     });
+  });
+
+  group('a rate-limited fetch', () {
+    testWidgets(
+      'retries and still draws the image, rather than caching one 429 as a '
+      'permanently broken emoji - the shape a large bulk import hits when '
+      'every settings-list row fetches its image at once past the asset '
+      'budget',
+      (tester) async {
+        var requests = 0;
+        final container = ProviderContainer(
+          overrides: [
+            sessionProvider.overrideWithValue(
+              api.SessionStore(
+                tokens: const api.TokenPair(
+                  userId: 'u1',
+                  accessToken: 'a',
+                  refreshToken: 'r',
+                  accessExpiresAt: 9999999999999,
+                ),
+              ),
+            ),
+            apiProvider.overrideWith(
+              (ref) => api.SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((request) async {
+                  requests += 1;
+                  if (requests <= 2) {
+                    return http.Response(
+                      '{"error":"slow down and retry"}',
+                      429,
+                    );
+                  }
+                  return http.Response.bytes(
+                    _png,
+                    200,
+                    headers: {'content-type': 'image/png'},
+                  );
+                }),
+              ),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        // runAsync escapes the virtual clock so the retry's real delay fires.
+        final bytes = await tester.runAsync(
+          () =>
+              container.read(customEmojiImageProvider('e-party_parrot').future),
+        );
+
+        expect(bytes, _png);
+        expect(
+          requests,
+          3,
+          reason: 'the first two 429s must be retried, not surfaced',
+        );
+      },
+    );
+
+    testWidgets(
+      'gives up and shows the missing-image glyph once retries are spent, '
+      'rather than retrying forever',
+      (tester) async {
+        var requests = 0;
+        final container = ProviderContainer(
+          overrides: [
+            sessionProvider.overrideWithValue(
+              api.SessionStore(
+                tokens: const api.TokenPair(
+                  userId: 'u1',
+                  accessToken: 'a',
+                  refreshToken: 'r',
+                  accessExpiresAt: 9999999999999,
+                ),
+              ),
+            ),
+            apiProvider.overrideWith(
+              (ref) => api.SlimmApi(
+                baseUrl: Uri.parse('http://localhost:8080'),
+                session: ref.watch(sessionProvider),
+                httpClient: MockClient((request) async {
+                  requests += 1;
+                  return http.Response('{"error":"slow down"}', 429);
+                }),
+              ),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.runAsync(() async {
+          await expectLater(
+            container.read(customEmojiImageProvider('e-party_parrot').future),
+            throwsA(isA<api.RateLimitedException>()),
+          );
+        });
+        expect(requests, 4, reason: 'one try plus three retries, then give up');
+      },
+    );
   });
 }
