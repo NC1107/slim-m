@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.1](https://github.com/NC1107/slim-m/compare/server-v0.47.0...server-v0.47.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **server:** give cheap authenticated reads their own rate-limit class ([#949](https://github.com/NC1107/slim-m/issues/949)) ([f30adca](https://github.com/NC1107/slim-m/commit/f30adcad9eb531afc10b8fc5257b0ecd3ea16b3e))
+
 ## [0.47.0](https://github.com/NC1107/slim-m/compare/server-v0.46.0...server-v0.47.0) (2026-08-28)
 
 
