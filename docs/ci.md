@@ -522,14 +522,16 @@ Naming follows the server binaries in this same workflow (`slimm-server-<version
 Packaging then gates per format, not on both at once: `packaging/flatpak/top.npcserver.slimm.yaml` enables the Flatpak step and `packaging/rpm/slim-m-client.spec` enables the rpm step, independently.
 An earlier version required both, which would have held a working rpm behind a flatpak manifest nobody had written.
 Each missing input still warns by name, and the tarball ships either way.
-The flatpak step also carries `continue-on-error: true`, unlike the rpm step: it has one real build behind it rather than the rpm's dozens of releases, so a bad first run must not be able to take the tarball or rpm down with it; see `packaging/flatpak/README.md`.
+The flatpak step also carries `continue-on-error: true`, unlike the rpm step: it has far fewer real releases behind it than the rpm, so a bad run must not be able to take the tarball or rpm down with it; see `packaging/flatpak/README.md`.
+That guard let a real failure (`flatpak-builder` needs `eu-strip` from `elfutils` to strip debuginfo, and the step never installed it) hide across every release through `client-v0.61.0`, because a `continue-on-error` step's own `conclusion` reports `success` over the API regardless of what its logs say.
+A `verify flatpak bundle was produced` step right after it stays non-blocking the same way, but fails by name and with an `::error::` annotation whenever `dist/*.flatpak` does not exist, so the next time the build breaks it is loud instead of silent.
 
 The rpm is built inside a `fedora:latest` container rather than on the runner, because the spec is written against Fedora's macros and dependency generators and Ubuntu's `rpm` has neither.
 It builds from the tarball staged moments earlier in the same job, not from the URL in `Source0`, since that release asset does not exist yet at that point in the run.
 The `copr` job below is the one that goes through the published URL.
 Both stamp the tag's version over the spec's `Version:` line, so a spec that is behind in git cannot mislabel a release.
 
-The flatpak step is still a skeleton; its manifest will need to reference the same bundle as its app source.
+The flatpak manifest is no longer a skeleton; see `packaging/flatpak/README.md` for what has actually been built and launched with it.
 
 `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` are optional here too, for signing the checksums only.
 

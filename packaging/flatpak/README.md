@@ -77,12 +77,23 @@ This is no longer only a theoretical risk found by reading `ldd` output: the fou
 
 **Not attempted**, each for a stated reason: Flathub submission (out of scope per the task this manifest was built under; a real submission also wants an AppStream `metainfo.xml`, which nothing here writes); a 32-bit or aarch64 build (the rpm's own `ExclusiveArch: x86_64` reasoning applies identically, since the bundle `linux-client` builds is x86_64 only); and confirming the `--talk-name=org.freedesktop.secrets` and `--filesystem=xdg-run/pipewire-0` grants are sufficient rather than merely necessary, which needs a running app on a session with a Secret Service provider and a compositor, not a build sandbox.
 
-## Why `release.yml`'s flatpak step is `continue-on-error: true`
+## `release.yml`'s CI build had never once succeeded, through every release up to `client-v0.61.0`
 
-The rpm has shipped from dozens of real release runs; this manifest has zero.
-A release job that fails outright on an unproven manifest is worse than the warn-and-skip this repository already uses for an absent packaging input, so the same shape is extended to a present-but-possibly-broken one: `steps.pkg.outputs.flatpak` still gates whether the step runs at all, and `continue-on-error: true` means a failure inside it cannot take down the portable tarball or the rpm the same job already produces.
-The checksums step already tolerates a missing `.flatpak` (`shopt -s nullglob`), so this costs nothing on the success path and only changes behaviour the one way that matters: a broken flatpak build now shows as a yellow warning on an otherwise green release, not a red one.
-Once a few real releases have produced a working bundle, revisit whether `continue-on-error` should come off.
+Every tagged client release from the manifest's introduction through `client-v0.61.0` was checked directly (`gh release view` per tag): not one carries a `.flatpak` asset.
+The `build flatpak` step's own `conclusion` reports `success` on every one of those runs regardless, because `continue-on-error: true` makes the field lie about a step that actually failed.
+The real failure, read from `client-v0.61.0`'s own run logs: `flatpak-builder` strips debuginfo out of every module it builds and shells out to `eu-strip` to do it, and the step only ever installed `flatpak flatpak-builder`, never the `elfutils` package that provides `eu-strip` (and `eu-elfcompress`, which the same step warns about but does not hard-fail on).
+It failed on `libdbusmenu`, a module that predates the mpv work in #964 by a wide margin, so this was never a video-plumbing regression; it was broken from the manifest's very first CI run and stayed that way because nothing was watching the artifact list, only the green checkmark the API reported.
+The fix is one line: install `elfutils` alongside `flatpak flatpak-builder` in the same `apt-get install`.
+Confirmed locally (below) that `org.flatpak.Builder`, the sandboxed stand-in used on this machine, does not need it, because a Flathub-published `flatpak-builder` build carries its own bundled `eu-strip`; the Ubuntu apt package used in CI does not, which is exactly why this only ever broke there.
+
+## Why `release.yml`'s flatpak step is still `continue-on-error: true`
+
+The rpm has shipped from dozens of real release runs; this manifest, even once the `eu-strip` fix lands, has none.
+A release job that fails outright on a format with this little of a track record is worse than the warn-and-skip this repository already uses for an absent packaging input, so the same shape is extended to a present-but-possibly-broken one: `steps.pkg.outputs.flatpak` still gates whether the step runs at all, and `continue-on-error: true` means a failure inside it cannot take down the portable tarball or the rpm the same job already produces.
+The checksums step already tolerates a missing `.flatpak` (`shopt -s nullglob`), so this costs nothing on the success path.
+What changed is that a broken build can no longer hide behind that green checkmark: a `verify flatpak bundle was produced` step immediately after it checks `dist/*.flatpak` for real and fails, by name, with an `::error::` annotation, whenever the build step did not actually produce one.
+That step is `continue-on-error: true` too, for the same non-blocking reason, but a named, annotated failure sitting right next to a real one is a different thing from the build step's own `conclusion` field silently reporting a lie - the six-release blind spot was never `continue-on-error` itself, it was that nothing else was checking what it was quietly letting through.
+Once a few real releases have produced a working bundle, revisit whether `continue-on-error` should come off entirely.
 The rpm needed no such guard once it had a track record.
 
 ## Permissions, briefly
