@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.59.0](https://github.com/NC1107/slim-m/compare/client-v0.58.1...client-v0.59.0) (2026-08-28)
+
+
+### Features
+
+* **client:** add a desktop splash on/off and duration preference ([#948](https://github.com/NC1107/slim-m/issues/948)) ([1ab9da4](https://github.com/NC1107/slim-m/commit/1ab9da4d7357198fa85e7ea6c41a7c406205b082))
+* **client:** add moderation-history tab beside the reports queue ([#954](https://github.com/NC1107/slim-m/issues/954)) ([94baed3](https://github.com/NC1107/slim-m/commit/94baed32a1581bbbd427f166fe55a6f4d7cb0967))
+
+
+### Bug Fixes
+
+* **client:** cap the transcript history window at a shared retention ceiling ([#952](https://github.com/NC1107/slim-m/issues/952)) ([e894ba8](https://github.com/NC1107/slim-m/commit/e894ba8647647015e4958b6449b5d762bca845d8))
+
 ## [0.58.1](https://github.com/NC1107/slim-m/compare/client-v0.58.0...client-v0.58.1) (2026-08-28)
 
 
