@@ -85,6 +85,10 @@ abstract final class AppIcons {
   /// Overlaid on a held gif or a not-yet-loaded media preview: tap to reveal.
   static const IconData play = LucideIcons.play300;
 
+  /// A playing attachment video's own transport control, distinct from
+  /// [play]'s poster-overlay role.
+  static const IconData pause = LucideIcons.pause300;
+
   /// The document-browser route onto an attachment, distinct from [image]'s
   /// Photos-backed one; see `attachment_picker.dart`.
   static const IconData attachFile = LucideIcons.paperclip300;
@@ -129,6 +133,9 @@ abstract final class AppIcons {
 
   /// Expanding a call tile's video to fill the screen.
   static const IconData expand = LucideIcons.maximize2300;
+
+  /// Leaving full screen playback - the shrink counterpart to [expand].
+  static const IconData collapse = LucideIcons.shrink300;
 
   /// Starting or joining a DM call, distinct from [voice] (a voice channel's
   /// own icon) since a DM has no channel kind of its own to draw.
