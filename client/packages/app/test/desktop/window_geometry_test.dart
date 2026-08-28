@@ -136,4 +136,80 @@ void main() {
       expect(restored.position, isNull);
     });
   });
+
+  group('looksLikeSplashSize', () {
+    test('the splash size itself is flagged', () {
+      expect(looksLikeSplashSize(kSplashWindowSize), isTrue);
+    });
+
+    test(
+      'the owner\'s own corrupted sample - 380x508, the splash height plus a '
+      'lingering 48px native title bar - is flagged',
+      () {
+        expect(
+          looksLikeSplashSize(const WindowSize(width: 380, height: 508)),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'one pixel taller than the title-bar margin allows is not flagged',
+      () {
+        expect(
+          looksLikeSplashSize(const WindowSize(width: 380, height: 509)),
+          isFalse,
+          reason: 'both dimensions must be implausibly small, not just width',
+        );
+      },
+    );
+
+    test('an ordinary desktop size is never flagged', () {
+      expect(
+        looksLikeSplashSize(const WindowSize(width: 1280, height: 720)),
+        isFalse,
+      );
+    });
+
+    test(
+      'a narrow but tall window is not flagged - only one axis is small',
+      () {
+        expect(
+          looksLikeSplashSize(const WindowSize(width: 380, height: 1800)),
+          isFalse,
+        );
+      },
+    );
+
+    test('a short but wide window is not flagged - only one axis is small', () {
+      expect(
+        looksLikeSplashSize(const WindowSize(width: 1920, height: 500)),
+        isFalse,
+      );
+    });
+  });
+
+  group('healSplashCorruption', () {
+    test('a splash-sized geometry heals to the fallback, dropping position '
+        'and run state along with the size', () {
+      const corrupted = WindowGeometry(
+        windowedSize: WindowSize(width: 380, height: 508),
+        position: WindowRect(x: 45, y: 45, width: 380, height: 508),
+        runState: WindowRunState.maximized,
+      );
+
+      final healed = healSplashCorruption(corrupted);
+
+      expect(healed, same(WindowGeometry.fallback));
+    });
+
+    test('a legitimate saved geometry is returned unchanged', () {
+      const legitimate = WindowGeometry(
+        windowedSize: WindowSize(width: 900, height: 600),
+        position: WindowRect(x: 20, y: 20, width: 900, height: 600),
+      );
+
+      expect(healSplashCorruption(legitimate), same(legitimate));
+    });
+  });
 }

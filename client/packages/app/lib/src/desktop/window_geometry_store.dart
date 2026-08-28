@@ -18,12 +18,18 @@ class WindowGeometryStore {
   final SharedPreferences _prefs;
 
   /// Null on a fresh install, or if the stored value is corrupt - a broken
-  /// blob degrades to "nothing saved yet" rather than a crash on launch.
+  /// blob degrades to "nothing saved yet" rather than a crash on launch. A
+  /// value that decodes fine but [looksLikeSplashSize] is healed to
+  /// [WindowGeometry.fallback] instead - see [healSplashCorruption] for why
+  /// that self-heals every build shipped before the write-time fix landed.
   WindowGeometry? read() {
     final raw = _prefs.getString(windowGeometryPreferenceKey);
     if (raw == null) return null;
     try {
-      return WindowGeometry.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      final decoded = WindowGeometry.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+      return healSplashCorruption(decoded);
     } catch (_) {
       return null;
     }

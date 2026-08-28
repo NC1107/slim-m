@@ -8,6 +8,7 @@
 /// is whatever the deployment uploaded.
 library;
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,10 +48,32 @@ final customEmojiIndexProvider = Provider<Map<String, String>>((ref) {
 /// on the way back. Bounded rather than unbounded, unlike an attachment cache:
 /// the set is capped at 500 (`MAX_CUSTOM_EMOJI`, `store/emoji.rs:15`) and each
 /// image at 1 MiB (`MAX_IMAGE_BYTES`, `emoji.rs:34`).
+///
+/// The emoji settings screen builds every row's image widget at once
+/// (`emoji_screen.dart`'s `_EmojiRow` list is not lazily built), so importing
+/// a pack larger than `Class::Asset`'s burst (`ratelimit/class.rs`, sized for
+/// one member page's avatars, not a few hundred emoji at once) fires more
+/// concurrent fetches than that budget admits in one instant, and some of
+/// them draw a [RateLimitedException] rather than a missing or broken image.
+/// Retried with backoff the same way `CanvasSync._fetchPage` retries a
+/// rate-limited page fetch, so a burst that trips the limiter resolves once
+/// the budget refills, rather than caching that single 429 as this emoji's
+/// image forever - which is what a broken-image placeholder that never
+/// recovers on reload actually was.
 final customEmojiImageProvider = FutureProvider.family<Uint8List, String>((
   ref,
   emojiId,
 ) async {
-  final fetched = await ref.watch(apiProvider).fetchCustomEmojiImage(emojiId);
-  return fetched.bytes;
+  final api = ref.watch(apiProvider);
+  var delay = const Duration(milliseconds: 250);
+  for (var attempt = 0; ; attempt++) {
+    try {
+      final fetched = await api.fetchCustomEmojiImage(emojiId);
+      return fetched.bytes;
+    } on RateLimitedException {
+      if (attempt >= 3) rethrow;
+      await Future<void>.delayed(delay);
+      delay *= 2;
+    }
+  }
 });
