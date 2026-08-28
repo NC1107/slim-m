@@ -8,16 +8,33 @@
 /// showing zero children. This drives the real `start()` against a mocked
 /// `tray_manager` channel that fails `setToolTip` the same way, and asserts
 /// the context menu is still built.
+///
+/// Also covers a second regression on the released 0.61.0 build: the menu
+/// rendered correctly but clicking any item did nothing. `tray_manager`
+/// 0.5.3 fires `menuItem.onClick` from inside a loop over its registered
+/// `TrayListener`s (`tray_manager.dart` line ~42); with none registered the
+/// loop body never runs. The test below drives the plugin's own click event
+/// (`onTrayMenuItemClick`, a call *from* the platform back into Dart) through
+/// the mocked channel and asserts the click actually reached the port, not
+/// just that the menu looks right.
 library;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/desktop/tray/desktop_tray_controller.dart';
+import 'package:tray_manager/tray_manager.dart';
 
 import '../voice_controller_harness.dart';
 import 'support/fake_desktop_window_port.dart';
 
 const _channel = MethodChannel('tray_manager');
+
+Future<void> _simulateMenuItemClick(int id) async {
+  final call = MethodCall('onTrayMenuItemClick', {'id': id});
+  final data = const StandardMethodCodec().encodeMethodCall(call);
+  await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .handlePlatformMessage(_channel.name, data, (_) {});
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,4 +77,42 @@ void main() {
     expect(items, isNotEmpty);
     expect(items.first['label'], 'Show/Hide slim-m');
   });
+
+  test(
+    'clicking the Show/Hide menu item actually reaches the window port',
+    () async {
+      final harness = VoiceHarness();
+      harness.controllerWith(FakeSession(), voiceApi());
+      addTearDown(harness.dispose);
+
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_channel, (call) async {
+            calls.add(call);
+            return true;
+          });
+
+      final port = FakeDesktopWindowPort()..visible = true;
+      final controller = DesktopTrayController(
+        port: port,
+        container: harness.container,
+      );
+
+      await controller.start();
+      addTearDown(controller.dispose);
+
+      expect(TrayManager.instance.hasListeners, isTrue);
+
+      final menuCall = calls.firstWhere(
+        (call) => call.method == 'setContextMenu',
+      );
+      final menu = (menuCall.arguments as Map)['menu'] as Map;
+      final items = menu['items'] as List;
+      final showHideId = items.first['id'] as int;
+
+      await _simulateMenuItemClick(showHideId);
+
+      expect(port.hideCalls, 1);
+    },
+  );
 }
