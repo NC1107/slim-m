@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.60.1](https://github.com/NC1107/slim-m/compare/client-v0.60.0...client-v0.60.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **client:** bound message store and extras retention with a mounted-channel registry ([#961](https://github.com/NC1107/slim-m/issues/961)) ([272ba3c](https://github.com/NC1107/slim-m/commit/272ba3c0fa5fe03dc794c8252e9a59a3f9bab777))
+* **client:** let the compact drawer's edge-swipe work on a narrow desktop window ([#960](https://github.com/NC1107/slim-m/issues/960)) ([0c5dfb3](https://github.com/NC1107/slim-m/commit/0c5dfb3fa198fb7b9afc0f6006eaab6ff1fc74c0))
+
 ## [0.60.0](https://github.com/NC1107/slim-m/compare/client-v0.59.0...client-v0.60.0) (2026-08-28)
 
 
