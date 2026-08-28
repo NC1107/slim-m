@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The Voice Canvas, as a mode of a channel rather than a route.
 ///
-/// Riverpod fetches, subscribes and mounts; nothing it does is observed inside
-/// a frame. The live subscription is a plain `.listen` on the sync
+/// This widget is a thin consumer of [CanvasEngine] (`canvas_engine.dart`),
+/// which owns the document, the fetch, the live-event subscription and every
+/// per-channel helper - see that file's own doc for the fetch and lifecycle
+/// contract. What is left here is genuinely widget-shaped: the tool strip's
+/// own state, fullscreen, and wiring the engine's objects onto
+/// `CanvasPaneBody`'s params.
+///
+/// The live subscription inside the engine is a plain `.listen` on the sync
 /// controller's broadcast stream, never a `StreamProvider` a widget watches -
 /// two shapes of that hang a widget test with a symptom indistinguishable from
 /// a slow CI job, and both are already recorded in the project's knowledge
@@ -22,7 +28,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
@@ -33,19 +38,15 @@ import '../../providers/blocks_controller.dart';
 import '../../providers/canvas_self_presence.dart';
 import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
-import '../../providers/live_events.dart';
-import '../../providers/sync_controller.dart';
-import '../../providers/user_profiles.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_commit_queue.dart';
 import 'canvas_cursor_relay.dart';
+import 'canvas_engine.dart';
 import 'canvas_fullscreen.dart';
-import 'canvas_image_hydrator.dart';
 import 'canvas_image_paste.dart';
-import 'canvas_live_event_dispatch.dart';
 import 'canvas_media_slot_sync.dart';
 import 'canvas_note_sheet.dart';
 import 'canvas_ops_controller.dart';
@@ -77,47 +78,6 @@ class CanvasPane extends ConsumerStatefulWidget {
 }
 
 class _CanvasPaneState extends ConsumerState<CanvasPane> {
-  final CanvasDocument _document = CanvasDocument();
-  final CanvasCursors _cursors = CanvasCursors();
-  final RemoteStrokeDrafts _remoteDrafts = RemoteStrokeDrafts();
-
-  /// Every camera and screen-share tile's own drag, resize, lock and depth -
-  /// shared and persistent, mirroring the server's own `canvas_media_slots`
-  /// table (`_slotSync`, below, is what keeps it current); only `hidden`
-  /// stays local to this field. Lives for exactly this pane's own mount, so
-  /// closing and reopening the canvas re-fetches rather than remembering -
-  /// harmless, since the server is the real source of truth either way.
-  final CanvasPresenceTileOverrides _tileOverrides =
-      CanvasPresenceTileOverrides();
-
-  /// Reads and writes [_tileOverrides]' shared fields against the server -
-  /// see that class's own doc for the split between what this syncs and
-  /// what stays local.
-  late final CanvasMediaSlotSync _slotSync = CanvasMediaSlotSync(
-    channelId: widget.channelId,
-    client: ref.read(apiProvider),
-    overrides: _tileOverrides,
-  );
-  late final CanvasActivityLog _activityLog = CanvasActivityLog(
-    isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
-  );
-  StreamSubscription<api.ServerEvent>? _live;
-  CanvasCommitQueue? _queue;
-  CanvasOpsController? _opsController;
-  CanvasCursorRelay? _cursorRelay;
-  CanvasStrokePreviewRelay? _strokePreviewRelay;
-  Timer? _panDebounce;
-  late final CanvasSync _sync;
-  ProviderSubscription<SyncStatus>? _syncStatusSubscription;
-
-  Rect? _fetched;
-
-  /// The view [_onCameraMoved] last examined, regardless of what it decided
-  /// to do about it. See that method's doc for why this exists.
-  Rect? _lastCameraView;
-  bool _loading = true;
-  String? _error;
-  bool _truncated = false;
   int _localZ = provisionalLocalZIndex;
   CanvasTool _tool = CanvasTool.pen;
 
@@ -128,240 +88,54 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
   CanvasShapeKind _shapeKind = CanvasShapeKind.rectangle;
   CanvasImagePaste? _imagePasteHelper;
   CanvasQuickPlacement? _quickPlacementHelper;
-  late final CanvasImageHydrator _hydrator = CanvasImageHydrator(
-    client: ref.read(apiProvider),
-    document: _document,
+
+  /// Captured once here rather than read fresh from `ref` on every access:
+  /// `ref.read`/`ref.watch` both throw once this element is unmounting (see
+  /// [dispose]'s own doc), so a handle taken while it is still safe to ask
+  /// is the only way [dispose] can reach the engine at all. Bound to
+  /// [widget.channelId] as of this exact call, matching every other
+  /// per-channel field this pane ever bound eagerly at construction - a
+  /// later `didUpdateWidget` with a different channel id was never a case
+  /// this pane handled.
+  late final CanvasEngine _engine = ref.read(
+    canvasEngineProvider(widget.channelId).notifier,
   );
 
+  /// Forces the engine into existence now, matching the ordering every
+  /// prior version of this pane gave its own sync setup: before this
+  /// widget's first `build()` mounts a `CanvasSurface` that expects the
+  /// document to already have a listener. `build()`'s own `ref.watch` is
+  /// what keeps the engine alive past this call - accessing [_engine] alone
+  /// would not stop the very next scheduler pass from disposing an engine
+  /// nothing is watching yet.
   @override
   void initState() {
     super.initState();
-    _live = ref.read(liveEventsProvider).listen(_onEvent);
-    _sync = CanvasSync(
-      channelId: widget.channelId,
-      client: ref.read(apiProvider),
-      document: _document,
-      coldFetch: _fetch,
-      forgetFetchedRegion: () => _fetched = null,
-      onObjectPlaced: _hydrator.hydrate,
-      onOpApplied: _activityLog.recordOp,
-      onHardReset: _activityLog.recordResync,
-    );
-    // Registered once here, not in build: a listener re-attached per rebuild would fire a catch-up per rebuild, not per transition into live.
-    _syncStatusSubscription = ref.listenManual<SyncStatus>(
-      syncControllerProvider,
-      (previous, next) {
-        if (next == SyncStatus.live) {
-          unawaited(_sync.catchUp());
-          unawaited(_slotSync.fetch());
-        }
-      },
-    );
-    // No fetch here: CanvasSurface's first setViewport call reaches _onCameraMoved below and fetches the real region, not a wasted one against a zero viewport.
-    _document.addListener(_onCameraMoved);
+    _engine; // touching the late field is what forces its ref.read now
     // This pane is the only content mounted while it exists, so one listener for the whole mount is safe: nothing else here could hold it at the same time.
     _imagePaste.start();
-    unawaited(_slotSync.fetch());
   }
 
+  /// Disposes the engine directly, synchronously, rather than trusting
+  /// `canvasEngineProvider`'s own `.autoDispose` scheduling to get there:
+  /// that scheduling only runs on the next rebuild after the last listener
+  /// goes, which is soon but not now, and the engine's cursor and
+  /// stroke-preview relays each hold a real, periodic `Timer` for that long.
+  /// A closed canvas is closed the instant this method returns, not a frame
+  /// later - [CanvasEngine.dispose]'s own doc covers the double-call this
+  /// makes safe once `.autoDispose` gets to it too.
+  ///
+  /// [_engine] is used here rather than `ref.read`: by the time `dispose()`
+  /// runs, Flutter has already marked this element defunct (`Element.unmount`
+  /// calls `super.unmount()`, which does that, before calling `state.dispose()`
+  /// at all), and riverpod's `ref.read`/`ref.watch` both throw once that has
+  /// happened - `_engine`'s own field is what makes this reachable without
+  /// touching `ref` at all.
   @override
   void dispose() {
-    _hydrator.dispose();
     _imagePasteHelper?.stop();
-    _panDebounce?.cancel();
-    _queue?.close();
-    unawaited(_live?.cancel());
-    _syncStatusSubscription?.close();
-    _sync.dispose();
-    _document.removeListener(_onCameraMoved);
-    _document.dispose();
-    _cursorRelay?.dispose();
-    _cursors.dispose();
-    _strokePreviewRelay?.dispose();
-    _remoteDrafts.dispose();
-    _activityLog.dispose();
-    _tileOverrides.dispose();
+    _engine.dispose();
     super.dispose();
-  }
-
-  void _onEvent(api.ServerEvent event) => dispatchCanvasLiveEvent(
-    event,
-    paneChannelId: widget.channelId,
-    sync: _sync,
-    document: _document,
-    relay: () => _relay,
-    strokePreviewRelay: () => _strokePreview,
-    applyPlacedObject: _apply,
-    forgetFetchedRegion: () => _fetched = null,
-    activityLog: _activityLog,
-    mediaSlotSync: _slotSync,
-  );
-
-  void _apply(api.CanvasObject object) {
-    final input = canvasStrokeInputFrom(object);
-    if (input == null) return;
-    _document
-      ..applyPlaced(input)
-      ..refresh();
-    _hydrator.hydrate(object);
-  }
-
-  /// A pan re-reads once the camera has settled, never per frame.
-  ///
-  /// [CanvasDocument]'s listenable fires on any content change too - a fetch
-  /// landing, a live frame, a locally drawn stroke - since [CanvasDocument]'s
-  /// `refresh()` and a real camera move both end in the same
-  /// `notifyListeners()`. Reading [_lastCameraView] is what tells those
-  /// apart: a content-only notification reports the same world view as last
-  /// examined, so it returns before touching [_fetched] at all. Without that
-  /// guard a still-truncated region never becomes "covered", so every one of
-  /// those content notifications re-read a null [_fetched] and rescheduled a
-  /// fetch for the unmoved viewport - forever, since the answer stays
-  /// truncated for the same reason each time.
-  void _onCameraMoved() {
-    final view = _document.worldView;
-    if (view == _lastCameraView) return;
-    final isFirstView = _lastCameraView == null;
-    _lastCameraView = view;
-    final fetched = _fetched;
-    if (fetched != null &&
-        fetched.contains(view.topLeft) &&
-        fetched.contains(view.bottomRight)) {
-      return;
-    }
-    _panDebounce?.cancel();
-    if (isFirstView) {
-      unawaited(_fetch());
-      return;
-    }
-    _panDebounce = Timer(
-      const Duration(milliseconds: 150),
-      () => unawaited(_fetch()),
-    );
-  }
-
-  Rect _padded(Rect view) {
-    final wide = view.inflate(view.width.clamp(1, 4000) / 2);
-    return Rect.fromLTRB(
-      wide.left.clamp(-worldLimit, worldLimit),
-      wide.top.clamp(-worldLimit, worldLimit),
-      wide.right.clamp(-worldLimit, worldLimit),
-      wide.bottom.clamp(-worldLimit, worldLimit),
-    );
-  }
-
-  Future<void> _fetch() async {
-    final region = _padded(_document.worldView);
-    if (region.width <= 0 || region.height <= 0) return;
-    try {
-      final page = await ref
-          .read(apiProvider)
-          .canvasViewport(
-            widget.channelId,
-            region: api.CanvasRect(
-              minX: region.left,
-              minY: region.top,
-              maxX: region.right,
-              maxY: region.bottom,
-            ),
-            limit: 2000,
-          );
-      if (!mounted) return;
-      for (final object in page.objects) {
-        final input = canvasStrokeInputFrom(object);
-        if (input != null) {
-          _document.applyPlaced(input);
-          _hydrator.hydrate(object);
-        }
-      }
-      // Set before refresh(), not after: refresh() reaches _onCameraMoved synchronously and must see this fetch's own answer, not the value from before it ran.
-      setState(() {
-        _loading = false;
-        _error = null;
-        _truncated = page.hasMore;
-        // A truncated page is not coverage: recording it would let the next pan skip what this read never returned.
-        _fetched = page.hasMore ? null : region;
-      });
-      _document.refresh();
-      _sync.seedFromViewport(page.latestSeq);
-      await _sync.catchUp();
-    } on api.ForbiddenException {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = 'The canvas is not available in this channel.';
-        });
-      }
-    } on api.ApiException {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = _genericLoadError;
-        });
-      }
-    }
-  }
-
-  /// [_error]'s exact text for an almost-certainly-transient fetch failure -
-  /// shared with the `onRetryError` gate below, so the one error this pane
-  /// can meaningfully retry (re-running [_fetch]) is identified by more than
-  /// a string literal repeated in two places.
-  static const _genericLoadError = 'The canvas could not be loaded.';
-
-  void _onStroke(List<Offset> worldPoints) {
-    final selfId = ref.read(meProvider).valueOrNull?.id;
-    final ids = <String>[];
-    for (final segment in splitStroke(worldPoints)) {
-      final id = newCanvasObjectId();
-      ids.add(id);
-      _document.applyPlaced(
-        CanvasStrokeInput(
-          id: id,
-          seq: 0,
-          zIndex: _localZ++,
-          x: segment.x,
-          y: segment.y,
-          w: segment.w,
-          h: segment.h,
-          points: segment.points,
-          width: 3,
-          colorKey: 'annotation',
-          authorId: selfId,
-        ),
-      );
-      _commits.add(
-        CanvasCommit(
-          id: id,
-          x: segment.x,
-          y: segment.y,
-          w: segment.w,
-          h: segment.h,
-          props: {
-            'points': segment.points,
-            'width': 3.0,
-            'color': 'annotation',
-          },
-        ),
-      );
-    }
-    _document.refresh();
-    // recordDraw is what makes undoing this whole gesture one op, not several.
-    _ops.recordDraw(ids);
-    if (mounted) setState(() {});
-  }
-
-  void _onErase(Offset world) {
-    final me = ref.read(meProvider).valueOrNull;
-    // A safe read, not a cold one: build() already watches this same family instance every frame.
-    final manageCanvas = ref
-        .read(myChannelPermissionsProvider(widget.channelId))
-        .hasPermission(Perm.manageCanvas);
-    _ops.onErasePoint(world, manageCanvas: manageCanvas, selfId: me?.id);
-  }
-
-  Future<void> _onEraseEnd() async {
-    await _ops.endErase();
-    if (mounted) setState(() {});
   }
 
   /// The same bridge [_refresh] is, for a caller that needs the raw
@@ -387,6 +161,8 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
         .hasPermission(Perm.manageCanvas);
     final selfPresence = ref.watch(canvasSelfPresenceProvider);
     final fullscreen = _fullscreen;
+    // The one ref.watch keeping canvasEngineProvider alive; see its own doc.
+    final engineState = ref.watch(canvasEngineProvider(widget.channelId));
     return CallbackShortcuts(
       bindings: {
         // Only bound while there is something to escape from, so Escape keeps reaching whatever else would have handled it.
@@ -419,13 +195,13 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onClear: _onClear,
           onPasteImage: () => unawaited(_imagePaste.pasteFromButton()),
           onRecenter: _onRecenter,
-          error: _error,
-          onDismissError: () => setState(() => _error = null),
-          onRetryError: _error == _genericLoadError
-              ? () => unawaited(_fetch())
+          error: engineState.error,
+          onDismissError: () => _engine.reportError(null),
+          onRetryError: engineState.error == CanvasEngine.genericLoadError
+              ? () => unawaited(_engine.fetch())
               : null,
-          truncated: _truncated,
-          loading: _loading,
+          truncated: engineState.truncated,
+          loading: engineState.loading,
           onStroke: _onStroke,
           onErase: _onErase,
           onEraseEnd: () => unawaited(_onEraseEnd()),
