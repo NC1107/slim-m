@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.0](https://github.com/NC1107/slim-m/compare/server-v0.46.0...server-v0.47.0) (2026-08-28)
+
+
+### Features
+
+* **server:** bulk-add custom emoji in one rate-limit charge ([#932](https://github.com/NC1107/slim-m/issues/932)) ([8243bac](https://github.com/NC1107/slim-m/commit/8243bacb1b92d62f55eb18a24f16b617433ea9e0))
+
 ## [0.46.0](https://github.com/NC1107/slim-m/compare/server-v0.45.2...server-v0.46.0) (2026-08-27)
 
 
