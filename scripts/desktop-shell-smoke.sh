@@ -17,7 +17,17 @@
 # the real geometry, and DesktopWindowShell.revealAfterHandoff shows it again -
 # see that decision record's superseding section. wmctrl briefly stops
 # listing the window during that hide, so every check below that needs the
-# settled geometry polls rather than asserting once.
+# settled geometry polls rather than asserting once. The splash-size checks
+# below sample continuously from launch and keep every distinct size seen
+# rather than reading geometry at one specific poll: a bootstrap fast enough
+# to beat one poll (observed both on an unrelated PR and on a release commit,
+# see the incident notes this PR's description links) used to read as the
+# splash never having appeared, when it plainly had. This still cannot rule
+# out a bootstrap so fast it beats the 100ms sample interval itself - that
+# residual race is real, just far smaller than racing a single poll - and it
+# still asserts the same claim decision 0012 makes (a real splash size, then
+# a real settle), only at whatever instant it actually happened rather than
+# at one guessed instant.
 #
 # There is no org.kde.StatusNotifierWatcher on this bus - fluxbox is a plain
 # window manager, not a full desktop shell - so the close path here always
@@ -36,6 +46,8 @@
 set -euo pipefail
 
 readonly APP_NAME="slim-m"
+readonly SPLASH_WIDTH=380
+readonly SPLASH_HEIGHT=460
 BUNDLE="${1:?usage: desktop-shell-smoke.sh <bundle-dir>}"
 BIN="${BUNDLE}/slimm_app"
 export DISPLAY=:99
@@ -74,62 +86,79 @@ cleanup() {
 }
 trap cleanup EXIT
 
-wait_for_window() {
-  local timeout_s="$1" waited=0
-  while ! wmctrl -l | grep -q "$APP_NAME"; do
-    sleep 0.5
-    waited=$((waited + 1))
-    if [[ "$waited" -ge "$((timeout_s * 2))" ]]; then
-      echo "::error::window titled slim-m did not appear within ${timeout_s}s" >&2
-      exit 1
-    fi
-  done
-}
-
 window_id() {
-  # wait_for_geometry assigns this bare, so a "not listed yet" grep miss during a hide must not trip set -e via pipefail.
+  # track_to_settled_size assigns this bare, so a "not listed yet" grep miss during a hide must not trip set -e via pipefail.
   wmctrl -l | grep "$APP_NAME" | head -1 | awk '{print $1}' || true
 }
 
-assert_geometry() {
-  local expected_width="$1" expected_height="$2" actual
-  actual="$(xdotool getwindowgeometry --shell "$(window_id)")"
-  echo "$actual"
-  echo "$actual" | grep -q "^WIDTH=${expected_width}\$"
-  echo "$actual" | grep -q "^HEIGHT=${expected_height}\$"
+current_size() {
+  local id actual w h
+  id="$(window_id)"
+  [[ -n "$id" ]] || return 1
+  actual="$(xdotool getwindowgeometry --shell "$id" 2>/dev/null)" || return 1
+  w="$(echo "$actual" | sed -n 's/^WIDTH=//p')"
+  h="$(echo "$actual" | sed -n 's/^HEIGHT=//p')"
+  [[ -n "$w" && -n "$h" ]] || return 1
+  echo "${w}x${h}"
 }
 
-# Polls rather than asserting once: prepareHandoff hides the window while it
-# applies the real geometry, so window_id/xdotool can see nothing at all for
-# part of this wait, and a single immediate check would be racing that hide.
-wait_for_geometry() {
+# SIZES accumulates every distinct size seen so far, oldest first, and is reset at the start of each track_to_settled_size call.
+SIZES=()
+
+# A bare SIZES[-1] throws under set -e when SIZES has zero elements, not just an unset value, so every read of the last entry goes through this instead.
+last_size() {
+  [[ ${#SIZES[@]} -gt 0 ]] && echo "${SIZES[-1]}"
+}
+
+record_size() {
+  local size
+  size="$(current_size)" || return 0
+  if [[ "$(last_size)" != "$size" ]]; then
+    SIZES+=("$size")
+  fi
+}
+
+# Samples every 0.1s until the size reads settled for three straight samples; see the header comment for why this replaced a single existence-then-geometry check.
+track_to_settled_size() {
   local expected_width="$1" expected_height="$2" timeout_s="$3"
-  local waited=0 id actual=""
+  local expected="${expected_width}x${expected_height}" waited=0 hits=0
+  SIZES=()
   while true; do
-    id="$(window_id)"
-    if [[ -n "$id" ]]; then
-      actual="$(xdotool getwindowgeometry --shell "$id" 2>/dev/null || true)"
-      if echo "$actual" | grep -q "^WIDTH=${expected_width}\$" && echo "$actual" | grep -q "^HEIGHT=${expected_height}\$"; then
-        echo "$actual"
-        return 0
-      fi
+    record_size
+    if [[ "$(last_size)" == "$expected" ]]; then
+      hits=$((hits + 1))
+      [[ "$hits" -ge 3 ]] && return 0
+    else
+      hits=0
     fi
-    sleep 0.5
+    sleep 0.1
     waited=$((waited + 1))
-    if [[ "$waited" -ge "$((timeout_s * 2))" ]]; then
-      echo "::error::window never settled at ${expected_width}x${expected_height} within ${timeout_s}s (last seen: ${actual:-nothing})" >&2
+    if [[ "$waited" -ge "$((timeout_s * 10))" ]]; then
+      if [[ ${#SIZES[@]} -eq 0 ]]; then
+        echo "::error::window titled slim-m did not appear within ${timeout_s}s" >&2
+      else
+        echo "::error::window never settled at ${expected} within ${timeout_s}s (observed sequence: ${SIZES[*]})" >&2
+      fi
       exit 1
     fi
   done
+}
+
+assert_splash_seen() {
+  local size
+  for size in "${SIZES[@]}"; do
+    [[ "$size" == "${SPLASH_WIDTH}x${SPLASH_HEIGHT}" ]] && return 0
+  done
+  echo "::error::window never passed through the splash size ${SPLASH_WIDTH}x${SPLASH_HEIGHT}; observed sequence: ${SIZES[*]:-none}" >&2
+  exit 1
 }
 
 echo "::group::fresh launch starts in the small splash shape, then settles into the documented default size"
 "$BIN" &
 APP_PID=$!
-wait_for_window 30
-# 380x460 must match DesktopWindowShell.splashWindowSize.
-assert_geometry 380 460
-wait_for_geometry 1280 720 20
+track_to_settled_size 1280 720 50
+assert_splash_seen
+echo "observed size sequence: ${SIZES[*]}"
 echo "::endgroup::"
 
 echo "::group::resize past the debounce, then kill mid-session"
@@ -143,9 +172,9 @@ echo "::endgroup::"
 echo "::group::relaunch starts in the splash shape again, then settles into the geometry saved mid-session, not the default"
 "$BIN" &
 APP_PID=$!
-wait_for_window 30
-assert_geometry 380 460
-wait_for_geometry 900 650 20
+track_to_settled_size 900 650 50
+assert_splash_seen
+echo "observed size sequence: ${SIZES[*]}"
 echo "::endgroup::"
 
 echo "::group::a close request no longer terminates the process, and the window stays reachable"
