@@ -28,6 +28,12 @@ String? customEmojiIdFor(String token, Map<String, String> index) {
   return index[token.substring(1, token.length - 1).toLowerCase()];
 }
 
+/// While the image is queued or in flight this draws a static tinted tile,
+/// the same shape `AttachmentPlaceholder` already uses for a pending
+/// attachment - deliberately not an animated spinner. An indeterminate
+/// spinner never lets `pumpAndSettle` settle while a cell is still loading,
+/// which every screen that renders one of these under a real fetch would
+/// then have to work around.
 class CustomEmojiImage extends ConsumerWidget {
   const CustomEmojiImage({
     super.key,
@@ -62,14 +68,19 @@ class CustomEmojiImage extends ConsumerWidget {
           cacheWidth: edge,
           cacheHeight: edge,
         ),
-        // A fetch that failed says so rather than leaving a tile that looks
-        // tappable and blank; one still in flight just holds the space.
+        // A fetch that failed says so, distinct from one still queued or in flight below.
         AsyncError() => Icon(
           AppIcons.imageMissing,
           size: size,
           color: tokens.textSecondary,
         ),
-        _ => const SizedBox.shrink(),
+        // Queued behind the fetch limiter or already in flight; see the class doc.
+        _ => DecoratedBox(
+          decoration: BoxDecoration(
+            color: tokens.stripe,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+        ),
       },
     );
     final name = label;
