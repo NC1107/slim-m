@@ -25,7 +25,7 @@ extension _CanvasPaneGestures on _CanvasPaneState {
     final placed = await _quickPlacement.placeNote(
       world,
       text,
-      onError: (message) => _refresh(() => _error = message),
+      onError: _engine.reportError,
     );
     if (placed != null) _selectPlaced(placed.id);
   }
@@ -45,7 +45,7 @@ extension _CanvasPaneGestures on _CanvasPaneState {
     final placed = await _quickPlacement.placeShape(
       world,
       _shapeKind,
-      onError: (message) => _refresh(() => _error = message),
+      onError: _engine.reportError,
     );
     if (placed != null) _selectPlaced(placed.id);
   }
@@ -139,17 +139,63 @@ extension _CanvasPaneGestures on _CanvasPaneState {
 
   void _onPointerMoved(Offset world) => _relay.reportLocalPointer(world);
 
-  /// A remote cursor's label as of the last resolved answer, kicking off a
-  /// fetch for an id this session has not asked about yet - the same
-  /// resolve-then-fall-back order `authorLabel` uses for a message author,
-  /// minus the local `authorDisplayName` cache a cursor has no row to carry.
-  String _cursorLabel(String userId) {
-    final profiles = ref.read(batchProfilesControllerProvider);
-    resolveAuthorProfiles(ref, [userId]);
-    if (profiles.containsKey(userId)) {
-      return profiles[userId]?.displayName ?? 'Deleted user';
+  /// Draws a local stroke at once - optimistic on [_document], queued for
+  /// the server through [_commits] - and records it as one undoable gesture
+  /// regardless of how many segments [splitStroke] broke it into.
+  void _onStroke(List<Offset> worldPoints) {
+    final selfId = ref.read(meProvider).valueOrNull?.id;
+    final ids = <String>[];
+    for (final segment in splitStroke(worldPoints)) {
+      final id = newCanvasObjectId();
+      ids.add(id);
+      _document.applyPlaced(
+        CanvasStrokeInput(
+          id: id,
+          seq: 0,
+          zIndex: _localZ++,
+          x: segment.x,
+          y: segment.y,
+          w: segment.w,
+          h: segment.h,
+          points: segment.points,
+          width: 3,
+          colorKey: 'annotation',
+          authorId: selfId,
+        ),
+      );
+      _commits.add(
+        CanvasCommit(
+          id: id,
+          x: segment.x,
+          y: segment.y,
+          w: segment.w,
+          h: segment.h,
+          props: {
+            'points': segment.points,
+            'width': 3.0,
+            'color': 'annotation',
+          },
+        ),
+      );
     }
-    return 'Someone';
+    _document.refresh();
+    // recordDraw is what makes undoing this whole gesture one op, not several.
+    _ops.recordDraw(ids);
+    _refresh();
+  }
+
+  void _onErase(Offset world) {
+    final me = ref.read(meProvider).valueOrNull;
+    // A safe read, not a cold one: build() already watches this same family instance every frame.
+    final manageCanvas = ref
+        .read(myChannelPermissionsProvider(widget.channelId))
+        .hasPermission(Perm.manageCanvas);
+    _ops.onErasePoint(world, manageCanvas: manageCanvas, selfId: me?.id);
+  }
+
+  Future<void> _onEraseEnd() async {
+    await _ops.endErase();
+    _refresh();
   }
 
   /// Who to show on the canvas as a camera bubble: nobody, unless this

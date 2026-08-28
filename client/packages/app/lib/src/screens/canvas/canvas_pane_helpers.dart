@@ -1,22 +1,37 @@
 // SPDX-License-Identifier: Apache-2.0
 part of 'canvas_pane.dart';
 
-/// The lazily-built helper objects `_CanvasPaneState` hands its child
-/// widgets: split out once the floating call dock's own wiring pushed
-/// `canvas_pane.dart` to the 500-line hard limit, the same reason
-/// `_CanvasPaneGestures` already lives in its own `part of` file rather
-/// than as a second class - these all need `_CanvasPaneState`'s own
-/// fields. `_cursorLabel`, the one thing `_relay` needs beyond its own
-/// constructor arguments, stays in `canvas_pane_gestures.dart` instead of
-/// moving here too, since defining it in two `part of` files under
-/// different extension names is a duplicate-member error, not a choice.
+/// The helper objects `_CanvasPaneState` hands its child widgets: split out
+/// once the floating call dock's own wiring pushed `canvas_pane.dart` to the
+/// 500-line hard limit, the same reason `_CanvasPaneGestures` already lives
+/// in its own `part of` file rather than as a second class - these all need
+/// `_CanvasPaneState`'s own fields.
+///
+/// `_document`, `_cursors`, `_remoteDrafts`, `_activityLog`,
+/// `_tileOverrides`, `_slotSync`, `_sync`, `_commits` and `_ops` are every
+/// one of them a thin forward onto [canvasEngineProvider]'s own notifier now
+/// - this pane owns none of them directly any more, only the two helpers
+/// below that are genuinely its own (a note sheet to await, a keystroke to
+/// register).
 extension _CanvasPaneHelpers on _CanvasPaneState {
+  CanvasDocument get _document => _engine.document;
+  CanvasCursors get _cursors => _engine.cursors;
+  RemoteStrokeDrafts get _remoteDrafts => _engine.remoteDrafts;
+  CanvasActivityLog get _activityLog => _engine.activityLog;
+  CanvasPresenceTileOverrides get _tileOverrides => _engine.tileOverrides;
+  CanvasMediaSlotSync get _slotSync => _engine.slotSync;
+  CanvasSync get _sync => _engine.sync;
+  CanvasCommitQueue get _commits => _engine.commits;
+  CanvasOpsController get _ops => _engine.ops;
+  CanvasCursorRelay get _relay => _engine.cursorRelay;
+  CanvasStrokePreviewRelay get _strokePreview => _engine.strokePreviewRelay;
+
   CanvasImagePaste get _imagePaste => _imagePasteHelper ??= CanvasImagePaste(
     client: ref.read(apiProvider),
     channelId: widget.channelId,
     document: _document,
     onPlaced: _selectPlaced,
-    onError: (message) => _refresh(() => _error = message),
+    onError: _engine.reportError,
     timedOutUntil: () => ref.read(meProvider).valueOrNull?.timedOutUntil,
   );
 
@@ -26,62 +41,5 @@ extension _CanvasPaneHelpers on _CanvasPaneState {
         channelId: widget.channelId,
         document: _document,
         timedOutUntil: () => ref.read(meProvider).valueOrNull?.timedOutUntil,
-      );
-
-  CanvasCommitQueue get _commits => _queue ??= CanvasCommitQueue(
-    client: ref.read(apiProvider),
-    channelId: widget.channelId,
-    onPlaced: _apply,
-    onFailed: (id, message) {
-      _document
-        ..kill(id)
-        ..refresh();
-      _refresh(() => _error = message);
-    },
-    onRemoved: (id) {
-      _document
-        ..removeObject(id)
-        ..refresh();
-      _refresh(
-        () => _error = 'That stroke was erased while it was being saved.',
-      );
-    },
-    onEraseOnConfirm: (id) => unawaited(_ops.eraseOnConfirm(id)),
-    timedOutUntil: () => ref.read(meProvider).valueOrNull?.timedOutUntil,
-  );
-
-  CanvasOpsController get _ops => _opsController ??= CanvasOpsController(
-    channelId: widget.channelId,
-    client: ref.read(apiProvider),
-    document: _document,
-    commits: _commits,
-    onError: (message) => _refresh(() => _error = message),
-  );
-
-  CanvasCursorRelay get _relay => _cursorRelay ??= CanvasCursorRelay(
-    cursors: _cursors,
-    paletteSize: AppCanvasColors.cursors.length,
-    send: (x, y) => ref
-        .read(syncControllerProvider.notifier)
-        .notifyCanvasCursor(widget.channelId, x, y),
-    resolveLabel: _cursorLabel,
-    isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
-    selfId: () => ref.read(meProvider).valueOrNull?.id,
-  );
-
-  CanvasStrokePreviewRelay get _strokePreview =>
-      _strokePreviewRelay ??= CanvasStrokePreviewRelay(
-        drafts: _remoteDrafts,
-        paletteSize: AppCanvasColors.cursors.length,
-        send: (objectId, points, ended) => ref
-            .read(syncControllerProvider.notifier)
-            .notifyCanvasStrokePreview(
-              widget.channelId,
-              objectId,
-              points,
-              ended: ended,
-            ),
-        isBlocked: (userId) => ref.read(blocksProvider).contains(userId),
-        selfId: () => ref.read(meProvider).valueOrNull?.id,
       );
 }
