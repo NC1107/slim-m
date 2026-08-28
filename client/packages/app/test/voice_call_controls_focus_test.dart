@@ -9,7 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
@@ -29,7 +29,7 @@ void main() {
 
       await pumpControls(
         tester,
-        const VoiceState(state: VoiceSessionState.connected),
+        const VoiceFlags(state: VoiceSessionState.connected),
       );
 
       expect(_hasControlFocusRing(tester), isFalse);

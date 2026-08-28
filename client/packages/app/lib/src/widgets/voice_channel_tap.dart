@@ -20,14 +20,18 @@ library;
 
 import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 
 /// [alreadySelected] is whether this row's channel was already the one on
 /// screen the instant it was tapped - a re-click, not a fresh navigation
 /// elsewhere, which `VoiceScreen`'s own auto-join already covers and this
 /// must not duplicate into a redundant second join.
+///
+/// Takes [VoiceFlags], not the full state: every field this reads
+/// (`channelId`, `state`, `joining`) already lives there, and the roster has
+/// nothing to say about whether a re-click should rejoin.
 bool voiceChannelTapShouldRejoin({
-  required VoiceState voice,
+  required VoiceFlags voice,
   required String channelId,
   required bool alreadySelected,
 }) {

@@ -37,6 +37,7 @@ import '../../providers/live_events.dart';
 import '../../providers/sync_controller.dart';
 import '../../providers/user_profiles.dart';
 import '../../providers/voice_controller.dart';
+import '../../providers/voice_flags.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_commit_queue.dart';
@@ -461,7 +462,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           selfBubbleHidden: selfPresence.hidden,
           onToggleSelfBubbleHidden: _onToggleSelfBubbleHidden,
           callDock: callDockDataFor(
-            ref.watch(voiceControllerProvider),
+            ref.watch(voiceFlagsProvider),
             ref.read(voiceControllerProvider.notifier),
             widget.channelId,
           ),

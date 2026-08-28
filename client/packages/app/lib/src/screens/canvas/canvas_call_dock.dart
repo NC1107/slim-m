@@ -50,6 +50,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import '../voice_call_controls.dart';
 import '../../providers/voice_controller.dart';
+import '../../providers/voice_flags.dart';
 import '../../widgets/floating_dock_card.dart';
 import 'canvas_tools_row.dart';
 
@@ -57,7 +58,7 @@ import 'canvas_tools_row.dart';
 class CallDockData {
   const CallDockData({required this.voice, required this.controller});
 
-  final VoiceState voice;
+  final VoiceFlags voice;
   final VoiceController controller;
 }
 
@@ -147,7 +148,7 @@ class CanvasDockData {
 /// every build rather than cached, since a call joined or left while the
 /// canvas stays open must show up here on the very next frame.
 CallDockData? callDockDataFor(
-  VoiceState voice,
+  VoiceFlags voice,
   VoiceController controller,
   String channelId,
 ) {

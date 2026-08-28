@@ -20,6 +20,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/voice_call_controls.dart';
 import 'package:slimm_app/src/screens/voice_call_dock.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -261,7 +262,7 @@ api.SlimmApi _fakeVersionApi(int? screenShareMaxHeight) {
 /// sees it pass through unchanged.
 Future<ProviderContainer> pumpControls(
   WidgetTester tester,
-  VoiceState voice, {
+  VoiceFlags voice, {
   InertSession? session,
   int? screenShareMaxHeight = 2160,
 }) async {
@@ -304,7 +305,7 @@ Future<ProviderContainer> pumpControls(
 /// `pumpCanvasCallDock` already uses, so the two dock suites read alike.
 Future<ProviderContainer> pumpVoiceCallDock(
   WidgetTester tester,
-  VoiceState voice, {
+  VoiceFlags voice, {
   String? canvasChannelId,
   double width = 800,
   bool touch = false,

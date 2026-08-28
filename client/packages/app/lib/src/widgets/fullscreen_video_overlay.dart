@@ -17,8 +17,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 
 /// Which live view a tile was showing when it was expanded.
 enum FullscreenVideoKind { camera, screenShare }
@@ -80,8 +82,8 @@ class _FullscreenVideoViewState extends ConsumerState<FullscreenVideoView> {
   /// participant leaving the call, or turning off the very camera (or share)
   /// this route is showing, must close it behind them - the alternative is a
   /// frozen or blank stage with no way to know it stopped being the truth.
-  bool _stillLive(VoiceState voice) {
-    final participant = voice.participants
+  bool _stillLive(List<VoiceParticipant> participants) {
+    final participant = participants
         .where((p) => p.identity == widget.identity)
         .firstOrNull;
     if (participant == null) return false;
@@ -99,9 +101,9 @@ class _FullscreenVideoViewState extends ConsumerState<FullscreenVideoView> {
 
   @override
   Widget build(BuildContext context) {
-    final voice = ref.watch(voiceControllerProvider);
+    final participants = ref.watch(voiceParticipantsProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
-    final live = _stillLive(voice);
+    final live = _stillLive(participants);
     // Scheduled: a build method must not itself change the navigator stack.
     if (!live && !_exiting) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _exit());

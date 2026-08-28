@@ -159,10 +159,11 @@ extension _CanvasPaneGestures on _CanvasPaneState {
   /// without one), so there is no video to lay out for anybody in that
   /// case, not even for participants known some other way.
   List<VoiceParticipant> _callParticipants() {
-    final voice = ref.watch(voiceControllerProvider);
-    if (voice.channelId != widget.channelId) return const [];
+    final channelId = ref.watch(voiceFlagsProvider.select((f) => f.channelId));
+    if (channelId != widget.channelId) return const [];
     final blocks = ref.watch(blocksProvider);
-    return voice.participants
+    final participants = ref.watch(voiceParticipantsProvider);
+    return participants
         .where((p) => !blocks.contains(p.identity))
         .toList(growable: false);
   }

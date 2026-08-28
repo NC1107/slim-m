@@ -3,7 +3,7 @@
 /// riding only the screen's shared fade, and must not replay on a rebuild
 /// that leaves the same call in progress (a mute toggle, a participant
 /// change) - only a genuinely new call, identified by
-/// [VoiceState.channelId], plays it again.
+/// [VoiceFlags.channelId], plays it again.
 library;
 
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/voice_call_dock.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -18,21 +19,21 @@ import 'package:slimm_rtc/rtc.dart' show VoiceSessionState;
 
 import 'voice_call_controls_harness.dart';
 
-const _c1 = VoiceState(channelId: 'c1', state: VoiceSessionState.connected);
-const _c1Muted = VoiceState(
+const _c1 = VoiceFlags(channelId: 'c1', state: VoiceSessionState.connected);
+const _c1Muted = VoiceFlags(
   channelId: 'c1',
   state: VoiceSessionState.connected,
   microphoneEnabled: false,
 );
-const _c2 = VoiceState(channelId: 'c2', state: VoiceSessionState.connected);
+const _c2 = VoiceFlags(channelId: 'c2', state: VoiceSessionState.connected);
 
 /// Pumps [VoiceCallDock] wired to [voice], swappable in place via
 /// [ValueNotifier] so a later call can rebuild the same widget - and the same
-/// `State` - with a new [VoiceState] rather than tearing the tree down, the
+/// `State` - with a new [VoiceFlags] rather than tearing the tree down, the
 /// only way to tell a rebuild apart from a fresh mount.
 Future<ProviderContainer> _pump(
   WidgetTester tester,
-  ValueNotifier<VoiceState> voice, {
+  ValueNotifier<VoiceFlags> voice, {
   bool reduceMotion = false,
 }) async {
   final container = ProviderContainer(
@@ -55,7 +56,7 @@ Future<ProviderContainer> _pump(
           child: Scaffold(
             body: Align(
               alignment: Alignment.bottomCenter,
-              child: ValueListenableBuilder<VoiceState>(
+              child: ValueListenableBuilder<VoiceFlags>(
                 valueListenable: voice,
                 builder: (context, value, _) => VoiceCallDock(
                   controller: container.read(voiceControllerProvider.notifier),

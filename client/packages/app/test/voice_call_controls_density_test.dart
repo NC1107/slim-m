@@ -18,7 +18,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart' show VoiceSessionState;
 
@@ -37,7 +37,7 @@ Future<void> _pumpAt(WidgetTester tester, Size size) async {
   addTearDown(tester.view.reset);
   await pumpControls(
     tester,
-    const VoiceState(state: VoiceSessionState.connected),
+    const VoiceFlags(state: VoiceSessionState.connected),
   );
 }
 

@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import 'channel_rail.dart';
 import 'channel_rail_frame.dart';
 
@@ -37,7 +38,7 @@ class CollapsedRailStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final voice = ref.watch(voiceControllerProvider);
+    final voice = ref.watch(voiceFlagsProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
 
     final buttons = [

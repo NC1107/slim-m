@@ -39,6 +39,7 @@ import '../providers/dms.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import '../routing/routes.dart';
 import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
@@ -293,27 +294,31 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     final me = ref.watch(meProvider).valueOrNull;
     final isSelf = me?.id == profile.id;
     final mine = ref.watch(myPermissionsProvider);
-    final voice = ref.watch(voiceControllerProvider);
+    // Narrowed: this popover has no use for mic/camera flags, only state and channel.
+    final (voiceState, voiceChannelId) = ref.watch(
+      voiceFlagsProvider.select((f) => (f.state, f.channelId)),
+    );
+    final participants = ref.watch(voiceParticipantsProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
     final host = widget.host ?? context;
 
     // The call section exists only while you share a call: it is about your ears in this room, not the person.
     final inCallTogether =
-        voice.state == VoiceSessionState.connected &&
-        voice.participants.any((p) => p.identity == profile.id && !p.isLocal);
+        voiceState == VoiceSessionState.connected &&
+        participants.any((p) => p.identity == profile.id && !p.isLocal);
 
     final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
     final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
     final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
     // The voice kick handler checks KICK_MEMBERS in this call's own channel, since an overwrite may grant it there alone.
-    final voiceChannelPermissions = voice.channelId != null
-        ? ref.watch(myChannelPermissionsProvider(voice.channelId!))
+    final voiceChannelPermissions = voiceChannelId != null
+        ? ref.watch(myChannelPermissionsProvider(voiceChannelId))
         : 0;
     // Needs a room to evict them from, not just the bit; the call section above already answers that.
     final canEject =
         !isSelf &&
         inCallTogether &&
-        voice.channelId != null &&
+        voiceChannelId != null &&
         voiceChannelPermissions.hasPermission(Perm.kickMembers);
     // See the library doc above for why this must agree with showModeration.
     final canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null;
@@ -408,7 +413,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
                 context,
                 listen: false,
               );
-              final channelId = voice.channelId!;
+              final channelId = voiceChannelId;
               widget.onDone();
               unawaited(_eject(host, container, channelId));
             },

@@ -20,7 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_app/src/providers/providers.dart';
-import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/providers/voice_settings_controller.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -35,7 +35,7 @@ void main() {
   ) async {
     await pumpControls(
       tester,
-      const VoiceState(
+      const VoiceFlags(
         state: VoiceSessionState.connected,
         awaitingBroadcast: true,
       ),
@@ -54,7 +54,7 @@ void main() {
   testWidgets('a live share reads as sharing', (tester) async {
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected, screenSharing: true),
+      const VoiceFlags(state: VoiceSessionState.connected, screenSharing: true),
     );
 
     expect(find.byIcon(AppIcons.screenShare), findsOneWidget);
@@ -71,7 +71,7 @@ void main() {
       final session = InertSession();
       final container = await pumpControls(
         tester,
-        const VoiceState(state: VoiceSessionState.connected),
+        const VoiceFlags(state: VoiceSessionState.connected),
         session: session,
       );
 
@@ -104,7 +104,7 @@ void main() {
       final session = InertSession();
       final container = await pumpControls(
         tester,
-        const VoiceState(state: VoiceSessionState.connected),
+        const VoiceFlags(state: VoiceSessionState.connected),
         session: session,
       );
 
@@ -130,7 +130,7 @@ void main() {
       final session = InertSession();
       await pumpControls(
         tester,
-        const VoiceState(state: VoiceSessionState.connected),
+        const VoiceFlags(state: VoiceSessionState.connected),
         session: session,
         screenShareMaxHeight: 720,
       );
@@ -149,7 +149,7 @@ void main() {
       final session = InertSession();
       await pumpControls(
         tester,
-        const VoiceState(state: VoiceSessionState.connected),
+        const VoiceFlags(state: VoiceSessionState.connected),
         session: session,
         screenShareMaxHeight: null,
       );
@@ -167,7 +167,7 @@ void main() {
     final session = InertSession();
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected),
+      const VoiceFlags(state: VoiceSessionState.connected),
       session: session,
     );
 
@@ -187,7 +187,7 @@ void main() {
     );
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected),
+      const VoiceFlags(state: VoiceSessionState.connected),
       session: session,
     );
 
@@ -225,7 +225,7 @@ void main() {
       );
       await pumpControls(
         tester,
-        const VoiceState(state: VoiceSessionState.connected),
+        const VoiceFlags(state: VoiceSessionState.connected),
         session: session,
       );
 
@@ -250,7 +250,7 @@ void main() {
     final session = InertSession();
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected),
+      const VoiceFlags(state: VoiceSessionState.connected),
       session: session,
     );
 
@@ -268,14 +268,14 @@ void main() {
   ) async {
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected),
+      const VoiceFlags(state: VoiceSessionState.connected),
       session: InertSession()..canFlipCamera = true,
     );
     expect(find.byTooltip('Switch camera'), findsNothing);
 
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      const VoiceFlags(state: VoiceSessionState.connected, cameraEnabled: true),
       session: InertSession()..canFlipCamera = true,
     );
     expect(find.byTooltip('Switch camera'), findsOneWidget);
@@ -292,7 +292,7 @@ void main() {
         ];
       await pumpControls(
         tester,
-        const VoiceState(
+        const VoiceFlags(
           state: VoiceSessionState.connected,
           cameraEnabled: true,
         ),
@@ -315,7 +315,7 @@ void main() {
         ];
       await pumpControls(
         tester,
-        const VoiceState(
+        const VoiceFlags(
           state: VoiceSessionState.connected,
           cameraEnabled: true,
         ),
@@ -332,7 +332,7 @@ void main() {
     final session = InertSession()..canFlipCamera = true;
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      const VoiceFlags(state: VoiceSessionState.connected, cameraEnabled: true),
       session: session,
     );
 
@@ -355,7 +355,7 @@ void main() {
       ];
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      const VoiceFlags(state: VoiceSessionState.connected, cameraEnabled: true),
       session: session,
     );
 
@@ -381,7 +381,7 @@ void main() {
       ];
     await pumpControls(
       tester,
-      const VoiceState(state: VoiceSessionState.connected, cameraEnabled: true),
+      const VoiceFlags(state: VoiceSessionState.connected, cameraEnabled: true),
       session: session,
     );
     expect(find.byTooltip('Switch camera'), findsOneWidget);

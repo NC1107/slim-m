@@ -34,6 +34,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import '../widgets/floating_dock_card.dart';
 import 'canvas/canvas_pane.dart';
 import 'voice_call_controls.dart';
@@ -47,7 +48,11 @@ class VoiceCallDock extends StatefulWidget {
   });
 
   final VoiceController controller;
-  final VoiceState voice;
+
+  /// Only the flags half: this dock never renders the roster, only
+  /// [CallControls] and its own canvas toggle, both of which read [voice]
+  /// for mic/camera/channel state alone.
+  final VoiceFlags voice;
 
   /// The channel the toggle opens, or null to omit the toggle entirely -
   /// see this file's own doc for the two reasons that happens.

@@ -47,6 +47,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart' show apiProvider;
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import '../providers/voice_settings_controller.dart'
     show voiceSettingsControllerProvider;
 import '../widgets/camera_source_sheet.dart';
@@ -60,7 +61,11 @@ class CallControls extends ConsumerStatefulWidget {
   });
 
   final VoiceController controller;
-  final VoiceState voice;
+
+  /// Only the flags half of the call: this row never has any use for the
+  /// roster, and typing it this way keeps a future caller from threading it
+  /// back in the way `railVoiceToggleButtons` used to.
+  final VoiceFlags voice;
 
   @override
   ConsumerState<CallControls> createState() => _CallControlsState();
@@ -164,7 +169,7 @@ class _CallControlsState extends ConsumerState<CallControls> {
     );
   }
 
-  static String _shareTooltip(VoiceState voice) {
+  static String _shareTooltip(VoiceFlags voice) {
     if (voice.screenSharing) return 'Stop sharing';
     if (voice.awaitingBroadcast) {
       return 'Waiting for you to start the broadcast. Tap to cancel.';
