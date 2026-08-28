@@ -21,9 +21,11 @@ import '../api_failure.dart';
 import '../providers/providers.dart';
 import 'attachment_format.dart';
 import 'attachment_save.dart';
+import 'attachment_video_fullscreen.dart';
 import 'attachment_video_source_io.dart'
     if (dart.library.js_interop) 'attachment_video_source_web.dart';
 import 'run_guarded.dart';
+import 'video_playback_controls.dart';
 
 /// Half [kMessageColumnMax], the same cap an inline image draws under, and
 /// the same 16:9 box every shipped platform's player fills as it loads
@@ -90,6 +92,15 @@ class _AttachmentVideoPlayerState extends ConsumerState<AttachmentVideoPlayer>
     }
   }
 
+  Future<void> _openFullscreen() {
+    return showFullscreenAttachmentVideo(
+      context,
+      player: _player,
+      controller: _videoController,
+      filename: attachment.filename,
+    );
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     final failure = await saveAttachment(ref, attachment);
@@ -132,17 +143,17 @@ class _AttachmentVideoPlayerState extends ConsumerState<AttachmentVideoPlayer>
                   border: Border.all(color: tokens.borderSubtle),
                 ),
                 child: _ready
-                    ? Video(controller: _videoController)
-                    : Center(
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            value: _fetchProgress,
-                          ),
+                    ? VideoPlaybackControls(
+                        player: _player,
+                        isFullscreen: false,
+                        onToggleFullscreen: _openFullscreen,
+                        // No default media_kit chrome; see video_playback_controls.dart's doc.
+                        child: Video(
+                          controller: _videoController,
+                          controls: null,
                         ),
-                      ),
+                      )
+                    : _VideoLoading(progress: _fetchProgress, tokens: tokens),
               ),
             ),
           ),
@@ -187,6 +198,58 @@ class _AttachmentVideoPlayerState extends ConsumerState<AttachmentVideoPlayer>
           ),
         ],
       ],
+    );
+  }
+}
+
+/// What the 16:9 frame shows before `Player.open` resolves - a still poster
+/// glyph plus whatever load signal is available, never an indeterminate
+/// spinner: a widget test that pumps this state must be able to settle, and
+/// an [AnimationController] that never completes is exactly what a bare
+/// [CircularProgressIndicator] would install here.
+///
+/// Web tracks bytes fetched against the attachment's known size, so
+/// [progress] is a real fraction there; native platforms hand the URL
+/// straight to libmpv's own streaming reader, which has no comparable count
+/// to report, so [progress] stays null and the label carries the state
+/// instead.
+class _VideoLoading extends StatelessWidget {
+  const _VideoLoading({required this.progress, required this.tokens});
+
+  final double? progress;
+  final AppTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(AppIcons.play, size: 28, color: tokens.textSecondary),
+            const SizedBox(height: AppSpacing.s8),
+            if (progress != null)
+              SizedBox(
+                width: 120,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.full),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: tokens.surfaceSunken,
+                    color: tokens.accentFill,
+                  ),
+                ),
+              )
+            else
+              Text(
+                'Loading video…',
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

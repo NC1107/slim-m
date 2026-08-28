@@ -44,6 +44,16 @@ void main() {
       ),
     );
     await tester.pump();
+
+    // Still loading here (the failure lands on the next pump).
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is CircularProgressIndicator && w.value == null,
+      ),
+      findsNothing,
+    );
+    expect(find.text('Loading video…'), findsOneWidget);
+
     await tester.pump();
 
     expect(
