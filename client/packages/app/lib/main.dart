@@ -14,6 +14,7 @@ import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
 import 'src/providers/attachment_preview_quality.dart';
+import 'src/providers/desktop_splash_preference.dart';
 import 'src/providers/media_preferences.dart';
 import 'src/providers/message_page_size.dart';
 import 'src/providers/image_cache_preference.dart';
@@ -95,6 +96,9 @@ Future<void> main() async {
 /// [appReadyProvider] the instant this resolves: on desktop that sequence
 /// can finish in a frame or two on a warm start, which is the exact reason
 /// the startup screen went unnoticed - see `src/desktop/splash_floor.dart`.
+/// [_resolveSplashFloor] picks which floor to wait out - or none at all,
+/// with the splash turned off - ahead of that wrapped call, so the choice is
+/// already known before the floor starts counting.
 ///
 /// [DesktopWindowShell.prepareHandoff] and [DesktopWindowShell.revealAfterHandoff]
 /// bracket the ready flip rather than running before or after it: the window
@@ -103,12 +107,42 @@ Future<void> main() async {
 /// painted, or the handoff would show a stale splash frame, an empty one, or
 /// the real content briefly stretched across the splash's small bounds. See
 /// decision 0012's superseding section for why this hide/resize/show
-/// sequence is the traded-off stand-in for a genuine second window.
+/// sequence is the traded-off stand-in for a genuine second window - and why
+/// a disabled splash still goes through it: the window is born small by the
+/// native runner before any preference can be read, so even "off" cannot
+/// skip that first small frame, only the added dwell on top of it.
 Future<void> _bootstrapApp(ProviderContainer container) async {
-  await awaitBootstrapWithSplashFloor(() => _runBootstrapSequence(container));
+  final floor = await _resolveSplashFloor(container);
+  await awaitBootstrapWithSplashFloor(
+    () => _runBootstrapSequence(container),
+    floor: floor,
+  );
   await DesktopWindowShell.prepareHandoff(container);
   container.read(appReadyProvider.notifier).state = true;
   await DesktopWindowShell.revealAfterHandoff();
+}
+
+/// Restores the splash on/off and duration preferences and turns them into
+/// the one [Duration] [awaitBootstrapWithSplashFloor] needs, ahead of the
+/// rest of bootstrap rather than alongside it in [_runBootstrapSequence]'s
+/// own preference-restore block - that ordering is what lets "off" mean no
+/// floor at all rather than one only known partway through the sequence it
+/// bounds. The on/off-to-duration mapping itself is [splashFloorFor], a pure
+/// function this only restores state for and calls - see its own doc.
+///
+/// Both controllers restore from [preferencesProvider]'s own cached future,
+/// the same one every other preference in [_runBootstrapSequence] reads, so
+/// this cannot race or duplicate that restore. Each controller's own
+/// constructor default (splash on, standard duration) is what a read before
+/// this restore completes would see, which already matches the fallback this
+/// function needs: nothing here has to special-case "not loaded yet".
+Future<Duration> _resolveSplashFloor(ProviderContainer container) async {
+  await container.read(splashEnabledControllerProvider.notifier).restore();
+  await container.read(splashDurationControllerProvider.notifier).restore();
+  return splashFloorFor(
+    enabled: container.read(splashEnabledControllerProvider),
+    duration: container.read(splashDurationControllerProvider),
+  );
 }
 
 Future<void> _runBootstrapSequence(ProviderContainer container) async {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /// [awaitBootstrapWithSplashFloor]'s own timing: a floor on desktop, never
-/// added latency on top of a slow bootstrap, and no floor at all off
-/// desktop.
+/// added latency on top of a slow bootstrap, no floor at all off desktop, and
+/// - for the splash on/off preference - an explicit [Duration.zero] floor
+/// that behaves like no floor at all rather than a second code path.
 library;
 
 import 'dart:async';
@@ -73,4 +74,68 @@ void main() {
       expect(completed, isTrue);
     });
   });
+
+  test('a splash disabled on desktop passes a zero floor, which adds no '
+      'dwell at all to an instant bootstrap', () {
+    fakeAsync((async) {
+      var completed = false;
+      unawaited(
+        awaitBootstrapWithSplashFloor(
+          () async {},
+          desktop: true,
+          floor: Duration.zero,
+        ).whenComplete(() => completed = true),
+      );
+
+      // A zero-duration Future.delayed still needs a timer tick, not flushMicrotasks.
+      async.elapse(Duration.zero);
+      expect(completed, isTrue);
+    });
+  });
+
+  test('a splash disabled on desktop never pads a slow bootstrap either - '
+      'the zero floor resolves no later than the bootstrap itself', () {
+    fakeAsync((async) {
+      final slow = minSplashDuration * 3;
+      var completed = false;
+      unawaited(
+        awaitBootstrapWithSplashFloor(
+          () => Future<void>.delayed(slow),
+          desktop: true,
+          floor: Duration.zero,
+        ).whenComplete(() => completed = true),
+      );
+
+      async.elapse(slow - const Duration(milliseconds: 1));
+      expect(completed, isFalse);
+
+      async.elapse(const Duration(milliseconds: 1));
+      expect(completed, isTrue);
+    });
+  });
+
+  for (final floor in [
+    const Duration(milliseconds: 500),
+    minSplashDuration,
+    const Duration(milliseconds: 1500),
+  ]) {
+    test('each named splash duration is honoured as the floor ($floor)', () {
+      fakeAsync((async) {
+        var completed = false;
+        unawaited(
+          awaitBootstrapWithSplashFloor(
+            () async {},
+            desktop: true,
+            floor: floor,
+          ).whenComplete(() => completed = true),
+        );
+
+        async.elapse(floor - const Duration(milliseconds: 1));
+        expect(completed, isFalse);
+
+        async.elapse(const Duration(milliseconds: 1));
+        expect(completed, isTrue);
+      });
+    });
+  }
 }
