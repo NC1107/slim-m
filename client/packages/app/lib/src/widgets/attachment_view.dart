@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Renders one attachment: an inline image once its bytes arrive, or a
-/// filename-and-size chip for anything else. There is no save-to-disk
-/// action here; the fetch endpoint is permission-checked and in-memory only
-/// (see `providers/attachment_bytes.dart`), and building a per-platform
-/// download flow was out of proportion to what this change set out to do.
+/// Renders one attachment: an inline image once its bytes arrive, a real
+/// player for a video, or a filename-and-size chip for anything else. The
+/// chip and the video player both carry a save action (`attachment_save.dart`)
+/// - every attachment this app cannot render inline is still something a
+/// user can get out of it.
 ///
 /// An inline image opens fullscreen on tap. The chip does not: only the
 /// types the server itself renders inline are images this can display, and a
@@ -18,10 +18,16 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/attachment_bytes.dart';
 import '../providers/attachment_preview_quality.dart';
 import '../providers/media_preferences.dart';
+import 'attachment_chip.dart';
+import 'attachment_format.dart';
 import 'attachment_reveal.dart';
+import 'attachment_video_player.dart';
 import 'fullscreen_image_viewer.dart';
 import 'image_decode.dart';
 import 'message_row_parts.dart' show AttachmentPlaceholder;
+
+// `formatByteSize` used to live here; re-exported since other files still import it from here.
+export 'attachment_format.dart';
 
 /// Mirrors `media::is_inline` in `crates/slimm-server/src/media.rs`: the
 /// allowlisted types the server serves inline rather than as a forced
@@ -38,6 +44,16 @@ const Set<String> inlineImageTypes = {
 bool isInlineImage(String contentType) =>
     inlineImageTypes.contains(contentType);
 
+/// A prefix match, unlike [inlineImageTypes]: there is no server-side
+/// allowlist to disagree with here (the server never treats video as
+/// inline, so every `video/*` is served as a forced download either way),
+/// and unlike Flutter's fixed set of raster codecs, `media_kit`'s player
+/// already attempts whatever container/codec its native backend supports.
+/// A file this cannot actually decode fails through `Player.stream.error`
+/// the same way an undecodable image already fails through [Image]'s own
+/// `errorBuilder` - loosely matched here, then handled per-file there.
+bool isVideo(String contentType) => contentType.startsWith('video/');
+
 /// The largest an image is drawn inline, in logical pixels, on both axes.
 ///
 /// Half [kMessageColumnMax]. An uncapped preview let one image fill a desktop
@@ -48,20 +64,6 @@ bool isInlineImage(String contentType) =>
 /// is the conversation, and an attachment is a thing in it. Full size is one
 /// tap away and already built.
 const double kInlineImageMax = kMessageColumnMax / 2;
-
-/// `1.2 MB`-style formatting; short enough that this app has no existing
-/// dependency worth using instead.
-String formatByteSize(int bytes) {
-  const units = ['B', 'KB', 'MB', 'GB'];
-  var value = bytes.toDouble();
-  var unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  final digits = unit == 0 ? 0 : 1;
-  return '${value.toStringAsFixed(digits)} ${units[unit]}';
-}
 
 class AttachmentView extends ConsumerStatefulWidget {
   const AttachmentView({super.key, required this.attachment});
@@ -95,37 +97,12 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
 
+    if (isVideo(attachment.contentType)) {
+      return AttachmentVideoPlayer(attachment: attachment);
+    }
+
     if (!_isImage) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s12,
-          vertical: AppSpacing.s8,
-        ),
-        decoration: BoxDecoration(
-          color: tokens.surfaceRaised,
-          border: Border.all(color: tokens.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.control),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Flexible, not a bare Text: a long real filename would otherwise overflow the row.
-            Flexible(
-              child: Text(
-                attachment.filename,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.ui.copyWith(color: tokens.textPrimary),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.s8),
-            Text(
-              formatByteSize(attachment.size),
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-          ],
-        ),
-      );
+      return AttachmentChip(attachment: attachment);
     }
 
     final autoDownload = ref.watch(mediaAutoDownloadControllerProvider);

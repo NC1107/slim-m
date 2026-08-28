@@ -28,4 +28,12 @@ extension SlimmApiAttachments on SlimmApi {
   /// same bytes.
   Future<FetchedBytes> fetchAttachment(String attachmentId) =>
       _fetchBytes('/attachments/$attachmentId');
+
+  /// The same endpoint [fetchAttachment] reads, for a caller that streams the
+  /// bytes itself rather than loading them into memory - a native video
+  /// player, which can attach `session.tokens?.accessToken` as its own
+  /// bearer header and let the player issue range requests directly. Carries
+  /// no token itself: this is only the address.
+  Uri attachmentUrl(String attachmentId) =>
+      _requestUri('/attachments/$attachmentId', null);
 }

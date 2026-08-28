@@ -10,6 +10,8 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_secure_storage_windows
   flutter_webrtc
   livekit_client
+  media_kit_libs_windows_video
+  media_kit_video
   screen_retriever_windows
   sqlite3_flutter_libs
   tray_manager

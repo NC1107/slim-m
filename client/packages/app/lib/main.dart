@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -62,6 +63,8 @@ import 'src/widgets/toast_overlay.dart';
 /// size. Waiting for the real first frame avoids that race entirely.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Registers media_kit's player backend; every inline video attachment goes through it (attachment_video_player.dart).
+  MediaKit.ensureInitialized();
   await _initAndroidPush();
   await DesktopWindowShell.applyInitialGeometry();
   DesktopWindowShell.registerSecondInstanceHandler();
