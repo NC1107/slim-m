@@ -23,6 +23,7 @@ import '../providers/channel_search_controller.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_extras.dart';
 import '../providers/message_jump.dart';
+import '../providers/mounted_channels.dart';
 import '../providers/providers.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/blocked_dm_notice.dart';
@@ -108,6 +109,14 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// once resolved, so holding it plainly is enough.
   late final ChannelDraftsController _drafts = ref.read(channelDraftsProvider);
 
+  /// Captured once, not read via `ref` in [dispose] - see [_drafts]'s own
+  /// note for why. This is the registry `providers/retention_sweep.dart`
+  /// reads to know which channels are actually open; see
+  /// `providers/mounted_channels.dart`.
+  late final MountedChannels _mountedChannels = ref.read(
+    mountedChannelsProvider,
+  );
+
   /// See `channel_screen_streams.dart`: recreates a channel's drift streams
   /// only when the store, channel id, or window actually change, rather than
   /// on every build the way an inline `store.watchChannel(...)` call did.
@@ -116,6 +125,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   void initState() {
     super.initState();
+    _mountedChannels.register(widget.channelId);
     unawaited(_hydrateExtras());
     // Fresh or reused (see [ReadMarker]), this must open on this channel's own draft.
     _composer.text = _drafts.draftFor(widget.channelId);
@@ -127,6 +137,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     // This State outlives a channel switch (see [ReadMarker]), so the field
     // would otherwise still hold the previous channel's query.
     if (oldWidget.channelId != widget.channelId) {
+      _mountedChannels.unregister(oldWidget.channelId);
+      _mountedChannels.register(widget.channelId);
       _searchController.clear();
       // A jump neither finished nor consumed before the switch must not
       // replay against whichever channel is open next.
@@ -154,6 +166,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   @override
   void dispose() {
+    _mountedChannels.unregister(widget.channelId);
     // Last chance to save unsent text before a torn-down State (voice, a DM call, canvas) loses it.
     _drafts.save(widget.channelId, _composer.text);
     _composer.dispose();
