@@ -112,12 +112,34 @@ void main() {
     final port = FakeDesktopWindowPort();
     DesktopWindowShell.debugPort = port;
 
-    // endOfFrame only resolves once a frame runs, which needs an explicit pump here (a real host runs one on its own).
     final reveal = DesktopWindowShell.revealAfterHandoff();
+
+    // Flushes show()'s own microtask before the pump that satisfies the endOfFrame wait after it (a real host runs both on its own).
+    await Future<void>.value();
     await tester.pump();
     await reveal;
 
     expect(port.showCalls, 1);
+  });
+
+  testWidgets('revealAfterHandoff shows the window without ever waiting on '
+      'a frame while it is still hidden - regression test for the v0.61.0 '
+      'handoff timeout, where a hidden window never receives a frame at '
+      'all, so waiting on one before show() could only ever time out', (
+    tester,
+  ) async {
+    final port = FakeDesktopWindowPort()..visible = false;
+    DesktopWindowShell.debugPort = port;
+
+    final reveal = DesktopWindowShell.revealAfterHandoff();
+
+    // Only a microtask turn runs here, never a pumped frame - a real hidden window never gets one either.
+    await Future<void>.value();
+    expect(port.showCalls, 1);
+
+    // Lets the trailing, now non-gating, frame wait resolve normally so nothing is left pending.
+    await tester.pump();
+    await reveal;
   });
 
   test('a resize before prepareHandoff completes is not persisted; the same '
