@@ -101,11 +101,38 @@ void main() {
     );
 
     final targets = await container.read(
-      forwardTargetsProvider('nowhere').future,
+      forwardTargetsProvider((
+        excludeChannelId: 'nowhere',
+        hasAttachments: false,
+      )).future,
     );
 
     expect(targets.map((t) => t.channelId), ['c1']);
     expect(targets.single.label, 'general');
+  });
+
+  test('a message with attachments excludes a channel that can send but '
+      'not attach', () async {
+    final container = _containerWith(
+      channels: [
+        _channelJson(id: 'c1', name: 'general', permissions: Perm.sendMessages),
+        _channelJson(
+          id: 'c2',
+          name: 'announcements',
+          permissions: Perm.sendMessages | Perm.attachFiles,
+        ),
+      ],
+      dms: const [],
+    );
+
+    final targets = await container.read(
+      forwardTargetsProvider((
+        excludeChannelId: 'nowhere',
+        hasAttachments: true,
+      )).future,
+    );
+
+    expect(targets.map((t) => t.channelId), ['c2']);
   });
 
   test('excludes the channel the message already sits in', () async {
@@ -116,7 +143,12 @@ void main() {
       dms: const [],
     );
 
-    final targets = await container.read(forwardTargetsProvider('c1').future);
+    final targets = await container.read(
+      forwardTargetsProvider((
+        excludeChannelId: 'c1',
+        hasAttachments: false,
+      )).future,
+    );
 
     expect(targets, isEmpty);
   });
@@ -128,7 +160,10 @@ void main() {
     );
 
     final targets = await container.read(
-      forwardTargetsProvider('nowhere').future,
+      forwardTargetsProvider((
+        excludeChannelId: 'nowhere',
+        hasAttachments: false,
+      )).future,
     );
 
     expect(targets.single.channelId, 'dm1');
@@ -145,7 +180,10 @@ void main() {
     await container.read(blocksProvider.notifier).refresh();
 
     final targets = await container.read(
-      forwardTargetsProvider('nowhere').future,
+      forwardTargetsProvider((
+        excludeChannelId: 'nowhere',
+        hasAttachments: false,
+      )).future,
     );
 
     expect(targets, isEmpty);
@@ -158,7 +196,10 @@ void main() {
     );
 
     final targets = await container.read(
-      forwardTargetsProvider('nowhere').future,
+      forwardTargetsProvider((
+        excludeChannelId: 'nowhere',
+        hasAttachments: false,
+      )).future,
     );
 
     expect(targets.single.label, 'You');

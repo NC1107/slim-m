@@ -14,6 +14,15 @@
 /// A plain send needs no such check: everything it can name is text this
 /// client already has in hand, and the destination picker itself only ever
 /// offers a channel or DM the caller can already send to.
+///
+/// Attachments ride along the same send rather than being re-uploaded:
+/// `message_attachments` is a join table keyed `(message_id, sha256)`
+/// (`crates/slimm-server/migrations/0002_core_schema.sql`), so the same
+/// content-addressed blob can already sit on any number of messages, and
+/// `store::attachments::may_link` grants the link the moment the forwarder
+/// can view some channel that already has it - which they always can, since
+/// they are looking at [message] right now. No server change, no
+/// re-upload, no migration.
 library;
 
 import 'dart:async';
@@ -29,10 +38,11 @@ import '../ids.dart';
 import '../providers/forward_targets.dart';
 import '../providers/message_extras.dart';
 import '../providers/providers.dart';
+import '../providers/toasts.dart';
 import '../providers/user_profiles.dart';
-import 'app_snackbar.dart';
 import 'author_label.dart';
 import 'run_guarded.dart';
+import 'sheet_item_list.dart';
 
 /// Quotes [message]'s current content as a markdown block quote, attributed
 /// to its author, the same `>`-per-line syntax `message_markdown_blocks.dart`
@@ -46,49 +56,62 @@ String buildForwardedContent({
   return 'Forwarded from $authorLabel\n$quoted';
 }
 
-/// Opens the destination picker, then sends the forward. Returns once the
-/// sheet is dismissed either way; a cancelled pick sends nothing.
+/// Opens the destination picker, then sends the forward. The picker itself
+/// runs the send and stays open on a failure (see [_ForwardTargetSheet]),
+/// so this only has a success or a cancel left to react to; a cancelled
+/// pick, or a pick whose send never succeeded, pops with `null`. A
+/// successful pop fires a toast rather than `showAppSnackbar`: with the
+/// failure now handled inline in the sheet, this call has no failure
+/// branch of its own left to tie it to a SnackBar (see decision 0018).
 Future<void> forwardMessage(
   BuildContext context,
   WidgetRef ref,
   Message message,
 ) async {
-  final target = await showAppSheet<ForwardTarget>(
-    context,
-    builder: (context) =>
-        _ForwardTargetSheet(excludeChannelId: message.channelId),
-  );
-  if (target == null || !context.mounted) return;
-
+  final extras = ref.read(messageExtrasProvider.notifier).extrasFor(message.id);
+  final attachmentIds = [for (final a in extras.attachments) a.id];
   final authorName = authorLabel(
     authorId: message.authorId,
     cachedDisplayName: message.authorDisplayName,
     profiles: ref.read(batchProfilesControllerProvider),
   );
-  final failure = await runGuarded(
-    whatFailed: 'forward the message',
-    action: () => _sendForward(ref, message, target, authorName),
+
+  final target = await showAppSheet<ForwardTarget>(
+    context,
+    scrolls: true,
+    builder: (context) => _ForwardTargetSheet(
+      excludeChannelId: message.channelId,
+      content: message.content,
+      authorName: authorName,
+      attachmentIds: attachmentIds,
+    ),
   );
-  if (!context.mounted) return;
-  showAppSnackbar(context, failure ?? 'Forwarded to ${target.label}.');
+  if (target == null || !context.mounted) return;
+  ref
+      .read(toastsProvider.notifier)
+      .show(
+        'Forwarded to ${target.label}.',
+        severity: AppToastSeverity.success,
+      );
 }
 
+/// Sends the forward to [target], applying the response the same way any
+/// other sent message is: onto the local store and the extras cache, so the
+/// transcript (if this forward landed in a channel already open) picks it
+/// up without waiting for its own `message.created` broadcast to loop back.
 Future<void> _sendForward(
-  WidgetRef ref,
-  Message message,
-  ForwardTarget target,
-  String authorName,
-) async {
-  final content = buildForwardedContent(
-    authorLabel: authorName,
-    content: message.content,
-  );
+  WidgetRef ref, {
+  required ForwardTarget target,
+  required String content,
+  required List<String> attachmentIds,
+}) async {
   final sent = await ref
       .read(apiProvider)
       .sendMessage(
         channelId: target.channelId,
         id: newMessageId(),
         content: content,
+        attachmentIds: attachmentIds,
       );
   final store = await ref.read(storeProvider.future);
   await store.applyMessage(sent);
@@ -97,22 +120,88 @@ Future<void> _sendForward(
 
 const _headingPadding = EdgeInsets.fromLTRB(
   AppSpacing.s16,
-  0,
-  AppSpacing.s16,
   AppSpacing.s12,
+  AppSpacing.s16,
+  AppSpacing.s8,
 );
 
-/// Lists every [ForwardTarget], newest-channel-first exactly as the API
-/// already orders channels and DMs - no re-sorting here, since a forward is
-/// a one-off pick rather than a list somebody scans repeatedly.
-class _ForwardTargetSheet extends ConsumerWidget {
-  const _ForwardTargetSheet({required this.excludeChannelId});
+/// The destination picker: a search field over every [ForwardTarget], each
+/// row sending on tap.
+///
+/// Unlike the sheet this replaces, tapping a row does not pop immediately -
+/// see `docs/design/desktop-vs-mobile.md` rule 4 ("a short task with a
+/// submit" gets a `showAppSheet`, kept open through the submit). A picker
+/// that popped on tap and only then found out whether the send worked had
+/// nowhere left to put a failure but a `SnackBar`, exactly the shape
+/// `run_guarded.dart`'s own doc comment warns off and
+/// `scripts/check-error-surface.py` exists to keep from creeping back. This
+/// sheet stays open, in flight, until the send actually succeeds: a
+/// failure renders inline as an [AppErrorState] (via [GuardedActionState]),
+/// dismissible, and the same row can simply be tapped again.
+class _ForwardTargetSheet extends ConsumerStatefulWidget {
+  const _ForwardTargetSheet({
+    required this.excludeChannelId,
+    required this.content,
+    required this.authorName,
+    required this.attachmentIds,
+  });
 
   final String excludeChannelId;
+  final String content;
+  final String authorName;
+  final List<String> attachmentIds;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final targets = ref.watch(forwardTargetsProvider(excludeChannelId));
+  ConsumerState<_ForwardTargetSheet> createState() =>
+      _ForwardTargetSheetState();
+}
+
+class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
+    with GuardedActionState<_ForwardTargetSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  /// The target currently sending, or null. Disables every other row while
+  /// set, so a fast double-tap on two different rows can never race two
+  /// sends from one picker.
+  String? _sendingToChannelId;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send(ForwardTarget target) async {
+    clearActionError();
+    setState(() => _sendingToChannelId = target.channelId);
+    final content = buildForwardedContent(
+      authorLabel: widget.authorName,
+      content: widget.content,
+    );
+    final ok = await guard(
+      whatFailed: 'forward the message',
+      action: () => _sendForward(
+        ref,
+        target: target,
+        content: content,
+        attachmentIds: widget.attachmentIds,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _sendingToChannelId = null);
+    if (ok) Navigator.of(context).pop(target);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final ForwardTargetsQuery query = (
+      excludeChannelId: widget.excludeChannelId,
+      hasAttachments: widget.attachmentIds.isNotEmpty,
+    );
+    final targets = ref.watch(forwardTargetsProvider(query));
+
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -122,37 +211,94 @@ class _ForwardTargetSheet extends ConsumerWidget {
             padding: _headingPadding,
             child: Text('Forward to', style: AppText.heading),
           ),
-          AppAsyncView(
-            value: AppAsyncState(
-              data: targets.valueOrNull,
-              error: targets.error,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+            child: AppInput(
+              controller: _searchController,
+              placeholder: 'Search channels and DMs',
+              icon: Icon(
+                AppIcons.search,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
+              ),
+              onChanged: (value) => setState(() => _query = value),
+              semanticLabel: 'Search where to forward this',
             ),
-            errorMessage: 'Could not load where you can forward this.',
-            onRetry: () =>
-                ref.invalidate(forwardTargetsProvider(excludeChannelId)),
-            emptyMessage: 'Nowhere to forward this to yet.',
-            isEmpty: (list) => list.isEmpty,
-            data: (context, list) => ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          if (actionError case final error?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                0,
+                AppSpacing.s16,
+                AppSpacing.s8,
               ),
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final target in list)
-                    AppListRow(
-                      leading: Icon(
-                        target.isDm ? AppIcons.account : AppIcons.hash,
-                      ),
-                      label: target.label,
-                      onTap: () => Navigator.of(context).pop(target),
-                    ),
-                ],
+              child: AppErrorState(message: error, onDismiss: clearActionError),
+            ),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+            ),
+            child: AppAsyncView(
+              value: AppAsyncState(
+                data: targets.valueOrNull,
+                error: targets.error,
               ),
+              errorMessage: 'Could not load where you can forward this.',
+              onRetry: () => ref.invalidate(forwardTargetsProvider(query)),
+              emptyMessage: 'Nowhere to forward this to yet.',
+              isEmpty: (list) => list.isEmpty,
+              data: (context, list) => _buildResults(context, tokens, list),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildResults(
+    BuildContext context,
+    AppTokens tokens,
+    List<ForwardTarget> list,
+  ) {
+    final query = _query.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? list
+        : [
+            for (final target in list)
+              if (target.label.toLowerCase().contains(query)) target,
+          ];
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          child: Text(
+            'No matches.',
+            style: TextStyle(color: tokens.textSecondary),
+          ),
+        ),
+      );
+    }
+    return SheetItemList(
+      itemCount: filtered.length,
+      itemBuilder: (context, i) {
+        final target = filtered[i];
+        final sendingHere = _sendingToChannelId == target.channelId;
+        final busy = _sendingToChannelId != null;
+        return AppListRow(
+          leading: Icon(target.isDm ? AppIcons.account : AppIcons.hash),
+          label: target.label,
+          trailing: sendingHere
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+          onTap: busy ? null : () => unawaited(_send(target)),
+        );
+      },
     );
   }
 }

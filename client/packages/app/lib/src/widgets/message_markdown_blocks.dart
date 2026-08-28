@@ -46,7 +46,14 @@ class ListBlock extends MarkdownBlock {
 }
 
 final RegExp _heading = RegExp(r'^(#{1,3})[ \t]+(.*)$');
-final RegExp _quote = RegExp(r'^>[ \t]?(.*)$');
+
+/// `(?:>[ \t]?)+` rather than one `>`: a forward of a forward requotes an
+/// already-quoted line, stacking a `>` per hop (`buildForwardedContent` in
+/// `forward_message.dart`). Stripping only the outermost one left every
+/// deeper hop's marker sitting in the rendered text as a literal `>`
+/// character; consuming every leading marker in one match flattens the
+/// whole chain into a single quote box instead.
+final RegExp _quote = RegExp(r'^(?:>[ \t]?)+(.*)$');
 final RegExp _bullet = RegExp(r'^( {2})?[-*][ \t]+(.*)$');
 final RegExp _ordered = RegExp(r'^( {2})?\d+\.[ \t]+(.*)$');
 

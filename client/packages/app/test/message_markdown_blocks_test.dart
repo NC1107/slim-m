@@ -43,6 +43,13 @@ void main() {
     expect((blocks.single as QuoteBlock).text, 'line one\nline two');
   });
 
+  test('a doubly-quoted line (a forward of a forward) strips every leading '
+      '>, not just the outermost', () {
+    final blocks = splitMarkdownBlocks('> > hello there');
+    expect(blocks, [isA<QuoteBlock>()]);
+    expect((blocks.single as QuoteBlock).text, 'hello there');
+  });
+
   test('a > that is not at the start of a line is not a quote', () {
     final blocks = splitMarkdownBlocks('see the diagram: a -> b');
     expect(blocks, [isA<ParagraphBlock>()]);
