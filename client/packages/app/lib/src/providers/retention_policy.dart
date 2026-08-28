@@ -25,24 +25,23 @@
 /// or of [message_extras.dart]'s map must keep every message in that range,
 /// for every channel currently open, and may only ever evict older than that.
 ///
-/// **Landed here**: the window ceiling itself, in `channel_history.dart` -
+/// **Landed**: the window ceiling itself, in `channel_history.dart` -
 /// `loadOlder()` no longer grows a channel's window without bound, which was
 /// the one part of the shared policy that was already an active bug (an
 /// ever-larger `LIMIT` re-evaluated by drift on every write, not merely a
-/// growing cache).
+/// growing cache). Later, the rest of it: `providers/mounted_channels.dart`
+/// is the registry of which channel ids are actually open, and
+/// `providers/retention_sweep.dart` is the periodic sweep that caps the
+/// local store to [channelWindowCeiling] rows per channel
+/// (`MessageStore.pruneToRetentionCeiling`) and then answers
+/// `message_extras.dart`'s own reachability question off the capped store,
+/// rather than inventing a second rule for it.
 ///
-/// **Deferred, with this policy already fixed for whoever picks it up**:
-/// a per-channel row cap in the local store, and eviction of whole channels
-/// that have not been opened recently, both keyed on this same
-/// [channelWindowCeiling] and the reachability rule above so a sweep can
-/// never evict a row a still-open channel's transcript is showing. Wiring
-/// that up needs a registry of which channel ids are actually mounted right
-/// now (there is no such registry today - `channelHistoryProvider` is
-/// per-channel and never disposed, so it cannot answer "is this open" on its
-/// own) and a trigger to run the sweep on, neither of which belongs in this
-/// change alongside the ceiling fix. `message_extras.dart`'s map should
-/// follow the identical rule once that registry exists, rather than
-/// inventing a second one.
+/// **Deferred**: eviction of whole channels that have not been opened
+/// recently, which the sweep above does not attempt - it caps every
+/// channel's rows to the ceiling uniformly, open or not, rather than
+/// dropping a closed channel's history further. Worth revisiting only if a
+/// future profile shows the per-channel cap is not enough on its own.
 library;
 
 /// How many of a channel's newest messages the transcript will ever hold in

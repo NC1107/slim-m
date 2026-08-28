@@ -26,13 +26,19 @@
 /// [_applyThreadUpdated] - which closes the gap
 /// `docs/decisions/0005-threads.md` once named for `thread_channel_id`.
 ///
-/// Nothing prunes one entry at a time, deliberately. Every consumer selects
-/// the one id it is about, and there is no reachability answer to prune
-/// against, since search, pins, the command palette and the transcript's own
-/// paged window all render extras for messages outside any one channel's
-/// visible rows. An over-eager prune shows a message with its reactions
-/// missing until some later fetch happens to include it again, which is
-/// worse than the memory.
+/// Nothing used to prune one entry at a time, because no consumer had a
+/// reachability answer to prune against: search, pins, the command palette
+/// and the transcript's own paged window all render extras for messages
+/// outside any one channel's visible rows, and an over-eager prune shows a
+/// message with its reactions missing until some later fetch happens to
+/// include it again, which is worse than the memory. [retain] is the bulk
+/// answer `providers/retention_sweep.dart` now has for that question - every
+/// id still held for a channel some `ChannelScreen` has open right now, which
+/// covers every one of those four surfaces because none of them can render a
+/// message from a channel that is not open (see that file's own doc for why).
+/// It drops everything else in one state write, never one id at a time,
+/// which is what keeps a message still on screen from ever losing its
+/// reactions mid-render the way a per-id prune risked.
 ///
 /// That memory is real, not free: each entry retains a reaction list, an
 /// attachment list and a poll, and history pagination
@@ -375,6 +381,18 @@ class MessageExtrasController
   void clear() {
     if (state.isEmpty) return;
     state = const {};
+  }
+
+  /// Drops every entry whose id is not in [reachable]. See the file doc
+  /// comment for why this, not a per-id prune, is the safe way to bound this
+  /// map - only ever called from `providers/retention_sweep.dart`'s periodic
+  /// sweep, with [reachable] already computed off the local store.
+  void retain(Set<String> reachable) {
+    if (state.keys.every(reachable.contains)) return;
+    state = {
+      for (final entry in state.entries)
+        if (reachable.contains(entry.key)) entry.key: entry.value,
+    };
   }
 
   @override

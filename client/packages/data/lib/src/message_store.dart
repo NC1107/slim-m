@@ -10,6 +10,7 @@ import 'message_dto.dart';
 import 'rail_channel.dart';
 
 part 'message_store_batch.dart';
+part 'message_store_retention.dart';
 
 /// The local store's read and write surface.
 ///
@@ -469,6 +470,19 @@ class MessageStore {
           .write(ChannelsCompanion(lastReadSeq: Value(seq)));
     });
   }
+
+  /// Caps every channel's delivered rows to the newest [ceiling], deleting
+  /// whatever is older. Body in `message_store_retention.dart`, which also
+  /// explains why this is safe to call unconditionally rather than only for
+  /// channels a caller knows are closed.
+  Future<void> pruneToRetentionCeiling(int ceiling) =>
+      _pruneToRetentionCeiling(this, ceiling);
+
+  /// The message ids currently held for [channelIds]. See
+  /// `message_store_retention.dart` for the reachability reading a caller may
+  /// only place on this after [pruneToRetentionCeiling] has already run.
+  Future<Set<String>> reachableMessageIds(Iterable<String> channelIds) =>
+      _reachableMessageIds(this, channelIds);
 
   /// Moves a channel's cursor forward. Never backwards: the cursor is the
   /// high-water mark of what has been applied.

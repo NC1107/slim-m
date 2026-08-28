@@ -21,6 +21,7 @@ import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
 import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
+import '../providers/retention_sweep.dart';
 import '../providers/threads.dart';
 import '../providers/voice_controller.dart';
 import '../routing/breakpoints.dart';
@@ -70,6 +71,8 @@ class HomeShell extends ConsumerWidget {
     ref.watch(roleChangeWatcherProvider);
     // Forces creation for the session; nothing here reads its own state.
     ref.watch(notificationSoundControllerProvider);
+    // Same reasoning: the periodic local-store/extras sweep only needs to run for the session.
+    ref.watch(retentionSweepControllerProvider);
     // CanvasBar is the only header while open (ConversationPane's doc); the compact app bar below would otherwise stack a second one above it.
     final canvasOpen =
         selected != null && ref.watch(canvasOpenProvider) == selected;
