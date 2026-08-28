@@ -395,7 +395,7 @@ jobs:
         if: steps.pkg.outputs.flatpak == 'true'
         continue-on-error: true
         run: |
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
           flatpak remote-add --user --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
           flatpak-builder --user --install-deps-from=flathub --force-clean \
@@ -404,6 +404,18 @@ jobs:
           flatpak build-bundle dist/flatpak-repo \
             "dist/slim-m-client-${{ steps.ver.outputs.version }}.flatpak" \
             top.npcserver.slimm
+
+      # Non-blocking like the build step above, but fails by name with an ::error:: annotation when no bundle exists, so a broken build cannot hide behind a green run the way it did across every release through client-v0.61.0; see packaging/flatpak/README.md.
+      - name: verify flatpak bundle was produced
+        if: steps.pkg.outputs.flatpak == 'true'
+        continue-on-error: true
+        run: |
+          shopt -s nullglob
+          bundles=(dist/slim-m-client-*.flatpak)
+          if [ ${#bundles[@]} -eq 0 ]; then
+            echo "::error::build flatpak did not produce a .flatpak bundle; see its logs for the real failure"
+            exit 1
+          fi
 
       # In a Fedora container, not on the runner: the spec is written against
       # Fedora's macros and dependency generators, and Ubuntu's rpm has neither.
