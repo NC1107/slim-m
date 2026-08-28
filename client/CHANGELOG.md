@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.0](https://github.com/NC1107/slim-m/compare/client-v0.60.1...client-v0.61.0) (2026-08-28)
+
+
+### Features
+
+* **client:** catch up what's new through 0.60.1 ([#965](https://github.com/NC1107/slim-m/issues/965)) ([a2bb38a](https://github.com/NC1107/slim-m/commit/a2bb38aa2564d2839775c7afbab8296cec5a80ca))
+
 ## [0.60.1](https://github.com/NC1107/slim-m/compare/client-v0.60.0...client-v0.60.1) (2026-08-28)
 
 
