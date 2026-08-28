@@ -267,27 +267,51 @@ class DesktopWindowShell {
   }
 
   /// Shows the window again after [prepareHandoff] applied the real geometry
-  /// and `appReadyProvider` flipped - waits for the swapped-in real UI to
-  /// actually paint first ([SchedulerBinding.endOfFrame]), so the window
-  /// never reappears onto a stale splash frame or a blank one. `main.dart`
-  /// calls this right after flipping `appReadyProvider` true.
+  /// and `appReadyProvider` flipped, then waits, best-effort, for the
+  /// swapped-in real UI to actually paint ([SchedulerBinding.endOfFrame]).
+  /// `main.dart` calls this right after flipping `appReadyProvider` true.
   ///
-  /// Bounded by [_setupTimeout] even though a real host always paints a
-  /// frame on its own: leaving the window hidden forever on an unexpected
-  /// stall would be strictly worse than the slow-splash failure modes
-  /// [applyInitialGeometry] and [prepareHandoff] already guard against, so
-  /// this shows the window regardless once the wait times out.
+  /// The wait runs *after* `show()`, not before, despite this method's own
+  /// name suggesting the reveal should come last: a hidden top-level window
+  /// never receives a compositor frame callback on this embedder at all, so
+  /// waiting on a frame while still hidden cannot time out early or late -
+  /// it can only ever time out, on any host, because there is no frame to
+  /// wait for. Confirmed by instrumenting a real launch on the reporter's
+  /// own KDE Wayland session: the wait failed after the full
+  /// [_setupTimeout] every time while the window stayed hidden, then
+  /// resolved within a single frame the instant [_port.show] ran. Waiting
+  /// first and revealing second, the order this replaces, could only ever
+  /// spend that timeout for nothing before doing the exact same `show()`
+  /// its own timeout fallback already did - see decision 0012's 2026-08-28
+  /// addendum for the measurement.
+  ///
+  /// This still does not promise a literally flash-free transition: the one
+  /// frame `show()` exposes is whatever Flutter last painted before
+  /// [prepareHandoff] hid the window - the splash, at the splash's small
+  /// bounds - for at most one vsync tick until the already-pending
+  /// `appReadyProvider` frame lands. That exposure is not new: the previous
+  /// ordering's own timeout fallback showed the window in exactly the same
+  /// state, on every launch on this platform, since the wait it ran first
+  /// could never succeed. [prepareHandoff] having already applied the real
+  /// geometry before either ordering calls `show()` is what keeps that
+  /// exposure to "stale content, right-sized window" rather than a visible
+  /// resize as well.
+  ///
+  /// The post-`show()` wait is bounded by [_setupTimeout] purely so a host
+  /// that stalls for a genuinely different reason gets logged rather than
+  /// hanging this method forever; nothing downstream awaits this method's
+  /// completion, so the bound protects a log line, not a caller.
   static Future<void> revealAfterHandoff() async {
     if (currentDesktopPlatform() == null) return;
-    try {
-      await SchedulerBinding.instance.endOfFrame.timeout(_setupTimeout);
-    } catch (error) {
-      debugPrint('desktop: splash handoff frame wait failed: $error');
-    }
     try {
       await _port.show();
     } catch (error) {
       debugPrint('desktop: splash handoff reveal failed: $error');
+    }
+    try {
+      await SchedulerBinding.instance.endOfFrame.timeout(_setupTimeout);
+    } catch (error) {
+      debugPrint('desktop: post-reveal frame wait failed: $error');
     }
   }
 
