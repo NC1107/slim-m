@@ -65,6 +65,18 @@ Requires:       libasound.so.2()(64bit)
 Requires:       libpulse.so.0()(64bit)
 Requires:       libpipewire-0.3.so.0()(64bit)
 
+# media_kit_video's own Linux plugin - the video texture/rendering
+# integration, distinct from media_kit's separate dlopen of libmpv to drive
+# playback - links libmpv and libepoxy directly (`pkg_check_modules` plus
+# `target_link_libraries` in its own linux/CMakeLists.txt; confirmed with
+# readelf on the built .so, which lists both as real NEEDED entries). rpm's
+# own ELF scan should already pick these up automatically the way it does
+# for GTK and GStreamer, but they are named explicitly as a fallback, and
+# because a plain mpv-libs install (no -devel) ships only the versioned
+# `libmpv.so.2`, never the unversioned name upstream's own install docs quote.
+Requires:       libmpv.so.2()(64bit)
+Requires:       libepoxy.so.0()(64bit)
+
 # Services rather than libraries, and each backs one feature rather than the app:
 # no portal means no screen share, no secret service means no remembered sign-in.
 Recommends:     xdg-desktop-portal

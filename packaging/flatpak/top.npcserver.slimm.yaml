@@ -23,6 +23,18 @@
 # now hard-links against libayatana-appindicator3, absent from the runtime, so
 # a libayatana-appindicator module builds it. See the README's own account of
 # what this pass could and could not verify locally.
+#
+# Known gap, added with inline video playback (media_kit): media_kit_video's
+# own Linux plugin links libmpv and libepoxy directly (confirmed with
+# readelf on the built .so - real NEEDED entries, not a dlopen), and
+# Flutter dlopens every registered plugin at process startup. Unless this
+# runtime already carries libepoxy (plausible; it is a common GL dependency)
+# and libmpv (unlikely; nothing else here would pull it in), the app may
+# fail to even launch from a Flatpak install, not merely fail to play video.
+# No module here builds or vendors either, unlike libayatana-appindicator3
+# above. The rpm and the plain release tarball are unaffected, since both
+# use a real system libmpv rather than this sandbox's own runtime. See
+# docs/dependencies.md's media_kit section for the full account.
 
 app-id: top.npcserver.slimm
 runtime: org.freedesktop.Platform

@@ -102,6 +102,13 @@ jobs:
           flutter-version: 3.47.0
           cache: true
 
+      # media_kit's Linux backend dlopens the system's libmpv at runtime,
+      # never linked at build time (see packaging/rpm/slim-m-client.spec's own
+      # comment on this), so `flutter test` here needs it present the same
+      # way the runner already carries libgtk/libsecret for other plugins.
+      - name: libmpv (media_kit's native video backend on Linux)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libmpv-dev
+
       # --enforce-lockfile, for the same reason the Rust side builds --locked:
       # without it the committed lockfile is advisory and CI can silently
       # resolve versions nobody committed.
@@ -197,13 +204,15 @@ jobs:
           path: bundle
 
       # linux-compiles builds with -dev packages on its own runner; this job only downloads the binary, so it needs the matching runtime libs named explicitly.
+      # libmpv2 and libepoxy0 are new with media_kit_video: its own plugin links against both (confirmed via readelf on the built .so), so the app cannot even load its plugins - never mind play a video - without them present.
       - name: xvfb, window-manipulation tools, dbus, and the binary's runtime libs
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             xvfb fluxbox wmctrl xdotool libgl1-mesa-dri mesa-utils \
             libgtk-3-0 libsecret-1-0 libgstreamer1.0-0 dbus-daemon \
-            libgstreamer-plugins-base1.0-0 libayatana-appindicator3-1 libpulse0
+            libgstreamer-plugins-base1.0-0 libayatana-appindicator3-1 libpulse0 \
+            libmpv2 libepoxy0
 
       - name: chmod the downloaded binary
         run: chmod +x bundle/slimm_app

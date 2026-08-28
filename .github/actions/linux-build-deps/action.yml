@@ -15,6 +15,17 @@
 # libpulse-dev is flutter_webrtc's own build-time switch for Linux
 # screen-share audio; without it the build succeeds and silently ships
 # without that capability.
+#
+# libmpv-dev and libepoxy-dev are media_kit_video's own linux/CMakeLists.txt
+# doing `pkg_check_modules(mpv IMPORTED_TARGET mpv)` / `... epoxy` and then
+# `target_link_libraries(media_kit_video_plugin PRIVATE ... PkgConfig::mpv
+# PkgConfig::epoxy)` - a real link, not the dlopen media_kit's own Dart FFI
+# layer does separately to drive playback. Confirmed by reproducing the
+# missing-package failure and then checking the built plugin's own NEEDED
+# entries with readelf once these were installed: libmpv.so.2 and
+# libepoxy.so.0 are both there, so both are required to build this bundle at
+# all, and to launch it: Flutter dlopens every registered plugin at startup,
+# not only when a video is actually opened.
 
 name: linux build deps
 description: Install the apt packages a Linux build of the slim-m client needs.
@@ -28,4 +39,4 @@ runs:
         sudo apt-get install -y --no-install-recommends \
           clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
           libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-          libayatana-appindicator3-dev libpulse-dev
+          libayatana-appindicator3-dev libpulse-dev libmpv-dev libepoxy-dev

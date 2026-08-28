@@ -100,6 +100,10 @@ abstract final class AppIcons {
   /// opens a device's own photo library rather than a search.
   static const IconData gif = LucideIcons.clapperboard300;
 
+  /// Saving an attachment this app cannot render inline - a PDF, an archive,
+  /// or a video before it finishes buffering. See `attachment_save.dart`.
+  static const IconData download = LucideIcons.download300;
+
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.

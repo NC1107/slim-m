@@ -9,11 +9,15 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/attachment_bytes.dart';
+import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/widgets/attachment_video_player.dart';
 import 'package:slimm_app/src/widgets/attachment_view.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -41,7 +45,40 @@ Future<void> _pump(WidgetTester tester, Uint8List bytes) async {
   await tester.pumpAndSettle();
 }
 
+/// Extends (never implements) [FilePickerPlatform]; see
+/// `attachment_save_test.dart` for the same fake in isolation.
+class _FakeSaver extends FilePickerPlatform {
+  String? savedFileName;
+  Uint8List? savedBytes;
+
+  @override
+  Future<String?> saveFile({
+    String? dialogTitle,
+    required String fileName,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    required Uint8List bytes,
+    void Function(FilePickerStatus)? onFileLoading,
+    bool lockParentWindow = false,
+  }) async {
+    savedFileName = fileName;
+    savedBytes = bytes;
+    return '/home/user/Downloads/$fileName';
+  }
+}
+
+_FakeSaver _useSaver() {
+  final previous = FilePickerPlatform.instance;
+  final saver = _FakeSaver();
+  FilePickerPlatform.instance = saver;
+  addTearDown(() => FilePickerPlatform.instance = previous);
+  return saver;
+}
+
 void main() {
+  setUpAll(MediaKit.ensureInitialized);
+
   testWidgets('the decode width is capped at the inline max, scaled by dpr', (
     tester,
   ) async {
@@ -107,5 +144,118 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  const pdf = api.Attachment(
+    id: 'p1',
+    filename: 'report.pdf',
+    contentType: 'application/pdf',
+    size: 1800000,
+  );
+
+  testWidgets(
+    'a non-image attachment exposes a save action that fetches with auth '
+    'and hands off the exact bytes',
+    (tester) async {
+      final saver = _useSaver();
+      final bytes = Uint8List.fromList(const [9, 9, 9]);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            attachmentBytesProvider(pdf.id).overrideWith((ref) async {
+              return bytes;
+            }),
+          ],
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(body: AttachmentView(attachment: pdf)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(AppIcons.download), findsOneWidget);
+      await tester.tap(find.text(pdf.filename));
+      await tester.pumpAndSettle();
+
+      expect(saver.savedFileName, pdf.filename);
+      expect(saver.savedBytes, bytes);
+    },
+  );
+
+  testWidgets(
+    'a save failure surfaces through this row\'s own AppErrorState, never a '
+    'SnackBar',
+    (tester) async {
+      _useSaver();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            attachmentBytesProvider(pdf.id).overrideWith((ref) async {
+              throw const api.ForbiddenException('not in this channel');
+            }),
+          ],
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(body: AttachmentView(attachment: pdf)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(pdf.filename));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+      expect(
+        find.text(
+          'Could not save ${pdf.filename}: you are not allowed to do that.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  test(
+    'the four inline image types still render inline, nothing else does',
+    () {
+      for (final type in const [
+        'image/png',
+        'image/jpeg',
+        'image/gif',
+        'image/webp',
+      ]) {
+        expect(isInlineImage(type), isTrue, reason: type);
+        expect(isVideo(type), isFalse, reason: type);
+      }
+      expect(isInlineImage('video/mp4'), isFalse);
+      expect(isInlineImage('application/pdf'), isFalse);
+    },
+  );
+
+  testWidgets('a video attachment routes to the inline player, not the chip', (
+    tester,
+  ) async {
+    const video = api.Attachment(
+      id: 'v1',
+      filename: 'clip.mp4',
+      contentType: 'video/mp4',
+      size: 12000000,
+    );
+    // No sign-in: the player's own source rejects it before touching the network, so this settles rather than spinning forever.
+    final signedOut = api.SlimmApi(baseUrl: Uri.parse('http://localhost:1'));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [apiProvider.overrideWithValue(signedOut)],
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(body: AttachmentView(attachment: video)),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(AttachmentVideoPlayer), findsOneWidget);
   });
 }
