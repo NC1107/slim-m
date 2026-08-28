@@ -18,6 +18,7 @@ import 'message_ops_sync.dart';
 import 'op_adjacency.dart';
 import 'message_extras.dart';
 import 'providers.dart';
+import 'reconnect_backoff.dart';
 import 'user_profiles.dart';
 
 /// How the connection is doing, for the UI to show honestly rather than
@@ -55,7 +56,9 @@ final initialSyncCompleteProvider = StateProvider<bool>((ref) => false);
 /// rotation in between, so a routine access-token refresh mid-session does
 /// not drop and reconnect the socket for no reason.
 class SyncController extends StateNotifier<SyncStatus> {
-  SyncController(this._ref) : super(SyncStatus.offline) {
+  SyncController(this._ref, {Random? random})
+    : _backoff = ReconnectBackoff(random: random),
+      super(SyncStatus.offline) {
     final session = _ref.read(sessionProvider);
     // Subscribe before reading the current value, so a change landing between the two is never missed.
     _sessionSubscription = session.changes.listen((tokens) {
@@ -81,7 +84,7 @@ class SyncController extends StateNotifier<SyncStatus> {
   StreamSubscription<ServerEvent>? _events;
   Timer? _retry;
   bool _disposed = false;
-  int _attempt = 0;
+  final ReconnectBackoff _backoff;
   final _channelRefresher = ChannelRefresher();
 
   /// Bumped by every [stop], every fresh [start] and [dispose], so a run
@@ -170,7 +173,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       await _attach(generation, api, store);
       if (generation != _generation) return;
 
-      _attempt = 0;
+      _backoff.reset();
       state = SyncStatus.live;
       // A DB read failure here must not read as this connect itself having failed; retryMessage's own catch already covers a failed resend.
       unawaited(
@@ -417,15 +420,12 @@ class SyncController extends StateNotifier<SyncStatus> {
   }
 
   /// Backs off, and jitters, so a server restart does not bring every client
-  /// back in the same instant.
+  /// back in the same instant. See [ReconnectBackoff] for the delay itself;
+  /// this only schedules the timer it returns.
   void _scheduleRetry() {
     if (_disposed) return;
-    _attempt = (_attempt + 1).clamp(1, 6);
-    final seconds = (1 << (_attempt - 1)).clamp(1, 32);
-    // Random, not DateTime.now().microsecond: web's Date is ms-resolution, so that was always zero.
-    final jitter = Duration(milliseconds: Random().nextInt(1000));
     _retry?.cancel();
-    _retry = Timer(Duration(seconds: seconds) + jitter, start);
+    _retry = Timer(_backoff.next(), start);
   }
 
   Future<void> _teardown() async {
