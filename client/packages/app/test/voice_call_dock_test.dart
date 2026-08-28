@@ -10,15 +10,15 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart';
 import 'package:slimm_app/src/widgets/floating_dock_card.dart';
 import 'package:slimm_rtc/rtc.dart' show VoiceSessionState;
 
 import 'voice_call_controls_harness.dart';
 
-const _connected = VoiceState(state: VoiceSessionState.connected);
-const _connectedWithCamera = VoiceState(
+const _connected = VoiceFlags(state: VoiceSessionState.connected);
+const _connectedWithCamera = VoiceFlags(
   state: VoiceSessionState.connected,
   cameraEnabled: true,
 );

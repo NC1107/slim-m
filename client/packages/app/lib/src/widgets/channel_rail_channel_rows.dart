@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
 import 'channel_row_menu.dart';
@@ -173,23 +174,23 @@ class VoiceChannelRow extends ConsumerWidget {
   /// own press/hover highlight rather than beside it.
   final Widget? trailingExtra;
 
-  bool _inCall(VoiceState voice) =>
-      voice.state == VoiceSessionState.connected &&
-      voice.channelId == channel.id;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    // Watched here, not by the section that lays out every row, so a room event rebuilds only voice rows.
-    final voice = ref.watch(voiceControllerProvider);
-    final inCall = _inCall(voice);
+    // Watched here, not by the section laying out every row, narrowed to state/channelId alone.
+    final (voiceState, voiceChannelId) = ref.watch(
+      voiceFlagsProvider.select((f) => (f.state, f.channelId)),
+    );
+    final inCall =
+        voiceState == VoiceSessionState.connected &&
+        voiceChannelId == channel.id;
     final iconColor = inCall
         ? tokens.accent
         : tokens.textSecondary.withValues(alpha: 0.7);
 
     // A joined call already has this live; an unjoined one polls for it below.
     final participants = inCall
-        ? voice.participants
+        ? ref.watch(voiceParticipantsProvider)
         : ref
                   .watch(voiceRosterProvider(channel.id))
                   .valueOrNull
@@ -221,9 +222,9 @@ class VoiceChannelRow extends ConsumerWidget {
           trailingExtra: trailingExtra,
           onTap: () {
             context.go(Routes.channel(channel.id));
-            // A re-click already open; see voice_channel_tap.dart for why.
+            // A re-click already open; see voice_channel_tap.dart for why. Read fresh, not the watched tuple: this only runs on a tap.
             if (voiceChannelTapShouldRejoin(
-              voice: voice,
+              voice: ref.read(voiceFlagsProvider),
               channelId: channel.id,
               alreadySelected: selected,
             )) {

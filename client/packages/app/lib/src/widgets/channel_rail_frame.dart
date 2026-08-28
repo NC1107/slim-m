@@ -15,6 +15,7 @@ import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import 'presence_menu.dart';
@@ -251,10 +252,14 @@ class RailConnectionBar extends ConsumerWidget {
 
 /// The mic/deafen toggle pair, shared by [RailUserFooter]'s row and
 /// [CollapsedRailStrip]'s column so the two surfaces cannot diverge on icon,
-/// label or enabled state. Both read the same [VoiceState]/[VoiceController];
+/// label or enabled state. Both read the same [VoiceFlags]/[VoiceController];
 /// only the surrounding layout differs.
+///
+/// Takes [VoiceFlags] rather than the full [VoiceState] on purpose: neither
+/// caller has any use for the roster, and typing this as the narrower flags
+/// object makes it impossible for a future caller to thread it back in.
 List<Widget> railVoiceToggleButtons({
-  required VoiceState voice,
+  required VoiceFlags voice,
   required VoiceController voiceController,
 }) {
   final inCall = voice.state == VoiceSessionState.connected;
@@ -306,7 +311,7 @@ class RailUserFooter extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final me = ref.watch(meProvider);
     final visibility = ref.watch(presenceVisibilityDisplayProvider);
-    final voice = ref.watch(voiceControllerProvider);
+    final voice = ref.watch(voiceFlagsProvider);
     final voiceController = ref.read(voiceControllerProvider.notifier);
     final inCall = voice.state == VoiceSessionState.connected;
     // A call in the channel already on screen has its own full call UI.

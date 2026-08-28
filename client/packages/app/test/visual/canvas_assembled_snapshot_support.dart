@@ -31,6 +31,7 @@ import 'package:slimm_app/src/providers/avatar_bytes.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/user_profiles.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_activity_log.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_call_dock.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane_body.dart';
@@ -214,10 +215,9 @@ Future<void> renderCanvasAssembledPane(
               callDock: controller == null
                   ? null
                   : CallDockData(
-                      voice: VoiceState(
+                      voice: const VoiceFlags(
                         channelId: 'c1',
                         state: VoiceSessionState.connected,
-                        participants: participants,
                       ),
                       controller: controller,
                     ),

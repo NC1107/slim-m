@@ -24,6 +24,7 @@ import '../providers/call_recap.dart';
 import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
+import '../providers/voice_flags.dart';
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
 import 'voice_call_dock.dart';
@@ -38,7 +39,10 @@ import 'voice_join_preview.dart';
 /// [VoiceController.join] carries no state transition of its own) - without
 /// it, an arrival during that window read the controller as idle and
 /// auto-joined a second call with no [VoiceSwitchPrompt] at all.
-bool _busyElsewhere(VoiceState voice, String channelId) =>
+///
+/// Takes [VoiceFlags]: the roster has nothing to say about whether another
+/// channel's call is already busy.
+bool _busyElsewhere(VoiceFlags voice, String channelId) =>
     voice.channelId != null &&
     voice.channelId != channelId &&
     (voice.state == VoiceSessionState.connected ||
@@ -49,7 +53,7 @@ bool _busyElsewhere(VoiceState voice, String channelId) =>
 /// is one instance for every channel, and CLAUDE.md already recorded this
 /// exact leak shape once for an in-call error message shown in the wrong
 /// channel's preview.
-CallRecap? recapForChannel(VoiceState voice, String channelId) =>
+CallRecap? recapForChannel(VoiceFlags voice, String channelId) =>
     voice.recap?.channelId == channelId ? voice.recap : null;
 
 class VoiceScreen extends ConsumerStatefulWidget {
@@ -99,7 +103,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final voice = ref.watch(voiceControllerProvider);
+    final voice = ref.watch(voiceFlagsProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
     final channelId = widget.channelId;
     final inThisChannel = voice.channelId == channelId;
@@ -217,7 +221,7 @@ class _InCall extends ConsumerWidget {
               offset: 0,
               child: VoiceCallDock(
                 controller: controller,
-                voice: voice,
+                voice: VoiceFlags.from(voice),
                 canvasChannelId: isDm ? null : channelId,
               ),
             ),

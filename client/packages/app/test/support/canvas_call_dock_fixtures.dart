@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_call_dock.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -20,9 +21,9 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import '../voice_controller_harness.dart';
 import 'canvas_tools_row_fixtures.dart';
 
-/// A connected [VoiceState] with sensible defaults, matching what
+/// A connected [VoiceFlags] with sensible defaults, matching what
 /// `callDockDataFor` would hand this dock for an ordinary active call.
-const connectedVoiceState = VoiceState(state: VoiceSessionState.connected);
+const connectedVoiceState = VoiceFlags(state: VoiceSessionState.connected);
 
 /// Pumps a [CanvasCallDock]. When [withCall] is true, the dock's call
 /// section is wired to a real [VoiceController] over a [FakeSession] built
@@ -40,7 +41,7 @@ Future<
 pumpCanvasCallDock(
   WidgetTester tester, {
   bool withCall = false,
-  VoiceState callVoice = connectedVoiceState,
+  VoiceFlags callVoice = connectedVoiceState,
   CanvasDockData? canvas,
   double width = 800,
   bool? touch,

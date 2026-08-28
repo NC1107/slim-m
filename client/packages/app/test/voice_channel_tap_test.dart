@@ -5,7 +5,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/widgets/voice_channel_tap.dart';
 import 'package:slimm_rtc/rtc.dart';
 
@@ -13,7 +13,7 @@ void main() {
   test('a fresh navigation elsewhere never double-fires the auto-join', () {
     expect(
       voiceChannelTapShouldRejoin(
-        voice: const VoiceState(),
+        voice: const VoiceFlags(),
         channelId: 'ch-1',
         alreadySelected: false,
       ),
@@ -26,7 +26,7 @@ void main() {
     () {
       expect(
         voiceChannelTapShouldRejoin(
-          voice: const VoiceState(
+          voice: const VoiceFlags(
             channelId: 'ch-1',
             state: VoiceSessionState.idle,
           ),
@@ -41,7 +41,7 @@ void main() {
   test('re-clicking after a failed join also asks to rejoin', () {
     expect(
       voiceChannelTapShouldRejoin(
-        voice: const VoiceState(
+        voice: const VoiceFlags(
           channelId: 'ch-1',
           state: VoiceSessionState.failed,
         ),
@@ -57,7 +57,7 @@ void main() {
     () {
       expect(
         voiceChannelTapShouldRejoin(
-          voice: const VoiceState(
+          voice: const VoiceFlags(
             channelId: 'ch-1',
             state: VoiceSessionState.connected,
           ),
@@ -72,7 +72,7 @@ void main() {
   test('re-clicking mid-connect does not stack a second join', () {
     expect(
       voiceChannelTapShouldRejoin(
-        voice: const VoiceState(
+        voice: const VoiceFlags(
           channelId: 'ch-1',
           state: VoiceSessionState.connecting,
         ),
@@ -87,7 +87,7 @@ void main() {
       'restart it either', () {
     expect(
       voiceChannelTapShouldRejoin(
-        voice: const VoiceState(channelId: 'ch-1', joining: true),
+        voice: const VoiceFlags(channelId: 'ch-1', joining: true),
         channelId: 'ch-1',
         alreadySelected: true,
       ),
@@ -99,7 +99,7 @@ void main() {
       'this one', () {
     expect(
       voiceChannelTapShouldRejoin(
-        voice: const VoiceState(
+        voice: const VoiceFlags(
           channelId: 'ch-2',
           state: VoiceSessionState.connected,
         ),

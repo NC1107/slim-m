@@ -20,6 +20,7 @@ import 'package:tray_manager/tray_manager.dart';
 import '../../providers/presence_controller.dart';
 import '../../providers/providers.dart';
 import '../../providers/voice_controller.dart';
+import '../../providers/voice_flags.dart';
 import '../../routing/router.dart';
 import '../../routing/routes.dart';
 import '../../widgets/presence_menu.dart' show presenceOptions;
@@ -35,24 +36,20 @@ class DesktopTrayController {
   final DesktopWindowPort port;
   final ProviderContainer container;
 
-  ProviderSubscription<VoiceState>? _voiceSubscription;
+  ProviderSubscription<(VoiceSessionState, bool, bool)>? _voiceSubscription;
   ProviderSubscription<api.PresenceVisibility?>? _presenceSubscription;
 
   Future<void> start() async {
     await TrayManager.instance.setIcon(trayIconAssetPath);
     await _setToolTip();
     await _rebuildMenu();
-    _voiceSubscription = container.listen<VoiceState>(voiceControllerProvider, (
-      previous,
-      next,
-    ) {
-      if (previous?.state == next.state &&
-          previous?.microphoneEnabled == next.microphoneEnabled &&
-          previous?.deafened == next.deafened) {
-        return;
-      }
-      _rebuildMenu();
-    });
+    // Selected to the three flags this menu draws, so a roster change never fires it.
+    _voiceSubscription = container.listen(
+      voiceFlagsProvider.select(
+        (f) => (f.state, f.microphoneEnabled, f.deafened),
+      ),
+      (previous, next) => _rebuildMenu(),
+    );
     _presenceSubscription = container.listen<api.PresenceVisibility?>(
       presenceVisibilityDisplayProvider,
       (previous, next) {
@@ -84,18 +81,18 @@ class DesktopTrayController {
   }
 
   Future<void> _rebuildMenu() async {
-    final voiceState = container.read(voiceControllerProvider);
-    final inCall = voiceState.state == VoiceSessionState.connected;
+    final voiceFlags = container.read(voiceFlagsProvider);
+    final inCall = voiceFlags.state == VoiceSessionState.connected;
     final selected = container.read(presenceVisibilityDisplayProvider);
     final items = trayMenuActions(inCall: inCall)
-        .map((kind) => _itemFor(kind, voiceState, selected))
+        .map((kind) => _itemFor(kind, voiceFlags, selected))
         .toList(growable: false);
     await TrayManager.instance.setContextMenu(Menu(items: items));
   }
 
   MenuItem _itemFor(
     TrayMenuActionKind kind,
-    VoiceState voiceState,
+    VoiceFlags voiceState,
     api.PresenceVisibility? selected,
   ) => switch (kind) {
     TrayMenuActionKind.showHide => MenuItem(

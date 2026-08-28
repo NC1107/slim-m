@@ -14,8 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/call_recap.dart';
+import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
-import 'package:slimm_app/src/providers/voice_state.dart';
 import 'package:slimm_app/src/screens/voice_join_preview.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_app/src/widgets/call_recap_card.dart';
@@ -63,14 +63,14 @@ void main() {
   group('recapForChannel', () {
     test("returns the recap when it belongs to this screen's channel", () {
       final recap = _recap(channelId: 'channel-1');
-      final voice = const VoiceState().copyWith(recap: recap);
+      final voice = VoiceFlags(recap: recap);
 
       expect(recapForChannel(voice, 'channel-1'), same(recap));
     });
 
     test('returns null for a recap left over from a different channel', () {
       final recap = _recap(channelId: 'channel-a');
-      final voice = const VoiceState().copyWith(recap: recap);
+      final voice = VoiceFlags(recap: recap);
 
       expect(
         recapForChannel(voice, 'channel-b'),
@@ -82,7 +82,7 @@ void main() {
     });
 
     test('returns null when there is no recap at all', () {
-      expect(recapForChannel(const VoiceState(), 'channel-1'), isNull);
+      expect(recapForChannel(const VoiceFlags(), 'channel-1'), isNull);
     });
   });
 
