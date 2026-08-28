@@ -8,6 +8,15 @@
 /// themselves a native singleton resource the same way `window_manager`'s
 /// window is, and `tray_menu_actions.dart` already carries the one piece of
 /// this that is worth testing headlessly - which rows appear at all.
+///
+/// `tray_manager` 0.5.3 dispatches a menu click by looping over its
+/// registered [TrayListener]s and calling `menuItem.onClick` from inside that
+/// loop; with zero listeners registered, the loop body never runs and every
+/// `onClick` callback below is dead code. Mixing in [TrayListener] here (and
+/// registering/removing `this`) exists purely to give that loop one
+/// iteration. `onClick` stays the authoritative handler; the mixin's own
+/// `onTrayMenuItemClick` hook is left at its default no-op so a click is not
+/// handled twice.
 library;
 
 import 'dart:async';
@@ -30,7 +39,7 @@ import 'tray_menu_actions.dart';
 
 const trayIconAssetPath = 'assets/icons/tray_icon.png';
 
-class DesktopTrayController {
+class DesktopTrayController with TrayListener {
   DesktopTrayController({required this.port, required this.container});
 
   final DesktopWindowPort port;
@@ -40,6 +49,7 @@ class DesktopTrayController {
   ProviderSubscription<api.PresenceVisibility?>? _presenceSubscription;
 
   Future<void> start() async {
+    TrayManager.instance.addListener(this);
     await TrayManager.instance.setIcon(trayIconAssetPath);
     await _setToolTip();
     await _rebuildMenu();
@@ -60,6 +70,7 @@ class DesktopTrayController {
   }
 
   void dispose() {
+    TrayManager.instance.removeListener(this);
     _voiceSubscription?.close();
     _presenceSubscription?.close();
   }
