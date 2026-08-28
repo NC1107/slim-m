@@ -50,7 +50,13 @@ class BadRequestException extends ApiException {
 
 /// Over the rate budget for this traffic class. Back off before retrying.
 class RateLimitedException extends ApiException {
-  const RateLimitedException(super.message);
+  const RateLimitedException(super.message, {this.retryAfter});
+
+  /// How long the response itself said to wait, parsed from a `Retry-After`
+  /// header carrying a delay in seconds. Null when the response carried no
+  /// such header (the server does not send one today) or one this could not
+  /// parse, in which case a caller falls back to its own backoff.
+  final Duration? retryAfter;
 }
 
 /// The server shed the request under load. Retry shortly.

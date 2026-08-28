@@ -214,7 +214,10 @@ extension SlimmApiTransport on SlimmApi {
       403 => ForbiddenException(reason),
       404 => NotFoundException(reason),
       409 => ConflictException(reason),
-      429 => RateLimitedException(reason),
+      429 => RateLimitedException(
+          reason,
+          retryAfter: _retryAfter(response),
+        ),
       501 => NotConfiguredException(reason),
       503 => UnavailableException(reason),
       _ => ServerException(reason, response.statusCode),
@@ -229,3 +232,20 @@ extension SlimmApiTransport on SlimmApi {
 String _withoutDotSegment(String segment) => (segment == '.' || segment == '..')
     ? segment.replaceAll('.', '%2E')
     : segment;
+
+/// The delay a `Retry-After` header names, or null if there is none or it
+/// does not parse.
+///
+/// Only the delta-seconds form (RFC 9110 10.2.3) is read; the server sends
+/// nothing here today, so this is forward-compatible plumbing rather than a
+/// path anything currently exercises. The alternative HTTP-date form is
+/// deliberately not parsed: nothing this server or a caller of it would ever
+/// send needs it, and a caller with no value here already falls back to its
+/// own backoff.
+Duration? _retryAfter(http.Response response) {
+  final header = response.headers['retry-after'];
+  if (header == null) return null;
+  final seconds = int.tryParse(header.trim());
+  if (seconds == null || seconds < 0) return null;
+  return Duration(seconds: seconds);
+}

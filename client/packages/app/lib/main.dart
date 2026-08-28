@@ -15,6 +15,8 @@ import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
 import 'src/providers/attachment_preview_quality.dart';
 import 'src/providers/desktop_splash_preference.dart';
+import 'src/providers/emoji_catalog_provider.dart';
+import 'src/providers/emoji_image_cache.dart';
 import 'src/providers/media_preferences.dart';
 import 'src/providers/message_page_size.dart';
 import 'src/providers/image_cache_preference.dart';
@@ -67,7 +69,12 @@ Future<void> main() async {
   DesktopWindowShell.registerSecondInstanceHandler();
   DesktopQuitShortcut.register(DesktopWindowShell.port);
 
-  final container = ProviderContainer();
+  // See emojiImageCacheProvider's own doc for why this is opted into here rather than left as its default.
+  final container = ProviderContainer(
+    overrides: [
+      emojiImageCacheProvider.overrideWithValue(createEmojiImageCache()),
+    ],
+  );
   // Before anything that can throw, so startup failures land in the log too.
   installDiagnostics(container);
 
