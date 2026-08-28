@@ -77,6 +77,7 @@ export 'src/events.dart'
         ProfileChanged,
         ReactionsChanged,
         ReactionTally,
+        ReportsChanged,
         RoleChanged,
         ServerEvent,
         ThreadUpdated,

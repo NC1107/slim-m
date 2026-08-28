@@ -36,6 +36,36 @@ extension SlimmApiModeration on SlimmApi {
         .toList(growable: false);
   }
 
+  /// One page of the merged moderation-history feed: resolved reports and
+  /// `moderation_audit_log` entries, newest first. Requires MANAGE_MESSAGES.
+  ///
+  /// The cursor is composite like [listOpenReports]'s but paged backward:
+  /// [after] is the event time of the last item already held (a resolved
+  /// report's `resolvedAt`, an audit entry's `createdAt`), [afterKind] is
+  /// that item's own [ModerationHistoryItem.cursorKind], and [afterId] is its
+  /// [ModerationHistoryItem.id]. All three go together or not at all.
+  Future<List<ModerationHistoryItem>> moderationHistory({
+    int? after,
+    String? afterKind,
+    String? afterId,
+    int? limit,
+  }) async {
+    final query = <String, String>{
+      if (after != null) 'after': '$after',
+      if (afterKind != null) 'after_kind': afterKind,
+      if (afterId != null) 'after_id': afterId,
+      if (limit != null) 'limit': '$limit',
+    };
+    final json = await _send(
+      'GET',
+      '/reports/history',
+      query: query.isEmpty ? null : query,
+    );
+    return (json as List<dynamic>)
+        .map((e) => ModerationHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// A reporter's own, narrow view of a report they filed: whether it is
   /// still open. No permission is required beyond having filed it - scoped
   /// hard to the caller's own reports server-side, not by anything this

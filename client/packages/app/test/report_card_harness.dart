@@ -115,6 +115,7 @@ class _NoopSyncController extends SyncController {
 Future<Harness> pumpReports(
   WidgetTester tester, {
   required List<String> reports,
+  List<String> history = const [],
   Map<String, String> profiles = const {},
   int permissions = 0,
   SlimmDatabase? db,
@@ -137,6 +138,14 @@ Future<Harness> pumpReports(
             if (request.method == 'GET' && request.url.path == '/reports') {
               return http.Response(
                 '[${reports.join(',')}]',
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.method == 'GET' &&
+                request.url.path == '/reports/history') {
+              return http.Response(
+                '[${history.join(',')}]',
                 200,
                 headers: {'content-type': 'application/json'},
               );
