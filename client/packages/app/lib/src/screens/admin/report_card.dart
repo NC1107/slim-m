@@ -38,6 +38,7 @@ import '../../widgets/message_text.dart';
 import '../../widgets/moderation_unavailable_caption.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
+import '../channel_screen.dart' show knownUsernamesFrom;
 import 'report_card_actions.dart';
 import 'report_card_labels.dart';
 import 'report_card_quick_actions.dart';
@@ -159,13 +160,7 @@ class _ReportCardState extends ConsumerState<ReportCard>
     final profiles = ref.watch(batchProfilesControllerProvider);
     final me = ref.watch(meProvider).valueOrNull;
     final mine = ref.watch(myPermissionsProvider);
-    final knownUsernames = ref
-        .watch(membersProvider)
-        .maybeWhen(
-          data: (members) =>
-              members.map((m) => m.username.toLowerCase()).toSet(),
-          orElse: () => const <String>{},
-        );
+    final knownUsernames = knownUsernamesFrom(ref.watch(membersProvider));
     final customEmoji = ref.watch(customEmojiIndexProvider);
 
     final isMessageReport = report.subjectKind == api.ReportSubject.message;
