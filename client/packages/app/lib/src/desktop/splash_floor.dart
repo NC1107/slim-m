@@ -47,8 +47,8 @@ import 'package:slimm_platform/platform.dart' show isDesktopHost;
 /// only thing anyone waits on.
 const Duration minSplashDuration = Duration(milliseconds: 900);
 
-/// Runs [bootstrap] to completion, and on [desktop] also waits out
-/// [minSplashDuration] - whichever finishes later.
+/// Runs [bootstrap] to completion, and on [desktop] also waits out [floor] -
+/// whichever finishes later.
 ///
 /// The two run concurrently, not back to back: the floor starts counting
 /// before [bootstrap] is awaited, so a bootstrap slower than the floor is
@@ -56,12 +56,20 @@ const Duration minSplashDuration = Duration(milliseconds: 900);
 /// the remainder. [desktop] defaults to [isDesktopHost] (a getter, so it
 /// cannot be a default parameter value directly) and exists as a parameter
 /// purely so tests can drive both branches without a real host.
+///
+/// [floor] defaults to [minSplashDuration] for callers with nothing else to
+/// say. `main.dart` passes [Duration.zero] when the splash preference is
+/// turned off, which still runs this same concurrent-wait shape rather than
+/// skipping it - a zero floor resolves as soon as the event loop next turns,
+/// so it adds no perceptible wait on top of [bootstrap] without needing a
+/// second code path.
 Future<void> awaitBootstrapWithSplashFloor(
   Future<void> Function() bootstrap, {
   bool? desktop,
+  Duration floor = minSplashDuration,
 }) async {
   final onDesktop = desktop ?? isDesktopHost;
-  final floor = onDesktop ? Future<void>.delayed(minSplashDuration) : null;
+  final floorFuture = onDesktop ? Future<void>.delayed(floor) : null;
   await bootstrap();
-  if (floor != null) await floor;
+  if (floorFuture != null) await floorFuture;
 }

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The performance pane carries both memory dials - attachment preview quality
 /// and the image-cache cap - each stating its current value with the default
-/// marked.
+/// marked. The desktop splash toggle and duration row are covered on their
+/// own in `desktop_splash_settings_row_test.dart`, the same "a new preference
+/// gets its own file" shape `voice_settings_push_to_talk_test.dart` already
+/// uses; this file only asserts they are present at all.
 library;
 
 import 'package:flutter/material.dart';
@@ -34,5 +37,8 @@ void main() {
     expect(find.text('Sharp (default)'), findsOneWidget);
     expect(find.text('100 MB (default)'), findsOneWidget);
     expect(find.text('Standard (50, default)'), findsOneWidget);
+    // Desktop-only, same as _PushToTalkSection's own isDesktopHost gate.
+    expect(find.text('Startup splash'), findsOneWidget);
+    expect(find.text('Splash duration'), findsOneWidget);
   });
 }
