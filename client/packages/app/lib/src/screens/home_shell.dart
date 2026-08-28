@@ -32,6 +32,7 @@ import '../widgets/channel_rail_drawer.dart';
 import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
+import '../widgets/drawer_edge_swipe.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/push_to_talk_listener.dart';
 import '../widgets/rail_slot.dart';
@@ -143,36 +144,43 @@ class HomeShell extends ConsumerWidget {
       final replacesHeader = canvasOpen || dmCallOpen;
       final channelId = selected;
       // Withheld, not just its own button - a Drawer's default edge-swipe would still reach it.
-      Widget compactScaffold(bool isDm) => Scaffold(
-        appBar: replacesHeader
-            ? null
-            : CompactChannelAppBar(
-                channelId: channelId,
-                onBack: () => context.go(Routes.channels),
-              ),
-        // Withheld with the back button above: the open pane claims the edge.
-        drawer: replacesHeader
-            ? null
-            : CompactChannelRailDrawer(selectedChannelId: channelId),
-        // The roster slides in from the right instead of docking beside the
-        // conversation, which is the only pane there is at this width.
-        endDrawer: isDm
-            ? null
-            : const Drawer(
-                width: AppMemberPane.width,
-                child: SafeArea(child: AppMemberPane()),
-              ),
-        // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
-        body: SafeArea(
-          child: Column(
-            children: [
-              const RailConnectionBar(),
-              Expanded(child: child),
-              if (showVoiceStrip) const VoiceStripIndicator(),
-            ],
+      Widget compactScaffold(bool isDm) {
+        final compactBody = Column(
+          children: [
+            const RailConnectionBar(),
+            Expanded(child: child),
+            if (showVoiceStrip) const VoiceStripIndicator(),
+          ],
+        );
+        return Scaffold(
+          appBar: replacesHeader
+              ? null
+              : CompactChannelAppBar(
+                  channelId: channelId,
+                  onBack: () => context.go(Routes.channels),
+                ),
+          // Withheld with the back button above: the open pane claims the edge.
+          drawer: replacesHeader
+              ? null
+              : CompactChannelRailDrawer(selectedChannelId: channelId),
+          // The roster slides in from the right instead of docking beside the
+          // conversation, which is the only pane there is at this width.
+          endDrawer: isDm
+              ? null
+              : const Drawer(
+                  width: AppMemberPane.width,
+                  child: SafeArea(child: AppMemberPane()),
+                ),
+          // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
+          body: SafeArea(
+            // Withheld the same way as the drawer above: nothing to swipe open.
+            child: replacesHeader
+                ? compactBody
+                : DrawerEdgeSwipe(child: compactBody),
           ),
-        ),
-      );
+        );
+      }
+
       final storeAsync = ref.watch(storeProvider);
       scaffold = storeAsync.maybeWhen(
         orElse: () => compactScaffold(false),
