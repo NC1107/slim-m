@@ -299,6 +299,58 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.59.0',
+    headline: 'A moderation history, and a startup screen you can turn off',
+    points: [
+      WhatsNewPoint(
+        'The moderation queue has a History tab next to open reports now, '
+        'showing who removed, timed out or restored someone, and when. The '
+        'server has been keeping this all along - there was just nowhere to '
+        'look at it.',
+      ),
+      WhatsNewPoint(
+        'On desktop, Settings > Performance can turn the startup splash off '
+        'entirely, or set how long it lingers: brief, standard, or long.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.60.0',
+    headline: 'Video plays inline, and every attachment can be saved',
+    points: [
+      WhatsNewPoint(
+        'Video attachments play right in the app now instead of sitting '
+        'there as a dead chip, on Linux, Windows, macOS, Android, iOS and '
+        'web. On native platforms it streams as it plays rather than '
+        'downloading the whole file first.',
+      ),
+      WhatsNewPoint(
+        'Any attachment can be saved or opened now, whatever it is - PDFs, '
+        'audio, archives, all of it. Before, only four image formats '
+        'rendered and everything else was a dead end with no way to get it '
+        'back out of the app.',
+      ),
+      WhatsNewPoint(
+        'Custom emoji stopped showing up as broken images. They\'re cached '
+        'on disk now, so reopening the picker does not refetch everything, '
+        'and a picker full of emoji no longer overwhelms the connection and '
+        'fails partway through.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.60.1',
+    headline: 'The channel rail opens on a narrow desktop window again',
+    points: [
+      WhatsNewPoint(
+        'Narrowing a desktop window past the point it switches to the '
+        'compact layout used to shut you out of the channel rail entirely - '
+        'the edge-swipe that opens it was disabled there regardless of '
+        'width, and no button stood in for it. The swipe works now.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
