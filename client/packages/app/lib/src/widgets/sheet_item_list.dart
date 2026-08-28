@@ -34,16 +34,23 @@ class SheetItemList extends StatelessWidget {
     super.key,
     required this.itemCount,
     required this.itemBuilder,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
   });
 
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
 
+  /// Defaults to the horizontal inset every sheet caller wants against its
+  /// own edge-to-edge box. A caller nesting this inside a container that
+  /// already insets its content (`SettingsSectionCard`'s own card padding)
+  /// passes [EdgeInsets.zero] instead, so the two insets do not stack.
+  final EdgeInsets padding;
+
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       shrinkWrap: itemCount <= sheetListShrinkWrapLimit,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+      padding: padding,
       itemCount: itemCount,
       itemBuilder: itemBuilder,
     );
