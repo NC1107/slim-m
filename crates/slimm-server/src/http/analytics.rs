@@ -2,6 +2,14 @@
 //! Space usage analytics: one resource, gated on MANAGE_SERVER same as
 //! `/space/settings`, that reads as disabled rather than refusing outright
 //! when the toggle is off. See `docs/decisions/0008-space-analytics.md`.
+//!
+//! **Rate limit**: `read` charges `Class::Write`, not the generous
+//! `Class::AuthedRead` its three siblings below use, because
+//! [`current_analytics`] runs real cross-table aggregation over the whole
+//! message and attachment history rather than a single-row lookup - see its
+//! own doc. `read_retention`, `read_canvas_cap`, and `read_screen_share_cap`
+//! each read one config value, the same shape `/space/settings`'s own read
+//! does, so they stay on `AuthedRead`.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
@@ -142,7 +150,8 @@ async fn read(
     parts: Parts,
     Authed(ctx): Authed,
 ) -> Result<Json<AnalyticsDto>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    // Write, not AuthedRead: current_analytics does real cross-table aggregation.
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     require_manage_server(&state, &ctx).await?;
     Ok(Json(current_analytics(&state).await?))
 }
@@ -194,7 +203,7 @@ async fn read_retention(
     parts: Parts,
     Authed(ctx): Authed,
 ) -> Result<Json<RetentionDto>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require_manage_server(&state, &ctx).await?;
     Ok(Json(RetentionDto {
         retention_days: state.store.message_retention_days().await?,
@@ -236,7 +245,7 @@ async fn read_canvas_cap(
     parts: Parts,
     Authed(ctx): Authed,
 ) -> Result<Json<CanvasCapDto>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require_manage_server(&state, &ctx).await?;
     Ok(Json(CanvasCapDto {
         object_cap: state.store.canvas_object_cap().await?,
@@ -277,7 +286,7 @@ async fn read_screen_share_cap(
     parts: Parts,
     Authed(ctx): Authed,
 ) -> Result<Json<ScreenShareCapDto>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require_manage_server(&state, &ctx).await?;
     Ok(Json(ScreenShareCapDto {
         max_height: state.store.screen_share_max_height().await?,

@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::ChannelId;
@@ -149,7 +149,7 @@ struct UpdateChannelRequest {
 /// carrying it into the response is a change to what gets kept, not a new
 /// query.
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ChannelDto>>, ApiError> {
     let visible = state

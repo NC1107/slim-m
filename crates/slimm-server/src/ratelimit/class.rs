@@ -31,6 +31,13 @@ pub enum Class {
     /// mid-keystroke; what this bounds is a flood, not a guess. `InviteCheck`
     /// stays tight because a hit there discloses real deployment metadata and
     /// this does not.
+    ///
+    /// Unauthenticated only - no `Authed`/`AuthedLimited` handler may charge
+    /// this, enforced by `tests/rate_limit_coverage.rs`. An authenticated GET
+    /// used to charge this too, on the reasoning that it was "just a read";
+    /// that made every one of them fight `/version`'s own callers for a
+    /// budget sized for a login screen, not a signed-in client. See
+    /// [`Class::AuthedRead`] for where those moved.
     Read,
     /// Checking an invite code before signup. Unauthenticated, and a valid
     /// code now discloses real deployment metadata rather than a bare
@@ -101,6 +108,47 @@ pub enum Class {
     /// [`Class::CanvasStrokePreview`] already works - not a smaller budget
     /// here, which would break the avatar case this exists to serve.
     Asset,
+    /// A cheap authenticated read: a list, a lookup, or a poll, never a
+    /// mutation and never a real aggregation or outbound call.
+    ///
+    /// Every authenticated read used to be split between two other classes,
+    /// both wrong for it: [`Class::Read`], whose own doc says it exists for
+    /// *unauthenticated* metadata like `/version` and is tighter than
+    /// [`Class::Write`] on the theory that nobody needs more than a handful
+    /// of those - a theory that never held once an authenticated route
+    /// started charging it too; or [`Class::Write`], which meant the voice
+    /// roster, `/space/settings`, and the removed-members list shared one
+    /// budget with token mint, heartbeat, and kick. This is the third class
+    /// that should have existed from the start: every plain list/lookup GET
+    /// behind `AuthedLimited<AUTHED_READ>` (`crate::http::extract`), plus
+    /// the voice roster, `/space/settings`, `/members/removed`, and the
+    /// cheap single-row analytics config reads (retention, canvas cap,
+    /// screen-share cap). `/space/analytics`'s own stats query and
+    /// `/metrics`'s live SFU probe are *not* here - both do real
+    /// cross-table aggregation or an uncached outbound call, so they stay on
+    /// [`Class::Write`]'s tighter budget even though they are GETs; see
+    /// their own call sites for why.
+    ///
+    /// Sized against two concrete workloads rather than a round number.
+    /// The sustained refill answers the polled voice roster: every unjoined
+    /// voice channel a client is rendering re-fetches its roster every 15
+    /// seconds (`voiceRosterPollInterval` in
+    /// `client/packages/app/lib/src/providers/voice_roster.dart`), nudged
+    /// early on a live join/leave rather than waiting out the interval. At
+    /// this refill, over 100 simultaneously-open voice channels could each
+    /// poll on their own 15-second cycle forever without ever touching the
+    /// burst, leaving headroom for every other read a client makes in the
+    /// same stretch. The burst answers a reconnect: `ChannelRefresher`
+    /// (`client/packages/app/lib/src/providers/channel_refresher.dart`)
+    /// fetches every channel's and DM's read marker concurrently the moment
+    /// a dropped socket comes back, alongside the channel/category/DM lists
+    /// and the notification-override and block lists two other controllers
+    /// fire at the same time. A deployment with more open channels than the
+    /// burst covers does not fail that reconnect: the extra read-marker
+    /// fetches simply wait out the refill and land a couple of seconds
+    /// later, the same graceful-degradation shape [`Class::Canvas`]'s own
+    /// doc describes, not a 429 storm.
+    AuthedRead,
     /// Searching a third-party GIF provider, and picking a result to attach.
     ///
     /// Tighter than [`Class::Read`] on purpose: unlike every other read this
@@ -134,6 +182,8 @@ impl Class {
             // A full member page plus a transcript's own avatars, at once.
             Class::Asset => (150.0, 25.0),
             Class::Gif => (10.0, 1.0),
+            // See this variant's own doc comment for the roster and reconnect math.
+            Class::AuthedRead => (40.0, 8.0),
         }
     }
 
@@ -142,7 +192,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 13] = [
+    pub const ALL: [Class; 14] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -156,6 +206,7 @@ impl Class {
         Class::CanvasStrokePreview,
         Class::Asset,
         Class::Gif,
+        Class::AuthedRead,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -175,6 +226,7 @@ impl Class {
             Class::CanvasStrokePreview => "canvas_stroke_preview",
             Class::Asset => "asset",
             Class::Gif => "gif",
+            Class::AuthedRead => "authed_read",
         }
     }
 }

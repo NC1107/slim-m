@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::ChannelId;
 use crate::notifications::NotificationPreference;
@@ -59,7 +59,7 @@ struct SetRequest {
 /// each channel: every id here is one the caller set themselves, so this
 /// tells them nothing they did not already know.
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ChannelPreferenceDto>>, ApiError> {
     let rows = state

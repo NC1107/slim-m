@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use crate::notifications::NotificationPreference;
 use crate::ratelimit::Class;
 use crate::store::PushRegistration;
@@ -161,7 +161,7 @@ async fn report_lifecycle(
 /// batched, per-viewer-derived answer, so there is no reason this cannot
 /// simply answer with the stored value.
 async fn get_preference(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<NotificationPreferenceDto>, ApiError> {
     let preference = state

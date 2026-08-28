@@ -68,8 +68,8 @@ fn get(uri: &str, token: &str) -> Request<Body> {
         .unwrap()
 }
 
-/// Read's burst is 20 (`ratelimit.rs`), so a run well past it is refused if
-/// the route charges anything at all.
+/// `AuthedRead`'s burst is 40 (`ratelimit/class.rs`), so a run well past it
+/// is refused if the route charges anything at all.
 #[tokio::test]
 async fn channel_and_category_lists_charge_a_rate_limit() {
     let (store, _guard) = new_store("slimm-list-routes-rate-limited").await;

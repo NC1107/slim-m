@@ -104,6 +104,96 @@ fn every_authenticated_handler_charges_a_rate_limit_class() {
     );
 }
 
+/// `Class::Read` exists for unauthenticated metadata (`/version`) and is
+/// tighter on purpose than every authenticated read class - see its own doc
+/// comment in `ratelimit/class.rs`. An authenticated handler charging it
+/// anyway is exactly the API1 defect this test set closes: analytics and
+/// metrics fought `/version`'s own callers for a budget sized for a login
+/// screen, and the roster, `/space/settings`, and `/members/removed` shared
+/// a mutation budget on the other class instead of landing here.
+///
+/// A handler is flagged if it takes `AuthedLimited<READ>` (the old, wrong
+/// code - authenticated call sites now take `AuthedLimited<AUTHED_READ>`) or
+/// calls `enforce(..., Class::Read)` while also authenticating the caller.
+#[test]
+fn no_authenticated_handler_charges_class_read() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/http");
+    let mut offenders = Vec::new();
+
+    for entry in std::fs::read_dir(&dir).expect("read src/http") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().is_none_or(|ext| ext != "rs") {
+            continue;
+        }
+        let file = path.file_name().unwrap().to_string_lossy().into_owned();
+        let scrubbed = support::code_only(&std::fs::read_to_string(&path).expect("read source"));
+
+        for (name, body) in handlers(&scrubbed) {
+            let sig = signature(&body);
+            let takes_authed = sig.contains(": Authed,")
+                || sig.contains(": Authed)")
+                || sig.contains(": AuthedLimited<");
+            if !takes_authed {
+                continue;
+            }
+            let charges_read =
+                sig.contains(": AuthedLimited<READ>") || body.contains("Class::Read)");
+            if charges_read {
+                offenders.push(format!("{file}::{name}"));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "these authenticated handlers charge Class::Read, which is reserved for \
+         unauthenticated metadata like /version; use AuthedLimited<AUTHED_READ> \
+         for a cheap read, or Class::Write if the route does real work:\n  {}",
+        offenders.join("\n  ")
+    );
+}
+
+/// The gate above must be able to fail, or it proves nothing - the same
+/// argument [`the_gate_sees_an_uncharged_handler`] already makes for the
+/// coverage gate. Drives it over one handler still on the extractor code and
+/// one still on the literal enforce call, and asserts both are caught.
+#[test]
+fn the_read_class_gate_sees_both_charge_shapes() {
+    let sample = r#"
+async fn charged_by_old_extractor(
+    AuthedLimited(ctx): AuthedLimited<READ>,
+) -> Result<(), ApiError> { Ok(()) }
+
+async fn charged_by_literal_enforce(
+    Authed(ctx): Authed,
+) -> Result<(), ApiError> { enforce(&state, &parts, Some(&ctx), Class::Read)?; Ok(()) }
+
+async fn charged_correctly(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+) -> Result<(), ApiError> { Ok(()) }
+"#;
+    let scrubbed = support::code_only(sample);
+    let seen: Vec<String> = handlers(&scrubbed)
+        .into_iter()
+        .filter(|(_, body)| {
+            let sig = signature(body);
+            let takes_authed = sig.contains(": Authed,")
+                || sig.contains(": Authed)")
+                || sig.contains(": AuthedLimited<");
+            takes_authed && (sig.contains(": AuthedLimited<READ>") || body.contains("Class::Read)"))
+        })
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(
+        seen,
+        vec![
+            "charged_by_old_extractor".to_owned(),
+            "charged_by_literal_enforce".to_owned(),
+        ],
+        "the detector must catch exactly the two handlers still on Class::Read"
+    );
+}
+
 /// The gate must be able to fail, or it proves nothing.
 ///
 /// A gate over source text passes trivially if its own matching is broken -

@@ -20,7 +20,7 @@ use uuid::Uuid;
 use super::AppState;
 use super::attachment_ids::parse_attachment_ids;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
@@ -192,7 +192,7 @@ async fn send(
 }
 
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     Query(params): Query<ListParams>,
     State(state): State<AppState>,
@@ -371,7 +371,7 @@ async fn edit(
 /// that does not exist, is not in this channel, or is deleted answers 404,
 /// exactly as [`list`] and [`edit`] do.
 async fn history(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path((channel_id, message_id)): Path<(String, String)>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<MessageRevisionDto>>, ApiError> {

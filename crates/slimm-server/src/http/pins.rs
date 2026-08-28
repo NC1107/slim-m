@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::message_enrich::with_reactions;
 use super::messages::{MessageDto, parse_uuid};
 use crate::hub::Event;
@@ -131,7 +131,7 @@ async fn unpin(
 }
 
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     Query(params): Query<ListParams>,
     State(state): State<AppState>,
@@ -169,7 +169,7 @@ async fn list(
 }
 
 async fn count(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<PinCountDto>, ApiError> {

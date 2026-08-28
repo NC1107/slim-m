@@ -135,6 +135,12 @@ pub(crate) const UPLOAD: u8 = 5;
 pub(crate) const CANVAS: u8 = 6;
 pub(crate) const ASSET: u8 = 7;
 pub(crate) const GIF: u8 = 8;
+/// A cheap authenticated read, never [`RateLimited`]: every
+/// `AuthedLimited<AUTHED_READ>` site is reached only after `Authed` already
+/// resolved a session, so this code has no unauthenticated caller to serve
+/// the way [`READ`] still does for `/version`. See [`Class::AuthedRead`] for
+/// the budget and the workload it is sized against.
+pub(crate) const AUTHED_READ: u8 = 9;
 
 /// Panics on an unknown code rather than falling back.
 ///
@@ -154,6 +160,7 @@ fn class_of(code: u8) -> Class {
         CANVAS => Class::Canvas,
         ASSET => Class::Asset,
         GIF => Class::Gif,
+        AUTHED_READ => Class::AuthedRead,
         other => unreachable!("no rate-limit class for code {other}"),
     }
 }
@@ -248,8 +255,8 @@ impl FromRequest<AppState> for Bytes {
 #[cfg(test)]
 mod tests {
     use super::{
-        ASSET, CANVAS, GIF, INVITE_CHECK, PASSWORD, READ, REFRESH, UPLOAD, WRITE, class_of,
-        forwarded_for,
+        ASSET, AUTHED_READ, CANVAS, GIF, INVITE_CHECK, PASSWORD, READ, REFRESH, UPLOAD, WRITE,
+        class_of, forwarded_for,
     };
     use crate::ratelimit::Class;
     use axum::http::Request;
@@ -270,6 +277,7 @@ mod tests {
             (CANVAS, Class::Canvas),
             (ASSET, Class::Asset),
             (GIF, Class::Gif),
+            (AUTHED_READ, Class::AuthedRead),
         ];
         let mut seen = std::collections::HashSet::new();
         for (code, class) in pairs {

@@ -17,7 +17,7 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, READ};
+use super::extract::{AUTHED_READ, AuthedLimited, Json};
 use super::messages::parse_uuid;
 use crate::store::ReporterOwnReport;
 
@@ -62,7 +62,7 @@ impl From<ReporterOwnReport> for MyReportStatusDto {
 /// [`crate::store::Store::reporter_own_report`], and both become this same
 /// 404, per decision 0011's status-code masking rule.
 pub(super) async fn my_report_status(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(report_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<MyReportStatusDto>, ApiError> {

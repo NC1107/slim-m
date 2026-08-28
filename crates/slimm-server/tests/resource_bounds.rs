@@ -212,7 +212,7 @@ async fn the_previously_uncharged_routes_are_charged_now() {
     let channel = store.list_channels().await.unwrap()[0].id;
     let app = app_with_hops(store, 0);
 
-    // Write's burst is 30 and Read's is 20, so a run well past both is refused.
+    // Write's burst is 30 and AuthedRead's is 40, so a run well past both is refused.
     let cases: Vec<(&str, String, Option<Value>)> = vec![
         (
             "POST",

@@ -20,7 +20,7 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::ids::UserId;
 use crate::ratelimit::Class;
@@ -84,7 +84,7 @@ impl From<DmConversation> for DmConversationDto {
 
 /// Lists the caller's DM conversations, most recently active first.
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DmConversationDto>>, ApiError> {
     let conversations = state.store.list_dm_conversations(ctx.user_id).await?;

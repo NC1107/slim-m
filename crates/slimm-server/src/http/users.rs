@@ -22,7 +22,7 @@ use super::AppState;
 use super::attachments::serve;
 use super::auth::validate_label;
 use super::error::ApiError;
-use super::extract::{ASSET, Authed, AuthedLimited, Bytes, Json, Query, READ, enforce};
+use super::extract::{ASSET, AUTHED_READ, Authed, AuthedLimited, Bytes, Json, Query, enforce};
 use super::messages::parse_uuid;
 use super::user_status::validate_status_text;
 use crate::hub::Event;
@@ -220,7 +220,7 @@ struct ListMembersParams {
 // --- Handlers: /me ---
 
 async fn get_me(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<MeDto>, ApiError> {
     let user = state
@@ -280,7 +280,7 @@ async fn update_me(
 // --- Handlers: /users ---
 
 async fn get_user(
-    AuthedLimited(_ctx): AuthedLimited<READ>,
+    AuthedLimited(_ctx): AuthedLimited<AUTHED_READ>,
     Path(user_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<UserDto>, ApiError> {
@@ -297,7 +297,7 @@ async fn get_user(
 /// absent from the result rather than reported, so the response may be
 /// shorter than the request; the caller matches by id.
 async fn list_users(
-    AuthedLimited(_ctx): AuthedLimited<READ>,
+    AuthedLimited(_ctx): AuthedLimited<AUTHED_READ>,
     Query(params): Query<ListUsersParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserDto>>, ApiError> {
@@ -329,7 +329,7 @@ async fn list_users(
 /// is fetched and attached only here rather than in [`to_dtos`] itself,
 /// which every other `UserDto` response also goes through.
 async fn list_members(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Query(params): Query<ListMembersParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserDto>>, ApiError> {

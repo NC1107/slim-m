@@ -21,6 +21,12 @@
 //! scrape credential is a reasonable follow-up if that friction turns out
 //! to matter, not built here.
 //!
+//! **Rate limit**: `Class::Write`, not the generous `Class::AuthedRead` most
+//! authenticated GETs use, because `write_voice` below makes a real,
+//! uncached outbound call to the configured SFU on every scrape - a cheap
+//! list read this is not, and a scrape interval short enough to blow
+//! `Write`'s budget is already misconfigured against the SFU it is probing.
+//!
 //! **No metrics crate.** `docs/dependencies.md` already declines a charting
 //! package for three bar charts on the grounds that a small, bespoke output
 //! is a function, not a dependency; four gauges and two counter families
@@ -52,7 +58,8 @@ async fn metrics(
     parts: Parts,
     Authed(ctx): Authed,
 ) -> Result<Response, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Read)?;
+    // Write, not AuthedRead: write_voice probes the SFU live on every call.
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let permissions = state.store.base_permissions(ctx.user_id).await?;
     if !permissions.contains(Permissions::MANAGE_SERVER) {
         return Err(ApiError::Forbidden);

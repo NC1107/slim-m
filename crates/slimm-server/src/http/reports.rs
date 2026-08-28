@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, Query, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::messages::parse_uuid;
 use super::reports_cursor::parse_history_cursor;
 use super::reports_mine::my_report_status;
@@ -159,7 +159,7 @@ const MODERATES_CHANNEL: Permissions =
 /// what the audit filed this route for: the per-report evaluation, several
 /// indexed queries each, is now four queries for the whole page.
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Query(params): Query<ListParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ReportDto>>, ApiError> {
@@ -293,7 +293,7 @@ impl From<ModerationHistoryItem> for ModerationHistoryItemDto {
 /// still carries the reported content snapshot. An audit row is
 /// deployment-wide and needs no such exclusion.
 async fn history(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Query(params): Query<HistoryListParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ModerationHistoryItemDto>>, ApiError> {

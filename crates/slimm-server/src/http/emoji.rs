@@ -31,7 +31,7 @@ use super::attachments::serve;
 use super::error::ApiError;
 use super::extract::Authed;
 use super::extract::enforce;
-use super::extract::{ASSET, AuthedLimited, Bytes, Json, Query, READ};
+use super::extract::{ASSET, AUTHED_READ, AuthedLimited, Bytes, Json, Query};
 use crate::emoji::bulk::{self, BulkAddError};
 use crate::emoji::{self, AddError};
 use crate::ids::EmojiId;
@@ -87,7 +87,7 @@ struct BulkUploadRequest {
 
 /// Every emoji in the deployment, for any authenticated caller.
 async fn list(
-    AuthedLimited(_ctx): AuthedLimited<READ>,
+    AuthedLimited(_ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CustomEmojiDto>>, ApiError> {
     let emoji = state.store.list_custom_emoji().await?;

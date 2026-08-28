@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, READ, WRITE};
+use super::extract::{AUTHED_READ, AuthedLimited, Json, WRITE};
 use super::message_enrich::with_reactions;
 use super::messages::{MessageDto, parse_uuid};
 use super::sync_ops::{MessageOpDto, SYNC_RESPONSE_BYTES, ops_for_scope};
@@ -107,7 +107,7 @@ struct ScopeDelta {
 // --- Handlers ---
 
 async fn get_read(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<ReadStateDto>, ApiError> {
