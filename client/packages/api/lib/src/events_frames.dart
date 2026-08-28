@@ -293,3 +293,13 @@ class VoiceActivityChanged extends ServerEvent {
 
   final String channelId;
 }
+
+/// The moderation queue or history changed: a report was filed or resolved,
+/// or a moderation act was recorded. Carries nothing beyond the type tag,
+/// matching the server's own frame - only a connection holding
+/// MANAGE_MESSAGES ever receives one, so there is nothing per-viewer to
+/// resolve and no content worth a second copy on the wire. A receiver
+/// re-fetches whichever of `listOpenReports`/`moderationHistory` it has open.
+class ReportsChanged extends ServerEvent {
+  const ReportsChanged();
+}

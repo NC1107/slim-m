@@ -157,6 +157,7 @@ sealed class ServerEvent {
       'category.changed' => const CategoryChanged(),
       'voice.activity' when decoded['channel_id'] is String =>
         VoiceActivityChanged(channelId: decoded['channel_id'] as String),
+      'reports.changed' => const ReportsChanged(),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&
               decoded['object'] is Map<String, dynamic> =>
