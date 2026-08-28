@@ -67,7 +67,11 @@ class DesktopWindowShell {
   /// born at this size instead. `splash_native_default_size_test.dart`
   /// checks the two stay in sync. macOS and Windows have no such embedder
   /// constraint and are expected to size correctly from `setSize` alone.
-  static const splashWindowSize = WindowSize(width: 380, height: 460);
+  ///
+  /// The value itself lives as [kSplashWindowSize] in `window_geometry.dart`
+  /// rather than here, so that file's own read-time corruption guard can use
+  /// it with no import cycle: this file already imports that one.
+  static const splashWindowSize = kSplashWindowSize;
 
   static DesktopWindowController? _controller;
   static DesktopTrayController? _trayController;
@@ -212,6 +216,13 @@ class DesktopWindowShell {
   ///
   /// Bounded and swallowed the same way [applyInitialGeometry] is: a hang or
   /// throw here must not strand the app hidden with nothing to reveal it.
+  /// [DesktopWindowController.enableGeometryPersistence] is flipped
+  /// unconditionally afterwards, success or failure: whatever this method
+  /// could do to reach the real geometry has already happened by then, and
+  /// leaving persistence disabled forever on a failure would silently
+  /// disable geometry persistence for the rest of the run - the same
+  /// "must not strand the app" reasoning [applyInitialGeometry] already
+  /// applies to its own failures.
   static Future<void> prepareHandoff(ProviderContainer container) async {
     if (currentDesktopPlatform() == null) return;
     try {
@@ -219,6 +230,7 @@ class DesktopWindowShell {
     } catch (error) {
       debugPrint('desktop: splash handoff geometry failed: $error');
     }
+    _controller?.enableGeometryPersistence();
   }
 
   static Future<void> _applyFinalGeometry(ProviderContainer container) async {

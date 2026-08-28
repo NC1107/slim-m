@@ -7,6 +7,52 @@
 /// that record names as fully automatable with no display involved.
 library;
 
+/// The desktop splash window's own fixed footprint - the canonical value
+/// behind `DesktopWindowShell.splashWindowSize`, defined here rather than
+/// there because this file is deliberately platform-channel-free per
+/// decision 0012's own rule, and `DesktopWindowShell` already imports this
+/// file, so the reverse import would be a cycle. See [looksLikeSplashSize].
+const kSplashWindowSize = WindowSize(width: 380, height: 460);
+
+/// The tallest a native Linux title bar could still be adding on top of
+/// [kSplashWindowSize] at the instant a stray write landed, before
+/// `DesktopWindowShell.lockSplashChrome` hid it: decision 0012's own
+/// title-bar section measures "a native GNOME GTK header bar runs roughly
+/// 46-48 logical pixels." The regression this constant exists to catch
+/// produced exactly that: a saved height of 508, which is 460 plus 48.
+const _splashTitleBarMargin = 48;
+
+/// True only if [size] could never be a real desktop window a user resized
+/// to through this app's own UI - both dimensions have to sit at or below
+/// the splash's own footprint (width) or that footprint plus a lingering
+/// native title bar (height) for this to trip, so an oddly-shaped but
+/// otherwise ordinary window (very narrow and tall, or very short and wide)
+/// does not get caught by one axis alone. [DesktopWindowController] no
+/// longer ever writes a splash-sized geometry (see its
+/// `geometryPersistenceEnabled` gate), so on any build carrying that fix a
+/// size this small can only be leftover corruption from a build that
+/// shipped without it - see [healSplashCorruption].
+bool looksLikeSplashSize(WindowSize size) =>
+    size.width <= kSplashWindowSize.width &&
+    size.height <= kSplashWindowSize.height + _splashTitleBarMargin;
+
+/// [geometry] as read from disk, replaced with [WindowGeometry.fallback]
+/// wholesale - not patched field by field - if its [WindowGeometry.windowedSize]
+/// [looksLikeSplashSize]. A full reset rather than a narrower fix: a
+/// corrupted [WindowGeometry.position] carries the same implausible
+/// dimensions in its own width/height (the regression's own sample has
+/// position 45,45,380,508 alongside a windowedSize of 380x508), and a
+/// [WindowRunState.maximized] carried alongside a corrupted size reflects a
+/// later, separately-legitimate maximize event that only ever preserves
+/// whatever windowed size preceded it - so nothing else in the record can be
+/// trusted once its size is this implausible. This is the read-time half of
+/// the splash-corruption fix; [DesktopWindowController.enableGeometryPersistence]
+/// is the write-time half that stops new corruption from ever landing.
+WindowGeometry healSplashCorruption(WindowGeometry geometry) =>
+    looksLikeSplashSize(geometry.windowedSize)
+    ? WindowGeometry.fallback
+    : geometry;
+
 /// Which of the three states the window was actually in, since only one of
 /// them - [windowed] - is a rectangle. Maximized and full-screen both keep
 /// [WindowGeometry.windowedSize] around as "what to return to", the same way

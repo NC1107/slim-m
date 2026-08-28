@@ -32,7 +32,8 @@ class DesktopWindowController {
     required this.trayAvailable,
     this.onShow,
     this.debounce = desktopGeometryDebounce,
-  });
+    bool geometryPersistenceEnabled = false,
+  }) : _geometryPersistenceEnabled = geometryPersistenceEnabled;
 
   final DesktopWindowPort port;
   final WindowGeometryStore store;
@@ -54,9 +55,32 @@ class DesktopWindowController {
 
   final Duration debounce;
 
+  /// Gates every actual write, checked inside [_writeNow] rather than
+  /// [_scheduleWrite]: a debounced write is left free to schedule at any
+  /// time, since it always re-reads live bounds when it fires, and rejecting
+  /// it only at the point of persistence is what lets a write scheduled
+  /// while this was false still land the correct geometry once it later
+  /// fires true, rather than being lost for having been scheduled too
+  /// early. False by default rather than true: a caller that forgets to
+  /// call [enableGeometryPersistence] gets the safe behaviour - nothing
+  /// persisted - rather than silently writing whatever the window's bounds
+  /// happen to be at construction time, which is how PR #934 shipped a
+  /// splash size into every user's saved geometry.
+  bool _geometryPersistenceEnabled;
+
   Timer? _debounceTimer;
   StreamSubscription<DesktopWindowEventKind>? _subscription;
   CloseAction? _lastCloseAction;
+
+  /// Flips [_geometryPersistenceEnabled] on, permanently, for the rest of
+  /// this controller's life. [DesktopWindowShell.prepareHandoff] is the one
+  /// caller, once the real window has actually been resized to its real
+  /// geometry - not [DesktopWindowShell.revealAfterHandoff], which only
+  /// shows a window that is by then already correctly sized. Before this
+  /// runs, the window is either still the splash or mid-handoff to its real
+  /// shape, and nothing observed before this call is the user's real
+  /// windowed size.
+  void enableGeometryPersistence() => _geometryPersistenceEnabled = true;
 
   void start() {
     _subscription = port.events.listen(_onEvent);
@@ -103,6 +127,7 @@ class DesktopWindowController {
 
   Future<void> _writeNow() async {
     _debounceTimer?.cancel();
+    if (!_geometryPersistenceEnabled) return;
     await store.write(await _currentGeometry());
   }
 

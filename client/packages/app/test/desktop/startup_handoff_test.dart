@@ -16,11 +16,15 @@
 /// own doc comments and `main.dart`'s.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:slimm_app/src/desktop/desktop_window_controller.dart';
+import 'package:slimm_app/src/desktop/desktop_window_port.dart';
 import 'package:slimm_app/src/desktop/desktop_window_shell.dart';
 import 'package:slimm_app/src/desktop/window_geometry.dart';
 import 'package:slimm_app/src/desktop/window_geometry_store.dart';
@@ -114,5 +118,41 @@ void main() {
     await reveal;
 
     expect(port.showCalls, 1);
+  });
+
+  test('a resize before prepareHandoff completes is not persisted; the same '
+      'resize after prepareHandoff completes is - regression test for the '
+      'client-v0.58.0 splash-geometry bug', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = WindowGeometryStore(await SharedPreferences.getInstance());
+    final port = FakeDesktopWindowPort();
+    DesktopWindowShell.debugPort = port;
+    final container = _container();
+
+    fakeAsync((async) {
+      unawaited(DesktopWindowShell.registerListenersAndTray(container));
+      async.flushMicrotasks();
+
+      port.bounds = const WindowRect(x: 45, y: 45, width: 380, height: 460);
+      port.emit(DesktopWindowEventKind.resize);
+      async.elapse(desktopGeometryDebounce);
+
+      expect(
+        store.read(),
+        isNull,
+        reason: 'the splash is still up; prepareHandoff has not run yet',
+      );
+
+      unawaited(DesktopWindowShell.prepareHandoff(container));
+      async.flushMicrotasks();
+
+      port.bounds = const WindowRect(x: 100, y: 100, width: 1280, height: 720);
+      port.emit(DesktopWindowEventKind.resize);
+      async.elapse(desktopGeometryDebounce);
+    });
+
+    final saved = store.read();
+    expect(saved, isNotNull);
+    expect(saved!.windowedSize, const WindowSize(width: 1280, height: 720));
   });
 }
