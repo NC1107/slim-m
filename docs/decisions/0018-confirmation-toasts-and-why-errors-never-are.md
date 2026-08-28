@@ -41,10 +41,16 @@ Six sites carried a success-or-neutral message with no failure branch, and moved
 Seven sites carried a failure sentence, including the ones that pick between a failure and a success string with one call, and stayed on `showAppSnackbar`:
 
 - `screens/channel_message_actions.dart` - two call sites, both failure-only.
-- `widgets/forward_message.dart` - one call site, `failure ?? succeeded`.
+- `widgets/forward_message.dart` - one call site, `failure ?? succeeded` at the time.
 - `widgets/member_profile.dart` - two call sites, both failure-only.
 - `widgets/message_jump.dart` - one call site, failure-only ("Could not find that message").
 - `widgets/safety_actions.dart` - one call site, `failure ?? succeeded`.
+
+**Update, forwarding's redesign (the same change that gave forwarding its attachments and its picker's UI):** `forward_message.dart` moved off this list.
+Its picker used to pop the destination sheet on tap and only find out afterwards whether the send worked, which was exactly the "surface already closed" case `safety_actions.dart` still is - nothing left to hold a durable failure in, so `failure ?? succeeded` on one `showAppSnackbar` call was the least-bad option.
+The redesign keeps the sheet open through the send instead, so a failure now renders as an inline `AppErrorState` in the picker itself (retryable, dismissible) rather than sharing a surface with success at all.
+That leaves the success path with no failure branch tied to it, the same shape the six sites above already had, so it now fires through `toastsProvider` (`AppToastSeverity.success`) instead of `showAppSnackbar`.
+`safety_actions.dart`'s sites did not change: a member popover and a report dialog still close before their request answers, with nothing to hold a failure in the way the forward picker now does.
 
 The mixed sites were not split into a toast half and a SnackBar half.
 Routing only the failure branch through `showAppSnackbar` while its sibling success branch went through a toast would leave one call site with two different confirmation mechanisms for the same action, chosen by which string happened to be non-null - worse than the single mechanism it replaced.

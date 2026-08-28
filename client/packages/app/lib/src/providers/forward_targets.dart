@@ -41,15 +41,27 @@ class ForwardTarget {
   final bool isDm;
 }
 
-/// Every target for forwarding a message currently in [excludeChannelId] -
-/// forwarding into the channel a message already sits in is excluded, since
-/// that would just be a duplicate of a message already on screen.
+/// What [forwardTargetsProvider] needs to answer "where can this go": the
+/// channel the message already sits in, and whether it carries attachments.
+///
+/// A record, not a plain `String` key: once forwarding could carry
+/// attachments, a channel offering SEND_MESSAGES but not ATTACH_FILES had to
+/// stop being offered for those messages specifically, since the send would
+/// otherwise reach this list only to 403 on the one permission this provider
+/// used to never ask about (`http/messages.rs`'s `send` only demands
+/// ATTACH_FILES when the request actually carries an attachment id).
+typedef ForwardTargetsQuery = ({String excludeChannelId, bool hasAttachments});
+
+/// Every target for forwarding a message currently in
+/// [ForwardTargetsQuery.excludeChannelId] - forwarding into the channel a
+/// message already sits in is excluded, since that would just be a
+/// duplicate of a message already on screen.
 ///
 /// Fetched fresh on every watch, matching `myVisibleChannelsProvider` and
 /// `invitesProvider`: this is a picker's own one-shot list, not long-lived
 /// state a live event needs to keep current.
 final forwardTargetsProvider = FutureProvider.autoDispose
-    .family<List<ForwardTarget>, String>((ref, excludeChannelId) async {
+    .family<List<ForwardTarget>, ForwardTargetsQuery>((ref, query) async {
       final client = ref.watch(apiProvider);
       final channels = await client.listChannels();
       final dms = await client.listDirectMessages();
@@ -58,16 +70,19 @@ final forwardTargetsProvider = FutureProvider.autoDispose
 
       return [
         for (final channel in channels)
-          if (channel.id != excludeChannelId &&
-              (channel.permissions ?? 0).hasPermission(Perm.sendMessages))
+          if (channel.id != query.excludeChannelId &&
+              (channel.permissions ?? 0).hasPermission(Perm.sendMessages) &&
+              (!query.hasAttachments ||
+                  (channel.permissions ?? 0).hasPermission(Perm.attachFiles)))
             ForwardTarget(
               channelId: channel.id,
               label: channel.name,
               isDm: false,
             ),
         for (final dm in dms)
-          // A blocked party's DM is frozen server-side both ways (`store/dms.rs`'s `BLOCKED_DENY`), so offering it here would just 403.
-          if (dm.channelId != excludeChannelId && !blocked.contains(dm.user.id))
+          // `store/dms.rs`: a blocked party is denied SEND_MESSAGES/ATTACH_FILES both ways, and otherwise a DM always grants both to its two participants, so attachments need no extra check here.
+          if (dm.channelId != query.excludeChannelId &&
+              !blocked.contains(dm.user.id))
             ForwardTarget(
               channelId: dm.channelId,
               label: dm.user.id == selfId
