@@ -9,10 +9,10 @@ So `release.yml`'s `linux-client` job builds the bundle first, and this manifest
 
 ## What is verified, and how
 
-This manifest has been built for real, three times now, with `org.flatpak.Builder` (the sandboxed Flathub build tool, installed with `flatpak install --user flathub org.flatpak.Builder`) against a real `flutter build linux --release` output produced on this machine.
-All three produced a working `flatpak-builder` export and an installable `.flatpak` bundle.
-`flatpak install --user` accepted it, and the sandbox's own dynamic linker resolved every plugin library except one, below.
-That is the extent of what was checked: **the app has never been launched from the resulting bundle.**
+This manifest has been built for real, several times now, with `org.flatpak.Builder` (the sandboxed Flathub build tool, installed with `flatpak install --user flathub org.flatpak.Builder`) against a real `flutter build linux --release` output produced on this machine.
+Every pass produced a working `flatpak-builder` export and an installable `.flatpak` bundle, and `flatpak install --user` accepted every one.
+The fourth defect below is the first pass that also launched the installed bundle, so the sandbox's own dynamic linker having resolved every plugin library is now confirmed by a real process starting, not only by reading `readelf`/`ldd` output against the unlaunched bundle.
+**The app has still never painted a window on this machine**; see the fourth defect's own account below for exactly how far a launch gets and why.
 Nothing here proves the window opens, that a call connects, or that any permission below is sufficient rather than merely plausible.
 
 Two real defects were found and fixed by the first two builds, not by reading the manifest:
@@ -42,10 +42,28 @@ The rpm carries the identical gap for the identical reason (`libtray_manager_plu
 
 **A `flatpak-builder` operational trap, worth keeping for the next rebuild.** The first attempt at this failed with `Error: renameat(checkout-union-*, idotypebuiltins.c): Invalid cross-device link` partway through the `ayatana-ido` module's build - a real `EXDEV` from the kernel, not a manifest bug. It happened only once C-compiling modules entered the picture; nothing in the manifest before this pass ever built anything, only copied and patched prebuilt files, so nothing had exercised `flatpak-builder`'s own checkout-union merge step until now. The fix was pointing `TMPDIR` and `--state-dir` at the same granted filesystem the `--repo`/build-dir already live under, rather than letting `org.flatpak.Builder`'s own sandbox default them somewhere else. This is specific to running `flatpak-builder` as a Flatpak (`org.flatpak.Builder`), the only way available on this machine; `release.yml`'s CI step installs the native `flatpak-builder` apt package instead, which has no sandbox of its own to default a `TMPDIR` into a different filesystem, so this is unlikely to reproduce there - unconfirmed, since nothing here can run the actual CI job.
 
+## The fourth defect, closed 2026-08-28: media_kit's libmpv gap actually blocked launch, confirmed both ways
+
+The third defect above was found by reading the built plugin's own `NEEDED` entries, not by running the app.
+`media_kit_video`'s Linux plugin has the identical shape (`libmpv.so.2` and `libepoxy.so.0`, both real links per `docs/dependencies.md`'s media_kit section) and `org.freedesktop.Platform//25.08` carried neither library the manifest built a module for at the time, so this one was closed by actually building both versions and launching each, rather than reasoning from the plugin's ELF headers alone.
+
+`libepoxy` and the ffmpeg libraries mpv links against (`libavcodec`, `libavformat`, `libavutil`, `libswscale`, `libswresample`) are confirmed present in the runtime by inspection (`flatpak run --command=sh org.freedesktop.Platform//25.08`), so neither is vendored.
+`libmpv` is genuinely absent, so a `libass` module and a `libplacebo`/`mpv` module pair were added, all three pinned by git tag and commit the same way the `libayatana-appindicator` module above is.
+mpv has linked libplacebo unconditionally since 0.37 (checked directly against mpv's own `meson.build` at several tags, not assumed from a changelog line), so building a current mpv means building libplacebo too; both build with Vulkan disabled, since `media_kit_video` only ever drives mpv's plain GL output.
+
+Built with `org.flatpak.Builder`, installed with `flatpak install --user`, and launched twice on this machine to isolate the fix from everything else running on it: once with the manifest as it stood before this pass (no `libass`/`libplacebo`/`mpv` modules), and once with them added, both from the identical Flutter bundle.
+The first run reproduced the exact reported bug verbatim - `slim-m: error while loading shared libraries: libmpv.so.2: cannot open shared object file: No such file or directory` - proving the failure mode was real and not merely plausible from reading `readelf` output.
+The second run got straight past it: no complaint about `libmpv.so.2`, `libepoxy.so.0`, `libass.so.9` or `libplacebo.so.360`, all four of which `ldd` inside the installed sandbox (`flatpak run --command=sh top.npcserver.slimm`) confirms resolve, the former two against `/app/lib` and the latter two against the runtime.
+Getting to that comparison required a private, unshipped workaround for the third defect above: this machine has only the older `appindicator3-0.1.pc`, not `ayatana-appindicator3-0.1.pc`, so its local rebuild links `libappindicator3.so.1` rather than the `libayatana-appindicator3.so.1` the manifest's module provides, exactly the gap the third defect's own account already predicted rather than something this pass introduced.
+A `LD_LIBRARY_PATH` override pointing at a private symlink (`libappindicator3.so.1 -> /app/lib/libayatana-appindicator3.so.1`), passed only via `flatpak run`'s own commandline flags and never written into the manifest, got both launches past that point so the libmpv comparison could run at all.
+
+Neither run reached a window: both stopped at the glibc mismatch below, which is unrelated to media_kit and was already known.
+That is a weaker result than "the app opened and played a video," and is reported as such rather than rounded up; see the "not verified" list below for exactly what remains open.
+
 ## What is not verified, and the one real problem found doing this on this machine
 
-**The app was never launched, on any display.**
-No screenshot, no confirmation the GTK window paints, no confirmation a call connects, no confirmation the webcam or screen-share permissions below are the right shape rather than merely a documented pattern from another WebRTC flatpak app (Element's `im.riot.Riot.yaml`, fetched and read for this).
+**The app has been launched, but never past the glibc mismatch below, so it has still never painted a window.**
+No screenshot, no confirmation the GTK window paints, no confirmation a call connects, no confirmation the webcam or screen-share permissions below are the right shape rather than merely a documented pattern from another WebRTC flatpak app (Element's `im.riot.Riot.yaml`, fetched and read for this), and no confirmation a video attachment actually plays even though the fourth defect above confirms libmpv itself now loads.
 
 **A real, reproducible glibc mismatch was found, and it is very likely specific to building on this machine rather than to the manifest.**
 Inside the installed bundle, `ldd /app/slim-m/lib/liblivekit_client_plugin.so` reports `GLIBC_2.43' not found`.
@@ -55,6 +73,7 @@ A newer symbol version than the runtime ships leaked into the LiveKit plugin's l
 It is recorded rather than silently worked around because "most likely" is not "confirmed," and because it names a real, general risk: if a future CI runner image ever ships a newer glibc than whatever `runtime-version` this manifest is pinned to, the same failure would recur, silently, for whichever plugin happens to pull in the newest symbol.
 Nothing here fixes that risk structurally.
 The mitigation is watching the first real release build's job log for exactly this `ldd`/`GLIBC_` shape if voice ever fails to load from a shipped Flatpak.
+This is no longer only a theoretical risk found by reading `ldd` output: the fourth defect's own launch attempts hit it live, at process start, both times.
 
 **Not attempted**, each for a stated reason: Flathub submission (out of scope per the task this manifest was built under; a real submission also wants an AppStream `metainfo.xml`, which nothing here writes); a 32-bit or aarch64 build (the rpm's own `ExclusiveArch: x86_64` reasoning applies identically, since the bundle `linux-client` builds is x86_64 only); and confirming the `--talk-name=org.freedesktop.secrets` and `--filesystem=xdg-run/pipewire-0` grants are sufficient rather than merely necessary, which needs a running app on a session with a Secret Service provider and a compositor, not a build sandbox.
 
@@ -85,7 +104,7 @@ flatpak run --user --env=TMPDIR=$HOME/.cache/slim-m-flatpak/tmp \
 flatpak build-bundle $HOME/.cache/slim-m-flatpak/repo \
   $HOME/.cache/slim-m-flatpak/slim-m-client.flatpak top.npcserver.slimm
 flatpak install --user $HOME/.cache/slim-m-flatpak/slim-m-client.flatpak
-flatpak run top.npcserver.slimm   # the one step this account has not taken
+flatpak run top.npcserver.slimm   # launches; see the fourth defect above for how far
 ```
 
 `~/.cache`, not `/tmp`: this box's own `/tmp` is a 16 GiB tmpfs shared with every other agent session on it (`CLAUDE.md`), and this build's own sources and build tree run to several hundred MB.

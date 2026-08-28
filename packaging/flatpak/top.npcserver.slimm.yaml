@@ -24,17 +24,22 @@
 # a libayatana-appindicator module builds it. See the README's own account of
 # what this pass could and could not verify locally.
 #
-# Known gap, added with inline video playback (media_kit): media_kit_video's
-# own Linux plugin links libmpv and libepoxy directly (confirmed with
-# readelf on the built .so - real NEEDED entries, not a dlopen), and
-# Flutter dlopens every registered plugin at process startup. Unless this
-# runtime already carries libepoxy (plausible; it is a common GL dependency)
-# and libmpv (unlikely; nothing else here would pull it in), the app may
-# fail to even launch from a Flatpak install, not merely fail to play video.
-# No module here builds or vendors either, unlike libayatana-appindicator3
-# above. The rpm and the plain release tarball are unaffected, since both
-# use a real system libmpv rather than this sandbox's own runtime. See
-# docs/dependencies.md's media_kit section for the full account.
+# Updated 2026-08-28: media_kit_video's own Linux plugin links libmpv and
+# libepoxy directly (confirmed with readelf on the built .so - real NEEDED
+# entries, not a dlopen), and Flutter dlopens every registered plugin at
+# process startup, so a runtime missing either library fails to launch at
+# all, not merely fails to play video. `org.freedesktop.Platform//25.08`
+# already carries libepoxy and the ffmpeg libraries mpv links against
+# (confirmed by inspecting the runtime, not assumed), so nothing here
+# vendors ffmpeg. It does not carry libmpv, so the `libass` and
+# `libplacebo`/`mpv` modules below build it. mpv (0.37+) links libplacebo
+# unconditionally, even for its plain GL output and not only its optional
+# vo_gpu_next, so building a current mpv means building libplacebo too; the
+# alternative of pinning mpv below 0.37 would dodge that module but ship a
+# video-playback dependency more than two years stale, a worse trade for a
+# shipping blocker than one extra build module. Built and installed for
+# real, and confirmed to get past the exact reported failure - see the
+# README's own account of what this pass could and could not verify.
 
 app-id: top.npcserver.slimm
 runtime: org.freedesktop.Platform
@@ -65,6 +70,77 @@ modules:
   # the runtime carries none of this stack. flathub/shared-modules' own
   # module, vendored rather than a git submodule since this repo has no other.
   - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+  # media_kit_video links libmpv directly; libass is libmpv's own subtitle dep.
+  - name: libass
+    config-opts:
+      - --disable-static
+      - --enable-asm
+      - --enable-harfbuzz
+      - --enable-fontconfig
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - '*.la'
+    sources:
+      - type: git
+        url: https://github.com/libass/libass.git
+        tag: 0.17.5
+        commit: 4a05d8127f525943ebf45fdc6497c9e665947f0d
+  # mpv links libplacebo unconditionally since 0.37; built GL-only (Vulkan
+  # disabled) since media_kit_video only ever drives mpv's plain GL output.
+  - name: libplacebo
+    buildsystem: meson
+    config-opts:
+      - -Dvulkan=disabled
+      - -Dopengl=enabled
+      - -Dgl-proc-addr=enabled
+      - -Dd3d11=disabled
+      - -Dglslang=disabled
+      - -Dshaderc=disabled
+      - -Ddemos=false
+      - -Dtests=false
+      - -Dbench=false
+      - -Dfuzz=false
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    sources:
+      - type: git
+        url: https://github.com/haasn/libplacebo.git
+        tag: v7.360.1
+        commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
+  # libmpv only, no CLI player; audio/video backends stay 'auto' to pick up
+  # whatever the runtime/SDK already carry (GL, VAAPI, PulseAudio, ALSA).
+  - name: mpv
+    buildsystem: meson
+    config-opts:
+      - -Dcplayer=false
+      - -Dlibmpv=true
+      - -Dbuild-date=false
+      - -Dmanpage-build=disabled
+      - -Dgl=enabled
+      - -Dplain-gl=enabled
+      - -Dvulkan=disabled
+      - -Dcplugins=disabled
+      - -Djavascript=disabled
+      - -Dlua=disabled
+      - -Dlibarchive=disabled
+      - -Dlibbluray=disabled
+      - -Ddvdnav=disabled
+      - -Dcdda=disabled
+      - -Dvapoursynth=disabled
+      - -Duchardet=disabled
+      - -Drubberband=disabled
+      - -Dzimg=disabled
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/man
+    sources:
+      - type: git
+        url: https://github.com/mpv-player/mpv.git
+        tag: v0.41.0
+        commit: 41f6a645068483470267271e1d09966ca3b9f413
   - name: slim-m-client
     buildsystem: simple
     only-arches:
