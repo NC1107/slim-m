@@ -26,7 +26,7 @@ use serde::Deserialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, Query, READ};
+use super::extract::{AUTHED_READ, AuthedLimited, Json, Query};
 use super::message_enrich::with_reactions;
 use super::messages::{MessageDto, parse_uuid};
 use crate::ids::ChannelId;
@@ -85,7 +85,7 @@ struct SearchParams {
 /// *from* is refused before `in:` is ever looked at, even if `in:` names a
 /// channel they could otherwise read.
 async fn search(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     Query(params): Query<SearchParams>,
     State(state): State<AppState>,

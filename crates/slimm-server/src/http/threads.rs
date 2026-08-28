@@ -15,7 +15,7 @@ use serde::Serialize;
 use super::AppState;
 use super::channels::ChannelDto;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, READ, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
@@ -118,7 +118,7 @@ impl ThreadParentDto {
 /// docs/decisions/0011-per-channel-permissions.md for the precedent this
 /// reuses rather than reinvents.
 async fn thread_parent(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<ThreadParentDto>, ApiError> {
@@ -189,7 +189,7 @@ impl From<ThreadListItem> for ThreadListItemDto {
 /// same channel - never a filtered or masked answer, since there is nothing
 /// left to filter once the one check has already refused.
 async fn list(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ThreadListItemDto>>, ApiError> {

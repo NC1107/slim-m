@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, AuthedLimited, Json, READ, WRITE, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, WRITE, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{DeviceId, MessageId, UserId};
@@ -103,7 +103,7 @@ struct ReportFiled {
 // --- Devices ---
 
 async fn list_devices(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<DeviceDto>>, ApiError> {
     let devices = state.store.list_devices(ctx.user_id, ctx.device_id).await?;
@@ -134,7 +134,7 @@ async fn remove_device(
 // --- Blocking ---
 
 async fn list_blocks(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<String>>, ApiError> {
     let blocked = state.store.blocked_users(ctx.user_id).await?;

@@ -149,11 +149,12 @@ async fn a_manage_server_caller_gets_valid_prometheus_text_with_every_series() {
 }
 
 /// The one gauge that reflects real traffic within the request itself: the
-/// probing call above already spent one `Read`-class request, so this asks
-/// again and reads a count of at least 2, rather than trusting a fixed
-/// number an unrelated change to route wiring could shift.
+/// probing call above already spent one `Write`-class request - `/metrics`'s
+/// own class, since `write_voice` makes a real outbound call on every scrape
+/// - so this asks again and reads a count of at least 2, rather than
+/// trusting a fixed number an unrelated change to route wiring could shift.
 #[tokio::test]
-async fn the_read_class_counter_reflects_real_requests() {
+async fn the_write_class_counter_reflects_real_requests() {
     let (s, _guard) = store("slimm-metrics-counts").await;
     let (admin, _member) = deployment(&s).await;
     let session = s.open_session(admin.id, "laptop").await.unwrap();
@@ -165,7 +166,7 @@ async fn the_read_class_counter_reflects_real_requests() {
         .await
         .unwrap();
     let first_text = body_text(first).await;
-    let before = read_count(&first_text);
+    let before = write_count(&first_text);
 
     let second = router
         .clone()
@@ -173,7 +174,7 @@ async fn the_read_class_counter_reflects_real_requests() {
         .await
         .unwrap();
     let second_text = body_text(second).await;
-    let after = read_count(&second_text);
+    let after = write_count(&second_text);
 
     assert!(
         after > before,
@@ -204,12 +205,12 @@ async fn a_configured_but_unreachable_sfu_reports_both_gauges() {
     assert!(text.contains("slimm_livekit_reachable 0"));
 }
 
-fn read_count(text: &str) -> u64 {
+fn write_count(text: &str) -> u64 {
     text.lines()
-        .find(|line| line.starts_with("slimm_requests_total{class=\"read\"} "))
+        .find(|line| line.starts_with("slimm_requests_total{class=\"write\"} "))
         .and_then(|line| line.rsplit(' ').next())
         .and_then(|value| value.parse().ok())
-        .expect("the read counter line is present and numeric")
+        .expect("the write counter line is present and numeric")
 }
 
 /// Every metric line the server answers with parses under the Prometheus
@@ -261,9 +262,9 @@ fn assert_prometheus_format(text: &str) {
     }
 }
 
-/// Also gated on `Class::Read`'s ordinary rate limit, matching every other
-/// authenticated read: a caller who exhausts that budget is refused 429 the
-/// same way `/space/analytics` already is.
+/// Also gated on `Class::Write`'s ordinary rate limit, the same tighter
+/// budget `/space/analytics`'s own stats query stays on: a caller who
+/// exhausts it is refused 429 the same way that route already is.
 #[tokio::test]
 async fn returns_json_error_shape_on_forbidden_not_a_partial_metrics_body() {
     let (s, _guard) = store("slimm-metrics-forbidden-shape").await;

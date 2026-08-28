@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, READ};
+use super::extract::{AUTHED_READ, AuthedLimited, Json};
 use super::messages::parse_uuid;
 use crate::ids::ChannelId;
 use crate::permissions::mask_unless_viewable;
@@ -43,7 +43,7 @@ struct ChannelPermissionsDto {
 /// permitted here" refuse identically, the same precedent `overwrites.rs`
 /// already states for this API.
 async fn get_permissions(
-    AuthedLimited(ctx): AuthedLimited<READ>,
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<ChannelPermissionsDto>, ApiError> {

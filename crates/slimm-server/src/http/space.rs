@@ -40,7 +40,8 @@ async fn read(
     parts: Parts,
     Authed(ctx): Authed,
 ) -> Result<Json<SpaceSettingsDto>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    // AuthedRead, not Write: this reads one config value, same as `update` writes one.
+    enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require_manage_server(&state, &ctx).await?;
     Ok(Json(SpaceSettingsDto {
         join_policy: state.store.join_policy().await?.as_str().to_owned(),

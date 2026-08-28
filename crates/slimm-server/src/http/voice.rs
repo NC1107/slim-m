@@ -251,13 +251,24 @@ struct RosterResponse {
 /// A configured SFU that cannot be reached answers 503, not 500 or an empty
 /// list: an empty room and an unreachable one are different claims, and only
 /// the former means nobody is there.
+///
+/// **Rate limit**: `Class::AuthedRead`, sized against this route's own real
+/// cadence - `voiceRosterPollInterval` in the client polls it every 15
+/// seconds per channel a rail row renders unjoined. It used to share
+/// `Class::Write`'s budget with token mint, heartbeat, and kick, so a
+/// deployment with more than a couple of open channels could exhaust that
+/// budget on polling alone before any of those mutations ran. This still
+/// makes one real call to the SFU's `ListParticipants` per request rather
+/// than a plain row lookup, and unlike `/metrics` or `/space/analytics` it
+/// is reachable by any member with `VIEW_CHANNEL`, not only an operator; see
+/// [`Class::AuthedRead`]'s own doc for why that budget still holds here.
 async fn roster(
     Authed(ctx): Authed,
     parts: Parts,
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<RosterResponse>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
 
     let permissions = state

@@ -247,7 +247,8 @@ async fn list_removed(
     parts: Parts,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<RemovalDto>>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    // AuthedRead, not Write: a plain list query, not a mutation.
+    enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require(&state, ctx.user_id, Permissions::BAN_MEMBERS).await?;
 
     let removals = state.store.list_removals().await?;
