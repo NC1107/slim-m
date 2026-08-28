@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.62.0](https://github.com/NC1107/slim-m/compare/client-v0.61.0...client-v0.62.0) (2026-08-28)
+
+
+### Features
+
+* **client:** add gestures, palette, and controls to attachment video playback ([#972](https://github.com/NC1107/slim-m/issues/972)) ([c45a553](https://github.com/NC1107/slim-m/commit/c45a5532b61cbf8e73eba2e5b17337a6336ba268))
+
+
+### Bug Fixes
+
+* **client:** forward attachments and redesign the target picker ([#970](https://github.com/NC1107/slim-m/issues/970)) ([f50a3d8](https://github.com/NC1107/slim-m/commit/f50a3d80e3931ced9db4d7eddaa9f63daf5a8130))
+* **client:** register a TrayListener so tray menu clicks actually fire ([#968](https://github.com/NC1107/slim-m/issues/968)) ([0d7a936](https://github.com/NC1107/slim-m/commit/0d7a9367521a0da2a03faf14d526d2a259ea7c40))
+* **client:** stop waiting on a frame a hidden window cannot produce ([#969](https://github.com/NC1107/slim-m/issues/969)) ([131b503](https://github.com/NC1107/slim-m/commit/131b503ce16ea36e0d8f7a5ab1ce0f3278b8fa07))
+
 ## [0.61.0](https://github.com/NC1107/slim-m/compare/client-v0.60.1...client-v0.61.0) (2026-08-28)
 
 
