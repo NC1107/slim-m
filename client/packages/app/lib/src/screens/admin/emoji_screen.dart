@@ -24,8 +24,14 @@ import '../../widgets/custom_emoji_image.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
+import '../../widgets/sheet_item_list.dart';
 import 'emoji_bulk_upload_card.dart';
 import 'emoji_upload_card.dart';
+
+/// Marks the sizing box around the emoji list, so a test can measure it
+/// directly rather than inferring the fix from a screenshot - the same
+/// technique `pinnedMessagesBodyBoxKey` uses.
+const emojiListBodyBoxKey = Key('emoji_list_body_box');
 
 class EmojiScreen extends StatelessWidget {
   const EmojiScreen({super.key});
@@ -41,6 +47,13 @@ class EmojiScreen extends StatelessWidget {
 
 /// The emoji catalog and upload card, embeddable as a Space settings pane as
 /// well as routed.
+///
+/// The catalog itself sits in a bounded box handed to [SheetItemList]: a
+/// plain `Column` of every row used to lag once a deployment passed a
+/// couple hundred emoji, because it built, laid out and fetched the image
+/// for every row regardless of what was actually on screen. Bounding the
+/// box and reusing the same lazy list the pin/thread sheets already use
+/// means a large catalog only ever realizes the rows actually visible.
 class EmojiPane extends ConsumerWidget {
   const EmojiPane({super.key});
 
@@ -64,7 +77,20 @@ class EmojiPane extends ConsumerWidget {
           emptyMessage: 'No emoji yet.',
           data: (context, list) => SettingsSectionCard(
             title: 'Emoji',
-            children: [for (final item in list) _EmojiRow(emoji: item)],
+            children: [
+              ConstrainedBox(
+                key: emojiListBodyBoxKey,
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+                ),
+                child: SheetItemList(
+                  padding: EdgeInsets.zero,
+                  itemCount: list.length,
+                  itemBuilder: (context, index) =>
+                      _EmojiRow(emoji: list[index]),
+                ),
+              ),
+            ],
           ),
         ),
       ],
