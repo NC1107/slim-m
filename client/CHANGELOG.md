@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.58.1](https://github.com/NC1107/slim-m/compare/client-v0.58.0...client-v0.58.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **client:** bound the custom emoji list to a lazy view ([#942](https://github.com/NC1107/slim-m/issues/942)) ([7cfba24](https://github.com/NC1107/slim-m/commit/7cfba243166651fc99794c6853da1a4a7ce63a33))
+* **client:** keep report card mentions highlighted when members refetch fails ([#946](https://github.com/NC1107/slim-m/issues/946)) ([c843601](https://github.com/NC1107/slim-m/commit/c84360134cc23bb53d35736f8f2b132d386fbaeb))
+* **client:** retry a rate-limited emoji image fetch instead of caching it broken ([#945](https://github.com/NC1107/slim-m/issues/945)) ([02b2fef](https://github.com/NC1107/slim-m/commit/02b2fefa2f98233be2a00a5b4dd407c2cca83816))
+* **client:** stop the desktop splash size from being saved as the window geometry ([#943](https://github.com/NC1107/slim-m/issues/943)) ([1767091](https://github.com/NC1107/slim-m/commit/1767091c9a15d2442fae08047e4f4adf95c0778f))
+
 ## [0.58.0](https://github.com/NC1107/slim-m/compare/client-v0.57.0...client-v0.58.0) (2026-08-27)
 
 
