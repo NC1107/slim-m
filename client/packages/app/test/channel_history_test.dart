@@ -11,7 +11,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/channel_history.dart';
 import 'package:slimm_app/src/providers/message_page_size.dart';
+import 'package:slimm_app/src/providers/retention_policy.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/widgets/message_transcript_widgets.dart';
 import 'package:slimm_data/data.dart';
@@ -327,4 +329,49 @@ void main() {
       expect(find.text('There is more history above.'), findsNothing);
     },
   );
+
+  testWidgets('a long scrollback session stops growing the window at the ceiling '
+      'instead of feeding drift an ever-larger LIMIT', (tester) async {
+    // More history than the ceiling holds, so the cap - not a real start - stops the loop below.
+    final harness = await mountChannel(
+      tester,
+      serverSeqs: _range(1, channelWindowCeiling + 200),
+      seededSeqs: _range(channelWindowCeiling + 1, channelWindowCeiling + 200),
+      messagePageSize: MessagePageSize.large,
+    );
+    final notifier = harness.container.read(
+      channelHistoryProvider('c1').notifier,
+    );
+    notifier.syncOldest(channelWindowCeiling + 1);
+
+    // One page more than needed to reach the ceiling from the seeded 200.
+    final pagesToCeiling =
+        (channelWindowCeiling - 200) ~/ MessagePageSize.large.rows;
+    for (var i = 0; i < pagesToCeiling + 3; i++) {
+      await notifier.loadOlder();
+      await flush(tester);
+    }
+
+    expect(
+      harness.container.read(channelHistoryProvider('c1')).window,
+      channelWindowCeiling,
+      reason: 'the window must stop exactly at the shared ceiling',
+    );
+    expect(
+      harness.container.read(channelHistoryProvider('c1')).atStart,
+      isFalse,
+      reason:
+          'seqs 1..200 are still unfetched, so the real start was never '
+          'reached - only the ceiling stopped further paging',
+    );
+    expect(
+      harness.beforeCursors.length,
+      pagesToCeiling,
+      reason:
+          'once the window is at the ceiling, further loadOlder calls must '
+          'not even ask the server for more',
+    );
+
+    await _unmount(tester);
+  });
 }

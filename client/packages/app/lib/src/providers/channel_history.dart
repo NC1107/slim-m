@@ -44,6 +44,7 @@ import 'package:slimm_data/data.dart';
 import 'message_extras.dart';
 import 'message_page_size.dart';
 import 'providers.dart';
+import 'retention_policy.dart';
 
 /// The transcript's opening window, matching [MessageStore.watchChannel]'s
 /// own default so a channel that has never been paged reads exactly as it
@@ -73,6 +74,11 @@ class ChannelHistory {
 
   /// How many rows the local store is asked to hand the transcript, grown by
   /// each page so prepended history is actually visible.
+  ///
+  /// Capped at [channelWindowCeiling] (see `retention_policy.dart`): past
+  /// that, [ChannelHistoryController.loadOlder] stops growing this rather
+  /// than feeding drift's watch an ever-larger `LIMIT` for the rest of the
+  /// session.
   final int window;
 
   ChannelHistory copyWith({
@@ -122,9 +128,11 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
   /// and prepends it to the local store.
   ///
   /// Safe to call on every scroll frame: it is a no-op once the start has
-  /// been reached, while a page is in flight, and after a failure. A null or
-  /// zero cursor means nothing delivered is loaded yet, so there is no keyset
-  /// to page from.
+  /// been reached, while a page is in flight, after a failure, and once
+  /// [ChannelHistory.window] has reached [channelWindowCeiling] - the local
+  /// store may hold far more than that already, but nothing past the ceiling
+  /// joins this session's live-watched window. A null or zero cursor means
+  /// nothing delivered is loaded yet, so there is no keyset to page from.
   ///
   /// The page size is the user's [messagePageSizeControllerProvider] choice,
   /// read once here so the number asked for and the number that decides
@@ -132,6 +140,7 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
   /// the only evidence the channel's start has been reached.
   Future<void> loadOlder() async {
     if (state.atStart || state.loading || state.failed) return;
+    if (state.window >= channelWindowCeiling) return;
     final oldest = _oldest;
     if (oldest == null || oldest <= 0) return;
     final pageSize = _ref.read(messagePageSizeControllerProvider).rows;
@@ -149,7 +158,7 @@ class ChannelHistoryController extends StateNotifier<ChannelHistory> {
       state = state.copyWith(
         loading: false,
         atStart: older.length < pageSize,
-        window: state.window + older.length,
+        window: cappedChannelWindow(state.window + older.length),
       );
     } catch (_) {
       // Not only ApiException: the store write above can fail too, and either must not wedge loading.

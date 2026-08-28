@@ -9,6 +9,16 @@
 /// provider, and the family cache below already means a given author is
 /// only ever fetched once per session regardless of how many of their
 /// messages are on screen.
+///
+/// [BatchProfilesController]'s map is left uncapped, deliberately rather than
+/// by oversight (see `retention_policy.dart` for the sibling caches this was
+/// weighed against): it is bounded by the number of distinct accounts this
+/// viewer ever resolves an author for in one session, which tracks a
+/// deployment's member count rather than its message count, and each entry
+/// is a small profile record rather than a channel's worth of content. A
+/// self-hosted community sized for this product does not put that anywhere
+/// near the message-store or transcript-window concern this file's siblings
+/// have.
 library;
 
 import 'dart:async';
