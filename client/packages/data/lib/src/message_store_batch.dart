@@ -17,7 +17,7 @@ Future<void> _applyMessagesBatched(
   if (incoming.isEmpty) return;
   await db.transaction(() async {
     final ids = {for (final m in incoming) m.id}.toList(growable: false);
-    final stored = <String, Message>{
+    final stored = <String, MessageRow>{
       for (final row
           in await (db.select(db.messages)..where((m) => m.id.isIn(ids))).get())
         row.id: row,

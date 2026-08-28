@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import 'database.dart';
+import 'message_dto.dart';
 import 'rail_channel.dart';
 
 part 'message_store_batch.dart';
@@ -57,7 +58,9 @@ class MessageStore {
         (m) => OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc),
       ])
       ..limit(limit);
-    return query.watch().map((rows) => rows.reversed.toList(growable: false));
+    return query.watch().map(
+          (rows) => rows.reversed.map((r) => r.toDto()).toList(growable: false),
+        );
   }
 
   /// Position first, then creation order as the tiebreak every DM (whose
@@ -210,9 +213,10 @@ class MessageStore {
   /// Every message currently marked failed, across every channel - what
   /// `SyncController` reads to retry each one once on reconnect. Order is
   /// unspecified: nothing downstream cares which failed row goes first.
-  Future<List<Message>> failedMessages() {
+  Future<List<Message>> failedMessages() async {
     final query = db.select(db.messages)..where((m) => m.failed.equals(true));
-    return query.get();
+    final rows = await query.get();
+    return rows.map((r) => r.toDto()).toList(growable: false);
   }
 
   /// Every channel's cursors, for a bundled catch-up request.

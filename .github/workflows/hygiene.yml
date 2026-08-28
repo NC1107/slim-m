@@ -329,6 +329,11 @@ jobs:
       - name: no API failure is caught and shown with a SnackBar
         run: python3 scripts/check-error-surface.py
 
+      # TECHNICAL_DEBT CA1: `data.dart` exporting a drift row as `Message`
+      # coupled most of `app` to drift transitively. See the script header.
+      - name: data.dart exports Message as a plain DTO, not a drift row
+        run: python3 scripts/check-message-dto-boundary.py
+
       # A duplicate version, or an edit to one already on main, only fails at
       # a deployed server's startup - which took the live instance down for
       # five hours on 2026-08-13. See the script header.
