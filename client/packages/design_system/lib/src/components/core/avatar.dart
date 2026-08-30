@@ -73,6 +73,16 @@ const Color _avatarTintInk = Color(0xFFFFFFFF);
 /// A person's (or bot's) picture, falling back to a tinted initials disc (or,
 /// for a square avatar, to [placeholder]) when [image] is null or fails to
 /// load.
+///
+/// The picture draws at [FilterQuality.medium] because an avatar is nearly
+/// always MINIFIED at paint time, not magnified: `UserAvatar` decodes at
+/// `max(devicePixelRatio, 3) x size`, so a 36pt avatar holds a 108px texture
+/// and paints it into 36 physical pixels on any 1.0-ratio display - a 0.33x
+/// scale. Flutter's own [FilterQuality] docs put the mipmap medium adds
+/// squarely in that regime ("prevent loss of detail at small scale sizes"),
+/// and warn that [FilterQuality.high] is worse than medium below 0.5x.
+/// [FilterQuality.low] is plain bilinear with no mipmap, which loses detail
+/// on exactly this downscale and is what made avatars read as soft.
 class AppAvatar extends StatelessWidget {
   const AppAvatar({
     super.key,
@@ -136,8 +146,7 @@ class AppAvatar extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.cover,
-            // medium's mipmap only helps when magnifying; UserAvatar's decode floor almost always shrinks the source instead, where mipmapping visibly blurs a photo.
-            filterQuality: FilterQuality.low,
+            filterQuality: FilterQuality.medium,
             errorBuilder: (context, error, stack) => _Face(
               round: round,
               initials: initials,
