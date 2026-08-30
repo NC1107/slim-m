@@ -32,6 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = REPO_ROOT / "release-please-config.server.json"
 MANIFEST = REPO_ROOT / ".release-please-manifest.server.json"
 OPENAPI_PATH = "schema/openapi.yaml"
+OPENAPI_YAML = REPO_ROOT / "schema" / "openapi.yaml"
 
 
 def config() -> dict:
@@ -60,17 +61,47 @@ class OpenapiVersionIsReleaseManagedTest(unittest.TestCase):
             "so info.version stops being bumped on a server release",
         )
 
-    def test_the_openapi_extra_file_targets_info_version(self):
+    def test_the_openapi_extra_file_uses_the_generic_updater(self):
+        """The `yaml` updater destroys the document; `generic` edits one line.
+
+        Learned the expensive way. The first version of this wiring used
+        `{"type": "yaml", "jsonpath": "$.info.version"}`, which does not edit
+        the version in place - it parses the document and RE-SERIALIZES it.
+        The 0.48.0 release commit rewrote all of schema/openapi.yaml that way,
+        3578 insertions against 3066 deletions, dropping every one of its 34
+        comment lines including the SPDX header, and pushing the file 512 lines
+        past its budget so hygiene went red on main.
+
+        The `generic` updater instead rewrites only the line carrying an
+        `x-release-please-version` annotation, leaving the rest byte-identical.
+        """
         root = config()["packages"]["."]
         entry = next(
-            e for e in root["extra-files"] if e.get("path") == OPENAPI_PATH
+            e for e in root["extra-files"]
+            if (e.get("path") if isinstance(e, dict) else e) == OPENAPI_PATH
         )
-        self.assertEqual(entry.get("type"), "yaml")
         self.assertEqual(
-            entry.get("jsonpath"),
-            "$.info.version",
-            "the extra-file must target info.version specifically; a broader "
-            "jsonpath would rewrite unrelated version strings in the schema",
+            entry.get("type") if isinstance(entry, dict) else "generic",
+            "generic",
+            "the openapi extra-file must use the `generic` updater; `yaml` "
+            "re-serializes the whole document and strips every comment",
+        )
+
+    def test_the_openapi_version_line_carries_the_annotation(self):
+        """The `generic` updater is a no-op without this marker.
+
+        Nothing else in the repo would notice its absence: the version would
+        simply stop being bumped, and the mismatch would only surface as a red
+        hygiene run on a release PR, which is exactly the manual step this
+        wiring exists to remove.
+        """
+        for line in OPENAPI_YAML.read_text().splitlines():
+            if line.strip().startswith("version:") and "x-release-please-version" in line:
+                return
+        self.fail(
+            "schema/openapi.yaml's info.version line lost its "
+            "`# x-release-please-version` annotation, so release-please's "
+            "generic updater silently stops bumping it"
         )
 
     def test_the_root_package_is_linked_to_the_server_version(self):
