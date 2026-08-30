@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Every join from sessions to refresh_tokens (r.session_id = s.id) and the
 -- revocation UPDATE in revoke_session_rows filter on a column no index
 -- reached: only family_id (0002) and expires_at (0019) were ever indexed.

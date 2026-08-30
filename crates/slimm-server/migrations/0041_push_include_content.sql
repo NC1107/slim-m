@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Whether this device asked for message content inside its sealed push
 -- envelope. Per device, not per account: the lock screen this decides the
 -- contents of belongs to one physical device, so a personal phone and a

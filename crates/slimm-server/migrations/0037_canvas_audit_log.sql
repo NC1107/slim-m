@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- A minimal moderation trail for canvas remove/clear/restore, independent of
 -- and outliving canvas_ops itself.
 --

@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Adds `reorder` to `canvas_ops`: changing which object paints on top
 -- without touching its position, so two overlapping images have a way to
 -- swap which one is in front. `z_index` is not part of the R-Tree (only

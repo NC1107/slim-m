@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 --
 -- Direct messages: a DM is an ordinary channel (kind = 'dm' - no CHECK
 -- constraint enforces the enum, exactly like 'text'/'voice' already are not

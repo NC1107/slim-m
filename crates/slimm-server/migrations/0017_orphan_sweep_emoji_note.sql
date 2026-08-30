@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- No schema change: a correction to what 0016_custom_emoji.sql claims, which
 -- cannot be edited in place because sqlx checksums a migration's whole file
 -- and would refuse to start any deployment that had already applied it.

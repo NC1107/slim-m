@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Notification preference: a durable per-account choice for which messages
 -- are worth waking a device for. The backlog channel's own trigger was the
 -- seed script - a 500-message channel buzzes a phone for every one of them -

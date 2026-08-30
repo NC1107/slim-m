@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- No column to add: `channels.topic` has existed since migration 0002's core
 -- schema, added speculatively ahead of any code that used it, the same
 -- situation 0013 found the attachment tables in. Nothing before this point

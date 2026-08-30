@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- A timeout: a member keeps reading and loses every way of expressing
 -- themselves, for a while, without anybody deleting anything.
 --

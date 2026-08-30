@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Blocking and reporting: the safety surface the app stores require, and the
 -- one the owner chose (manual reports, no automated scanning).
 

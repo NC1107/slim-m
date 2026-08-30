@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Wires up the `attachments` / `message_attachments` tables that 0002 created
 -- but that nothing has ever written to: no route, no store method, anywhere.
 -- Reused rather than replaced, because the shape 0002 chose is the right one:

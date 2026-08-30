@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Channel categories: rail sections a channel of any kind may be dragged
 -- into, per docs/decisions/0006-channel-categories.md. `kind` keeps deciding
 -- a channel's behaviour (a transcript or a call); `category_id` decides

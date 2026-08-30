@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- A per-(user, channel) override of the account-wide notification
 -- preference (users.notification_preference, migration 0032): mute one
 -- channel, or narrow it to mentions only, while every other channel keeps
