@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.64.0](https://github.com/NC1107/slim-m/compare/client-v0.63.0...client-v0.64.0) (2026-08-30)
+
+
+### Features
+
+* **client,server:** add a canvas to DMs for 1-on-1 working sessions ([#990](https://github.com/NC1107/slim-m/issues/990)) ([7ccc0ec](https://github.com/NC1107/slim-m/commit/7ccc0ec5aab84b8faa430b53974b00c8a267fa7c))
+* **client:** give the composer a Discord-shaped tabbed Emoji/GIFs picker ([#987](https://github.com/NC1107/slim-m/issues/987)) ([b04fab5](https://github.com/NC1107/slim-m/commit/b04fab5cfcdff83fd7bbff1fd2f1cdf947bd73eb))
+* **server,client:** add quiet hours for notifications ([#981](https://github.com/NC1107/slim-m/issues/981)) ([28ba783](https://github.com/NC1107/slim-m/commit/28ba783aac18367d3f72e3de49e60f460787b3e4))
+* **server,client:** let a DM be closed out of the sidebar ([#991](https://github.com/NC1107/slim-m/issues/991)) ([5844786](https://github.com/NC1107/slim-m/commit/58447865ae74f9e8bae7834cd3f3253f53d67604))
+
+
+### Bug Fixes
+
+* **client:** draw avatars mipmapped so a minified picture stays sharp ([#983](https://github.com/NC1107/slim-m/issues/983)) ([dae5043](https://github.com/NC1107/slim-m/commit/dae5043d9beb75e5e0d6c4514fd0db1e684eab91))
+* **client:** show a reporter their own filed reports automatically ([#980](https://github.com/NC1107/slim-m/issues/980)) ([ccb0978](https://github.com/NC1107/slim-m/commit/ccb0978b9e135b0a0b3e314a6d2786cd5d39f176))
+* **server:** make the klipy gif provider actually parse real responses ([#984](https://github.com/NC1107/slim-m/issues/984)) ([b87a65b](https://github.com/NC1107/slim-m/commit/b87a65b7bdbeab42c64de383b8d9254048ed5c05))
+
 ## [0.63.0](https://github.com/NC1107/slim-m/compare/client-v0.62.0...client-v0.63.0) (2026-08-30)
 
 
