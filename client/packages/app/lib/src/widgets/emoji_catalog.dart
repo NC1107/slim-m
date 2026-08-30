@@ -97,6 +97,13 @@ extension EmojiCategoryInfo on EmojiCategory {
     EmojiCategory.symbols => EmojiGroup.symbols,
     EmojiCategory.flags => EmojiGroup.flags,
   };
+
+  /// The browse view's own section header text - "Frequently used" for
+  /// [recent], Discord's own wording for that section, while [label] (the
+  /// rail's tooltip and the live-region announcement) keeps "Recently used"
+  /// everywhere else so neither of those changes meaning.
+  String get sectionLabel =>
+      this == EmojiCategory.recent ? 'Frequently used' : label;
 }
 
 /// One tile in the picker, whichever kind it is.
@@ -111,6 +118,13 @@ sealed class PickerEmoji {
 
   /// The accessible name, and what a search query matches against.
   String get label;
+
+  /// The preview footer's own name line - distinct from [label], which for
+  /// [DeploymentEmoji] is already the shortcode.
+  String get displayName;
+
+  /// The preview footer's `:name:` line.
+  String get shortcode;
 }
 
 /// A codepoint from the bundled catalog.
@@ -124,6 +138,12 @@ final class UnicodeEmoji extends PickerEmoji {
 
   @override
   String get label => emoji.name;
+
+  @override
+  String get displayName => emoji.name;
+
+  @override
+  String get shortcode => ':${emoji.shortName}:';
 }
 
 /// One of the deployment's own, drawn from its image and typed between
@@ -139,6 +159,12 @@ final class DeploymentEmoji extends PickerEmoji {
 
   @override
   String get label => emoji.shortcode;
+
+  @override
+  String get displayName => emoji.name;
+
+  @override
+  String get shortcode => emoji.shortcode;
 }
 
 /// The tabs to offer. [EmojiCategory.custom] leads when the deployment has
@@ -237,3 +263,36 @@ PickerEmoji? _resolveRecent(String token, List<CustomEmoji> custom) {
   }
   return null;
 }
+
+/// One labeled group of tiles in the browse view: a category plus the
+/// entries [pickerResults] already found for it, so a caller wiring up the
+/// whole continuous scrollable does not call that once per tab itself.
+final class EmojiSection {
+  const EmojiSection({required this.category, required this.emoji});
+
+  final EmojiCategory category;
+  final List<PickerEmoji> emoji;
+}
+
+/// The browse view's own data: every [pickerTabs] entry, each with its
+/// [pickerResults] folded in, empty ones dropped. A continuous scrollable
+/// renders these one after another rather than swapping a single grid's
+/// contents on a tab tap.
+List<EmojiSection> pickerSections({
+  required List<String> recent,
+  required List<CustomEmoji> custom,
+}) => [
+  for (final category in pickerTabs(
+    hasCustom: custom.isNotEmpty,
+    hasRecent: recent.isNotEmpty,
+  ))
+    EmojiSection(
+      category: category,
+      emoji: pickerResults(
+        query: '',
+        category: category,
+        recent: recent,
+        custom: custom,
+      ),
+    ),
+].where((section) => section.emoji.isNotEmpty).toList();

@@ -9,10 +9,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' show Attachment;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/threads.dart';
 import 'composer_extras.dart';
+import 'composer_picker_button.dart';
 import 'poll_composer_sheet.dart';
 
 class ComposerActionBar extends ConsumerWidget {
@@ -33,7 +35,8 @@ class ComposerActionBar extends ConsumerWidget {
     required this.onInsertCode,
     required this.onPickEmoji,
     required this.gifSearchEnabled,
-    required this.onPickGif,
+    required this.onInsertEmoji,
+    required this.onStageGif,
   });
 
   final bool touch;
@@ -47,7 +50,12 @@ class ComposerActionBar extends ConsumerWidget {
   /// (`Version.gifSearchEnabled`); the desktop icon button is absent, not
   /// disabled, when it does not.
   final bool gifSearchEnabled;
-  final VoidCallback onPickGif;
+
+  /// Desktop-only handlers for `ComposerPickerButton`'s anchored panel:
+  /// insert an emoji token at the caret, or stage a picked GIF as an
+  /// attachment. Touch density never reaches these - see [onPickEmoji].
+  final ValueChanged<String> onInsertEmoji;
+  final ValueChanged<Attachment> onStageGif;
 
   /// Whether [onSendPressed] is offered at all right now; see
   /// `composer.dart`'s own `_canSend` for everything that feeds it.
@@ -58,6 +66,9 @@ class ComposerActionBar extends ConsumerWidget {
   final VoidCallback onPickFile;
   final VoidCallback onSendPressed;
   final VoidCallback onInsertCode;
+
+  /// Touch density's own smile button: the Space-emoji-only sheet, since
+  /// the OS keyboard already has every native one under the field.
   final VoidCallback onPickEmoji;
 
   @override
@@ -115,20 +126,18 @@ class ComposerActionBar extends ConsumerWidget {
                 tooltip: 'Insert code',
                 onPressed: onInsertCode,
               ),
-              if (gifSearchEnabled)
-                AppIconButton(
-                  icon: AppIcons.gif,
-                  semanticLabel: 'Insert a GIF',
-                  tooltip: 'Insert a GIF',
-                  onPressed: onPickGif,
-                ),
-            ],
-            AppIconButton(
-              icon: AppIcons.smile,
-              semanticLabel: 'Insert emoji',
-              tooltip: 'Insert emoji',
-              onPressed: onPickEmoji,
-            ),
+              ComposerPickerButton(
+                gifSearchEnabled: gifSearchEnabled,
+                onSelectEmoji: onInsertEmoji,
+                onPickedGif: onStageGif,
+              ),
+            ] else
+              AppIconButton(
+                icon: AppIcons.smile,
+                semanticLabel: 'Insert emoji',
+                tooltip: 'Insert emoji',
+                onPressed: onPickEmoji,
+              ),
             // Always rendered, only disabled when empty or over the limit.
             AppIconButton(
               icon: AppIcons.send,

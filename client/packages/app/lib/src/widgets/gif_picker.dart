@@ -44,16 +44,42 @@ Future<void> showGifPickerSheet(
     maxWidth: 480,
     builder: (context) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(child: _GifPickerBody(onPicked: onPicked)),
+      child: SafeArea(
+        child: GifPickerBody(
+          onPicked: (attachment) {
+            Navigator.of(context).pop();
+            onPicked(attachment);
+          },
+        ),
+      ),
     ),
   );
 }
 
-/// The whole flow `composer.dart`'s own GIF button needs: open the sheet,
-/// and once something is picked, fetch its bytes back once (`selectGif`
-/// already stored them server side; this is only for the newly staged
-/// tile's own local preview) and stage it - or hand [onError] a sentence,
-/// never a raw exception, if that last step fails.
+/// Fetches a freshly picked GIF's own bytes back once (`selectGif` already
+/// stored them server side; this is only for the newly staged tile's own
+/// local preview) and stages it - or hands [onError] a sentence, never a
+/// raw exception, if that last step fails. Shared by [pickGif]'s sheet flow
+/// and the desktop anchored panel `composer_picker_panel.dart` opens instead.
+Future<void> stageGif({
+  required BuildContext context,
+  required WidgetRef ref,
+  required AttachmentStagingController attachments,
+  required ValueChanged<String?> onError,
+  required api.Attachment attachment,
+}) async {
+  try {
+    final bytes = await ref.read(apiProvider).fetchAttachment(attachment.id);
+    // The composer may have been torn down while this awaited.
+    if (!context.mounted) return;
+    attachments.addResolved(attachment, bytes.bytes);
+  } on api.ApiException catch (e) {
+    onError(describeApiFailure('attach that gif', e));
+  }
+}
+
+/// The whole flow the composer's touch-density GIF entry point needs: open
+/// the sheet, then [stageGif] once something is picked.
 Future<void> pickGif({
   required BuildContext context,
   required WidgetRef ref,
@@ -62,31 +88,32 @@ Future<void> pickGif({
 }) {
   return showGifPickerSheet(
     context,
-    onPicked: (attachment) async {
-      try {
-        final bytes = await ref
-            .read(apiProvider)
-            .fetchAttachment(attachment.id);
-        // The composer may have been torn down while this awaited.
-        if (!context.mounted) return;
-        attachments.addResolved(attachment, bytes.bytes);
-      } on api.ApiException catch (e) {
-        onError(describeApiFailure('attach that gif', e));
-      }
-    },
+    onPicked: (attachment) => stageGif(
+      context: context,
+      ref: ref,
+      attachments: attachments,
+      onError: onError,
+      attachment: attachment,
+    ),
   );
 }
 
-class _GifPickerBody extends ConsumerStatefulWidget {
-  const _GifPickerBody({required this.onPicked});
+/// The picker's content: search field, trending/search grid, nothing else.
+/// Exposed (not `_`-private) so `composer_picker_panel.dart` can embed it as
+/// one tab of the composer's own anchored picker rather than a sheet;
+/// [onPicked] is this widget's only opinion about closing anything - the
+/// sheet built by [showGifPickerSheet] pops itself before calling it, and
+/// the anchored panel closes its own overlay the same way.
+class GifPickerBody extends ConsumerStatefulWidget {
+  const GifPickerBody({super.key, required this.onPicked});
 
   final ValueChanged<api.Attachment> onPicked;
 
   @override
-  ConsumerState<_GifPickerBody> createState() => _GifPickerBodyState();
+  ConsumerState<GifPickerBody> createState() => _GifPickerBodyState();
 }
 
-class _GifPickerBodyState extends ConsumerState<_GifPickerBody> {
+class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
   final _queryController = TextEditingController();
   Timer? _debounce;
 
@@ -178,9 +205,7 @@ class _GifPickerBodyState extends ConsumerState<_GifPickerBody> {
     try {
       final attachment = await ref.read(apiProvider).selectGif(result.id);
       if (!mounted) return;
-      final onPicked = widget.onPicked;
-      Navigator.of(context).pop();
-      onPicked(attachment);
+      widget.onPicked(attachment);
     } on api.ApiException catch (e) {
       if (!mounted) return;
       setState(() {
