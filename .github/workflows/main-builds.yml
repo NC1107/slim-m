@@ -61,6 +61,7 @@ jobs:
     outputs:
       client: ${{ steps.filter.outputs.client }}
       server: ${{ steps.filter.outputs.server }}
+      packaging: ${{ steps.filter.outputs.packaging }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Include patterns only. This action defaults to predicate-quantifier
@@ -71,6 +72,16 @@ jobs:
       # server-only merge and uploading a TestFlight build with no client
       # change in it. The version-bump exclusion belongs in `on.push.paths`
       # above, where GitHub's own path semantics apply negation correctly.
+      #
+      # `packaging` is its own output rather than folded into `client`: a
+      # packaging-only change (the rpm spec, the flatpak manifest) has
+      # nothing to do with Android or iOS, so it should wake the Linux job
+      # below without also uploading a TestFlight build. Before this output
+      # existed, `on.push.paths` triggered the workflow on a packaging-only
+      # commit but every downstream job still gated on `client`/`server`
+      # alone, so the run did nothing at all - confirmed against the real
+      # run for #964, which touched only the flatpak manifest and skipped
+      # every job. See docs/ci.md.
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
         with:
@@ -79,11 +90,16 @@ jobs:
               - 'client/**'
             server:
               - 'crates/**'
+            packaging:
+              - 'packaging/**'
 
   # The Linux build and its portable tarball, which both the rpm below and the copr job downstream are built from.
+  # Gated on `packaging` as well as `client`: a change to the rpm spec or the
+  # icons only touches `packaging/**`, not `client/**`, and still needs this
+  # job to rebuild the rpm it ships.
   linux-client:
     needs: [changes]
-    if: needs.changes.outputs.client == 'true'
+    if: needs.changes.outputs.client == 'true' || needs.changes.outputs.packaging == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -410,7 +426,7 @@ jobs:
   # action, since the job needs its own container image.
   copr:
     needs: [changes, linux-client]
-    if: needs.changes.outputs.client == 'true'
+    if: needs.changes.outputs.client == 'true' || needs.changes.outputs.packaging == 'true'
     uses: ./.github/workflows/copr-publish.yml
     # Named rather than `inherit`: this job reads COPR_CONFIG and nothing else,
     # and inherit would hand a container running dnf-installed tooling ambient

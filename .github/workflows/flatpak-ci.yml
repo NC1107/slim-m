@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: flatpak-ci
+
+# Builds and smoke-checks the Flatpak manifest before merge.
+#
+# Before this existed, nothing in CI ever built the flatpak except
+# release.yml, which only runs at client-v* tag time. PR #964 changed
+# packaging/flatpak/top.npcserver.slimm.yaml to fix client-v0.60.x failing to
+# launch at all under Flatpak (media_kit_video's plugin has a hard NEEDED
+# entry on libmpv.so.2, and the freedesktop 25.08 runtime carries no libmpv),
+# and it merged with only SonarCloud and hygiene as checks. Nothing would
+# have said so before it shipped. See docs/ci.md.
+#
+# A full build compiles mpv, libplacebo and libass from source, which is slow
+# and not something to run on every PR. So this is gated narrowly on the
+# manifest and its vendored build inputs, not on all of packaging/**: a rare
+# trigger, run in full, rather than a cheap manifest lint that would not have
+# caught #964 in the first place (flatpak-builder happily builds a manifest
+# whose result cannot resolve a shared library at launch; only building and
+# starting the bundle exposes that).
+#
+# What this does and does not prove, stated plainly. It builds on the same
+# ubuntu-latest runner release.yml's linux-client job uses, so it links
+# against the same host packages (notably libayatana-appindicator3-dev) and
+# will not diverge the way a contributor's local Fedora build can; see
+# packaging/flatpak/README.md's account of that drift. It does NOT catch
+# that drift itself, since it never builds on a Fedora host, and it does NOT
+# catch a client-side change that adds a new native Linux dependency without
+# also touching this manifest, since nothing here runs unless the manifest
+# or its vendored modules change in the same PR.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packaging/flatpak/top.npcserver.slimm.yaml"
+      - "packaging/flatpak/shared-modules/**"
+      - ".github/workflows/flatpak-ci.yml"
+  pull_request:
+    paths:
+      - "packaging/flatpak/top.npcserver.slimm.yaml"
+      - "packaging/flatpak/shared-modules/**"
+      - ".github/workflows/flatpak-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flatpak-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-launch:
+    name: build flatpak and check it starts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # libsecret-1-dev is here because flutter_secure_storage's Linux plugin
+      # will not even configure without it. Why that is unavoidable: docs/ci.md.
+      - name: linux build deps
+        uses: ./.github/actions/linux-build-deps
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: build linux release
+        run: |
+          flutter config --enable-linux-desktop
+          dart pub get --enforce-lockfile
+          flutter build linux --release
+        working-directory: client/packages/app
+
+      # elfutils provides eu-strip, which flatpak-builder shells out to for
+      # every module; its absence is exactly what made every release build
+      # through client-v0.61.0 report success while producing no bundle. #967.
+      - name: build flatpak
+        run: |
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --repo=dist/flatpak-repo build-dir \
+            packaging/flatpak/top.npcserver.slimm.yaml
+          flatpak build-bundle dist/flatpak-repo \
+            dist/slim-m-client-pr-check.flatpak top.npcserver.slimm
+
+      # Not continue-on-error, unlike release.yml's own build step: the whole
+      # point of this workflow is to fail loudly on exactly this before merge.
+      - name: verify a bundle was produced
+        run: |
+          shopt -s nullglob
+          bundles=(dist/*.flatpak)
+          if [ ${#bundles[@]} -eq 0 ]; then
+            echo "::error::build flatpak did not produce a .flatpak bundle; see its logs for the real failure"
+            exit 1
+          fi
+
+      - name: install the bundle
+        run: |
+          flatpak install --user --noninteractive --bundle dist/slim-m-client-pr-check.flatpak
+
+      # Catches exactly the class of bug #964 fixed: flatpak-builder succeeds
+      # at build time even when a plugin's shared-library dependency cannot
+      # resolve inside the sandboxed runtime, because that only fails at
+      # dlopen time, when the app actually starts. A timeout is expected and
+      # not a failure: packaging/flatpak/README.md records that this app has
+      # never been confirmed to paint a window in any environment tried so
+      # far, only that it gets past plugin loading. What this checks is
+      # narrower and does not depend on that: whether it fails immediately
+      # with a missing shared library, the literal error #964 reproduced.
+      - name: attempt a headless launch and check for a missing shared library
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb dbus-daemon
+          timeout 20 dbus-run-session -- xvfb-run -a \
+            flatpak run top.npcserver.slimm > flatpak-run.log 2>&1 || true
+          cat flatpak-run.log
+          if grep -qiE 'error while loading shared libraries|cannot open shared object file' flatpak-run.log; then
+            echo "::error::the installed flatpak failed to load a shared library at startup; see the log above"
+            exit 1
+          fi

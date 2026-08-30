@@ -31,6 +31,7 @@ Each section below is named for its workflow file.
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
 | `main-builds` | changes under `client/`, `crates/` or `packaging/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
+| `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
 
 ## Keeping this table honest
 
@@ -683,8 +684,12 @@ A tagged release still supersedes all of this: it wins over any COPR snapshot of
 
 ### What triggers it, and the one filter step that replaces two workflows
 
-A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**` or `crates/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`) and a `changes` job built on `dorny/paths-filter` narrows that into the two booleans (`client`, `server`) every downstream job gates on.
+A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**`, `crates/**` or `packaging/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`) and a `changes` job built on `dorny/paths-filter` narrows that into the three booleans (`client`, `server`, `packaging`) every downstream job gates on.
 The brief allowed splitting this into two workflows with their own top-level `paths` instead; one workflow with one filter step was chosen because it keeps the concurrency group, the header, and this section in one place, and because the filter step is one checkout rather than two.
+
+`packaging` used to not exist, and every job below gated on `client`/`server` alone even though `on.push.paths` already listed `packaging/**`.
+The trigger fired on a packaging-only commit, and then every downstream job's own `if:` read `client`/`server` as both false and skipped, so the run did nothing at all; confirmed directly against the real run for the commit that merged #964, which touched only `packaging/flatpak/top.npcserver.slimm.yaml`.
+`linux-client` (the rpm build) and `copr` now also gate on `packaging`, so a packaging-only change reaches them; `android-client` and `ios-testflight` deliberately do not, since a packaging change has nothing to do with either.
 
 The two client exclusions are load-bearing.
 A release-please release commit for the client touches exactly `.release-please-manifest.client.json`, `client/CHANGELOG.md` and `client/pubspec.yaml` (verified against the actual `chore(main): release client 0.16.0` commit, back when the manifest was still the single shared file; the split manifest changed only which root-level file name that first one is).
@@ -733,3 +738,45 @@ It is still the right default for this workflow rather than an oversight: an own
 
 `release.yml` sets `cancel-in-progress: false`, because a half-published release is worse than a queued one.
 This workflow sets it `true`, because a continuous build carries no such asymmetry: a newer commit's build simply supersedes an older one's, so cancelling the older run in favour of the newer one loses nothing worth keeping.
+
+## flatpak-ci
+
+The gap this closes: before it existed, nothing in CI ever built the flatpak except `release.yml`'s `linux-client` job, which only runs at `client-v*` tag time (or when release-please has just cut a client release).
+`desktop-clients.yml` is tag-only too, for Windows and macOS.
+`main-builds.yml` lists `packaging/**` in its own trigger, but never builds the flatpak at all, on any push; it only builds the rpm and the tarball, and even that was silently skipped for a packaging-only commit until the `changes`-job fix described above.
+So a broken flatpak manifest reached `main` and shipped to whoever installed client 0.60.x through Flatpak before anything caught it: PR #964 fixed the underlying defect (`media_kit_video`'s Linux plugin has a hard `NEEDED` entry on `libmpv.so.2`, which the freedesktop 25.08 runtime does not carry, so the app failed to launch at all), and PR #964 itself passed with only SonarCloud and hygiene as checks.
+
+### Why a full build, not a manifest lint
+
+A schema/lint check on the YAML would not have caught #964.
+`flatpak-builder` builds a manifest that omits a runtime library without complaint; the failure only exists at `dlopen` time, when the installed app actually starts and the dynamic loader cannot resolve `libmpv.so.2`.
+`packaging/flatpak/README.md`'s own account of finding this defect is explicit that it was found "by actually building both versions and launching each, rather than reasoning from the plugin's ELF headers alone."
+A lint is cheap but would have reported this manifest as fine, which is worse than the two-checks status quo it replaces: a green check that cannot see the actual failure mode invites more trust than no check at all.
+
+### Why gated narrowly on the manifest, not on all of `packaging/**`
+
+The build compiles mpv, libplacebo, libass and the `libayatana-appindicator` stack from source; per `packaging/flatpak/README.md` this has taken multiple real passes on the author's own machine and is not a build to run on every PR.
+`packaging/**` also covers the rpm spec, the Linux desktop file and the icon set, none of which touch the flatpak sandbox at all, so a build gated on that whole tree would run far more often than the manifest actually changes.
+Triggering only on `packaging/flatpak/top.npcserver.slimm.yaml` and `packaging/flatpak/shared-modules/**` (the vendored build inputs the manifest reads directly) keeps the expensive path rare without weakening it: those are exactly the files whose breakage this workflow exists to catch, and per the manifest's own README they have changed only a handful of times since the manifest was introduced.
+
+### What this does and does not prove
+
+It builds on `ubuntu-latest`, the same runner `release.yml`'s `linux-client` job uses, and installs the same `linux-build-deps` composite action, so it links against the same host packages, notably `libayatana-appindicator3-dev`.
+`packaging/flatpak/README.md` documents a real host-dependent link: `tray_manager`'s CMake picks `ayatana-appindicator3-0.1` or the older `appindicator3-0.1` from whichever the build host's pkg-config offers, and a Fedora desktop build links a different soname than Ubuntu CI does.
+Building on the same Ubuntu runner CI already uses for the raw Linux build means this check cannot diverge that way itself; it does not and cannot prove anything about a contributor's own machine, since it never builds on one.
+
+It also does not catch a client-side change that adds a new native Linux dependency without touching this manifest in the same PR.
+The regression class #964 fixed was really introduced whenever `media_kit_video` was wired into the client, not when the manifest was edited to catch up; a future plugin addition with the identical shape would not trigger this workflow unless the same PR also touches the flatpak manifest.
+Closing that fully would mean cross-checking the flatpak manifest's declared modules against `linux-build-deps`' apt package list on every client change, which is out of scope here and left as a known gap.
+
+### The launch check, and why a timeout is not a failure
+
+After installing the built bundle, the job runs `flatpak run` for 20 seconds under `xvfb-run` and a private D-Bus session, then greps the captured output for the literal dynamic-linker error `#964` reproduced (`error while loading shared libraries`, `cannot open shared object file`).
+A timeout with no such line is treated as success, not failure: `packaging/flatpak/README.md` records that this app has never been confirmed to paint a window in any environment tried so far, only that a fixed manifest gets past plugin loading before hitting an unrelated glibc-version mismatch.
+Waiting for a window that may never paint would make this workflow fail for a reason it does not exist to catch; checking for the specific startup error #964 produced is a narrower, more reliable signal that does not depend on the window ever appearing.
+
+### What remains unverified until this runs for real
+
+This workflow has not run in GitHub Actions.
+Locally verified: the YAML parses, `actionlint` reports no findings, and every command mirrors a step `release.yml`'s own `linux-client` job already runs successfully in CI (the `elfutils` fix from #967 included).
+Not verified: that `flatpak run` actually reaches the plugin-loading stage within the 20-second timeout on a GitHub-hosted runner with no display attached at all (unlike the author's own machine, which has a real session), and that unprivileged flatpak sandboxing itself works unmodified on `ubuntu-latest`'s current image.
