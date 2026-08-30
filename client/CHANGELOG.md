@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.63.0](https://github.com/NC1107/slim-m/compare/client-v0.62.0...client-v0.63.0) (2026-08-30)
+
+
+### Features
+
+* **client:** add a right-click quick-action menu for empty canvas space ([#973](https://github.com/NC1107/slim-m/issues/973)) ([45093fb](https://github.com/NC1107/slim-m/commit/45093fb42bc458fa12cdbcb243d2777745695a25))
+* **client:** add whats-new entries for 0.61.0 through 0.63.0 ([#978](https://github.com/NC1107/slim-m/issues/978)) ([c0cd514](https://github.com/NC1107/slim-m/commit/c0cd5149fd269ba14657335786e165220fa6cbf6))
+* **client:** give voice channels a text surface ([#976](https://github.com/NC1107/slim-m/issues/976)) ([91e221c](https://github.com/NC1107/slim-m/commit/91e221cbf704ace075416b123125ff43898b1719))
+* **server:** add private per-user notes ([#975](https://github.com/NC1107/slim-m/issues/975)) ([bd49e6c](https://github.com/NC1107/slim-m/commit/bd49e6ce4ad2ae11ffd047c3efabcbdb6bb5d25a))
+
 ## [0.62.0](https://github.com/NC1107/slim-m/compare/client-v0.61.0...client-v0.62.0) (2026-08-28)
 
 
