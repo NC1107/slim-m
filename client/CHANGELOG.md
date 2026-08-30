@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.65.0](https://github.com/NC1107/slim-m/compare/client-v0.64.0...client-v0.65.0) (2026-08-30)
+
+
+### Features
+
+* **server,client:** ring the other side of a DM call and release it if unanswered ([#993](https://github.com/NC1107/slim-m/issues/993)) ([cc62b65](https://github.com/NC1107/slim-m/commit/cc62b651667627819aad89f92fa82180594b6a48))
+
+
+### Bug Fixes
+
+* **license:** carry PolyForm in the files the ring PR added ([#997](https://github.com/NC1107/slim-m/issues/997)) ([311b78d](https://github.com/NC1107/slim-m/commit/311b78ddfe677498f8f3caf5b118a6b4e79c6166))
+
 ## [0.64.0](https://github.com/NC1107/slim-m/compare/client-v0.63.0...client-v0.64.0) (2026-08-30)
 
 
