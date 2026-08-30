@@ -121,6 +121,24 @@ Fixed the same way: `"build-options": {"libdir": "lib"}` (YAML `build-options: {
 This was diagnosed and fixed entirely from two real CI failures in sequence, per the standard the rest of this document holds itself to - not reasoned from the manifest text or reproduced locally, since the local tool that already carries safe defaults for at least the `cmake-ninja` case would not have reproduced the first failure, and this repository has no local copy of `flatpak-builder` 1.4.2 to have reproduced the second.
 See `docs/ci.md`'s `flatpak-ci` section for the runs that caught each half of this and the run that confirms the full fix.
 
+## A sixth defect, found and fixed 2026-08-30: icon export validation depends on a gdk-pixbuf loader the build host, not the sandbox, provides
+
+With every module building and installing correctly (the fifth defect's fix in place), the same run got all the way to `flatpak-builder`'s export step and failed there instead: `.../export/share/icons/hicolor/scalable/apps/top.npcserver.slimm.svg is not a valid icon: Format not recognized`.
+
+This looks exactly like the first defect this document opens with (gdk-pixbuf's SVG sniffer rejecting a leading comment), but it is not that defect recurring: the manifest's `sed -n '/<svg/,$p'` fix is still in the build log doing its job, and the resulting file, checked directly (well-formed XML, root element `{http://www.w3.org/2000/svg}svg`, loads at 512x512), is a valid SVG by every measure that matters.
+The difference is where the check runs. `flatpak build-export` (called by `flatpak-builder` at the very end, not inside the build sandbox) validates every icon it exports through gdk-pixbuf running **on the CI runner itself**, and `ubuntu-latest` carries no gdk-pixbuf image loaders at all by default - not broken, just absent, so a perfectly valid SVG reports the same generic "Format not recognized" a genuinely corrupt one would.
+`librsvg2-common` provides the loader (`libpixbufloader-svg.so`), confirmed directly against Ubuntu's own package-contents search for noble/amd64, not assumed.
+Fixed by adding it to the `apt-get install` line in both `flatpak-ci.yml` and `release.yml`'s `build flatpak` steps - `release.yml`'s own flatpak build had never gotten far enough to hit this on any release through this fix, since the fourth and fifth defects were still blocking it.
+
+## The pattern across all three real defects here: the build host leaks into the result
+
+The soname drift (third defect), the CMake/meson libdir default (fifth defect), and this icon-export loader are the same shape three times over, not three unrelated bugs: each one is a place where `flatpak-builder` hands part of the job to whatever the **host** happens to provide - a `pkg-config` name, a buildsystem's own platform-detection default, a gdk-pixbuf loader - rather than something pinned by the manifest or carried inside the `org.freedesktop` sandbox.
+The sandbox is real and does isolate the actual compiled output from the host in the ways it advertises; what it does not isolate is every tool `flatpak-builder` itself shells out to on the host's own account, and export-time validation is one of those.
+
+The practical consequence: a build of this manifest on any machine is only as trustworthy as how closely that machine's host tooling matches the one that will actually ship it.
+A local Fedora build proved the manifest could produce a working bundle at all, and still missed two of these three (the appindicator soname the other direction, and both the libdir default and the icon loader, since the local machine's own tooling happened to paper over or not trigger either).
+That is the whole reason `flatpak-ci` builds on `ubuntu-latest` specifically, matching `release.yml`'s own `linux-client` runner rather than any other environment: it is the one host whose quirks are the ones that will actually reach a shipped release, so it is the only build result worth calling authoritative for this manifest.
+
 ## Permissions, briefly
 
 The manifest's own inline comments carry the reasoning for each non-obvious `finish-args` entry.

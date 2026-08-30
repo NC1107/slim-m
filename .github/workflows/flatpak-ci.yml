@@ -79,9 +79,15 @@ jobs:
       # elfutils provides eu-strip, which flatpak-builder shells out to for
       # every module; its absence is exactly what made every release build
       # through client-v0.61.0 report success while producing no bundle. #967.
+      # librsvg2-common provides the gdk-pixbuf SVG loader (libpixbufloader-svg.so)
+      # that `flatpak build-export` uses ON THIS HOST to validate every icon
+      # it exports; ubuntu-latest carries none of the gdk-pixbuf loaders by
+      # default, so a perfectly valid SVG fails export with "Format not
+      # recognized". Checked directly against packages.ubuntu.com for
+      # noble/amd64, not assumed. See packaging/flatpak/README.md.
       - name: build flatpak
         run: |
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils librsvg2-common
           flatpak remote-add --user --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
           flatpak-builder --user --install-deps-from=flathub --force-clean \
