@@ -81,7 +81,7 @@ Wayland matches a window to its launcher entry by that id, so the two names have
 Each was checked rather than waved through:
 
 - `crypto-policy-non-compliance-openssl` on `lib/libwebrtc.so` - upstream libwebrtc calls `SSL_CTX_set_cipher_list`, which pins a cipher list instead of deferring to the system crypto policy. It is inside a prebuilt vendored library, so nothing in this spec can change it; fixing it means an upstream change in libwebrtc or in flutter_webrtc's bundled build. Recorded rather than suppressed, because it is a real property of what we ship.
-- `invalid-license Apache-2.0` - a false positive from a non-Fedora rpmlint. The PyPI build ships an empty `ValidLicenses` list, so every license string fails it, `GPL-3.0-only` in `nc1107/sink` included. Fedora's rpmlint reads the real list from `fedora-license-data`.
+- `invalid-license LicenseRef-PolyForm-Noncommercial-1.0.0` - a false positive from a non-Fedora rpmlint. The PyPI build ships an empty `ValidLicenses` list, so every license string fails it, `GPL-3.0-only` in `nc1107/sink` included. Fedora's rpmlint reads the real list from `fedora-license-data`.
 - `non-versioned-file-in-library-package` (6) - rpmlint infers "library package" from `.so` files under `%{_libdir}`. This is an application whose private libraries live in `%{_libdir}/%{name}`, which is the layout Fedora asks for.
 - `invalid-soname`, `no-soname`, `missing-hash-section`, `missing-gnu-hash-section` - how upstream builds the engine and `libwebrtc`. Confirmed byte-identical in the unpackaged bundle, so `patchelf` did not introduce them, and harmless for libraries excluded from rpm's dependency namespace.
 - `unstripped-binary-or-object` (6), `position-independent-executable-suggested` - deliberate, see above.

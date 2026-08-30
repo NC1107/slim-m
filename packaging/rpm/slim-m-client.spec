@@ -28,7 +28,7 @@ Version:        0.4.0
 Release:        1%{?dist}
 Summary:        Desktop client for the slim-m self-hosted messaging platform
 
-License:        Apache-2.0
+License:        LicenseRef-PolyForm-Noncommercial-1.0.0
 URL:            https://github.com/NC1107/slim-m
 # The portable release tarball. Repackaged rather than built from source: a
 # Flutter build needs network for pub, which a COPR/mock buildroot has not.
