@@ -368,7 +368,7 @@ jobs:
           fi
           mkdir -p "stage/${name}" dist
           cp -a "${bundle}/." "stage/${name}/"
-          cp LICENSES/Apache-2.0.txt "stage/${name}/LICENSE"
+          cp LICENSES/LicenseRef-PolyForm-Noncommercial-1.0.0.txt "stage/${name}/LICENSE"
           cp packaging/linux/README.md "stage/${name}/README.md"
           tar -C stage -czf "dist/${name}-linux-amd64.tar.gz" "${name}"
 
