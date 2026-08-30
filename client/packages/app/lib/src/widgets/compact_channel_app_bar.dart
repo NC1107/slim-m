@@ -81,7 +81,7 @@ class CompactChannelAppBar extends ConsumerWidget
         if (!isVoice) _PinsAction(channelId: channelId),
         if (!isVoice) _ThreadsAction(channelId: channelId),
         DmCallButton(channelId: channelId),
-        CanvasOpenButton(channelId: channelId, isVoice: isVoice),
+        CanvasOpenButton(channelId: channelId, isVoice: isVoice, isDm: isDm),
         if (!isDm) const _MembersAction(),
         const SizedBox(width: AppSpacing.s8),
       ],

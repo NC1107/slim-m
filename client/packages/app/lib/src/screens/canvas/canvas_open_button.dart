@@ -6,23 +6,23 @@
 /// it, so an in-call-only entry would leave the product's signature feature
 /// invisible whenever the room is empty.
 ///
-/// Voice channels only, by owner decision (backlog, 2026-08-13, "there also
-/// should not be a canvas in text channels, only voice channels"). This
-/// deliberately reverses what this comment used to argue: that a text
-/// channel needs it too, because bootstrap seeds one text channel and
-/// `SLIMM_LIVEKIT_URL` is optional, so a fresh self-host with no voice
-/// channel now cannot reach the canvas at all. That consequence is real and
-/// accepted rather than overlooked - the canvas belongs to talking together,
-/// and a deployment that wants one creates a voice channel.
+/// Voice channels and DMs, not text channels, by owner decision. The
+/// original call (backlog, 2026-08-13, "there also should not be a canvas
+/// in text channels, only voice channels") also read as excluding DMs, since
+/// a DM's base permissions granted no `USE_CANVAS` at the time. The owner
+/// has since asked for a DM canvas too, to work through something 1-on-1
+/// without needing a voice channel for it, which supersedes that reading:
+/// `DM_BASE` (`store/dms.rs`) now grants `USE_CANVAS`, and this button opens
+/// for a DM the same way it does for a voice channel - the personal space
+/// (self-DM) included, where it doubles as a personal scratch canvas rather
+/// than needing its own special case. Text channels stay excluded on the
+/// original rule: the canvas belongs to talking together or to a direct
+/// conversation, not to a channel of many.
 ///
-/// The kind arrives as [isVoice] from the header that builds this, rather
-/// than being read back out of the local store: every call site already
-/// knows it, and a store round trip would make an affordance appear a frame
-/// or two late on a screen that has the answer synchronously. It subsumes
-/// the DM case for free - a DM is not a voice channel, and its base
-/// permissions never include `USE_CANVAS` (`store/dms.rs`'s `DM_BASE`, and
-/// DMs skip the overwrite evaluator that could otherwise grant it), so every
-/// canvas route 403s there regardless.
+/// The kind arrives as [isVoice] and [isDm] from the header that builds
+/// this, rather than being read back out of the local store: every call
+/// site already knows both, and a store round trip would make an affordance
+/// appear a frame or two late on a screen that has the answer synchronously.
 library;
 
 import 'package:flutter/widgets.dart';
@@ -36,16 +36,23 @@ class CanvasOpenButton extends ConsumerWidget {
     super.key,
     required this.channelId,
     required this.isVoice,
+    this.isDm = false,
   });
 
   final String channelId;
 
-  /// Whether this channel is a voice channel, the only kind that has a canvas.
+  /// Whether this channel is a voice channel or a DM - the two kinds a
+  /// canvas can open in. Everything else (a text channel) hides this.
   final bool isVoice;
+
+  /// Whether this channel is a DM, personal space included. Defaults false
+  /// so every existing caller that predates the DM canvas keeps its old
+  /// voice-only behavior until it opts in.
+  final bool isDm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!isVoice) return const SizedBox.shrink();
+    if (!isVoice && !isDm) return const SizedBox.shrink();
     final open = ref.watch(canvasOpenProvider) == channelId;
     return _button(ref, open);
   }

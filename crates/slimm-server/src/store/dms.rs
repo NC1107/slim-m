@@ -34,30 +34,40 @@ use super::{Channel, Store, User, now_ms};
 pub(crate) const DM_CHANNEL_KIND: &str = "dm";
 
 /// Everything a DM participant can ever do inside it. Deliberately narrower
-/// than [`Permissions::ALL`]: there is no moderation, no roles, and no canvas
-/// inside a DM, only a conversation between two people - voice is the one
-/// exception, since a call between exactly those two people is still just
-/// that conversation. `KICK_MEMBERS` stays out on purpose, so neither party
-/// can evict the other from their own call; leaving is each side's own doing.
+/// than [`Permissions::ALL`]: there is no moderation and no roles, only a
+/// conversation between two people - voice and the canvas are the two
+/// exceptions, since a call or a shared working surface between exactly those
+/// two people is still just that conversation. `USE_CANVAS` here reverses an
+/// earlier owner call (backlog, 2026-08-13, "there also should not be a
+/// canvas in text channels, only voice channels") that had also read as
+/// excluding DMs; the owner has since asked for one directly, to work through
+/// something 1-on-1 without a voice channel. `MANAGE_CANVAS` stays out like
+/// every other moderation bit, so a DM canvas has no "clear" or rearrange-
+/// anyone's-object power, only placing and removing your own. `KICK_MEMBERS`
+/// stays out on purpose too, so neither party can evict the other from their
+/// own call; leaving is each side's own doing.
 const DM_BASE: Permissions = Permissions::VIEW_CHANNEL
     .union(Permissions::SEND_MESSAGES)
     .union(Permissions::ADD_REACTIONS)
     .union(Permissions::ATTACH_FILES)
     .union(Permissions::CONNECT)
-    .union(Permissions::SPEAK);
+    .union(Permissions::SPEAK)
+    .union(Permissions::USE_CANVAS);
 
-/// What a block removes: everything that creates new content, voice
-/// included, since a blocked person must not be able to ring or join a call
-/// any more than they can send a message. `VIEW_CHANNEL` survives so a block
-/// stops a conversation without erasing it; a party who blocked (or was
-/// blocked by) the other can still read what already happened, and it also
+/// What a block removes: everything that creates new content, voice and the
+/// canvas included, since a blocked person must not be able to ring, join a
+/// call, or draw on the shared canvas any more than they can send a message.
+/// `VIEW_CHANNEL` survives so a block stops a conversation without erasing
+/// it; a party who blocked (or was blocked by) the other can still read what
+/// already happened (and still see the canvas as it stood), and it also
 /// means an out-of-band delete of `user_blocks` cannot double as a way to
 /// silently reopen a hidden history.
 const BLOCKED_DENY: Permissions = Permissions::SEND_MESSAGES
     .union(Permissions::ADD_REACTIONS)
     .union(Permissions::ATTACH_FILES)
     .union(Permissions::CONNECT)
-    .union(Permissions::SPEAK);
+    .union(Permissions::SPEAK)
+    .union(Permissions::USE_CANVAS);
 
 /// Why opening a DM failed.
 #[derive(Debug)]

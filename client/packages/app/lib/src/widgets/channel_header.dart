@@ -145,7 +145,7 @@ class ChannelHeader extends ConsumerWidget {
           const SizedBox(width: AppSpacing.s4),
           DmCallButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),
-          CanvasOpenButton(channelId: channelId, isVoice: isVoice),
+          CanvasOpenButton(channelId: channelId, isVoice: isVoice, isDm: isDm),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.search,

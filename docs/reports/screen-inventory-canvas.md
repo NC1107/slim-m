@@ -7,7 +7,7 @@ The canvas is never a route: `ConversationPane` substitutes `CanvasPane` for the
 
 ## Top-level open/closed
 
-- **canvas-closed** — default; `CanvasOpenButton` unlit; the button itself is entirely absent for a DM (DM base permissions lack `USE_CANVAS`). Coverage: implicit whenever a non-canvas surface is captured.
+- **canvas-closed** — default; `CanvasOpenButton` unlit. At the time this inventory was written the button was entirely absent for a DM (DM base permissions lacked `USE_CANVAS`); the owner has since asked for a DM canvas, so `DM_BASE` now grants it and the button shows there too, same as a voice channel. Coverage: implicit whenever a non-canvas surface is captured.
 - **canvas-open-standalone-no-call** — pane mounted, `callDockDataFor` returns null so the dock shows tools only, no call controls. Coverage: covered (`canvas` surface, `c-general`).
 - **canvas-open-during-call** — the dock combines `CallControls` and `CanvasToolsRow`, side-by-side at or above compact width, stacked below it. **Coverage gap worth flagging deliberately**: the `canvas-voice` surface forces `canvasOpenProvider` open on `c-main` but applies **no** `voiceControllerProvider` override, so `callDockDataFor` most likely still reads as not-connected — despite its name, this surface probably does not actually render the combined call+canvas dock. There is no surface anywhere that forces both providers together in the same channel. This is the single highest-value gap in the whole inventory to close with a real capture.
 
