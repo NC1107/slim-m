@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import '../providers/blocks_controller.dart';
+import '../providers/filed_reports.dart';
 import '../providers/providers.dart';
 import 'app_snackbar.dart';
 import 'report_dialog.dart';
@@ -42,6 +43,10 @@ Future<void> _tell(
 ///
 /// [subjectLabel] names the thing in the prompt ("this member", "this message"),
 /// and is the only difference between the two callers.
+///
+/// Remembers the new report's id in [filedReportsProvider] on success, so it
+/// shows up in `ReportStatusSection` without the reporter ever seeing, let
+/// alone writing down, a bare id themselves.
 Future<void> fileReport(
   BuildContext context,
   ProviderContainer container, {
@@ -55,9 +60,12 @@ Future<void> fileReport(
     context,
     'file the report',
     'Report filed. A moderator will review it.',
-    () => container
-        .read(apiProvider)
-        .report(subject: subject, subjectId: subjectId, reason: reason),
+    () async {
+      final reportId = await container
+          .read(apiProvider)
+          .report(subject: subject, subjectId: subjectId, reason: reason);
+      await container.read(filedReportsProvider.notifier).record(reportId);
+    },
   );
 }
 
