@@ -77,17 +77,31 @@ class FiledReportsController extends StateNotifier<List<String>> {
   /// Bumps [_generation] first, the same guard [_onSessionChanged] uses: a
   /// [_load] already in flight from construction can otherwise answer after
   /// this sets [state] and clobber it back to whatever was last on disk.
+  ///
+  /// The list to persist is captured into [updated] before the only await
+  /// here, and that local - not [state] - is what gets written, with
+  /// [generation] re-checked after the await before writing at all. [state]
+  /// itself can change out from under this call while it is suspended on
+  /// [preferencesProvider]: a sign-out lands, [_onSessionChanged] bumps
+  /// [_generation] and resets [state] to empty, and this call resumes still
+  /// holding [userId] from the account that just signed out. Reading [state]
+  /// at that point would persist an empty list under the *previous*
+  /// account's key - wiping its real list - so the generation check skips
+  /// the write entirely rather than persisting anything for an account this
+  /// call no longer belongs to.
   Future<void> record(String reportId) async {
     final userId = _account;
     if (userId == null) return;
-    _generation++;
-    state = [
+    final generation = ++_generation;
+    final updated = [
       reportId,
       ...state.where((id) => id != reportId),
     ].take(_maxFiledReports).toList();
+    state = updated;
     try {
       final prefs = await _ref.read(preferencesProvider.future);
-      await prefs.setStringList(filedReportsKey(userId), state);
+      if (!mounted || generation != _generation) return;
+      await prefs.setStringList(filedReportsKey(userId), updated);
     } catch (_) {
       // Best-effort: the report was still filed even if this did not persist.
     }

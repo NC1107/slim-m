@@ -6,6 +6,8 @@
 /// per-account flag.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -137,5 +139,46 @@ void main() {
     await pumpEventQueue();
 
     expect(container.read(filedReportsProvider), ['report-1']);
+  });
+
+  test('a sign-out landing while record() is suspended on preferences must '
+      "not wipe the signed-out account's stored list", () async {
+    // Seeds self's list directly, keeping the resolved prefs so the completer below controls when record() sees them.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(filedReportsKey('self'), ['old-report']);
+
+    final prefsCompleter = Completer<SharedPreferences>();
+    final session = api.SessionStore(tokens: _selfTokens);
+    final container = ProviderContainer(
+      overrides: [
+        sessionProvider.overrideWithValue(session),
+        preferencesProvider.overrideWith((ref) => prefsCompleter.future),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final notifier = container.read(filedReportsProvider.notifier);
+    // Suspends on the completer having already set state; nothing is written to prefs yet.
+    final recordFuture = notifier.record('new-report');
+
+    // A sign-out lands and fully resolves while that call is still suspended.
+    session.clear();
+    await pumpEventQueue();
+
+    prefsCompleter.complete(prefs);
+    await recordFuture;
+
+    expect(
+      prefs.getStringList(filedReportsKey('self')),
+      ['old-report'],
+      reason:
+          'record() resumed after the sign-out and must not persist an '
+          "empty list under the account it captured before it - that "
+          "account's own list must be untouched",
+    );
+
+    session.set(_selfTokens);
+    await pumpEventQueue();
+    expect(container.read(filedReportsProvider), ['old-report']);
   });
 }
