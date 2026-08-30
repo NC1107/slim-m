@@ -144,6 +144,14 @@ impl Store {
         .fetch_optional(&mut *tx)
         .await?
         {
+            // Opening un-hides it for the caller; see `dm_hides` (0057_dm_hides.sql).
+            sqlx::query!(
+                "DELETE FROM dm_hides WHERE user_id = ? AND channel_id = ?",
+                caller,
+                channel_id
+            )
+            .execute(&mut *tx)
+            .await?;
             tx.commit().await?;
             return self.channel(channel_id).await?.ok_or_else(|| {
                 anyhow::anyhow!("dm_channels row exists but its channel does not").into()
@@ -197,7 +205,11 @@ impl Store {
 
     /// The caller's DM conversations, most recently active first. A
     /// conversation whose other participant has been deleted is omitted
-    /// rather than shown with nothing to render for them.
+    /// rather than shown with nothing to render for them, and so is one the
+    /// caller has hidden (`dm_hides`, 0057_dm_hides.sql) - unless it has
+    /// picked up new activity since, which is what brings a closed DM back
+    /// on its own rather than silently dropping whatever the other person
+    /// sends next.
     ///
     /// Activity is the newest live message's `created_at`, found by seeking
     /// `ORDER BY seq DESC LIMIT 1` rather than `MAX(created_at)`: both are
@@ -206,25 +218,38 @@ impl Store {
     /// seek - the MAX form scanned every live message in the channel, per
     /// conversation, on a table nothing ever sweeps (measured at ~7,700x
     /// slower by the 2026-08-11 review at 200k rows). `tests/dm_activity.rs`
-    /// pins both the plan and the equivalence.
+    /// pins both the plan and the equivalence. The hide filter is applied in
+    /// an outer query rather than folded into the same `WHERE` as the pair
+    /// match, because SQLite cannot see a `SELECT`-list alias (`activity_at`)
+    /// from its own `WHERE` clause.
     pub async fn list_dm_conversations(
         &self,
         user_id: UserId,
     ) -> anyhow::Result<Vec<DmConversation>> {
         let rows = sqlx::query!(
-            r#"SELECT d.channel_id AS "channel_id!: ChannelId",
-                      CASE WHEN d.user_a = ? THEN d.user_b ELSE d.user_a END AS "other_id!: UserId",
-                      c.created_at AS "created_at!",
-                      COALESCE(
-                          (SELECT m.created_at FROM messages m
-                           WHERE m.channel_id = d.channel_id AND m.deleted_at IS NULL
-                           ORDER BY m.seq DESC LIMIT 1),
-                          c.created_at
-                      ) AS "activity_at!: i64"
-               FROM dm_channels d
-               JOIN channels c ON c.id = d.channel_id AND c.deleted_at IS NULL
-               WHERE d.user_a = ? OR d.user_b = ?
+            r#"SELECT channel_id AS "channel_id!: ChannelId",
+                      other_id AS "other_id!: UserId",
+                      created_at AS "created_at!",
+                      activity_at AS "activity_at!: i64"
+               FROM (
+                   SELECT d.channel_id AS channel_id,
+                          CASE WHEN d.user_a = ? THEN d.user_b ELSE d.user_a END AS other_id,
+                          c.created_at AS created_at,
+                          COALESCE(
+                              (SELECT m.created_at FROM messages m
+                               WHERE m.channel_id = d.channel_id AND m.deleted_at IS NULL
+                               ORDER BY m.seq DESC LIMIT 1),
+                              c.created_at
+                          ) AS activity_at,
+                          h.hidden_at AS hidden_at
+                   FROM dm_channels d
+                   JOIN channels c ON c.id = d.channel_id AND c.deleted_at IS NULL
+                   LEFT JOIN dm_hides h ON h.channel_id = d.channel_id AND h.user_id = ?
+                   WHERE d.user_a = ? OR d.user_b = ?
+               )
+               WHERE hidden_at IS NULL OR hidden_at < activity_at
                ORDER BY "activity_at!: i64" DESC"#,
+            user_id,
             user_id,
             user_id,
             user_id
@@ -304,6 +329,39 @@ impl Store {
         .fetch_optional(&self.pool)
         .await?;
         Ok(channel_id)
+    }
+
+    /// Closes a DM out of `user_id`'s own sidebar - a per-viewer hide, never
+    /// a delete: no message is touched, and the other participant's own list
+    /// is unaffected. Idempotent, and silently a no-op if the pair has never
+    /// opened a channel, the same way [`Store::open_dm`]'s eventual read side
+    /// treats "no channel yet" and "hidden" as the same absence.
+    ///
+    /// Independent of both mute (`channel_notification_prefs`) and blocking
+    /// (`user_blocks`): hiding is about the caller's own clutter, not about
+    /// notifications or safety, and neither of those tables is read or
+    /// written here.
+    ///
+    /// The write is a plain upsert rather than "insert if absent": hiding an
+    /// already-hidden conversation moves `hidden_at` forward, which matters
+    /// because `list_dm_conversations` treats a *stale* hide (one older than
+    /// the conversation's latest activity) as no longer in effect - closing
+    /// it again after new activity has to re-arm that comparison.
+    pub async fn hide_dm_conversation(&self, user_id: UserId, other: UserId) -> anyhow::Result<()> {
+        let Some(channel_id) = self.dm_channel_for_pair(user_id, other).await? else {
+            return Ok(());
+        };
+        let now = now_ms();
+        sqlx::query!(
+            "INSERT INTO dm_hides (user_id, channel_id, hidden_at) VALUES (?, ?, ?)
+             ON CONFLICT (user_id, channel_id) DO UPDATE SET hidden_at = excluded.hidden_at",
+            user_id,
+            channel_id,
+            now
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub(crate) async fn dm_permissions(

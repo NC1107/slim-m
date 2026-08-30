@@ -222,6 +222,7 @@ async fn the_activity_subquery_seeks_the_live_index_rather_than_scanning() {
         .bind(&zero)
         .bind(&zero)
         .bind(&zero)
+        .bind(&zero)
         .fetch_all(&pool)
         .await
         .expect("plan");

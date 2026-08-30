@@ -115,6 +115,13 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     c.bare("openDirectMessage", "POST", &format!("/dms/{bob_id}"), root)
         .await;
     c.get("listDirectMessages", "/dms", root).await;
+    c.bare(
+        "hideDirectMessage",
+        "DELETE",
+        &format!("/dms/{bob_id}"),
+        root,
+    )
+    .await;
 
     c.get("listRoles", "/roles", root).await;
     let role = c

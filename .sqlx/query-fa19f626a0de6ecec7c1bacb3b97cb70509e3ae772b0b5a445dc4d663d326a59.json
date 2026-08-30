@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM dm_hides WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "fa19f626a0de6ecec7c1bacb3b97cb70509e3ae772b0b5a445dc4d663d326a59"
+}

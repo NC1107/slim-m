@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Direct-message conversations: listing the caller's own, and opening (or
+//! Direct-message conversations: listing the caller's own, opening (or
 //! returning) the one with another user - or, naming yourself, your own
-//! personal space (see `crate::store::dms`).
+//! personal space - and closing one out of the caller's own list (see
+//! `crate::store::dms`).
 //!
 //! A DM is a channel under the hood (kind `dm`), so once one is open, every
 //! other message operation - send, list, edit, delete, react, search, mark
@@ -14,6 +15,7 @@
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, post};
 use serde::Serialize;
@@ -32,7 +34,7 @@ const BODY_LIMIT: usize = 1024;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/dms", get(list))
-        .route("/dms/{user_id}", post(open))
+        .route("/dms/{user_id}", post(open).delete(hide))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -132,4 +134,25 @@ async fn open(
         unread,
         created_at: channel.created_at,
     }))
+}
+
+/// Closes a DM out of the caller's own sidebar - a per-viewer hide, never a
+/// delete: no message is touched, and the other participant's own list is
+/// unaffected (see [`crate::store::Store::hide_dm_conversation`]).
+///
+/// Idempotent, and a no-op rather than a `404` when the pair has no channel:
+/// the caller asked for "not in my list", which is already true.
+async fn hide(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path(user_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let target = UserId(parse_uuid(&user_id)?);
+    state
+        .store
+        .hide_dm_conversation(ctx.user_id, target)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }

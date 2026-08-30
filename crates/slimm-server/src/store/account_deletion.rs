@@ -196,6 +196,10 @@ impl Store {
         sqlx::query!("DELETE FROM user_notes WHERE author_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        // Which DMs this account had closed out of its own sidebar is its own preference, not the other side's.
+        sqlx::query!("DELETE FROM dm_hides WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
         // Which inviter's code this account joined with is theirs to forget too; the tombstone never fires its CASCADE.
         sqlx::query!("DELETE FROM invite_redemptions WHERE user_id = ?", user_id)
             .execute(&mut *tx)

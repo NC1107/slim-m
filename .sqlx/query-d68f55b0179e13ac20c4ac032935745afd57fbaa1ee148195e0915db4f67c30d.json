@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO dm_hides (user_id, channel_id, hidden_at) VALUES (?, ?, ?)\n             ON CONFLICT (user_id, channel_id) DO UPDATE SET hidden_at = excluded.hidden_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "d68f55b0179e13ac20c4ac032935745afd57fbaa1ee148195e0915db4f67c30d"
+}
