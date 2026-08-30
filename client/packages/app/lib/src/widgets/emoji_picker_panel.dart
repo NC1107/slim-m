@@ -32,6 +32,7 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
     required this.onClose,
     this.autofocusSearch = true,
     this.width = pickerWidth,
+    this.chrome = true,
   });
 
   /// Exposed so a test can find this exact node rather than any other
@@ -50,6 +51,12 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
   /// Overridable so the panel can shrink to a narrow phone rather than
   /// overflow its sheet.
   final double width;
+
+  /// Off when a caller already draws its own floating card - the composer's
+  /// tabbed picker (`composer_picker_panel.dart`) embeds this panel as its
+  /// Emoji tab and draws exactly one `AppMenu` around both tabs, not one
+  /// nested inside the other.
+  final bool chrome;
 
   @override
   ConsumerState<EmojiPickerPanel> createState() => _EmojiPickerPanelState();
@@ -157,72 +164,71 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
       _highlighted = results.isEmpty ? 0 : results.length - 1;
     }
 
-    return CallbackShortcuts(
-      bindings: _bindings(),
-      child: Material(
-        type: MaterialType.transparency,
-        child: AppMenu(
-          width: widget.width,
-          children: [
-            // Invisible live region: announces a category switch or a search's result count / "no matches", which the silently-repainting grid below never voices on its own.
-            Semantics(
-              key: EmojiPickerPanel.liveRegionKey,
-              liveRegion: true,
-              label: _announcement(searching, category, results),
-              child: const SizedBox.shrink(),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.s8),
-              child: AppInput(
-                controller: _searchController,
-                focusNode: _searchFocus,
-                autofocus: widget.autofocusSearch,
-                placeholder: 'Search emoji',
-                icon: Icon(
-                  AppIcons.search,
-                  size: AppSizes.icon16,
-                  color: tokens.textSecondary,
-                ),
-                onChanged: _onQueryChanged,
-                onSubmitted: (_) => _pickHighlighted(),
-                semanticLabel: 'Search emoji',
-              ),
-            ),
-            if (!searching) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
-                child: EmojiCategoryTabs(
-                  categories: pickerTabs(
-                    hasCustom: custom.isNotEmpty,
-                    hasRecent: recent.isNotEmpty,
-                  ),
-                  selected: category,
-                  onSelect: _selectCategory,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s4),
-            ],
-            const AppMenuDivider(),
-            SizedBox(
-              height: _gridHeight,
-              child: results.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No matches.',
-                        style: AppText.body.copyWith(
-                          color: tokens.textSecondary,
-                        ),
-                      ),
-                    )
-                  : EmojiGrid(
-                      emoji: results,
-                      highlighted: _highlighted,
-                      onTap: _pick,
-                    ),
-            ),
-          ],
+    final content = [
+      // Invisible live region: announces a category switch or a search's result count / "no matches", which the silently-repainting grid below never voices on its own.
+      Semantics(
+        key: EmojiPickerPanel.liveRegionKey,
+        liveRegion: true,
+        label: _announcement(searching, category, results),
+        child: const SizedBox.shrink(),
+      ),
+      Padding(
+        padding: const EdgeInsets.all(AppSpacing.s8),
+        child: AppInput(
+          controller: _searchController,
+          focusNode: _searchFocus,
+          autofocus: widget.autofocusSearch,
+          placeholder: 'Search emoji',
+          icon: Icon(
+            AppIcons.search,
+            size: AppSizes.icon16,
+            color: tokens.textSecondary,
+          ),
+          onChanged: _onQueryChanged,
+          onSubmitted: (_) => _pickHighlighted(),
+          semanticLabel: 'Search emoji',
         ),
       ),
+      if (!searching) ...[
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+          child: EmojiCategoryTabs(
+            categories: pickerTabs(
+              hasCustom: custom.isNotEmpty,
+              hasRecent: recent.isNotEmpty,
+            ),
+            selected: category,
+            onSelect: _selectCategory,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s4),
+      ],
+      const AppMenuDivider(),
+      SizedBox(
+        height: _gridHeight,
+        child: results.isEmpty
+            ? Center(
+                child: Text(
+                  'No matches.',
+                  style: AppText.body.copyWith(color: tokens.textSecondary),
+                ),
+              )
+            : EmojiGrid(
+                emoji: results,
+                highlighted: _highlighted,
+                onTap: _pick,
+              ),
+      ),
+    ];
+
+    return CallbackShortcuts(
+      bindings: _bindings(),
+      child: widget.chrome
+          ? Material(
+              type: MaterialType.transparency,
+              child: AppMenu(width: widget.width, children: content),
+            )
+          : Column(mainAxisSize: MainAxisSize.min, children: content),
     );
   }
 }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// Tests for the emoji button beside the composer field.
+/// Tests for the emoji button beside the composer field, at touch density.
 ///
 /// Split out of `composer_affordances_test.dart`, which shares the same
 /// harness and had grown past the file budget holding both.
 ///
 /// The defects these pin: the button opened the whole unicode catalog on a
 /// phone that has all of it on the keyboard already, and a pick left the
-/// caret in the dismissed sheet.
+/// caret in the dismissed sheet. `composer_desktop_picker_test.dart` covers
+/// the anchored panel this same button opens at desktop width instead.
 library;
 
 import 'package:flutter/material.dart';
@@ -27,6 +28,15 @@ Finder get _firstEmojiCell => find
     )
     .first;
 
+/// Touch density follows width, not platform (`AppTouchTargets.of`), so
+/// every test in this file narrows the window itself rather than relying on
+/// [TargetPlatform.iOS] to mean anything about layout.
+void _useCompactWindow(WidgetTester tester) {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
   late TextEditingController controller;
   late Sends sends;
@@ -42,6 +52,7 @@ void main() {
   // The owner's decision: the composer offers the Space's own emoji only.
   // Native ones come from the soft keyboard already under the field.
   testWidgets('offers the Space emoji, and no unicode catalog', (tester) async {
+    _useCompactWindow(tester);
     await tester.pumpWidget(
       composerHarness(
         controller: controller,
@@ -71,6 +82,7 @@ void main() {
   testWidgets('a Space with none says so rather than opening empty', (
     tester,
   ) async {
+    _useCompactWindow(tester);
     await tester.pumpWidget(
       composerHarness(
         controller: controller,
@@ -94,6 +106,7 @@ void main() {
   testWidgets('a picked Space emoji lands at the caret, not at the end', (
     tester,
   ) async {
+    _useCompactWindow(tester);
     await tester.pumpWidget(
       composerHarness(
         controller: controller,
@@ -134,6 +147,7 @@ void main() {
   /// framework's own restoration does not cover.
   testWidgets('the caret lands in the field after a pick, even if it was '
       'never there', (tester) async {
+    _useCompactWindow(tester);
     await tester.pumpWidget(
       composerHarness(
         controller: controller,

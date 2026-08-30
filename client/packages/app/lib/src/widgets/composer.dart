@@ -376,17 +376,18 @@ class _ComposerState extends ConsumerState<Composer> {
 
   void _insertCodeFence() => _insert('``', caretOffset: 1);
 
-  /// The Space's own emoji only. Native ones come from the keyboard already
-  /// under the field, which searches and skin-tones better than this could.
-  void _pickEmoji() => unawaited(
-    showSpaceEmojiSheet(
-      context,
-      onSelect: (emoji) {
-        _focus.requestFocus();
-        _insert(emoji);
-      },
-    ),
-  );
+  /// Touch density only: the Space's own emoji, nothing else. Native ones
+  /// come from the keyboard already under the field, which searches and
+  /// skin-tones better than this could. Desktop width reaches the anchored
+  /// Emoji/GIFs panel `ComposerPickerButton` owns instead, wired to
+  /// [_insertPickedEmoji] directly.
+  void _pickEmoji() =>
+      unawaited(showSpaceEmojiSheet(context, onSelect: _insertPickedEmoji));
+
+  void _insertPickedEmoji(String emoji) {
+    _focus.requestFocus();
+    _insert(emoji);
+  }
 
   void _openActions() => unawaited(
     showComposerActionsSheet(
@@ -404,8 +405,10 @@ class _ComposerState extends ConsumerState<Composer> {
     ),
   );
 
-  /// The whole flow, opening through closing, is `gif_picker.dart`'s own
-  /// `pickGif` - nothing here but the wiring.
+  /// Touch density only: the whole flow, opening through closing, is
+  /// `gif_picker.dart`'s own `pickGif` - nothing here but the wiring.
+  /// Desktop width reaches [_stageGif] directly through the same anchored
+  /// panel [_pickEmoji]'s doc comment names.
   void _pickGif() => unawaited(
     pickGif(
       context: context,
@@ -413,6 +416,14 @@ class _ComposerState extends ConsumerState<Composer> {
       attachments: _attachments,
       onError: _setAttachmentError,
     ),
+  );
+
+  Future<void> _stageGif(Attachment attachment) => stageGif(
+    context: context,
+    ref: ref,
+    attachments: _attachments,
+    onError: _setAttachmentError,
+    attachment: attachment,
   );
 
   /// Re-focuses first so a soft keyboard stays up across the send, matching
@@ -533,7 +544,8 @@ class _ComposerState extends ConsumerState<Composer> {
               onInsertCode: _insertCodeFence,
               onPickEmoji: _pickEmoji,
               gifSearchEnabled: _gifSearchEnabled,
-              onPickGif: _pickGif,
+              onInsertEmoji: _insertPickedEmoji,
+              onStageGif: _stageGif,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
