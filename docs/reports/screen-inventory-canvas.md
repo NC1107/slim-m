@@ -41,8 +41,9 @@ The canvas is never a route: `ConversationPane` substitutes `CanvasPane` for the
 
 - **canvas-object-menu-closed** — default, invisible hit-catcher. Coverage: implicit.
 - **canvas-object-menu-open-own-object** — 3-item menu (bring to front / send to back / delete), anchored at pointer or object center depending on trigger. Coverage: none.
-- **canvas-object-menu-mismatched-permission** — right-clicking someone else's object without `MANAGE_CANVAS` opens nothing at all, same as an empty-space click. Not a distinct visible state; noted so nobody expects a disabled menu here.
-- **canvas-object-menu-empty-click** — clicking empty canvas space does nothing, deliberately no canvas-wide menu. Not a distinct visible state.
+- **canvas-object-menu-mismatched-permission** — right-clicking someone else's object without `MANAGE_CANVAS` falls through to the empty-space menu below, the same as a genuine miss. Not a distinct visible state; noted so nobody expects a disabled menu here.
+- **canvas-space-menu-open** — **added 2026-08-29, overriding this report's own prior finding below on direct owner request** ("no basic right click on canvas for quick actions"). Right-clicking empty canvas space now opens a 3-item pointer-anchored menu: paste image, add note, recenter view - each targeted at the exact world point clicked rather than the view's centre. Built as a second mode of `CanvasObjectContextMenu` rather than a new widget, so it inherits that file's own tap-up/hit-test-miss gating: a right-drag pan never opens it, and an object under the cursor always takes the object menu instead. "Clear canvas" is deliberately absent - see `canvas_object_context_menu.dart`'s own doc for why. Coverage: none (not in the overlay harness's 21).
+- ~~**canvas-object-menu-empty-click** — clicking empty canvas space does nothing, deliberately no canvas-wide menu. Not a distinct visible state.~~ Superseded by **canvas-space-menu-open** above; kept struck through rather than deleted since this file's cross-reference section below still describes the harness's own coverage gap for it.
 
 ## Tool selection and pickers
 
@@ -77,4 +78,4 @@ The canvas is never a route: `ConversationPane` substitutes `CanvasPane` for the
 
 ## Cross-reference: what the harness's `canvas`/`canvas-voice` surfaces do *not* show
 
-Activity log panel, note sheet, object context menu, camera/screen bubbles, locked/sent-to-back tiles, the timeout-freeze error banner, the truncation callout, an open overflow menu in any of its conditional shapes, any non-pen tool active, and (very likely, per the gap noted above) the combined call+canvas dock despite the `canvas-voice` name suggesting otherwise.
+Activity log panel, note sheet, object context menu, the empty-space context menu, camera/screen bubbles, locked/sent-to-back tiles, the timeout-freeze error banner, the truncation callout, an open overflow menu in any of its conditional shapes, any non-pen tool active, and (very likely, per the gap noted above) the combined call+canvas dock despite the `canvas-voice` name suggesting otherwise.

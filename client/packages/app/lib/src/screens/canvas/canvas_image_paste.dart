@@ -84,19 +84,27 @@ class CanvasImagePaste {
   Future<void> pasteFromKeystroke() =>
       pasteClipboardImageFromKeystroke(_stage, onError);
 
+  /// The canvas-wide right-click menu's "Paste image" item: places at
+  /// [world] instead of the view's centre, since that menu already knows
+  /// exactly where the pointer was.
+  Future<void> pasteAt(ui.Offset world) => pasteClipboardImage(
+    (bytes, filename) => _stage(bytes, filename, at: world),
+    onError,
+  );
+
   void _handleNativePaste(Uint8List bytes, String filename) =>
       unawaited(_stage(bytes, filename));
 
-  Future<void> _stage(Uint8List bytes, String filename) async {
-    final placed = await _place(bytes);
+  Future<void> _stage(Uint8List bytes, String filename, {ui.Offset? at}) async {
+    final placed = await _place(bytes, at: at);
     if (placed != null) onPlaced(placed.id);
   }
 
   /// Decodes [bytes], uploads them, and places an image object centered on
-  /// the document's current view. On success, applies the placed object and
-  /// hands it the already-decoded bitmap directly - no second fetch and
-  /// decode of what this call already holds.
-  Future<api.CanvasObject?> _place(Uint8List bytes) async {
+  /// [at], or on the document's current view when [at] is null. On success,
+  /// applies the placed object and hands it the already-decoded bitmap
+  /// directly - no second fetch and decode of what this call already holds.
+  Future<api.CanvasObject?> _place(Uint8List bytes, {ui.Offset? at}) async {
     onError(null);
     final ui.Image decoded;
     try {
@@ -123,7 +131,7 @@ class CanvasImagePaste {
     final scale = _fitScale(decoded.width, decoded.height);
     final w = decoded.width * scale;
     final h = decoded.height * scale;
-    final center = document.worldView.center;
+    final center = at ?? document.worldView.center;
     final x = center.dx - w / 2;
     final y = center.dy - h / 2;
 
