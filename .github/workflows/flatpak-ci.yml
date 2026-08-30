@@ -108,19 +108,62 @@ jobs:
       # Catches exactly the class of bug #964 fixed: flatpak-builder succeeds
       # at build time even when a plugin's shared-library dependency cannot
       # resolve inside the sandboxed runtime, because that only fails at
-      # dlopen time, when the app actually starts. A timeout is expected and
-      # not a failure: packaging/flatpak/README.md records that this app has
-      # never been confirmed to paint a window in any environment tried so
-      # far, only that it gets past plugin loading. What this checks is
-      # narrower and does not depend on that: whether it fails immediately
-      # with a missing shared library, the literal error #964 reproduced.
+      # dlopen time, when the app actually starts.
+      #
+      # dbus-run-session ships in the dbus-daemon package on Ubuntu 24.04
+      # (ubuntu-latest as of this writing), not dbus-bin: checked directly
+      # against packages.ubuntu.com's content search for noble/amd64, not
+      # assumed, since a missing binary here would make every check below
+      # pass vacuously.
+      #
+      # This asserts positively, not just on a bad substring, because a
+      # negative-only check (grep for the known error, otherwise pass) is
+      # exactly the "green check that verifies nothing" shape #967 fixed
+      # elsewhere in this pipeline: it would pass on an empty log just as
+      # readily as a clean run. So: fail if nothing was captured at all,
+      # fail on any sign the sandbox itself never started (proves nothing
+      # about the bundle), fail on the specific #964 error text, and then
+      # fail on any other nonzero exit that is not the timeout's own 124 -
+      # 124 is the one nonzero code that means "still running when killed",
+      # which is the expected shape here: packaging/flatpak/README.md
+      # records that this app has never been confirmed to paint a window in
+      # any environment tried so far, only that it gets past plugin loading
+      # and into the engine's own run loop, which does not exit on its own.
+      #
+      # This has not been run for real: no flatpak-builder was available to
+      # build and launch this exact bundle locally while writing this check,
+      # so the 124-vs-other-nonzero split is reasoned from documented
+      # `timeout`/flatpak behavior, not confirmed against a live run. If the
+      # first real CI run fails on an unrelated headless-environment quirk
+      # (a portal or D-Bus service genuinely absent here, not a missing
+      # shared library), loosen this exit-code assertion then, not the two
+      # grep patterns, which are the actual defect this exists to catch.
       - name: attempt a headless launch and check for a missing shared library
         run: |
           sudo apt-get install -y --no-install-recommends xvfb dbus-daemon
+          set +e
           timeout 20 dbus-run-session -- xvfb-run -a \
-            flatpak run top.npcserver.slimm > flatpak-run.log 2>&1 || true
-          cat flatpak-run.log
+            flatpak run top.npcserver.slimm > flatpak-run.log 2>&1
+          status=$?
+          set -e
+          cat flatpak-run.log || true
+
+          if [ ! -s flatpak-run.log ]; then
+            echo "::error::flatpak run produced no output at all; the launch never happened (flatpak, xvfb or dbus-run-session likely missing or non-functional), so this proves nothing"
+            exit 1
+          fi
+
+          if grep -qiE 'bwrap: |permission denied|operation not permitted|failed to create.*namespace|error: (app|runtime) .* not installed|no such ref' flatpak-run.log; then
+            echo "::error::flatpak itself failed to reach the app (sandbox setup or install lookup failed); see the log above, this proves nothing about the bundle's own libraries"
+            exit 1
+          fi
+
           if grep -qiE 'error while loading shared libraries|cannot open shared object file' flatpak-run.log; then
             echo "::error::the installed flatpak failed to load a shared library at startup; see the log above"
+            exit 1
+          fi
+
+          if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+            echo "::error::flatpak run exited $status with no recognized error string above; treating an unrecognized failure as a failure rather than assuming success, see the log"
             exit 1
           fi
