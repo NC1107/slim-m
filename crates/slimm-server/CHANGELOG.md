@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.48.0](https://github.com/NC1107/slim-m/compare/server-v0.47.1...server-v0.48.0) (2026-08-30)
+
+
+### Features
+
+* **server,client:** add quiet hours for notifications ([#981](https://github.com/NC1107/slim-m/issues/981)) ([28ba783](https://github.com/NC1107/slim-m/commit/28ba783aac18367d3f72e3de49e60f460787b3e4))
+* **server:** add private per-user notes ([#975](https://github.com/NC1107/slim-m/issues/975)) ([bd49e6c](https://github.com/NC1107/slim-m/commit/bd49e6ce4ad2ae11ffd047c3efabcbdb6bb5d25a))
+
 ## [0.47.1](https://github.com/NC1107/slim-m/compare/server-v0.47.0...server-v0.47.1) (2026-08-28)
 
 
