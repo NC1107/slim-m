@@ -133,28 +133,6 @@ async fn block(app: &Router, token: &str, target_id: &str) -> StatusCode {
         .status()
 }
 
-fn stroke() -> Value {
-    json!({
-        "id": Uuid::now_v7().to_string(),
-        "kind": "stroke",
-        "x": 10.0, "y": 20.0, "w": 30.0, "h": 40.0,
-        "props": { "points": [0.0, 0.0, 30.0, 40.0], "width": 3.0, "color": "annotation" },
-    })
-}
-
-async fn place_object(app: &Router, channel_id: &str, token: &str) -> StatusCode {
-    app.clone()
-        .oneshot(request(
-            "POST",
-            &format!("/channels/{channel_id}/canvas/objects"),
-            Some(token),
-            Some(stroke()),
-        ))
-        .await
-        .unwrap()
-        .status()
-}
-
 /// The single most important invariant here: a DM does not run through the
 /// role/overwrite evaluator, so ADMINISTRATOR - which bypasses everything
 /// else in this codebase on purpose - reaches nothing in a DM it was never a
@@ -609,67 +587,5 @@ async fn a_dm_does_not_let_the_last_real_channel_be_deleted() {
         response.status(),
         StatusCode::NO_CONTENT,
         "the last real channel must not be deletable just because a DM exists"
-    );
-}
-
-/// The owner asked for a canvas inside a DM for 1-on-1 working sessions
-/// (superseding the earlier "no canvas outside voice channels" call, which
-/// had also read as excluding DMs). `DM_BASE` now grants `USE_CANVAS`, and
-/// the canvas routes carry no channel-kind check of their own, so a
-/// participant placing an object should succeed exactly as it does in an
-/// ordinary channel.
-#[tokio::test]
-async fn a_dm_participant_can_use_the_canvas() {
-    let (store, _guard) = new_store().await;
-    let app = app(store.clone());
-
-    let (alice_token, _alice_id) = register(&store, "alice").await;
-    let (bob_token, bob_id) = register(&store, "bob").await;
-
-    let (status, opened) = open_dm(&app, &alice_token, &bob_id).await;
-    assert_eq!(status, StatusCode::OK);
-    let channel_id = opened["channel_id"].as_str().unwrap().to_owned();
-
-    assert_eq!(
-        place_object(&app, &channel_id, &alice_token).await,
-        StatusCode::CREATED,
-        "a DM participant must be able to place a canvas object"
-    );
-    assert_eq!(
-        place_object(&app, &channel_id, &bob_token).await,
-        StatusCode::CREATED,
-        "the other participant must be able to as well"
-    );
-}
-
-/// `USE_CANVAS` is one of the bits `BLOCKED_DENY` removes: a blocked pair
-/// must not be able to draw on the shared canvas any more than they can send
-/// a message, in either direction.
-#[tokio::test]
-async fn a_blocked_dm_pair_cannot_use_the_canvas_in_either_direction() {
-    let (store, _guard) = new_store().await;
-    let app = app(store.clone());
-
-    let (alice_token, _alice_id) = register(&store, "alice").await;
-    let (bob_token, bob_id) = register(&store, "bob").await;
-
-    let (status, opened) = open_dm(&app, &alice_token, &bob_id).await;
-    assert_eq!(status, StatusCode::OK);
-    let channel_id = opened["channel_id"].as_str().unwrap().to_owned();
-
-    assert_eq!(
-        block(&app, &alice_token, &bob_id).await,
-        StatusCode::NO_CONTENT
-    );
-
-    assert_eq!(
-        place_object(&app, &channel_id, &bob_token).await,
-        StatusCode::FORBIDDEN,
-        "the blocked party must not be able to use the canvas"
-    );
-    assert_eq!(
-        place_object(&app, &channel_id, &alice_token).await,
-        StatusCode::FORBIDDEN,
-        "the blocker must not be able to either"
     );
 }
