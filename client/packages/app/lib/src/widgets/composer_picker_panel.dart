@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The composer's own Emoji/GIFs picker: `EmojiPickerPanel`'s content under
-/// an Emoji tab, `gif_picker.dart`'s `GifPickerBody` under a GIFs tab, both
-/// inside one floating card - there is no third picker implementation here.
+/// The composer's own Emoji/GIFs picker: `composer_emoji_browse.dart`'s
+/// `ComposerEmojiPicker` under an Emoji tab, `gif_picker.dart`'s
+/// `GifPickerBody` under a GIFs tab, both inside one floating card.
 /// `composer_picker_button.dart` anchors and opens this.
+///
+/// The Emoji tab is deliberately its own richer view rather than the shared
+/// `EmojiPickerPanel` the hover-anchored reaction picker uses - see
+/// `composer_emoji_browse.dart`'s own doc comment for why, and the PR body
+/// for the blast-radius reasoning.
 ///
 /// Stickers are deliberately absent. Nothing in this repo models a sticker -
 /// no server type, no schema entry, no client model - so there is no tab for
@@ -16,7 +21,8 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
-import 'emoji_picker_panel.dart';
+import 'composer_emoji_browse.dart';
+import 'emoji_picker_panel.dart' show pickerWidth;
 import 'gif_picker.dart' show GifPickerBody;
 
 /// Which half of the panel is showing.
@@ -63,7 +69,7 @@ class _ComposerPickerPanelState extends State<ComposerPickerPanel> {
   Widget build(BuildContext context) {
     final close = activatorFor(AppAction.escape);
     return CallbackShortcuts(
-      // The emoji tab's own search/grid nav lives inside EmojiPickerPanel.
+      // The emoji tab's own search/grid nav lives inside ComposerEmojiPicker.
       bindings: {if (close != null) close: widget.onClose},
       child: AppMenu(
         width: widget.width,
@@ -84,8 +90,7 @@ class _ComposerPickerPanelState extends State<ComposerPickerPanel> {
               ),
             ),
           switch (_tab) {
-            ComposerPickerTab.emoji => EmojiPickerPanel(
-              chrome: false,
+            ComposerPickerTab.emoji => ComposerEmojiPicker(
               width: widget.width,
               onSelect: widget.onSelectEmoji,
               onClose: widget.onClose,

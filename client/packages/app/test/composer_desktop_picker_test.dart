@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/composer_picker_panel.dart';
+import 'package:slimm_app/src/widgets/emoji_picker_grid.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_harness.dart';
@@ -197,8 +198,11 @@ void main() {
     await tester.tap(emojiButton);
     await tester.pumpAndSettle();
 
-    // No custom emoji: this opens straight on the native catalog instead.
-    final tokens = gridTokens(tester);
+    // No custom emoji: rendered as EmojiCell tiles in the browse view's own sectioned grid, not a single EmojiGrid.
+    final tokens = tester
+        .widgetList<EmojiCell>(find.byType(EmojiCell))
+        .map((cell) => cell.emoji.token)
+        .toList();
     expect(tokens, isNotEmpty);
     expect(
       tokens.every((token) => !token.startsWith(':')),
