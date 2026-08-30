@@ -1,0 +1,176 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+name: flatpak-ci
+
+# Builds and smoke-checks the Flatpak manifest before merge.
+#
+# Before this existed, nothing in CI ever built the flatpak except
+# release.yml, which only runs at client-v* tag time. PR #964 changed
+# packaging/flatpak/top.npcserver.slimm.yaml to fix client-v0.60.x failing to
+# launch at all under Flatpak (media_kit_video's plugin has a hard NEEDED
+# entry on libmpv.so.2, and the freedesktop 25.08 runtime carries no libmpv),
+# and it merged with only SonarCloud and hygiene as checks. Nothing would
+# have said so before it shipped. See docs/ci.md.
+#
+# A full build compiles mpv, libplacebo and libass from source, which is slow
+# and not something to run on every PR. So this is gated narrowly on the
+# manifest and its vendored build inputs, not on all of packaging/**: a rare
+# trigger, run in full, rather than a cheap manifest lint that would not have
+# caught #964 in the first place (flatpak-builder happily builds a manifest
+# whose result cannot resolve a shared library at launch; only building and
+# starting the bundle exposes that).
+#
+# What this does and does not prove, stated plainly. It builds on the same
+# ubuntu-latest runner release.yml's linux-client job uses, so it links
+# against the same host packages (notably libayatana-appindicator3-dev) and
+# will not diverge the way a contributor's local Fedora build can; see
+# packaging/flatpak/README.md's account of that drift. It does NOT catch
+# that drift itself, since it never builds on a Fedora host, and it does NOT
+# catch a client-side change that adds a new native Linux dependency without
+# also touching this manifest, since nothing here runs unless the manifest
+# or its vendored modules change in the same PR.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packaging/flatpak/top.npcserver.slimm.yaml"
+      - "packaging/flatpak/shared-modules/**"
+      - ".github/workflows/flatpak-ci.yml"
+  pull_request:
+    paths:
+      - "packaging/flatpak/top.npcserver.slimm.yaml"
+      - "packaging/flatpak/shared-modules/**"
+      - ".github/workflows/flatpak-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flatpak-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-launch:
+    name: build flatpak and check it starts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # libsecret-1-dev is here because flutter_secure_storage's Linux plugin
+      # will not even configure without it. Why that is unavoidable: docs/ci.md.
+      - name: linux build deps
+        uses: ./.github/actions/linux-build-deps
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: build linux release
+        run: |
+          flutter config --enable-linux-desktop
+          dart pub get --enforce-lockfile
+          flutter build linux --release
+        working-directory: client/packages/app
+
+      # elfutils provides eu-strip, which flatpak-builder shells out to for
+      # every module; its absence is exactly what made every release build
+      # through client-v0.61.0 report success while producing no bundle. #967.
+      # librsvg2-common provides the gdk-pixbuf SVG loader (libpixbufloader-svg.so)
+      # that `flatpak build-export` uses ON THIS HOST to validate every icon
+      # it exports; ubuntu-latest carries none of the gdk-pixbuf loaders by
+      # default, so a perfectly valid SVG fails export with "Format not
+      # recognized". Checked directly against packages.ubuntu.com for
+      # noble/amd64, not assumed. See packaging/flatpak/README.md.
+      - name: build flatpak
+        run: |
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils librsvg2-common
+          mkdir -p dist
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --repo=dist/flatpak-repo build-dir \
+            packaging/flatpak/top.npcserver.slimm.yaml
+          flatpak build-bundle dist/flatpak-repo \
+            dist/slim-m-client-pr-check.flatpak top.npcserver.slimm
+
+      # Not continue-on-error, unlike release.yml's own build step: the whole
+      # point of this workflow is to fail loudly on exactly this before merge.
+      - name: verify a bundle was produced
+        run: |
+          shopt -s nullglob
+          bundles=(dist/*.flatpak)
+          if [ ${#bundles[@]} -eq 0 ]; then
+            echo "::error::build flatpak did not produce a .flatpak bundle; see its logs for the real failure"
+            exit 1
+          fi
+
+      - name: install the bundle
+        run: |
+          flatpak install --user --noninteractive --bundle dist/slim-m-client-pr-check.flatpak
+
+      # Catches exactly the class of bug #964 fixed: flatpak-builder succeeds
+      # at build time even when a plugin's shared-library dependency cannot
+      # resolve inside the sandboxed runtime, because that only fails at
+      # dlopen time, when the app actually starts.
+      #
+      # dbus-run-session ships in the dbus-daemon package on Ubuntu 24.04
+      # (ubuntu-latest as of this writing), not dbus-bin: checked directly
+      # against packages.ubuntu.com's content search for noble/amd64, not
+      # assumed, since a missing binary here would make every check below
+      # pass vacuously.
+      #
+      # This asserts positively, not just on a bad substring, because a
+      # negative-only check (grep for the known error, otherwise pass) is
+      # exactly the "green check that verifies nothing" shape #967 fixed
+      # elsewhere in this pipeline: it would pass on an empty log just as
+      # readily as a clean run. So: fail if nothing was captured at all,
+      # fail on any sign the sandbox itself never started (proves nothing
+      # about the bundle), fail on the specific #964 error text, and then
+      # fail on any other nonzero exit that is not the timeout's own 124 -
+      # 124 is the one nonzero code that means "still running when killed",
+      # which is the expected shape here: packaging/flatpak/README.md
+      # records that this app has never been confirmed to paint a window in
+      # any environment tried so far, only that it gets past plugin loading
+      # and into the engine's own run loop, which does not exit on its own.
+      #
+      # This has not been run for real: no flatpak-builder was available to
+      # build and launch this exact bundle locally while writing this check,
+      # so the 124-vs-other-nonzero split is reasoned from documented
+      # `timeout`/flatpak behavior, not confirmed against a live run. If the
+      # first real CI run fails on an unrelated headless-environment quirk
+      # (a portal or D-Bus service genuinely absent here, not a missing
+      # shared library), loosen this exit-code assertion then, not the two
+      # grep patterns, which are the actual defect this exists to catch.
+      - name: attempt a headless launch and check for a missing shared library
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb dbus-daemon
+          set +e
+          timeout 20 dbus-run-session -- xvfb-run -a \
+            flatpak run top.npcserver.slimm > flatpak-run.log 2>&1
+          status=$?
+          set -e
+          cat flatpak-run.log || true
+
+          if [ ! -s flatpak-run.log ]; then
+            echo "::error::flatpak run produced no output at all; the launch never happened (flatpak, xvfb or dbus-run-session likely missing or non-functional), so this proves nothing"
+            exit 1
+          fi
+
+          if grep -qiE 'bwrap: |permission denied|operation not permitted|failed to create.*namespace|error: (app|runtime) .* not installed|no such ref' flatpak-run.log; then
+            echo "::error::flatpak itself failed to reach the app (sandbox setup or install lookup failed); see the log above, this proves nothing about the bundle's own libraries"
+            exit 1
+          fi
+
+          if grep -qiE 'error while loading shared libraries|cannot open shared object file' flatpak-run.log; then
+            echo "::error::the installed flatpak failed to load a shared library at startup; see the log above"
+            exit 1
+          fi
+
+          if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+            echo "::error::flatpak run exited $status with no recognized error string above; treating an unrecognized failure as a failure rather than assuming success, see the log"
+            exit 1
+          fi

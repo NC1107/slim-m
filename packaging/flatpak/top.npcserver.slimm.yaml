@@ -71,6 +71,11 @@ modules:
   # module, vendored rather than a git submodule since this repo has no other.
   - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
   # media_kit_video links libmpv directly; libass is libmpv's own subtitle dep.
+  # No buildsystem key: autotools by default, whose own libdir default is a
+  # plain '<prefix>/lib' with no lib64/multiarch detection, unlike cmake and
+  # meson below. Confirmed against real CI logs, not assumed: this and
+  # libdbusmenu (also autotools) both install to /app/lib/pkgconfig with no
+  # libdir override. See packaging/flatpak/README.md's fifth defect.
   - name: libass
     config-opts:
       - --disable-static
@@ -90,6 +95,8 @@ modules:
   # disabled) since media_kit_video only ever drives mpv's plain GL output.
   - name: libplacebo
     buildsystem: meson
+    build-options:
+      libdir: lib
     config-opts:
       - -Dvulkan=disabled
       - -Dopengl=enabled
@@ -113,6 +120,8 @@ modules:
   # whatever the runtime/SDK already carry (GL, VAAPI, PulseAudio, ALSA).
   - name: mpv
     buildsystem: meson
+    build-options:
+      libdir: lib
     config-opts:
       - -Dcplayer=false
       - -Dlibmpv=true
