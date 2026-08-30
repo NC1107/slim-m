@@ -96,6 +96,27 @@ That step is `continue-on-error: true` too, for the same non-blocking reason, bu
 Once a few real releases have produced a working bundle, revisit whether `continue-on-error` should come off entirely.
 The rpm needed no such guard once it had a track record.
 
+## A fifth defect, found and fixed 2026-08-30: the manifest never actually built in CI at all, on any flatpak-builder version this old
+
+The `eu-strip` fix above was necessary but not sufficient. `flatpak-ci.yml`'s first real run (a new PR-time workflow that builds this manifest before merge rather than only at `client-v*` tag time) failed the `ayatana-ido` -> `libayatana-indicator` step with `Package 'libayatana-ido3-0.4' not found`, even though the module order is correct (`intltool` -> `libdbusmenu` -> `ayatana-ido` -> `libayatana-indicator`) and `ayatana-ido` is pinned well above the version `libayatana-indicator`'s CMake requires.
+
+The real cause, confirmed against the actual CI job log rather than reasoned from the manifest alone: `ayatana-ido`'s CMake step installed to `/app/lib64/pkgconfig/libayatana-ido3-0.4.pc`, not `/app/lib/pkgconfig`, so `libayatana-indicator`'s own `pkg_check_modules` call genuinely cannot find it.
+That is CMake's own `GNUInstallDirs` module choosing `lib64` for `CMAKE_INSTALL_LIBDIR` on any 64-bit Linux system that lacks `/etc/debian_version` - which the `org.freedesktop.Sdk//25.08` sandbox does, since it is not a Debian derivative.
+`/app/lib` is the one path the runtime's linker searches unconditionally (established by the fourth defect above), so this would have broken the installed bundle even if the build had somehow limped past the immediate CMake configure error.
+
+Why this was never caught locally: `flatpak-builder` itself has carried an unconditional `-DCMAKE_INSTALL_LIBDIR:PATH='lib'` default for `cmake`/`cmake-ninja` modules since a July 2024 fix ([flatpak/flatpak-builder@745d6b7](https://github.com/flatpak/flatpak-builder/commit/745d6b7b2ffb5993f5e64bd29b86ac88ad611290), correcting an earlier, buggier absolute-path version of the same default), which exists precisely to paper over this `GNUInstallDirs` behavior.
+`org.flatpak.Builder`, the Flathub-published sandboxed tool this README's own local verification runs use, tracks current flatpak-builder and already carries that default, so every local pass here built correctly without ever needing to set `CMAKE_INSTALL_LIBDIR` explicitly.
+Ubuntu 24.04's apt package is `flatpak-builder 1.4.2-1build2` (read directly from the failing job's own `apt-get install` log), and `flatpak-builder`'s source at the `1.4.2` tag only passes `-DCMAKE_INSTALL_LIBDIR` when a module's manifest sets `build-options.libdir` explicitly - checked directly against `src/builder-module.c` and `src/builder-options.c` at that tag, not assumed - so on that version, an unset `libdir` means CMake never gets told, and falls through to its own `lib64` default inside the non-Debian sandbox.
+This is the same shape as the `libayatana-appindicator3` vs `libayatana-ido3-0.4` soname drift the third defect documents above: a build result that depends on which host tool built it, not on the manifest text alone, except this time the divergence is in the orchestrator (`flatpak-builder`'s own version) rather than in the build host's `pkg-config` listing.
+
+The fix is `"build-options": {"libdir": "lib"}` added to all three `cmake-ninja` modules in the chain - `libayatana-appindicator`, `ayatana-ido`, and `libayatana-indicator` - in `shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json`.
+It is set per module rather than once at the top of that file or the top-level manifest, because `flatpak-builder`'s own option resolution (`get_all_options` in `builder-options.c`) only checks a module's own `build-options` plus the single global one from the top-level app manifest, not an intermediate parent module's - so setting it once on the outer `libayatana-appindicator` module would not have reached its own nested `ayatana-ido`/`libayatana-indicator` sub-modules.
+It is also not set globally on the top-level manifest, because the same `libdir` build-option means something different to `autotools`/`meson` (`--libdir=<value>`, used as-is) than it does to `cmake` (`-DCMAKE_INSTALL_LIBDIR=<value>`, relative to the prefix by convention): a single manifest-wide `libdir: lib` would have fixed the three `cmake-ninja` modules above while breaking `libdbusmenu` (autotools), `libplacebo` and `mpv` (meson), which currently work correctly only because they fall back to their own buildsystem's `<prefix>/lib` default when `libdir` is unset.
+Confirmed, not guessed, that `libdbusmenu`, `libplacebo` and `mpv` do not need this fix: `libdbusmenu`'s `.pc` files installed to `/app/lib/pkgconfig` correctly in the same failing CI run (visible in its log, before the `ayatana-ido` module even started), and `libplacebo`/`mpv` were already confirmed working under `org.flatpak.Builder` locally by the fourth defect's own account.
+
+This was diagnosed and fixed entirely from a real CI failure, per the standard the rest of this document holds itself to - not reasoned from the manifest text or reproduced locally, since the local tool that already carries the safe default would not have reproduced it.
+See `docs/ci.md`'s `flatpak-ci` section for the run that first caught this and the run that confirms the fix.
+
 ## Permissions, briefly
 
 The manifest's own inline comments carry the reasoning for each non-obvious `finish-args` entry.
