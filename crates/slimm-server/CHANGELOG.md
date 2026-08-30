@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.49.0](https://github.com/NC1107/slim-m/compare/server-v0.48.0...server-v0.49.0) (2026-08-30)
+
+
+### Features
+
+* **client,server:** add a canvas to DMs for 1-on-1 working sessions ([#990](https://github.com/NC1107/slim-m/issues/990)) ([7ccc0ec](https://github.com/NC1107/slim-m/commit/7ccc0ec5aab84b8faa430b53974b00c8a267fa7c))
+* **server,client:** let a DM be closed out of the sidebar ([#991](https://github.com/NC1107/slim-m/issues/991)) ([5844786](https://github.com/NC1107/slim-m/commit/58447865ae74f9e8bae7834cd3f3253f53d67604))
+
 ## [0.48.0](https://github.com/NC1107/slim-m/compare/server-v0.47.1...server-v0.48.0) (2026-08-30)
 
 
