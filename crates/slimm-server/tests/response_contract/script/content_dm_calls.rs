@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `ringDmCall`/`declineDmCallRing` calls for `content.rs`'s own DM channel,
 //! a sibling module rather than folded into `content.rs` (already near the
 //! line budget) or `script.rs` itself.

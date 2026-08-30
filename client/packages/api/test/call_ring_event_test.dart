@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Frame-parsing coverage for `call.ringing` and `call.ring_ended`: the live
 /// signal that lets a DM's callee see an incoming call, and both sides learn
 /// how it ended.

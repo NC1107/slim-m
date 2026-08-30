@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Tracks the single outstanding "somebody is being rung" attempt for a DM
 //! channel.
 //!

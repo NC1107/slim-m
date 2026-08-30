@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The app-wide incoming-DM-call banner.
 ///
 /// Mounted once, above the whole shell in `HomeShell.build`, in flow rather
