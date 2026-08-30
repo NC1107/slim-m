@@ -25,9 +25,8 @@
       "skip-changelog": true,
       "extra-files": [
         {
-          "type": "yaml",
-          "path": "schema/openapi.yaml",
-          "jsonpath": "$.info.version"
+          "type": "generic",
+          "path": "schema/openapi.yaml"
         }
       ]
     }
