@@ -102,6 +102,22 @@ pub(super) enum ServerFrame {
     CategoryChanged,
     #[serde(rename = "voice.activity")]
     VoiceActivityChanged { channel_id: String },
+    /// A DM call ring started; see [`crate::hub::Event::CallRinging`].
+    #[serde(rename = "call.ringing")]
+    CallRinging {
+        channel_id: String,
+        ring_id: String,
+        caller_id: String,
+    },
+    /// A DM call ring reached a terminal state; see
+    /// [`crate::hub::Event::CallRingEnded`]. `outcome` is one of
+    /// `answered`, `declined`, `canceled`, `timed_out`.
+    #[serde(rename = "call.ring_ended")]
+    CallRingEnded {
+        channel_id: String,
+        ring_id: String,
+        outcome: String,
+    },
     #[serde(rename = "canvas.object.placed")]
     CanvasObjectPlaced {
         channel_id: String,

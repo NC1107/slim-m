@@ -52,6 +52,7 @@ pub async fn run() -> anyhow::Result<()> {
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
     spawn_call_sweep(voice.clone(), hub.clone());
+    spawn_ring_sweep(voice.clone(), hub.clone());
     spawn_message_retention_sweep(store.clone(), media.clone(), hub.clone());
     let gifs = http::gifs::GifSearch::new(&config)?;
     let app = cors.apply(http::router(http::AppState {
@@ -267,6 +268,74 @@ pub async fn sweep_stale_voice_calls_at(
 /// burst from serialising while staying well under a thundering herd of
 /// simultaneous connections to the SFU.
 const STALE_SWEEP_CONCURRENCY: usize = 16;
+
+/// How often an outstanding DM call ring is checked for having gone past
+/// [`voice::RING_TIMEOUT`]. Short, the same reasoning [`CALL_SWEEP_INTERVAL`]
+/// gives: this bounds how long a caller can sit alone on an open SFU room
+/// after nobody answered, so the interval is part of that bound rather than
+/// housekeeping on its own schedule.
+const RING_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Runs the stale-call-ring sweep in the background for the life of the
+/// process, on the same detached, best-effort, wait-first model as
+/// [`spawn_token_sweep`]. A deployment with no SFU configured, or one that
+/// never rings, never has anything to sweep, so this is safe to spawn
+/// unconditionally.
+fn spawn_ring_sweep(voice: voice::VoiceService, hub: hub::Hub) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(RING_SWEEP_INTERVAL);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            sweep_stale_call_rings(&voice, &hub).await;
+        }
+    });
+}
+
+/// One pass of the stale-call-ring sweep: every ring nobody answered inside
+/// [`voice::RING_TIMEOUT`] is ended, and the caller's own SFU participant -
+/// left dangling in a room they may well have joined alone while it rang -
+/// is released.
+///
+/// A distinct sweep from [`sweep_stale_voice_calls`] rather than folded into
+/// it: a heartbeat going stale means a participant's own connection went
+/// quiet, which says nothing about whether anybody else ever joined them.
+/// This one instead asks "did a call that was never joined by a second
+/// person ever get answered", the condition the owner actually flagged as
+/// wasting resources - a caller sitting alone with a perfectly live
+/// heartbeat is exactly the case [`sweep_stale_voice_calls`] cannot see.
+pub async fn sweep_stale_call_rings(voice: &voice::VoiceService, hub: &hub::Hub) {
+    sweep_stale_call_rings_at(voice, hub, std::time::Instant::now()).await;
+}
+
+/// [`sweep_stale_call_rings`] with an explicit clock, `pub` for the same
+/// testing reason [`sweep_stale_voice_calls_at`] is.
+pub async fn sweep_stale_call_rings_at(
+    voice: &voice::VoiceService,
+    hub: &hub::Hub,
+    now: std::time::Instant,
+) {
+    for (channel_id, ring_id, caller_id) in voice.rings().sweep_stale_at(now) {
+        hub.publish(hub::Event::CallRingEnded {
+            channel_id,
+            ring_id,
+            outcome: voice::CallRingOutcome::TimedOut,
+        });
+        match voice.remove_participant(channel_id, caller_id).await {
+            Ok(()) => tracing::info!(
+                %channel_id,
+                %caller_id,
+                "released a dm call room nobody answered before the ring timed out"
+            ),
+            Err(voice::VoiceError::Unavailable) => {}
+            Err(voice::VoiceError::Internal(err)) => tracing::warn!(
+                error = %err,
+                %channel_id,
+                "failed to release an unanswered dm call room"
+            ),
+        }
+    }
+}
 
 /// How often the message retention window is applied. Long, the same
 /// reasoning [`TOKEN_SWEEP_INTERVAL`] gives: a day-granularity setting has

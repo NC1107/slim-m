@@ -46,9 +46,11 @@ use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 
 mod heartbeat;
+mod ring;
 mod room_lifecycle;
 mod roster;
 use heartbeat::{CallHeartbeats, STALE_AFTER as HEARTBEAT_STALE_AFTER};
+pub use ring::{CallRingOutcome, CallRings, RING_TIMEOUT};
 pub use roster::RoomParticipant;
 
 /// How long a join token is good for.
@@ -115,6 +117,9 @@ pub struct VoiceService {
     /// no SFU is configured, and a `VoiceService::new` that later reloads a
     /// config with voice freshly enabled starts this bookkeeping empty either way.
     heartbeats: CallHeartbeats,
+    /// Ephemeral, the same independence from `inner` [`Self::heartbeats`] has;
+    /// see `voice::ring`'s own module doc.
+    rings: CallRings,
 }
 
 struct Enabled {
@@ -162,6 +167,7 @@ impl VoiceService {
         Ok(Self {
             inner,
             heartbeats: CallHeartbeats::new(),
+            rings: CallRings::new(),
         })
     }
 
@@ -170,6 +176,7 @@ impl VoiceService {
         Self {
             inner: None,
             heartbeats: CallHeartbeats::new(),
+            rings: CallRings::new(),
         }
     }
 
@@ -185,6 +192,7 @@ impl VoiceService {
                 service_url: http_url_for(url).expect("test url"),
             })),
             heartbeats: CallHeartbeats::new(),
+            rings: CallRings::new(),
         }
     }
 
@@ -327,6 +335,17 @@ impl VoiceService {
     /// the real one.
     pub fn sweep_stale_calls_at(&self, now: std::time::Instant) -> Vec<(UserId, ChannelId)> {
         self.heartbeats.sweep_stale_at(HEARTBEAT_STALE_AFTER, now)
+    }
+
+    /// The shared, cloneable ring tracker (a cheap `Arc` clone), the same
+    /// shape [`crate::hub::Hub::presence`] already uses to hand out shared
+    /// ephemeral state: unlike [`Self::sweep_stale_calls_at`] and its
+    /// heartbeat siblings above, a ring's own start/answer/decline/cancel/
+    /// sweep methods live directly on [`CallRings`] rather than being
+    /// mirrored here one by one, since every caller already reaches this
+    /// through a `VoiceService` handle either way.
+    pub fn rings(&self) -> CallRings {
+        self.rings.clone()
     }
 
     /// Removes a participant from a channel's room immediately.

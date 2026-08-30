@@ -70,4 +70,22 @@ extension SlimmApiVoice on SlimmApi {
         .map((p) => VoiceRosterParticipant.fromJson(p as Map<String, dynamic>))
         .toList(growable: false);
   }
+
+  /// Rings the other side of a DM channel's call.
+  ///
+  /// Throws [NotConfiguredException] when the deployment has no SFU, and
+  /// [NotFoundException] for anything that is not a DM between this caller
+  /// and exactly one other account.
+  Future<RingStarted> ringDmCall(String channelId) async {
+    final json = await _send('POST', '/channels/$channelId/voice/ring');
+    return RingStarted.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Declines an incoming DM call ring. Idempotent: declining one that
+  /// already ended some other way still succeeds.
+  Future<void> declineDmCallRing(String channelId) => _send(
+        'POST',
+        '/channels/$channelId/voice/ring/decline',
+        expectNoContent: true,
+      );
 }

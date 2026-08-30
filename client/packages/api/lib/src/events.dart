@@ -157,6 +157,24 @@ sealed class ServerEvent {
       'category.changed' => const CategoryChanged(),
       'voice.activity' when decoded['channel_id'] is String =>
         VoiceActivityChanged(channelId: decoded['channel_id'] as String),
+      'call.ringing'
+          when decoded['channel_id'] is String &&
+              decoded['ring_id'] is String &&
+              decoded['caller_id'] is String =>
+        CallRinging(
+          channelId: decoded['channel_id'] as String,
+          ringId: decoded['ring_id'] as String,
+          callerId: decoded['caller_id'] as String,
+        ),
+      'call.ring_ended'
+          when decoded['channel_id'] is String &&
+              decoded['ring_id'] is String &&
+              _callRingOutcomeOf(decoded['outcome']) != null =>
+        CallRingEnded(
+          channelId: decoded['channel_id'] as String,
+          ringId: decoded['ring_id'] as String,
+          outcome: _callRingOutcomeOf(decoded['outcome'])!,
+        ),
       'reports.changed' => const ReportsChanged(),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&

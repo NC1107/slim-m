@@ -238,7 +238,11 @@ async fn message_preview(
 /// report is still fresh. WebSocket presence is deliberately not consulted
 /// here: iOS suspends a socket without closing it, so a connected socket is
 /// not evidence the app can show anything right now.
-fn is_foreground_and_recent(target: &crate::store::PushTarget, now: i64) -> bool {
+///
+/// `pub(super)` rather than private: `call_ring.rs`'s own ring push shares
+/// this exact check, for the same reason - a foreground app already has the
+/// live ring event, so a push would only duplicate what it just showed.
+pub(super) fn is_foreground_and_recent(target: &crate::store::PushTarget, now: i64) -> bool {
     let Some(state) = target.lifecycle_state.as_deref() else {
         return false;
     };

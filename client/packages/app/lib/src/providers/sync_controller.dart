@@ -13,6 +13,7 @@ import 'package:slimm_data/data.dart';
 import 'channel_history.dart';
 import 'channel_refresher.dart';
 import 'dm_call_activity.dart';
+import 'dm_call_ring_controller.dart';
 import 'failed_send_retry.dart';
 import 'message_ops_sync.dart';
 import 'op_adjacency.dart';
@@ -155,7 +156,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.read(batchProfilesControllerProvider.notifier).clear();
     // A missed voice.activity frame while disconnected is otherwise unrecoverable.
     _ref.read(dmCallActivityProvider.notifier).clear();
-
+    _ref.read(dmCallRingControllerProvider.notifier).clear();
     try {
       final api = _ref.read(apiProvider);
       final store = await _ref.read(storeProvider.future);
