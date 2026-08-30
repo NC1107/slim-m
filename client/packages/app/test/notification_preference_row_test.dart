@@ -133,9 +133,13 @@ void main() {
   testWidgets(
     'a genuine fetch failure shows a retryable error, not a silent Unknown',
     (tester) async {
-      final container = _containerWith(
-        (request) async => http.Response('', 500),
-      );
+      // Only /push/preference fails; /push/quiet-hours succeeds so its own error state stays out of this test.
+      final container = _containerWith((request) async {
+        if (request.url.path == '/push/quiet-hours') {
+          return _json({'quiet_hours': null});
+        }
+        return http.Response('', 500);
+      });
       addTearDown(container.dispose);
 
       await tester.pumpWidget(_harness(container));

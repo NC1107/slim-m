@@ -54,6 +54,7 @@ mod pins;
 mod polls;
 mod presence;
 mod push;
+mod quiet_hours;
 mod reactions;
 mod read_state;
 mod recovery;

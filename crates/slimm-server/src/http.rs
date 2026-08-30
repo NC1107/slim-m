@@ -58,6 +58,7 @@ mod pins;
 mod polls;
 mod presence;
 mod push;
+mod quiet_hours;
 mod reactions;
 mod recovery;
 mod reports;
@@ -146,6 +147,7 @@ pub fn router(state: AppState) -> Router {
         .merge(presence::routes())
         .merge(reactions::routes())
         .merge(push::routes())
+        .merge(quiet_hours::routes())
         .merge(pins::routes())
         .merge(recovery::routes())
         .merge(reports::routes())

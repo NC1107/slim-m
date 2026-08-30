@@ -118,4 +118,30 @@ extension SlimmApiPush on SlimmApi {
         '/notification-preferences/channels/$channelId',
         expectNoContent: true,
       );
+
+  /// Reads the caller's own quiet-hours window, or `null` if disabled - the
+  /// default, and what every account that predates this feature keeps.
+  Future<QuietHours?> quietHours() async {
+    final json = await _send('GET', '/push/quiet-hours');
+    final raw = (json as Map<String, dynamic>)['quiet_hours'];
+    return raw == null
+        ? null
+        : QuietHours.fromJson(raw as Map<String, dynamic>);
+  }
+
+  /// Sets the caller's own quiet-hours window. [quietHours] is UTC minutes
+  /// since midnight; converting from the account's local clock is a client
+  /// concern, done before this call.
+  Future<QuietHours> setQuietHours(QuietHours quietHours) async {
+    final json = await _send(
+      'PUT',
+      '/push/quiet-hours',
+      body: quietHours.toJson(),
+    );
+    return QuietHours.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Disables the caller's own quiet-hours window.
+  Future<void> clearQuietHours() =>
+      _send('DELETE', '/push/quiet-hours', expectNoContent: true);
 }
