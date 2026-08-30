@@ -90,6 +90,8 @@ modules:
   # disabled) since media_kit_video only ever drives mpv's plain GL output.
   - name: libplacebo
     buildsystem: meson
+    build-options:
+      libdir: lib
     config-opts:
       - -Dvulkan=disabled
       - -Dopengl=enabled
@@ -113,6 +115,8 @@ modules:
   # whatever the runtime/SDK already carry (GL, VAAPI, PulseAudio, ALSA).
   - name: mpv
     buildsystem: meson
+    build-options:
+      libdir: lib
     config-opts:
       - -Dcplayer=false
       - -Dlibmpv=true
