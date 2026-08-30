@@ -128,6 +128,23 @@ async fn search_with_base(State(base): State<String>) -> axum::Json<Value> {
     }))
 }
 
+/// Tenor's own `/v2/featured` (trending) endpoint, shaped identically to
+/// `/v2/search` but with a distinct title so a test can tell the two routes
+/// apart by their response alone.
+async fn trending_with_base(State(base): State<String>) -> axum::Json<Value> {
+    axum::Json(json!({
+        "next": "",
+        "results": [{
+            "id": "fake-trending-1",
+            "content_description": "a trending waffle",
+            "media_formats": {
+                "tinygif": {"url": format!("{base}/preview.gif"), "dims": [220, 165], "size": 1},
+                "gif": {"url": format!("{base}/full.gif"), "dims": [498, 373], "size": 2}
+            }
+        }]
+    }))
+}
+
 async fn preview() -> Vec<u8> {
     gif_bytes(8)
 }
@@ -142,6 +159,7 @@ async fn spawn_fake_tenor() -> String {
     let base = format!("http://{addr}");
     let router = Router::new()
         .route("/v2/search", get(search_with_base))
+        .route("/v2/featured", get(trending_with_base))
         .route("/preview.gif", get(preview))
         .route("/full.gif", get(full))
         .with_state(base.clone());
@@ -154,7 +172,7 @@ async fn spawn_fake_tenor() -> String {
 #[tokio::test]
 async fn search_preview_select_and_send_round_trip_through_the_fake_provider() {
     let tenor_base = spawn_fake_tenor().await;
-    let gifs = GifSearch::for_test("tenor", &format!("{tenor_base}/v2/search"), "test-key");
+    let gifs = GifSearch::for_test("tenor", &tenor_base, "test-key");
 
     let (store, _guard) = new_store().await;
     let channel = store.create_channel("general", "text").await.unwrap();
@@ -234,6 +252,43 @@ async fn search_preview_select_and_send_round_trip_through_the_fake_provider() {
     assert_eq!(fetched.status(), StatusCode::OK);
 }
 
+/// The picker's default content before a member types anything: a distinct
+/// endpoint from `search`, proxied and tokenized exactly the same way -
+/// never the provider's own id or a raw CDN URL, and its preview streams
+/// through this server precisely like a search result's does.
+#[tokio::test]
+async fn trending_returns_results_through_the_fake_provider_and_mints_a_token() {
+    let tenor_base = spawn_fake_tenor().await;
+    let gifs = GifSearch::for_test("tenor", &tenor_base, "test-key");
+
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone(), gifs);
+    let (token, _user_id) = register(&store, "alice").await;
+
+    let trending_response = app
+        .clone()
+        .oneshot(req_get("/gifs/trending", &token))
+        .await
+        .unwrap();
+    assert_eq!(trending_response.status(), StatusCode::OK);
+    let body = json_body(trending_response).await;
+    let results = body["results"].as_array().expect("a results array");
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0]["title"], "a trending waffle");
+    let gif_id = results[0]["id"]
+        .as_str()
+        .expect("an opaque token")
+        .to_owned();
+    assert_ne!(gif_id, "fake-trending-1");
+
+    let preview_response = app
+        .clone()
+        .oneshot(req_get(&format!("/gifs/preview/{gif_id}"), &token))
+        .await
+        .unwrap();
+    assert_eq!(preview_response.status(), StatusCode::OK);
+}
+
 #[tokio::test]
 async fn with_no_provider_configured_every_route_answers_not_implemented() {
     let (store, _guard) = new_store().await;
@@ -246,6 +301,13 @@ async fn with_no_provider_configured_every_route_answers_not_implemented() {
         .await
         .unwrap();
     assert_eq!(search_response.status(), StatusCode::NOT_IMPLEMENTED);
+
+    let trending_response = app
+        .clone()
+        .oneshot(req_get("/gifs/trending", &token))
+        .await
+        .unwrap();
+    assert_eq!(trending_response.status(), StatusCode::NOT_IMPLEMENTED);
 
     let preview_response = app
         .clone()
@@ -273,7 +335,7 @@ async fn with_no_provider_configured_every_route_answers_not_implemented() {
 #[tokio::test]
 async fn without_attach_files_the_route_is_forbidden_even_with_a_provider_configured() {
     let tenor_base = spawn_fake_tenor().await;
-    let gifs = GifSearch::for_test("tenor", &format!("{tenor_base}/v2/search"), "test-key");
+    let gifs = GifSearch::for_test("tenor", &tenor_base, "test-key");
 
     let (store, _guard) = new_store().await;
     let app = app(store.clone(), gifs);
@@ -303,7 +365,7 @@ async fn without_attach_files_the_route_is_forbidden_even_with_a_provider_config
 #[tokio::test]
 async fn an_empty_query_is_refused_before_any_provider_call() {
     let tenor_base = spawn_fake_tenor().await;
-    let gifs = GifSearch::for_test("tenor", &format!("{tenor_base}/v2/search"), "test-key");
+    let gifs = GifSearch::for_test("tenor", &tenor_base, "test-key");
     let (store, _guard) = new_store().await;
     let app = app(store.clone(), gifs);
     let (token, _user_id) = register(&store, "alice").await;

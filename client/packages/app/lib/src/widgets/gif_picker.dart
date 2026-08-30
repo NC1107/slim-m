@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /// The composer's GIF picker: a search field, a debounced request, and a
-/// grid of results streamed through this deployment's own server. Nothing
-/// here ever reaches the configured provider directly - `searchGifs`,
-/// `fetchGifPreview` and `selectGif` all proxy through
+/// grid of results streamed through this deployment's own server. Opens on
+/// trending results rather than a blank grid, the same "something to look
+/// at before you type" behavior Discord's own picker has - clearing the
+/// query falls back to the same trending grid rather than emptying it.
+/// Nothing here ever reaches the configured provider directly - `searchGifs`,
+/// `fetchTrendingGifs`, `fetchGifPreview` and `selectGif` all proxy through
 /// [SlimmApiGifs] - and the whole surface is only ever shown when
 /// `Version.gifSearchEnabled` is true; see `composer.dart` for that check.
 library;
@@ -91,9 +94,21 @@ class _GifPickerBodyState extends ConsumerState<_GifPickerBody> {
   String? _error;
   List<api.GifResult>? _results;
 
+  /// The picker's default content, fetched once on open so the grid is never
+  /// blank before a member types anything - the same "trending on open"
+  /// behavior Discord's own picker has.
+  List<api.GifResult>? _trending;
+  bool _trendingLoading = true;
+
   /// The result currently being picked, so its own tile can show a spinner
   /// and every other tile is disabled until this one resolves.
   String? _selectingId;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadTrending());
+  }
 
   @override
   void dispose() {
@@ -102,10 +117,28 @@ class _GifPickerBodyState extends ConsumerState<_GifPickerBody> {
     super.dispose();
   }
 
+  Future<void> _loadTrending() async {
+    try {
+      final results = await ref.read(apiProvider).fetchTrendingGifs();
+      if (!mounted) return;
+      setState(() {
+        _trending = results;
+        _trendingLoading = false;
+      });
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = describeApiFailure('load trending gifs', e);
+        _trendingLoading = false;
+      });
+    }
+  }
+
   void _onQueryChanged(String value) {
     _debounce?.cancel();
     final query = value.trim();
     if (query.isEmpty) {
+      // Falls back to the trending grid rather than a blank one.
       setState(() {
         _results = null;
         _error = null;
@@ -193,7 +226,7 @@ class _GifPickerBodyState extends ConsumerState<_GifPickerBody> {
   }
 
   Widget _content(AppTokens tokens) {
-    if (_loading) {
+    if (_loading || (_results == null && _trendingLoading)) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(AppSpacing.s24),
@@ -201,14 +234,10 @@ class _GifPickerBodyState extends ConsumerState<_GifPickerBody> {
         ),
       );
     }
-    final results = _results;
+    final results = _results ?? _trending;
     if (results == null) {
-      return Center(
-        child: Text(
-          'Type to search for a GIF.',
-          style: AppText.body.copyWith(color: tokens.textSecondary),
-        ),
-      );
+      // Trending failed and nothing has been searched; the banner above explains.
+      return const SizedBox.shrink();
     }
     if (results.isEmpty) {
       return Center(

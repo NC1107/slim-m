@@ -20,6 +20,7 @@ mod content;
 mod content_emoji;
 mod content_media_slots;
 mod content_messages_window;
+mod gifs;
 mod people;
 mod threads;
 
@@ -27,6 +28,7 @@ use content::{channel_calls, message_calls};
 use content_emoji::emoji_calls;
 use content_media_slots::media_slot_calls;
 use content_messages_window::bulk_delete_by_author_call;
+use gifs::gif_calls;
 use people::{moderation_calls, profile_calls, safety_calls};
 use threads::thread_calls;
 
@@ -209,26 +211,7 @@ pub async fn run(c: &mut Contract) {
     safety_calls(c, root, bob_token, &bob_id).await;
 
     let channel = channel_calls(c, root, &bob_id).await;
-    // Against a fake local provider (see world.rs), so all three reach a real 2xx.
-    let gif_search = c
-        .bare("searchGifs", "GET", "/gifs/search?q=cat", root)
-        .await;
-    let gif_id = text(&gif_search["results"][0], "id");
-    c.bare(
-        "getGifPreview",
-        "GET",
-        &format!("/gifs/preview/{gif_id}"),
-        root,
-    )
-    .await;
-    c.json(
-        "selectGif",
-        "POST",
-        "/gifs/select",
-        root,
-        json!({ "id": gif_id }),
-    )
-    .await;
+    gif_calls(c, root).await;
     let message = message_calls(c, root, &channel).await;
     bulk_delete_by_author_call(c, root, bob_token, &bob_id, &channel).await;
     thread_calls(c, root, &channel, &message).await;

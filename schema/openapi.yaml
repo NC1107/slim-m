@@ -2618,6 +2618,62 @@ paths:
         "503":
           $ref: "#/components/responses/Unavailable"
 
+  /gifs/trending:
+    get:
+      operationId: getTrendingGifs
+      tags: [gifs]
+      summary: The deployment's configured GIF provider's current trending results.
+      description: >
+        The picker's own default content before a member ever types a query -
+        same proxying, tokenizing and permission model as `searchGifs`
+        (requires deployment-wide ATTACH_FILES; a member's own IP address
+        never reaches the provider directly), against the provider's
+        dedicated trending endpoint rather than an empty search.
+
+
+        Each result's `id` is an opaque token minted by this request, never
+        the provider's own id or CDN URL. It is redeemable at
+        `getGifPreview` and `selectGif` for a short time and then expires,
+        exactly like a `searchGifs` result's.
+
+
+        A 501 means this deployment has no GIF provider configured at all
+        (see `/version`'s `gif_search_enabled`), which a client is expected
+        to check before ever showing a GIF picker.
+      parameters:
+        - name: limit
+          in: query
+          description: Most results to return. Defaults to 20, capped at 50.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trending results, as the provider ordered them.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GifResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no GIF provider configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
   /gifs/preview/{token}:
     parameters:
       - name: token
