@@ -382,6 +382,15 @@ A direct tag push (`server-v*` or `client-v*`) is also honored, so a release can
 The release-please job runs manifest mode twice, once per package, each against its own config and manifest file (`release-please-config.server.json` / `.release-please-manifest.server.json` for the server, the `.client.json` pair for the client), and only on main-branch pushes.
 Splitting the manifest is what stops one package's release commit from conflicting the other's still-open standing PR: both used to read and write one shared `.release-please-manifest.json`, so merging either PR moved that file underneath the other, on every merge that did not also carry releasable commits for it. See PR #321 for the incident history.
 
+The server config carries a second package rooted at the repo root, `.`, with component `schema`.
+It exists for one reason: `schema/openapi.yaml`'s `info.version` has to track the server's own version, and `scripts/lib/test_openapi_version_matches_cargo.py` reds hygiene when it does not.
+release-please resolves an `extra-files` path relative to the package directory, so a package rooted at `crates/slimm-server` cannot legally name a repo-root file - a parent-relative path is rejected with `illegal pathing characters in path`, and that rejection takes down every release-please run rather than just the one file, which is how PR #933 froze the standing release PR several merges behind main before #940 reverted it.
+Declaring the key at the config's top level does not help either; the path still resolves against the package directory.
+A package rooted at `.` can name the file, and the `linked-versions` plugin holds it to the server's version so a client-only release cannot drift `info.version` away from the server's Cargo version.
+That package publishes nothing of its own: `skip-github-release` and `skip-changelog` are both set, so it produces no second release and no second changelog.
+Its one visible artifact is a repo-root `version.txt`, which `release-type: simple` maintains; nothing reads it, and it is auto-maintained so it cannot drift.
+`scripts/lib/test_openapi_version_is_release_managed.py` pins each of those moving parts, since dropping any one silently returns us to hand-editing the release branch, which is how 0.46.0 and 0.47.0 shipped.
+
 ### The release PR's own checks
 
 Both `release-please-action` invocations take `token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}`, and which one is in play decides whether a release PR can ever go green.

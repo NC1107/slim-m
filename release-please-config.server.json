@@ -2,13 +2,34 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "bump-minor-pre-major": true,
   "plugins": [
-    "cargo-workspace"
+    "cargo-workspace",
+    {
+      "type": "linked-versions",
+      "groupName": "server",
+      "components": [
+        "server",
+        "schema"
+      ]
+    }
   ],
   "packages": {
     "crates/slimm-server": {
       "release-type": "rust",
       "component": "server",
       "package-name": "slimm-server"
+    },
+    ".": {
+      "release-type": "simple",
+      "component": "schema",
+      "skip-github-release": true,
+      "skip-changelog": true,
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "schema/openapi.yaml",
+          "jsonpath": "$.info.version"
+        }
+      ]
     }
   }
 }
