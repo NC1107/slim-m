@@ -22,8 +22,9 @@
 //! unknown-platform case; `platform` for the unknown-kind case) is a value
 //! the server genuinely produced this run, not a literal retyped from
 //! scratch that could quietly stop matching what `envelope.rs`/`relay.rs`
-//! actually emit. `kind` can only ever be `"message"` today - `PushKind`
-//! only encodes that one variant - so every entry, real and synthetic
+//! actually emit. This fixture only ever drives a message send, so `kind` is
+//! always `"message"` here even though `PushKind` also encodes `"call"` for
+//! a DM call ring (`push/call_ring.rs`) - every entry, real and synthetic
 //! alike, carries whichever real kind value this run produced; the relay
 //! must still reject an outright-unknown `kind` or `platform`, which is
 //! exactly the failure mode this contract exists to close off before it

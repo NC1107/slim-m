@@ -34,6 +34,7 @@ import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/drawer_edge_swipe.dart';
+import '../widgets/incoming_call_banner.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/push_to_talk_listener.dart';
 import '../widgets/rail_slot.dart';
@@ -53,6 +54,8 @@ part 'home_shell_pane_slots.dart';
 /// The shell. One widget handles every width: at compact widths it shows one
 /// pane at a time, and above that both at once. The panes themselves are the
 /// same widgets either way, so behaviour cannot drift between layouts.
+/// [IncomingCallBanner] sits above everything else `build` returns; see its
+/// own doc comment for why.
 class HomeShell extends ConsumerWidget {
   const HomeShell({required this.child, super.key});
 
@@ -204,7 +207,7 @@ class HomeShell extends ConsumerWidget {
     final openSettings = activatorFor(AppAction.openSettings);
     final nextChannel = activatorFor(AppAction.nextChannel);
     final previousChannel = activatorFor(AppAction.previousChannel);
-    return WhatsNewGate(
+    final body = WhatsNewGate(
       child: PushToTalkListener(
         child: CallbackShortcuts(
           bindings: {
@@ -228,6 +231,12 @@ class HomeShell extends ConsumerWidget {
           ),
         ),
       ),
+    );
+    return Column(
+      children: [
+        const IncomingCallBanner(),
+        Expanded(child: body),
+      ],
     );
   }
 

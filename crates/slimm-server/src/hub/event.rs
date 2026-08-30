@@ -7,9 +7,10 @@
 //! shortened to make room instead.
 
 use crate::ids::{
-    CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
+    CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
 use crate::store::{AttachmentSummary, CanvasObject, Channel, MediaSlotKind, Message};
+use crate::voice::CallRingOutcome;
 
 /// Something that happened and should reach interested connections.
 #[derive(Debug, Clone)]
@@ -262,6 +263,33 @@ pub enum Event {
     /// receiving connection re-fetches the roster, which already applies
     /// that per-viewer filtering, instead of being told who moved.
     VoiceActivityChanged { channel_id: ChannelId },
+    /// Ringing was started for a DM call: `caller_id` is calling whoever the
+    /// other side of the `channel_id` DM is. `ring_id` names this specific
+    /// attempt so a receiving client can tell it apart from an immediate
+    /// retry, and so [`Event::CallRingEnded`] can name exactly which ring it
+    /// concerns.
+    ///
+    /// Reaches only the two DM participants, the ordinary `VIEW_CHANNEL`
+    /// check every voice event already uses - a DM's own permission model
+    /// (`store/dms.rs`) grants that to nobody else, `ADMINISTRATOR` included.
+    /// A blocked party is refused before this is ever published: `CONNECT`
+    /// is one of the bits a block removes, and starting a ring is gated on
+    /// it the same way minting a token already is.
+    CallRinging {
+        channel_id: ChannelId,
+        ring_id: CallRingId,
+        caller_id: UserId,
+    },
+    /// A ring (started by [`Event::CallRinging`]) reached a terminal state:
+    /// answered, declined, canceled by the caller, or timed out unanswered.
+    /// See [`CallRingOutcome`] for what each means and
+    /// `voice::ring`'s own module doc for why the ring itself is tracked
+    /// in memory rather than persisted.
+    CallRingEnded {
+        channel_id: ChannelId,
+        ring_id: CallRingId,
+        outcome: CallRingOutcome,
+    },
     /// An object was placed on a channel's canvas.
     ///
     /// Carries the whole row for the same reason [`Event::MessageCreated`]

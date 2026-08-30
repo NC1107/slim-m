@@ -37,6 +37,7 @@
 //! nothing here can turn a successful send into an error, and nothing here can
 //! make it slower.
 
+mod call_ring;
 mod debounce;
 mod deliver;
 mod envelope;
@@ -49,7 +50,7 @@ use anyhow::Context;
 use url::{Host, Url};
 
 use crate::config::Config;
-use crate::ids::{ChannelId, MessageId, Seq, UserId};
+use crate::ids::{CallRingId, ChannelId, MessageId, Seq, UserId};
 use crate::presence::PresenceTracker;
 use crate::store::Store;
 
@@ -160,6 +161,30 @@ impl PushSender {
             self.debounce.clone(),
             store,
             sent,
+        ));
+    }
+
+    /// Considers pushing a wake for a DM call ring that was just started.
+    ///
+    /// The same synchronous-and-cheap shape [`Self::notify_message`] already
+    /// has: a disabled sender returns immediately, and everything else -
+    /// the preference check, the lookup, sealing, and the relay call - runs
+    /// in a detached background task so this never blocks the `ring` route's
+    /// own response. No debounce: see `call_ring`'s own module doc for why a
+    /// ring never needs one.
+    pub fn notify_call_ring(
+        &self,
+        store: Store,
+        channel_id: ChannelId,
+        ring_id: CallRingId,
+        caller_id: UserId,
+        callee_id: UserId,
+    ) {
+        let Some(enabled) = self.inner.clone() else {
+            return;
+        };
+        tokio::spawn(call_ring::deliver(
+            enabled, store, channel_id, ring_id, caller_id, callee_id,
         ));
     }
 }

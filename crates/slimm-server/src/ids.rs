@@ -51,6 +51,10 @@ uuid_id!(
     ChannelCategoryId,
     "A channel category identity: a rail section a channel of any kind may be placed in."
 );
+uuid_id!(
+    CallRingId,
+    "A DM call's ring-attempt identity: minted fresh per ring, never persisted, so a client can tell today's ring apart from a rapid retry of the same call."
+);
 
 /// A per-scope monotonic order key. Deliberately a distinct type from identity:
 /// it answers "in what order", not "which one".

@@ -49,7 +49,7 @@ use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::presence::Visibility;
 use crate::ratelimit::Class;
-use crate::voice::{RoomToken, VoiceError};
+use crate::voice::{CallRingOutcome, RoomToken, VoiceError};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -150,6 +150,11 @@ async fn token(
 /// Publishes [`Event::VoiceActivityChanged`] only on a first heartbeat for
 /// this `(user, channel)` pair - a real join - never on the routine refreshes
 /// that follow it every few seconds for as long as the call lasts.
+///
+/// That same first join is also what answers an outstanding
+/// [`crate::voice::CallRings`] ring naming this caller as the callee, since
+/// nothing separate marks answering: joining a call *is* answering it. See
+/// `voice::ring`'s own module doc for why answering has no route of its own.
 async fn heartbeat(
     Authed(ctx): Authed,
     parts: Parts,
@@ -181,6 +186,14 @@ async fn heartbeat(
         state
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });
+        // See this function's own doc for why a join answers a ring.
+        if let Some(ring_id) = state.voice.rings().answer(channel_id, ctx.user_id) {
+            state.hub.publish(Event::CallRingEnded {
+                channel_id,
+                ring_id,
+                outcome: CallRingOutcome::Answered,
+            });
+        }
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -201,6 +214,10 @@ async fn heartbeat(
 /// Publishes [`Event::VoiceActivityChanged`] only when there really was
 /// something to forget, so a client that calls this having never joined (or
 /// calling it twice) does not fan out a signal for a call that never changed.
+///
+/// Also cancels an outstanding ring naming this caller, independently of
+/// whether a heartbeat existed to forget: a caller who rang but never got as
+/// far as heartbeating yet can still hang up on the ring itself.
 async fn forget_heartbeat(
     Authed(ctx): Authed,
     parts: Parts,
@@ -216,6 +233,14 @@ async fn forget_heartbeat(
         state
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });
+    }
+    // See this function's own doc for why this runs regardless of the above.
+    if let Some(ring_id) = state.voice.rings().cancel(channel_id, ctx.user_id) {
+        state.hub.publish(Event::CallRingEnded {
+            channel_id,
+            ring_id,
+            outcome: CallRingOutcome::Canceled,
+        });
     }
     Ok(StatusCode::NO_CONTENT)
 }

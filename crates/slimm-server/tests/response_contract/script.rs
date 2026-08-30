@@ -17,6 +17,7 @@ use uuid::Uuid;
 use super::world::{Contract, Payload};
 
 mod content;
+mod content_dm_calls;
 mod content_emoji;
 mod content_media_slots;
 mod content_messages_window;
@@ -25,6 +26,7 @@ mod people;
 mod threads;
 
 use content::{channel_calls, message_calls};
+use content_dm_calls::dm_call_ring_calls;
 use content_emoji::emoji_calls;
 use content_media_slots::media_slot_calls;
 use content_messages_window::bulk_delete_by_author_call;
@@ -210,7 +212,8 @@ pub async fn run(c: &mut Contract) {
     profile_calls(c, root, &admin_id, &bob_id).await;
     safety_calls(c, root, bob_token, &bob_id).await;
 
-    let channel = channel_calls(c, root, &bob_id).await;
+    let (channel, dm_channel) = channel_calls(c, root, &bob_id).await;
+    dm_call_ring_calls(c, root, bob_token, &dm_channel).await;
     gif_calls(c, root).await;
     let message = message_calls(c, root, &channel).await;
     bulk_delete_by_author_call(c, root, bob_token, &bob_id, &channel).await;

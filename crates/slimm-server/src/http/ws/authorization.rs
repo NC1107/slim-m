@@ -79,6 +79,9 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::OverwriteChanged { .. }
         // The same VIEW_CHANNEL gate the roster read route itself uses.
         | Event::VoiceActivityChanged { .. }
+        // Same again: a DM's own VIEW_CHANNEL already limits this to the pair.
+        | Event::CallRinging { .. }
+        | Event::CallRingEnded { .. }
         // Handled earlier in `authorize` and never reach this call.
         | Event::SessionRevoked(_)
         | Event::PresenceChanged(_)
@@ -207,6 +210,8 @@ pub(super) async fn authorize(
             Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
             Event::OverwriteChanged { channel_id, .. } => *channel_id,
             Event::VoiceActivityChanged { channel_id } => *channel_id,
+            Event::CallRinging { channel_id, .. } => *channel_id,
+            Event::CallRingEnded { channel_id, .. } => *channel_id,
             // canvas_frames::channel_id already answered Some for any of these.
             Event::CanvasObjectPlaced { .. }
             | Event::CanvasObjectsRemoved { .. }
@@ -427,6 +432,24 @@ pub(super) async fn authorize(
         },
         Event::VoiceActivityChanged { channel_id } => ServerFrame::VoiceActivityChanged {
             channel_id: channel_id.to_string(),
+        },
+        Event::CallRinging {
+            channel_id,
+            ring_id,
+            caller_id,
+        } => ServerFrame::CallRinging {
+            channel_id: channel_id.to_string(),
+            ring_id: ring_id.to_string(),
+            caller_id: caller_id.to_string(),
+        },
+        Event::CallRingEnded {
+            channel_id,
+            ring_id,
+            outcome,
+        } => ServerFrame::CallRingEnded {
+            channel_id: channel_id.to_string(),
+            ring_id: ring_id.to_string(),
+            outcome: outcome.as_str().to_owned(),
         },
         // canvas_frames::to_frame already answered Ok for any of these.
         Event::CanvasObjectPlaced { .. }

@@ -53,11 +53,11 @@ use crate::store::PushTarget;
 /// Domain-separates this plaintext from anything else that might ever be
 /// sealed to the same device key, so a payload from a different context can
 /// never be reinterpreted as a push envelope.
-const DOMAIN: &str = "slim-m.push.v1";
-const ENVELOPE_VERSION: u8 = 1;
+pub(super) const DOMAIN: &str = "slim-m.push.v1";
+pub(super) const ENVELOPE_VERSION: u8 = 1;
 
 /// X25519 public keys are exactly 32 bytes.
-const PUBLIC_KEY_BYTES: usize = 32;
+pub(super) const PUBLIC_KEY_BYTES: usize = 32;
 
 /// How much base64 payload one relay-bound message may carry. The relay's own
 /// ceiling is 4096 (`slim-m-relay`'s `maxPayloadBytes`, itself APNs' whole
@@ -75,7 +75,7 @@ const SEALED_BOX_OVERHEAD_BYTES: usize = 48;
 /// [`MAX_PAYLOAD_BASE64_BYTES`]. Derived rather than written down, so
 /// adjusting the payload ceiling cannot leave a stale plaintext limit behind
 /// it.
-const MAX_ENVELOPE_PLAINTEXT_BYTES: usize =
+pub(super) const MAX_ENVELOPE_PLAINTEXT_BYTES: usize =
     (MAX_PAYLOAD_BASE64_BYTES / 4) * 3 - SEALED_BOX_OVERHEAD_BYTES;
 
 /// How much of a message body a preview carries. A lock screen shows far less
@@ -84,7 +84,7 @@ const MAX_ENVELOPE_PLAINTEXT_BYTES: usize =
 const MAX_PREVIEW_BODY_CHARS: usize = 160;
 
 /// How much of a display name or channel name a preview carries.
-const MAX_PREVIEW_NAME_CHARS: usize = 48;
+pub(super) const MAX_PREVIEW_NAME_CHARS: usize = 48;
 
 /// Marks a body that was cut short, so a preview ending mid-word reads as
 /// elided rather than as a truncation bug.
@@ -92,16 +92,19 @@ const ELISION: char = '\u{2026}';
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
-enum PushKind {
+pub(super) enum PushKind {
     Message,
+    /// A DM call ring; see `call_ring::CallRingEnvelope`.
+    Call,
 }
 
 impl PushKind {
     /// The relay's own `kind` field, a separate string from this envelope's
     /// serialized form (which lives inside the sealed, opaque payload).
-    fn wire_str(self) -> &'static str {
+    pub(super) fn wire_str(self) -> &'static str {
         match self {
             PushKind::Message => "message",
+            PushKind::Call => "call",
         }
     }
 }
@@ -141,7 +144,7 @@ impl MessagePreview {
 /// length a Latin one keeps; the byte ceiling that actually matters is
 /// enforced separately, against the encoded plaintext, in
 /// [`seal_for_message`].
-fn truncate(value: &str, max_chars: usize, elide: bool) -> String {
+pub(super) fn truncate(value: &str, max_chars: usize, elide: bool) -> String {
     let mut kept: String = value.chars().take(max_chars).collect();
     if elide && value.chars().nth(max_chars).is_some() {
         kept.push(ELISION);

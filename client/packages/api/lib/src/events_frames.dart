@@ -294,6 +294,66 @@ class VoiceActivityChanged extends ServerEvent {
   final String channelId;
 }
 
+/// A DM call ring started. [callerId] is who is calling; the receiving
+/// account is always the other participant of [channelId]'s DM, so this
+/// reaches only the two of them.
+class CallRinging extends ServerEvent {
+  const CallRinging({
+    required this.channelId,
+    required this.ringId,
+    required this.callerId,
+  });
+
+  final String channelId;
+
+  /// Names this specific ring attempt; [CallRingEnded.ringId] echoes it back
+  /// so a receiver can tell which ring reached a terminal state.
+  final String ringId;
+  final String callerId;
+}
+
+/// A DM call ring reached a terminal state - see [CallRingOutcome] for what
+/// each value means.
+class CallRingEnded extends ServerEvent {
+  const CallRingEnded({
+    required this.channelId,
+    required this.ringId,
+    required this.outcome,
+  });
+
+  final String channelId;
+  final String ringId;
+  final CallRingOutcome outcome;
+}
+
+/// How a DM call ring ended.
+enum CallRingOutcome {
+  /// The callee joined the call before the timeout.
+  answered,
+
+  /// The callee explicitly declined it.
+  declined,
+
+  /// The caller hung up, or left the call, before it was answered.
+  canceled,
+
+  /// Nobody answered before the server's own ring timeout elapsed; the
+  /// caller's own call has already been torn down server-side by the time
+  /// this arrives.
+  timedOut,
+}
+
+/// Resolves a frame's raw `outcome` string to a known [CallRingOutcome], or
+/// null for anything else, the same forward-compatible shape
+/// [_presenceStateOf] already uses for [PresenceState].
+CallRingOutcome? _callRingOutcomeOf(Object? raw) => switch (raw) {
+      'answered' => CallRingOutcome.answered,
+      'declined' => CallRingOutcome.declined,
+      'canceled' => CallRingOutcome.canceled,
+      'timed_out' => CallRingOutcome.timedOut,
+      _ => null,
+    };
+
 /// The moderation queue or history changed: a report was filed or resolved,
 /// or a moderation act was recorded. Carries nothing beyond the type tag,
 /// matching the server's own frame - only a connection holding

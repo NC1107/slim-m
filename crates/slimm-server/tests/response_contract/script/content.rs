@@ -12,8 +12,9 @@ use super::{PNG, THUMBS_UP, media_slot_calls, text};
 use crate::world::{Contract, Payload};
 
 /// Builds the channel the message calls run in, plus the role, overwrite and
-/// direct-message state, and returns that channel's id.
-pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) -> String {
+/// direct-message state, and returns that channel's id and the caller's DM
+/// channel id with bob.
+pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) -> (String, String) {
     c.get("listChannels", "/channels", root).await;
     let channel = c
         .json(
@@ -112,8 +113,10 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     )
     .await;
 
-    c.bare("openDirectMessage", "POST", &format!("/dms/{bob_id}"), root)
+    let dm = c
+        .bare("openDirectMessage", "POST", &format!("/dms/{bob_id}"), root)
         .await;
+    let dm_channel = text(&dm, "channel_id");
     c.get("listDirectMessages", "/dms", root).await;
     c.bare(
         "hideDirectMessage",
@@ -297,7 +300,7 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     c.bare("deleteChannelOverwrite", "DELETE", &overwrite, root)
         .await;
 
-    channel
+    (channel, dm_channel)
 }
 
 /// Sends everything a `Message` can carry - an attachment, a poll, a reaction

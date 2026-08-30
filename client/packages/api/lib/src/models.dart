@@ -263,6 +263,24 @@ class VoiceRosterParticipant {
       );
 }
 
+/// A DM call ring the caller just started, from `POST
+/// /channels/{id}/voice/ring`.
+class RingStarted {
+  const RingStarted({required this.ringId, required this.timeoutMs});
+
+  final String ringId;
+
+  /// How long the server itself waits for an answer before giving up on this
+  /// ring; a client renders its own countdown from this rather than a
+  /// hard-coded duration that could drift from the server's.
+  final int timeoutMs;
+
+  factory RingStarted.fromJson(Map<String, dynamic> json) => RingStarted(
+        ringId: json['ring_id'] as String,
+        timeoutMs: json['timeout_ms'] as int,
+      );
+}
+
 /// How far a user has read in a channel, and how much is left.
 class ReadState {
   const ReadState({required this.lastReadSeq, required this.unread});

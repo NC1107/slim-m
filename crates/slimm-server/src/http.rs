@@ -75,6 +75,7 @@ mod user_notes;
 mod user_status;
 mod users;
 mod voice;
+mod voice_ring;
 mod ws;
 
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
@@ -159,6 +160,7 @@ pub fn router(state: AppState) -> Router {
         .merge(sync::routes())
         .merge(threads::routes())
         .merge(voice::routes())
+        .merge(voice_ring::routes())
         .merge(polls::routes())
         .merge(users::routes())
         .merge(user_notes::routes())
