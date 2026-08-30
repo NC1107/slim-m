@@ -351,6 +351,55 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.62.0',
+    headline:
+        'A tray menu that works, forwarded attachments, and a nicer video '
+        'player',
+    points: [
+      WhatsNewPoint(
+        'Clicking anything in the desktop tray menu actually does something '
+        'now. Every item in it had quietly been doing nothing at all.',
+      ),
+      WhatsNewPoint(
+        'The app starts about five seconds faster on desktop - the startup '
+        'screen was waiting on a frame that could never arrive while the '
+        'window stayed hidden.',
+      ),
+      WhatsNewPoint(
+        'Forwarding a message now brings its attachments along instead of '
+        'dropping them, and the picker you forward into was rebuilt with '
+        'search.',
+      ),
+      WhatsNewPoint(
+        'The inline video player got real controls: swipe down to leave '
+        'fullscreen, double-tap to enter it, and the whole thing now '
+        'matches the app\'s own colours instead of the system default.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.63.0',
+    headline:
+        'Chat inside a voice call, a private note, and a canvas '
+        'right-click menu',
+    points: [
+      WhatsNewPoint(
+        'You can read and send messages in a voice channel now without '
+        'leaving the call - a side pane next to it on a wide window, or a '
+        'full-screen swap with a toggle at narrower widths. Unread dots on '
+        'voice channels behave the same as text channels now too.',
+      ),
+      WhatsNewPoint(
+        'Right-click empty canvas space for a quick menu: paste an image '
+        'or add a note right where you clicked, or recenter the view.',
+      ),
+      WhatsNewPoint(
+        'You can leave a private note on someone else\'s profile now, '
+        'visible only to you.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
