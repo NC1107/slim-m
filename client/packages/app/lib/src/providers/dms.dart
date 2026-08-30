@@ -92,3 +92,26 @@ Future<String> openDirectMessage(
   ]);
   return conversation.channelId;
 }
+
+/// Closes the DM with [userId] out of this device's own sidebar - a
+/// per-viewer hide on the server (see `POST /dms/{userId}`'s sibling
+/// `DELETE`), never a delete: no message is touched, the other
+/// participant's own list is unaffected, and it comes back on its own once
+/// they send something new or the caller opens or messages them again.
+///
+/// [channelId] is dropped from the local store via `removeChannel`, the same
+/// call already used for any channel the server has stopped listing, so the
+/// row leaves the rail immediately rather than waiting on the next periodic
+/// refresh - its cached messages go with it, which costs nothing: reopening
+/// refetches history from the server the way any freshly (re)synced channel
+/// already does.
+Future<void> hideDmConversation(
+  ProviderContainer container,
+  String userId,
+  String channelId,
+) async {
+  final client = container.read(apiProvider);
+  await client.hideDirectMessage(userId);
+  final store = await container.read(storeProvider.future);
+  await store.removeChannel(channelId);
+}

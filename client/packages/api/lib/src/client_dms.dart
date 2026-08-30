@@ -21,4 +21,12 @@ extension SlimmApiDms on SlimmApi {
     final json = await _send('POST', '/dms/$userId');
     return DmConversation.fromJson(json as Map<String, dynamic>);
   }
+
+  /// Closes the DM with [userId] out of the caller's own sidebar - a
+  /// per-viewer hide, never a delete: no message is touched, and the other
+  /// participant's own list is unaffected. Reappears on its own once they
+  /// send something new, or the moment the caller opens or messages them
+  /// again. Idempotent, and a no-op if the pair has no DM channel yet.
+  Future<void> hideDirectMessage(String userId) =>
+      _send('DELETE', '/dms/$userId', expectNoContent: true);
 }

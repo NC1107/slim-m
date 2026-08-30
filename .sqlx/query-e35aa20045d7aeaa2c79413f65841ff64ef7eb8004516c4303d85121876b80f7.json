@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT channel_id AS \"channel_id!: ChannelId\",\n                      other_id AS \"other_id!: UserId\",\n                      created_at AS \"created_at!\",\n                      activity_at AS \"activity_at!: i64\"\n               FROM (\n                   SELECT d.channel_id AS channel_id,\n                          CASE WHEN d.user_a = ? THEN d.user_b ELSE d.user_a END AS other_id,\n                          c.created_at AS created_at,\n                          COALESCE(\n                              (SELECT m.created_at FROM messages m\n                               WHERE m.channel_id = d.channel_id AND m.deleted_at IS NULL\n                               ORDER BY m.seq DESC LIMIT 1),\n                              c.created_at\n                          ) AS activity_at,\n                          h.hidden_at AS hidden_at\n                   FROM dm_channels d\n                   JOIN channels c ON c.id = d.channel_id AND c.deleted_at IS NULL\n                   LEFT JOIN dm_hides h ON h.channel_id = d.channel_id AND h.user_id = ?\n                   WHERE d.user_a = ? OR d.user_b = ?\n               )\n               WHERE hidden_at IS NULL OR hidden_at < activity_at\n               ORDER BY \"activity_at!: i64\" DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "other_id!: UserId",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "activity_at!: i64",
+        "ordinal": 3,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "e35aa20045d7aeaa2c79413f65841ff64ef7eb8004516c4303d85121876b80f7"
+}

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-/// The DM row's right-click/long-press menu: open, mute or narrow to
-/// mentions only, and report/block the other participant - nothing more,
-/// since nothing else about a DM has a real route behind it (see
-/// `dm_row.dart`'s own doc comment on why there is no "close" or "hide"
-/// item).
+/// The DM row's right-click/long-press menu: open, close it out of the
+/// sidebar, mute or narrow to mentions only, and report/block the other
+/// participant.
 library;
 
 import 'dart:convert';
@@ -132,7 +130,7 @@ Future<void> _openMenu(WidgetTester tester) => tester.tapAt(
 
 void main() {
   testWidgets(
-    'a right-click offers Open, Mute, Mentions only, Report user and Block',
+    'a right-click offers Open, Close DM, Mute, Mentions only, Report user and Block',
     (tester) async {
       final channel = _dm('dm-1', 'Priya', 'user-priya');
       final container = _container();
@@ -144,6 +142,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Open'), findsOneWidget);
+      expect(find.text('Close DM'), findsOneWidget);
       expect(find.text('Mute'), findsOneWidget);
       expect(find.text('Mentions only'), findsOneWidget);
       expect(find.text('Report user'), findsOneWidget);
@@ -153,6 +152,43 @@ void main() {
       container.dispose();
     },
   );
+
+  testWidgets('tapping Close DM hides it and removes the local channel row', (
+    tester,
+  ) async {
+    final channel = _dm('dm-1', 'Priya', 'user-priya');
+    String? hideRequest;
+    final container = _container(
+      onRequest: (request) {
+        if (request.method == 'DELETE' &&
+            request.url.path == '/dms/user-priya') {
+          hideRequest = request.url.path;
+        }
+      },
+    );
+    final store = await container.read(storeProvider.future);
+    await store.upsertChannels([
+      const api.Channel(
+        id: 'dm-1',
+        name: 'Priya',
+        kind: dmChannelKind,
+        createdAt: 0,
+        dmParticipantId: 'user-priya',
+      ),
+    ]);
+
+    await tester.pumpWidget(_harness(container, _router(channel)));
+    await tester.pump();
+
+    await _openMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Close DM'));
+    await tester.pumpAndSettle();
+
+    expect(hideRequest, '/dms/user-priya');
+    expect(await store.channelRow('dm-1'), isNull);
+    container.dispose();
+  });
 
   testWidgets('tapping Mute sets the channel override to nothing', (
     tester,

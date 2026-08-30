@@ -1673,6 +1673,27 @@ paths:
           $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: hideDirectMessage
+      tags: [dms]
+      summary: Close a DM out of the caller's own sidebar.
+      description: >
+        A per-viewer hide, never a delete: no message is touched, and the
+        other participant's own list is unaffected. Reversed automatically -
+        the conversation reappears once the other person sends something
+        new, and re-opening or re-messaging them (`POST` this same route)
+        also brings it back right away. Independent of mute and of blocking.
+        Idempotent, and a no-op rather than a 404 if the pair has no DM
+        channel yet: that already means it is not in the caller's list.
+      responses:
+        "204":
+          description: The DM is no longer in the caller's list.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   /roles:
     get:

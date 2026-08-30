@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /// One direct-message row in the rail: open on tap, and a right-click or
-/// long-press menu to mute it, narrow it to mentions only, or report or
-/// block the person on the other end of it.
+/// long-press menu to close it, mute it, narrow it to mentions only, or
+/// report or block the person on the other end of it.
 ///
 /// Also the in-app half of `docs/IMPLIED-GAPS.md` #2: a call already
 /// happening in this DM shows as an icon, and tapping the row while it is
@@ -13,14 +13,13 @@
 /// burst the write-class rate budget the instant the rail rendered. See that
 /// provider's own doc comment for the fix.
 ///
-/// There is deliberately no "close" or "hide this conversation" item here.
-/// Nothing backs one: `store/dms.rs` has no concept of leaving or archiving a
-/// DM, only `channel_scopes_moderation` and the generic channel routes this
-/// row already reaches through Open, and inventing a client-only hide flag
-/// for a DM (unlike the personal space's own "Remove from list", which hides
-/// a channel that is entirely the caller's own) would silently disagree with
-/// every other device signed into the same account. See `personal_space_menu.dart`
-/// for the one DM-shaped row that does have a real hide affordance, and why.
+/// "Close DM" is a real per-viewer hide on the server (`DELETE /dms/{userId}`,
+/// `store/dms.rs`'s `dm_hides`), not a client-only flag: unlike the personal
+/// space's own "Remove from list" (`personal_space_menu.dart`), which hides a
+/// channel that is entirely the caller's own, a client-only hide of a shared
+/// DM would silently disagree with every other device signed into the same
+/// account. It reverses itself once the other person sends something new, or
+/// the moment this device opens or messages them again.
 library;
 
 import 'dart:async';
@@ -35,6 +34,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/dm_call_activity.dart';
+import '../providers/dms.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
@@ -89,6 +89,13 @@ class DmRow extends ConsumerWidget {
           context.go(Routes.channel(channel.id));
         },
       ),
+      if (peerId != null)
+        AppMenuItem(
+          label: 'Close DM',
+          leading: AppIcons.dismiss,
+          onTap: () =>
+              run(() => hideDmConversation(container, peerId, channel.id)),
+        ),
       const AppMenuDivider(),
       AppMenuItem(
         label: 'Mute',
