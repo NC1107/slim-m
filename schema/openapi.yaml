@@ -69,7 +69,7 @@ tags:
   - name: users
     description: Public profiles, the caller's own account, and the member list.
   - name: safety
-    description: Devices, blocking, and report intake.
+    description: Devices, blocking, private notes, and report intake.
   - name: moderation
     description: Report triage. Requires MANAGE_MESSAGES.
   - name: roles
@@ -675,6 +675,90 @@ paths:
               schema:
                 type: string
                 format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /users/{userId}/note:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The note's subject.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getUserNote
+      tags: [safety]
+      summary: The caller's own private note about another account.
+      description: >
+        Caller-private, always: this can only ever answer for the caller's
+        own note, never anyone else's, and a note is never shown to its
+        subject or to any other member. There is no moderation surface for
+        these.
+
+
+        A subject with nothing live to answer for - never registered, since
+        deleted, or anonymized - refuses exactly like one the caller has
+        simply never left a note about, per decision 0011's masking rule, so
+        this can never confirm whether a subject id names a real,
+        currently-visible account. Refuses the same way for the caller's own
+        id: there is no note about yourself.
+      responses:
+        "200":
+          description: >-
+            The caller's note, or a body of all nulls if they have not left
+            one about this subject.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserNote"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    put:
+      operationId: putUserNote
+      tags: [safety]
+      summary: Set or clear the caller's private note about another account.
+      description: >
+        An empty or whitespace-only body clears the note rather than storing
+        a blank one, the same convention the caller's own status text
+        follows. Masked identically to `getUserNote` for a subject with
+        nothing live to answer for, and refused the same way for the
+        caller's own id.
+
+
+        Survives the subject being renamed, since it keys on their id; purged
+        only when the author's own account is deleted, never the subject's.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  description: At most 500 characters after trimming.
+      responses:
+        "200":
+          description: The note as stored, after trimming and the empty-clears rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserNote"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -5177,6 +5261,20 @@ components:
         is_current:
           type: boolean
           description: Whether this is the device making the request.
+
+    UserNote:
+      type: object
+      required: [body, updated_at]
+      properties:
+        body:
+          type: [string, "null"]
+          description: >-
+            `null` if the caller has left no note about this subject.
+        updated_at:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            When the note was last set, or `null` alongside a `null` body.
 
     ReportRequest:
       type: object

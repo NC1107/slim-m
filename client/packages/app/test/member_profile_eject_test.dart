@@ -140,6 +140,19 @@ void _giveCompactSheetRoom(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
+/// The default test window (800x600) is shorter than the call section plus
+/// the moderation section plus the private-note row can fit without
+/// scrolling; a real desktop window is taller, and `AnchoredMemberPopover`
+/// clamps and scrolls its own content, so this is a test-harness fix rather
+/// than production behavior changing. Every test here pumps
+/// `MemberProfileBody` directly, bypassing that popover, so it needs the
+/// room itself.
+void _giveDesktopMenuRoom(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 Widget _body() => MemberProfileBody(
   profile: _other,
   status: AppPresence.online,
@@ -204,6 +217,7 @@ void main() {
   testWidgets('appears once both the bit and a shared call are true', (
     tester,
   ) async {
+    _giveDesktopMenuRoom(tester);
     final wired = _wire(permissions: Perm.kickMembers);
     await tester.pumpWidget(
       reducedMotionApp(container: wired.container, child: _body()),
@@ -217,6 +231,7 @@ void main() {
   testWidgets('names the room, not a ban, and confirming reaches the API', (
     tester,
   ) async {
+    _giveDesktopMenuRoom(tester);
     final wired = _wire(permissions: Perm.kickMembers);
     await tester.pumpWidget(
       reducedMotionApp(container: wired.container, child: _body()),
@@ -243,6 +258,7 @@ void main() {
   });
 
   testWidgets('cancelling sends nothing', (tester) async {
+    _giveDesktopMenuRoom(tester);
     final wired = _wire(permissions: Perm.kickMembers);
     await tester.pumpWidget(
       reducedMotionApp(container: wired.container, child: _body()),

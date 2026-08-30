@@ -192,7 +192,7 @@ class SlimmApi {
         .toList(growable: false);
   }
 
-  // --- Devices, blocking, and reporting ---
+  // --- Devices, blocking, private notes, and reporting ---
 
   /// The account's own devices, with the current one flagged.
   Future<List<Device>> listDevices() async {
@@ -219,6 +219,28 @@ class SlimmApi {
 
   Future<void> unblockUser(String userId) =>
       _send('DELETE', '/blocks/$userId', expectNoContent: true);
+
+  /// The caller's own private note about [userId], or an all-null [UserNote]
+  /// if they have not left one. Never the subject's view of anything: this
+  /// can only ever answer for the caller's own note. A subject with nothing
+  /// live to answer for - never registered, or since deleted - answers 404,
+  /// exactly like [getUser].
+  Future<UserNote> getUserNote(String userId) async {
+    final json = await _send('GET', '/users/$userId/note');
+    return UserNote.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Sets the caller's private note about [userId]. An empty or
+  /// whitespace-only [body] clears it rather than storing a blank one, the
+  /// same convention [updateMe]'s status text follows.
+  Future<UserNote> setUserNote(String userId, String body) async {
+    final json = await _send(
+      'PUT',
+      '/users/$userId/note',
+      body: {'body': body},
+    );
+    return UserNote.fromJson(json as Map<String, dynamic>);
+  }
 
   /// Whether an invite code can be used, and if so, a preview of what it
   /// joins. Unauthenticated, because the person holding a code does not have

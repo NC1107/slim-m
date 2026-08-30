@@ -70,6 +70,7 @@ mod space;
 mod sync;
 mod sync_ops;
 mod threads;
+mod user_notes;
 mod user_status;
 mod users;
 mod voice;
@@ -158,6 +159,7 @@ pub fn router(state: AppState) -> Router {
         .merge(voice::routes())
         .merge(polls::routes())
         .merge(users::routes())
+        .merge(user_notes::routes())
         .merge(gifs::routes())
         .merge(attachments::routes())
         // Bounded, and the socket is deliberately outside this: see below.

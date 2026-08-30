@@ -385,6 +385,26 @@ class Device {
       );
 }
 
+/// The caller's own private note about another account. Caller-private,
+/// always: this is never the subject's own view of anything, only what the
+/// caller themselves wrote down about them.
+///
+/// `body` and `updatedAt` are both null together, meaning the caller has
+/// left no note about that subject - the same all-null shape a fresh account
+/// gets, so this cannot be used to tell "no note yet" apart from anything
+/// else about the subject.
+class UserNote {
+  const UserNote({required this.body, required this.updatedAt});
+
+  final String? body;
+  final int? updatedAt;
+
+  factory UserNote.fromJson(Map<String, dynamic> json) => UserNote(
+        body: json['body'] as String?,
+        updatedAt: json['updated_at'] as int?,
+      );
+}
+
 /// What a report is about.
 enum ReportSubject {
   message,
