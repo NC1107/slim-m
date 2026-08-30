@@ -158,6 +158,13 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
   }
 }
 
+/// `unread` reads the same `cursor > lastReadSeq` test [_TextChannelRow]
+/// does: a voice channel has its own transcript and composer now
+/// (`screens/voice_text_pane.dart`), so unread text here means the same
+/// thing it does anywhere else. It used to read `inCall` instead, which left
+/// the dot permanently lit for whoever was in the call and blind to actual
+/// unread text; being in the call already has its own cue, the accented mic
+/// icon below, so it does not need to borrow this one too.
 class VoiceChannelRow extends ConsumerWidget {
   const VoiceChannelRow({
     super.key,
@@ -204,7 +211,7 @@ class VoiceChannelRow extends ConsumerWidget {
         AppListRow(
           label: channel.name,
           selected: selected,
-          unread: inCall,
+          unread: channel.cursor > channel.lastReadSeq,
           leading: Icon(
             AppIcons.voice,
             size: AppSizes.icon16,

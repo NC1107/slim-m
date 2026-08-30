@@ -46,6 +46,7 @@ import 'channel_screen.dart';
 import 'dm_call_pane.dart';
 import 'thread_screen.dart';
 import 'voice_screen.dart';
+import 'voice_text_pane.dart';
 
 part 'home_shell_pane_slots.dart';
 
@@ -361,14 +362,23 @@ class ConversationPane extends ConsumerWidget {
   }
 }
 
-class _VoiceConversationHeader extends StatelessWidget {
+/// [_ChannelTitle] plus, at a width [LayoutClass.fitsThreadPane] fits a
+/// docked pane at, the toggle for `voice_text_pane.dart`'s side pane -
+/// matching `VoiceScreen`'s own condition for showing that pane rather than
+/// its compact tab fallback, so the toggle is never dead chrome pointed at a
+/// pane that is not there.
+class _VoiceConversationHeader extends ConsumerWidget {
   const _VoiceConversationHeader({required this.channelId});
 
   final String channelId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final canDock = LayoutClass.of(
+      context,
+    ).fitsThreadPane(MediaQuery.sizeOf(context).width);
+    final chatOpen = ref.watch(voiceChatPaneVisibleProvider);
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
@@ -378,6 +388,17 @@ class _VoiceConversationHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: _ChannelTitle(channelId: channelId)),
+          if (canDock) ...[
+            AppIconButton(
+              icon: AppIcons.hash,
+              semanticLabel: 'Toggle text chat',
+              active: chatOpen,
+              onPressed: () =>
+                  ref.read(voiceChatPaneVisibleProvider.notifier).state =
+                      !chatOpen,
+            ),
+            const SizedBox(width: AppSpacing.s4),
+          ],
           CanvasOpenButton(channelId: channelId, isVoice: true),
         ],
       ),
