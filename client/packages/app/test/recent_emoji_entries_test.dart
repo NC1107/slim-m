@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `recentEmojiEntries` resolves the recently-used shelf's stored tokens back
 /// into pickable emoji. The picker widget test covers a used emoji showing up,
 /// but not the case that actually breaks quietly: a stored token that no

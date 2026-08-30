@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ChannelDraftsController` in isolation: the plain get/save/clear
 /// contract, and the sign-out and account-switch wipes that close the same
 /// leak `BlocksController` already closed (a draft is the same shape as a

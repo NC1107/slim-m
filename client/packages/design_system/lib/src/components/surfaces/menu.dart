@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A floating menu and its parts: a context menu, a dropdown, a command
 /// palette result list, and the right-click/long-press sheet share this one
 /// body.

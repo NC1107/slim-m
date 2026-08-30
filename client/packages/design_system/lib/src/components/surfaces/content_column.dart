@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A comfortable column for a screen that is a list of settings.
 ///
 /// The same reasoning as [kMessageColumnMax], applied to rows rather than

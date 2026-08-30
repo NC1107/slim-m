@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Keeping the most recent `autoDispose` provider values alive after their
 /// last listener goes, rather than discarding them the instant nothing is
 /// watching.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Entity and event identity.
 //!
 //! Identity is a client-generatable UUIDv7 (its 48-bit millisecond prefix makes

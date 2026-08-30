@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether a tray is reachable right now, decision 0012's split: macOS and
 /// Windows are unconditional, Linux asks the runtime probe every time.
 library;

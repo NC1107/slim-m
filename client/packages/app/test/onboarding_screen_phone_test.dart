@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// How the onboarding screen's two modals present at phone width.
 ///
 /// Both used to be bare Material dialogs that stayed a fixed-size card on a

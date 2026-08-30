@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sheet the rail's Space menu "Add channel" item opens: a name and a
 /// text/voice choice, sent through `POST /channels`
 /// ([api.SlimmApi.createChannel]).

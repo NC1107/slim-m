@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the camera-on-join preference: it persists, reaches the next
 /// join call this same session (not merely the toggle's own visual state),
 /// and its accessible name holds up against the real dumped semantics tree.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Bounds how long a terminated app can leave a ghost participant in a room.
 //!
 //! A LiveKit room reaps a dead connection on its own once ICE gives up on it,

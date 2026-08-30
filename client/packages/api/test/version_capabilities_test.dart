@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reading a server's advertised capabilities off `/version`.
 ///
 /// The distinction these tests exist for is unknown versus missing. Both are

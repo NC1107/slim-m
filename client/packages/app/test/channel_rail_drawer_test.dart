@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the compact layout's edge-swipe route to the channel rail:
 /// reachable at phone width, absent at expanded width (the rail is already
 /// docked there so a drawer would be redundant), dismissible by a scrim tap

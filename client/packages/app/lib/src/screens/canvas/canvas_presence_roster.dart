@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Who is here, drawn as a small face-pile rather than left implicit.
 ///
 /// The owner's third report: "the voice canvas feels like its missing life

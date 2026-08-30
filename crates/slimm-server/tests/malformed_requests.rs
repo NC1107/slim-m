@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A malformed JSON body, a query string that will not parse, and a body over
 //! the configured size limit all used to answer with axum's own plain-text
 //! rejection rather than the `{"error": ...}` shape every other response

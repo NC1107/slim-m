@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The gate `ui_snapshot_test.dart` never carried: a real notch, and a call
 /// live elsewhere so every fixed bar the compact shell and the rail can show
 /// is actually on screen, driven through the real shell rather than

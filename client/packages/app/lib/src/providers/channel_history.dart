@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Paging a channel's history backwards, and knowing whether the top of it
 /// has actually been reached.
 ///

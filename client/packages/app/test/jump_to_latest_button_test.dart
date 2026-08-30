@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The jump-to-latest affordance was a full-width labelled bar and covered
 /// too much of the transcript it exists to reach, reported from a real
 /// phone. This measures the shape rather than inspecting the widget tree,

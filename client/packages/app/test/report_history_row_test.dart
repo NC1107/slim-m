@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ReportHistoryRow` renders the four fields decision 0015's audit trail
 /// exists to answer - actor, action, subject and timestamp - for both halves
 /// of the merged `/reports/history` feed: an audit-log entry and a resolved

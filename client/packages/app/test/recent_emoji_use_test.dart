@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The recently-used emoji shelf moves a picked emoji to the front, never
 /// duplicates one, and caps its length. The picker test only checks that a
 /// pick lands on the shelf; the move-to-front, the dedup, and the cap - the

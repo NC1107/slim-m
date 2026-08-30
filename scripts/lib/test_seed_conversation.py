@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for parsing a generated conversation defensively.
 
 No network: `seed_ollama.load_or_generate_conversations` is patched out in

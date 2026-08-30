@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The undo ledger, the eraser's authorship scoping, and the clear control -
 /// driven directly against `CanvasOpsController` and a real
 /// `CanvasCommitQueue`, rather than through the widget tree.

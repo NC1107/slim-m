@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Acting on one message, from a screen that can confirm and can report back.
 ///
 /// `providers/message_actions.dart` is the layer below this one: it applies

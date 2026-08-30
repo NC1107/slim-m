@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Deployment-wide settings an admin changes at runtime.
 //!
 //! One row, read on registration and written from the Space settings screen.

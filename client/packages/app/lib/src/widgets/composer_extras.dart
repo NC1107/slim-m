@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's smaller pieces: the text field itself, its markdown key
 /// bindings, and the banners above the action bar.
 library;

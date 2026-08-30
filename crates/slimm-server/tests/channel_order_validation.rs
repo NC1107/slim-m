@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `PUT /channels/order`'s all-or-nothing validation: a missing, unknown, or
 //! duplicated channel id, an unknown category id, and a DM refused the same
 //! way an unknown id is. Split out of `channel_order.rs` (the happy-path

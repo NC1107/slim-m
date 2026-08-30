@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Selection that travels: a list-owned accent bar that slides from the old
 /// row to the new one, instead of two rows cross-fading their tints.
 ///

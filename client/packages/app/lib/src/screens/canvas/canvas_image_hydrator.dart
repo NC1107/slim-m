@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fetches and decodes the bitmap for a placed image object arriving from
 /// anywhere other than this client's own paste: the initial viewport fetch,
 /// catch-up ops, and a live event from another participant.

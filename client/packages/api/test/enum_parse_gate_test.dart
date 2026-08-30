@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Forbids `values.byName` anywhere under `packages/api/lib`.
 ///
 /// `byName` throws a bare `ArgumentError` on a value it does not recognise,

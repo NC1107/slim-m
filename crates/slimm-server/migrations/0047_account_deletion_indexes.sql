@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- The DELETE half of account deletion, which 0019 missed.
 --
 -- 0019 indexed the three UPDATE ... WHERE author_id = ? statements that

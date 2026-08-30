@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sheet a category header's context menu opens: rename it, or delete it.
 /// `PATCH`/`DELETE /categories/{id}` ([api.SlimmApiChannelAdmin]).
 ///

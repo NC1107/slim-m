@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The pure version-compare and entry-selection logic behind the
 /// what's-new sheet, tested with no widget, provider or platform channel
 /// involved.

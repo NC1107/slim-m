@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'client.dart';
 
 /// The `auth` tag: everything that starts, rotates, or ends a session.

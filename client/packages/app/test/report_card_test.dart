@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The report card names what a moderator is being asked to act on: a user
 /// report's subject, and either kind's reporter, both resolved through
 /// `GET /users` rather than left as the raw id the wire carries, and both

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one wrapper `main.dart`'s `appChromeBuilder` adds for the desktop
 /// window shell: the frameless title bar, once it is actually active, and
 /// the first-run tray notice banner, both mounted above the routed content

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A channel's messages, laid out: the reversed scroll, the grouping and
 /// unread rules that decide what each row shows, and what an empty list means.
 ///

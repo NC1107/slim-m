@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Cross-checks `parseInline`'s mention extraction against the same table of
 /// tricky inputs the server asserts in `crates/slimm-server/src/push/
 /// recipients.rs`'s `the_shared_charset_fixture_agrees_with_message_inline_dart`.

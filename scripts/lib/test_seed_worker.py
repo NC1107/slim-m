@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for how a worker's action handlers draw on an ollama corpus.
 
 No network: `ctx.api` is a `Mock` standing in for `e2e_api.Api`, and every

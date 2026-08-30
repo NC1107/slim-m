@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Composer affordances for typing markdown by hand: continuing a list on
 /// Enter, and Ctrl/Cmd+B and Ctrl/Cmd+I wrapping the current selection.
 ///

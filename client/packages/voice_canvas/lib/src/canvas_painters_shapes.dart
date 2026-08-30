@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'canvas_painters.dart';
 
 /// [StrokePainter]'s note and shape paint methods. An extension in a `part

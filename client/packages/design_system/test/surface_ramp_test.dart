@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The surface ramp: whether sunken, base and raised actually read as three
 /// surfaces, measured rather than eyeballed.
 ///

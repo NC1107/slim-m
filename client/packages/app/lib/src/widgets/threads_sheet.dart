@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sheet the channel header's thread pill opens: every thread hanging
 /// off a message in this channel, newest activity first, each showing its
 /// parent's own snippet and author, its reply count, and whether the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The compact quote a reply shows above its own row: the parent's author
 /// and a one-line snippet of its content, tappable to jump to it.
 ///

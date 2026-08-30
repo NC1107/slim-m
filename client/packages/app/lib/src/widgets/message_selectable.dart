@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A message row that can be picked while the transcript is in selection
 /// mode, and is untouched when it is not.
 ///

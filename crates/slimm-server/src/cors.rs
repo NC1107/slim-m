@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Cross-origin access, for a browser build of the client.
 //!
 //! [`CorsPolicy`] is the same two-state shape as [`crate::push::PushSender`]

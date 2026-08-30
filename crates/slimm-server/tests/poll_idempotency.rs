@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A retried poll send is answered as the retry it is, including after the
 //! first one's message has been deleted.
 //!

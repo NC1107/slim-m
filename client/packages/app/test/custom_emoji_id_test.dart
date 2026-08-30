@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `customEmojiIdFor` turns a `:shortcode:` token in message text into the
 /// custom emoji id that renders it, and it was untested. The delimiters and
 /// the case fold are what make a typed `:Party:` find the uploaded `party`,

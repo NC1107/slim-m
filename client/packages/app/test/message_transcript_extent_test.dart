@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The reported bug: the transcript's scrollbar "jumps around a lot and
 /// doesn't move cleanly".
 ///

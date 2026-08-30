@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Seed a fresh deployment with the two accounts and voice channel the call needs.
 
 Prints shell assignments for scripts/e2e.sh to eval. The first account

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `SpaceConnectionDot`, the header indicator that replaced the profile
 /// footer's own override of a person's presence with the socket's state
 /// (owner request, 2026-08-03). Split out of `channel_rail_test.dart`, which

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The camera badge's two-source picker: both sources are offered, and
 /// choosing one routes to the plugin request that source names.
 ///

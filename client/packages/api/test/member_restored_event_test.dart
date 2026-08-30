@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [ServerEvent.parse] for `member.restored` - the mirror of
 /// `member.removed`, added so a remove-then-restore reaches already-open
 /// clients instead of waiting for an unrelated refetch.

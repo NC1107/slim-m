@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Per-kind mutation logic for `submit_canvas_op`: what `remove`, `restore`
 //! and `move` each authorize and touch, and the small reads they share.
 //!

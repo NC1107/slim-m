@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Shared by every integration test binary via `mod support;` (a `mod.rs`
 //! directory is never auto-discovered as its own test target, unlike a
 //! sibling `main.rs`). A subdirectory binary reaches it with

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /channels/{channel_id}/permissions`: the caller's effective
 //! permission bitmask in one channel, the per-channel sibling `GET /me`'s
 //! deployment-wide bitmask has never answered. See

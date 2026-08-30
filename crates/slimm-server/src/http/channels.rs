@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Channel routes: list, create, rename, and soft-delete.
 //!
 //! Listing is filtered per caller, so a channel you cannot view is simply not

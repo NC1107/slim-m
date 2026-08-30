@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reacts to the window's own lifecycle: persists geometry on a settled
 /// resize or move, and routes a close through [resolveCloseAction] rather
 /// than letting the OS quit the process. One controller rather than two,

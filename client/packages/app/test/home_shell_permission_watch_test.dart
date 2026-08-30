@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The permission watcher must be alive from [HomeShell]'s own tree.
 ///
 /// Its only watch site used to be [RolesScreen], a MANAGE_ROLES-gated modal

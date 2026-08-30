@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Three delivery patterns for a canonical op log
 /// (`canvas_convergence_model.dart`), each driving real production code -
 /// `CanvasDocument`, `CanvasSync`, and `dispatchCanvasLiveEvent`, the exact

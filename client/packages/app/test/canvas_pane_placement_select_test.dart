@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Report 3: placing a new object leaves it selected, with resize handles
 /// already live, and the surface already in Move mode - no separate tool
 /// switch first. Covers the shape and note tools driven through the full

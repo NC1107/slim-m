@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Detects the exact silent failure release.yml's own concurrency shape
 # produced on 2026-08-06: a release-please manifest bumped to a new version

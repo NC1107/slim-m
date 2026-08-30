@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `DockHeightReporter` (`canvas_pane_body.dart`'s wrapper around the call
 /// dock) resets its own `bottomDockReservationProvider` entry on unmount.
 /// Two real defects sat in that one line, neither visible from reading the

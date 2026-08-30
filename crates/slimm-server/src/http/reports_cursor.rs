@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Parsing the moderation-history pagination cursor, split out of `reports.rs`
 //! so it has a home to be unit-tested in and the handler file stays under its
 //! line budget. A pure function of its three string arguments.

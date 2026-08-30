@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one glyph each [CanvasShapeKind] gets, shared by the bar's own Shape
 /// button (which one is armed) and the overflow menu's picker rows (which
 /// one to pick) so the two surfaces cannot silently disagree.

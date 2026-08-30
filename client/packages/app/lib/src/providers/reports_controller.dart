@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The moderation queue, one page at a time.
 ///
 /// `GET /reports` is bounded now: it used to answer with every open report in

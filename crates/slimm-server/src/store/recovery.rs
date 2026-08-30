@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Admin-issued password reset codes: the self-hosted recovery path chosen in
 //! place of email, since a self-hosted deployment has no mail server to trust
 //! and the owner decided against wiring one in for this.

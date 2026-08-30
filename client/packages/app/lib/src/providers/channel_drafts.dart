@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Unsent composer text, held per channel for as long as the session lasts.
 ///
 /// `ChannelScreen` reuses its own `State` across a channel switch in the

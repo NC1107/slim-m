@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `POST /channels/{id}/canvas/ops` with `kind: "move"`: authorship the same
 //! way `remove` gates it, the one place a timeout applies to this op stream,
 //! and that a move touches only `x`, `y`, `w` and `h`.

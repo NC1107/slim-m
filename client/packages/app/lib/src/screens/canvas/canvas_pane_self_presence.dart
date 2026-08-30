@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'canvas_pane.dart';
 
 /// The caller's own "never show my own camera" toggle: split out once

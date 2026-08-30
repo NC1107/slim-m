@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A per-note cache of laid-out body text.
 ///
 /// `StrokePainter` repaints on every camera move, and `_paintNote` laid its

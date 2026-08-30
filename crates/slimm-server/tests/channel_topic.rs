@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Channel topics: gated on the same MANAGE_CHANNELS check renaming uses, a
 //! server-side length ceiling, and round-tripping through both the PATCH
 //! response and the channel list. Split out from `channels.rs` (rename and

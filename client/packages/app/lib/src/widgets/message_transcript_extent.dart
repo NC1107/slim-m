@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Why the transcript's scrollbar thumb jittered, and the one number that
 /// settles it.
 ///

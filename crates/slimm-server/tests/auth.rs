@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Integration tests for auth against a real embedded SQLite db, plus one HTTP
 //! round-trip proving the wiring end to end.
 //!

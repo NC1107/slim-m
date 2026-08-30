@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The canvas inside a DM: the owner asked for one so two people can work
 //! through something 1-on-1 without needing a voice channel for it,
 //! superseding the earlier "no canvas outside voice channels" call, which

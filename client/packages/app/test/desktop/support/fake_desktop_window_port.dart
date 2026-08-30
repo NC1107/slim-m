@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A [DesktopWindowPort] with no window, no plugin channel, and no platform
 /// behind it at all - shared across every desktop-shell test that needs one
 /// rather than each rebuilding its own copy.

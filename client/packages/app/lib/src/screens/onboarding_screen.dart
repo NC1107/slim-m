@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Joining: the three ways in.
 ///
 /// Self-hosting is the normal case here, not an advanced option, so choosing a

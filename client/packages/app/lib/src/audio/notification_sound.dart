@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The seven synthesised notification sounds (`assets/audio/notifications/`,
 /// see that directory's own `sounds.py` for what each one is for) and the
 /// seam a fake stands in for, so nothing that plays one ever touches real

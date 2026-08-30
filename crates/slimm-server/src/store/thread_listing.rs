@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Listing a channel's threads, split out of `threads.rs` for the review
 //! budget: `docs/IMPLIED-GAPS.md` named this as missing entirely - before
 //! this, the only way to find a thread was from the message it hangs off,

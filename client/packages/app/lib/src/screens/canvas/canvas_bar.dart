@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas pane's own minimal identity strip.
 ///
 /// This used to be the canvas's entire toolbar - five tools, undo, the

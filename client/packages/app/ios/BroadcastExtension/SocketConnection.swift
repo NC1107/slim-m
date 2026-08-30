@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Adapted from the LiveKit Flutter example's broadcast extension, which took
 // it in turn from Jitsi Meet. Kept close to the original on purpose: the app
 // side of this socket is flutter_webrtc's `FlutterSocketConnection`, and the

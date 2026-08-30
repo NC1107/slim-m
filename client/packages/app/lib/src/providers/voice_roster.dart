@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Who is in a voice channel the caller has not joined, kept current by
 /// polling, now nudged promptly by a live event rather than waiting out the
 /// interval.

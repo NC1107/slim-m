@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Gates schema/openapi.yaml's `"429"` response against which routes really
 //! charge the rate limiter, so a handler that starts charging cannot stay
 //! undocumented the way most of the surface already had before this gate:

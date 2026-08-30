@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Over the character limit is a 400 naming how far over, not a bare
 //! rejection: a client silently retrying the same doomed content needs the
 //! number to know why every attempt fails identically. Split out of

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The three rows #38 added to Appearance: the clock's 12/24-hour format, an
 /// in-app reduce-motion override, and the high-contrast toggle. Each has to
 /// be proven reachable by tapping it, the same property

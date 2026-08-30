@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Voice kick, the actor-versus-target half: `voice.rs`'s `kick` handler is
 //! the one KICK_MEMBERS consumer with no level check before this pass, and
 //! it needs its own per-channel escalation guard rather than the

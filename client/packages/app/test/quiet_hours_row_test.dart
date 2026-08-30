@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The "do not wake me for ordinary chatter overnight" row
 /// `NotificationsSection` gained: it reads the real window back from
 /// `GET /push/quiet-hours`, turning it on sends a `PUT` and turning it off

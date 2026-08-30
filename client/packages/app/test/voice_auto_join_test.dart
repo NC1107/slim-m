@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the direct-join redesign: a voice channel joins on arrival with
 /// no lobby and no explicit Join tap, except the one case that still asks
 /// first - already being in a different call somewhere else.

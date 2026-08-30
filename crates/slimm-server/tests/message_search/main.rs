@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Full-text message search: matching, permission scoping, deleted-message
 //! exclusion, malformed FTS5 syntax answering 400 rather than 500, and the
 //! Slack-style operator layer (`from:`, `in:`, `has:`, `before:`/`after:`)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The member popover's "Private note" row: `GET`/`PUT
 /// /users/{userId}/note` (`SlimmApi.getUserNote`/`setUserNote`), the note
 /// itself held in [userNoteProvider].

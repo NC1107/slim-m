@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `DirectMessagesSection` mounts every DM row at once, so a call state
 /// poller owned per-row multiplies with the DM list. This pins the property
 /// that regression would break: mounting many DM rows at once must not

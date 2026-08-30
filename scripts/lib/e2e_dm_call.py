@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Starting a DM from the member list, then holding a call inside it.
 
 There is no "+" affordance on the DM rail section (deliberately not built,

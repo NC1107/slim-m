@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pure geometry shared between [CanvasPresenceLayer] (the interactive
 /// shell every tile's controls live on) and [CanvasPresenceBackdrop] (the
 /// non-interactive paint of a tile sent to the back) - both need the exact

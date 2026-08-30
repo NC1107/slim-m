@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `cameraFailureMessage` turns a camera toggle failure into what the user
 /// reads. Two rules were untested: a reason-specific message is shown only when
 /// turning the camera *on* (a failure to turn it off is never "permission

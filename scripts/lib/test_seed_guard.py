@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the seeding script's target guard.
 
 No network here: every check in seed_guard.py is a pure function over

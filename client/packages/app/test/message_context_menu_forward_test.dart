@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The context menu's forward and thread items, split from `message_context_menu_test.dart`
 /// once that file crossed the 500-line hard ceiling in the merge that brought
 /// forwarding and the thread cross-link together.

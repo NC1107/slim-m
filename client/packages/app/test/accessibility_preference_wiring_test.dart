@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `main.dart`'s own doc comment on [appChromeBuilder] and [SlimMApp.build]
 /// claims two preferences reach the running app: high contrast swaps two
 /// token roles, and the reduce-motion override reaches

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests that the composer lifts its content off the home indicator.
 ///
 /// This is the bottom edge of the compact conversation screen, and it had no

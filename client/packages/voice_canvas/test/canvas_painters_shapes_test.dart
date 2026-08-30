@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Note and shape objects: a note's own box and text truncation, and a
 /// shape's own primitive and zoom scaling.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The message-op half of `POST /sync`, over the real route.
 //!
 //! The load-bearing one here is `an_old_client_is_never_told_to_reset`: a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Channel settings' danger zone: `DELETE /channels/{id}`, with the same
 /// confirm-then-delete flow the old `manage_channel_sheet` carried before
 /// `channel_settings_screen.dart` replaced it.

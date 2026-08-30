@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The debug log's own `ExpansionTile` (an entry with a stack trace) drives
 /// its expand/collapse with a plain `AnimationController` Flutter owns,
 /// keyed to the platform's own reduce-motion feature rather than this app's

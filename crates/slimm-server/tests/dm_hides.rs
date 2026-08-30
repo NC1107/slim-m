@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Closing a DM out of the sidebar: a per-viewer hide, never a delete. See
 //! `dm_hides` (0057_dm_hides.sql) and `Store::hide_dm_conversation`.
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Literal copies of the design tokens a canvas visual render needs.
 ///
 /// This package deliberately carries no dependency on `slimm_design_system`

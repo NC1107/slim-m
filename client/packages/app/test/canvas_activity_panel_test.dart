@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The activity panel and its always-mounted announcer, as an actual
 /// accessibility tree rather than a widget reasoned about on paper - see
 /// this file's own dumped-tree assertion for why that distinction mattered

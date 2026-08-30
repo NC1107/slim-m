@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Presence and typing glue for one WebSocket connection: the connect and
 //! disconnect bookkeeping presence needs, and the inbound typing-frame
 //! handling. Split out of `super` (the envelope and connection loop) so that

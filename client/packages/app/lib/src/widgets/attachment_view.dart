@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders one attachment: an inline image once its bytes arrive, a real
 /// player for a video, or a filename-and-size chip for anything else. The
 /// chip and the video player both carry a save action (`attachment_save.dart`)

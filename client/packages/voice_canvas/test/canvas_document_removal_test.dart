@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Removal, clear, restore and a hard reset: the tombstone set that makes
 /// each of them safe to replay, and the two ways a restored id has to be
 /// un-blocked before it can be placed again.

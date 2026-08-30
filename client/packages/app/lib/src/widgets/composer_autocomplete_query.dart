@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What the caret is currently in the middle of typing, if anything.
 ///
 /// Kept as one pure function over (text, caret) with no widget, controller or

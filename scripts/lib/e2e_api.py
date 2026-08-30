@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Ask the server what actually happened, rather than believing the screen.
 
 Every scenario drives the UI and then checks here. A roster that renders, a

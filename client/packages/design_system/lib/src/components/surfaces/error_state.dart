@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The persistent record of a failed action.
 ///
 /// The error grammar's rule is that a failure is a state, not an event: it

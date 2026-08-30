@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one shape for "a setting you turn on or off".
 ///
 /// There were three: `AppListRow(trailing: AppToggle(...))` in

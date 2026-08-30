@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The gap above the reactions row, reported as sitting a few pixels too
 /// low on a real phone.
 ///

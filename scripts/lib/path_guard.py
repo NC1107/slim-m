@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Validates a database-sourced value before it becomes a filesystem path
 component, for backup_lib.py and restore_drill_lib.py.
 

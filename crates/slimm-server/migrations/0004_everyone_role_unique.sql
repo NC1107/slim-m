@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Enforce the single-@everyone-role invariant the permission evaluator depends on.
 --
 -- The base of every permission evaluation is the one role with is_everyone = 1.

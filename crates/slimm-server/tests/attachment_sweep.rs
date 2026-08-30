@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The orphaned-attachment sweep, and the custom emoji that sits in front of
 //! it.
 //!

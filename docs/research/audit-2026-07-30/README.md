@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # The full-stack audit (2026-07-30)
 
 Thirty-three specialist reviews over the whole stack, every one put through a

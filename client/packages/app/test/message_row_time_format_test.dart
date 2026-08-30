@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The grouped continuation gutter's timestamp follows the 12/24-hour
 /// preference (#38), not a hardcoded format. Split out of
 /// `message_row_test.dart`, which is already at its line budget and whose

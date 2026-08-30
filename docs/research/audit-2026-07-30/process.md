@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # CI, tests and documentation
 
 The gates that exist are unusually good, and the gaps are all in the same shape: something is asserted rather than enforced.
@@ -285,7 +285,7 @@ Separately, the `catch (_) { return true; }` at lines 39-41 of that widget has n
 `scripts/ui-snapshots.sh:1`
 
 Line 1 is the shebang and line 2 is a description comment.
-Checking `head -3` for SPDX across scripts/*.sh, scripts/*.py and scripts/lib/*.py flags this file and no other; e2e.sh carries `# SPDX-License-Identifier: Apache-2.0` on line 2.
+Checking `head -3` for SPDX across scripts/*.sh, scripts/*.py and scripts/lib/*.py flags this file and no other; e2e.sh carries `# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0` on line 2.
 CLAUDE.md requires the header on every source file and the hygiene gate only checks the Rust ones, so it slipped through - the single exception in an otherwise clean scripts tree.
 
 ## The end-to-end harness

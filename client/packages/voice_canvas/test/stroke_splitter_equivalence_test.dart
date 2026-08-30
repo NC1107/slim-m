@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CP6: `splitStroke` was rewritten to track its byte and extent budgets
 /// incrementally instead of re-encoding the whole candidate segment on every
 /// probe (which was O(L^2) in a segment's point count, run on the UI thread the

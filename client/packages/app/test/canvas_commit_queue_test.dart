@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The commit queue: retry, the distinct "removed while sending" failure,
 /// and the cancel/arm split undo needs from a placement that has not landed
 /// yet.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [DesktopChrome] must pass its child through completely unwrapped while
 /// [DesktopWindowShell.active] is false - the property every other widget
 /// test in this package's tree shape depends on never changing, since

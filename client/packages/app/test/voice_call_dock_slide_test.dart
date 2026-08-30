@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [VoiceCallDock]'s own entrance: it slides up once per call rather than
 /// riding only the screen's shared fade, and must not replay on a rebuild
 /// that leaves the same call in progress (a mute toggle, a participant

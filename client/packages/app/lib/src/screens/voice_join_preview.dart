@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The non-connected states of a voice screen: connecting, needing to
 /// confirm a switch between two calls, and needing an explicit rejoin.
 ///

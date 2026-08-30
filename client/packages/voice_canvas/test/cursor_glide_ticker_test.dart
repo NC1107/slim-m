@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The surface's glide driver: frames are scheduled only while a cursor is
 /// actually mid-glide, stop once every glide lands, and are never scheduled
 /// at all for a zero (reduce-motion, or unwired) glide.

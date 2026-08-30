@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """perf/baselines/ must not fall far behind the server's own release tags.
 
 perf/README.md's model is one committed baseline per server release, but

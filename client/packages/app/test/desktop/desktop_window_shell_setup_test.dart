@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [DesktopWindowShell.registerListenersAndTray] must never leave
 /// `main.dart`'s bootstrap stuck: a thrown error or a hang in the native
 /// window/tray plumbing has to be logged and swallowed, not left to strand

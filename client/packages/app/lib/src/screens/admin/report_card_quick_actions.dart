@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The report card's quick-action row: jump to the message, delete it, time
 /// out its author, or remove them from the Space. Split out of
 /// `report_card.dart` to keep that file under budget.

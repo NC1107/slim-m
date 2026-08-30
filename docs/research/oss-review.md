@@ -1,6 +1,7 @@
 # Adversarial review: open source strategy (oss.md)
 
 Status: adversarial review pass, pre-implementation.
+Resolved 2026-08-30: the licensing findings below (4, 5, 8) are settled and no longer open questions. The whole repository moved to PolyForm Noncommercial 1.0.0, so the AGPL-versus-Apache split these findings argue about no longer exists, and finding 8's warning about DCO-only leaving a commercial pivot hard to reverse was acted on: CONTRIBUTING.md now takes an explicit relicensing grant from contributors. The non-licensing findings stand as written. See [LICENSING.md](../../LICENSING.md).
 Reviewed: docs/research/oss.md against docs/BRIEF.md, docs/decisions/0001-owner-decisions.md, docs/research/stack-decision.md, docs/research/devops.md, docs/research/flutter-client.md, docs/research/networking-relay.md, docs/research/media.md.
 Method note: echo-messenger (decentralized-chat-app) was not opened at any point in this review, in line with the off-limits rule.
 check-in-relay was opened only to verify two factual claims in oss.md, which is the allowed reference for the relay.

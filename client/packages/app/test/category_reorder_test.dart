@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `CategoryList`/`CategoryDragHandle`: fewer than two categories
 /// draws no handle at all, a real drag reports the new arrangement in the
 /// right order, and the handle carries a real accessible name - see

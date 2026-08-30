@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail's fixed top and bottom bars: the Space header (with its menu)
 /// and the signed-in user's footer.
 library;

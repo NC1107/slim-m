@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Runtime configuration, loaded from `SLIMM_`-prefixed environment variables.
 //!
 //! Flat environment-variable config keeps the self-host operational surface

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Serving a stored attachment's bytes back with HTTP range support, split out
 //! of [`super::attachments`] so that file holds the upload/fetch handlers and
 //! this one holds the RFC 9110 `Range` arithmetic and the streamed response it

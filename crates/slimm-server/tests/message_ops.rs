@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The message op stream, against a real embedded SQLite database.
 //!
 //! What these bind is density: after N real edits and deletes, the feed holds

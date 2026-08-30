@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A [CanvasToolsRow] wrapped for a widget test, and its own
 /// fill-in-the-blanks constructor - shared between `canvas_tools_row_test.dart`
 /// (everything the row does), `canvas_tools_row_shape_kind_test.dart` (the

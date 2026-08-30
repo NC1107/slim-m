@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The gap *between* reaction chips, reported as looser than it should read:
 /// "emoji reactions can be compacted left to right a bit more, less padding
 /// between them."

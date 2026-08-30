@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The value types a voice call exposes to the rest of the client.
 ///
 /// Split out of `voice_session.dart` when that file reached the 500-line

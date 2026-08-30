@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Pinned messages: the MANAGE_MESSAGES gate is evaluated per channel rather
 //! than off a deployment-wide check, reading the pin list needs only
 //! VIEW_CHANNEL, pinning is idempotent, deleting a pinned message clears its

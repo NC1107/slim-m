@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Migration 0025 against real data: widening `dm_channels`' pair ordering
 //! to admit a self pair must not disturb an ordinary pair already stored.
 //!

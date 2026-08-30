@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [FirstRunTrayNoticeBanner] must say the true thing for the resolved
 /// [CloseAction] it is handed, never the other path's copy - the bug this
 /// file exists to catch had the tray-only copy shown unconditionally,

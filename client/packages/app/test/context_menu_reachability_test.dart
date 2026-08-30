@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The context menu stays reachable without a mouse: by long press, including
 /// to a screen reader, and by keyboard.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'client.dart';
 
 /// Reading a region of a channel's canvas and placing objects on it, the

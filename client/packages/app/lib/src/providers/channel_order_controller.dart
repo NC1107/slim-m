@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Setting the deployment's channel order and category placement from the
 /// rail: `PUT /channels/order` ([api.SlimmApiChannelAdmin.reorderChannels]).
 /// [CategoryOrderController] below is the category-reorder sibling, from the

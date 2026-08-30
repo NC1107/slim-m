@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the generated attachment fixtures.
 
 Checks structure the server's own sniffer cares about (real magic bytes,

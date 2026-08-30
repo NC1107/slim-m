@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two touch-reachable entry points into the emoji picker, split out of
 /// `emoji_picker.dart` to keep that file inside the review budget.
 ///

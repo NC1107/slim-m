@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The "increase contrast" preference's effect on the token set: a targeted
 /// boost of the two weakest roles, not a second palette.
 ///

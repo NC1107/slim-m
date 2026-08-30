@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # The file-size budget from CLAUDE.md: 300 lines soft, 500 lines hard.
 # Warns at 300 and fails at 500, over hand-authored source only. Files already

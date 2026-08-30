@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The start-of-channel header: it welcomes a named channel and gives the
 /// channel topic its one home in the message body, and it stays out of the way
 /// where there is no such thing (a DM, whose name is a person).

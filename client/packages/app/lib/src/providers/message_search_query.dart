@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Parses the Slack-style operators `http::search` accepts
 /// (`from:`/`in:`/`has:`/`before:`/`after:`) out of a raw search-bar string,
 /// leaving whatever free text remains.

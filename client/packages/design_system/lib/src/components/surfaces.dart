@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Surface components: bordered content containers and the floating and
 /// fenced-code widgets built on top of them.
 library;

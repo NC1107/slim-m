@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests that the rail's header keeps its content clear of the status-bar
 /// inset while its background and border still reach the screen edge.
 ///

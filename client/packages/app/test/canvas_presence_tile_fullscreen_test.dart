@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Expanding one canvas presence tile to full screen - the owner's report
 /// was "no way to full screen a camera", which was closed on the voice
 /// screen (PR #468, `voice_screen_fullscreen_test.dart`) and left open on

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The per-channel canvas object cap as a space setting: its default, the
 //! config round trip over HTTP, its MANAGE_SERVER gate, and the settable
 //! range. The cap's actual enforcement at placement is covered in

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Grants and revokes one role across members: `PUT`/`DELETE
 /// /members/{userId}/roles/{roleId}`, both idempotent.
 ///

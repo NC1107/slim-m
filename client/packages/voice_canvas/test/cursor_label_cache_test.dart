@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CP5: a cursor's name chip must be laid out once and reused, not re-shaped on
 /// every paint. `CursorPainter` repaints every frame while a cursor glides, but
 /// its label text and colour do not change frame to frame - only its position

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Message retention: an opt-in, deployment-wide window past which a
 //! message is pruned, on the same periodic-sweep model as
 //! [`Store::sweep_expired_tokens`] and [`Store::sweep_canvas_ops`].

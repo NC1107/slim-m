@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The three chart cards on [AnalyticsScreen]: messages by day, active
 /// hours, and this server's own memory. Split out of `analytics_screen.dart`
 /// to keep that file under the review budget.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A poll option's label sits in the middle of its row, not against its top.
 ///
 /// The option is a [Stack]: a full-height track, the fill bar over it, and

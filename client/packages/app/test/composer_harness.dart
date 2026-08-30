@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the two suites that pump a [Composer]: its send paths
 /// and its affordances (attach a file, insert a Space emoji).
 ///

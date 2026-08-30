@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Per-participant playback gain, and the honest answer about where it works.
 ///
 /// livekit_client 2.8.1 has no per-participant volume API at all - only

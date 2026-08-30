@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for the other half of profile-name reconciliation:
 /// `SyncController.start()` forgets every cached author name on every
 /// (re)connect, since there is no cursor over a rename to catch up from and

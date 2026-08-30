@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Who has been removed from this Space, and letting them back in.
 ///
 /// The only place a removed member is still nameable: `GET /members` drops

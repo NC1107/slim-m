@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The CI bundle-check the roadmap named: a missing notification sound must
 /// fail a build, never fall back to silently playing nothing.
 ///

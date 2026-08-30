@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The animated call roster: a joiner pops in, a leaver plays out in place
 /// before the wrap reflows, and reduce motion skips both.
 ///

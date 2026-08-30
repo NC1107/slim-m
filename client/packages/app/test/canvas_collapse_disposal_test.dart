@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// docs/ROADMAP.md's Phase 6 "collapse-to-strip" deliverable: closing the
 /// canvas must not merely hide it, it must unmount and free what it decoded.
 ///

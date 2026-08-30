@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the seeding script's 429 backoff.
 
 A fake sleep and a fake rng make this deterministic and instant: no test

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The scoping report 4 asked for by name: "the pfp should not be broken or
 /// resizeable." An avatar-only tile (camera off, no screen share) drags and
 /// hides like any other presence tile, but exposes no resize grip and no

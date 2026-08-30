@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Typed client for the slim-m wire protocol.
 ///
 /// The contract lives in `schema/openapi.yaml`; this package is its Dart side.

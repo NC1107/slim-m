@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'canvas_pane.dart';
 
 /// The helper objects `_CanvasPaneState` hands its child widgets: split out

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Direct-message conversations: the `dms` tag.
 ///
 /// Split out of models.dart purely to stay under this repo's line budget; see

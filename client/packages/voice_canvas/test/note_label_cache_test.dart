@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CP9: a note's body text must be laid out once and reused across the frames
 /// `StrokePainter` paints on every camera move, not re-shaped each time. A
 /// note's layout depends only on its text and its projected size, so a pan

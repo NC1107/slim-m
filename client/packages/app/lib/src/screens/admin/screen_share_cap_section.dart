@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The screen-share resolution ceiling control on the Space performance
 /// screen. Split from `performance_screen.dart`, which is at its file-size
 /// ceiling; the two share the screen but not a file, the same split

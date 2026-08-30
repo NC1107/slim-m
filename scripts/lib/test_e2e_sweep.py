@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for e2e_sweep's read-state and sync checks.
 
 `devices_and_read_state` used to assert only `is not None` on both the read

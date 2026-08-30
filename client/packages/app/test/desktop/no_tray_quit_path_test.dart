@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The property that matters: with the tray probe answering "no host" -
 /// GNOME with no AppIndicator extension, the well-known Discord-on-GNOME
 /// case decision 0012 itself names - close falls back to an ordinary

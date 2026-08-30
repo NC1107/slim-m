@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One channel row by id, watched through the local store.
 ///
 /// Replaces the pattern where several widgets each opened a stream over the

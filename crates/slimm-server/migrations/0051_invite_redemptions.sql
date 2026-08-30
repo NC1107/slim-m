@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Which user redeemed which invite code, so a redemption is idempotent per
 -- (code, user). `spend_invite`'s conditional UPDATE guards the code's own use
 -- limit, expiry and revocation, but nothing recorded whether this caller had

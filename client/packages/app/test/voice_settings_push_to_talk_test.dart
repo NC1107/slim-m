@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the push-to-talk section: enabling it and choosing a key both
 /// persist, and both rows carry their own real accessible name against the
 /// dumped tree. What holding and releasing the key actually does to the

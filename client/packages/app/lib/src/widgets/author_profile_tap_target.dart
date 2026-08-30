@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [AuthorProfileTapTarget], split out of `message_row_identity.dart` to keep
 /// that file to the row's own leading/header composition rather than this
 /// wrapper's own semantics reasoning.

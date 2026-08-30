@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the message row's background highlight: a hovered message shifts
 /// colour so the floating reaction button reads as attached to it, and an
 /// open context menu keeps that same shift for as long as the menu is open.

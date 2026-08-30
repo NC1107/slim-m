@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A minimal, schema-faithful SQLite database and media tree for the backup
 and restore-drill tests, so they exercise the real column shapes
 (crates/slimm-server/migrations/0002_core_schema.sql and 0013_attachments.sql)

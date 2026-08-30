@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The endpoints a person reaches through UI this harness cannot drive yet.
 
 Search, pins, polls, editing, deleting, invites, DMs, devices and read state

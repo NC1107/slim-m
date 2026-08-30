@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A small label chip: a member role, a bot tag, or a stale-ness warning.
 ///
 /// All three are outlined and unfilled, each with its own letter-spacing

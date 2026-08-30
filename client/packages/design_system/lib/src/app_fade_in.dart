@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A one-shot entrance: fade in while rising a few pixels, once, when first
 /// shown.
 ///

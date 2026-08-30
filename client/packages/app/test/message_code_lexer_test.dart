@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [lexCodeBlock]: each [AppCodeRole] must trace back to the
 /// right substring for a recognised language, and an unrecognised one must
 /// render unhighlighted rather than guessing.

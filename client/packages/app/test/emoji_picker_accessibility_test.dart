@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Accessibility coverage for the emoji picker: the search field and every
 /// tile carry a name a screen reader can speak, a deployment's own emoji
 /// announces its shortcode rather than a blank glyph, and the category /

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A muted or mentions-only channel neither chimes in-app - the client-side
 /// half of "so a muted channel neither chimes nor pushes". `channelEarnsASound`'s
 /// own decision logic is covered standalone in `notification_sound_rules_test.dart`;

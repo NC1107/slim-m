@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Message-row content tests split out of message_row_test.dart to keep both
 /// under the file budget: reactions, attachments, and the emoji panel.
 library;

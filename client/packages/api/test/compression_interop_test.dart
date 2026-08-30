@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// permessage-deflate interop between the Dart client and the Rust server.
 ///
 /// Compression is negotiated per connection, and a mismatch does not fail

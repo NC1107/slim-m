@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which room events can change what one participant's video tile shows.
 ///
 /// `CameraView` and `ScreenShareView` each render a single participant's video

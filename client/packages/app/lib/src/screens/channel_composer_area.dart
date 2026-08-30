@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Everything below the transcript: the reply banner and composer normally,
 /// and the selection bar while messages are being picked for deletion.
 ///

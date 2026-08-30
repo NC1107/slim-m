@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Coverage for `forwardTargetsProvider`: which channels and DMs a forward
 /// may actually go to.
 library;

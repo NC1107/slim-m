@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the parts of `customEmojiImageProvider` that sit around the
 /// network fetch itself: the disk cache short-circuiting it entirely, a
 /// `Retry-After` header overriding the fixed backoff, and a rate limit that

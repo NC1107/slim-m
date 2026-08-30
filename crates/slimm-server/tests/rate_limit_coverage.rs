@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Every authenticated route charges a rate-limit class, proven against the
 //! router's own source rather than a list kept by hand.
 //!

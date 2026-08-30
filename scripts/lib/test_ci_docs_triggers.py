@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A workflow's row in docs/ci.md must mention every trigger kind it has.
 
 `scripts/check-ci-docs.py` enforces that every workflow has a row and every

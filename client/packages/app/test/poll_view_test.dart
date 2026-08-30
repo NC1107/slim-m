@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Poll cleanup: the voted option used to be told from the others by colour
 /// alone, a closed poll said so only in fine caption text nobody reads first,
 /// and each option's percentage started at a different horizontal offset

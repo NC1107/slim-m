@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two per-channel drift streams `ChannelScreen` watches, cached so a
 /// rebuild that leaves the channel id and window unchanged reuses the same
 /// `Stream` instance instead of asking drift to start a fresh query.

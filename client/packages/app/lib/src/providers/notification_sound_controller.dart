@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Plays a notification chime for the three kinds of event this client can
 /// already see live: an incoming message, a voice roster changing while
 /// connected, and a DM call becoming active while this device is not

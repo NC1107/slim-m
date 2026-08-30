@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The canvas op stream: the single ordering authority every canvas mutation
 //! writes into, and the paged catch-up feed a client reads it back through.
 //!

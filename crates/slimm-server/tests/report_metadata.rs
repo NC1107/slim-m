@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Report metadata: who wrote the reported content, and what the caller can
 //! do about it in `channel_id`. Split from `reports.rs` (queue lifecycle and
 //! gating) once it crossed the 500-line hard limit; see

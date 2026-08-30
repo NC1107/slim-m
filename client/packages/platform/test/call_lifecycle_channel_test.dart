@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the CallKit lifecycle bridge: a non-iOS platform never touches
 /// the channel, an iOS one forwards the right calls, and an `endCall` from
 /// the native side surfaces as [CallLifecycleChannel.endCallRequests].

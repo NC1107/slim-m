@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The message page-size preference: it defaults to the standard 50 the app
 /// has always fetched, a choice persists and restores, an unknown stored value
 /// degrades to the default, only the default names itself so in the picker, and

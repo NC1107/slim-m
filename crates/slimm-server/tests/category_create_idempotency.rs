@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! API2: category creation accepts an optional client-supplied id and is
 //! idempotent on it, the same contract `send_message` already gives a
 //! message send (see `message_endpoints.rs::send_is_idempotent_over_http`).

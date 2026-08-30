@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Space usage analytics: off by default, and the whole feature - derived
 //! counts included - answers nothing while the toggle is off. See
 //! `docs/decisions/0008-space-analytics.md` and `store/analytics.rs`.

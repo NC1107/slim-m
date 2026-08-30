@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The batched permission read paths: many candidates against one channel
 //! (push fan-out), many channels against one caller (the rail listing and
 //! `GET /channels`'s own bitmask), and many arbitrary channel ids against

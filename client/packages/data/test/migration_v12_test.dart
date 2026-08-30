@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests the schema-12 migration, which is what an upgrading client needs
 /// for channel categories - see docs/decisions/0006-channel-categories.md.
 ///

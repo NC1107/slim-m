@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// An inline attachment image must never be asked to decode wider than it can
 /// ever be drawn: a phone photo attached to a message is routinely megabytes
 /// at full resolution, and the transcript never shows more than

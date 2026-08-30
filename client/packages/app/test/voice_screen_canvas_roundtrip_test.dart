@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Hanging up after a canvas round trip must not rejoin the call.
 ///
 /// Opening the canvas swaps the whole conversation pane (`home_shell.dart`'s

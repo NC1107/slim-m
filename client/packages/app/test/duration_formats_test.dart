@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Two duration labels with no test between them: `formatCallDuration` on a
 /// call recap card, and `formatRemaining` on a member's timeout. Both turn on
 /// thresholds and one pluralizes, which is exactly where an off-by-one hides -

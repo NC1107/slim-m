@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `applyLocalReactionToggle` is the optimistic preview a reaction chip shows
 /// the instant you tap it, before the `reactions.changed` broadcast confirms
 /// it. Its arithmetic was untested, and it is where a wrong count or a chip

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A fresh launch must not claim a presence visibility it cannot read back.
 ///
 /// The preference is durable server-side (`users.presence_visibility`,

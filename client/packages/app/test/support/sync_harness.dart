@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Drives a real [SyncController] against a fake server: REST answered by a
 /// router the test controls, and a WebSocket this harness actually accepts
 /// and can push frames down at a chosen moment.

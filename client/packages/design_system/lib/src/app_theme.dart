@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The ThemeData built from a token set.
 ///
 /// Split from `app_tokens.dart` when the component themes pushed that file

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The client's emoji-name preview must agree with the server, character for
 /// character, or the name shown before an upload is not the name stored after
 /// it.

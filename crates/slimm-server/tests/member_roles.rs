@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Roles on the member list: `@everyone` excluded, a member with nothing
 //! beyond it answers empty, and a page of members with mixed role sets does
 //! not pay a query per member. Split out from `users.rs` (profiles and the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Migration 0049 against real data: widening the audit log's action set is a
 //! table rebuild, and a rebuild is where audit rows get lost.
 //!

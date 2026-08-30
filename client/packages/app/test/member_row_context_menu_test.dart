@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A right-click on a member row used to do nothing at all; a left tap
 /// already opened the full profile popover (message, report, block, and
 /// every moderation verb the caller holds), so the fix is reaching that

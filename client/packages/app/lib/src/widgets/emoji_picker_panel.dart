@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The picker surface itself: search, category tabs, and the grid they
 /// filter. Its two entry points (a hover-anchored button and a bottom sheet)
 /// live in `emoji_picker.dart`, which re-exports this.

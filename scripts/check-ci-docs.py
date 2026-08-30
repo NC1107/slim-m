@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Every workflow appears in the table `docs/ci.md` opens with.
 
 CLAUDE.md sends a reviewer to `docs/ci.md` as the authoritative list before

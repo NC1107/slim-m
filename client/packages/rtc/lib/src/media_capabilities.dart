@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What this device can actually do with media, asked at runtime.
 ///
 /// This exists because the answer is not knowable from the platform alone.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The menu a right-click on a presence tile opens - the same verbs
 /// `TileControls`'s hover row already exposes, reached without hovering or
 /// pressing first. `CanvasPresenceTileMenuController` is the seam:

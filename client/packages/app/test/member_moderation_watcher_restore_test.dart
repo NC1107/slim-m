@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `memberModerationWatcherProvider` refetches the roster on
 /// [api.MemberRestored], the case the 2026-08-11 review added: a removed
 /// member let back in stayed off every open member pane until an unrelated

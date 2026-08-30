@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Coverage for `channelPermissionsProvider`, `myChannelPermissionsProvider`,
 /// and the invalidation cases `roleChangeWatcherProvider` gained for them -
 /// see docs/decisions/0011-per-channel-permissions.md. Mirrors

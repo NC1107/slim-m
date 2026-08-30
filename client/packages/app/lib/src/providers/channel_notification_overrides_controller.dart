@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which channels this account has muted, or narrowed to mentions only,
 /// held for as long as the session lasts - the client-side counterpart of
 /// `store/channel_notification_prefs.rs`.

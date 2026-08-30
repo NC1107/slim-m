@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The window-select sibling of `bulkDeleteMessages`'s call in `content.rs`,
 //! a separate module for the same reason `content_media_slots.rs` is: folding
 //! it into `message_calls` pushed `content.rs` past the 500-line hard cap.

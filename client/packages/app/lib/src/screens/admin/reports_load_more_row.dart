@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The end of a full page: more items may follow, and only asking finds out.
 /// Shared by the open-reports queue and the history feed beside it
 /// (`reports_screen.dart`, `report_history_pane.dart`), which page the same

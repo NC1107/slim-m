@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `pickerTabs` decides which emoji category tabs the picker shows: the custom
 /// and recent tabs appear only when they have something in them, custom ahead
 /// of recent, and the standard categories always follow. A tab shown while

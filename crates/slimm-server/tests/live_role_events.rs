@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end coverage for the `RoleChanged` and `MemberRoleChanged` events,
 //! half of the 2026-07-30 audit's fan-out finding that was missing entirely
 //! (`hub.publish` never appeared in `http/roles.rs`). See `live_channel_events.rs`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [UserAvatar] and [AuthorAvatar]: the real picture is wired in
 /// once its bytes resolve, and a user with none (or with an id not yet
 /// resolved) still falls back to the same initials [AppAvatar] always draws.

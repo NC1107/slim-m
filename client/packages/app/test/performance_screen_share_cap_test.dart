@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The screen-share resolution ceiling control on the Space performance
 /// screen: it shows the current ceiling, patches a new one, and states the
 /// bandwidth consequence of the chosen ceiling. Its own file for the same

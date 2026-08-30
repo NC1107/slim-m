@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The shared "you cannot reach above your own level" comparison.
 //!
 //! [`members.rs`](super::members) states the reasoning this exists to carry

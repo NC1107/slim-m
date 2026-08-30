@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reproduces the "second round, 2026-07-31" backlog entry: sending a message
 /// briefly shows an extra day divider above it that then disappears.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The History tab beside the open-reports queue, exercised through the real
 /// `ReportsScreen`: switching tabs shows the other feed without disturbing
 /// the one left behind. `moderation_history_controller_test.dart` covers the

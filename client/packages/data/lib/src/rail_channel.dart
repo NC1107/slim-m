@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The channel-rail projection `MessageStore.watchRailChannels` dedupes
 /// against - split out once adding it to `message_store.dart` crossed the
 /// review budget.

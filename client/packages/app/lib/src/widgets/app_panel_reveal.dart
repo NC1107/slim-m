@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A side pane's content arriving with its slot: a fade plus a short drift
 /// in from the edge the pane lives on, once, on mount.
 ///

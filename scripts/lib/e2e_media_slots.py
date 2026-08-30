@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A camera tile's shared, persistent position on the Voice Canvas.
 
 Every other canvas scenario in this run proves a client agrees with the

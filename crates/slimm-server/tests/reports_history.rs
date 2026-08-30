@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! MOD4: `GET /reports/history`, the merged read over resolved reports and
 //! `moderation_audit_log` that `reports.rs` (open queue) and
 //! `moderation_audit_routes.rs` (write-only until now) never gave a reader.

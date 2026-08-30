@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders [PollView] across the states the redesign exists to fix, so a
 /// reviewer sees pixels rather than a description: zero votes, a clear
 /// leader, an option you have voted for, a tie (which must mark nobody as

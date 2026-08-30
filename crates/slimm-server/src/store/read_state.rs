@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Read state and the catch-up read path.
 //!
 //! Read state is a per-(user, channel) monotonic `last_read_seq`. Unread is not

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One direct-message row in the rail: open on tap, and a right-click or
 /// long-press menu to close it, mute it, narrow it to mentions only, or
 /// report or block the person on the other end of it.

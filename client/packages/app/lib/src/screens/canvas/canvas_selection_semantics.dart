@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The current selection's own accessibility node - a note's full text,
 /// unclipped, reachable by a screen reader with no permission of its own
 /// beyond what selecting the object already needed.

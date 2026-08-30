@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # The dependency-license allowlist, one job per ecosystem.
 # One policy of record in deny.toml: cargo-deny reads it for the Rust tree and

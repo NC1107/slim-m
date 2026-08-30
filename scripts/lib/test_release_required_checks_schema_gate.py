@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The additive-only schema gate must actually be able to appear on the
 commit `verify-release-checks.yml` verifies, not just be named in
 `required_checks`.

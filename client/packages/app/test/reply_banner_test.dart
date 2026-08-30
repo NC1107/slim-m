@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The staged-reply strip above the composer: it names who a reply targets and
 /// a one-line snippet, and cancels back to an ordinary send. A text-less parent
 /// is named by what it carried instead, so replying to a photo is not a blank

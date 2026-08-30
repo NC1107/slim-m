@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The create/edit form for a role: `POST /roles` and `PATCH /roles/{id}`.
 ///
 /// A permission toggle is only interactive when the signed-in caller holds

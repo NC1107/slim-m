@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One permission's three-way state in a channel overwrite: inherit
 /// (neither bit set), allow (forced on), or deny (forced off). Split out of
 /// `channel_overwrites_screen.dart` to keep that file under budget.

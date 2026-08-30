@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """`data.dart` must never again re-export a drift row as `Message`.
 
 TECHNICAL_DEBT CA1: most of `app` was transitively coupled to drift because

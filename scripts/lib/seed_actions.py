@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Which action a worker performs next.
 
 Weighted rather than uniform, so a run reads like an uneven real

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's own entry point into `composer_picker_panel.dart`: a GIF
 /// icon (only when this deployment has search enabled) and an Emoji smile,
 /// sharing one floating panel anchored above them and right-aligned, the

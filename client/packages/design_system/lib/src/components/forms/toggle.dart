@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// An on/off switch. State is never colour alone: the thumb moves between
 /// two fixed positions and the track only fills when on, so position and
 /// fill carry the state together with the accent hue rather than instead

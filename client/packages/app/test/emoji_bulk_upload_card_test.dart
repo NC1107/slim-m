@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Widget tests for bulk emoji import (backlog #137): picking a zip drives
 /// `POST /emoji/bulk` in chunks rather than one `POST /emoji` per image - see
 /// `emoji_bulk_upload_card.dart`'s own module doc for why a per-image request

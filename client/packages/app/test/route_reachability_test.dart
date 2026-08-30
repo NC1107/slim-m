@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every route the app can show must be somewhere the user can get to.
 ///
 /// This exists because `Routes.settings` was registered, built, and tested,

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """How much of the documented API a run actually touched.
 
 Counted from what was really called rather than from a list kept by hand: the

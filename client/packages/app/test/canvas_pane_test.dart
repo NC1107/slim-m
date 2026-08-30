@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas pane: it fetches on open, applies live frames for its own
 /// channel and nobody else's, commits a drag, and says so when the server
 /// refuses rather than rendering an empty board.

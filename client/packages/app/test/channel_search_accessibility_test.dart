@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Accessibility coverage for real search hits: a result row's accessible
 /// name and the live region that announces how many came back, both of
 /// which need real messages over a real [ChannelScreen] rather than the

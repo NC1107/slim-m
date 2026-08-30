@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Platform-facing seams, kept behind interfaces so the app never depends on a
 /// specific platform mechanism.
 library;

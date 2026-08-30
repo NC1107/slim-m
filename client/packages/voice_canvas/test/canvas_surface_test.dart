@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Phase 5 rebuild gate, run against the shipped surface rather than
 /// against a benchmark fixture.
 ///

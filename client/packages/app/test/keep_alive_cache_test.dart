@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `KeepAliveCache` is the count-bounded window behind every autoDispose byte
 /// cache in the app (avatars, attachments, gif previews). Its whole reason to
 /// exist is evicting the least-recently-held entry once capacity is passed, so

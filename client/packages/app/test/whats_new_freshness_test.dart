@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The gate that stops the what's-new list quietly stopping again.
 ///
 /// It stopped once already and nothing anywhere said so. The newest entry sat

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Jumping to a message end to end, over a real [ChannelScreen]: a message
 /// already loaded is scrolled to and flashed; one that needs older history
 /// paged in gets there the same way once paging catches up; and one that can

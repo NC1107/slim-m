@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Camera and screen-share tiles for whoever is on this channel's call -
 /// including the caller's own - positioned in the canvas's own
 /// world-coordinate space, exactly the AR-glasses framing the owner asked

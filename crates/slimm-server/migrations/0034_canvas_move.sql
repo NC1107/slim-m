@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Adds `move` to `canvas_ops`: repositioning a placed object without erasing
 -- it, so a pasted image is not nailed permanently to wherever it first
 -- landed. SQLite cannot widen a CHECK constraint in place, and unlike 0026's

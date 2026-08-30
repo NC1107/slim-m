@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Per-language keyword tables and comment/string rules for
 /// [message_code_lexer.dart]. Kept as space-separated word lists rather than
 /// one-element-per-line set literals so a keyword table reads as a table,

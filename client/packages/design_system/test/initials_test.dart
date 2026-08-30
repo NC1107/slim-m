@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [initialsFor] is the one initials rule, made public when the 2026-08-11
 /// review found a second implementation in `onboarding_shell.dart` without
 /// the symbol-stripping - the same name rendered different initials in the

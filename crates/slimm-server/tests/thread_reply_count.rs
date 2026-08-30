@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The "N replies" affordance `docs/decisions/0005-threads.md` named as not
 //! built: `Store::thread_summaries_for_messages` batch-loads a reply count
 //! and a last-reply timestamp onto whichever message opened a thread, the

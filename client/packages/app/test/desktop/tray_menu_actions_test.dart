@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which rows the tray menu shows: Show/Hide, Status, Preferences and Quit
 /// always, Mute microphone, Deafen and Leave call only while a call is
 /// actually live - the owner's own answer to decision 0012's open question

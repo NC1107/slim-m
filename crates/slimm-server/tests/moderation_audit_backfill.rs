@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Migration 0048 against real data: an upgrading deployment's standing
 //! removals and timeouts have to arrive in the log, or it opens by implying
 //! that nothing had ever happened.

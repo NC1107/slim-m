@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sheet the composer's poll button opens: a question and 2-4 options,
 /// sent through `POST /channels/{id}/messages/polls`
 /// ([api.SlimmApiMessages.sendPollMessage]).

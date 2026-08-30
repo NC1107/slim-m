@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The other half of pinning a server's identity: a later connection whose
 /// key does not match what was pinned before. Trust-on-first-use exists to
 /// make exactly this visible, so nothing here may read like the routine

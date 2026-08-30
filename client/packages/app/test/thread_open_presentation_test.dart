@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `openThreadPresenting`, the trigger half of UX1: dock the thread beside the
 /// transcript where the pane fits, otherwise push the modal `/thread/:id`
 /// route. `home_shell_test.dart` proves the shell reacts to

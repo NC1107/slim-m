@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Adding one custom emoji: a name, an image, and a preview of the name the
 /// server will actually store.
 ///

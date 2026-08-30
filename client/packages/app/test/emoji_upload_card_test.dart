@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the new-emoji card's two truth-telling gaps: a taken name must
 /// not also promise the upload will succeed, and a picked image must be
 /// visible, and reversible, rather than standing in for a checkmark.

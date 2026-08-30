@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Signing out never left a live call. `voiceControllerProvider` is
 /// app-lifetime, not scoped to a session, so nothing else would ever stop it
 /// posting a heartbeat against a session `SignOutRow.signOut` was about to

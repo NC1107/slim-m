@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `emojiSectionScrollOffset` is the rail's jump-to-section math: an
 /// estimate from item counts alone, deliberately not a real layout
 /// measurement, so a jump works even for a section nothing has built yet.

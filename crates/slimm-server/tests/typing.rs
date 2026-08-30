@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end typing indicator tests: channel-view authorization (reusing the
 //! same permission check messages and reactions already go through), the
 //! self-expiring lapse with no explicit stop frame, and rate limiting.

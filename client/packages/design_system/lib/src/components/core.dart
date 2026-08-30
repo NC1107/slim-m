@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Core components: the smallest identity and control building blocks
 /// (avatars, presence, badges, icon buttons, keycaps) that other components
 /// and screens compose from.

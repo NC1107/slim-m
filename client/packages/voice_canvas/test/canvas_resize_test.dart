@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The pure geometry in `canvas_resize.dart`: which corner a pointer grabs,
 /// how a drag reshapes the box, and the two ceilings it must respect.
 library;

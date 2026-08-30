@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Integration tests for the permission evaluator against a real db, exercising
 //! the load-and-evaluate path and the precedence rules end to end.
 

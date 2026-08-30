@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Backlog #134: a chime must never play at the player's own full scale on
 /// top of an already-normalised wav, so [AudioPlayersSoundPlayer] caps its
 /// own playback volume rather than leaving `audioplayers`' default of 1.0.

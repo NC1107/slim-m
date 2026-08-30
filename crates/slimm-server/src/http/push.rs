@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Push registration routes: register or replace the caller's own device's
 //! push registration, drop it, report the client's lifecycle state, and read
 //! or set the caller's account-wide notification preference.

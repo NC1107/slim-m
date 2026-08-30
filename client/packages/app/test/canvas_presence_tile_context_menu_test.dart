@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A right-click landing on a presence tile is absorbed rather than
 /// reaching a canvas object underneath it - the interaction #456's per-
 /// object right-click menu and a presence tile share one `Stack`, and the

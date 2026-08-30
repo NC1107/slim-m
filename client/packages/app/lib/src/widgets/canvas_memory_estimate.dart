@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A canvas object's resident-memory cost has no clean closed form: the only
 /// real numbers available are two measured points from
 /// `docs/reports/perf-2026-08.md`'s `canvas_memory_benchmark.dart` run. A real

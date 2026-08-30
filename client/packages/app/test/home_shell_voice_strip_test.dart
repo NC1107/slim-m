@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests that the collapsed voice strip actually reaches the screen.
 ///
 /// It was built (`VoiceStripIndicator`) and never placed anywhere in the

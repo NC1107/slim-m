@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's own richer Emoji tab: a vertical rail that jumps a
 /// continuous scroll rather than filtering it, and a preview footer driven
 /// by hover, a held touch, or the keyboard's own highlight - not a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The speaking ring: the one looping animation in the chrome, and what it
 /// becomes for a viewer who has asked for less motion.
 ///

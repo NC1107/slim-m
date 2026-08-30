@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Channel categories: the MANAGE_CHANNELS gate, create/rename/reposition,
 //! and that deleting a category never deletes its channels. See
 //! docs/decisions/0006-channel-categories.md.

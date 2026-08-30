@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Opening a thread, replying inside it, and the property most likely to
 regress quietly: a thread channel must never show up beside the real ones.
 

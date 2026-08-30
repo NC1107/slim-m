@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! MOD7: `Event::ReportsChanged` reaching a moderator's live connection when
 //! a report is filed or resolved, and - the security assertion this exists
 //! to prove - reaching nobody else.

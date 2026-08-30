@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [fadeThroughRoute] carries [fadeThroughPage]'s own transition to the one
 /// place a route is pushed imperatively (`Navigator.push`) rather than
 /// through go_router: the onboarding server-identity steps. A route pushed

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [RemoteStrokeDrafts]: appending as a delta, `end`, prune-by-age, and
 /// `clear` - the same shape `canvas_cursors_test.dart` already covers, plus
 /// what is new here: accumulation across several frames.

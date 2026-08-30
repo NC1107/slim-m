@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// WCAG 2.1 relative-luminance contrast, computed from the real design tokens so
 /// this file is the token contrast gate rather than a description of one.
 ///

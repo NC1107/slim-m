@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one composer on screen registers its own focus node here, so the
 /// global focus-composer shortcut has something to reach: `HomeShell` binds
 /// the shortcut and is an ancestor of `Composer`, but it holds no reference

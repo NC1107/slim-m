@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The user picture: round for a person, square for a non-human author (a
 /// webhook, a CI bot).
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Phase 6 spike: what camera-bubble placement and viewport hysteresis cost,
 /// per recomputation, at participant counts this product targets and well
 /// past them.

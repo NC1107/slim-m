@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The toast layer renders what the queue holds, positions itself by width
 /// (bottom-right wide, top on a phone), dismisses on tap, and clears a toast
 /// once its timer elapses.

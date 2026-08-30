@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the shared ollama wire plumbing and conversation fetch.
 
 No network and no real Ollama here, matching CI's bare runner: every test

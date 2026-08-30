@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Linux-only runtime check for whether a tray host is actually present
 /// on the session bus right now - `org.kde.StatusNotifierWatcher`'s own
 /// `IsStatusNotifierHostRegistered` property, read through a small

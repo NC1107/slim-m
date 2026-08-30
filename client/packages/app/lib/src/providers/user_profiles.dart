@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Resolves one user's public profile by id, for a caller that only holds an
 /// author id (a message, a pin) rather than the full profile it rides on,
 /// and needs the avatar cache key ([api.UserProfile.avatarUpdatedAt]) that

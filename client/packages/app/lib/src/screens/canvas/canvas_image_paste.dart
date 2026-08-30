@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pastes a clipboard image onto the canvas: decode, upload, place, and
 /// attach the decoded bitmap directly - the bytes this call already holds
 /// in memory, never re-fetched from the server it was just sent to.

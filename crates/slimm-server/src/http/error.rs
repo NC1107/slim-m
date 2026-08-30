@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The shared HTTP error type and its status mapping. Every route returns this
 //! so error responses are uniform across the API, and so do axum's own
 //! extractor rejections (malformed JSON, a bad query string, an oversized

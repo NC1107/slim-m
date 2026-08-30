@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The in-call controls: mute, camera, screen share and leave.
 ///
 /// Sharing has no quality dialog of its own: the ceiling, and whether to

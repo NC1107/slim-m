@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ReportCard`'s own combination states: which quick actions a moderator's
 /// bits offer, the disabled-not-absent Jump exception, and the reporter and
 /// subject lines' three-ways-of-reading-null shapes.

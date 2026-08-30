@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The breathing halo behind a waiting state's glyph: a few breaths on
 /// mount, then rest - never an unbounded loop, which would hang every
 /// `pumpAndSettle` crossing a waiting screen - and stillness at full

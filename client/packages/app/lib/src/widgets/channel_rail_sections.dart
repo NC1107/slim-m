@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail's sections: direct messages, and every channel category (plus
 /// the implicit uncategorised one) grouped and reordered as one list. See
 /// docs/decisions/0006-channel-categories.md.

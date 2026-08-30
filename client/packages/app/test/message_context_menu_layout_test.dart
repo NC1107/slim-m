@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// On a compact layout the message context menu slides up as a bottom sheet,
 /// matching every other modal in the app, rather than floating right under
 /// the thumb that opened it. Wider layouts keep the floating follower

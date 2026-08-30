@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas call dock and a plain [showAppSnackbar] both anchor to the
 /// same [ScaffoldMessenger] at any layout, because `HomeShell` wraps the
 /// rail, the conversation pane and the member pane in one shared [Scaffold]

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [AppAvatar], wired to a real picture: watches the user's cached avatar
 /// bytes and swaps them in once they arrive, falling back to the same
 /// initials disc `AppAvatar` already draws for everyone without one.

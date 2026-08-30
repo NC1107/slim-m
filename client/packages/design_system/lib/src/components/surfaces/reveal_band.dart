@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One shape for every band that appears above or below something stable: a
 /// reply strip, a search bar, an inline error, a row of staged attachments.
 ///

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the pooled, ollama-generated `Corpus`.
 
 No network and no real Ollama here, matching CI's bare runner: every test

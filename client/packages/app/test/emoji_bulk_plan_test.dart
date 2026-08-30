@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the pure derivation behind bulk emoji import (backlog #137):
 /// given a zip's decoded entries, which become planned uploads, which are
 /// skipped, and why.

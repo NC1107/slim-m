@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The gesture-opened menus `ui_overlay_snapshot_test.dart`'s own map cannot
 /// reach: each opens from a right-click or long-press over real content
 /// rather than an imperative `show*(context, ref)` call, so each gets its

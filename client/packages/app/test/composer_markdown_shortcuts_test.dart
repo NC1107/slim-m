@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the composer's markdown key bindings: continuing or ending a
 /// list on Enter, and wrapping the selection for bold/italic.
 library;

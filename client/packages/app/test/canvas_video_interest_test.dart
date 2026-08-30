@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasPresenceLayer]'s `onVideoInterest`: which tiles the canvas tells
 /// the live session are worth subscribing remote video for.
 ///

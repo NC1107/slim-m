@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `lib.rs`'s own `sweep_stale_voice_calls_at`, driven directly against a
 //! fake room service that records what it receives, so a heartbeat going
 //! stale is proven to reach a real `RemoveParticipant` call rather than only

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [UserProfile] needs value equality: a `.select`ed [AuthorResolution]
 /// record (see `providers/user_profiles.dart` in the app package) compares
 /// its `profile` field with `==`, and a re-resolve after `.clear()` always

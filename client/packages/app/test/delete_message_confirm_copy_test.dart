@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A message's own actions menu and a report card's moderation action both
 /// confirm a delete with `confirmDangerousAction`, and this drives both real
 /// call sites - `confirmAndDeleteMessage` (`channel_message_actions.dart`)

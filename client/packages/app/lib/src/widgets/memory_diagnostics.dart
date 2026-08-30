@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A live memory readout for the debug screen: the process's resident size and
 /// how full Flutter's decoded-image cache is.
 ///

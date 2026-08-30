@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 <!-- The app icon at 16, 22 and 24px: the same mark, drawn at 78% of the tile
      rather than 60%, so the dots survive the size instead of being dropped.
      512*0.78/20.2 = 19.770297 maps the mark's 20.2-unit bounding box there.

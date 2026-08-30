@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the shell's width-driven layout: the member pane must not
 /// merely be styled as hidden, it must not be built at all below expanded
 /// width, and must appear once the window is wide enough.

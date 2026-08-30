@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Named for the GTK application id set in client/packages/app/linux/CMakeLists.txt.
 # Wayland matches a window to its launcher entry by that id, so the two must agree.
 [Desktop Entry]

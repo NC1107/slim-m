@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two things a caller has to say and be told about a screen share: how
 /// it may be published, and what asking actually did.
 ///

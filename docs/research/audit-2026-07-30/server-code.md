@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Server code
 
 Seven specialists went over `crates/slimm-server` - HTTP core, HTTP routes, store core, store rest, the standalone modules, a duplication pass, and two performance passes (server and database) - and every finding was then put through an adversarial refutation round.

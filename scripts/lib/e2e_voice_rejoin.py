@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Re-clicking a voice channel already left rejoins it, checked at the SFU.
 
 Split out of e2e_voice.py to keep that file under the review budget; it

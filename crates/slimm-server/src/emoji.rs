@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Custom emoji naming and creation, shared by every path that adds one.
 //!
 //! There is exactly one normaliser and exactly one create path in this crate.

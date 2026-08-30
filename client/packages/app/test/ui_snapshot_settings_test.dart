@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The four admin screens `ui_snapshot_test.dart`'s own `_surfaces` map never
 /// carried at all (`admin-categories`, `admin-analytics`,
 /// `admin-removed-members`, `debug-log`), plus the permission-gated shapes

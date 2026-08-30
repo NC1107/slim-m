@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Proves `geometry.dart`'s helpers read the real `RenderBox` tree rather
 /// than a widget's own requested padding, on fixtures small enough that the
 /// expected numbers are worked out by hand rather than trusted from a run.

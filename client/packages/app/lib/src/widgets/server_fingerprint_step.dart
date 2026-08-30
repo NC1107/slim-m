@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one moment trust-on-first-use asks for a human to compare a server's
 /// identity out of band rather than assume it silently.
 ///

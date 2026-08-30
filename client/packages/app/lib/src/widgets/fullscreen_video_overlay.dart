@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A participant's camera or a shared screen, filled to the whole window.
 ///
 /// One overlay serves both kinds rather than a second implementation for

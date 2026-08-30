@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasPresenceLayer]: which tiles render (self and remote, camera and
 /// screen share), whether a live view or an avatar fallback fills one, that
 /// panning far away drops a tile through the viewport hysteresis, and the

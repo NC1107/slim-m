@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the personal settings screen's own structure: a failure
 /// partway through sign-out or deletion reaches the screen rather than
 /// vanishing, the nav lays out and carries an icon per pane, and the

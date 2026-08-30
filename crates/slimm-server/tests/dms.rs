@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Direct messages: a DM channel grants access only to its two participants,
 //! never through the deployment's role/overwrite evaluator - so not even
 //! ADMINISTRATOR reaches one it is not part of - opening the same pair is

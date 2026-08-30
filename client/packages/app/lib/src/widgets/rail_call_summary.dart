@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail footer's call-elsewhere row: a way back to a call live in a
 /// channel other than the one currently on screen, plus a way to leave it
 /// without navigating there first.

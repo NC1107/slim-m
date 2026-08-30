@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The upload content-type allowlist: what an attachment may be stored as,
 //! decided from the bytes alone, and whether that type is safe to render
 //! inline in a browser.

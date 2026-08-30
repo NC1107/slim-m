@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The assembled canvas pane - dock, face-pile, self bubble and surface,
 /// together - rendered at real widths in all three themes, with realistic
 /// content rather than a handful of test objects.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail used to stack two docks when a call was live elsewhere: a call
 /// bar (`VoiceStripIndicator`) directly above `RailUserFooter`, each with
 /// its own mic and headset toggle. This is what fails if that regresses.

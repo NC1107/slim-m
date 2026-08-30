@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The transcript's hand-on moments travel instead of hard-cutting: a send
 /// confirming cross-fades its time mark and lerps its body ink, and a
 /// removed reaction chip pops out where it stood rather than vanishing.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Space performance and capacity: message retention, the per-channel canvas
 /// object cap, and the screen-share resolution ceiling.
 ///

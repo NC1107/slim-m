@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- An opt-in, deployment-wide window past which a message is pruned. `0`
 -- (the default, and what every deployment keeps on upgrade) means keep
 -- forever - the same "off means the feature does not run" shape 0033 gave

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Makes a capture harness's `BoxShadow` render the way a real device does,
 /// closing the artifact that has now misled five separate review passes
 /// into reading the floating dock's shadow as a hard-edged defect (see

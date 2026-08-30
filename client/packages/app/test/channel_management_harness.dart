@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The shared fixture for the channel-management tests: a session, a caller
 /// with chosen permissions, a mock-backed api, an in-memory local store and a
 /// real GoRouter wired for the channel, channel-settings and list routes.

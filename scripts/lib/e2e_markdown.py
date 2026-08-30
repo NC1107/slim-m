@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Formatting markers are a rendering choice, not something the wire carries.
 
 The one property worth driving a real browser for: what the server stores and

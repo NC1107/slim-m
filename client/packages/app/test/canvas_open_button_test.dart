@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `CanvasOpenButton` shows for a voice channel or a DM, and hides for a text
 /// channel. Voice-only was the original owner decision (backlog,
 /// 2026-08-13); the owner has since asked for a DM canvas too, for a 1-on-1

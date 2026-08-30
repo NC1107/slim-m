@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The conversation: history, live arrivals, search, and the composer.
 ///
 /// This screen holds the state a channel view has to carry across a rebuild

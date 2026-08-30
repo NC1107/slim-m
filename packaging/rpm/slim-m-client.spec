@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Fedora package for the slim-m Linux desktop client, built and hosted on COPR.
 # Install steps and how to cut a new COPR build: README.md alongside this file.
 

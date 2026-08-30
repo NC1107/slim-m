@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The tile a staged attachment renders into: a thumbnail or file glyph, its
 /// name, its upload state, and the controls to remove or retry it.
 ///

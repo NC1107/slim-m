@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Report ids filed from this device, remembered locally so
 /// `ReportStatusSection` can show a reporter their own filed reports without
 /// them ever having to write an id down.

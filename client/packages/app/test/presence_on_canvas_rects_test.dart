@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `presenceOnCanvasRects` is the one place both presence widgets read a tile's
 /// world rect from, so a control never manipulates a different box than the one
 /// painted. Three rules decide what it returns and none were tested: a hidden

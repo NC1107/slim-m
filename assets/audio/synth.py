@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The one implementation of partials, envelope and normalisation.
 
 Every sound in the family imports this rather than carrying its own DSP, which

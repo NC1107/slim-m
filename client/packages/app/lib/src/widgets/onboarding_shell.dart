@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The frame every pre-session screen sits in: a brand panel on the left, the
 /// step you are on to the right of it.
 ///

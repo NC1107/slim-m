@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The member profile popover's own permission-combination matrix: which
 /// sections are present, absent, or (once) present-and-then-failing,
 /// depending on the caller's bits, the target's own state, and whether the

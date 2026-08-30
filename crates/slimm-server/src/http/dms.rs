@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Direct-message conversations: listing the caller's own, opening (or
 //! returning) the one with another user - or, naming yourself, your own
 //! personal space - and closing one out of the caller's own list (see

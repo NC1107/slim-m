@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Everything a voice surface needs to render, in one value.
 ///
 /// Split out of `voice_controller.dart`, which sat at this repo's 500-line

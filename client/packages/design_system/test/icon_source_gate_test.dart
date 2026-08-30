@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A raw `LucideIcons.`, Material `Icons.` or `CupertinoIcons.` reference
 /// outside [AppIcons] is how the icon vocabulary stops being one vocabulary,
 /// one call site at a time - the same drift [type_scale_literal_test]

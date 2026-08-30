@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! GIF search, proxied end to end so a client's search and every thumbnail
 //! it renders reach the configured provider through this server rather than
 //! directly - the same privacy reasoning `push.rs` already carries for a

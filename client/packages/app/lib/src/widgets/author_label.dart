@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The single place a message author's display name is resolved, closing the
 /// recorded debt that a renamed author's already-cached messages never
 /// reconciled: `message_row_identity.dart`, `channel_search.dart`,

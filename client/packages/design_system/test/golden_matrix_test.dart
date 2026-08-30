@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The golden matrix: every theme at 100% and 200% text scale, at both a
 /// pointer-width and a compact-width viewport.
 ///

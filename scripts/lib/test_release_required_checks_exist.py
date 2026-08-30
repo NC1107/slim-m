@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Every name in a `required_checks` string must be some job's real name.
 
 `verify-release-checks.sh` splits `REQUIRED_CHECKS` on `|` and compares each

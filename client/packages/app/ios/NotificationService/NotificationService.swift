@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // The Notification Service Extension: given a push before iOS shows it, it
 // opens the sealed envelope and replaces the relay's generic "New message"

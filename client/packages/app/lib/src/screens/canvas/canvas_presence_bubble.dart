@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two kinds of content a presence tile can show - a camera and an
 /// avatar fallback, or a screen share - split out of `canvas_presence_layer
 /// .dart` once wiring screen share and manipulation pushed it past the

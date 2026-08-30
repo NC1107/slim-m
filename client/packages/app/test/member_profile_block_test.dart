@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Block and Unblock are opposite actions and used to share one glyph
 /// (`AppIcons.revoke`), which drew "Block" and "Unblock" identically in the
 /// same popover. Split out of `member_profile_test.dart` to keep that file

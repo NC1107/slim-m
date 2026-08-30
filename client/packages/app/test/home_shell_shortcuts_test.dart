@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `platform`'s shortcut table advertised six actions; only two
 /// (`quickSwitch`, `escape`) were ever bound to anything in the shell, so
 /// the other four did nothing no matter what key a user pressed. This

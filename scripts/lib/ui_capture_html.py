@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The contact sheet `ui_capture_report.py` writes: one page, every image,
 grouped by the harness that made it, with the failures a reviewer needs to
 see before trusting the set as complete right at the top.

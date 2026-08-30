@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The attachment thumbnail's hero flight into the fullscreen viewer, and
 /// the tag choice that makes it safe: each mounted thumbnail mints its own
 /// identity tag, so the same content-addressed image shown twice never puts

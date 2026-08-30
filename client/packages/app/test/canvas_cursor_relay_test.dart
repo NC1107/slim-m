@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasCursorRelay]: outgoing throttle, and applying an incoming frame
 /// (self-echo dropped, a blocked author dropped, the label resolved).
 library;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Persistent [KeyStore] backends.
 ///
 /// iOS and Android get the platform keychain (Keychain / Keystore) through

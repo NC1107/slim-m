@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Persistence for the "show message text on your lock screen" toggle, the
 /// same shape `notification_sound_settings.dart`'s own tests would cover if
 /// that file had a dedicated test of its own - this one exists mainly

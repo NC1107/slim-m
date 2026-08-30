@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/flatpak/flatpak-builder/main/data/flatpak-manifest.schema.json
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Flatpak manifest for the slim-m desktop client. This repackages the same
 # Flutter Linux bundle the rpm (packaging/rpm/slim-m-client.spec) repackages,

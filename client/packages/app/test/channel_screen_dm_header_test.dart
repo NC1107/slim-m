@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The owner's report: a two-person DM's header offered a members toggle
 /// that opened the deployment's whole roster, not the DM's two participants
 /// - `membersProvider` is deliberately deployment-wide (see `member_pane.dart`'s

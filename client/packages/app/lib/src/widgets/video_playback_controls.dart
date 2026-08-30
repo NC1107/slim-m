@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The chrome an attachment video draws over `package:media_kit`'s bare
 /// texture - a scrubber, play/pause, elapsed/remaining time, mute, and the
 /// full screen toggle - plus the two gestures the owner asked for by name: a

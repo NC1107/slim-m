@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The Voice Canvas viewport read, backed by the R-Tree migration 0015 keeps
 //! in sync.
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What renders *inside* a presence tile - a live camera view, a screen
 /// share, or (report 4 in the backlog channel) a plain avatar with no card
 /// around it for a participant with neither - split out of

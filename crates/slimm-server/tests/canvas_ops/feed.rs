@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The store side of the feed: object liveness, the three reset triggers,
 //! pagination, and anonymization on account deletion. The page-byte budget
 //! has its own sibling module, `feed_budget`.

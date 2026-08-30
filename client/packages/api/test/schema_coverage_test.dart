@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Gates schema/openapi.yaml against the routes SlimmApi actually calls.
 ///
 /// The mirror image of crates/slimm-server/tests/openapi_contract.rs on this

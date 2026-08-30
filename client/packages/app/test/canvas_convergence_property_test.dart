@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Property test for Phase 6's convergence exit criterion: two or more
 /// clients applying the same canvas op log through different delivery
 /// patterns must reach the same materialized state, with no

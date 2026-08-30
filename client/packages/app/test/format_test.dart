@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `formatDateTime` renders the timestamps a report, an invite, a role or a
 /// timeout shows. The one place it was used from a test built its expected
 /// string with the function itself and only ever in 24-hour mode, so the

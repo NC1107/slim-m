@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the handle that replaced the header's rail-collapse button
 /// (#256's toggle) and then replaced drag-to-resize with a plain click
 /// (backlog item 54): tap the rail's own edge to open or close it.

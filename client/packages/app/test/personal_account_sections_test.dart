@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `DevicesSection`'s "Sign out" had no `try` at all: a failure threw out of
 /// an async `onPressed` with no catch anywhere above it, so nothing ever
 /// reached the user, and there was no test to notice. Now each row owns its

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `editingMessageIdProvider`'s own doc comment claims two things: it is
 /// `family`-keyed so an edit started in one channel cannot keep showing
 /// after a switch to another, and `autoDispose` so a channel nobody is

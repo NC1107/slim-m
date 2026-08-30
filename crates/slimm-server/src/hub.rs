@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The in-process fan-out hub.
 //!
 //! Durable writes happen over REST; this hub carries the resulting events to

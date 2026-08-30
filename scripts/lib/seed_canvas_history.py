@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The op-stream history pass: move, resize, reorder, remove and restore.
 
 Run after the main placement pass so the canvas ships with real history

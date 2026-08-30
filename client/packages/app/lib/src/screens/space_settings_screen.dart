@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Space settings: reports, invites, roles, channel permissions, who can
 /// join, and emoji, in the same nav-and-pane shape personal settings has
 /// ([SettingsPanesScaffold]) rather than a scroll of rows that each push a

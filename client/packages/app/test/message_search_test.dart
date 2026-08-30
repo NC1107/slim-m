@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `searchChannelMessages` (`providers/message_search.dart`): that a raw
 /// search-bar string is parsed and forwarded as the structured query
 /// parameters `http::search` reads, and that a query which parses to

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Enumerating what a desktop will let this app capture.
 ///
 /// On desktop this is not optional and not a nicety. `getDisplayMedia` matches

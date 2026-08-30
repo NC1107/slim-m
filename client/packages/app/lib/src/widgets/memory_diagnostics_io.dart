@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The `dart:io` side of the resident-size read; see the web sibling for why
 /// this is split behind a conditional import.
 library;

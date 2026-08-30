@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # The nine-specialist audit (2026-07-29)
 
 Nine specialist reviews run in parallel over the same build: five over the code (server performance, database, Rust correctness, Flutter correctness, client performance) and four over screenshots of the running product (product design, a first-time end user, a Discord power user, accessibility).

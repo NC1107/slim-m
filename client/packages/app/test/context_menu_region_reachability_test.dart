@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The generic `ContextMenuRegion` behind every non-message context menu
 /// (channel rows, DM rows): reachable by keyboard, the same guarantee
 /// `context_menu_reachability_test` covers for the message region, plus the

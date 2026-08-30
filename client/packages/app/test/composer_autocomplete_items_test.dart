@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Ranking, which is the half that decides whether Enter takes the row you
 /// meant. The detector's own cases are in
 /// `composer_autocomplete_query_test.dart`.

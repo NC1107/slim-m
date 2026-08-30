@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The capability handshake: `/version` names the safety routes this build
 //! serves, and it names them because the router really serves them.
 //!

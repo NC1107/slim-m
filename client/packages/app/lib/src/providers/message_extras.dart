@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reactions, attachments, polls, and a thread reply summary, kept in memory
 /// rather than in the local database.
 ///

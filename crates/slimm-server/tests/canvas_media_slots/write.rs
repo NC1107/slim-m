@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Placement, authorization, validation and persistence for a channel's
 //! media slots - everything the shared lock invariant does not need on its
 //! own; see `lock.rs` for that.

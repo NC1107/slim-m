@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the sign-in screen's connection-trust behaviour: the shared
 /// https rule, address reduction on submit, the identity tick reflecting a
 /// real pin comparison, and binding identity confirmation to connecting.

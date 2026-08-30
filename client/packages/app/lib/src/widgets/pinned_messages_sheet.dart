@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sheet the channel header's pin pill opens: every message currently
 /// pinned in this channel, newest pin first, with an unpin action for
 /// whoever the server lets use it (a failed attempt is just left in place -

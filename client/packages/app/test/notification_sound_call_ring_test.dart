@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [NotificationSoundController]'s incoming-DM-call half: `call_ring` fires
 /// only for a DM call actually starting live, never for the first catch-up
 /// answer about one already under way, and never for a call this device is

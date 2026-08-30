@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The empty-transcript start header used to float at the top of a mostly
 /// empty screen, disconnected from the composer below it: the empty branch
 /// of `MessageTranscript.build` used a plain top-anchored

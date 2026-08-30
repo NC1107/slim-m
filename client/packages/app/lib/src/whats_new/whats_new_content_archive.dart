@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Older entries for `whatsNewEntries`, split out purely to keep both files
 /// under the review budget as the list keeps growing release over release.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [cameraAfterWheelScroll] and [cameraAfterZoom] in isolation, with no
 /// widget at all - the pure math [CanvasSurface]'s own gesture layer and a
 /// manipulable presence tile both read now, so the invariant belongs at

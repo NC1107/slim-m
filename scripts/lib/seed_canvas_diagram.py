@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Composes one deliberate diagram on top of the random main pass: a box
 drawn around a busy cluster, an arrow pointing from it to a callout note,
 a divider line, and three notes at genuinely different lengths - a

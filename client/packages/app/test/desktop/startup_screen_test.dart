@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Discord-style startup screen: renders the brand mark, and honours
 /// reduce-motion the same way every other animated surface in this app
 /// does - through [AppFadeIn], not a bespoke animation of its own.

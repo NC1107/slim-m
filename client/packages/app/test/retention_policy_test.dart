@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [cappedChannelWindow] is the one bound `channel_history.dart` and any
 /// future store or extras sweep must agree on, so it is tested on its own
 /// rather than only indirectly through `channel_history_test.dart`.

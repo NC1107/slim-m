@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The gate is how the sheet is actually reached: no route is registered for
 /// it (see the widget's own doc comment on why `route_reachability_test.dart`
 /// does not need one), so this is what proves a real user sees it, rather

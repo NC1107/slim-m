@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A row of 2-4 mutually exclusive options, in two variants.
 ///
 /// `inline` is a sunken trough where the selected segment becomes a raised

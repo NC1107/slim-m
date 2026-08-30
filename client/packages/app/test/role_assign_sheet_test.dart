@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests that this sheet does not offer a grant the server will refuse.
 ///
 /// The server enforces permission containment: a caller may only hand out a

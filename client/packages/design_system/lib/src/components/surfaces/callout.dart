@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A tone-coded banner for a message the surrounding content cannot make on
 /// its own: an expiring invite, background on a setting, a positive highlight.
 library;

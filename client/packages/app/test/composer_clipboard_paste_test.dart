@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's "Paste image" row end to end: whether it appears, what
 /// tapping it stages, what a platform read failure shows, and that
 /// `ClipboardPasteBridge.m`'s edit-menu swizzle installing successfully

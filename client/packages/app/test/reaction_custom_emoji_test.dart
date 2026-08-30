@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for reacting with one of the deployment's own emoji.
 ///
 /// A reaction is keyed on a string the server hands back verbatim, so the

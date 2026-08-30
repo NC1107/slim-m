@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A small token with two variants. `operator` is a static, non-interactive
 /// span used in a search bar (`from:priya`); `reaction` is a real button
 /// carrying an emoji (user content, never interface chrome), a count, and

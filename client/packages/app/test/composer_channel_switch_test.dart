@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A staged attachment must not carry into another channel's send.
 ///
 /// It is already uploaded, server-side, real cost, and unlike the composer's

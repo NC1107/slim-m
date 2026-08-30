@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The desktop splash on/off and duration preferences: both default to the
 /// existing behaviour (on, standard = 900ms), a choice persists and restores,
 /// an unknown stored value degrades to the default, and [SplashDurationX]

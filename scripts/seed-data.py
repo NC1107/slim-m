@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Fills a deployment with varied, realistic-looking chat activity.
 
 Creates a channel named for today's date, then N accounts (default 10) that

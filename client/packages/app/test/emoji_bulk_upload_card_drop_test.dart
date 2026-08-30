@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Dropping onto the emoji import card: a real `.zip` drives the exact same
 /// chunked `POST /emoji/bulk` path `emoji_bulk_upload_card_test.dart` already
 /// exercises from the button - never a second, unchunked import route - and

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Keeps the server's proof of a live call fresh while [VoiceController]
 /// holds one connected.
 ///

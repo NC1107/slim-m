@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The command palette's compact-width shell: pattern pair 3 in
 /// `docs/design/desktop-vs-mobile.md` ("Command palette -> pull-down").
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `saveAttachment` fetches through the same cached, authenticated path an
 /// inline image already uses, then hands the bytes to `file_picker`'s own
 /// cross-platform save flow. No platform channel involved: the picker's

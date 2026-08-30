@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The invite and manual-server dialogs, and the two trust-on-first-use
 /// identity screens both entry points can fall into on the way through.
 ///

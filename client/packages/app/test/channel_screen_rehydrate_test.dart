@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CQ1: `ChannelScreen` seeds a channel's extras (reactions, polls,
 /// attachments, thread summaries) from `_hydrateExtras`, which ran only in
 /// `initState`. A route that reuses this State across a channel switch - a

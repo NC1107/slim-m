@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Measures [child]'s real rendered height after every frame and publishes
 /// it to `bottomDockReservationProvider`, so `app_snackbar.dart` knows how
 /// much of the bottom edge a floating dock actually occupies right now.

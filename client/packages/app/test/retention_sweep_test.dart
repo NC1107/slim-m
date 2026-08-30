@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [runRetentionSweep] is where CD2 (the store) and CS4 (`message_extras`)
 /// meet the registry: it caps the store, then treats whatever survives for
 /// an open channel as the reachability answer `message_extras.dart`'s own

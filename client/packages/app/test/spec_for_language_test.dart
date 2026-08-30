@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `specForLanguage` resolves a code fence's language tag to the highlighting
 /// spec for it, and it was untested. It normalizes case and surrounding space
 /// and follows aliases, so `` ```JS `` and `` ```javascript `` light up the

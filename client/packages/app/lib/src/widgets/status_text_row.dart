@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A free-text status line ("in a meeting", "afk"), edited in place from
 /// personal settings' own Presence section and shown in the member pane
 /// under a name (`member_pane.dart`'s own row) - the same "rides `users`

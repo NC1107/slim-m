@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP surface: liveness, version, the auth routes, and the message routes. The
 //! WebSocket routes are added as the protocol is built.
 

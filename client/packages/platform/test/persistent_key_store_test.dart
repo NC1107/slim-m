@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the desktop [KeyStore] backend: it must actually survive a
 /// restart, which is the entire point of replacing [InMemoryKeyStore], and it
 /// must actually be private, which is the entire point of not just reusing

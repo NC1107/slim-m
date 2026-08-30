@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two small presentational pieces `canvas_presence_tile.dart` paints
 /// over a tile's own content - split out to keep that file, which also
 /// carries the tile's gesture handling, under the review budget.

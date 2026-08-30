@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The caller's own quiet-hours window: an optional time-of-day span,
 /// stored server-side in minutes since midnight UTC.
 ///

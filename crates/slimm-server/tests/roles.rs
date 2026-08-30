@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Role management and member role assignment: the MANAGE_ROLES gate, the
 //! escalation guard (nobody can grant a permission they do not themselves
 //! hold), and the invariant that the deployment never ends up with zero

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rows inside [NotificationsSection] (`personal_status_sections.dart`)
 /// that are each their own genuine round trip to the server, rather than a
 /// bare toggle backed by local state: the lock-screen preview switch, the

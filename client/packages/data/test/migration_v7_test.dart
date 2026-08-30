@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests the schema-7 migration, which closes the pre-op-stream epoch.
 ///
 /// Until the server had a message op stream, an edit or a delete made while a

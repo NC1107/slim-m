@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A hand-rolled recursive-descent parser for inline Discord-flavoured
 /// markdown: `**bold**`, `*italic*`/`_italic_`, `~~strikethrough~~` and
 /// `||spoiler||`, nesting inside one another, plus the three leaf tokens

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// How many pointers are down somewhere in the canvas pane's own tree that
 /// [CanvasSurface] itself never sees a `PointerDownEvent` for - a presence
 /// tile sits in its own opaque layer above the surface (see

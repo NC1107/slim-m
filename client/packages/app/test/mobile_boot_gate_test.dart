@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The phone boot splash's decision and its look: it covers a cold launch
 /// until the first catch-up lands, holds through the resting `offline` and the
 /// `connecting` attempt, and steps aside for the cached home the moment a seen

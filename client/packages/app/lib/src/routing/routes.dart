@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Route paths, written by hand rather than generated.
 ///
 /// Every navigation goes through these, so a renamed path is a compile error at

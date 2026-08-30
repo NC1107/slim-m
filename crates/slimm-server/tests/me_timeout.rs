@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `/me`'s own timeout fields: the reason a moderator left, self-view only.
 //!
 //! Split out of `me.rs` rather than added to it - that file was already

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Chases the first of the two mechanisms docs/BACKLOG.md's "sending a
 /// message flashes a day divider" entry names as untried: a real catch-up
 /// round landing between an optimistic send and that send's own REST

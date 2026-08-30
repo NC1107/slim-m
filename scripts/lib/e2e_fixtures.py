@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Write the files the run uploads.
 
 Generated rather than committed: they are two tiny PNGs, and a binary in the

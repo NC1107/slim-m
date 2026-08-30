@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The History tab beside the open-reports queue: `GET /reports/history`'s
 /// merged feed of resolved reports and `moderation_audit_log` entries -
 /// docs/decisions/0015-moderation-audit-log.md's audit trail, finally

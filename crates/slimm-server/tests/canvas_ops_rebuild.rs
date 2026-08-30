@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Migration 0026 against real data: the guard must abort the rebuild by
 //! name rather than dropping whatever a deployment happened to have written
 //! to the 0002 shape of `canvas_ops`, even though no deployment ever has (see

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The activity log's presentation: a navigable list plus an always-mounted
 /// live region. Split from `canvas_pane_body.dart` because this is the one
 /// place canvas widgets resolve an actor id into a display name, the same

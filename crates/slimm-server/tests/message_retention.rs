@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Message retention: the config round trip, what one sweep tick prunes and
 //! frees, and the floor/reset mechanism a client offline across a prune
 //! recovers through. See `store/message_retention.rs`'s own doc for the

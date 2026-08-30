@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! One connection's memory of which channels its viewer may see.
 //!
 //! `authorize` asks `has_permission` once per delivered event, and that

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the three suites that pump a [MessageRow]: the row's
 /// own rendering, its context menu, and its inline edit field.
 ///

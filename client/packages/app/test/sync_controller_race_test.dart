@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for SyncController.start() having no in-flight guard: a
 /// sign-out landing while catch-up's network round trip is already running
 /// must not let that round trip's answer write into the store the sign-out

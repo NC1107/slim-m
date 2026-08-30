@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `refresh_tokens.session_id` had no index until migration 0042: only
 //! `family_id` (0002) and `expires_at` (0019) were ever covered. The
 //! revocation `UPDATE` in `revoke_session_rows` filtered on it as a full

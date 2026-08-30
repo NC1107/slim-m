@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's own Emoji tab content: search, a vertical category rail,
 /// a continuous scrollable of sections, and a hover/press/keyboard-driven
 /// preview footer - Discord's own shape. `EmojiPickerPanel` (the hover

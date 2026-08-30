@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What a call amounted to, built entirely from the roster a live call
 /// already reports - no new server state, since a per-call roster with join
 /// and leave times is a record worth having for the person who was in the

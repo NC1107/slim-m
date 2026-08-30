@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A wheel notch's effect on the camera, as pure functions rather than a
 /// method on [CanvasSurface]'s own gesture state.
 ///

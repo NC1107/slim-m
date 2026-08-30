@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Phase 5 spike: what routing the canvas hot path through Riverpod costs
 /// against a plain [ChangeNotifier] driving the painter directly.
 ///

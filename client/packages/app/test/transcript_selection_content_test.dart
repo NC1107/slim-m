@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `docs/IMPLIED-GAPS.md` item 8's own unchecked worry: does copying selected
 /// message text actually round-trip the visible content of a mention chip,
 /// an inline code span and a spoiler, all three of which render as

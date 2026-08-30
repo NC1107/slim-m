@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The extras cache has two front doors with opposite authority, and getting
 /// them the same way was the CQ3 bug.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which stroke, or which box object, a pointer landed on.
 ///
 /// A stroke is nearest-segment-within-tolerance against its own points,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for telling why a camera enable failed, per the survey in
 /// `camera_failure.dart`'s own library doc: enumeration is the reliable
 /// signal, and the error text only gets a say where a platform actually

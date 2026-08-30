@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasCursors]: upsert, prune-by-age, and the id-keyed removal a block
 /// needs.
 library;

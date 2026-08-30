@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// canvas.md: at the previous `width: 200`, this menu's own longest labels
 /// truncated - "Paste image" (with its Ctrl+V hint) to "Paste i…", "Hide my
 /// camera bubble" to "Hide my camera bu…" - narrower than every sibling

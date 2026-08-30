@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A minimum visible duration for [StartupScreen], so a warm desktop start -
 /// whose bootstrap often resolves in a frame or two - still reads as a real
 /// splash rather than flashing invisibly, per the owner's own report that no

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Selecting several messages, and the two rules that are easy to get wrong.
 ///
 /// The cap is one: a selection that has reached 64 must still let go of a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Channel settings: one place for a channel's name, topic, permission
 /// overwrites, and deletion, replacing the two disconnected surfaces the
 /// kebab used to open separately - a "manage channel" sheet (name, topic,

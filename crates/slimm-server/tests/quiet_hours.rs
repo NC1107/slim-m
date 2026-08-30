@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Quiet hours (migration 0056): a per-account time-of-day window that
 //! narrows an `everything` notification preference to `mentions`, enforced
 //! in `push::recipients::narrow_for_notification_preference` - the same

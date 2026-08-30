@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `/notification-preferences/channels[/{channelId}]`: the HTTP surface over
 //! `store/channel_notification_prefs.rs` - permission gating, input
 //! validation, and the PUT/GET/DELETE round trip. `tests/channel_notification_prefs.rs`

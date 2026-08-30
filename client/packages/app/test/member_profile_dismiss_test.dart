@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The bug this pins: `run` (and `_remove`) in `member_profile.dart` called
 /// `widget.onDone()` - a real `Navigator.pop` - and only then awaited a
 /// dialog before touching a provider. flutter_riverpod throws once the

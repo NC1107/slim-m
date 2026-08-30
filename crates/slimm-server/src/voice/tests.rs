@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Unit tests for token minting and signing; split out of `mod.rs` for the
 //! line budget. `roster.rs` carries its own tests beside it instead.
 

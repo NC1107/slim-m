@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// LiveKit room and client wrapper behind an explicit public API.
 ///
 /// Everything the app does with media goes through here, so nothing else in

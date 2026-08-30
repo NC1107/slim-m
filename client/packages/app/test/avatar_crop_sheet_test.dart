@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The crop sheet has to fit the window it opens in.
 ///
 /// Its square viewport was sized from the window's width alone, so on any

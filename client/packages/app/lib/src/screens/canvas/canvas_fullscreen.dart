@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether the canvas has dropped its surrounding chrome to show nothing but
 /// the surface.
 ///

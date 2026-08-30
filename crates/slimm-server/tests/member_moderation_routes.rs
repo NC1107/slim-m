@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The authorization on the moderation routes, which is the whole of what
 //! stands between KICK_MEMBERS and a moderator silencing every administrator
 //! on the deployment one at a time.

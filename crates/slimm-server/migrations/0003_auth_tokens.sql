@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Phase 1 auth credential rows.
 --
 -- 0002 already defines the durable anchors: users (with an Argon2id

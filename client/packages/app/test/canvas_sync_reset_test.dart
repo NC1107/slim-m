@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two ways a bad answer from the ops feed must not become a document
 /// wipe - a rate limit, retried with backoff - and the two ways it correctly
 /// must - an unknown op kind, or the server's own `reset` - each rate-limited

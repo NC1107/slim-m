@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Forwarding a message: picking where, composing the content, and sending
 /// it - three small pieces the context menu's "Forward message" item drives.
 ///

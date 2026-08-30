@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A client-generated UUIDv7 id, matching what a real slim-m client sends.
 
 CLAUDE.md's own architecture summary says identity is "a client-generatable

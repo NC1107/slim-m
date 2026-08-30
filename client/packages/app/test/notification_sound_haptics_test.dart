@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [NotificationSoundController]'s haptic half: a message and a call ring
 /// fire an [AppHaptics] cue on the same call site the chime does, so a
 /// suppressed sound (settings off, own message, a blocked author) suppresses

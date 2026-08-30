@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the suites that pump a real [HomeShell]: its
 /// width-driven layout (`home_shell_test.dart`) and the canvas pane's swap
 /// within it (`home_shell_canvas_test.dart`). Split out when the second of

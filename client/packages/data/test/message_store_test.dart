@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the local store's two invariants: writes are idempotent by message
 /// id, and a stale copy can never overwrite a newer one. Both delivery routes
 /// (live push and catch-up) rely on those holding under any interleaving.

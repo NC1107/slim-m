@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for custom emoji: the `emoji` tag, its model, and the byte fetch
 /// that does not go through the JSON transport.
 library;

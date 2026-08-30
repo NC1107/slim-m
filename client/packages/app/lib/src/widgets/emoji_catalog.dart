@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The emoji picker's data: which categories it shows, in what order, and
 /// how a search query filters the catalog.
 ///

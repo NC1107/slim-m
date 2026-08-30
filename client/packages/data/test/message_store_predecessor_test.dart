@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether `watchChannel`'s stream ever emits a row set in which a message
 /// just sent has no predecessor, even though older messages already exist in
 /// the channel.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Chases the second of the two mechanisms docs/BACKLOG.md's "sending a
 /// message flashes a day divider" entry names as untried: a live
 /// `message.created` echo of the sender's own message, arriving over a real

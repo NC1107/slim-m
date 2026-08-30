@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The GIF picker's composer wiring: absent entirely on a deployment with no
 /// provider configured (the acceptance the job this closes was built
 /// against - zero UI, zero network calls), present and reachable on one that

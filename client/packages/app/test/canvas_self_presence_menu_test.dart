@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Wiring `canvas_pane.dart`'s overflow menu to `canvasSelfPresenceProvider`
 /// end to end: hiding the caller's own camera bubble from the menu removes
 /// it, showing it again restores it, and the choice survives reopening the

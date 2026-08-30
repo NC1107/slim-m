@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Three hand-rolled `OverlayPortal` popovers - the Space menu, the status
 /// menu, and the personal space kebab - never adopted `ContextMenuFocus`'s
 /// own `ContextMenuKeyboardScope`, the route `ContextMenuRegion` and both

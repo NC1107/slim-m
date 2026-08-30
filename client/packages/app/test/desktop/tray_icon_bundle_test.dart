@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [trayIconAssetPath] is a git symlink out to `packaging/linux/icons/`, the
 /// same fix this project already applied once for the notification sounds
 /// (`notification_sound_bundle_test.dart`) after a `../../../` asset path

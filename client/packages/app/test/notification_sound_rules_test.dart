@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The pure decision logic behind which chime (if any) an event deserves,
 /// with no provider container, fake stream, or widget involved.
 library;

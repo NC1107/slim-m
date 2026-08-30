@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One row in the message list: the avatar or continuation gutter, the
 /// header line, the body, and everything that can follow it.
 ///

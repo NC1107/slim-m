@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Hides a video renderer until it has actually painted something.
 ///
 /// `livekit_client`'s `VideoTrackRenderer` attaches its platform texture to

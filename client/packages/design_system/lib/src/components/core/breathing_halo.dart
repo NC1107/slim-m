@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A soft disc that breathes behind a waiting state's glyph.
 ///
 /// For the screens that are legitimately about waiting - a call connecting,

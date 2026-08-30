@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Session and token persistence: registration, login sessions, opaque access
 //! and refresh tokens, and single-use WebSocket connect tickets.
 //!

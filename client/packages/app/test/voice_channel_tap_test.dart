@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Unit tests for the predicate deciding whether a voice channel tap should
 /// explicitly ask to (re)join; see `voice_channel_tap.dart`'s own doc for
 /// why this cannot be left to `VoiceScreen`'s auto-join alone.

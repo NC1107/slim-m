@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The custom emoji administration screen, driven through the real
 /// [SlimmApi] against a mock transport, so the assertions are about the
 /// requests that actually leave the client rather than about a stubbed

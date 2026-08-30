@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [WindowMenuButton] is the guaranteed quit control this pane exists to
 /// close a real gap for: on a desktop with no tray host, the tray menu's
 /// own "Quit slim-m" item never renders anywhere, so this has to be its own

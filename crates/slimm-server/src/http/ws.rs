@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The WebSocket surface: connect, authenticate, negotiate, and fan out events.
 //!
 //! A client connects to `/ws`, then sends a `hello` frame carrying a single-use

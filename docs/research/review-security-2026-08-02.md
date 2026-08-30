@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Security and safety review: threads, replies, DM calling, the report queue, drag-to-reorder, display-name reconciliation, the live thread event, and clipboard (2026-08-02)
 
 Scope: everything that shipped in the last two days (2026-08-01 and 2026-08-02), the seven surfaces named in the task plus the client clipboard plugins.

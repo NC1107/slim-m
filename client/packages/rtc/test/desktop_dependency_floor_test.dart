@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Guards the flutter_webrtc/livekit_client floor against a downgrade.
 ///
 /// flutter_webrtc 1.4.0 (the version `livekit_client 2.8.1` hard-pins) has a

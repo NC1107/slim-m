@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The attachment-preview-quality setting: the default is Sharp (the
 /// full-resolution decode this app has always done), a choice persists and
 /// restores, an unknown stored value degrades to the default, and each level

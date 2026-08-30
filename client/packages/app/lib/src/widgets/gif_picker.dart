@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's GIF picker: a search field, a debounced request, and a
 /// grid of results streamed through this deployment's own server. Opens on
 /// trending results rather than a blank grid, the same "something to look

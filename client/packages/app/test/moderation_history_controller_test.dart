@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ModerationHistoryController`'s own behavior, the same shape
 /// `reports_controller_test.dart` pins for its sibling queue: the composite
 /// cursor, a refused fetch surfacing as an error rather than a crash (a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [splitMarkdownBlocks]: headings, quotes and lists are line-level
 /// structure, and every one of them must stay inert unless it starts a line.
 library;

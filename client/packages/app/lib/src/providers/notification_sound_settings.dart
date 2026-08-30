@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether a direct message, mention, group message or error chimes at all.
 ///
 /// A pure local device preference with no server truth, the same shape

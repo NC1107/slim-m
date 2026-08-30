@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 --
 -- Polls: a message attachment carrying a question, 2-4 fixed ordered options,
 -- and a per-user vote. Keyed by message_id rather than a surrogate id of its

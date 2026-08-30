@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the suites that drive [ChannelOverwritesScreen]: a
 /// session, an [apiProvider] backed by a caller-supplied handler, and an
 /// in-memory local store seeded with one channel, plus the tap sequence that

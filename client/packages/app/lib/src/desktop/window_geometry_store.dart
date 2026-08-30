@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Persists [WindowGeometry] as one JSON blob under one key, the same
 /// one-value-per-feature shape `display_preferences.dart`'s controllers
 /// already use, rather than five separate keys for size, position and state.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A hand-rolled bar chart for the analytics screen's three small series.
 ///
 /// No charting package: three simple bar charts do not carry the weight of a

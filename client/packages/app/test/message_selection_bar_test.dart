@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The bar that replaces the composer while messages are being selected, and
 /// the request the delete on it actually sends.
 ///

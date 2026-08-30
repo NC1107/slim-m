@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for the stacked-header bug: `ThreadScreen` wraps
 /// `ChannelScreen` in its own `AppBar`, and `ChannelScreen` used to build a
 /// second `ChannelHeader` underneath it at any width that shows both panes -

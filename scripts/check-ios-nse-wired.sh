@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # The iOS Notification Service Extension's own wiring, checked as text on
 # an ubuntu runner rather than by a 14-minute macOS build: the target, its

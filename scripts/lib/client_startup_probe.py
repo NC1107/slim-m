@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Cold-start time and idle memory of the Flutter web client, over CDP.
 
 There is no offscreen way to run the Linux desktop build on this box: the

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """One account's stream of actions.
 
 Each worker owns one `WorkerContext` (one `Api`, one `random.Random`) and

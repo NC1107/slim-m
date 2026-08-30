@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Refuses to seed anywhere the caller has not explicitly named and confirmed.
 
 A seeding run creates accounts, a channel, and hundreds of messages. Pointed

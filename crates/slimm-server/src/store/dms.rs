@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Direct messages: a DM is a channel of kind [`DM_CHANNEL_KIND`] with one or
 //! two participants recorded in `dm_channels`, normalized so the pair (a, b)
 //! and (b, a) always resolve to the same row and hence the same channel.

@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- A moderation trail for removals and timeouts, independent of and outliving
 -- the two tables that hold what is currently in force.
 --

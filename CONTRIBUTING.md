@@ -36,4 +36,4 @@ curl localhost:8080/healthz
 
 ## Licensing
 
-By contributing you agree your contribution is licensed under the license of the component you touch (see [LICENSING.md](LICENSING.md)): AGPL-3.0-only for the server, Apache-2.0 for the client and shared schema.
+By contributing you agree that your contribution is licensed under [PolyForm Noncommercial 1.0.0](LICENSE) (see [LICENSING.md](LICENSING.md)), and that you additionally grant NC1107 a perpetual, worldwide, irrevocable, royalty-free license to use, modify and relicense your contribution under any terms, including commercial ones. That second part is what keeps commercial licensing possible without having to track every contributor down later.

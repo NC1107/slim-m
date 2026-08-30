@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Answers a question a design review raised about `zoom_stress_0.25x.png`:
 /// the thin diagonal ink stroke there looks broken, almost dotted, rather
 /// than a continuous line. Is that a real sub-pixel-width geometry problem,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's mobile clipboard-image bridge, proven at the platform
 /// channel: nothing on this box can drive a real iOS or Android pasteboard,
 /// or a real Objective-C method swizzle.

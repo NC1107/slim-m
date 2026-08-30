@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the invites screen: creating one posts the chosen options, and
 /// revoking one is gated behind a confirmation that actually says what
 /// happens, matching `confirm_dialog.dart`'s contract.

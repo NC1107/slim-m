@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Invite routes: creating, listing, checking, and redeeming.
 //!
 //! Checking a code is unauthenticated, because it happens before someone has an

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A wheel event landing on a manipulable presence tile, not on bare
 /// canvas - the owner's actual report, per a screenshot from the same
 /// session showing camera and screen-share tiles covering a large part of

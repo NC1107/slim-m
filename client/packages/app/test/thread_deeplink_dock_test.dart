@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The deep-link/reload half of UX1: a cold-opened `/thread/:id` on a wide
 /// viewport resolves its parent channel, sets `openThreadProvider`, and lands
 /// on that channel - so a reload, a notification tap or a pasted link reaches

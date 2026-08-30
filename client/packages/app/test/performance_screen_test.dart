@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Space performance screen: that all three capacity controls render
 /// together, and the message retention section - its toggle-independence,
 /// its patch, and the consequence text stating what a chosen window actually

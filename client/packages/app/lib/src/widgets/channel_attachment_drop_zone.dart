@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer/transcript half of drag-and-drop: wraps a whole channel pane
 /// so a file dropped anywhere on it - the transcript above the composer
 /// included - reaches that channel's own `Composer`, through the exact same

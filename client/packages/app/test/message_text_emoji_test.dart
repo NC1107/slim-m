@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `:shortcode:` rendering in a message body.
 ///
 /// Driven through the real API client over a [MockClient] rather than through

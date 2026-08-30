@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Paging the moderation queue: the cursor, the clamp, and the ordering of the
 //! per-channel filter against the limit.
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The channel's main body below the header: either the live search-results
 /// list or the live transcript stream plus its jump-to-latest control,
 /// whichever `channelSearchProvider` says is current for this channel.

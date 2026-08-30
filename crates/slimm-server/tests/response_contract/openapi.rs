@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! schema/openapi.yaml read as what it is.
 //!
 //! An OpenAPI 3.1 schema object *is* a JSON Schema 2020-12 schema, so a real

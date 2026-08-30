@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Generates the varied attachment fixtures a seeding run uploads.
 
 Everything here is a real, structurally valid file, generated in-process

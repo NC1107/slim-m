@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Applying the message op stream: how an edit or a delete made while this
 /// client was offline finally reaches it.
 ///

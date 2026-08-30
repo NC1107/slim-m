@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Drives the one voice call this client can be in.
 ///
 /// One call at a time, deliberately. Joining a second channel leaves the first

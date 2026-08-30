@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The tests themselves: registration over HTTP, triggering from the message
 //! send path, lifecycle gating, debounce, and a dead token clearing the
 //! registration. See `harness.rs` for the store, router, and mock relay they

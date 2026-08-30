@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for joining the one call this client can be in: the token round
 /// trip, the insecure-scheme refusal, and how a join failure is reported.
 ///

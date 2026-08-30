@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Attachments: uploaded once, referenced by content hash on a message, and
 /// the raw bytes a fetch (of either an attachment or an avatar) returns.
 ///

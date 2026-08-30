@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `ReorderableChannelRows`: no drag at all for an ordinary
 /// member, a completed drag within one section reporting the new order, -
 /// the property backlog item #34 asked for - a drag across two category

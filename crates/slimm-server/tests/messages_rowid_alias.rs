@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Migration 0024 against real data: the rebuild of `messages` onto an
 //! explicit rowid alias must lose nothing.
 //!

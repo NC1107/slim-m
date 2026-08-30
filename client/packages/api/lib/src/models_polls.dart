@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Polls: a message that carries a question with options fixed at creation.
 ///
 /// Split out of models.dart purely to stay under this repo's line budget; see

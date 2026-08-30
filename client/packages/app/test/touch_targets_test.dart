@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail's per-row controls at both densities.
 ///
 /// Originally written for the create-channel affordance: it was rendered,

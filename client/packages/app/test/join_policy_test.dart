@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Who can join, from the client's side: the Space settings row that changes
 /// it, and the sign-up notice that explains an invite-only Space instead of
 /// just refusing the account.

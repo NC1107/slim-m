@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one property this wrapper exists for: it must not claim the press
 /// gesture on a phone, where that gesture already raises the message sheet.
 ///

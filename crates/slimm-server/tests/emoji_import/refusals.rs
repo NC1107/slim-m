@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The paths where a file does not become an emoji and the report has to say
 //! why: not an image, an extension that lies, an allowlisted type that is not
 //! an image, and a filename that is legal but too long.

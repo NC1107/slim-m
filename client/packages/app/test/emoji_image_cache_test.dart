@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the disk-backed emoji image cache: a write is readable back, a
 /// miss is null rather than a throw, eviction keeps the cache under its own
 /// byte ceiling, and the web build's no-op degrades visibly rather than

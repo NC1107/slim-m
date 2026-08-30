@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The bounded world's dimensions and the pure geometry checks over them,
 //! split out of `canvas.rs` so those checks have a home to be unit-tested in
 //! and the query-and-write file stays under its line budget. No database or

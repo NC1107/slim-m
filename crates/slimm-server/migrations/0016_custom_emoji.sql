@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Deployment-wide custom emoji, the Discord-shaped kind: a name a member
 -- types as `:shortcode:` and an image the deployment supplies.
 --

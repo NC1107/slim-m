@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Rebuilds `canvas_ops` into the canvas's single ordering authority. The 0002
 -- shape was one unconstrained `op TEXT` column and has never held a row on any
 -- deployment: the only reference is the authorship anonymisation in

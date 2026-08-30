@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The moderation queue (`GET /reports`, `PATCH /reports/{id}`) and, beside
 /// it, the moderation-history feed (`GET /reports/history`, MOD4): who was
 /// removed, timed out, or restored, by whom, and when - see

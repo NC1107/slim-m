@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Frame-parsing coverage for the role, overwrite, and channel WebSocket
 /// events (`RoleChanged`, `MemberRoleChanged`, `ChannelCreated`,
 /// `ChannelUpdated`, `ChannelDeleted`, `OverwriteChanged`): the client half of

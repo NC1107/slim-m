@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether sending a tile to the back changes anything about the two
 /// pointer fixes in `canvas_presence_tile.dart` - it must not, and this is
 /// what proves it rather than assumes it.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The half of the pass that builds and reads content: channels, roles and
 //! overwrites, then a message carrying every optional part a `Message` has -
 //! an attachment, a poll, a reaction and a pin - so the calls that return

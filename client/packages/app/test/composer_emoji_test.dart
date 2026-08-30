@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the emoji button beside the composer field, at touch density.
 ///
 /// Split out of `composer_affordances_test.dart`, which shares the same

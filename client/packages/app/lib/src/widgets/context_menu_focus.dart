@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The keyboard route into a context menu, used by `MessageContextMenuRegion`.
 ///
 /// The menu opens on a right-click or a long press only, which left edit,

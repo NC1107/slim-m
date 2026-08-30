@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [VideoSubscriptionCuller]: the dwell before an unwanted track is
 /// unsubscribed, the immediate resubscribe when it is wanted again, and the
 /// two things that must never happen - a track thrashing at the boundary,

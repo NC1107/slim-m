@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether this build can actually open a microphone or capture a screen on
 /// this device, checked on request rather than assumed.
 ///

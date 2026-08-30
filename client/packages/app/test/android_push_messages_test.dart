@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the FCM data-message-to-notification mapping: the two kinds
 /// that should alert someone with a plain notification, the one that rings
 /// as a call instead, and every kind (including none at all) that must stay

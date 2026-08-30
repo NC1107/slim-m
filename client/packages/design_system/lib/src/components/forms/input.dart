@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A single-line text field. The source design fixes three heights (sm 32,
 /// md 38, lg 44) and a constant body-size font across all three: size only
 /// changes the row, never the type, matching the rest of this system's

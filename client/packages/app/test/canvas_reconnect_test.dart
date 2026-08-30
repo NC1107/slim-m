@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one property that lives in `CanvasPane`'s own Riverpod wiring rather
 /// than in `CanvasSync` itself: a transition into `SyncStatus.live` runs
 /// exactly one catch-up, however many times the pane rebuilds around it.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The DM list's unread counts across more than one conversation.
 //!
 //! Its own file rather than another case in `dms.rs`, which is already at its

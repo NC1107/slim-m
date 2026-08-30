@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for push registration: gated on a session, tracked as an honest
 /// status rather than swallowed silence, and retried on resume and on a
 /// session already signed in when the controller is created (a restored

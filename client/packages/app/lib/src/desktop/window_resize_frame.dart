@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The hand-rolled resize hit-test border decision 0012 named as a real cost
 /// of going frameless: eight thin regions, one per edge and corner, each
 /// starting a native [DesktopWindowPort.startResizing] drag on pointer-down

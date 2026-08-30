@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `DELETE /dms/{userId}`: closing a DM out of the caller's own sidebar.
 ///
 /// Its own file, the same split `quiet_hours_test.dart` already uses and

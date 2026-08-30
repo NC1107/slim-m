@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Prints "true" on stdout if VERSION is at least as new, by `sort -V`, as
 # every semver-shaped tag GHCR already has published for IMAGE, else "false"

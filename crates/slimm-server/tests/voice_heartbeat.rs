@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `POST .../voice/heartbeat`: the route a live call refreshes so a
 //! terminated app's ghost participant is bounded rather than left to
 //! whatever the SFU's own reconnect grace period happens to be.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The caller's own private note about one other account: the per-subject
 /// sibling of `channelPermissionsProvider`'s per-channel bitmask, and the
 /// same shape for the same reason - nothing here is long-lived state, so a

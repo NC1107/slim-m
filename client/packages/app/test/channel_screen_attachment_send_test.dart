@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The attachment-only send, driven end to end through the real screen.
 ///
 /// Every other test of this feature stops one layer short: the composer suite

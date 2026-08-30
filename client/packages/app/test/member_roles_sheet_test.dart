@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The three ways this sheet differs from `role_assign_sheet.dart`, each of
 /// which is a real bug if the symmetric version is copied across.
 ///

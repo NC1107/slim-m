@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the personal space row's own kebab: it opens a menu with one
 /// action, that action hides the row, and hiding it says how to get it
 /// back rather than vanishing silently.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two native pickers an attachment action can open, and the seam that
 /// makes the choice between them testable.
 ///

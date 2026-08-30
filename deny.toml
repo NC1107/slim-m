@@ -1,11 +1,12 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # The dependency-license allowlist, and the only copy of it.
 # cargo-deny reads this file for the Rust tree and
 # scripts/check-dart-licenses.py reads the same [licenses] table for the Dart
 # tree, so the two ecosystems cannot drift onto different policies.
 # Every allowed license below is permissive and imposes no source-disclosure
-# obligation on either the AGPL server or the Apache-2.0 client; anything else
+# or copyleft obligation on slim-m, which is not open source and could not
+# satisfy one; anything else
 # fails the gate and wants a human decision, one named package at a time.
 # Why each exception is here, and why advisories and bans are not configured,
 # is in docs/ci.md.
@@ -32,10 +33,12 @@ confidence-threshold = 0.9
 # A license only the Dart half uses is not an unused Rust allowance.
 unused-allowed-license = "allow"
 
-# Named rather than allowed outright, so a third-party AGPL crate still stops.
+# slim-m's own crate is not open source, so it is named here rather than
+# allowed outright: the allowlist above stays a statement about third-party
+# dependencies only.
 [[licenses.exceptions]]
 name = "slimm-server"
-allow = ["AGPL-3.0-only"]
+allow = ["LicenseRef-PolyForm-Noncommercial-1.0.0"]
 
 # MPL-2.0 is per-file copyleft and reaches neither client; see docs/ci.md.
 [[licenses.exceptions]]

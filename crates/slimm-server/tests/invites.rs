@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Integration tests for invites: the permission gate, the use limit under
 //! concurrency, expiry, the check endpoint's anti-mining guarantee and the
 //! community metadata it discloses for a usable code, and its rate limit.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Phase 5 spike: does uniform-grid viewport culling fit a 60fps frame at the
 /// roadmap's soft caps, and is it worth having over a linear scan.
 ///

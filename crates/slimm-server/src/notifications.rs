@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A durable per-account choice: how much of a channel's traffic is worth
 //! waking a device for.
 //!

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The three tools e2e_canvas.py's own module doc says it does not cover:
 note, shape, and reordering a stroke - each written after the canvas grew
 past the single pen it shipped with (see docs/research/canvas-removal-design-2026-07-31.md

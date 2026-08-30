@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Channel permission overwrites: MANAGE_ROLES is checked in the channel
 //! itself (not the deployment-wide base), a nonexistent channel is refused
 //! identically to a real one the caller cannot manage, `allow` cannot grant a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the message row's context menu: which items a caller's flags
 /// actually put on screen, and the placement rules the menu has to hold.
 ///

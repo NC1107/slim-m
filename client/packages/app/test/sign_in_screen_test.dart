@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the sign-in flow's interaction with sync: SyncController is
 /// session-driven (see its class doc) and reacts to a fresh sign-in on its
 /// own, so nothing on this screen may also start it explicitly, or two

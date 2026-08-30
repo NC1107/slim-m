@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The drawing surface: several repaint boundaries, raw pointer input, and no
 /// widget rebuild for anything the camera or a drag does. Grab-panning is
 /// the one exception: starting or ending one rebuilds a single

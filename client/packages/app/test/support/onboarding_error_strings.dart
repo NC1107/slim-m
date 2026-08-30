@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The exact wording `http/error.rs`'s `ApiError::Internal` and
 /// `http/auth.rs`'s `validate_password` send, read from the shared fixture
 /// both sides check against (`crates/slimm-server/tests/fixtures/

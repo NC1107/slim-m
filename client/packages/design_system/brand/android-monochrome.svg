@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 <!-- Android themed-icon (API 33+) monochrome layer. Same 108dp canvas and same
      placement as android-foreground.svg, painted flat white: the launcher
      recolours it from the user's wallpaper palette and keeps only the alpha,

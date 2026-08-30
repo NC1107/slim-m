@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [mapVideoSubscriptionRefs]: the decision `VoiceSession`'s own room walk
 /// hands off rather than makes itself, and the only part of that walk this
 /// package can drive without a signalling server.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The infinite Voice Canvas, isolated so its complexity is contained.
 ///
 /// The spatial index and off-Riverpod hot path the Phase 5 spike proved, plus

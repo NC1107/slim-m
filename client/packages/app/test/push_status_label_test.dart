@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every push status the settings screen can show has a label, and two states
 /// must never share one or read blank: the label is the only thing that tells
 /// a user whether notifications are working or why they are not, so a

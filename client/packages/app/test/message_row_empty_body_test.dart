@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the row shape an attachment-only message takes.
 ///
 /// The defect: the row built [MessageBody] unconditionally, so a message

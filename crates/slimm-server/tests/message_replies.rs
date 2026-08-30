@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP integration tests for `reply_to_id`: the write-time validation that
 //! keeps a reply's parent in the same channel, and that the id rides the
 //! wire unchanged through send, list and a parent's own later deletion.

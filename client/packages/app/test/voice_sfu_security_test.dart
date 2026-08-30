@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `insecureSfuReason` is the guard that stops an operator's plaintext LAN
 /// voice setting from quietly reaching a public deployment, where a call would
 /// send microphone and screen-share media across the network in the clear with

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The local device preferences behind `voice_settings_screen.dart`.
 ///
 /// Split out of that file to keep it under the review budget once the

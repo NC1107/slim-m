@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `POST /channels/{id}/canvas/ops`: `remove` and `clear`, and everything
 //! they share - density, idempotency, `MANAGE_CANVAS`, the timeout carve-out,
 //! and the validation each kind requires.

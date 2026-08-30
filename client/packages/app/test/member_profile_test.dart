@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The profile popover's composition rule: a section you have no rights or
 /// context for is *absent*, never present-and-disabled. That is what keeps a
 /// plain member's popover to a couple of verbs instead of a wall of greyed

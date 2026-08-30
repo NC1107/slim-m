@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two overlay hints `canvas_pane_body.dart`'s drawing surface shows in
 /// place of a blank canvas: a loading spinner while the viewport fetch is
 /// still in flight, and an empty-canvas prompt once it has resolved to

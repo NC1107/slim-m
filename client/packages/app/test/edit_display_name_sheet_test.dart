@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The display name edit sheet: `updateMe`'s one caller.
 ///
 /// The server validates length and refuses control/text-direction characters

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Canvas objects, as a viewport read returns them. The op stream that reads
 /// back removals, clears and restores is a sibling file, `models_canvas_ops.dart`.
 library;

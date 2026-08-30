@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // Salsa20/20's core, the HSalsa20 key derivation built on it, and the
 // keystream a sealed box's XSalsa20 half needs.

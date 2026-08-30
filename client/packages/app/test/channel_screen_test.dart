@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for the dead read-state feature: `SlimmApi.markRead` and
 /// `MessageStore.setReadMarker` were both implemented and unit-tested in
 /// isolation, but nothing in the running UI ever called either, so the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Placing an `image` object over HTTP: the one kind-specific field this
 //! route reads out of an otherwise opaque `props`, and what it authorizes
 //! against - the same `may_link` check a message's own attachment already

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Naming who is who on a report card: the reported author or user (the
 /// subject of the report) versus the reporter (its provenance). Split out of
 /// `report_card.dart` to keep that file under budget.

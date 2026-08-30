@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `parseSearchQuery` (`providers/message_search_query.dart`): every
 /// recognised operator on its own, several combined, and the edge cases the
 /// parser's own doc comment states - an empty operator value passing

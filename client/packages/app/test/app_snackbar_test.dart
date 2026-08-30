@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `showAppSnackbar` is this app's one choke point for a `SnackBar`, closing
 /// the gap `reduce_motion_gate_test.dart`'s own library doc names as left
 /// undone: `ScaffoldMessengerState.showSnackBar` drives its own entrance and

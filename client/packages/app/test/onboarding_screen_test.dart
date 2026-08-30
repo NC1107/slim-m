@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the server-identity confirmation step in the manual "connect to
 /// a server" flow: pin on first connect, stay silent on a later match, and
 /// force an explicit, non-default action through if the key ever changes.

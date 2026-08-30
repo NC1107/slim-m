@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Integration tests for the message store against a real embedded SQLite db.
 
 use slimm_server::config::Config;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The wire-facing shapes [CanvasDocument] stores: the camera, the input a
 /// placement carries, and the stroke ready to paint.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The transcript's top slot must never disappear from the loaded list once
 /// history reaches its start - only swap what fills it - or the list's own
 /// item count shrinks by exactly one row right where paging always triggers:

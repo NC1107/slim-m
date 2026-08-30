@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP-layer integration tests for custom emoji, driving the real handlers in
 //! `http/emoji.rs` rather than the shared domain logic in `crate::emoji`.
 //!

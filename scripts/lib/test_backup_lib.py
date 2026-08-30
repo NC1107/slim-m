@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for scripts/lib/backup_lib.py.
 
 No real server or network: a fixture SQLite database (backup_fixtures.py,

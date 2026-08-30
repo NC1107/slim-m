@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The Voice Canvas across two clients: draw, paste, move, resize, erase,
 clear, undo, and a reload that proves what persists actually persists.
 

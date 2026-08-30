@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [WindowGeometryStore.read] healing a persisted splash-sized geometry back
 /// to [WindowGeometry.fallback] - the read-time half of the fix for the
 /// client-v0.58.0 regression that let a splash-sized geometry get persisted

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas's cursor rules and live-frame handling, driven directly
 /// against `CanvasSync` rather than through the widget tree: the two-region
 /// race the cursor exists to close, the gap detector, and catch-up ordering.

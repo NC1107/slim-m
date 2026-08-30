@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for replaying a parsed conversation as real API calls.
 
 No network: every account's `api` is a `Mock`, so every assertion is on

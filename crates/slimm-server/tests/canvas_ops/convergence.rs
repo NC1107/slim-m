@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Concurrency property test for the server's own materialization: real
 //! concurrent `move`/`remove`/`restore` submissions must never leave
 //! `canvas_ops` (the durable log) disagreeing with `canvas_objects` (the

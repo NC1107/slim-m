@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `evict_from_voice` (`http/members.rs`) was written three days before a DM
 //! channel could hold a call at all, and nothing taught it about one once it
 //! could: it only ever walked `voice`-kind channels. A member removed or

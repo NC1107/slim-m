@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for `voice_settings_screen_test.dart` and
 /// `voice_settings_camera_test.dart`: a fake session, a voice token stub, and
 /// the pane's own wrap.

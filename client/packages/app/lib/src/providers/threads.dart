@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Opening a thread from a message.
 ///
 /// A thread is an ordinary channel once opened (`GET /channels/{id}/messages`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's desktop-width picker: an anchored panel with Emoji and
 /// GIFs tabs, opened by either the smile or the GIF button, reaching native
 /// emoji directly rather than only the Space's own - the defect the owner

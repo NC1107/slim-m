@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A message's edit history: the versions it has held, reconstructed from the
 //! `message_edits` rows [`Store::edit_message`] writes. Split out of
 //! `messages.rs` to keep that file under the line ceiling.

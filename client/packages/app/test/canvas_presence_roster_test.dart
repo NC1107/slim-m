@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Who is here, drawn as a face-pile: real presence only, deduped across
 /// the call roster and live cursors, and nothing shown at all when nobody
 /// but this device can be proven present.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reporting and blocking, from wherever they are offered.
 ///
 /// One implementation for both subjects. Report and block existed twice before

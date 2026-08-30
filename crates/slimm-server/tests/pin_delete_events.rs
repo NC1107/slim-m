@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `Event::MessageUnpinned` on the message-delete path (MOD12).
 //!
 //! Split out of `pins.rs` to stay under the file budget: the DB trigger in

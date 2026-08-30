@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'voice_controller.dart';
 
 /// Screen sharing's start/stop outcome handling and the broadcast deadline,

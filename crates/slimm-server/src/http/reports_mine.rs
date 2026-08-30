@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A reporter's own, narrow view of a report they filed - split out of
 //! `reports` (the MANAGE_MESSAGES-gated moderation queue) to stay under that
 //! file's review budget, and because this route answers a genuinely

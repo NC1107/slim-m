@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Optional Ollama-generated content, for less templated seed data.
 
 Off unless `--ollama` is passed; see `seed-data.py`. Two shapes of call, both

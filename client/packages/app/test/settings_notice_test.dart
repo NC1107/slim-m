@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `SettingsNotice` and `SettingsAbsentValue` had no test of their own
 /// contract before this: both were only reached indirectly through screen
 /// tests (`space_settings_section_test.dart`, `debug_log_screen_frame_test.dart`)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The cap on Flutter's decoded-image cache, as a user setting.
 ///
 /// Flutter's own default is 100 MB ([ImageCache.maximumSizeBytes] is

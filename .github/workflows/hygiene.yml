@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: hygiene
 
 on:
@@ -294,16 +294,16 @@ jobs:
           fi
           echo "no emoji in UI source"
 
-      # Presence alone passed while two client-side files claimed AGPL; the
-      # identifier has to match the path or the licensing split is decorative.
+      # Presence alone is not enough: the identifier has to match, or a stale
+      # header from the old per-component split would pass unnoticed.
       - name: SPDX headers on Rust source
         run: |
           missing=0
           checked=0
           while IFS= read -r f; do
             checked=$((checked + 1))
-            if ! head -1 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0-only'; then
-              echo "::error file=$f::server source needs 'SPDX-License-Identifier: AGPL-3.0-only'"
+            if ! head -1 "$f" | grep -q 'SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0'; then
+              echo "::error file=$f::source needs 'SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0'"
               missing=1
             fi
           done < <(find crates -name '*.rs')

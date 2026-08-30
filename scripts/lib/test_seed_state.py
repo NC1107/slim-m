@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the seeding script's shared, cross-account state.
 
 No threads here: the lock's correctness under real concurrency is not what

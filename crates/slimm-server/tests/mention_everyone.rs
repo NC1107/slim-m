@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `@everyone` and `@here`: two reserved mention words, resolved in
 //! `push::recipients::resolved_mentions` rather than through
 //! `Store::user_ids_for_usernames`, and only ever expanded once the author

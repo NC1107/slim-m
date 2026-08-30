@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where secrets live.
 ///
 /// The interface is deliberately narrower than "a map of strings": it never

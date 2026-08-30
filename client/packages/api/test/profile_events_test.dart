@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Frame-parsing coverage for `ProfileChanged`, the event that closes the
 /// recorded debt that a display name change never reached a live client.
 library;

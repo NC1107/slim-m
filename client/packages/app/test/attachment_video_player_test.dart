@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [AttachmentVideoPlayer] constructs a real `media_kit` [Player] the moment
 /// it mounts (see the widget's own field initializer), so every test here
 /// needs [MediaKit.ensureInitialized] and a real libmpv on the machine

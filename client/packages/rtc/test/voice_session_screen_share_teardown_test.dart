@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Screen-share teardown tests, split out of `voice_session_test.dart` for
 /// the file budget once this group grew to cover every way a call can end.
 ///

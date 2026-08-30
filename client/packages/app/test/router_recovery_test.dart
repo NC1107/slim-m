@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for where a signed-out user is sent.
 ///
 /// Losing a session is ordinary: a refresh token is rejected, a device is

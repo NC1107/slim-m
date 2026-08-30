@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The strip above the composer while the caller is timed out: when it
 /// lifts, and why, if the moderator left a reason.
 ///

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Shared text-scrubbing for source-reading hygiene gates over `.dart` files.
 
 Extracted out of `scripts/check-error-surface.py`, which was the first gate

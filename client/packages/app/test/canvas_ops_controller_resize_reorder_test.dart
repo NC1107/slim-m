@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Resize (a corner-handle drag on the current selection) and reorder
 /// (bring-to-front/send-to-back), driven directly against
 /// `CanvasOpsController` and a real `CanvasCommitQueue`, the same shape

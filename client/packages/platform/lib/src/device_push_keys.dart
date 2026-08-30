@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// This device's push-encryption keypair.
 ///
 /// The server seals a push envelope to the device's public key; the private

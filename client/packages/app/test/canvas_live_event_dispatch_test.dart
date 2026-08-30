@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `dispatchCanvasLiveEvent`'s own activity-log recording: every live kind
 /// this client currently handles - place, remove, clear, restore, move,
 /// reorder - must reach [CanvasActivityLog] the moment it lands, not only

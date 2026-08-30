@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the device capability check: nothing runs until asked, a
 /// successful probe shows each capability's real answer, and a probe that
 /// cannot finish reads as "could not tell" rather than a false "unsupported".

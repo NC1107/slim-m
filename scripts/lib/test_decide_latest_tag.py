@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for scripts/decide-latest-tag.sh.
 
 It shipped with nothing binding it: a manual run against a stubbed `gh` is

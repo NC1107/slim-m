@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Wiring `CanvasPane` -> `CanvasPresenceLayer`: a bubble shows only for the
 /// channel this device has actually joined a call in, and never for a
 /// blocked author, matching the filter every other canvas surface applies.

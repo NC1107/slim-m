@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Avatar bytes survive losing their last watcher, which is what makes a
 /// channel switch stop refetching every face in the pane.
 ///

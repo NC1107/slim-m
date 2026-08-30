@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the voice settings screen: the microphone meter reflects the
 /// only real signal `slimm_rtc` exposes (a live call's local participant
 /// speaking or not), and screen share quality and join/leave sounds are

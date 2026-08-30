@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Integration test against a real running slim-m server.
 ///
 /// Skipped unless `SLIMM_TEST_SERVER` is set, so CI and everyday `dart test`

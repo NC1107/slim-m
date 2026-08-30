@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The transport's deadline, and that both entry points share it.
 ///
 /// There was none anywhere: `http.Client` sets no timeout on either backend,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Bounding the two caches `retention_policy.dart` names as unbounded (CD2,
 /// the local store's message rows, and CS4, `message_extras.dart`'s map).
 ///

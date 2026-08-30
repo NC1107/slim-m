@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Klipy's v1 API: request-building and response-parsing for `search` and
 //! `trending`. Checked against real captured responses from a live account
 //! (search, trending, and an invalid-key error) - see this module's own

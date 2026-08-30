@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Roles, reporting, blocking: the parts that decide what people may do.
 
 Two of these are driven at the API rather than through the screen, and the

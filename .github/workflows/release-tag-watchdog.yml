@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: release-tag-watchdog
 
 # Nothing else notices a release-please manifest bumping to a new version on

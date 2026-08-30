@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Judging one answer against the operation the schema documents for it.
 //!
 //! Deliberately a free function over borrowed inputs rather than a method on

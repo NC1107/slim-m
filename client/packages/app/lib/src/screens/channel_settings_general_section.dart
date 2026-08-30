@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Channel settings' name and topic section: `PATCH /channels/{id}`
 /// ([api.SlimmApiChannelAdmin]). Split out of the old `manage_channel_sheet`
 /// that `channel_settings_screen.dart` replaced; unlike that sheet, this

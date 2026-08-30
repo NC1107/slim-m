@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Tests for first-run bootstrap and the channel routes, including the full
 //! register-to-message flow a fresh deployment must support.
 

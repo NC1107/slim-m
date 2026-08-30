@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The camera and screen-source sheets used a bare Material `ListTile` for
 /// each device row: a taller, differently-inset row than every other picker
 /// sheet in the app, which builds on `AppListRow` instead.

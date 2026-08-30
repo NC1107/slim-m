@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `CallDockButton` (mute, camera, share, leave) used to draw a flat 44dp
 /// chip at every width, on the stated reasoning that "one control size
 /// across widths is what 'one layout' has to mean." The owner reported the

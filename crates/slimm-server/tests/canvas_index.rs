@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The canvas spatial index: that the viewport read really goes through the
 //! R-Tree, that the triggers keep it true for writes no Rust code performs,
 //! and that its 32-bit float bounds never cost a correct answer.

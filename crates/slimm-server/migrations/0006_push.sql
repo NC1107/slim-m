@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Push notification support.
 --
 -- 0002 already carries push_token_ref, voip_push_token_ref, and

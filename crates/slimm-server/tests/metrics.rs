@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /metrics`: gating, and the shape of the Prometheus text it answers
 //! with. See `http/metrics.rs`'s own doc comment for the reasoning.
 

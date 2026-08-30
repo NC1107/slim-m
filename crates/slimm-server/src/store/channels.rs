@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Channel persistence: create, fetch, rename, and soft-delete.
 //!
 //! Listing lives in [`super::bootstrap`] alongside the rest of the admin

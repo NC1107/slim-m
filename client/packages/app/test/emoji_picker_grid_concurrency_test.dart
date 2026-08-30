@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A deployment with a few hundred custom emoji pushes the picker grid past
 /// what `Class::Asset` can absorb from one screen if every visible cell
 /// fires its image fetch at once (`emoji_catalog_provider.dart`'s own doc

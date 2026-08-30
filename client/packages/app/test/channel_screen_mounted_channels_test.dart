@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The wiring [MountedChannels] actually depends on: a mounted [ChannelScreen]
 /// must register its channel id, and a torn-down one must give it back up -
 /// the pure registry tests in `mounted_channels_test.dart` cannot see this

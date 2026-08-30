@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The wire shape a message answers with, split out of [`super::messages`]
 //! when that file crossed the 500-line hard ceiling again (it had already
 //! been split once, for [`super::message_enrich`]). This is the type only;

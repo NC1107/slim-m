@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /channels/{channel_id}/threads`, the listing docs/IMPLIED-GAPS.md
 //! named as missing entirely - before it, the only way to find a thread was
 //! from the message it hangs off - plus the two things riding alongside it:

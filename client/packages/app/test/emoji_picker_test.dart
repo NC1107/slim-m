@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the emoji picker panel: the default category, search filtering
 /// the whole catalog, category tabs switching which group shows, arrow-key
 /// and Escape keyboard handling, the recently-used shelf, and the

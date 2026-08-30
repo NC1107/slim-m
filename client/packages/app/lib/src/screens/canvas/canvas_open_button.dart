@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one affordance that opens a channel's canvas.
 ///
 /// It sits in a voice channel's header, at every width, rather than only

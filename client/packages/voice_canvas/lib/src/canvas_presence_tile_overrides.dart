@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where a call participant's camera or screen-share tile actually sits on
 /// a channel's canvas, once somebody has dragged, resized, locked or
 /// restacked it away from [CanvasPresenceLayout]'s default arrangement.

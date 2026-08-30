@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `GET`/`PUT /push/preference`: the caller's own notification preference.
 ///
 /// Its own file rather than a case in `new_routes_test.dart`, which is

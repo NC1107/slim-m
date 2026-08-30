@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasActivityLog]: recording ops and live events into entries, the
 /// blocked-author filter, bounded capacity, and the throttled announcement
 /// batch - plus the sentence builders that turn an entry into text.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The hover-reveal mechanism a message row uses to show its add-reaction
 /// button only on hover, and that the emoji picker and the context menu
 /// reuse to stay mounted while their own popup is open.

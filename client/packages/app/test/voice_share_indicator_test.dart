@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the local screen-share indicator: the in-call banner and the
 /// collapsed strip both have to show a live share, and both have to stay
 /// quiet for a share that is only requested, never actually live.

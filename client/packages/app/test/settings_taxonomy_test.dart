@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Personal settings is a nav beside a pane now, not nine sections in one
 /// scroll, so what is worth pinning has changed with it.
 ///

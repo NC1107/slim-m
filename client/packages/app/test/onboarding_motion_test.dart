@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The join flow's entrances: the three entry cards arrive as a stagger,
 /// and the stepper grows into the sign-in form as a band rather than a cut.
 ///

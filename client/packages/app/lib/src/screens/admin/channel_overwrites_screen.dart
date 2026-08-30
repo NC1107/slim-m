@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Per-channel permission overwrites: `PUT`/`DELETE
 /// /channels/{channelId}/overwrites/{kind}/{id}`. Requires MANAGE_ROLES in
 /// the target channel.

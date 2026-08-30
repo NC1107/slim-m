@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tapping a push notification opens the channel it came from.
 ///
 /// Reported from real device use as "clicking on a notification takes me to

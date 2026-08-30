@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The manage-category sheet: rename sends the PATCH and updates the store,
 /// delete confirms then sends the DELETE and drops it from the store.
 library;

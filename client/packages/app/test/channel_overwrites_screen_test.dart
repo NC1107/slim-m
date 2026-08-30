@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The role and member picker sheets `_pickTarget` opens must actually show
 /// rows once their provider resolves. Both were empty regardless of load
 /// state: `_pickTarget` pre-captured `ref.read(rolesProvider).valueOrNull`

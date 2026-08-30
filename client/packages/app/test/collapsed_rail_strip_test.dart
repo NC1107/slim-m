@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [CollapsedRailStrip]: what replaces the channel rail once it is
 /// collapsed at a wide layout (`home_shell.dart`'s `AnimatedContainer`
 /// branch). The rail itself unmounts when collapsed on purpose - see

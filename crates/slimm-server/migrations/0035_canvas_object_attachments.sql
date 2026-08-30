@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Links an already-uploaded attachment to a canvas object, the `message_attachments`
 -- shape carried over to a second placement surface: a pasted image is
 -- content-addressed and never re-attached to a message, so nothing else in

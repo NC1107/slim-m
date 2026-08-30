@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Blocking on the live socket, against a real server on an ephemeral port.
 //!
 //! A reaction tally is per viewer - a reactor the receiver has blocked is not

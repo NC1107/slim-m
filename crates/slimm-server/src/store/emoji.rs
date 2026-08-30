@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Custom emoji persistence: the deployment's named images.
 //!
 //! The bytes are not stored here. An emoji points at an `attachments` row by

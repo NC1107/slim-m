@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Cold-start time and idle memory for the client, measured against the web
 # build in a real headless `google-chrome-stable`, driven over the Chrome

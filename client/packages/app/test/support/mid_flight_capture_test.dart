@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Proves `expectSettled` actually discriminates a mid-flight capture from
 /// a genuinely settled one, rather than trusting the mechanism by reading
 /// it - the same standard `real_shadows_test.dart` holds itself to.

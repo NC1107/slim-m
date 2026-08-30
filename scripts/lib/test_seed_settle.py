@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the settle pass that keeps the newest messages active.
 
 No network: every context's `api` is a `Mock`, so every assertion is on

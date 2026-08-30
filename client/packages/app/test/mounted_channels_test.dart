@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [MountedChannels] is the registry `retention_sweep.dart` reads to know
 /// which channels a sweep must never prune past their live window - the one
 /// answer nothing in the app had before it existed (`retention_policy.dart`'s

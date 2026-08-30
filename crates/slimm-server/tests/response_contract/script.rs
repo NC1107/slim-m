@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! One pass over the whole documented surface, in dependency order: claim the
 //! deployment, invite a second account, then build the channel, message,
 //! attachment, poll, pin and reaction state each later call needs.

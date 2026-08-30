@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the session lifecycle across a restart: restoring what was
 /// persisted, restoring the server it belongs to, discovering a restored
 /// session is no longer valid, clearing a leftover keychain session on the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The wire envelope: every frame shape the WebSocket sends or accepts.
 //!
 //! Split out of `super` (the connect/authenticate/authorize/serve loop) once

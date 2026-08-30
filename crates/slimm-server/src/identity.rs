@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The server's long-lived identity: an Ed25519 keypair generated once on
 //! first boot and persisted forever, so a self-hosted deployment has
 //! something stable a client can pin.

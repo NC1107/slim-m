@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The voice screen's stage transitions: a fast join failure was found to
 /// hand off through a blank, unlabelled frame before landing on its real
 /// error - reproduced here against the widget itself, not inferred from

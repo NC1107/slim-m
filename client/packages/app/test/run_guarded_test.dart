@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What a guarded action tells the user when it fails.
 ///
 /// The rule this pins is the one the twenty-six hand-written copies broke:

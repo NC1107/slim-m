@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Choosing which screen to share, on the desktops that make the app ask.
 /// Built on `device_choice_sheet.dart`, the shape `camera_source_sheet.dart`
 /// shares.

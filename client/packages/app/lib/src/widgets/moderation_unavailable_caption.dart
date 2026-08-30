@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A one-line reason a moderation control is missing or refused, so a
 /// moderator who knows they hold a bit and still sees no row for it - or a
 /// refusal with nothing more than a generic 403 - has something to read

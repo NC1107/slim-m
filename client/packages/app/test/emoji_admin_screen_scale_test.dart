@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A deployment with a couple of emoji packs pushes this screen well past
 /// what a plain, eagerly-built list can afford: `MAX_CUSTOM_EMOJI` allows up
 /// to 500. This pins the fix at that scale rather than asserting a flag -

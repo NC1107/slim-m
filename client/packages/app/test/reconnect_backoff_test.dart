@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Property tests for [ReconnectBackoff]: the delay `SyncController` waits
 /// between reconnect attempts, so a server restart does not bring every
 /// client back in the same instant. Before this, the jitter came straight

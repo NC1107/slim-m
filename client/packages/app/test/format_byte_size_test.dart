@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `formatByteSize` labels an attachment's size. It had no test, yet it holds
 /// two things that break quietly: bytes show as a whole number while every
 /// larger unit shows one decimal, and the unit climb stops at GB - a value

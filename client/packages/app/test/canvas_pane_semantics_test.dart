@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas pane's own header title, dumped against the real semantics
 /// tree rather than reasoned about, per this project's own established
 /// technique (see CLAUDE.md's AppBar-title and resize-bar findings, both

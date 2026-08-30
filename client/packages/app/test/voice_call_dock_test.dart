@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [VoiceCallDock]: the canvas toggle it adds beside [CallControls], its own
 /// DM self-gating, and the narrow-width fold that keeps a crowded row from
 /// overflowing rather than shrinking any control below its 44dp floor.

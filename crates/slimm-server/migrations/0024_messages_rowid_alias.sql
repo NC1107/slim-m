@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- An explicit rowid alias on `messages`, so the full-text index is keyed on a
 -- column SQLite promises to keep.
 --

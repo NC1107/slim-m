@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Sending a presence tile to the back: its own content moves into
 /// [CanvasPresenceBackdrop], painted before [CanvasSurface] so real ink
 /// lands on top of it, while every control - drag, resize, lock, hide, and

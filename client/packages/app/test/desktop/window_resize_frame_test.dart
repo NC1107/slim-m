@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [WindowResizeFrame] is the one piece nothing else in this package's own
 /// tree can exercise: it never renders inside a real widget, only inside a
 /// window, so this file is what actually proves the eight regions exist,

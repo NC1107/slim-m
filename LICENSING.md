@@ -1,33 +1,29 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
+
 # Licensing
 
-slim-m is multi-licensed by component, so the network-copyleft protection sits where it matters and the client stays permissive.
+slim-m is under [PolyForm Noncommercial 1.0.0](LICENSE), one license for the whole repository.
+Server, client, schema, scripts, deploy and everything else are the same, so there is no per-path table to keep in sync anymore.
 
-| Component | Path | License | SPDX |
-|---|---|---|---|
-| Home server | `crates/`, `docker/` | GNU AGPL v3.0 only | `AGPL-3.0-only` |
-| Flutter client | `client/` | Apache License 2.0 | `Apache-2.0` |
-| Shared wire schema | `schema/` | Apache License 2.0 | `Apache-2.0` |
-| Push relay | separate repository | Apache License 2.0 | `Apache-2.0` |
+Every source file carries an `SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0` header, and CI checks the headers are present.
+The canonical text lives in `LICENSES/LicenseRef-PolyForm-Noncommercial-1.0.0.txt` (REUSE style) and is the same text as `LICENSE`.
 
-Rationale: the official-hosted-plus-self-hosting model creates a real SaaS-rehosting risk that only AGPL's network clause closes, so the server is AGPL.
-The client has no rehosting risk, AGPL on app-store binaries has caused real friction, and the client compiles in the Apache-2.0 generated schema code, so the client and the shared schema are Apache-2.0.
-See [docs/STRATEGY.md](docs/STRATEGY.md) and [docs/research/oss.md](docs/research/oss.md).
+## What that means
 
-Every source file carries an `SPDX-License-Identifier` header, and CI checks the server headers are present.
+Noncommercial use is free: personal, hobby, educational, research, nonprofit, and all that.
+You can run it, fork it, change it and redistribute it.
+You just can't sell it, host it as a paid service, or use it inside a commercial entity without a separate license.
+If you want to use it commercially, open an issue and ask.
 
-The canonical full license texts live in `LICENSES/AGPL-3.0-only.txt` and `LICENSES/Apache-2.0.txt` (REUSE style).
+## Why it changed
 
-## Paths this table does not name
+It used to be split, AGPL-3.0-only for the server and Apache-2.0 for the client, on the theory that the network copyleft closed the SaaS rehosting hole.
+It doesn't really. AGPL still permits commercial use and paid hosting, it only asks that the source goes with it, so someone could run a paid slim-m and comply by publishing their changes.
+The client was worse for this, Apache-2.0 is permissive, so anyone could take it, close it and ship it commercially.
+The goal was always that nobody else productizes this, and PolyForm says that directly instead of trying to get there through disclosure rules.
 
-`scripts/`, `perf/`, `packaging/` and `assets/` carry `Apache-2.0`, matching the
-client rather than the server: none of them is part of the server binary, and
-the tooling is meant to be as reusable as the client is.
+## Dependencies
 
-`deploy/` carries `AGPL-3.0-only`, since it exists to run the server.
-
-`.github/` is currently mixed, six files `AGPL-3.0-only` and five `Apache-2.0`,
-and that is a real inconsistency rather than a decision. It is left alone here
-rather than resolved in passing: relicensing anything, even a workflow, is the
-owner's call and not a tidy-up. New files there should follow whichever of the
-two the change they serve belongs to until that is settled.
-These verbatim texts are added as a mechanical step (for example `reuse download --all`) and are tracked as a Phase 0 checklist item; the per-component licensing above is authoritative in the meantime.
+`deny.toml` still gates dependency licenses to permissive ones, and matters more now rather than less.
+slim-m is not open source, so it cannot take on a copyleft dependency's source-disclosure obligation.
+`dbus` and `nm` stay named exceptions for MPL-2.0, which is per-file copyleft on those files and reaches neither half of slim-m.

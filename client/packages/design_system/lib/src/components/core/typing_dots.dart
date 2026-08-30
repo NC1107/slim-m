@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Three staggered pulsing dots: the universal "someone is typing" cue.
 ///
 /// Mounted only while somebody is actually typing, so nothing is left

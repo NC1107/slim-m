@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Tenor's v2 API: request-building and response-parsing for `search` and
 //! `trending`. Pinned against Tenor's own published v2 docs.
 

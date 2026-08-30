@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'home_shell.dart';
 
 // The two docked third-pane slots (member roster, thread), split from home_shell.dart for the line budget; kept as private part-of classes so the shell's Row still names them.

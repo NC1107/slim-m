@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [dedupeCameraDevices], the fix for a switch-camera control that
 /// offered a choice between devices that were really one physical webcam.
 ///

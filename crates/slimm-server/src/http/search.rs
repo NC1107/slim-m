@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Full-text search over one channel's live messages, backed by the FTS5
 //! index kept current by the triggers in migration 0002, plus a Slack-style
 //! operator layer over it: `from:`, `in:`, `has:`, `before:`/`after:`.

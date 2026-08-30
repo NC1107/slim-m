@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasSurface]'s `onDraftPoint`/`onDraftEnded`: fired for the same
 /// down/move/up gesture `onStroke` is eventually built from, including the
 /// second-pointer-cancels-a-draft path `onStroke` itself never sees at all.

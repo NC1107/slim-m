@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Enumerating the cameras a desktop offers, for the picker several webcams
 /// makes necessary.
 ///

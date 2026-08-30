@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A camera tile can be expanded full screen now: the owner's report was
 /// "no way to full screen a camera", which turned out to be true in a wider
 /// sense than the report itself - a *remote* participant's camera was never

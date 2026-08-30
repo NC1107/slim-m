@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The audit trail through the real router, not the store directly.
 //!
 //! `restore_to_space` and `clear_member_timeout` gained an acting-moderator

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `has:`, `before:`/`after:`, and combining several operators at once. Each
 //! reads a message's own bytes (its attachments, its content, its
 //! `created_at`) rather than resolving a caller-supplied name - the

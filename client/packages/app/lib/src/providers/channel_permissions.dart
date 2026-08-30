@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The caller's effective permission bitmask in one channel: the per-channel
 /// sibling of `myPermissionsProvider`'s deployment-wide bitmask.
 ///

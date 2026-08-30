@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Inline playback for a `video/*` attachment: a real player in the
 /// transcript rather than a name-and-size chip.
 ///

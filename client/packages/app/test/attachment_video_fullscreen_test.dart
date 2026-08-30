@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The full screen route itself: opening it, and that swiping down actually
 /// reaches [Navigator.pop] end to end. The drag-to-dismiss gesture's own
 /// threshold/velocity/snap-back behaviour is covered in isolation by

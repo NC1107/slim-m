@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Filesystem-backed storage for attachment and avatar bytes. The
 //! content-type allowlist that decides what may be stored and served at all
 //! lives in [`content_type`], split out to keep this file under the review

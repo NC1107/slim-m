@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The accessible names this harness drives the app by.
 
 Kept in one place because they are a contract with the UI, not incidental

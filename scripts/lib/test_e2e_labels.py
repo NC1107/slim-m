@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Guards e2e_labels.py against drifting out from under the client.
 
 Each constant here is a string this harness clicks or waits for by exact

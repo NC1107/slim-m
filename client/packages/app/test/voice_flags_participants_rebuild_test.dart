@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pins the rebuild boundary `voice_flags.dart` exists to draw:
 /// `voiceFlagsProvider` and `voiceParticipantsProvider` are two separate
 /// `select` forwards over the same `voiceControllerProvider`, so a widget

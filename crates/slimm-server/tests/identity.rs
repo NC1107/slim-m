@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Integration tests for the server's trust-on-first-use identity: the
 //! keypair survives a restart, and the fingerprint it exposes is what a
 //! client would actually pin.

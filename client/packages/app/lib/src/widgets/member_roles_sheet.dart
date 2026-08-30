@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every role, with this one member's assignments toggleable.
 ///
 /// The inverse of `role_assign_sheet.dart`, which fixes a role and lists

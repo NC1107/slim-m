@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Report triage: MANAGE_MESSAGES gates both the queue and resolving one, and
 //! nobody below that bar ever sees a report's content snapshot.
 

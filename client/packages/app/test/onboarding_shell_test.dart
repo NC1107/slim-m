@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The join flow's frame: what the stepper says, and what the brand panel
 /// does when there is no room for it.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The voice channel's text surface: `ChannelScreen`'s transcript and
 /// composer, docked beside the call at desktop widths and swapped in over
 /// the whole screen at compact ones - see `voice_screen.dart`'s own doc for

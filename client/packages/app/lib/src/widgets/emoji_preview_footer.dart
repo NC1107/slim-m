@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Discord's own preview strip under its picker: whichever emoji is under
 /// the pointer, held by a finger, or - lacking either - sits at the
 /// keyboard's own highlight, so it is never a pointer-only affordance (see

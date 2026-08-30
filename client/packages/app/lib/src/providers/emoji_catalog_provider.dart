@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The deployment's custom emoji as the render side needs them: a name-to-id
 /// index for resolving `:shortcode:`, and one emoji's image bytes.
 ///

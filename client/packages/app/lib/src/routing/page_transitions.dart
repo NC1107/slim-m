@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Route transitions for the shell's own surfaces.
 ///
 /// The settings and administration modals carry their own presentation in

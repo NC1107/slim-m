@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `DELETE /members/{id}/removal` publishes `Event::MemberRestored`, the
 //! mirror of the `MemberRemoved` its `PUT` sibling already publishes:
 //! without it a remove-then-restore left the member invisible in every

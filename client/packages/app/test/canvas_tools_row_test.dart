@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas tools row in isolation: the pen/eraser toggle, the undo
 /// button's enabled state, and the clear control's gating and confirm.
 /// `canvas_tools_row_shape_kind_test.dart` covers the shape-kind picker and

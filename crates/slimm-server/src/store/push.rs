@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Push registration persistence: the device attributes a push relay needs
 //! (platform, token, optional VoIP token, and the device's public key), the
 //! client-reported lifecycle state used to gate triggering, and the read path

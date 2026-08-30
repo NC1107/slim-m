@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's browse view: every [EmojiSection] as one continuous
 /// scrollable, a real `SliverGrid` per section so a category nobody has
 /// scrolled to yet never builds its cells - unlike `EmojiGrid`'s own

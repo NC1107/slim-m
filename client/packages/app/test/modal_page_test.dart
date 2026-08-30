@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A settings screen is a screen on a phone and a modal on a desktop.
 ///
 /// These screens took the whole window at every size, which on a monitor meant

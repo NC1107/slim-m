@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The custom title bar, decision 0012: one widget, branched once at the
 /// place window-control layout actually differs per platform, rather than
 /// three separate widgets duplicating the shared drag region and height.

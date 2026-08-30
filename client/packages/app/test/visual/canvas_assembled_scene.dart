@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Realistic content for the assembled-pane review: a canvas that reads as
 /// something somebody actually drew on, not three placeholder objects.
 ///

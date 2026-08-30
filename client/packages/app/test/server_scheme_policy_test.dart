@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The https-over-the-internet rule shared by every entry point that commits
 /// to a server address, and the LAN exemption it is built on.
 ///

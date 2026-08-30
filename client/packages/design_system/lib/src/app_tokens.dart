@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 import 'package:flutter/material.dart';
 
 /// Semantic design tokens for slim-m, exposed as a [ThemeExtension] so a widget

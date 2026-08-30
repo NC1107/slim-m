@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Each emoji category is a tab in the picker with a label and an icon, and no
 /// two may share either: a repeated label or icon makes two tabs read as the
 /// same one, so a copy-paste that duplicates one is caught here rather than in

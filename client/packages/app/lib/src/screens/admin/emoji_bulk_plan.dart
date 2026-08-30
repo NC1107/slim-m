@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Turning a picked zip's decoded entries into the emoji uploads they plan,
 /// before any network request happens.
 ///

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Thin wrappers over the canvas HTTP surface, one function per verb.
 
 Every write retries past a 429 the same way every other seed script's

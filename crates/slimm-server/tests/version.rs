@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! GET /version: the unauthenticated probe onboarding uses to learn what a
 //! server is before an account exists, including whether it can deliver push.
 

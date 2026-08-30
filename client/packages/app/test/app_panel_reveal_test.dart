@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The shared side-pane reveal: content fades and drifts in from the edge
 /// its pane lives on, and reduce motion lands it settled on frame one.
 ///

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # One command for every screen the client can render, mobile and desktop
 # widths, every theme that matters: a single set of PNGs plus a manifest and

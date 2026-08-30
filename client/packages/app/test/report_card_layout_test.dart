@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether a long value on the report card actually fits at phone width,
 /// split out of `report_card_test.dart` for the line budget - the same
 /// split that file's own doc comment already draws for the quick actions.

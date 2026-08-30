@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Adds `messages_deleted` to `moderation_audit_log`: a moderator removing
 -- somebody's messages in bulk is a moderation act, and 0048's action set had
 -- no room for one.

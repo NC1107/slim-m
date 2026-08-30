@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Reactions: idempotency, the permission gate, and the fact that reacting
 //! cannot be used to discover a message in a channel you cannot read.
 

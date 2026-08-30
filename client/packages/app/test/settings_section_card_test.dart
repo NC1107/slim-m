@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `SettingsSectionCard`: the fix for the owner's "settings UI is very flat"
 /// report (#39). A section's rows must sit inside a bordered `AppCard`, not
 /// loose on the pane background, and the header above it must keep reading

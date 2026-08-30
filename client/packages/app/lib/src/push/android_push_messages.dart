@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Turns an incoming data-only FCM message into the same fixed, content-free
 /// local notification on Android, whenever the app is backgrounded or not
 /// running at all - never while it is in the foreground, see

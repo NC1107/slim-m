@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasQuickPlacement.placeNote]: the request it actually posts carries
 /// [noteBoxFor]'s own box, not the old fixed default - the integration
 /// point `canvas_note_sizing_test.dart` cannot see on its own.

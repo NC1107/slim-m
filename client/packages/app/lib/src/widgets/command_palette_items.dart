@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The command palette's result rows: what counts as a match, and what
 /// running one does. Kept apart from the widget so the matching rules are
 /// plain top-level functions a test can call without pumping a tree.

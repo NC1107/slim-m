@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The canvas viewport route: its permission gate is evaluated per channel and
 //! wants the canvas bit as well as the view bit, and a rectangle it cannot
 //! honour is refused rather than quietly clamped into a different answer.

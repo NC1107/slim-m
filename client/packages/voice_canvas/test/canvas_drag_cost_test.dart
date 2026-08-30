@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What one drag costs the document.
 ///
 /// A drag calls [CanvasDocument.moveObject] once per pointer event - a few

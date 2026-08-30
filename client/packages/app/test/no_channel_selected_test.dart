@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// shell.md: this is the very first screen a fresh desktop sign-in lands
 /// on, and it used to be a single small line of grey text with no icon and
 /// no next step - noticeably less than the functionally identical

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Wire encoding for `canvas_convergence_harness.dart`: turns a canonical
 /// op (`canvas_convergence_model.dart`) into the JSON a catch-up page would
 /// answer with, or the live `ServerEvent` a socket would deliver. Split out

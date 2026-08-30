@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What `RemoteDraftPainter.paint` actually costs against the 16.6ms frame
 /// budget, at a shape the spike's own lesson says to check: viewport and
 /// content shape, not object count, is where a canvas painter falls over.

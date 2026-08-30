@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `PUT /channels/order`: the MANAGE_CHANNELS gate, the position and
 //! category this actually writes, the no-op case that changes nothing, and a
 //! cross-category drag. See `channel_order_validation.rs` for the

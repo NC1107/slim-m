@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas bar's overflow: "Paste image" and "Show/Hide activity log" are
 /// always present, since placing an image needs only the USE_CANVAS bit
 /// drawing already does and the activity log is an accessibility fallback

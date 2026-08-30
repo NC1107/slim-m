@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 [workspace]
 resolver = "3"
 members = ["crates/*"]
@@ -6,7 +6,7 @@ members = ["crates/*"]
 [workspace.package]
 edition = "2024"
 rust-version = "1.94"
-license = "AGPL-3.0-only"
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/NC1107/slim-m"
 
 # Shared dependency versions live here so every crate stays in lockstep.

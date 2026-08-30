@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The activity panel's own summary line must track the live document
 /// while the panel stays open, not just refresh on the next open/close
 /// toggle - a real bug this caught: `CanvasPaneBody`'s panel branch first

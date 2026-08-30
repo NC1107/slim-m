@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [ServerEvent.parse] for `canvas.media_slot.changed` - decision 0010's
 /// reversal, the live frame a media tile's shared position, size, lock and
 /// depth now reach every viewer through.

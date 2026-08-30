@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [MessageJumpHighlight] on its own: the flash it shows on arrival, and the
 /// reduce-motion rule that it must be held flat and removed rather than
 /// animated.

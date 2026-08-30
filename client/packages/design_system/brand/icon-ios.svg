@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 <!-- iOS app icon: identical to icon-master.svg but square and full-bleed.
      iOS applies its own superellipse mask, so a pre-rounded tile would show a
      gap inside the system corner; the spec's 114/512 radius describes that

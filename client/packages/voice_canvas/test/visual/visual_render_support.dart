@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Rasterising a canvas scene straight to a PNG, with no widget mounted at
 /// all: a plain `test()`, a `ui.PictureRecorder`, and a file write.
 ///

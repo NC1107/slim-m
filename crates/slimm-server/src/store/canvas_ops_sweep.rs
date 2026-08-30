@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Compacting `canvas_ops`: reclaiming `remove`, `clear` and `restore` rows
 //! once nothing they did is still in effect, on the same periodic-sweep
 //! model as [`Store::sweep_expired_tokens`] and

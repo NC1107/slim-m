@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Report 4: a right-click over a canvas object, driven through the full
 /// pane so the wiring from `_CanvasPaneState` down through `CanvasPaneBody`
 /// to `CanvasObjectContextMenu` is what is actually under test, not just the

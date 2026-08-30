@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `Store::now_ms_unique`'s fence value must stay unique across a process
 //! restart, not just within one running process.
 //!

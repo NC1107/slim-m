@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the command palette's own message search: it went unfiltered
 /// when blocking was wired up everywhere else, and it used to collapse
 /// every search failure to "no matches" rather than explaining a 403.

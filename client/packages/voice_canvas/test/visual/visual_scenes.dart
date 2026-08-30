@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Scene builders and the layer composite for `canvas_visual_render.dart`,
 /// split out once that file's own test bodies pushed it past the review
 /// budget - the same `part of`-free sibling-file split this package's own

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Coverage for `BatchProfilesController`'s two reconciliation halves: a
 /// live `ProfileChanged` frame evicts the renamed id while the app stays
 /// open, and `clear()` forgets everything on a reconnect that may have

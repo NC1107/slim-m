@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A `||spoiler||` span: a filled bar that swaps for its text on tap or on
 /// Enter/Space once tabbed to - it used to be a bare `GestureDetector`,
 /// which Flutter never makes a tab stop, so a spoiler could not be revealed

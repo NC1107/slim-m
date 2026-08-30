@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Space settings screen must be gated on what `GET /me` actually
 /// reports, not shown and left to answer 403: a caller with none of the
 /// gating bits should see the screen render nothing at all, and a caller

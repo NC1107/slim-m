@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A send the server refuses has to say why, driven through the real screen.
 ///
 /// The defect this pins: `sendOptimistically` used to catch

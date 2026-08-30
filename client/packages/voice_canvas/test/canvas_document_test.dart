@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What the document promises the surface, and what the splitter promises the
 /// server. Removal, tombstones, restore and a hard reset are a sibling file,
 /// `canvas_document_removal_test.dart`.

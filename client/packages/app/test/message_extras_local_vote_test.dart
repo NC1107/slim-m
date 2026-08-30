@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `applyLocalVote` is the optimistic tally a poll shows the instant you pick an
 /// option, before the `poll.voted` broadcast confirms it. Its arithmetic was
 /// untested: a first vote adds one to the chosen option, changing your vote

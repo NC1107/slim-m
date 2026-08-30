@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `Store::create_channel`'s next-position query is the fifth copy of the
 //! same predicate `list_channels`, `reorder_channels` and `delete_channel`'s
 //! last-channel guard already carry, and it was missing the

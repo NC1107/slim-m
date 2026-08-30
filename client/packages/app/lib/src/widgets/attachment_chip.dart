@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The filename-and-size chip for an attachment this app cannot render
 /// inline: anything outside `inlineImageTypes` and outside `isVideo`, most
 /// commonly a PDF, an archive, or plain text. Split out of

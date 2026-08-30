@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Phase 1 core schema: users, auth, RBAC, channels, messages, reactions,
 -- attachments, invites, read state, and the canvas tables.
 --

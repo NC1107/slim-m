@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Leaving a call, when leaving is not instantaneous.
 ///
 /// `_teardown` clears `_room` before it awaits anything, deliberately, so a

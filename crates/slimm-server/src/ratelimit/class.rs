@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The traffic classes [`super::RateLimiter`] meters, and their budgets.
 //!
 //! Split out of `ratelimit.rs` to keep that file under the review budget;

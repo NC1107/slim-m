@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The "show message text on your lock screen" toggle `NotificationsSection`
 /// carries: iOS-only (see `personal_status_sections.dart`'s own doc comment
 /// on `_PushContentPreviewRow` for why), persisted, and wired to trigger a

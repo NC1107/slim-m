@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas presence tiles are keyed by a `kind:identity` string built by one
 /// shared builder and parsed back by another, and sized by kind and camera
 /// state. A drift between build and parse, or a wrong size branch, silently

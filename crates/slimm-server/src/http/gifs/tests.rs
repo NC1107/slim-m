@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Unit tests for `gifs.rs` itself - construction, error mapping, and the
 //! filename extension helper. The token cache has its own tests beside it in
 //! `cache.rs`. The full search-pick-select round trip against a fake

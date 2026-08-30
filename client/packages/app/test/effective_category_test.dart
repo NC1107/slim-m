@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `effectiveCategory` picks which emoji tab is actually shown from the one the
 /// user chose (null until they pick) and whether any custom emoji exist. Two
 /// rules matter and neither was tested: with no pick it opens on custom only

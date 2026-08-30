@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Who this account has blocked, held for as long as the session lasts.
 ///
 /// The point of holding it here rather than beside the settings pane that

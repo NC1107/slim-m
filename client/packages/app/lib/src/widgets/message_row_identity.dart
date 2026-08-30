@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The identity half of a message row: the leading avatar or continuation
 /// gutter, and the header line carrying the author name and timestamp.
 ///

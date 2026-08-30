@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Ties every other file in this directory into the calls `main.dart` makes:
 /// put the window into small splash mode before it is ever shown, wire up
 /// close-to-tray, geometry persistence and the tray icon once the app has a

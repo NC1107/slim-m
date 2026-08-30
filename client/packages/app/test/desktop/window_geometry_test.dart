@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The geometry-clamp math decision 0012 names as fully automatable: whether
 /// a saved rectangle still lands on an attached display. No window, no
 /// platform channel, plain Dart per the record's own rule.

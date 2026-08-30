@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Backlog item 128: a status editor reached by tapping your own avatar in
 /// the sidebar. Under `kCompactWidth` the avatar menu still routes free-text
 /// editing through this bottom sheet; `presence_status_field_test.dart`

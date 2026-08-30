@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The pooled `Corpus`: disconnected short/long messages, code, polls.
 
 Split out of `seed_ollama.py` to keep that file under the review budget.

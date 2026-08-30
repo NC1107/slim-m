@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one retention policy the client's unbounded local caches are meant to
 /// share, rather than each growing its own unrelated cap.
 ///

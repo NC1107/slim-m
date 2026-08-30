@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Blanks `//` and `/* */` comments and `'...'`/`"..."` string-literal
 /// content to spaces, keeping every character's index (and every newline)
 /// exactly where it was, so a source-reading gate's regex or count only

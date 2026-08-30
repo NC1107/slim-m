@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fetches and caches one GIF search result's thumbnail bytes, streamed
 /// through this deployment's own server rather than a client asking the
 /// provider's CDN directly.

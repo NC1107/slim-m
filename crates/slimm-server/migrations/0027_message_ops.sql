@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- The message op stream: one row per real edit and one per real delete, dense
 -- over its own `'message_op'` seq, so a client that has consumed up to `n` may
 -- treat `n + 1` as the very next op that exists. `messages.seq` is untouched

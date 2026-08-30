@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Grab-to-pan: holding the middle mouse button and dragging moves the
 /// camera regardless of the active tool, without disturbing whatever that
 /// tool was mid-way through - see `_beginPan`/`_interruptForPan`'s own docs.

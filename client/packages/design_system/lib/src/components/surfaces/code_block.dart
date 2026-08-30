@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fenced code, and the short inline run used inside message text.
 ///
 /// Neither widget parses or lexes code: a message is already-authored content

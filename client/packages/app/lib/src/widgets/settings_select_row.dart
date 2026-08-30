@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A settings row that states its current value and, to change it, drops a
 /// dropdown down from the row on desktop or lifts a sheet on a phone.
 library;

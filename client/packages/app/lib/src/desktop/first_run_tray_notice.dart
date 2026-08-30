@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A first-time notice that closing hid or minimised the window rather than
 /// quitting - decision 0012's answer to Alt+F4 and the X button being
 /// indistinguishable: tell the person once, the first time it happens.

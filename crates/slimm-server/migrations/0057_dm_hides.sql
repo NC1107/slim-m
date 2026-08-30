@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Closing a DM out of the sidebar: a per-viewer hide, never a delete. The
 -- other participant's own list is untouched, and no message is removed -
 -- `store/dms.rs`'s `list_dm_conversations` simply stops listing this channel

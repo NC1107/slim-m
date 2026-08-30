@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasObjectContextMenu]: what a right-click resolves to (an object's
 /// own menu, or the empty-space menu once no object is hit), why a drag
 /// past the tap slop never opens either, ownership gating, and the

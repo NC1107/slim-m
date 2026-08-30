@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The floating dock a connected call shows once the canvas is not already
 /// open for its own channel: [CallControls] plus, room permitting, a one-tap
 /// way into that channel's canvas.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The scrollable body shared by sheets that list a bounded-but-growing
 /// per-channel set (`pinned_messages_sheet.dart`, `threads_sheet.dart`):
 /// each sits inside a `ConstrainedBox(maxHeight: ...)` and wants a short

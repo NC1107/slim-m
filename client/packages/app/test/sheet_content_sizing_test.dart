@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fix for the desktop-sheets audit: `whats_new_sheet.dart` and
 /// `role_assign_sheet.dart` used to force a fixed fraction (0.6/0.7) of the
 /// full window height inside `showAppSheet`'s dialog, leaving most of a

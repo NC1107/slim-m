@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The browser backend: sqlite3 compiled to WebAssembly, hosted in a worker
 /// so the query loop never blocks the frame.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every full-screen body keeps its content clear of the home indicator.
 ///
 /// The rail and the composer got this and nothing else did, so on a notched

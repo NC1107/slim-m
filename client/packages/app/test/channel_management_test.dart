@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Channel rail sections and `canManage` gating: which section headers show,
 /// and that a member without MANAGE_CHANNELS gets a read-only list. The
 /// Channel settings screen's own round trip lives in

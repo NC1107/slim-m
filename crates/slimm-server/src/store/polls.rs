@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Polls: a message attachment with 2-4 fixed ordered options and one vote per
 //! user, changeable but never doubled.
 //!

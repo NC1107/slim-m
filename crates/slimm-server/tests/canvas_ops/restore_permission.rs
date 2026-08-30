@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `restore`'s authorization once the actor's own `MANAGE_CANVAS` has moved
 //! since the op it targets was written.
 //!

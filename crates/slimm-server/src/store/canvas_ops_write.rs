@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Submitting a mutation to the canvas op stream: `remove`, `clear`,
 //! `restore`, `move`, and `reorder`.
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fullscreen: what the canvas drops, what it deliberately keeps, and the
 /// three ways back out.
 ///

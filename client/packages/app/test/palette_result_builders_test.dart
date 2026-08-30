@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The palette result builders, tested for the logic that is theirs rather
 /// than the match predicates': the result list is capped at
 /// [paletteResultLimit], a member list drops the caller themselves (a DM with

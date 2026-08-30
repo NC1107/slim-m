@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the canvas pane's own presentation within [HomeShell]: it must
 /// actually swap in for the conversation it replaces, must not leave the
 /// header above it doubled up, and must fade through rather than teleport.

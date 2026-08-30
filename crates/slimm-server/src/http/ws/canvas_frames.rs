@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Canvas [`Event`] variants: which channel one concerns, and its wire
 //! frame. Split out of `authorization.rs` once adding
 //! `canvas.media_slot.changed` there would have crossed the 500-line hard

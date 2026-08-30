@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Deleting a channel left any call inside it running.
 //!
 //! `delete_channel` soft-deletes the row and publishes `ChannelDeleted`, and

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Shared setup for the canvas write route's tests: a store, a signed-in
 //! caller, and the small POST/GET helpers every test in this module needs.
 

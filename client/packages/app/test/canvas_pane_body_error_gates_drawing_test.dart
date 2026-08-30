@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// screen-review canvas.md: the pane's own error banner kept the pen tool
 /// and the dock's "Paste image" reachable underneath it, so a person could
 /// pick a tool, or an action, that was guaranteed to fail the same write

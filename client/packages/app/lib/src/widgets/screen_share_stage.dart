@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The stage a peer's shared screen renders on during a call.
 ///
 /// Its own file rather than more of `voice_screen.dart`, which was over the

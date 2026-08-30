@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A tapped image, opened over the app: pinch to zoom, drag to pan, and
 /// either a swipe down or the close control to leave.
 ///

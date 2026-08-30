@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Public user profiles, the batch lookup, and the member list: the narrow
 //! public shape, consistent answers for a deleted account, and bounded
 //! batches.

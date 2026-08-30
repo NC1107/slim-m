@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rows the UI snapshot matrix's fake server answers with: real members,
 /// real roles, real invites, real reports, and a channel with a real topic.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the suites that pump the personal and Space settings
 /// screens: the Space screen's permission gating, and the App group's fixed
 /// position on the personal screen regardless of who is looking.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The message write paths: send, edit and delete, over embedded SQLite. The
 //! read paths (list, fetch by id) are [`super::message_reads`], split out to
 //! stay under the file budget. Full-text search is [`super::message_search`].

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sibling regression to `home_shell_snackbar_dock_test.dart`: that file
 /// covers a snackbar shown while the dock is already at its final height.
 /// This covers the opposite temporal order - a snackbar already on screen

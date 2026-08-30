@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Persistence for a per-(user, channel) override of the account-wide
 //! notification preference (`store/notifications.rs`).
 //!

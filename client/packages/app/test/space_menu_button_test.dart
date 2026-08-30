@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the Space menu's channel-creation items (backlog item 55): the
 /// rail used to float a bare "+" over the uncategorised section with no
 /// header explaining it, and creation moved here instead, gated on

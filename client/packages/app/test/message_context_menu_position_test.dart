@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The menu has to open under the pointer that opened it, not at a fixed
 /// offset from the region's own corner.
 ///

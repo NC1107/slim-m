@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Screen-share audio is offered only where the underlying capture can
 /// actually deliver it, the same `audio_gain_test.dart` shape for a
 /// different capability.

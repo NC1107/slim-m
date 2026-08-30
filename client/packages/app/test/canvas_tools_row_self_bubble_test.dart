@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The overflow's "Hide/Show my camera bubble" item: split out of
 /// `canvas_tools_row_test.dart` for the same reason `canvas_tools_row_shape_
 /// kind_test.dart` and `canvas_tools_row_touch_reach_test.dart` already

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [LocalAudioState]: what reaches this listener's ears, and the two things
 /// that pull in opposite directions.
 ///

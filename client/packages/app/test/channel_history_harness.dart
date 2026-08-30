@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A real [ChannelScreen] over a real local store and a fake server that
 /// answers `GET /channels/{id}/messages` the way the real one does: newest
 /// first, keyset-paginated on `seq`, capped by `limit`.

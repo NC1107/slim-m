@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """What a person does in a channel: talk, react, mention, attach, pin.
 
 Each of these drives the UI the way a person would and then asks the server

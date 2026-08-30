@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """What has to stay true of the notification sounds.
 
 The first of these is the one that matters and the one that was missing: a

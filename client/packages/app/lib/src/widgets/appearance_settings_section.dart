@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The appearance picker: follow the system, light, dark, or true black; the
 /// clock's 12/24-hour format; an in-app override of reduce-motion; and a
 /// high-contrast toggle for the text/border tokens that read weakest.

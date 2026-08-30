@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Ephemeral, self-expiring typing state, kept in memory only. Never
 //! persisted (a "someone is typing" row would outlive the typing itself by
 //! construction) and never pushed to mobile: `crate::push` has no path that

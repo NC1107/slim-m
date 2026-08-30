@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `moderation_audit_log`: one row per removal, restore, timeout and lift,
 //! written in the same transaction as the state change it records.
 //!

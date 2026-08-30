@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one sentence `canvas_commit_queue.dart`, `canvas_quick_placement.dart`
 /// and `canvas_image_paste.dart` each show for a draw refused with
 /// `ApiException.forbidden`.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [ServerEvent.parse] for `canvas.stroke_preview.updated`, the same
 /// coverage `canvas_cursor_event_test.dart` gives its sibling frame, plus
 /// the fields unique to this one: `object_id`, `points` and `ended`.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The performance pane carries both memory dials - attachment preview quality
 /// and the image-cache cap - each stating its current value with the default
 /// marked. The desktop splash toggle and duration row are covered on their

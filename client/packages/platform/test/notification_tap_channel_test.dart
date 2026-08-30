@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two halves of a notification tap, and why one is not enough.
 ///
 /// A tap is the ordinary way a killed app gets launched, so the native side

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Role and overwrite persistence, and the effective-permission read path.
 //!
 //! The pure precedence logic lives in [`crate::permissions`]; this module loads

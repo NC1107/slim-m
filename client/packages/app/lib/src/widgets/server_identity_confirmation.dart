@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The orchestration behind confirming a server's identity: probing
 /// `/version`, comparing against whatever this app already pinned for that
 /// address, and deciding which of the two identity screens (if either) a

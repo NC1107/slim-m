@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `VoiceCallWithChatPane`/`VoiceCallWithChatTabs` give a voice channel the
 /// same transcript and composer a text channel has, by mounting and
 /// unmounting a real `ChannelScreen` rather than a parallel implementation.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A terminated app must leave a voice call; a backgrounded one must not.
 ///
 /// Nothing can run once the process is actually killed, so this controller

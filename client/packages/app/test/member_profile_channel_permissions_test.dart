@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Proves the split docs/decisions/0011-per-channel-permissions.md draws
 /// through `member_profile.dart`'s own moderation section: `canEject` reads
 /// the call's own channel, its three siblings (time out, remove, roles)

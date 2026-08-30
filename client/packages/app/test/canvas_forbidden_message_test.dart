@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [canvasDrawForbiddenMessage]: whether a draw refusal names an active
 /// timeout's remaining time, or falls back to the plain permission wording.
 library;

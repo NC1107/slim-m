@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasMediaSlotSync]: the cold fetch applies every slot the server
 /// answers with, [CanvasMediaSlotSync.commit] sends the right kind and
 /// participant for a tile key, and [CanvasMediaSlotSync.applyRemote] only

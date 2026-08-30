@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders one participant's live camera feed.
 ///
 /// Not exported from the package barrel, for the same reason

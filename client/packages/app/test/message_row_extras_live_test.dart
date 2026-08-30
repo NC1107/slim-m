@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Proves the claim `message_extras.dart`'s own doc comment makes: "a live
 /// update reaching the cache is a live update reaching the screen".
 ///

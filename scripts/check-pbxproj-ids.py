@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Every object in an Xcode project file must have its own id.
 
 An `.xcodeproj` is a flat map from 24-hex-digit id to object, and the sections

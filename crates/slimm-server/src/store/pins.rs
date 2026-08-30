@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Pinned messages: a per-channel highlight set, keyed by (channel, message)
 //! exactly like reactions key on (message, user, emoji), so pinning an
 //! already-pinned message is naturally idempotent rather than something the

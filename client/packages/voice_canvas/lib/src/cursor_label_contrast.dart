@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one WCAG contrast computation this package needs: which of black or
 /// white a cursor's own name-chip label should use.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The running server every case in `script.rs` talks to: one fixture, one
 //! request helper, and the record of what has been covered so far.
 

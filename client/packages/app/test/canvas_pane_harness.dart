@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the two suites that pump a [CanvasPane]: its fetch,
 /// live-frame and drag behaviour (`canvas_pane_test.dart`) and its erase,
 /// undo and clear controls (`canvas_pane_ops_test.dart`).

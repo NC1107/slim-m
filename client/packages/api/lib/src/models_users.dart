@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Profiles: a public [UserProfile] and the caller's own richer [Me].
 ///
 /// Split out of models.dart purely to stay under this repo's line budget; see

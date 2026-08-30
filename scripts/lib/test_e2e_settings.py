@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for e2e_settings' theme and status persistence checks.
 
 `change_theme` and `change_status` used to stop at the control relabelling

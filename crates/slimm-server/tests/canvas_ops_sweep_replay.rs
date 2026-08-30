@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A busy channel, seeded rather than empty, replayed after a sweep.
 //!
 //! Split out of `canvas_ops_sweep.rs` to keep that file under the review

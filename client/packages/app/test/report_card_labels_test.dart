@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The report card's name labels resolve an id through a profile map that may
 /// not hold it yet, and the states must not blur: an id absent from the map is
 /// still *loading*, while an id present with a null value is a *deleted*

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasDocument.setCamera] notifies when the camera moved, and only then.
 ///
 /// Every listener on the document rebuilds when it fires, and the presence

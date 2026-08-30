@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A failure caught from the server is a SnackBar again, three times over.
 
 The nine-specialist audit (2026-07-29) replaced 27 vanishing SnackBars with

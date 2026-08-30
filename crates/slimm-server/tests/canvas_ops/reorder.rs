@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `POST /channels/{id}/canvas/ops` with `kind: "reorder"`: authorship the
 //! same way `move` gates it, the one place a timeout applies to this op
 //! stream alongside `move`, and that a reorder touches only `z_index`.

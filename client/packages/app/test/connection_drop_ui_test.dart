@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reproduces backlog #108/#110: "Channels format weird, colors change [...]
 /// mentions also get unhighlighted when the server was offline."
 ///

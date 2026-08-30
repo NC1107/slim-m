@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The HTTP call to the push relay's batch send endpoint, and its wire types.
 //!
 //! The relay is a separate stateless Go service; this is a thin client for its

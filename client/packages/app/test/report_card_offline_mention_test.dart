@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `report_card.dart` renders a reported message snapshot through the same
 /// [MessageBody] pipeline the channel transcript uses, but it built its own
 /// `knownUsernames` set with `membersProvider.maybeWhen(data: ..., orElse: ()

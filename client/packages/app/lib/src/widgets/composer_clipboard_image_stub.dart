@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The mobile-and-Linux-desktop bridge: iOS, Android and Linux each expose a
 /// real image clipboard that `package:flutter/services.dart`'s own
 /// [Clipboard] cannot reach (see `composer_clipboard_image.dart`'s doc

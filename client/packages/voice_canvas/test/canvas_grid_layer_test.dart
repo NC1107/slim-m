@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A regression guard for the grid never rendering once it was pulled out of
 /// `CanvasSurface`'s own `Stack(fit: StackFit.expand)` into its own widget -
 /// see `canvas_grid_layer.dart`'s own doc for the mechanism.

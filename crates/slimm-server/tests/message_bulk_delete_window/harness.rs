@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The store, router, and request helpers `cases.rs`'s tests share.
 //!
 //! Duplicated from `message_bulk_delete/harness.rs` rather than imported: an

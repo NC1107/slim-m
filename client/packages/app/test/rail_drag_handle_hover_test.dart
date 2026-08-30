@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [RailDragHandle]'s hover feedback: the hairline (and, collapsed, the
 /// glyph) travel on one lerped clock rather than swapping colour in a frame.
 /// Shipped by #606 alongside the rest of the design system's hover tempo,

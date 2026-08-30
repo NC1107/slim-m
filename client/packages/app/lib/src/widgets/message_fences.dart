@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Splitting a message body into plain-text and fenced-code blocks.
 ///
 /// A fence marker must occupy its whole line (only the backticks and an

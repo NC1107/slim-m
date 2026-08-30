@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Multi-line plain-comment runs that predate the comment-cap gate, at the
 # count each file had when it was listed. Ratchet only: lower a number when
 # you fix a file, never raise one. A file not listed here must be clean.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether this device asks the server to seal a message preview inside its
 /// push envelope, so a notification can show who sent it and part of what it
 /// says rather than the relay's generic fallback string.

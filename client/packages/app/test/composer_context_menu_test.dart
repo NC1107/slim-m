@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer field's context-menu fix: forcing the iOS 16+ system menu
 /// to offer Paste for an image.
 ///

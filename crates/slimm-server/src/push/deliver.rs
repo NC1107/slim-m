@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The background half of [`super::PushSender::notify_message`]: resolves
 //! recipients, applies the per-recipient debounce, seals an envelope per
 //! target, and calls the relay.

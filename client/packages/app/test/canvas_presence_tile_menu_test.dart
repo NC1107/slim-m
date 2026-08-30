@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A presence tile's own right-click menu - the fix for the owner's report
 /// that a camera or screen-share tile could not be right-clicked at all.
 /// `canvas_presence_tile.dart`'s own `onSecondaryTapUp` used to be a

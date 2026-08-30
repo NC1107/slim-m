@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 <!-- Primary app icon: accentFill on surfaceBase, 512 tile, 114 corner radius,
      mark at 60% of the tile. Colours are the dark theme's accentFill (#58B4D8)
      and surfaceBase (#17191C) from design_system/lib/src/app_tokens.dart. -->

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Fills a channel's Voice Canvas with realistic, reviewable content.
 
 The canvas shipped strokes, an eraser, undo, clear, restore, pasted

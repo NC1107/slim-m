@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one server this build knows about without being told.
 ///
 /// Compiled in rather than typed, so joining it can skip both the address

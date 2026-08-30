@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// On a wide window the avatar menu's free-text status editor is an inline
 /// `AppInput` in the anchored `AppMenu` itself, not a dialog hop through
 /// `status_editor_sheet.dart` - `docs/design/desktop-vs-mobile.md` rule 2:

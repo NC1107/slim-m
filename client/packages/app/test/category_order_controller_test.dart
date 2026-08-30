@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `CategoryOrderController`, split out of
 /// `channel_order_controller_test.dart` for the review budget. Unlike a
 /// channel reorder's single atomic request, this one fires N independent

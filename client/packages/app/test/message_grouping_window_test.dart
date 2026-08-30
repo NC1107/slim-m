@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A gap of a minute starts a fresh block rather than extending the last one.
 ///
 /// Messages from one author used to keep joining the same block for minutes,

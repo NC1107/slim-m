@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [MessageStore.hasMessage] and [MessageStore.oldestLocalSeq]: the two
 /// direct-database reads a message jump pages history backwards with, with
 /// no transcript or channel screen involved.

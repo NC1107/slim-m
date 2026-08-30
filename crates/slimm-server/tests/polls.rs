@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Polls: one vote per user per poll (a second vote replaces rather than
 //! doubling), refusal once closed, the per-channel SEND_MESSAGES gate, the
 //! fan-out event's privacy, rate limiting, and cleanup on delete.

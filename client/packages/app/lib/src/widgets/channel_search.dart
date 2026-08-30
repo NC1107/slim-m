@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The inline panel the channel header's search toggle reveals: a query
 /// field over the real full-text search endpoint, and its results in place
 /// of the live message list while open.

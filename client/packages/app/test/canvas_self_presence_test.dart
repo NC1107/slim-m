@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasSelfPresenceController]: the default state, that hiding persists
 /// to `SharedPreferences`, and that a fresh controller (a relaunch, or
 /// reopening the canvas) reads a previously persisted value back instead of

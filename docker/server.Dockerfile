@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Production image for the slim-m home server.
 #
 # Two stages: a static musl build, then a distroless nonroot runtime. The final

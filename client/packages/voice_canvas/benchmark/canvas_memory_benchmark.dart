@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What a full canvas actually costs to hold in memory at the roadmap's soft
 /// caps, the one number the spike-era benchmarks in this directory never
 /// measured: they time the spatial index and the paint layer, never the

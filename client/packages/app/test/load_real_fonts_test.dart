@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [loadRealFonts] used to guard the Lucide lookup with `existsSync()` and
 /// silently skip it when the file could not be found, so a wrong pub cache
 /// path meant the icon font never loaded and nothing in the run said so: the

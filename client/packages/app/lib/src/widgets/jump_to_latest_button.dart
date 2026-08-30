@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The way back to the newest message once a reader has scrolled into
 /// history, since the read marker only follows the view there and scrolling
 /// up should never look like giving up the thread.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `setPresenceVisibility` survives a visibility value it has never heard of.
 ///
 /// Its own file rather than another case in `new_routes_test.dart`: that one

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The "N replies" affordance a message row shows once it has an opened
 /// thread: `ThreadReplySummary` (`widgets/message_row_parts.dart`), wired
 /// into `MessageRow` from `MessageExtras.threadReplyCount` and

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A tracked vertical drag that dismisses whatever it wraps: [child] follows
 /// the finger via [Transform.translate] as it moves, and either commits to
 /// [onDismiss] or snaps back to place on release, the same shape

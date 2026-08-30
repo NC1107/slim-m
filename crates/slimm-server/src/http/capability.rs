@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! What a client can check for before it commits to a server.
 //!
 //! slim-m's safety model is manual reporting plus blocking, and nothing else:

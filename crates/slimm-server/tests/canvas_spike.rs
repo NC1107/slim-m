@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The Phase 5 canvas measurement, kept as a runnable thing rather than a
 //! number in a document that nobody can reproduce.
 //!

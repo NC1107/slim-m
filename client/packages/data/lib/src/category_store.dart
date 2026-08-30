@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Channel category reads and writes, split out of `message_store.dart` for
 /// the file budget. A category is not a channel and is replaced on its own
 /// path here, never through [MessageStore.replaceChannels] - see

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `channels.parent_message_id` had no index until migration 0043, so
 //! `open_thread`'s duplicate check scanned the whole channels table per
 //! thread open. The query is read out of its own source file, the

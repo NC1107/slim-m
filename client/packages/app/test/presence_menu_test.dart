@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail footer's status avatar had no press feedback at all: a
 /// [GestureDetector] with an [onTap] and nothing else, unlike every row and
 /// button built on [AppListRow]/[AppButton]/[AppIconButton]. It now scales

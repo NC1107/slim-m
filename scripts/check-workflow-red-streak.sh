@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Some workflows fail without anything else noticing. e2e.yml is advisory and
 # does not run on pull_request (see its own header), so a red run there never

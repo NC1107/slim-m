@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: slimm_api
 description: Typed client for the slim-m wire protocol, matching schema/openapi.yaml.
 publish_to: none

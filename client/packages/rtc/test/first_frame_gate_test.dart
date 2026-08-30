@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pins the fix for a screen share (and camera) tile painting whatever was
 /// already sitting in its texture's GPU memory - stale attachments, emoji,
 /// fragments of other UI - before its first real frame arrived.

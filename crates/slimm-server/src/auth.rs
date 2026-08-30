@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The authentication service: password hashing and opaque-token primitives.
 //!
 //! Two concerns live here, kept apart from persistence on purpose:

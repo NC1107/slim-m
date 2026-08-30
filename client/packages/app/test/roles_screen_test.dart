@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The everyone role offers no way to assign it, the same way it already
 /// offers no way to delete it: every member holds it already, so a grant
 /// would be a no-op the sheet next door has to filter out anyway.

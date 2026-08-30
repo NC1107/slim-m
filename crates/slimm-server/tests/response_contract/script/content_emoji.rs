@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Custom emoji calls for `content.rs`, a sibling module rather than folded
 //! into that already near-the-limit file - `content.rs` was past the
 //! 500-line hard cap with this inline.

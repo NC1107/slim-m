@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Validating a member's free-text status line, split out of `users.rs` so it
 //! has a home to be unit-tested in and the handler file stays under its line
 //! budget. A pure function of its argument.

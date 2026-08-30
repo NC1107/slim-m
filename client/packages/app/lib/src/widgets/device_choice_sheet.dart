@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A "choose one of these" sheet: a heading, an optional one-line caption,
 /// then a row per item. `camera_source_sheet.dart` and
 /// `screen_source_sheet.dart` were near-byte-identical copies of this shape,

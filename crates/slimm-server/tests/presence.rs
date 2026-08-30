@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end presence tests: the appear-offline leak test (through both the
 //! REST batch lookup and the WebSocket broadcast), and that presence flips to
 //! offline when the last live socket closes rather than only when a client

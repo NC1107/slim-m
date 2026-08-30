@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The jump-to-latest arrow used to key off `_atLatestSlop`, a 4-logical-
 /// pixel tolerance meant for overscroll bounce, so it counted a reader as
 /// "scrolled away" for the smallest real drag or settle. `TranscriptScrollTracker`

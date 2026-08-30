@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Applying the message op stream, the last half of reconciliation.
 ///
 /// Two properties carry the whole thing. An op's cursor moves only after the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! What `GET /attachments/{id}` answers: who is allowed to fetch at all, and
 //! what headers and bytes come back when they are.
 

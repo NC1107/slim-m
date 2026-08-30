@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A keycap: the visual stand-in for a key, or short label, used to show a
 /// keyboard shortcut.
 ///

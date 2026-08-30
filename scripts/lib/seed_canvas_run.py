@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Orchestrates a canvas seeding run end to end: accounts, a channel, a
 clustered mix of strokes and images, real op-stream history (moves,
 resizes, reorders, removes and restores), a handful of edge-case probes,

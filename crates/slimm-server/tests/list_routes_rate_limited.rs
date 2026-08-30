@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /categories` and `GET /channels` took a bare `Authed` with no rate
 //! limit charged at all, unlike every sibling handler in their own files -
 //! the same previously-uncharged-route shape `resource_bounds.rs` already

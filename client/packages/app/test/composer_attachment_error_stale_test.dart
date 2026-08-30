@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's single attachment-error band now carries both a
 /// clipboard-paste failure and a file-picker failure (`_ComposerState`'s own
 /// doc comment on `_attachmentError`), sharing one `String?` field and one

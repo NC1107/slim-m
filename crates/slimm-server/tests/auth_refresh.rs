@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Integration tests for refresh-token rotation: a normal rotation, two
 //! genuinely concurrent races over the same token, and reuse of an
 //! already-spent token revoking the whole session family.

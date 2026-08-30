@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Takes a consistent backup of the database and the attachment/avatar bytes
 Litestream does not cover (see deploy/README.md's "Backups" section).
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `AppInfoSection` used to render its Version and Debug log rows as bare
 /// `ListTile`s, the taller, differently-inset row the design system's own
 /// font-fix commit named as a defect (#477) but did not itself convert.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The note sheet's byte-budget limiter.
 ///
 /// The sheet used to cap input at a fixed character count (1800), on the

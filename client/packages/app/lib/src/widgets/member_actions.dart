@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Acting on one member, from the row's own context menu.
 ///
 /// Split out of `member_pane.dart`, for the same reason

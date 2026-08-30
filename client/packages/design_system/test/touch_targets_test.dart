@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The density seam: what a control does when its caller says nothing.
 ///
 /// The `touch` flag existed, was documented, was tested, and every call site

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Sends a parsed `seed_conversation.Conversation` as real API calls.
 
 Split out of `seed_conversation.py` to keep that file under the review

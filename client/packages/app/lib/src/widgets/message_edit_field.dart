@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The inline field a message row swaps in for its rendered body while being
 /// edited, in place of a dialog.
 library;

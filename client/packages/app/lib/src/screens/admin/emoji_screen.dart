@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Custom emoji administration: `GET/POST /emoji` and `DELETE /emoji/{id}`.
 /// Requires MANAGE_SERVER, the bit that already means "change what this
 /// deployment is".

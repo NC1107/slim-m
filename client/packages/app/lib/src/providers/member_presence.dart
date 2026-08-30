@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The deployment's member roster and live presence for it.
 ///
 /// Split out of `widgets/member_pane.dart` to separate the data (this file)

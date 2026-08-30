@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The report card's quick actions: jump to the message, delete it, time
 /// out its author, or remove them from the Space. Each is absent without
 /// its permission, present and wired to the right endpoint with it, and a

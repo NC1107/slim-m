@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [CameraSwitching.setEnabled] and the [CameraToggleResult] it
 /// returns, in particular the wrapping that lets [VoiceSession.lastError]
 /// keep answering with one `Object?` while still carrying a

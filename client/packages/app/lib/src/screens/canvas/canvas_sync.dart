@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reconciles a channel's canvas op stream against the local document.
 ///
 /// The canvas has no durable local state - `CanvasDocument` lives in the

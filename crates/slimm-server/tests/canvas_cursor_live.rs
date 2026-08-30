@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Live canvas cursor relay: the two-bit authorization canvas frames already
 //! need, the appear-offline guard typing already needs, and the bounds check
 //! that is new to this frame kind.

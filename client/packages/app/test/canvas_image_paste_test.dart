@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The real "Paste image" route end to end: the toolbar action, the native
 /// clipboard read, the upload, the placement, and - the thing report 2 in
 /// the backlog channel asked about - whether the just-pasted image can then

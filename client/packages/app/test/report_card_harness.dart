@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for `report_card_test.dart` and
 /// `report_card_actions_test.dart`: a report/profile/`/me` JSON builder, and
 /// [pumpReports], which mounts a real [ReportsScreen] over a fake transport

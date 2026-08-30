@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether a tray is reachable right now, combining the platform (macOS's
 /// Dock and Windows' notification area are both unconditional) with the
 /// Linux-only runtime probe, decision 0012's own split.

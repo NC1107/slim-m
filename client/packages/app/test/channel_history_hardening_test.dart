@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Four findings from an adversarial review of `channel_history.dart`, split
 /// out of `channel_history_test.dart` to keep both files under the line
 /// budget: a page filtered entirely from view walking the whole channel over

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # The verify-release-checks polling loop, pulled out of the workflow so
 # scripts/lib/test_verify_release_checks.py can drive it against a fake `gh`

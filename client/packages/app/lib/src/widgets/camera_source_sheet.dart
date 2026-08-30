@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Choosing which camera to publish, on the desktops (and browsers) where
 /// more than one may exist. Built on `device_choice_sheet.dart`, the shape
 /// `screen_source_sheet.dart` shares.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A horizontal swipe on a message row starts a reply to it - the one-handed
 /// gesture every comparable mobile messaging app offers - reached here by an
 /// ordinary [GestureDetector.onHorizontalDragStart]/`Update`/`End` trio

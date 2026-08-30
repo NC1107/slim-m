@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end tests for the ways a session's live socket dies: logout,
 //! device removal, account deletion, and a bad connect ticket. Split out of
 //! `tests/ws.rs`, which stayed focused on fan-out and delivery.

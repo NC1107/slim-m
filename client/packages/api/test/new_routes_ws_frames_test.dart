@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The WebSocket server frames this package picked up alongside the new REST
 /// routes: decoding each `ServerEvent` from its wire JSON. Split from
 /// `new_routes_test.dart` for the line budget; it shares none of that file's

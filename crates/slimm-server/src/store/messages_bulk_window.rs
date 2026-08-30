@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Selecting one author's recent live messages in a channel, for
 //! `http/messages_bulk_window.rs`'s window-based sibling of
 //! [`Store::bulk_delete_messages`].

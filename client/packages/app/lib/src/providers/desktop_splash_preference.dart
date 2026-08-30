@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether the desktop startup splash shows at all, and how long it holds the
 /// screen when it does, as a user setting.
 ///

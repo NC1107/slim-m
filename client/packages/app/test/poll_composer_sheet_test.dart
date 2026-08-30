@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The poll composer sheet's redesign: five identical fixed fields become a
 /// real add/remove list with a stated minimum and maximum, the primary
 /// button names what is missing rather than sitting disabled with no

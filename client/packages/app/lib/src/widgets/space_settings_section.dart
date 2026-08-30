@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Everything that changes the Space rather than the person: the reports
 /// queue, invites, roles, channel permission overwrites, who can join, and
 /// the Space's custom emoji - as the pane groups [SpaceSettingsScreen]'s

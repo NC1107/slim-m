@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasEngine]'s own lifecycle, with no widget ever pumped.
 ///
 /// This is the property the refactor exists to prove: before it, the fetch,

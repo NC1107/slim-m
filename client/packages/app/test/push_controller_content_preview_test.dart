@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether a registration carries `include_content`, split out of
 /// `push_controller_test.dart` to keep that file at its allowlisted size
 /// (`scripts/file-budget-allow.txt`) rather than growing it further.

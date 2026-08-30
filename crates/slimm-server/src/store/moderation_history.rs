@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! MOD4: the owner-visible moderation-history feed - resolved reports and
 //! `moderation_audit_log` rows, merged into one time-ordered, paginated read.
 //!

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The first-time-only tray notice: shows once per resolved [CloseAction],
 /// decision 0012's owner-supplied answer for Alt+F4/the X button both
 /// closing to something with no way to tell them apart.

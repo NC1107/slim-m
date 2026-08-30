@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! slim-m home server binary. All logic lives in the `slimm_server` library;
 //! this only picks which entry point an invocation asked for.
 

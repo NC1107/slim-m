@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one seam between this app's own window-shell logic and the real
 /// `window_manager`/`screen_retriever` plugins, so [DesktopWindowController]
 /// and [DesktopWindowShell] can be driven by a fake in a `flutter test` with

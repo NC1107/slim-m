@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas tools row's own accessibility surface: semantics reachability
 /// at phone width, hover tooltips, the disabled-undo explanation, keyboard
 /// dismissal of the overflow menu, and the Ctrl+V hint's pointer/touch

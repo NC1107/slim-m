@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Member timeouts: a moderator takes away every way of expressing yourself
 //! for a while, and takes away nothing else.
 //!

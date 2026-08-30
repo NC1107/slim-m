@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `CanvasSync`'s two hooks the activity log rides on: `onOpApplied` fires
 /// for every op the catch-up feed actually applies, and `onHardReset` fires
 /// when a reset discards local state - both are what let the accessibility

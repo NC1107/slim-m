@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A real "Always reduce" viewer, dropped onto five routed surfaces
 /// `ui_snapshot_test.dart` already renders, once each rather than at every
 /// breakpoint that harness samples: the same broad-sweep shape, aimed at

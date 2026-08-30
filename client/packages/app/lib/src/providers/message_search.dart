@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one message-search call both `ChannelSearchController` (the in-channel
 /// search bar) and the command palette's message section make.
 ///

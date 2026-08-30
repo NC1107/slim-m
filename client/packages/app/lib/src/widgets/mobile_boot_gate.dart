@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Covers the very first server connection on a phone with a boot splash, so a
 /// cold launch never lands on an empty, disconnected home while the session's
 /// first catch-up is still running.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The channel rail's own edge: click it to collapse or restore the rail.
 ///
 /// Replaced the header's dedicated toggle button once (#256), then replaced

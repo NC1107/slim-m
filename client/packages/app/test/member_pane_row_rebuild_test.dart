@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Proves the CS1 rebuild-scoping fix: a live `PresenceChanged` for one
 /// member must rebuild only that member's row in the pane, not every row.
 /// `MemberRow` watches its own id via `presenceControllerProvider.select`

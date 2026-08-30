@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: slimm_voice_canvas
 description: The infinite Voice Canvas, isolated so its complexity is contained.
 publish_to: none

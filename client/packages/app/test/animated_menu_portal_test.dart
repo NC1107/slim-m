@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `AnimatedMenuController`/`AnimatedMenuSurface`: the entrance and the
 /// reversible exit every bare-`OverlayPortal` menu was missing. The exit is
 /// the half a raw controller cannot have - `hide()` unmounts in one frame -

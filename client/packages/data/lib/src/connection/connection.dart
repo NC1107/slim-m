@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Picks the sqlite3 backend for the platform this build targets.
 ///
 /// The two backends share no runtime: the native one reaches sqlite3 through

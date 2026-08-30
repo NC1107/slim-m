@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Space usage analytics: `GET`/`PATCH /space/analytics`. Requires
 /// MANAGE_SERVER, the same bit `/space/settings` and the Emoji screen use.
 ///

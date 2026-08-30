@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [ServerEvent.parse] for `canvas.cursor.moved`, the one canvas frame with
 /// no counterpart in the durable object or op stream.
 library;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `MessageRowHeader` and `MessageRowLeading` used to watch the whole
 /// `batchProfilesControllerProvider` map, so every mounted row rebuilt
 /// whenever any author resolved, not only the row whose own author changed -

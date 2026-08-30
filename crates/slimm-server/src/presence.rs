@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Ephemeral, in-memory presence: who currently has a live WebSocket, and the
 //! one pure rule for what status a given viewer may be told about a given
 //! user.

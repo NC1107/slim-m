@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The generic drop-target overlay: shown only while a drag is genuinely
 /// over the target, and gone the moment it exits or the drop lands.
 ///

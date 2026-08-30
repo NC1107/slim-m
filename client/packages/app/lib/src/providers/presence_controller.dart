@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Live presence: a batch lookup seeded once per member list, kept current
 /// by `presence.changed` events for the rest of the session.
 library;

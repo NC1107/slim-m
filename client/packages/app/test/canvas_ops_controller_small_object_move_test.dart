@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A selected object small enough that its whole body sits inside
 /// `resizeHandleHitRadius`'s own fixed screen-space reach - a resized-down
 /// or naturally small pasted image is the easy way there, with

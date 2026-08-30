@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Painting the one object [CanvasDocument.selectedObjectId] names: an
 /// outline in screen space, plus resize handles for every box-shaped kind
 /// (image, note, shape).

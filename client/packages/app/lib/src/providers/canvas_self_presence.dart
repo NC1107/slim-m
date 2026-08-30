@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether the caller's own camera bubble is shown on the Voice Canvas at
 /// all - a standing, device-wide "never show my own camera" choice, kept
 /// distinct from where any one tile sits right now.

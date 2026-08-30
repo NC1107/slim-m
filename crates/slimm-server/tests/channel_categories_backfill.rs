@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Migration 0031 against real data: the "Text"/"Voice" backfill must leave
 //! an existing deployment's rail exactly as it rendered before, per
 //! docs/decisions/0006-channel-categories.md.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [AppAsyncView]: the three canonical states, and the fourth shape that
 /// only shows up once a caller has both a real error and real data at the
 /// same time - a refresh that fails after an earlier fetch already

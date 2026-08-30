@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Deployment-wide settings, read and written by an administrator.
 //!
 //! Reading is gated the same as writing rather than being open to any member.

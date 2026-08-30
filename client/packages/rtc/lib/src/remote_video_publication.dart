@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The pure half of the room walk that turns a call's remote video into the
 /// tile keys [VideoSubscriptionCuller] reasons over.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reading a room's participants into plain [VoiceParticipant] values, split
 /// out of `voice_session.dart` to make room there under this repo's file
 /// budget.

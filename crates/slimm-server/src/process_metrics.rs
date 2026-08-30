@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! This process's own resident memory, for the analytics screen's one
 //! recorded series. Linux-only: the server ships only as a Linux container
 //! (see `docker/server.Dockerfile`), and a platform this cannot read from

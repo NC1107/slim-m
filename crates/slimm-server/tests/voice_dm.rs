@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Calling someone in a DM: `POST /channels/{id}/voice/token` for a
 //! `dm`-kind channel, gated by nothing but [`Store::dm_permissions`] - see
 //! `store/dms.rs`'s `DM_BASE` and `BLOCKED_DENY`. No new route, no schema

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The frame every settings and administration screen sits in.
 ///
 /// Eight screens carried this verbatim, down to the same one-line comment

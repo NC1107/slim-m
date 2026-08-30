@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Space usage analytics: the recording toggle, and the stats it gates.
 //!
 //! Almost nothing here is stored. Total messages, messages per day, and the

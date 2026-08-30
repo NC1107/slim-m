@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The owner's "settings UI on desktop is very flat" report (#39): a pane's
 /// content used to stretch across whatever width the window happened to be,
 /// rows and all, once the nav's own fixed 240px was spent. It has to stay

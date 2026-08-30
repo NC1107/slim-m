@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP and store integration tests for threads: a thread is a channel with
 //! `parent_message_id` set (docs/decisions/0005-threads.md), so what needs
 //! testing is exactly the seam the decision record named - permission

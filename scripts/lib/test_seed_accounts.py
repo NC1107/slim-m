@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for account reuse: log in rather than re-register.
 
 No network: `e2e_api.Api.call` is patched directly rather than faking

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The visible half of a tile sent to the back: its own video and name
 /// badge, painted *before* [CanvasSurface] in `canvas_pane_body.dart`'s own
 /// Stack, so real ink drawn near it composites on top - answering "draw on

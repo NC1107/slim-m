@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Space usage analytics: an opt-in toggle plus a small memory-sample table.
 --
 -- Defaults to off. Nothing here is derived from anything new: message counts

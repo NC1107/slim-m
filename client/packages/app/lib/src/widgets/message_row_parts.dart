@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The smaller pieces a message row can carry beneath its body: the edited
 /// marker, an attachment placeholder, the failed-send row, and the "New"
 /// divider between read and unread messages. The reactions row lives in its

@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- A deployment-wide ceiling on screen-share resolution, so an admin can bound
 -- the load a screen share puts on every client and the SFU. Client-advertised:
 -- the client reads this and caps its own capture/publish parameters before

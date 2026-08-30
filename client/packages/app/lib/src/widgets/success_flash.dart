@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A transient "Saved" acknowledgement for a write that succeeded quietly.
 ///
 /// `runGuarded` gave failure a durable shape (`AppErrorState`) and left

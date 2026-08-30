@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// History was capped and the transcript said so was the beginning.
 ///
 /// `/sync` and the channel screen's own hydration both stop at 50 messages

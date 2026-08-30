@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'message_store.dart';
 
 /// [MessageStore.pruneToRetentionCeiling]'s body, split out for the same

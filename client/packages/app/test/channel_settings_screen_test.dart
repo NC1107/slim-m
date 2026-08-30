@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which sections Channel settings shows depends on which of MANAGE_CHANNELS
 /// and MANAGE_ROLES the caller holds - see `channel_settings_screen.dart`'s
 /// own doc on why the two are gated separately rather than the whole screen

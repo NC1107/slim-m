@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The tool strip's own scroll behaviour at a phone width: a tool clipped
 /// past the visible strip is not reachable by a bare tap, and the edge fade
 /// is the only on-screen cue that more sits past the edge it fades toward.

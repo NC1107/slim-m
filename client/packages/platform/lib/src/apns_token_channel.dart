@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Bridges the APNs device token from native iOS code.
 ///
 /// Registration is asynchronous and native-driven: the token, or a failure,

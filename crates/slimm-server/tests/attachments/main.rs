@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP integration tests for attachments.
 //!
 //! Split by which stage of an attachment's life the test pins, since that is

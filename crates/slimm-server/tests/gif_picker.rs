@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The full search-pick-select-send round trip against a fake GIF provider,
 //! and the two-state shape the feature is built on: disabled by default, and
 //! reachable only with `ATTACH_FILES`, the bit any other attachment already

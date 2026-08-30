@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The web [AttachmentVideoSource]. See `attachment_video_source.dart` for
 /// why this fetches the whole attachment rather than streaming it the way
 /// the native platforms do.

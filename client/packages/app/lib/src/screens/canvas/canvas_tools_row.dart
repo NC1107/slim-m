@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas's own row of interactive controls: the five tools, undo, the
 /// overflow menu and close - everything that used to live on `CanvasBar`'s
 /// top strip, extracted unchanged in mechanism so it can sit inside

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The box a note is placed with: sized to its own text so a long note
 /// simply fits, rather than a fixed box a long note quietly clips inside.
 ///

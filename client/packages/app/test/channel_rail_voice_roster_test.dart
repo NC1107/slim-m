@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail's voice row for a channel the caller has not joined: it now has
 /// a real roster to draw on ([voiceRosterProvider]) instead of always
 /// rendering as empty. See `channel_rail_channel_rows.dart`'s

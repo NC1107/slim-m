@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tapping an image opens it fullscreen, dismissing returns, and nothing
 /// that is not a displayable image is tappable at all.
 ///

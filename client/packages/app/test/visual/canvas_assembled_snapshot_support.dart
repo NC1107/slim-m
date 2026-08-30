@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The pump-and-capture helper `canvas_assembled_snapshot_test.dart` runs
 /// every scene through, split out the same way `ui_snapshot_support.dart`
 /// is split from `ui_snapshot_test.dart`: the widths, the themes and the

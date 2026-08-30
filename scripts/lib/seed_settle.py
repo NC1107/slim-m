@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A final pass of activity on the newest slice of the channel.
 
 The main loop's recency bias (`seed_state.RECENCY_BIAS`) already favours

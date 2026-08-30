@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A personal space removed from the rail (`personal_space_menu_test.dart`
 /// covers the removal itself) must still be reachable. This is the round
 /// trip the "Remove from list" notice promises, driven the way a person

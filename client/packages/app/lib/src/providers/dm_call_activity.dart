@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether each DM channel currently has a call in progress, shared across
 /// every [DmRow] rather than one poller per row.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [VoiceState] fixtures and the two controller shapes the surfaces matrix
 /// pins them through, split out of `ui_snapshot_test.dart` to keep that
 /// file a list of tables rather than a place state machines live.

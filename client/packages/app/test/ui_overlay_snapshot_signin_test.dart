@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Sign-in's server-probe notices and its `_submit` failure states: neither
 /// is a `show*` one-shot, both need a typed address and a mocked network
 /// answer, so this drives `SignInScreen` directly with `tester`, the same

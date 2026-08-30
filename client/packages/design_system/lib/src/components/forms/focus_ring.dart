@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A focus ring for a child that already owns its own focusability and
 /// gestures - typically a bare `InkWell` whose own intrinsic layout (an
 /// `Expanded` descendant, say) or non-square shape rules out

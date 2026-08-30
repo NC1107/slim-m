@@ -211,7 +211,7 @@ Nothing is listed speculatively: the list is exactly what the two trees resolve 
 
 Three package-level exceptions, each named one package at a time rather than allowing the license outright:
 
-- `slimm-server` is allowed `AGPL-3.0-only`, since it is the server itself. Allowing AGPL across the board would let a third-party AGPL crate in unnoticed, which is the opposite of what this is for.
+- `slimm-server` is allowed `LicenseRef-PolyForm-Noncommercial-1.0.0`, since it is slim-m itself. Allowing that across the board would let an unrelated crate claim it unnoticed, which is the opposite of what this is for.
 - `dbus` and `nm` are allowed `MPL-2.0`. MPL-2.0 is per-file copyleft: the obligation reaches modifications to those packages' own files and not the application that links them, so it is compatible with shipping an Apache-2.0 client. That is a decision rather than a default, which is why it is two named entries and not a line in `allow`; a new MPL dependency still stops the gate. Both are Linux desktop transitives reached through `connectivity_plus`.
 
 Advisories and bans are deliberately not configured here, so this is `cargo deny check licenses` and not `check all`.
@@ -409,7 +409,7 @@ The fallback to `GITHUB_TOKEN` keeps releases working while the secret is absent
 So an unset secret is a quiet degradation rather than a broken release, which is the right default for a self-hoster forking this repository, and the reason it is written as a fallback rather than required.
 On a tag push both invocations are a no-op so downstream jobs can still resolve their outputs via `needs`.
 
-Server (AGPL-3.0-only) and client (Apache-2.0) are versioned and released independently, each with its own tag and its own set of jobs.
+Server and client are versioned and released independently, each with its own tag and its own set of jobs. Both are under PolyForm Noncommercial 1.0.0.
 
 ### Gating publish on the commit's own CI
 

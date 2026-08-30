@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The DM row's call indicator: the in-app half of `docs/IMPLIED-GAPS.md` #2
 /// - a call already happening in a DM shows on its rail row, and tapping the
 /// row while it is lit opens straight into the call pane rather than the

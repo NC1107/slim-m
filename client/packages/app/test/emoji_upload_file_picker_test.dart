@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The emoji upload card's default picker, proven at the `file_picker`
 /// method channel: nothing on this box can drive a real OS picker.
 ///

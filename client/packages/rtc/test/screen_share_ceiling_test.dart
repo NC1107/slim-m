@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The space-wide screen-share resolution ceiling
 /// (`Store::screen_share_max_height` on the server): `captureOptionsFor`'s
 /// `maxHeight` clamp. Split from `screen_share_control_test.dart`, which is

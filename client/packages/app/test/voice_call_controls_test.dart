@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests that the share control never claims a share that is not happening,
 /// applies the quality already chosen in Voice settings without asking
 /// again, and cannot be re-entered by a fast double-tap while it is still

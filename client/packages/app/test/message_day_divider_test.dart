@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The day-divider rules: when a message opens a new calendar day (so the
 /// divider lands exactly once at each boundary), and how that day reads to a
 /// person - "Today", "Yesterday", or an absolute date, with the year only when

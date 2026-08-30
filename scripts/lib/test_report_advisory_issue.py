@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Drives `scripts/report-advisory-issue.sh` against a fake `gh`.
 
 A fake on PATH rather than a dry-run flag, deliberately: a dry run would only

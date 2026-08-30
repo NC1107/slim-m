@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where the composer's Emoji/GIFs picker lands: above whichever button
 /// opened it, right-aligned, clamped inside the viewport - the mirror image
 /// of `message_context_menu_layout.dart`'s `MessageMenuLayout`, which

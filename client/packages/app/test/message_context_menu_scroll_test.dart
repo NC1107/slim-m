@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for a menu that outlived the row it belongs to.
 ///
 /// The menu is placed once, at the anchor read when it opens, on the grounds

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The voice-call scenarios `ui_snapshot_test.dart` registers per theme,
 /// split out purely for that file's own line budget - every state here
 /// still renders through its `_renderSurface`, passed in as [RenderSurface]

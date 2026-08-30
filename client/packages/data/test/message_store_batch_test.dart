@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CD1: `applyMessages` is the batched catch-up/scroll-back path. It was a loop
 /// of `applyMessage`, each opening its own savepoint, select, upsert and cursor
 /// read-write; it now reads colliding rows once, writes survivors in one batch,

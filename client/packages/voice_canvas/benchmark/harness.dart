@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Timing harness and synthetic worlds for the Phase 5 canvas spike.
 ///
 /// Kept separate from the benchmark bodies so the measurement rules live in

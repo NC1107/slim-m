@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shows Android's local, content-free notification for a data-only push,
 /// and owns the versioned channels it displays through.
 ///

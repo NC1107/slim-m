@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether tapping a voice channel row should explicitly ask
 /// [VoiceController] to (re)join, rather than leaving it to
 /// `VoiceScreen`'s own arrival-triggered auto-join.

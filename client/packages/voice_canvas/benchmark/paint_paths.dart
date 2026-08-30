@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two ways a canvas frame can reach the paint layer, reduced to the
 /// smallest tree that still tells them apart.
 ///

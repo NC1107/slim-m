@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The toast queue: a confirmation is added, auto-dismisses on its own timer,
 /// a burst is capped to the newest few, and a hand dismiss removes exactly one.
 library;

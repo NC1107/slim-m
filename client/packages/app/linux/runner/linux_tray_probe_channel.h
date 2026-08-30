@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #ifndef FLUTTER_LINUX_TRAY_PROBE_CHANNEL_H_
 #define FLUTTER_LINUX_TRAY_PROBE_CHANNEL_H_
 

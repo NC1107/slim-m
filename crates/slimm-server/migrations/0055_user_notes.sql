@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- A private, per-author note about another account ("prior warning",
 -- "prefers they/them"). Keyed like user_blocks (0005_safety.sql): one row
 -- per (author, subject) pair, WITHOUT ROWID. A note is the author's own

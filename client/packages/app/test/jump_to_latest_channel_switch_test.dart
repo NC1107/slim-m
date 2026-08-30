@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ChannelScreen` outlives a channel switch (`ConversationPane` builds it
 /// with no key, see `channel_read_marker.dart`'s own doc comment), so its
 /// `ScrollController` and the "scrolled away" flag both used to carry across

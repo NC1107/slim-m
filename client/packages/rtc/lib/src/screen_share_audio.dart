@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether this platform can publish audio alongside a shared screen, and the
 /// honest answer per platform, traced through livekit_client 2.10.0 and the
 /// pinned flutter_webrtc 1.6.0 rather than assumed.

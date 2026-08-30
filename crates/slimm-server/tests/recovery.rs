@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Admin-issued password reset: issuing requires ADMINISTRATOR, consuming is
 //! public but single-use, and a successful consumption revokes every session
 //! that predates it.

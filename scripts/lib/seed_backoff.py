@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Retrying a write past a 429, without crashing the run or losing the action.
 
 `Class::Write` (crates/slimm-server/src/ratelimit.rs) is a 30-request burst

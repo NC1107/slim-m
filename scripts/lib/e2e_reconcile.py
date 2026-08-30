@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """An edit and a delete that happen while one client is away.
 
 This is the one thing the message op stream exists for, and the only scenario

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A blank canvas otherwise looks identical to a broken one, or to one still
 /// loading: a faint lattice with nothing on it. This is the sighted-only
 /// invitation to draw a first mark, which disappears the instant there is

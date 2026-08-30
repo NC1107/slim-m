@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A tool switch is the one thing allowed to change the surface's cursor -
 /// see [CanvasSurface]'s own doc for why a per-hover cursor is not.
 library;

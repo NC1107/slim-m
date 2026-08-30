@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The read marker used to follow the newest delivered message regardless of
 /// where the reader had scrolled: `_markReadUpToLatest` ran unconditionally
 /// from the transcript's `StreamBuilder`, so scrolling back into history to

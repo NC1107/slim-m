@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the `StrokePainter` test files: a stub [Canvas] that
 /// tracks the actual affine transform `save`/`translate`/`scale`/`restore`
 /// build up, the way the real engine would, plus the small document

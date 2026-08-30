@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The two halves of blocking a client cannot do for itself.
 //!
 //! Blocking is one viewer's view choice, and hiding a blocked author's messages

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Coverage for the hand-rolled UUIDv7 fallback.
 
 Exercises `_build` directly rather than the `uuid7()` wrapper, so these

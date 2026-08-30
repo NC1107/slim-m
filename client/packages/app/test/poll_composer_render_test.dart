@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders the poll composer sheet driven into the states that matter
 /// beyond the default empty one `ui_overlay_snapshot_test.dart` already
 /// covers: filled and ready to send, all four options in use, and long

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A reply's compact quote, driven through a real channel screen: it must
 /// not become a second way to read a blocked author's message, and it must
 /// not resurrect a deleted one.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP integration tests for avatars: upload, fetch, and delete. Kept
 //! separate from `attachments.rs` because avatars are deliberately not
 //! attachments (see migration 0013) - one mutable image per user, gated by

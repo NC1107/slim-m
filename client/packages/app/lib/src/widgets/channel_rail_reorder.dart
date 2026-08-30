@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Drag-to-reorder across the whole channel-rail listing: every category
 /// section in one list, so a channel of any kind can be dragged into any
 /// category - the property backlog item #34 asked for. See

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The draft stroke under the pointer must paint at the width and place it
 /// will keep once committed, or a stroke visibly changes size at pointer-up,
 /// plus the image placeholder and its elevation shadow.

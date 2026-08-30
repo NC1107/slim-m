@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Per-platform backlog
 
 Six files, one per supported OS: [windows_backlog.md](windows_backlog.md), [macos_backlog.md](macos_backlog.md), [linux_backlog.md](linux_backlog.md), [ios_backlog.md](ios_backlog.md), [android_backlog.md](android_backlog.md), [web_backlog.md](web_backlog.md).

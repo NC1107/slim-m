@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Confirms the invite usability rule's SQL copy (`spend_invite`'s `WHERE`,
 //! in `src/store/invites.rs`) agrees with its Rust copy (the shared
 //! `invite_usable` behind `Invite::is_usable`) at the exact boundary of each

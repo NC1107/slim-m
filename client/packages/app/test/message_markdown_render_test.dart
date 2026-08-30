@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Widget tests for [MessageBody]'s new markdown rendering: inline styling,
 /// spoilers, headings, quotes and lists, on top of the fenced-code and
 /// mention/emoji handling `message_text_test.dart` already covers.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Unit tests for [AttachmentStagingController], the piece the composer's
 /// visible-attachment fix actually rests on, independent of any widget pump
 /// timing.

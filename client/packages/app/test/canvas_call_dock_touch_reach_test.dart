@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The dock proven by real hit-testing, not by semantics-node existence,
 /// with both a call and a canvas present at once - the phone-width case the
 /// task that built this dock named directly: five tools, undo, the overflow,

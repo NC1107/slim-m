@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The personal space row's own kebab.
 ///
 /// Split out of `personal_space_row.dart` for the same reason

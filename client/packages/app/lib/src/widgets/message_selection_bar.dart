@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What replaces the composer while messages are being selected.
 ///
 /// It takes the composer's slot rather than stacking above it, for two

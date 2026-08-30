@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [AppSheetMenu] is the body [showAppSheet] callers pass when their content
 /// is a list of [AppMenuItem]s: [AppMenu]'s own floating card is right next
 /// to a cursor and wrong nested inside a bottom sheet, which already draws

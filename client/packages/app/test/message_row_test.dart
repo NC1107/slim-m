@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the message row: grouping must be visible in what actually
 /// renders (the avatar and the gutter timestamp), not just in the flag
 /// passed in, since that flag is exactly what a caller could get backwards.

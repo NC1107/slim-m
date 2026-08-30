@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Gates the bodies the server really sends against the bodies
 //! schema/openapi.yaml promises.
 //!

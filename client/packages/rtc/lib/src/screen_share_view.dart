@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders one participant's shared screen.
 ///
 /// Not exported from the package barrel on purpose: it takes LiveKit types,

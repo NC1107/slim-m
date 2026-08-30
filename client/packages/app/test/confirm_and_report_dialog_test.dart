@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `confirmDangerousAction` and `promptReportReason` both used to be a bare
 /// `AlertDialog`, which drew Material's own 28dp-radius shadowed card rather
 /// than the border-first, radius-10 chrome every other modal in the app

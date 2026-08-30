@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // Poly1305 one-time authenticator, in the original NaCl form a secret box
 // uses: the tag covers the ciphertext alone, with no associated data and no

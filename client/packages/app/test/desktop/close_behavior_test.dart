@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The close-vs-minimise router, decision 0012: what the close affordance
 /// does on each platform, asserted for every combination rather than the
 /// one this dev box happens to run.

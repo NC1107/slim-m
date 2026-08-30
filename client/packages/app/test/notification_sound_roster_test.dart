@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [NotificationSoundController]'s voice-roster half: member join/leave
 /// chimes, the baseline that keeps a room's existing occupants from reading
 /// as a burst of joins, the owner's own "roughly 8 participants" ceiling,

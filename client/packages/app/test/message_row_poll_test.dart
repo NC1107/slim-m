@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The poll a message can carry, rendered inside the message row.
 ///
 /// Split out of `message_row_test.dart`, which sits against the file budget:

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A DM with yourself: opening it, its privacy, and that it lists and syncs
 //! the same way any other channel does. Split out of `dms.rs` once the two
 //! files together would have crossed the file-budget ceiling; see that

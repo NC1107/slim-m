@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [DesktopWindowShell.splashWindowSize] and `my_application.cc`'s
 /// `gtk_window_set_default_size` are two sources of the same number, one
 /// Dart and one C, with no shared constant to keep them honest at compile

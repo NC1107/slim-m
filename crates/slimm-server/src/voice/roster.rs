@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Listing who is connected to a channel's voice room right now.
 //!
 //! This is the read-only half of [`super::VoiceService`]: unlike minting a

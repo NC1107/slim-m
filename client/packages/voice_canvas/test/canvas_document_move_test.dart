@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasDocument.moveObject], [CanvasDocument.objectBounds] and
 /// [CanvasDocument.setImageBitmap]: repositioning a placed object, and
 /// attaching a decoded bitmap to one.

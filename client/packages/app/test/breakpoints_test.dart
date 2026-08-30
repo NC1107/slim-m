@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `LayoutClass`'s width-driven decisions: which of the three
 /// classes a width lands in, and whether a docked member pane fits.
 library;

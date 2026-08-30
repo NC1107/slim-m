@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Custom [SliderTrackShape] and [SliderComponentShape] implementations for
 /// [AppSlider], split out of that file to keep both under the review budget:
 /// these are self-contained painting code with no state of their own.

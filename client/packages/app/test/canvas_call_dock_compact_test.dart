@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The dock's real, composed height - `DockHeightReporter`'s own measured
 /// value, the one `app_snackbar.dart` reads to clear the leave-call button -
 /// before and after the owner's "the dock can be made way more compact"

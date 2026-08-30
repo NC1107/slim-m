@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CA2: the channel-rail widget's optimistic-reorder overlay used drift's
 /// `Value` directly; the wrap now lives behind `Channel.repositioned` in the
 /// data layer. These pin that pure transform.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `Store::now_ms_unique`: the per-op timestamp two of `restore`'s
 //! authorization fences depend on for uniqueness - `restore_candidates`'s
 //! `clear` branch matches a whole batch of un-delete candidates against

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Message HTTP routes: send, list, edit, and delete, each authorized
 //! server-side through the permission evaluator. Full-text search lives in
 //! [`super::search`], a separate module since it has its own validation and

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The bounds that stop an unauthenticated caller costing this deployment more
 //! than they should: who a rate-limit bucket belongs to behind a proxy, and the
 //! routes that charged nothing at all.

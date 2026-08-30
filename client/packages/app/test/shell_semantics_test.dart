@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What the assembled shell publishes to a screen reader.
 ///
 /// Driving the web build found the channel rail publishing no accessibility

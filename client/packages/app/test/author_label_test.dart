@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Coverage for `authorLabel`, the one place a message author's name is
 /// resolved: the fix for the recorded debt that a renamed author's
 /// already-cached messages never reconciled on any other client.

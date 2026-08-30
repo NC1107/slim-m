@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one place a drawn stroke becomes rows on the server.
 ///
 /// Serial by design: one request in flight, FIFO. Ordering is what `z_index`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Channel category management: `POST /categories`,
 /// `PATCH /categories/{id}`, `DELETE /categories/{id}`. Requires
 /// MANAGE_CHANNELS - the rail-management surface a category is part of, per

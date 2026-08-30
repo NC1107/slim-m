@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The moderation quick actions a report card offers: delete the reported
 /// message, time out its author, or remove them from the Space.
 ///

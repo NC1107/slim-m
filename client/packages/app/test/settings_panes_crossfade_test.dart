@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Choosing a settings pane fades the new one in rather than teleporting it:
 /// the pane body is an `AppFadeIn` keyed on the pane's id, so a swap restarts
 /// the fade, and reduce motion lands it instantly.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fixtures for `message_transcript_extent_test.dart`: a transcript long and
 /// unevenly built enough for the scrollbar bug to be visible in it, and the
 /// scroll-and-sample loop that measures what the scrollbar reads.

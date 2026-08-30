@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one affordance that starts or opens a DM's call.
 ///
 /// Self-gated on the channel's own kind rather than a caller-supplied flag,

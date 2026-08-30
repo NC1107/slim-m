@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The shape-kind picker in the overflow, and the row's own Shape button
 /// reflecting whichever kind it armed - split out of `canvas_tools_row_test.dart`
 /// for the same reason `canvas_bar_shape_kind_test.dart`, this file's

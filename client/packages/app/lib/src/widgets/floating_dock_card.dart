@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one floating card shape a call's controls and a canvas's controls
 /// both sit inside, so "the voice bar" and "the canvas toolbar" read as one
 /// idea rather than two competing bars.

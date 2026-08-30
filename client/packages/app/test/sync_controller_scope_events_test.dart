@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression coverage for the role, overwrite, and channel WebSocket events:
 /// before this, none of the three ever reached `SyncController`, so a channel
 /// created, renamed, deleted, or whose visibility changed through a role or

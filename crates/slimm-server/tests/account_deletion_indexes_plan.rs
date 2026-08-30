@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The four predicates migration 0047 covers, each read out of the source it
 //! really runs from, the `canvas_ops/index_plan.rs` technique. Asserting the
 //! migration shipped would only prove the index exists; reading the query

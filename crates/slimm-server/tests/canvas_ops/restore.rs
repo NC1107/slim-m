@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `POST /channels/{id}/canvas/ops` with `kind: "restore"`: the authorship
 //! gate on the *op* rather than the object, the object ceiling, and the
 //! density and idempotency properties every kind of mutation already shares.

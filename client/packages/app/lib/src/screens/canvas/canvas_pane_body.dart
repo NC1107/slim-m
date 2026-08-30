@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas pane's widget tree: the identity strip, the error and
 /// truncation banners, the drawing surface, the floating call-and-canvas
 /// dock, and the text activity log a screen reader can browse in place of

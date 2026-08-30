@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The right-hand member pane: the deployment's roster.
 ///
 /// Presence is real now: `presenceSeedProvider` (in `member_presence.dart`,

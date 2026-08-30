@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Attachment metadata persistence: the content-addressed `attachments` rows,
 //! the join table linking them to messages, and the sweep that reclaims an
 //! upload nobody ever sent a message with.

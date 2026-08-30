@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Plain `q`-only search: matching, permission scoping, deleted-message
 //! exclusion, malformed FTS5 syntax, and channel scoping. The operator
 //! layer's own tests are in the `operators_*` siblings.

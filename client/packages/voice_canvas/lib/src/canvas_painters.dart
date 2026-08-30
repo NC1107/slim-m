@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas's committed-content paint layers: the lattice and the
 /// permanently placed ink, images, notes and shapes.
 ///

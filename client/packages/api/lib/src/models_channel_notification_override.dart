@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A per-(caller, channel) override of the account-wide notification
 /// preference (`NotificationPreference`, `models_notification_preference.dart`):
 /// mute one channel, or narrow it to mentions only, while every other

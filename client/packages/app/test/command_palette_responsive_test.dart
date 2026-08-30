@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the command palette's width-driven shell: a full-bleed pull-down
 /// with an on-screen Cancel below `kCompactWidth`, the floating card with its
 /// keyboard-hint footer above it, and the same results and ranking either way.

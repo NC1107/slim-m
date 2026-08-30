@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- `canvas_ops` had no index reaching `created_at` at all, so three separate
 -- readers were paying for a full table scan under the database's one write
 -- lock: `canvas_ops_sweep.rs`'s three passes (`WHERE kind = ? AND created_at

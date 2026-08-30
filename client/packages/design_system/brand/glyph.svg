@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 <!-- The below-16px fallback the spec calls for: the square alone, no lattice.
      Below 16px the three dots collapse into noise and reading them costs more
      than they add, so the object that left the grid carries the mark by itself. -->

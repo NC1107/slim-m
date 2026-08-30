@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The moderation queue controller, driven directly rather than through the
 /// screen: `ReportsController` in reports_controller.dart owns the paging, the
 /// composite cursor, the failure-preserves-what-is-on-screen rule, and the

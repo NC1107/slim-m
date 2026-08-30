@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Setting the deployment's channel order and category placement:
 //! `PUT /channels/order` takes either the flat `channel_ids` list every
 //! client before docs/decisions/0006-channel-categories.md already sent, or

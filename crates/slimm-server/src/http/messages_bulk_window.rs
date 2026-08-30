@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `POST /channels/{id}/messages/bulk-delete-by-author`: one author's recent
 //! messages in a channel, selected by a time window rather than named ids.
 //!

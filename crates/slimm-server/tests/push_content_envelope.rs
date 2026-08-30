@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! What a device that asked for message content in its push actually gets,
 //! and - the point of this file - what the relay gets while that happens.
 //!

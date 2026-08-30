@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What one listener has done about what reaches their own ears.
 ///
 /// Three axes that all end in the same place, so they live together rather

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A muted channel's rail row: the bell-off glyph replaces the unread dot
 /// in `AppListRow.trailing`, but `AppListRow.unread` itself - the flag a
 /// screen reader and the row's own bold weight both key off - stays exactly

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for the caller's own profile being fetched once per
 /// process: a second sign-in within one launch used to draw the first
 /// account's cached identity, since [meProvider] was never invalidated on

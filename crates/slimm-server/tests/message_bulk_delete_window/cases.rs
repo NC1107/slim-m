@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `bulk-delete-by-author`: selecting a raider's messages by author and time
 //! window instead of naming ids.
 //!

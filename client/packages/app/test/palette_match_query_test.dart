@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The command palette's two match predicates. Neither had a test, and each
 /// hides a rule worth pinning: an empty query matches everything (a blank
 /// browse), matching is case-insensitive and substring, a member is found by

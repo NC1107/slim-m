@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every SnackBar this app shows, in one place.
 ///
 /// Only for failures now: a genuine success confirmation goes through

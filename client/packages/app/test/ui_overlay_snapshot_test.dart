@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders overlays open, not resting screens: a sheet, dialog or popover
 /// shows nothing on a screenshot of what is underneath it, so each of these
 /// is driven open through its real `show*` entry point and rendered while

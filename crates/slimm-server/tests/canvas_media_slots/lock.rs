@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The shared lock invariant migration `0040`'s own doc describes: nobody
 //! may drag a locked tile, not only the arranging client's own UI.
 

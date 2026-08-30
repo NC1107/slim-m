@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Canvas slice two: removal, restore, and an op stream that owns the ordering
 
 Final implementation plan.
@@ -83,7 +83,7 @@ Forward-only.
 `canvas_ops` is rebuilt, and the guard table is what turns "nothing has ever written to it" from an assumption into a refusal.
 
 ```sql
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Rebuilds `canvas_ops` into the canvas's single ordering authority. The 0002
 -- shape was one unconstrained `op TEXT` column and has never held a row on any
 -- deployment: the only reference is the authorship anonymisation in

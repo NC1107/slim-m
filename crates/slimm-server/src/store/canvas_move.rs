@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The one write that touches every geometry column at once: naming all four
 //! in `UPDATE OF` is what fires the R-Tree trigger keeping `canvas_rtree`
 //! (migration 0015) in sync.

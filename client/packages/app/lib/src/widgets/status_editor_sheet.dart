@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The status editor reached by tapping your own avatar in the sidebar
 /// (`presence_menu.dart`'s `PresenceMenuButton`, backlog item 128): the same
 /// free-text status line `status_text_row.dart`'s personal-settings row

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Neither `messages` nor `message_ops` had an index reaching `created_at`
 //! before migration 0044, so both of `message_retention.rs`'s own sweep
 //! passes would have paid for a full table scan under the database's one

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `SettingsEntityRow` replaced five independent hand-rolled copies of one
 /// shape (roles, invites, emoji, removed members, categories). The copies had
 /// already drifted in two ways worth pinning here, because both would drift

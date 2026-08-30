@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where a call participant's camera bubble sits in world space.
 ///
 /// A camera bubble is ephemeral presence, never a persisted object (see

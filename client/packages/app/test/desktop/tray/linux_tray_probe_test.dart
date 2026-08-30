@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [MethodChannelLinuxTrayProbe]'s own invariant, stated in its doc comment
 /// and otherwise completely unproven before this file: absent, false, and
 /// an error must all read as false, the one property decision 0012's

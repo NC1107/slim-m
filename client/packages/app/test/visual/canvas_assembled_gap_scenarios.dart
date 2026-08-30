@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Canvas states the assembled-pane harness's own scenario file did not
 /// register yet: every error banner, loading, the four non-pen tools, the
 /// overflow menu open in its widest conditional shape, and the clear

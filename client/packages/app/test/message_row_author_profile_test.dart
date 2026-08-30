@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A message row's avatar and name were not clickable at all: no way to
 /// reach the author's profile or start a DM from the place a reader actually
 /// encounters them. Both now open the same [showMemberProfile] popover the

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Drives the real [HomeShell] under global reduce motion, not just a pane
 /// pumped in isolation.
 ///

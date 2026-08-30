@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Live coverage for `Event::VoiceActivityChanged`: the in-app half of "a DM
 //! call reaches nobody" (`docs/IMPLIED-GAPS.md` #2). Before this, joining or
 //! leaving a voice call published nothing over the socket at all, so a DM

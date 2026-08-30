@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The caller's own quiet-hours window: an optional local time-of-day span
 /// during which an `everything` notification preference is narrowed to
 /// `mentions` (`push::recipients::narrow_for_notification_preference` on the

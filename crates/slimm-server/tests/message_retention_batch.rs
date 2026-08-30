@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The batched retention prune's own invariants: op seqs stay dense per
 //! channel across a multi-channel batch, and a content-addressed attachment is
 //! freed exactly once and only when nothing outside the batch still holds it.

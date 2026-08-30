@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CP4: a camera or screen-share tile must rebuild only on events that can
 /// change its own participant's video, not on every room event. LiveKit emits
 /// `ActiveSpeakersChanged` several times a second for as long as anyone talks,

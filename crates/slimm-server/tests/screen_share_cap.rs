@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The screen-share height ceiling as a space setting: its default, the
 //! config round trip over HTTP, its MANAGE_SERVER gate, and the settable
 //! range. Enforcement is client-advertised; see

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Layout classes, chosen by available width.
 ///
 /// Width decides the layout, never the platform. A phone in landscape, a small

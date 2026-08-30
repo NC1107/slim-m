@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Gates every public `SlimmApi` method against something in the app calling
 /// it, so a wired endpoint with no way to reach it fails here instead of
 /// shipping.

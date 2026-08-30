@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Message-row actions shared by any screen that renders a message: reaction
 /// and poll-vote toggles apply an optimistic local update before the real
 /// request, reverting on failure where a clean revert exists; edit and

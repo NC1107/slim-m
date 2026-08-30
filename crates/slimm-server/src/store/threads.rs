@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Threads: a hidden channel opened from one message, per
 //! docs/decisions/0005-threads.md's recommendation. A thread is not its own
 //! kind of thing - it is an ordinary row in `channels` with

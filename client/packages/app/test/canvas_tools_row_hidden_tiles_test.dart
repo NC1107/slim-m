@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The overflow's "hidden tiles" recovery section: a hide must stay
 /// reversible without leaving the call, or it is a delete wearing a softer
 /// name - see `canvas_call_dock.dart`'s own doc on [CanvasHiddenTile].

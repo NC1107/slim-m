@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The in-call dock's own canvas toggle, driven through the real
 /// [VoiceScreen] state machine rather than [VoiceCallDock] directly - so
 /// this is the one suite proving [VoiceScreen]'s `isDm` flag actually reaches

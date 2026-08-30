@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The owner's report: opening a DM at a width that docks the member pane
 /// showed it anyway, with the deployment's whole roster in it -
 /// `memberPaneVisibleProvider` defaults open, and nothing before this

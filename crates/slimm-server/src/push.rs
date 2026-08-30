@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Push notification triggering: turns a new message into (at most) one wake
 //! per idle recipient, without ever slowing down or failing the send that
 //! triggered it.

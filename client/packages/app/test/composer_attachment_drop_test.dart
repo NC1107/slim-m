@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A mounted [Composer] registers a [ComposerAttachmentDropTarget] for its
 /// own channel id, and staging through it lands in the exact same place a
 /// picked file does - the defect this pins is a drop inventing a second,

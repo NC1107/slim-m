@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the local-notification seam: the versioned channel constants,
 /// that a non-Android platform never touches the plugin, and that
 /// permission is requested (and only requested) from [requestPermission],

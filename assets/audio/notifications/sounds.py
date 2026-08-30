@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The seven sounds, as contours over the shared timbre.
 
 Each is a list of notes and nothing else: the timbre, envelope and loudness

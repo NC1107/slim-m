@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Space analytics screen: the toggle, the off notice, and that the
 /// headline numbers are visible text rather than only pixels in a chart.
 ///

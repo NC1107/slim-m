@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression test for a DM's first message never appearing live: the
 /// recipient's SyncController applied a MessageCreated frame straight to the
 /// store even for a channel it had never fetched, so nothing downstream (the

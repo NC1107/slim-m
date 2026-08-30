@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A phone held upright: whether a call's camera bubbles land somewhere the
 /// person holding it can actually see.
 ///

@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Deployment-wide settings an admin can change at runtime, as one row.
 --
 -- The first is the join policy. Registration has been invite-only since the

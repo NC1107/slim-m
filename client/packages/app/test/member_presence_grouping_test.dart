@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// How the member pane decides who is "online". `isReachablePresence` and
 /// `groupMembersByPresence` carry two product rules with no test: hidden is
 /// the "appear offline" state and must group as offline, and a member whose

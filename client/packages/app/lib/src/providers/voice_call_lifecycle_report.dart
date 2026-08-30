@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reporting a call's start, connection and end to CallKit, split out of
 /// `voice_controller.dart` to make room there for the camera-control
 /// additions the file's own review budget would not otherwise fit.

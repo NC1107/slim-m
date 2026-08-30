@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for e2e_voice.mute_propagates' own cleanup.
 
 Muting is a persisted client preference, not a per-call toggle: leaving a

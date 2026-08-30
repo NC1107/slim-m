@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The action icons beside the composer's text field must stay pinned to
 /// the top of the bar as a multi-line message grows it, not drift toward
 /// the middle. Covers both the compact (phone, folded `+` sheet) and wide

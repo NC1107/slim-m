@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the routes and wire-shape changes this package just picked up:
 /// presence, direct messages, pins, polls, attachments and avatars, the
 /// invite-check community preview, the server identity on `Version`, and the

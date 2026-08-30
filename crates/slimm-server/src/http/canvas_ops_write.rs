@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Submitting a canvas mutation: `remove`, `clear`, `restore`, `move` and
 //! `reorder`, the kinds this slice writes to the op stream
 //! `super::canvas_ops` only reads.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression tests for two roster bugs found together: `membersProvider`
 /// fetched with no `limit`, so the server's own default of 50 silently
 /// truncated any roster past that; and the keep-alive guard that infers a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A picked attachment from the moment it appears in the composer, through
 /// its upload, to whichever of ready or failed resolves.
 ///

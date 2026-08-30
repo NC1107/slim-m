@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The three preferences added for #38: a 12/24-hour clock, an in-app
 /// reduce-motion override, and a high-contrast toggle. Each controller
 /// mirrors `ThemeController`'s own shape, so these tests mirror

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A DM with somebody already blocked used to open as a blank transcript
 /// with a live composer that would only ever fail on send (the channel is
 /// frozen server-side for that pair; see `store/dms.rs`). This drives the

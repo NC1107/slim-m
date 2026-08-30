@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A generic OS-file drop target: a visible overlay while a drag is over it,
 /// and one callback with whatever landed. `composer_attachment_drop.dart`
 /// and `emoji_bulk_upload_card.dart` are its two callers; neither invents

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression tests for `client_transport.dart`'s single choke point on
 /// request paths: a wire-supplied value (an emoji, here) must never decide
 /// which resource a request reaches. Mirrors finding 9 of

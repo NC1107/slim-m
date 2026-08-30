@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What the rejoin screen shows instead of nothing after a real call: how
 /// long it lasted, who else was in it, and whether a screen or camera was
 /// shared at any point. A solo call renders the same card with just the

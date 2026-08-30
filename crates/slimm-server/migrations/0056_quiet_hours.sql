@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Quiet hours: an optional per-account time-of-day window, stored in
 -- minutes since midnight UTC (0-1439), during which an `everything`
 -- notification preference is narrowed to `mentions` by

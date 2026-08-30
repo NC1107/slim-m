@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The message-sounds toggle `NotificationsSection` added beside the push
 /// registration status: it persists, the same shape
 /// `voice_settings_screen_test.dart` already proves for the call sounds.

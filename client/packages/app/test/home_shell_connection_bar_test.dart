@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `RailConnectionBar` lived only inside `ChannelRail`, which a compact
 /// layout with a channel open never mounts, so the one route a phone user
 /// spends all their time on never reported the socket dropping.

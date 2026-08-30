@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A member's own status text, shown as a caption under their name in the
 /// member pane - `status_text` on `UserProfile`, rendered by `_MemberRow`
 /// rather than folded into `AppListRow.meta`, since that row is deliberately

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The paths where a file does become an emoji: a clean run, a re-run over the
 //! same directory, and a name already taken by a different image.
 

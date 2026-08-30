@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The type system: two families, three weights, six sizes.
 ///
 /// From the 2026-07-26 visual identity review. Three constraints are worth

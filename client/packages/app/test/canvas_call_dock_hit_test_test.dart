@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether the floating dock's own hit test actually matches its two
 /// stated guarantees: a right-click anywhere on the card is absorbed, and a
 /// primary-button gesture on the card's own background (padding, the

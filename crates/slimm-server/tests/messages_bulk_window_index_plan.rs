@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Proves migration 0054's index, not just that it shipped.
 //!
 //! `messages_channel_live(channel_id, seq DESC)` and `messages_author(author_id)`

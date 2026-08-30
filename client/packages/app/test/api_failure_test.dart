@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [describeApiFailure] is the one place any caller, guarded by `runGuarded`
 /// or not, turns an [ApiException] into a sentence. This pins the mapping
 /// directly, beneath `run_guarded_test.dart`'s behavioural tests.

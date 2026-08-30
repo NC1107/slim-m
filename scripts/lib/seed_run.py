@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Orchestrates a seeding run end to end.
 
 Guards the target, sets up accounts and a channel, then lets every account

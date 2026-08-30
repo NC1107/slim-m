@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two media-performance gates on an inline attachment: with auto-download
 /// off nothing is fetched until the tap, and with autoplay off a gif holds
 /// under a play badge and only reveals on the tap. Both defaults leave the

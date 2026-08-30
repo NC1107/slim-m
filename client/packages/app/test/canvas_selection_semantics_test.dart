@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasSelectionSemantics]: the selected object's own accessibility
 /// node, carrying a note's full text past the activity log's 80-character
 /// cap.

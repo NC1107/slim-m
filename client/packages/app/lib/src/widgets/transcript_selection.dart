@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Dragging across message text to select part of it, on the platforms where
 /// that gesture is not already spoken for.
 ///

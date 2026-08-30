@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fetches and caches one user's avatar bytes.
 ///
 /// Keyed by (userId, avatarUpdatedAt) rather than userId alone: an upload

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Settings as a nav beside a pane, rather than every section stacked in one
 /// scroll behind full-width hairlines.
 ///

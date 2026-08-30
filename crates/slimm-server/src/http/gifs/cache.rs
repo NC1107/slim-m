@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The token cache described in the parent module's own doc comment: an
 //! opaque, bounded, TTL'd map from a search-minted token to the two real
 //! upstream URLs it stands in for. Split out to keep `gifs.rs` under the

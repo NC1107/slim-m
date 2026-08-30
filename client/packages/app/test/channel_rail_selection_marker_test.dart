@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail's travelling selection marker: one list-owned bar that slides
 /// from the old row to the new one, jumps under reduce motion, and retracts
 /// when its row unmounts or nothing is selected.

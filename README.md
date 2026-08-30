@@ -36,8 +36,12 @@ curl localhost:8080/version     # -> {"name":"slim-m",...}
 - API reference: [schema/openapi.yaml](schema/openapi.yaml) is the source of record; nothing renders it automatically (GitHub has no built-in OpenAPI viewer and building one into a CI artifact nobody downloads was not worth a job), so build a browsable copy locally with `npx @redocly/cli build-docs schema/openapi.yaml -o /tmp/api.html`
 - [Brief](docs/BRIEF.md), [strategy](docs/STRATEGY.md), [roadmap](docs/ROADMAP.md)
 - [Decisions of record](docs/decisions/), [backlog](docs/BACKLOG.md)
-- [Licensing](LICENSING.md) (AGPL-3.0 server, Apache-2.0 client and schema), [contributing](CONTRIBUTING.md)
+- [Licensing](LICENSING.md) (PolyForm Noncommercial, whole repo), [contributing](CONTRIBUTING.md)
 
 ## License
 
-Multi-licensed by component; see [LICENSING.md](LICENSING.md).
+[PolyForm Noncommercial 1.0.0](LICENSE), one license for the whole repository; see [LICENSING.md](LICENSING.md).
+
+Free for noncommercial use: personal, hobby, educational, research, nonprofit, and all that.
+You can fork it, change it and redistribute it, you just can't sell it or use it commercially without asking first.
+If you want to use it commercially, open an issue and ask.

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Builds the main pass of placed canvas objects: clustered strokes,
 images, notes and shapes, plus the one deliberately oversized stroke that
 proves `split_stroke`'s byte-budget path runs during a real seeding pass,

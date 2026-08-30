@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A channel switch mid-join: two `join()` calls overlapping on one
 /// controller instance, found while adversarially racing the stage
 /// computation `voice_screen.dart` builds on `VoiceState.joining`.

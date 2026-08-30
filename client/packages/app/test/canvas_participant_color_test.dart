@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `canvasParticipantColorIndex` picks a stable palette slot for a canvas
 /// participant from their user id. It had no test, yet it carries the two
 /// properties a color index must hold: it is always in range for the palette

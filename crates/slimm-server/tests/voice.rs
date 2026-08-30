@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Joining a channel's voice room.
 //!
 //! The token this endpoint returns is a bearer credential the SFU trusts, so

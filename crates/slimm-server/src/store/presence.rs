@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Persistence for the one durable piece of presence: a user's chosen
 //! visibility. Everything else about presence (whether they are actually
 //! connected right now) is in-memory only; see [`crate::presence`].

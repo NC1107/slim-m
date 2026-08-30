@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A live share is easy to forget about once the button that started it has
 /// scrolled out of view; this says so plainly, wherever the call view is.
 ///

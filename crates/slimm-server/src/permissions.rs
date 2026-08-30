@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The deny-by-default permission model and its evaluator.
 //!
 //! A permission set is a bitmask stored in a 63-bit `INTEGER`. Nothing is

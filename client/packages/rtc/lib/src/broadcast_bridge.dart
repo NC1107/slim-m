@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What the host app knows about iOS screen capture that Dart cannot see.
 ///
 /// iOS is the one platform where a screen share is not something the app does.

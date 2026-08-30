@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The [`Event`] enum: every fact `Hub::publish` can carry to a connection.
 //!
 //! Split out of `hub.rs` once that file reached the 500-line hard ceiling;

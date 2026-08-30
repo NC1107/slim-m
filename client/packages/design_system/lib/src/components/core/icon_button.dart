@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A square, icon-only control: header actions, toolbar buttons, message-row
 /// hover actions.
 library;

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Drive two web clients through the product, and check the server agrees.
 
 The scenarios run in one session against one deployment, in the order a person

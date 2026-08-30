@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Settings' profile card: a centred preview of the caller's own picture with
 /// a camera badge that reads as "tap to change", the display name beside its
 /// own rename affordance, and the `@handle` underneath.

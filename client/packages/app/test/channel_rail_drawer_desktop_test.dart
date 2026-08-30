@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The edge-swipe drawer at compact width, but with the theme's platform
 /// forced to a desktop family (as a real desktop build always reports via
 /// `defaultTargetPlatform`), rather than the `TargetPlatform.android` the

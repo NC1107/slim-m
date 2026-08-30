@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The channel rail's own slot in `HomeShell`'s row: the full rail, the
 /// collapsed icon strip, or nothing at all, plus the drag handle that
 /// toggles between the first two. Split out of `home_shell.dart`, which sat

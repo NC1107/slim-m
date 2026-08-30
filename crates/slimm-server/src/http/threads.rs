@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Opening the thread hanging off a message: `POST
 //! .../messages/{message_id}/thread`. Gated on the same VIEW_CHANNEL plus
 //! SEND_MESSAGES a plain send needs in the parent channel, because starting a

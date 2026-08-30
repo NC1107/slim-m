@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A live voice call, wrapped so nothing outside this package touches LiveKit.
 ///
 /// The rest of the client never imports `livekit_client`. That is not tidiness:

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for attaching a file from the composer. The button beside it, the
 /// Space emoji sheet, has its own file.
 ///

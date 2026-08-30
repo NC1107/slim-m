@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A single continuous value control, built on Material's [Slider] rather
 /// than a hand-rolled drag gesture: keyboard stepping, RTL layout, and the
 /// slider semantics role all already exist there. Only the track and thumb

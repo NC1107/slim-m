@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- The server's long-lived Ed25519 identity keypair, generated once on first
 -- boot and never rotated. See src/identity.rs for exactly what a client can
 -- and cannot conclude from it.

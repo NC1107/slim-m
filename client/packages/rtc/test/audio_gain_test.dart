@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Per-participant volume is offered only where the underlying call actually
 /// does something, and that guard is the whole feature on the platforms that
 /// cannot do it.

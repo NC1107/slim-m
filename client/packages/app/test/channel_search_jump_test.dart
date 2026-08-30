@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tapping an in-channel search result over a real [ChannelScreen]: it has
 /// to close the search panel, scroll to the message, and flash it - the
 /// third render site for a message hit, alongside the pins sheet and the

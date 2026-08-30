@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The dock's own composition: which sections it draws for which inputs,
 /// and the single-row-versus-two-row switch at [kCompactWidth]. Real hit
 /// testing at phone width, with both sections present, is

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Small formatting helpers with no state and no dependency on `intl`,
 /// matching `formatMessageTime` in `widgets/message_row_identity.dart`.
 library;

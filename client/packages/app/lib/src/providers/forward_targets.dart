@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where a message may be forwarded to: every ordinary channel the caller
 /// holds SEND_MESSAGES in, plus every DM they have open, each already
 /// resolved to a channel id the ordinary send route works on unchanged.

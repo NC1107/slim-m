@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Generates the cross-repo push-envelope contract fixture.
 //!
 //! The relay lives in a different repository and language

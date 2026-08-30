@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// slim-m design system: tokens, theme, and icon wrappers.
 ///
 /// Widgets consume semantic tokens through `AppTokens`, never raw hex or

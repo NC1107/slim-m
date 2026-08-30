@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! LiveKit room access: minting the capability tokens a client joins with, and
 //! evicting somebody who should no longer be in a room.
 //!

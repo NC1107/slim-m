@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Per-event, per-connection authorization: turning a fanned-out [`Event`]
 //! into the wire frame one specific viewer may or may not be shown.
 //!

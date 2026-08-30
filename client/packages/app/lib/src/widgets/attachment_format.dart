@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared byte-size formatting for an attachment's caption, wherever it is
 /// shown - the plain chip, an inline image, and the inline video player.
 library;

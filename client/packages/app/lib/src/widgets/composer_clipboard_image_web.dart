@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The web implementation: the browser's own `paste` DOM event, which hands
 /// over pasted bytes directly with no extra permission prompt.
 ///

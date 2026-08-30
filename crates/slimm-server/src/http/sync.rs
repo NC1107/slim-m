@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Read-state and bundled catch-up routes.
 //!
 //! `PUT /channels/{id}/read` advances the caller's last-read marker and returns

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Places a note or a shape: one request, no serial queue - the same
 /// direct-await shape `CanvasImagePaste` already uses for a pasted image,
 /// right for a one-off placement rather than the continuous stream

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The invite role-grant picker offers only what the caller could actually
 /// grant, because the server refuses the rest.
 library;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The GIF proxy's four documented calls, in the order they depend on each
 //! other: a search mints the opaque token every later call is keyed on, the
 //! preview fetches through it, and select turns it into a real attachment.

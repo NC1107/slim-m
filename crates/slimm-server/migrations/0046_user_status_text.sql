@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- A free-text status line, set from personal settings and shown in the
 -- member pane under a name - "in a meeting", "afk", the same kind of thing
 -- presence_visibility (migration 0008) already lets someone say by

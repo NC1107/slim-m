@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The container vocabulary every settings and administration screen is built
 /// from: a group header naming who a run of sections belongs to, the section
 /// header each one opens with, and [SettingsSectionCard], which is *the* way

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Shared fixtures for the canvas ops test binary: a store, a router, an
 //! authenticated caller, and the HTTP helpers both sibling modules need.
 //!

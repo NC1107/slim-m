@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `pickerSections` is the browse view's own data: every `pickerTabs` entry
 /// folded together with its own `pickerResults`, empty ones dropped. The
 /// continuous scrollable and its rail both read this rather than filtering

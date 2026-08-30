@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [canvasStrokeInputFrom]'s dispatch: a wire object's `kind` decides which
 /// of `points`, `attachment`, `text` or `shape` this client reads out of an
 /// otherwise opaque `props`, and an unparseable or unrecognised one answers

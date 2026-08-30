@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What a settings surface shows when it has nothing to show, and why.
 ///
 /// The per-screen review found the same root cause behind two findings at two

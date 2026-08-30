@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Space usage analytics: one resource, gated on MANAGE_SERVER same as
 //! `/space/settings`, that reads as disabled rather than refusing outright
 //! when the toggle is off. See `docs/decisions/0008-space-analytics.md`.

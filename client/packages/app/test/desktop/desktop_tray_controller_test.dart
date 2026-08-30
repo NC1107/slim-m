@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Regression for the tray reaching every real launch with an icon but no
 /// menu: `tray_manager`'s Linux plugin has no handler for `setToolTip`
 /// (`tray_manager_plugin.cc` only implements `setTitle`), so the call threw

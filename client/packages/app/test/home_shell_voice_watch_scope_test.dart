@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `HomeShell.build` used to `ref.watch(voiceControllerProvider)` whole, at
 /// its own top level, only to read `state` and `channelId` when deciding
 /// whether a call running in some other channel needs its own strip in the

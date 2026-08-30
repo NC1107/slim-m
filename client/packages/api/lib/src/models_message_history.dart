@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A message's edit history: the versions it has held, as returned by
 /// `SlimmApi.getMessageHistory`.
 library;

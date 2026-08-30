@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [presencePaintOrder] must put a sent-to-back tile beneath a front one even
 /// when the back tile has the higher touch-order z (it was dragged last). A
 /// `sentToBack`-blind sort let a back tile's own controls paint over a front

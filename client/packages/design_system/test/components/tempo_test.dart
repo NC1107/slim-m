@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One tempo for the design system: the state changes that used to snap now
 /// travel on [AppMotion]'s clocks, and each test here fails if its widget is
 /// reverted to the bare repaint it once was.

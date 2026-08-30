@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The "which messages wake a device" row `NotificationsSection` gained:
 /// it reads the real value back from `GET /push/preference` (unlike
 /// presence, which only ever echoes a local choice), a change round-trips

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The compact quote itself: what it shows when the parent resolved, and -
 /// the property that matters - what it refuses to show when it did not.
 ///

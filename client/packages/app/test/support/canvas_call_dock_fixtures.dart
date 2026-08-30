@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A [CanvasCallDock] wrapped for a widget test: a real [VoiceController]
 /// over a hand-driven [FakeSession] (so the call section's mic/camera/leave
 /// buttons reach something real), and the same

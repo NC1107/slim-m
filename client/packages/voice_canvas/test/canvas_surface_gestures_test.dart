@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Per-tool pointer behaviour for [CanvasSurface]: the eraser, select, note
 /// and shape tools, and the pinch-cancellation every placement tool and the
 /// eraser share. Split out of `canvas_surface_test.dart`, which keeps the

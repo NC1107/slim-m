@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [DesktopWindowController] reacts to a fake port's own events with no
 /// real window anywhere - the debounce, the close-vs-minimise routing, and
 /// the windowed-size-survives-maximize guard, all driven by [fakeAsync]

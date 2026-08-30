@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A screen reader must announce each control once.
 ///
 /// Wrapping a `Text` child inside a `Semantics(label: ...)` node merges the two

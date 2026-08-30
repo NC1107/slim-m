@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every cursor swatch's own derived label colour clears the WCAG 2.1 AA
 /// body-text floor, and the WCAG formula itself, so a seventh hue can never
 /// be added to the palette below that floor without this failing first.

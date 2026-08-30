@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `DELETE .../voice/heartbeat`: the route a clean leave calls so the server
 //! drops a caller's heartbeat entry immediately, rather than the sweep
 //! rediscovering it stale and evicting a participant who already

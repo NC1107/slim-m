@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # The one-line comment cap from CLAUDE.md: a plain `//` or `#` comment never
 # spans more than one line. Code explains how; a comment explains why, and one

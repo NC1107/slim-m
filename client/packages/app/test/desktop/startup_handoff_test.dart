@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The small-splash-then-handoff sequence added by decision 0012's
 /// superseding section: [DesktopWindowShell.applyInitialGeometry] sizes and
 /// centers the window before the very first frame, [DesktopWindowShell.lockSplashChrome]

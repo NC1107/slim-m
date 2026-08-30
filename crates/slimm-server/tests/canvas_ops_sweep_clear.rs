@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The compaction sweep's `clear` pass, split out of `canvas_ops_sweep.rs`
 //! once that file crossed the 500-line hard limit.
 //!

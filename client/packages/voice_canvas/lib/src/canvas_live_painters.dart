@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas's ephemeral paint layers: this device's own in-progress
 /// stroke, everyone else's in-flight strokes, and everyone's live pointers.
 ///

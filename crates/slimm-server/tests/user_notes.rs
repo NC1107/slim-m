@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A caller's private note about another account: round-trips, is invisible
 //! to everyone but its author, survives the subject being renamed, is purged
 //! with the author's own account deletion, and masks an invisible subject

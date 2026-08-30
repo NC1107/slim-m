@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The "before you join" half of the camera pre-toggle.
 ///
 /// There is no lobby to put a pre-toggle in anymore (`voice_screen.dart`'s

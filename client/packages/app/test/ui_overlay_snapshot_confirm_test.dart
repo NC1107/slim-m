@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The `confirmDangerousAction` variants `ui_overlay_snapshot_test.dart`'s
 /// own `confirm-dialog` entry does not show: that one instance is the
 /// delete-account copy, and every other call site has its own title and

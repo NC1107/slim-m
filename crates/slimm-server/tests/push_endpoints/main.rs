@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end push tests: registration over HTTP, triggering from the message
 //! send path against a real (mock) relay, lifecycle gating, debounce, a dead
 //! token clearing the registration, a disabled sender being a true no-op, and

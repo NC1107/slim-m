@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Exposes every live server event to whichever feature wants to react to
 /// one: presence, typing, reactions, pins, and polls all listen here rather
 /// than each opening its own connection or teaching [SyncController] about

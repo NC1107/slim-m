@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Naming the camera and screen-share tiles a viewer has hidden on their own
 /// canvas, for the dock's own recovery list.
 ///

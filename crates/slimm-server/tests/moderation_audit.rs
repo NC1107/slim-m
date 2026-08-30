@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Moderation keeps a record of what was done even after it is undone.
 //!
 //! `space_removals` and `member_timeouts` hold one row per member and answer

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The desktop-anchored status menu's own free-text editor: an [AppInput]
 /// that submits on Enter, replacing the dialog hop `status_editor_sheet.dart`
 /// still needs on a compact width. Per `docs/design/desktop-vs-mobile.md`

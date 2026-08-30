@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A single tap toggles the chrome instantly, a fast double tap enters full
 /// screen only where that gesture is turned on, and an idle, playing video
 /// hides its own chrome and brings it back on tap.

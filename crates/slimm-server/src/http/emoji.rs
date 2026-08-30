@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Custom emoji: the deployment's own named images.
 //!
 //! Access is deliberately not the attachment rule. An attachment is readable

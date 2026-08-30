@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `ChannelSearchController`, driven straight off a
 /// `ProviderContainer` with no widget tree: whether a search filters a
 /// blocked author, and whether a 403 is told apart from a genuinely empty

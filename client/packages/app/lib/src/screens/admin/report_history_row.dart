@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One row of the moderation-history feed: a resolved report or a
 /// `moderation_audit_log` entry, named "who did what to whom, when" - the
 /// four fields decision 0015 built the audit trail to answer. Split out of

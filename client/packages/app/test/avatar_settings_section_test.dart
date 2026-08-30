@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the settings profile card: the camera badge is a real,
 /// touch-sized affordance, the name and `@handle` render with their own
 /// rename affordance, "Remove" only offers itself when there is something to

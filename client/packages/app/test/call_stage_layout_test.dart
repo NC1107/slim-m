@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The stage-and-filmstrip layout `call_stage_layout.dart` replaced three
 /// separate boxes with. The owner's own report: "it creates 3 different
 /// boxes for if I'm screen sharing and having my camera on and it's not

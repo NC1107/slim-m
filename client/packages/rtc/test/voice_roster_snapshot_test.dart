@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [passesActivationThreshold], the pure function behind
 /// [VoiceSession.setSpeakingSensitivity]. Driven directly with plain values
 /// rather than a fake `lk.Participant` - the class is abstract and its own

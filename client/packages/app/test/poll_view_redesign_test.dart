@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rest of the poll redesign, split out of `poll_view_test.dart` to stay
 /// under this repo's line budget: the leading-option cue, the zero-vote
 /// state's own copy, and the option row's touch target at phone width.

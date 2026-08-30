@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The hand-written text the what's-new sheet shows, one entry per released
 /// version that has something worth telling a returning user.
 ///

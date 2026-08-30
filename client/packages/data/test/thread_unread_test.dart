@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A thread never puts an unread badge on the channel rail.
 ///
 /// Asked directly from real device use: "not sure if threads are invoking as

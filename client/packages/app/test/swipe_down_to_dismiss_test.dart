@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [SwipeDownToDismiss] against a plain child - no real video, no native
 /// texture - so the drag-to-dismiss gesture itself is exercised without any
 /// of the `media_kit` fragility that makes mounting a real `Video` widget

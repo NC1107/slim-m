@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The seam between the inline video player and how each platform gets
 /// authenticated attachment bytes to `package:media_kit`.
 ///

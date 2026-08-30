@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ManagedChannelRow` used to compose the manage kebab as a sibling of the
 /// channel row rather than inside it, so the row's own hover/press
 /// highlight (painted by `AppListRow`'s tinted container) visibly stopped

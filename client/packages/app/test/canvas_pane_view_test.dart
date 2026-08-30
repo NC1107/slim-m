@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Recenter view and Delete/Backspace over a selection, driven through the
 /// full pane the same way `canvas_pane_ops_test.dart` drives erase, undo and
 /// clear.

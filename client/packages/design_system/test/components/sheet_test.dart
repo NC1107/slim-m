@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A modal is whatever the window can carry.
 ///
 /// Every modal in the app was a bottom sheet, which is a phone affordance: it

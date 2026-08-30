@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Restores a scripts/backup.py snapshot into a scratch location and checks
 it, rather than trusting a backup nobody has ever restored.
 

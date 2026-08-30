@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where the transcript's scroll sits, and the two things that follow from
 /// it: the "jump to latest" affordance's visibility and when a viewed
 /// message is marked read. The affordance shows only once the reader has

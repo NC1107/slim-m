@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Guard the two migration mistakes that only surface at deployment startup.
 
 `main-builds.yml` moves the `latest` server image on every push to main, and

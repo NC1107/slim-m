@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A right-click on an in-call participant tile used to do nothing; a tap
 /// already opened their profile (the only route to per-participant volume
 /// that does not go through the member pane), so right-click reaches the

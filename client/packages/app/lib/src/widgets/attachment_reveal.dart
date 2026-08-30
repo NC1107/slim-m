@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The tappable stand-ins for an inline attachment held behind a performance
 /// gate: a not-yet-downloaded image, or a gif frozen on its first frame under a
 /// play badge. One tap reveals it. Split out of `attachment_view.dart` to keep

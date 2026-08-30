@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A caller's own private note about another account.
 //!
 //! Modeled on `store/safety.rs`'s blocking relation: one row per (author,

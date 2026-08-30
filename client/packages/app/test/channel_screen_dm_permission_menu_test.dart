@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The finding docs/decisions/0011-per-channel-permissions.md exists to fix:
 /// a DM message-action menu offering Delete and Pin because the caller's
 /// deployment-wide MANAGE_MESSAGES bit was consulted, when a DM's own

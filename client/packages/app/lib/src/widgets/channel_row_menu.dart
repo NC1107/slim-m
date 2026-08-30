@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one menu a channel row offers, reached three ways: a right-click or
 /// long-press on the row (`ContextMenuRegion`, wired in
 /// `channel_rail_channel_rows.dart`), and the row's own kebab, which used to

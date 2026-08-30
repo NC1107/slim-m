@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer and avatar attach actions' shared picker, proven at the
 /// `file_picker` method channel: nothing on this box can drive a real OS
 /// picker, and `attachment_picker.dart`'s whole reason to exist is that the

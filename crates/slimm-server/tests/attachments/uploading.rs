@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! What `POST /attachments` accepts: the size ceiling, the byte-sniffed
 //! content-type allowlist, and the rate limit on a sustained flood.
 

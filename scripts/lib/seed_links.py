@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Link-bearing message content: video, article, image, and repo URLs.
 
 Split out of seed_content.py rather than added to it, to keep that file

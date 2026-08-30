@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // Notices which channel a tapped notification came from, without taking the
 // notification delegate away from whoever already had it.

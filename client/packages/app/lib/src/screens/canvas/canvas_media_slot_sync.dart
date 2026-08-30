@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reading and writing the shared, persistent half of a media tile's state
 /// - position, size, lock and depth - which the server remembers per
 /// channel now (decision 0010's reversal). `hidden` never passes through

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A still-sending message dimmed its body but told a screen reader nothing:
 /// the same text read identically whether the message was still in flight or
 /// already delivered. See `message_text.dart`'s `MessageBody.announceSending`.

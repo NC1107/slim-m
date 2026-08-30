@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Dependency wiring.
 ///
 /// One Riverpod container holds everything; there is no second DI mechanism.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The same measurement `message_row_unrelated_profile_rebuild_test.dart`
 /// applies to `MessageRowHeader`/`MessageRowLeading`, extended to the four
 /// list rows that were later split out of their parent `itemBuilder`s for the

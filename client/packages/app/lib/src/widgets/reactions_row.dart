@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The reactions row under a message: one chip per distinct emoji, arriving
 /// with a pop and leaving with the same pop in reverse, played in place.
 ///

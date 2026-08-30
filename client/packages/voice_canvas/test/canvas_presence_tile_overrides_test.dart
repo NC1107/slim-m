@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CanvasPresenceTileOverrides]: default state, that each mutator both
 /// stores its own field and leaves the others untouched, that [prune] drops
 /// only [CanvasPresenceTileState.hidden] for a key that left the roster

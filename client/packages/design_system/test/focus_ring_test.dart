@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Guards [AppFocusRing]'s own contract: transparent (but space-reserving)
 /// until the wrapped control reports focus, then [AppTokens.focusRing].
 library;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The create-channel sheet's primary button names what is missing rather
 /// than sitting disabled with no explanation - the same "say why" treatment
 /// `poll_composer_sheet_test.dart` already covers for its own sheet - and

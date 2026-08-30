@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Keyboard shortcuts.
 ///
 /// Bindings live in one table rather than scattered across widgets, which is

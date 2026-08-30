@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Saving any attachment to wherever the platform's own picker offers.
 ///
 /// `file_picker`'s `saveFile` already differs correctly per platform under

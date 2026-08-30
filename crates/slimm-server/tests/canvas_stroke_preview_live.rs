@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Live in-flight stroke preview: the same two-bit authorization and
 //! appear-offline guard [`canvas_cursor_live`] already covers, plus what is
 //! new to a frame that carries drawing content rather than a bare position -

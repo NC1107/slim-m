@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The generic mechanism behind every right-click/long-press menu in the
 /// app: the gesture, where it lands, the compact-sheet/wide-floating split,
 /// and the keyboard route into it.

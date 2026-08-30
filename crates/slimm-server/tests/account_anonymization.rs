@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Account deletion is a tombstone `UPDATE`, never a `DELETE FROM users`, so
 //! every `ON DELETE SET NULL` authorship column in the schema is a promise
 //! only `delete_account`'s own explicit anonymization statements can keep.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `MessageExtrasController`'s merge rule for a message's thread summary:
 /// a REST fetch's real answer (including a genuine zero) is taken, and a
 /// bare live frame that carries none of the three fields never clobbers

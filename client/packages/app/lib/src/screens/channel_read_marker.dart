@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Advancing a channel's read marker: the local write, the server call, and
 /// the guard that keeps a busy channel from re-sending a seq it has already
 /// recorded.

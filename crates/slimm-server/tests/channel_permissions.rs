@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /channels/{channel_id}/permissions`: the answer has to match
 //! `Store::permissions_in_channel` exactly, including its thread resolution,
 //! its DM branch, and its timeout subtraction, and it has to mask to zero

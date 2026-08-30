@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the rail's fixed bars: the header's menu, and the user footer
 /// where the avatar is the status switcher and the bar keeps its content clear
 /// of the home indicator.

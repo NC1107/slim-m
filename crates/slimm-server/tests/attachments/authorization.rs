@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Who may link an already-uploaded attachment to a message. Before this,
 //! `link_attachments` authorized nothing beyond the id existing somewhere in
 //! `attachments`, so anyone who learned an id could attach it to a message

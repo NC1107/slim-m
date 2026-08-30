@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `pickGif`'s own race: its second fetch (the newly staged tile's local
 /// preview bytes) can still be in flight when whatever hosted the picker is
 /// torn down. Nothing here goes through `Composer` - only the seam

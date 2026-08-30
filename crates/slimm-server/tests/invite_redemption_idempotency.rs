@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Redemption is idempotent per (code, user): a retry after a lost response
 //! spends no second use and reports the success it already achieved, and a
 //! code spent at registration cannot be redeemed a second time by the same

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Uniform-grid viewport culling for the Voice Canvas, plus the linear-scan
 /// control it has to beat to justify existing.
 ///

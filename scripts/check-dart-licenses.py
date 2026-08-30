@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The Dart half of the dependency-license gate.
 
 cargo-deny covers the Rust tree; pub has no equivalent, so this reads

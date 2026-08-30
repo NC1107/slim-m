@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas's text activity log: docs/ROADMAP.md's Phase 6 accessibility
 /// fallback, closing the one surface in this product a `CustomPainter`
 /// leaves with nothing for a screen reader.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pure ordering over a channel listing, shared by the rail's sections and
 /// the next/previous-channel shortcuts so the two cannot drift apart the way
 /// `orderedChannels` and `DirectMessagesSection` once did: this used to

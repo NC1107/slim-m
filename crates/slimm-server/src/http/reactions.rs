@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Reaction routes: add and remove one emoji on one message.
 //!
 //! Both are idempotent, because the client that most needs them is the one on

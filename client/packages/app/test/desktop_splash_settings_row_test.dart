@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The desktop splash toggle and duration row inside the performance pane:
 /// turning the splash off both persists and hides the duration row (nothing
 /// to time once the splash never shows), turning it back on both persists and

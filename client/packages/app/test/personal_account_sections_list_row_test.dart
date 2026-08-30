@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `DevicesSection`, `BlockedSection` and `AccountSection` used to render
 /// their rows as bare `ListTile`s: taller, differently inset, and with none
 /// of `AppListRow`'s hover, press or keyboard-focus chrome.

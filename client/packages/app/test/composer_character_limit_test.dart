@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's own character limit: a live counter as the limit
 /// approaches, and a refusal to send once it is crossed.
 ///

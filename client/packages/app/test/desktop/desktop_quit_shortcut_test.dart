@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [DesktopQuitShortcut]'s own guarantee: Ctrl+Q reaches [DesktopWindowPort]
 /// regardless of what, if anything, the widget tree has focused - this is
 /// what a focus-independent [HardwareKeyboard] handler buys over the app's

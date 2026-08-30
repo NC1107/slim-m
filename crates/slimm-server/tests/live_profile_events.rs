@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end coverage for the `ProfileChanged` event: the fix for the
 //! recorded debt that a display name change never reached a live client, so
 //! a message row already cached locally showed the old name until the whole

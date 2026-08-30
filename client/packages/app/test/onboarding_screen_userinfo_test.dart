@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Userinfo in a typed server address must never ride along on a probe or
 /// survive into storage: dart:io turns it into a Basic auth header on every
 /// request the stored base URL makes afterward. See reduceServerAddress.

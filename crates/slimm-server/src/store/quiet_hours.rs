@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Persistence for the account-wide quiet-hours window (migration 0056):
 //! an optional time-of-day span, in minutes since midnight UTC, during
 //! which `push::recipients::narrow_for_notification_preference` treats an

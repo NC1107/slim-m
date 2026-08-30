@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The custom title bar's own controls: reachable by keyboard and a screen
 /// reader alike, and the close button routes through the same decision the
 /// native close/delete-event does rather than hiding the window

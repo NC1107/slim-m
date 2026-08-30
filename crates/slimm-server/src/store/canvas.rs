@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Canvas object persistence and the viewport read path over the R-Tree that
 //! migration 0015 keeps in sync by trigger.
 //!

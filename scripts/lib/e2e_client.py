@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Drive one Flutter web client over the Chrome DevTools Protocol.
 
 Flutter paints to a canvas, so the app is unreachable from a script until its

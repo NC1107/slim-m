@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Full-text search over messages, split out of [`super::messages`] when that
 //! file crossed the 500-line hard ceiling.
 //!

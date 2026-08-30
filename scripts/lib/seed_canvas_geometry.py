@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Generates hand-drawn-looking stroke geometry for canvas seeding.
 
 Two straight-line endpoints read as machine-made the instant a real person

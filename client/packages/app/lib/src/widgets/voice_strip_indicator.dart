@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The collapsed call strip: what a live call looks like on a phone once you
 /// have navigated to a different channel.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `from:` and `in:`, the two operators that resolve a caller-supplied name
 //! (a username, a channel name) against the deployment - so both carry the
 //! same oracle-safety obligation: a name that resolves to nothing must

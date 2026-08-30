@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// canvas.md: the loading state was a flat, featureless rectangle with no
 /// spinner or skeleton, pixel-identical for a sighted user to what a
 /// broken or blank canvas would look like - the `Semantics` label already

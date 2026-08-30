@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reported by the owner: setting your own status through the avatar menu
 /// did not update your own row in the member pane until something unrelated
 /// (a join, a moderation event) happened to refetch the roster.

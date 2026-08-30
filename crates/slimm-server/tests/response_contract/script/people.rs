@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The half of the pass about people rather than content: the caller's own
 //! profile and avatar, other users, presence, devices, blocks, and the
 //! report queue.

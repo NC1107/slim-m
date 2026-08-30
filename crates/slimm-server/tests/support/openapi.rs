@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Shared route/schema extraction for `tests/openapi_contract.rs` and
 //! `tests/openapi_429_coverage.rs`, so a route surface parser and a schema
 //! parser exist exactly once between the two gates rather than as two

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The edit-history viewer: the "(edited)" marker opens a sheet listing every
 /// version the message has held, oldest first, labelled from Original to
 /// Current, and a failed load says so with a retry rather than spinning.

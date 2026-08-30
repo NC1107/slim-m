@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A cache for a deployment's own emoji image bytes that survives an app
 /// restart, so reopening the picker on a later launch does not repeat the
 /// concurrent-fetch burst [customEmojiImageProvider]'s own doc describes.

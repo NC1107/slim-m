@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Two things an empty thread got wrong, both found while fixing the
 /// thread layout rather than reported.
 ///

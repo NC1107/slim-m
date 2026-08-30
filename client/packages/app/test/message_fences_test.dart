@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [splitMessageBlocks]: fenced code must be recognised only when
 /// its markers occupy a whole line, and every edge case a real message can
 /// hand it (unterminated, empty, unlabelled, inline) must degrade sanely

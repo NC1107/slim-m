@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Reaction summaries: one entry per distinct emoji on a message, from the
 /// calling user's point of view.
 ///

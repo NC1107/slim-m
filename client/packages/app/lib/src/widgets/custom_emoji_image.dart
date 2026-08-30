@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One of the deployment's own emoji, drawn from its image.
 ///
 /// Square and sized by the caller, because an emoji stands in for a glyph:

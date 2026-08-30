@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The mouse wheel and trackpad-scroll half of [CanvasSurface]'s camera
 /// controls - `_signal`'s own handling of `PointerScrollEvent`. Split out
 /// from `canvas_surface_test.dart` since nothing there touched it: there was

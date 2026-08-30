@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Builds the attachment fixtures a seeding run's `send_attachment` picks from.
 
 Split out of `seed_run.py` to keep that file under the review budget.

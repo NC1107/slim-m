@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A message row while the transcript is selecting, driven through the real
 /// widget rather than through the state behind it.
 ///

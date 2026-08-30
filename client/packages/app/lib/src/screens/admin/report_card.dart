@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One report in the moderation queue, split out of `reports_screen.dart` to
 /// keep that file under budget. Naming the reporter and reported subject
 /// lives in `report_card_labels.dart`; the quick moderation actions live in

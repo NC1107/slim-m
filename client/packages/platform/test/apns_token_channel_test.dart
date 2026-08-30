@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the APNs token bridge: the hex-format contract, platform gating,
 /// and every ordering the native side can arrive in.
 library;

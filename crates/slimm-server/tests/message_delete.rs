@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Message deletion: author-or-manage authorization, idempotency, and the
 //! fact that it cannot be used to probe for a message in a channel the
 //! caller cannot see.

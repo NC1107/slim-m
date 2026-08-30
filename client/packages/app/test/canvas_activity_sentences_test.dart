@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sentence builders [describeCanvasActivityEntry] and
 /// [summarizeCanvasActivity]: one entry read aloud or in the panel, and a
 /// throttled batch collapsed into one line.

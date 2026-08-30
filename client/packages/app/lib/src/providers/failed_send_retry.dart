@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Retries every locally failed send once, the moment `SyncController`
 /// reconnects. Split out of `sync_controller.dart` to keep that file under
 /// its own line budget, the same reason `ChannelRefresher` lives apart from

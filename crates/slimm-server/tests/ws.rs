@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end WebSocket tests against a real server on an ephemeral port, driven
 //! by a real WebSocket client. Covers the two-client fan-out and ordering and
 //! the per-event permission filter, including a store error while resolving

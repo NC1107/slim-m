@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pins the property that lets reactions, pins and polls skip reconciliation.
 ///
 /// `CLAUDE.md`'s "Reconciling an edit nobody was online for" names an open

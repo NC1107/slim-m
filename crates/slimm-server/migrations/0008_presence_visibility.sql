@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Presence visibility: a durable per-user choice of how they want to be
 -- shown, independent of whether they are connected right now.
 --

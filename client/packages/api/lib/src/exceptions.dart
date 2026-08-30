@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Typed failures, so callers branch on what happened rather than parsing
 /// status codes at every call site.
 library;

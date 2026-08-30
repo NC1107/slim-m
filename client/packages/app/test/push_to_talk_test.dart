@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [VoiceController.setPushToTalkHeld]: the hold/release mute
 /// transitions it drives, with a fake session standing in for a real call.
 /// Reaching the key event itself, and the composer-focus guard that keeps a

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `buildForwardedContent`: the plain-send-with-a-quote-block wire shape a
 /// forward actually sends, and the reason it exists at all rather than a
 /// cross-channel `reply_to_id` - see the file's own doc comment.

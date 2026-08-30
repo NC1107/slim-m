@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The account-wide quiet-hours window: an optional time-of-day span,
 //! entered in local time by the client and sent here already converted to
 //! minutes since midnight UTC, so the server never needs to know the

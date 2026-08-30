@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `BlockedDmNotice`, and the state screen-inventory-moderation.md ranks
 /// among the hardest to reach for a screenshot: being blocked *by* the other
 /// side of a DM, which carries no client-side signal at all - the block

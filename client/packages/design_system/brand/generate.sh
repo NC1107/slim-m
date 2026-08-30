@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Rasterises the SVG masters in this directory into every icon the repo ships.
 # Run it after changing a master or an accent token; see README.md.
 set -euo pipefail

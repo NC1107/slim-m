@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which build this is, for a tester to read off the device rather than
 /// asking whoever is looking at it what they have installed.
 ///

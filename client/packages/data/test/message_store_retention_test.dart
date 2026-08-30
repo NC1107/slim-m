@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// CD2: the local store had no retention at all - every delivered row ever
 /// synced or paged in stayed for the life of the install. These pin the two
 /// rules a sweep leans on: [MessageStore.pruneToRetentionCeiling] never

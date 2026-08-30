@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Where seeded canvas objects land: clustered, not scattered uniformly.
 
 A real board has busy regions and empty space, not an even grid - and

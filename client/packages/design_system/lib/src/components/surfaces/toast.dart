@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A transient confirmation that floats in, says one thing, and leaves.
 ///
 /// Deliberately not for failures. This app's error grammar holds that a failure

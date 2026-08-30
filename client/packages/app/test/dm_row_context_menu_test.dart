@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The DM row's right-click/long-press menu: open, close it out of the
 /// sidebar, mute or narrow to mentions only, and report/block the other
 /// participant.

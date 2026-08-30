@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The channel rail collapsed to a narrow icon strip, standing in for the
 /// bottom controls [ChannelRail] would otherwise carry away with it:
 /// settings, mic and deafen.

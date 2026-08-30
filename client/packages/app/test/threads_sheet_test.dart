@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the threads sheet's empty, loading and error states, the same
 /// shape `pinned_messages_sheet_test.dart` already covers for its sibling,
 /// plus that tapping a thread closes the sheet and opens it.

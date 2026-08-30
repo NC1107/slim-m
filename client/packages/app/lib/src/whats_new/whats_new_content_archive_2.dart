@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A second era of older entries for `whatsNewEntries`, split out for the
 /// same reason `whats_new_content_archive.dart` was: keep both the live
 /// file and each archive under the review budget as the list keeps growing

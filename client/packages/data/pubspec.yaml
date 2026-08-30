@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: slimm_data
 description: Local store and the sync logic that keeps it consistent with the server.
 publish_to: none

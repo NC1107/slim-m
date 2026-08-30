@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [voiceRosterProvider]'s polling contract: a text-only deployment stops
 /// asking, a transient failure keeps the last known roster rather than
 /// clearing it, and an interval governs the real network cost rather than

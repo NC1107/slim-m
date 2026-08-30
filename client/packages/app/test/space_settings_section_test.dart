@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Space settings as a nav beside embedded panes, matching personal
 /// settings' shape, with each pane gated on the server bit its surface
 /// requires. On a wide window choosing a pane embeds it beside the nav; on a

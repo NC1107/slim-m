@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Decision 0013's one rule about layout: horizontal inset is owned by the
 /// screen frame, never by a section or a screen re-deriving it by hand.
 /// `categories_screen.dart` broke it by coincidence rather than intent -

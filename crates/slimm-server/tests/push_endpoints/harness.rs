@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The store, router, and mock relay `delivery.rs`'s tests share: a real HTTP
 //! server on an ephemeral loopback port, so the sender under test exercises
 //! its real HTTP client end to end; only APNs/FCM themselves are out of

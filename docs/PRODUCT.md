@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # What slim-m does today
 
 This is an inventory of the product as it actually stands, derived by reading the server's route table (`crates/slimm-server/src/http.rs` and `http/*.rs`, gated against `schema/openapi.yaml`) and the client's screens, routes, and providers, not by reading the planning docs.

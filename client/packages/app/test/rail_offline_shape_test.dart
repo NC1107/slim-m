@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail must not reshape itself when the connection drops.
 ///
 /// `GET /me` carries the permission bitmask the rail reads to decide whether

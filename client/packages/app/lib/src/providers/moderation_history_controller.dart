@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The moderation-history feed, one page at a time: `GET /reports/history`
 /// merges resolved reports with `moderation_audit_log` entries into one
 /// newest-first feed, backing the History tab beside the open-reports queue

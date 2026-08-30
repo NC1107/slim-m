@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the runtime media capability probe.
 ///
 /// The branches that matter are the unhappy ones. A portal that answers with

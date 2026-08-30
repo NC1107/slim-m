@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [ServerEvent.parse] for `canvas.object.reordered`, and
 /// [CanvasOp.fromJson]'s `reorder` case in the catch-up feed - the two wire
 /// shapes a restacked canvas object can arrive through. Mirrors

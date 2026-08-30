@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Fails a captured surface whose settle budget was not actually enough:
 /// see CLAUDE.md's "The report card overflow, and how far the mid-flight
 /// capture problem actually spreads" for the bug this exists to catch.

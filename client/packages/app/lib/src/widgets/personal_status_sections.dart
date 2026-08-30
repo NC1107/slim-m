@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Three personal settings sections about how the account presents itself
 /// live: presence visibility, push notification status, and a link to the
 /// voice preferences screen.

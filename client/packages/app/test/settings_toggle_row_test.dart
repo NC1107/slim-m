@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `SettingsToggleRow` exists instead of `AppListRow(trailing: AppToggle())`
 /// for exactly one reason, and this is the test that reason has to survive:
 /// three of these settings carry a whole sentence, and `AppListRow` is

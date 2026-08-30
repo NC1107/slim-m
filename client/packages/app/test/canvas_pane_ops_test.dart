@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas pane's erase, undo and clear controls, driven through the
 /// full pane rather than the ops controller directly: this is what proves
 /// the tool toggle, the undo button, Ctrl+Z and the overflow clear menu are

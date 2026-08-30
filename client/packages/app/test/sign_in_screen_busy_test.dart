@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sign-in button's busy state: the label cross-fades to a spinner
 /// through an [AnimatedSwitcher] rather than swapping in one frame, matching
 /// every other loading transition in the app.

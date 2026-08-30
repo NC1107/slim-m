@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Cross-origin access: what a browser is actually told, for a configured
 //! origin, an unconfigured deployment, and an origin that is not on the list.
 //!

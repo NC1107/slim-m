@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What a DM with a blocked person shows in place of its composer.
 ///
 /// The channel itself is frozen server-side for exactly this pair

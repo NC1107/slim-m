@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's own Emoji/GIFs picker: `composer_emoji_browse.dart`'s
 /// `ComposerEmojiPicker` under an Emoji tab, `gif_picker.dart`'s
 /// `GifPickerBody` under a GIFs tab, both inside one floating card.

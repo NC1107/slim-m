@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Channel rename and soft-delete: the MANAGE_CHANNELS gate, the
 //! existence-not-observable behavior, idempotent delete, and the guard
 //! against deleting the deployment's last channel.

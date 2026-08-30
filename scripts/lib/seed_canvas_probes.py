@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Deliberate edge-case probes against a channel's canvas surface.
 
 This is the "integration test in disguise" half of canvas seeding: each

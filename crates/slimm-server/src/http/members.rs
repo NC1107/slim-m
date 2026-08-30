@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Moderating a member short of deleting their account: a timeout that lapses
 //! on its own, and a removal that does not.
 //!

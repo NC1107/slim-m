@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The performance pane: the local dials for what media does on its own, plus
 /// how much history a scroll-back fetches.
 ///

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A keyboard sweep found `CallDockButton` (mute, camera, share, hang up)
 /// reachable by Tab, but drawing Material's own translucent focus overlay
 /// instead of this system's [AppTokens.focusRing] outline. Split out of

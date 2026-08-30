@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The debug log: what the app caught, newest first, with a copy button.
 ///
 /// This screen used to build its own `Scaffold`/`AppBar` rather than going

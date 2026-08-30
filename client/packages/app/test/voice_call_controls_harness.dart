@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Shared fixtures for the suites that pump [CallControls]: its own
 /// screen-share and camera behaviour, and its focus-ring reachability.
 ///

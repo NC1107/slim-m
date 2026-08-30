@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Role management: create, list, update, and delete roles, and grant or
 //! revoke one on a member. Every verb here is gated on MANAGE_ROLES at the
 //! deployment level, since roles are not scoped to any one channel.

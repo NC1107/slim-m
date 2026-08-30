@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the pinned messages sheet's empty, loading, and error states:
 /// a failed first load must say so and offer a retry, never spin forever or
 /// read as an honest "nothing pinned".

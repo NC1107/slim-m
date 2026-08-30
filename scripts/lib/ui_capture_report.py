@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Turns what ui-capture.sh actually did into a manifest and a contact sheet.
 
 Nothing here keeps its own list of what should exist. A category's image

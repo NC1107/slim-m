@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The client app's own copy of the notification sounds must stay byte-
 identical to the canonical set this directory generates.
 

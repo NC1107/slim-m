@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A message left `failed` from before the socket went down must not sit
 /// there forever waiting for the person to notice and tap Retry: the moment
 /// `SyncController` reconnects, it is safe to replay unconditionally, since

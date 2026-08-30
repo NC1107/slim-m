@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The caller's own profile: reading it with effective base permissions, and
 //! updating the display name and/or status text.
 

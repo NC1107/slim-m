@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ChannelCategorySections` used to `ref.watch(voiceControllerProvider)` at
 /// its own top level and hand the result down to every row it built, text
 /// channels included. `voiceControllerProvider` updates on essentially every

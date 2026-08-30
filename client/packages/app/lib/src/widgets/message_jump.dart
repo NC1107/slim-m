@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Jumping to a message: the one entry point every tappable result (search,
 /// pins, the command palette) calls, the row wrapper that scrolls to and
 /// flashes the arrival, and the notice for when it cannot be reached.

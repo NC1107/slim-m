@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `myVisibleChannelsProvider`'s live invalidation, added when the
 /// 2026-08-11 review found no event branch invalidated it at all: a channel
 /// hidden or revealed by a role, timeout or overwrite change stayed stale in

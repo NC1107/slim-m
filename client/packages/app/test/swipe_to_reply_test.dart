@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Coverage for [SwipeToReply]'s own gesture layer, independent of the row
 /// it wraps in production: the threshold boundary, that a vertical scroll
 /// through it still scrolls the list rather than the row, that a desktop

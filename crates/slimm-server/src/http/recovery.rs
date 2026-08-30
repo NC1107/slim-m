@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Admin-issued password reset: the self-hosted account recovery path chosen
 //! in place of email. An administrator issues a one-time code for a locked-out
 //! account; whoever holds it spends it once, here, to set a new password.

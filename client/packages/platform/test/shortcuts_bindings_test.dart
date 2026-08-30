@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `resolveBindings` overlays a user's shortcut overrides on the defaults, and
 /// two rules make it correct: an override must *replace* the default key for
 /// its action rather than leave both bound (or the old key still fires it), and

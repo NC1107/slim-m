@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The call site of `AppSegmentedOption.disabled`.
 ///
 /// `forms_test.dart` proves the component honours the flag; this proves the

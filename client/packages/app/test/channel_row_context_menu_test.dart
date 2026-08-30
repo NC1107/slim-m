@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A channel row's context menu: opening it always, and reaching "Channel
 /// settings..." (name, topic, permissions, delete - `channel_settings_screen.dart`)
 /// only for a caller who holds MANAGE_CHANNELS, MANAGE_ROLES, or both.

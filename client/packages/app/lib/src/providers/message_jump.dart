@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Jumping to a message from search or from the pins sheet: paging a
 /// channel's history backwards until the target is loaded locally, or
 /// giving up within a bound rather than paging forever.

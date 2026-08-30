@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The emoji picker's recently-used shelf: not a secret, so it lives in
 /// [preferencesProvider] rather than the key store, and it does not need to
 /// survive a reinstall the way a session does.

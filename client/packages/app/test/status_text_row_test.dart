@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `StatusTextRow`: the personal settings field that sets `status_text` on
 /// the caller's own profile, mirroring `edit_display_name_sheet_test.dart`'s
 /// shape for `updateMe`'s other caller.

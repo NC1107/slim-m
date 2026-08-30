@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The DM rail's activity ordering, and the query plan behind it.
 //!
 //! `list_dm_conversations` used to order on a correlated

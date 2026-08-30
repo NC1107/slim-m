@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Routing.
 ///
 /// A shell route wraps the signed-in surfaces so the channel list stays mounted

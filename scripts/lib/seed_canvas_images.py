@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Builds the varied image fixtures a canvas seeding run uploads once and
 places many times, reusing scripts/lib/seed_media.py's generators rather
 than a second image pipeline - the same reuse `seed_fixtures.py` already

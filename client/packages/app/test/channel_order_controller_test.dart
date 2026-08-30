@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `ChannelOrderController`: the arrangement renders the instant a
 /// drag completes, and only the round trip decides whether it sticks.
 /// `category_order_controller_test.dart` is the sibling file covering

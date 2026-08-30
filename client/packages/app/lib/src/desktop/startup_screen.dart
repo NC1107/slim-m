@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Discord-style startup screen: the brand lockup plus a status line,
 /// shown in its own small window while `main.dart`'s async bootstrap
 /// sequence runs, per decision 0012's superseding section.

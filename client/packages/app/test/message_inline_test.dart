@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [parseInline]: nesting, the leaf tokens it hands unresolved to
 /// `message_text.dart`, and the false-positive cases a real message hits
 /// often enough to be worth a test of their own.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A caller's private note about another account.
 //!
 //! Caller-private, always: a note is visible only to the author who wrote

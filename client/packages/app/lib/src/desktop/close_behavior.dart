@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What "close" means on each desktop platform, and the one place that
 /// decision is made - decision 0012's close-vs-minimise router, kept as a
 /// pure function so the rule is provable without a window ever existing.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The in-call participant tiles, and the call-duration readout.
 ///
 /// A call used to render as a top-anchored list of small rows over a mostly

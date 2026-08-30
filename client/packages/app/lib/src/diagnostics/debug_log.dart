@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The in-app record of what went wrong, so a failure can be reported without
 /// a terminal attached. A packaged build has no stdout anybody reads.
 library;

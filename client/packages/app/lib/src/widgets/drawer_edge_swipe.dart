@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A left-edge drag that opens the ambient [Scaffold]'s start drawer.
 ///
 /// `Drawer`'s own edge-swipe lives inside Flutter's `DrawerControllerState`,

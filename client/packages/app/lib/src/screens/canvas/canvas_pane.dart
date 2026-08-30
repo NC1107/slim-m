@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Voice Canvas, as a mode of a channel rather than a route.
 ///
 /// This widget is a thin consumer of [CanvasEngine] (`canvas_engine.dart`),

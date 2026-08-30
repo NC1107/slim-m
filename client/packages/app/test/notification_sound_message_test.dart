@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [NotificationSoundController]'s message half, wired through real
 /// providers with a fake [SoundPlayer] recording what played - the pure
 /// decision rules themselves are covered without any of this in

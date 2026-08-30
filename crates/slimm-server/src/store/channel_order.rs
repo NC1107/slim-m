@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Setting the deployment's channel order, in the two shapes
 //! `PUT /channels/order` accepts. [`Store::reorder_channels_flat`] is the
 //! pre-category shape every client sent before docs/decisions/

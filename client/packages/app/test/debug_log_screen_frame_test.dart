@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Two things the debug log broke from its own family on, both from the
 /// per-screen review (`docs/reports/screen-review/settings.md`).
 ///

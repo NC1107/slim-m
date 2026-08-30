@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// How tall a floating dock anchored to the bottom of the screen currently
 /// is, so a [SnackBar] shown from anywhere in the shell can clear it rather
 /// than landing on top of a live call's mute or leave-call button.

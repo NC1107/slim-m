@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [DesktopWindowShell]'s receiving end of `linux_second_instance_channel.cc`
 /// - proves it reuses [DesktopWindowPort.show]/[DesktopWindowPort.restore]
 /// rather than a second implementation of "make the window visible again",

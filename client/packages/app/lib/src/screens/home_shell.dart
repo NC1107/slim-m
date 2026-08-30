@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The signed-in shell: channel rail beside, or instead of, a conversation,
 /// plus the member pane wherever it has room to dock
 /// ([LayoutClass.fitsMemberPane]).

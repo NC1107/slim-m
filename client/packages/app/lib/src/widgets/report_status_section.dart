@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Lets a reporter see their own filed reports, and check on one by id.
 ///
 /// Before `GET /reports/mine/{reportId}` existed, every report-reading

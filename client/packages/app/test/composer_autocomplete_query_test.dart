@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Every case here is something somebody actually types, and the ones that
 /// must *not* trigger matter more than the ones that must: an autocomplete
 /// that opens over the message you are writing is worse than none at all.

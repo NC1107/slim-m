@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `canvas_surface_gestures_test.dart`'s own pinch-cancellation guard
 /// (`_resolvePendingPlacement`, gated on this surface's own `_pointers`
 /// dropping to zero) only ever sees a second finger that lands on bare

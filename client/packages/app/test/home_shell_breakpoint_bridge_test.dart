@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The 599/600 chrome swap is bridged with a short fade rather than a
 /// one-frame interface replacement, and reduce motion keeps the instant
 /// swap.

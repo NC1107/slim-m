@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A call joined from this app's own UI must reach CallKit the same way an
 /// inbound VoIP push does, or it gets none of the background execution grant
 /// that makes the difference; see `VoipCallHandler.swift`'s doc comment and

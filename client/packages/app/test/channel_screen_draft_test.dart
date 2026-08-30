@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A per-channel draft survives switching away and back, even though
 /// `ChannelScreen` has no key (see `channel_read_marker.dart`'s doc comment)
 /// and the same `TextEditingController` is what a channel switch reuses or

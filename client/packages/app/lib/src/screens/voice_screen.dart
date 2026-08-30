@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A voice channel: joining, and the call once you are in it.
 ///
 /// Clicking a voice channel joins it directly. There used to be a lobby

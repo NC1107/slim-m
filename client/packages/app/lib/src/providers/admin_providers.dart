@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Data for the moderation and administration screens: the reports queue,
 /// invite management, roles, and channel permission overwrites.
 ///

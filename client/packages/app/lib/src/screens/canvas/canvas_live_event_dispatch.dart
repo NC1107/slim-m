@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The live-event dispatch switch `CanvasPane` reads off the socket, split
 /// out of `canvas_pane.dart` because it sat at the file budget's hard
 /// ceiling. A pure function over explicit callbacks rather than a class:

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A dragged tile's override survives `CanvasPresenceLayer.didUpdateWidget`
 /// pruning it when its owner leaves the call, without corrupting the frame
 /// the dock's own `ListenableBuilder` (`canvas_pane_body.dart`) is mid-build

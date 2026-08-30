@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A channel's pinned messages: fetched once per channel, refreshed whenever
 /// a live `message.pinned`/`message.unpinned` event says the set changed.
 ///

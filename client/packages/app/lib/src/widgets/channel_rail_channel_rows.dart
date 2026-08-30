@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail's channel rows: the kebab pairing (see `channel_row_menu.dart`
 /// for the menu it and the row's own right-click/long-press both open), the
 /// voice row and the participant strip beneath it.

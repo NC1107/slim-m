@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The categories screen's own drag-to-reorder list, split out of
 /// `categories_screen.dart` for the review budget.
 ///

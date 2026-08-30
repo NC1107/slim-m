@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The window's own saved shape, and the arithmetic that decides whether a
 /// saved position is still safe to apply.
 ///

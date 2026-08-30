@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The Channel settings screen's round trip through the API and the local
 /// store: the last-channel refusal, saving name and topic, and the two
 /// deletion paths. Split from `channel_management_test.dart` when it crossed

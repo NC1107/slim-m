@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// One treatment for the three states every fetched surface has.
 ///
 /// A component-usage audit found five different shapes for the same job

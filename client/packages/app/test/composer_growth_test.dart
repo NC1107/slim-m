@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A line break grows the composer over a beat instead of relayouting in one
 /// frame: the action bar rides an [AnimatedSize], so the mid-flight height
 /// sits strictly between the one-line and two-line heights. Reverting the

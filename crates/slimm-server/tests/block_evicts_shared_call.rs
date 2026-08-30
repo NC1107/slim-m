@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Blocking has the same shape of gap `evict_from_voice` had, in a milder,
 //! self-service form: `store/dms.rs`'s `BLOCKED_DENY` stops a new call being
 //! started or joined in either direction, but nothing ended one already under

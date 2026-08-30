@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the incoming-call notification seam: a non-Android platform
 /// never touches the channel, and Android forwards exactly the call id and
 /// caller name it was given.

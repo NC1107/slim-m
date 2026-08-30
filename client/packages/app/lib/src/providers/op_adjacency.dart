@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The `+1` adjacency test a live op frame is judged by, shared by the message
 /// op stream (`message_ops_sync.dart`, `sync_controller.dart`) and the canvas
 /// op stream (`canvas_sync.dart`).

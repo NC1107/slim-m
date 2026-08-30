@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Generates the varied message bodies a seeding run sends.
 
 Every function takes an explicit `random.Random` rather than the module-level

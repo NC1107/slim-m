@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the appearance choice: it must actually drive the theme, it must
 /// survive a restart, and an install with nothing stored must keep following
 /// the operating system exactly as it did before there was a control at all.

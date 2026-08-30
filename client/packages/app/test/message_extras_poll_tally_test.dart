@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A `poll.voted` broadcast refreshes everyone's tally, and the client merge
 /// behind it had no test. Two things must hold: the broadcast updates the vote
 /// counts but must not touch this viewer's own votedOption (per-viewer, never

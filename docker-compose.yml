@@ -1,9 +1,9 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # Production self-host example for slim-m: a small friend-group deployment.
 #
 # Four services:
-#   server     the slim-m home server (this repo's AGPL binary), embedded
+#   server     the slim-m home server (this repo's binary), embedded
 #              SQLite on a named volume, reachable only through Caddy.
 #   caddy      the only thing bound to 443. Terminates TLS automatically
 #              (Let's Encrypt) for the API domain and LiveKit's signaling

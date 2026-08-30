@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The inline suggestion list that sits above the composer while a `:`, `@` or
 /// `/` trigger is open.
 ///

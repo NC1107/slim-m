@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `GET /reports/history`'s merged feed: a resolved report or a
 /// `moderation_audit_log` entry, newest first. Split out of
 /// `models_moderation.dart` for the line budget.

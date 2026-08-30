@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The real faces every snapshot harness loads by hand.
 ///
 /// Split out of `ui_snapshot_support.dart` when the colour emoji lookup

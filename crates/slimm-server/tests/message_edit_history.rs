@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /channels/{id}/messages/{id}/history`: every version a message has
 //! held, oldest first, ending with its current content. The reconstruction of
 //! each version's "became live at" time is the load-bearing logic, so the

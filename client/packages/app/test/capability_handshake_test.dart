@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The capability handshake on the sign-in screen.
 ///
 /// slim-m's safety model is manual reporting plus blocking and nothing else,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Builds and rebuilds the tray icon's context menu, and routes its items to
 /// the window port, the running call, the caller's own presence, or the
 /// settings route.

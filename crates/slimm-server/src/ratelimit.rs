@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! In-process rate limiting.
 //!
 //! Every review of the auth work flagged the same gap: the expensive endpoints

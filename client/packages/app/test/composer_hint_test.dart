@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The composer's placeholder text, for the one channel kind whose name is
 /// genuinely empty: a thread (see ChannelScreen's `channelName`, `channel?.name
 /// ?? ''`), which reused the ordinary "Message #$channelName" hint and

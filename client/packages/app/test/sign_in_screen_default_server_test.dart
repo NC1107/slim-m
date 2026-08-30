@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the compiled-in official server collapsing the address field on
 /// sign-in: skipped entirely by default, revealed by "Use a different
 /// server", and never collapsed for any other address. Also covers the

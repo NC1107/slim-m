@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the three design constraints the what's-new sheet is built
 /// around: it shows once after an upgrade, never on a fresh install, and
 /// never again for a version already seen.

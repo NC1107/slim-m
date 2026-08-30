@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Remote cursors gliding between the ~80ms-apart frames the wire delivers,
 /// instead of stepping: the model's interpolation, the retarget that must
 /// continue from the in-flight position rather than jumping, and the painter

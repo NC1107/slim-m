@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A raw `fontSize:` literal that lands off [AppText]'s own scale is how the
 /// scale stops being a scale, one contributor at a time; a `FontWeight` past
 /// 600 is the same drift on the other axis.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `utcMinutesFromLocalTimeOfDay`/`localTimeOfDayFromUtcMinutes`
 /// (`quiet_hours_controller.dart`): the client-only conversion between this
 /// device's local wall clock and the UTC minutes the wire carries.

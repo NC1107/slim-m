@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The fixture the UI snapshot matrix renders: real fonts, a seeded session,
 /// a seeded local store, and a container wired like the app's.
 ///

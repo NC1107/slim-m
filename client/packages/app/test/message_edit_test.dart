@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the message row's inline edit: the body swaps for a pre-filled
 /// [MessageEditField], and saving and cancelling each report exactly once.
 ///

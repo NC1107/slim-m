@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A moderator denied `VIEW_CHANNEL` on one channel must not read its reports.
 //!
 //! The queue already filtered per channel, and already had a test for it - but

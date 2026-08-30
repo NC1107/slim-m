@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `ChannelRefresher` refreshes the channel and DM listings, hydrates each
 /// channel's read marker, and dedups a concurrent refresh into the one already
 /// running. None of that was tested: `sync_controller_race_test` drives the

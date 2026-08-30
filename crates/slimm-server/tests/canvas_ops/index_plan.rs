@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `canvas_ops` had no index reaching `created_at` at all until migration
 //! 0038, so the op-clock's restart seed and every pass of the sweep paid for
 //! a full table scan under the database's one write lock. Left to itself on

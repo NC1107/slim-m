@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// In-channel search: whether the field is open, and the last query's hits.
 ///
 /// This was `ChannelScreen`'s own [State] until the compact layout needed the

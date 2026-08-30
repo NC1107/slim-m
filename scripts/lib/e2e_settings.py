@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Personal settings and Space settings, which are two screens on purpose.
 
 The split is recent: one screen used to carry both, so a member with no

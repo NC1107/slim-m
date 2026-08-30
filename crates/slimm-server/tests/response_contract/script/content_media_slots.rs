@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Canvas media-slot calls for `content.rs`'s own `channel_calls`, a sibling
 //! module rather than folded into that already near-the-limit function -
 //! `content.rs` was 505 lines with this inline, over the 500-line hard cap.

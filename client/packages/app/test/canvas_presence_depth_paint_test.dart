@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether the grid, a sent-to-back tile and real ink actually composite in
 /// the order `canvas_presence_depth_test.dart`'s own structural test only
 /// infers from `Stack.children`'s list order.

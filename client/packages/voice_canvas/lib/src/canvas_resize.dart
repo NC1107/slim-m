@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The pure geometry behind dragging an image's resize handle: which corner
 /// anchors, how the box grows, and the two ceilings a drag must respect - a
 /// floor so an object can never shrink to nothing, and a copy of the

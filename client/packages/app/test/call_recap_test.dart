@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for [CallActivityTracker] and [CallRecap] in isolation: nothing
 /// here drives a [VoiceController] or a real session, only the arithmetic
 /// over a participant roster that a call recap is built from.

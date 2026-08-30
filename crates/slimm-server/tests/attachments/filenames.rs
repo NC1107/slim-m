@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! What an attacker-supplied filename can reach. It is the one piece of
 //! caller-controlled text that crosses upload, storage and a response
 //! header, so it is tested as one round trip rather than at either end.

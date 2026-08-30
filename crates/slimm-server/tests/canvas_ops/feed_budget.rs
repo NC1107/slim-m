@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The catch-up feed's page-byte budget, split out of `feed.rs` once these
 //! tests and their shared seed helpers pushed that file past the 500-line
 //! hard ceiling.

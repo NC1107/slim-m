@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for `TypingIndicator`: it renders every remote typist, but never
 /// the caller's own id, since the server fans a typist's own frame back to
 /// their own connections too (for a second device to show it).

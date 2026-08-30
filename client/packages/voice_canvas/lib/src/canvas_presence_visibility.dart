@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which camera bubbles are worth mounting a live video widget for.
 ///
 /// The Phase 5 spike found the canvas's real cliffs on viewport shape, not

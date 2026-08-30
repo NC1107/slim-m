@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Spacing, radii, control sizes and the two shadows this system has.
 ///
 /// Everything here is a closed set. The point of naming them is that a

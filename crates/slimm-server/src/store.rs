@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The persistence layer over one embedded SQLite database: the [`Store`]
 //! handle itself, the domain types shared across every feature submodule, and
 //! the handful of methods (account creation, liveness, live user ids) that do

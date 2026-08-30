@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Wiring `CanvasPane` -> `CanvasCallDock`'s call section: it appears only
 /// while this device is actually connected to a call in this exact channel,
 /// the same "own channel, own connection" gate `CanvasPresenceLayer`'s own

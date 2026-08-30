@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Two widgets that both build their text under a bare `DefaultTextStyle`
 /// rather than a `.merge`, so a family-less `AppText.*` style handed to
 /// either loses IBM Plex Sans silently rather than failing loudly.

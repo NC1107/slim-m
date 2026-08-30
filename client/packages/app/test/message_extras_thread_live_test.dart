@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `Event::ThreadUpdated`'s client-side half: it is what makes a thread
 /// appearing, or gaining a reply, visible to somebody already watching the
 /// parent channel with nobody reloading. See `message_extras_thread_test.dart`

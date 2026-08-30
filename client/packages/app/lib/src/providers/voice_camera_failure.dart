@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What to tell somebody whose camera would not turn on.
 ///
 /// Split out of `voice_controller.dart`, which `voice_state.dart`'s own doc

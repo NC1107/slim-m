@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The moderation report queue: filing, paging, and resolving a report.
 //!
 //! Split out of `safety` (which keeps the device list and blocking) to stay

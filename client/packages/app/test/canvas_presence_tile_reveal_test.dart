@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A presence tile's own lock/depth/hide row and resize grip, hidden until
 /// hovered (desktop), pressed once (touch, where there is no hover), or
 /// focused (keyboard) - report 3 in the backlog channel: "the buttons...

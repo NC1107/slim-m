@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: slimm_platform
 description: "Platform-facing seams: key storage, shortcuts, and context menus."
 publish_to: none

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A visual sign-off render of the canvas's own paint layers: real pixels,
 /// not a description of the code that produces them.
 ///

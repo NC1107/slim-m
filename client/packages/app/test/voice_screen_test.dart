@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the voice join preview's error handling: a failure this channel
 /// cannot retry its way out of must not offer a button that only fails again,
 /// and the one call controller's state must never leak across channels.

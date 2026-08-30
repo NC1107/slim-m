@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Regressions for the 2026-07-29 audit findings, gathered here rather than
 //! grown onto the existing suites past the line budget. Reports in a channel
 //! that cannot scope its own moderation (a DM, a deleted channel, a user

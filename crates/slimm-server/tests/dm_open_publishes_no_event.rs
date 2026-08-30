@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Whether opening a DM publishes any hub event at all - the answer a
 //! recipient's `SyncController` workaround (`sync_controller.dart`) depends
 //! on. `POST /channels` publishes `Event::ChannelCreated` in the same

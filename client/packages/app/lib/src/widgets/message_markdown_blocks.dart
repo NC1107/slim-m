@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Splitting an already-fence-free text run into structural markdown blocks:
 /// headings, block quotes and lists. Each is recognised a whole line at a
 /// time, since none of them can start except at the beginning of a line, and

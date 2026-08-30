@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas op stream: the single ordering authority every mutation -
 /// place, remove, clear, restore, move, reorder - writes into, and the paged
 /// catch-up feed a client reconciling after a drop reads it back through. A

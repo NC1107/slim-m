@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Bulk emoji upload from a `.zip` - backlog #137.
 ///
 /// One custom emoji per image inside the zip, named after its file stem

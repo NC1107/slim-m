@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Shared, persistent media-tile placement: decision 0010's reversal.
 //!
 //! The owner's own test was explicit - move a tile, leave, come back

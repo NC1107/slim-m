@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The AR-glasses interaction the owner asked for by name: a camera or
 /// screen-share tile you can drag anywhere in the canvas's own world space,
 /// resize with a grip, lock so a drawing tool reaches through it, or hide.

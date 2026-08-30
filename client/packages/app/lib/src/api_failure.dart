@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Turning a failed request into a sentence, in the one place both
 /// `runGuarded` and a bespoke catch clause can share it.
 ///

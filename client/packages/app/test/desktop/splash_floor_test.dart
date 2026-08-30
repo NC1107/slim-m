@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [awaitBootstrapWithSplashFloor]'s own timing: a floor on desktop, never
 /// added latency on top of a slow bootstrap, no floor at all off desktop, and
 /// - for the splash on/off preference - an explicit [Duration.zero] floor

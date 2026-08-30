@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The exact case that fooled a review pass into nearly filing a false
 /// layout bug: the floating dock (`canvas_pane_body.dart`'s canvas dock, and
 /// `voice_screen.dart`'s in-call dock) reads, in every capture harness

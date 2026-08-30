@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Two local media performance preferences that gate how much an inline
 /// attachment does on its own before you ask.
 ///

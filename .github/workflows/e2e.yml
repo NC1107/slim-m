@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: e2e
 #
 # scripts/e2e.sh stands up a real LiveKit SFU, the release server binary and a

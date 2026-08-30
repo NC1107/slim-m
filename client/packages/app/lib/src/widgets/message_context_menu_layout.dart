@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Where an open floating surface lands - originally split out of
 /// `message_context_menu.dart` to keep that file inside the review budget,
 /// now shared by every caller of `context_menu_region.dart` and by

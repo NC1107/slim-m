@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """The wiring that keeps schema/openapi.yaml's info.version bumped for us.
 
 test_openapi_version_matches_cargo.py asserts the two values agree. It says

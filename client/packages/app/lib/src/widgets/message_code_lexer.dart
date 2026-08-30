@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A tiny per-line lexer for a fenced code block's language label, mapping
 /// source text to [AppCodeRole] spans for [AppCodeBlock] to colour.
 ///

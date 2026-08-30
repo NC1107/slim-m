@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Joining a channel's voice room, and seeing who else already has.
 //!
 //! Most of these routes are almost entirely the check in front: the token

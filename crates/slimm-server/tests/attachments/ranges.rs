@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! HTTP `Range` on `GET /attachments/{id}`: a large download resumes and media
 //! seeks because the handler streams a requested byte range rather than the
 //! whole file. Every case pins one branch of the range parser and the mutation

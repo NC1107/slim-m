@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Two places that acted on a channel scope without fully asserting it.
 //!
 //! `update_channel` excluded DMs and not threads, so a thread's own channel

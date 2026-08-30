@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //
 // Which sound, if any, a decorated push should play - and the one rule that
 // overrides every other answer: a call already in progress must not be

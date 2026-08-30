@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The real shell, rendered at every resolution the product ships to.
 ///
 /// This is the matrix `design_system`'s golden matrix is not: that one renders

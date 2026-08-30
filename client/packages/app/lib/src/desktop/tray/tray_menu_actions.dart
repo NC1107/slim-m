@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which rows the tray/Dock menu shows, kept as one pure decision so the
 /// content stays as short as decision 0012 asks for - "a tray menu is not a
 /// settings screen" - without the ordering living only inside the widget

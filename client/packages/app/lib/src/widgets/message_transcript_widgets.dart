@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The presentational pieces the transcript composes but that carry no list
 /// logic of their own: the start-of-channel header, what stands in its place
 /// while there is still history above, what an empty list means, the one-shot

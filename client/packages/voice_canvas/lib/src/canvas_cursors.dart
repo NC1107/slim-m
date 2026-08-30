@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Remote pointer positions on the canvas: who, where, and how stale.
 ///
 /// A sibling of [CanvasDocument] rather than a part of it: a cursor is

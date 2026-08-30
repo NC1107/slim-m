@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Frame-parsing coverage for `voice.activity`: the live signal that closes
 /// `docs/IMPLIED-GAPS.md` #2's in-app half - a DM (or voice channel) call
 /// starting or ending while a bystander already has the app open.

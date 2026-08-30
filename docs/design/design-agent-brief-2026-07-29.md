@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 # Brief for the design agents (2026-07-29)
 
 Paste this into the Claude Design project. It says what shipped, what the

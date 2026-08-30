@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A DM's call, as a mode of that channel's pane rather than a route.
 ///
 /// Mirrors `canvas_pane.dart`'s `canvasOpenProvider`: opening a call swaps

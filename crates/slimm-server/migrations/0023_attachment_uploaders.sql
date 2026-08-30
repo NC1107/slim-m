@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Who may link an already-uploaded attachment to a message they are sending.
 --
 -- Before this table, `link_attachments` authorized nothing: its only

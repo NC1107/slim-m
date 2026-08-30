@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The local database: the client's single source of truth.
 ///
 /// The UI reads only from here, never from the network directly. Anything that

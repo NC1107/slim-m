@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The canvas object cap control on the Space performance screen: it shows
 /// the current cap, patches a new one, and states the estimated memory
 /// consequence of the chosen cap. Split from `performance_screen_test.dart`,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `presenceScreenRect` maps a tile's world rect to where it paints on screen -
 /// translate by the camera, then scale by zoom. Every presence bubble's
 /// position rides on it, so a swapped operation or an unscaled extent would

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """Unit coverage for the seeding run's corpus-status reporting.
 
 Only `_describe_corpus` is covered here: the rest of `seed_run.run` is an

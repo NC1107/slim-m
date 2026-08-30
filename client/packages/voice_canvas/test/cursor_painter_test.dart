@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [CursorPainter]: the glyph's contrast rim, and the label chip reading the
 /// caller's own type family rather than Flutter's platform default.
 ///

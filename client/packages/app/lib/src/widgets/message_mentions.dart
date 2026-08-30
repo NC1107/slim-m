@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Whether a message mentions a given username, for anything that needs the
 /// answer as a plain bool rather than as rendered chips - today, deciding a
 /// `mention` notification chime apart from an ordinary `group_message` one.

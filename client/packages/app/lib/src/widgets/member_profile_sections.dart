@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The sections a member profile composes from, split out of
 /// `member_profile.dart` when the moderation half took that file past the
 /// review budget.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Desktop push-to-talk: unmutes [VoiceController]'s microphone while the
 /// configured key is held, and re-mutes it on release.
 ///

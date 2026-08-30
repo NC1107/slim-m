@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// What a canvas surface holds: the spatial index, the camera, and the side
 /// table [CanvasScene] deliberately does not carry.
 ///

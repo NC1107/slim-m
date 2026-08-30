@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The first-time notice itself: shown once, the first time the window
 /// reopens after closing hid or minimised it rather than quitting.
 /// Persistent rather than a timed `SnackBar` - this app's own established

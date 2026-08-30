@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! An attachment's relationship to the message carrying it: what a send has
 //! to carry to be a message at all, and what happens to the file when that
 //! message is deleted.

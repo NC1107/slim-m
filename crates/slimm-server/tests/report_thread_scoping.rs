@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `channel_scopes_moderation` (`store/channels.rs`) treated a thread like a
 //! DM - opaque, unscoped - instead of resolving it to its parent channel the
 //! way every other permission check does. A moderator explicitly denied

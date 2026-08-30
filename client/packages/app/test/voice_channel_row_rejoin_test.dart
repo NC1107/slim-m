@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tapping the voice channel row already open, after a hang-up, must
 /// actually rejoin - reproducing the owner's report of landing on what
 /// reads as "the old voice lobby" on a click that should join directly.

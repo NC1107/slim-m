@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The predicates that gate a message's destructive actions - edit, delete,
 /// pin, report, block. The context-menu widget tests exercise them only
 /// through what the menu renders, never as a matrix, so the distinctions that

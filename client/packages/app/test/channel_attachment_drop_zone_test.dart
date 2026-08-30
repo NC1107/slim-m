@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Unit coverage for the composer's drop-target wiring: what counts as
 /// "attachments allowed here", and what a raw drop list turns into once
 /// [ComposerAttachmentDropTarget] is reached.

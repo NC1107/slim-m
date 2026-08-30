@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [SettingsSelectRow] changes its value two ways by width: a dropdown anchored
 /// to the row on desktop, the bottom sheet on a phone. Both reach the same
 /// [onChanged]; only the presentation differs.

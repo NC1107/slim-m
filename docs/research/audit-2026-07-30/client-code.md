@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
 ## Client code
 
 The client is the largest and least-gated part of the repository, and the shape of what the audit found reflects that.

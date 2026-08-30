@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A mention's username match has to agree with the client's own rendering,
 //! or a chip that looks like it worked wakes nobody: `channel_screen.dart`
 //! builds `knownUsernames` lowercased and `message_text.dart` matches a

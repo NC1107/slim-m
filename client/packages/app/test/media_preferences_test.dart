@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two media performance preferences: each defaults to what the app has
 /// always done (download on sight, autoplay gifs), a choice persists and
 /// restores, an unknown stored value degrades to the default, and only the

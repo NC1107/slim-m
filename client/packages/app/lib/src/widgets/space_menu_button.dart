@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail header's chevron: Space settings, plus channel creation
 /// (backlog item 55 - creation moved here from a header "+" that had no
 /// label explaining what it was for).

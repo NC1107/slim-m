@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Where a call participant's camera or screen-share tile sits on a channel's
 -- canvas, shared by every viewer - decision 0010's reversal of its own
 -- original call, which kept this per-viewer and ephemeral in client memory

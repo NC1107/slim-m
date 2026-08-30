@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the command palette itself: opening it (by key and by tap),
 /// grouped results, keyboard navigation, the channel/member/settings
 /// destinations it opens, and that closing it restores focus.

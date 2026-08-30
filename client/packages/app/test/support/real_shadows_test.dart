@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Proves `withRealShadows` actually produces a blurred shadow (a gradient,
 /// not a hard step) and always leaves `debugDisableShadows` restored, by
 /// sampling real rendered pixels rather than trusting the mechanism by

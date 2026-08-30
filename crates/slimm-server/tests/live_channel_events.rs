@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end coverage for `ChannelCreated`, `ChannelUpdated`, `ChannelDeleted`
 //! and `OverwriteChanged`, half of the 2026-07-30 audit's fan-out finding that
 //! was missing entirely (`hub.publish` never appeared in `http/channels.rs` or

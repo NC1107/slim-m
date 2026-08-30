@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Frame-parsing coverage for `ThreadUpdated`: the live signal that closes
 /// the gap `docs/decisions/0005-threads.md` named - a thread appearing, or
 /// gaining a reply, while a bystander already has the parent channel open.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Threads, split out of `content.rs` when that file crossed the 500-line
 //! hard ceiling: open one on the channel's own message, resolve it back to
 //! its parent, send a reply so `thread_reply_count`/`thread_last_reply_at`

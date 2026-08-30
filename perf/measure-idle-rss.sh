@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Measures idle and peak RSS of the slimm-server release binary on both
 # libcs that matter: the host's glibc, and the musl build every release
 # actually ships, via the committed docker/server.Dockerfile.

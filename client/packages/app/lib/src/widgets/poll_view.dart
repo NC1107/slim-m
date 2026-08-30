@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Renders a poll message: the question, each option with its live tally,
 /// and a tap to vote. Single-choice only - the server accepts exactly one
 /// vote per user per poll (a second vote replaces the first, it never adds

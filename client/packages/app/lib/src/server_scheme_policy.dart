@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one rule every entry point that commits to a server address must
 /// apply: plain http is only for a network that never crosses the internet.
 library;

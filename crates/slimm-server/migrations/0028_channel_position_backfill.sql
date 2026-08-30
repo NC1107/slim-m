@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: AGPL-3.0-only
+-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 -- Backfills `channels.position`, dormant since 0002_core_schema.sql: the
 -- column has existed on every deployment from the start, defaulted to 0 on
 -- every row, and `Store::list_channels`'s own `ORDER BY position, created_at`

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Prompts for a report's reason before filing one: the one piece of free
 /// text `POST /reports` requires alongside what is being reported.
 library;

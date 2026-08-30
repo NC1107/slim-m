@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A real render of [StartupScreen] at the one size it now actually launches
 /// into: [DesktopWindowShell.splashWindowSize], the small splash window
 /// decision 0012's superseding section describes - so a change here can be

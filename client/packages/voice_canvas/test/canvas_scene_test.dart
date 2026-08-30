@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

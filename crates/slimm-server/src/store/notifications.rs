@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Persistence for the one durable notification choice: how much of a
 //! channel's traffic is worth waking a device for. Read singly by
 //! `GET /push/preference` and in batch by push fan-out

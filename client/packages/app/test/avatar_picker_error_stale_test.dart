@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `_changePicture` (`avatar_settings_section.dart`) calls `setActionError`
 /// when the native picker throws, but nothing clears that error at the
 /// start of the *next* attempt the way `composer.dart`'s own

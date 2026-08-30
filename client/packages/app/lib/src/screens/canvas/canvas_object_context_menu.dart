@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A right-click on the canvas: over an object, bring to front/send to
 /// back/delete - the same three verbs the overflow menu already offers a
 /// selection, reached directly at the object under the cursor instead of a

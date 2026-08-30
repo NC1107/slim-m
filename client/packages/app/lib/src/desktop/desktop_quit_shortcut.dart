@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A second, independent route to the same quit [WindowMenuButton] offers:
 /// a global Ctrl+Q, reachable with no tray, with nothing needing focus, and
 /// with no title bar to open first - the redundancy is deliberate, the same

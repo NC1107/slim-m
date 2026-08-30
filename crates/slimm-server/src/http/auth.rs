@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Auth HTTP routes: register, login, refresh, connect-ticket, and logout.
 //!
 //! The durable mechanics live in [`crate::store`] and [`crate::auth`]; this

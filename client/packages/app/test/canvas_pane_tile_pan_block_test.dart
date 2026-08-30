@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A middle-mouse-button grab-pan started on top of an unlocked presence
 /// tile: `canvas_surface_pan_test.dart` proves it works over bare canvas,
 /// but `CanvasPresenceLayer` paints its own opaque `GestureDetector` above

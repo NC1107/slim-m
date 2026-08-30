@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail has two separate settings entry points now, and each must reach
 /// only its own screen: the Space menu (the chevron beside the Space name)
 /// reaches Space settings, and the footer's settings control reaches

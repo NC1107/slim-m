@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A handful of call sites reach for a raw `TextButton`/`FilledButton`/
 /// `IconButton` instead of `AppButton`/`AppIconButton`, which draw
 /// [AppTokens.focusRing] themselves. Without the theme-level fix this guards,

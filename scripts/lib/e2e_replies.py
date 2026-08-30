@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 """A reply's quote, rendered live on both sides, and what an honest failure
 looks like once its parent is gone.
 

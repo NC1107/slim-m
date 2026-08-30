@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// A hand-rolled canonical op-log generator and an independent oracle, built
 /// for `canvas_convergence_property_test.dart` rather than for production.
 ///

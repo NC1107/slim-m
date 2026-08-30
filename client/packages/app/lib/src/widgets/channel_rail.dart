@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The left rail: server header, search, direct messages, every channel
 /// category, and the signed-in user's footer bar.
 library;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Rendering a message body: fenced code, headings, quotes, lists, inline
 /// markdown, mentions, and the deployment's own `:shortcode:` emoji.
 ///

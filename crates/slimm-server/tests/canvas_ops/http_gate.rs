@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! The route wired end to end: gating, query validation, and a real
 //! placement over HTTP reaching the feed over HTTP.
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Running a write that can fail, and saying so if it does.
 ///
 /// Twenty-six places wrote the same six lines: set busy, await the call,

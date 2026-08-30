@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the features driven by the live event stream that
 /// `SyncController` now broadcasts to anyone watching `liveEventsProvider`:
 /// pins and typing. Both are tested against a fake event stream rather than

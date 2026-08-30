@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Hanging up and joining again before the hang-up has finished unwinding.
 ///
 /// `VoiceController.join` has carried a generation guard since PR #487, so an

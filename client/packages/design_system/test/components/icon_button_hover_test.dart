@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// `AppIconButton`'s own hover fill (`surfaceRaised`) used to paint
 /// unconditionally, which visibly clashed when an enclosing control (a
 /// channel row's kebab, say) already carries its own hover/selection tint -

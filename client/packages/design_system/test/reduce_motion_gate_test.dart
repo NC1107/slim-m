@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Four Flutter-owned widgets each drive their own entrance or expansion
 /// with a plain `AnimationController` the framework creates internally, keyed
 /// to the platform's own reduce-motion accessibility feature - never to this

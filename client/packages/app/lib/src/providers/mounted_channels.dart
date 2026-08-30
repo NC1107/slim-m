@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Which channel ids are genuinely open right now - the piece
 /// `retention_policy.dart` names as missing before its reachability rule can
 /// drive a real sweep: `channelHistoryProvider` is per-channel and never

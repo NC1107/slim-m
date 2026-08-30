@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Widget-level tests for the composer's attachment preview: a pick has to
 /// stay on screen from the moment it happens, through upload, to whichever
 /// of ready or failed resolves.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! User profile routes: the caller's own account (`/me`), public profiles
 //! (`/users`), and the deployment's member list (`/members`).
 //!

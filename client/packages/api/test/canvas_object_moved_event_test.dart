@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// [ServerEvent.parse] for `canvas.object.moved`, and [CanvasOp.fromJson]'s
 /// `move` case in the catch-up feed - the two wire shapes a repositioned
 /// canvas object can arrive through.

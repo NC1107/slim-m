@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Role management: `GET /roles`, `DELETE /roles/{id}`, plus the editor and
 /// assignment sheets this screen opens. Requires MANAGE_ROLES.
 library;

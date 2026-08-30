@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// How a settings or administration screen is presented.
 ///
 /// On a phone it is the whole window, because a phone has room for one thing

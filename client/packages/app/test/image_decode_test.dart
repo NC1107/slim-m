@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// decodeEdge: real pixels from logical size, and the floor that keeps a
 /// window-scaled desktop from starving a small image's decode.
 library;

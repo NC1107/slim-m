@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Turning a trigger into a ranked list of things to insert.
 ///
 /// Pure, and separate from the overlay that draws it, for the same reason

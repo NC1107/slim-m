@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Pure decision logic for which chime (if any) an event deserves, kept
 /// apart from the Riverpod and stream wiring in
 /// `notification_sound_controller.dart` so it is testable with no provider
