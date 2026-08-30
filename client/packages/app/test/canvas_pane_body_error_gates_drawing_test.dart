@@ -35,6 +35,7 @@ Widget _pane(CanvasDocument document, {required String? error}) =>
               document: document,
               onClear: () async {},
               onPasteImage: () {},
+              onPasteImageAt: (_) {},
               onRecenter: () {},
               error: error,
               onDismissError: () {},

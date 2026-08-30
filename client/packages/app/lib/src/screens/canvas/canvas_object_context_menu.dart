@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-/// A right-click over a canvas object: bring to front, send to back, delete
-/// - the same three verbs the overflow menu already offers a selection,
-/// reached directly at the object under the cursor instead of a
-/// select-then-open-the-overflow-menu round trip.
+/// A right-click on the canvas: over an object, bring to front/send to
+/// back/delete - the same three verbs the overflow menu already offers a
+/// selection, reached directly at the object under the cursor instead of a
+/// select-then-open-the-overflow-menu round trip. Over empty space, a
+/// smaller menu of paste-image, add-note and recenter, each anchored (or
+/// placed) at the exact point clicked - see this file's own doc, below,
+/// for why that second menu exists now when it once deliberately did not.
 ///
 /// **Why not `ContextMenuRegion`.** That widget wraps one static child as
 /// the gesture target and opens on tap-DOWN, both wrong here: a canvas
@@ -38,14 +41,32 @@
 /// affect an ordinary left-button draw, erase or select gesture on the
 /// surface beneath it.
 ///
-/// **Empty canvas does nothing**, deliberately: there is no established
-/// "act on this exact point" set of canvas-wide actions to justify a menu
-/// where one was never asked for, the toolbar's overflow menu already
-/// reaches everything canvas-wide (paste image, recenter, clear) from one
-/// place regardless of where the cursor happens to be, and popping a menu
-/// from a click that turns out to have been the start of a pan is worse
-/// than popping none. Revisiting this (a paste-at-cursor item, say) is real
-/// future work, not something this file backs into.
+/// **Empty canvas used to do nothing, deliberately - overridden 2026-08-29
+/// on direct owner request** ("no basic right click on canvas for quick
+/// actions"). The reasoning below was real at the time and is kept rather
+/// than deleted, since the owner's ask supersedes it rather than proving it
+/// wrong: there genuinely was no established "act on this exact point" set
+/// of canvas-wide actions, and the toolbar's overflow menu genuinely already
+/// reached everything canvas-wide from one place regardless of the cursor.
+/// What changed is not that reasoning, only the answer to whether reaching
+/// those same actions *at the cursor* is worth a menu - the owner decided it
+/// is. The three items chosen (paste image, add note, recenter) are exactly
+/// the overflow menu's own always-available, non-destructive verbs, placed
+/// or anchored at the clicked point instead of the view's centre or nowhere
+/// in particular; "Clear canvas" is deliberately excluded even though the
+/// overflow menu carries it too, both because it needs MANAGE_CANVAS (the
+/// two other menus this file already builds gate nothing so this new one
+/// would be the first to need a permission check) and because a destructive,
+/// confirm-gated action sitting one row from "Paste image" in a menu that
+/// opens on every stray right-click is a bad adjacency to introduce - a
+/// manager clearing the canvas is already one deliberate trip to the
+/// overflow menu away, which is exactly the friction `CanvasOverflowMenu`'s
+/// own doc says that action is supposed to keep. The same tap-up gesture
+/// arena and hit-test-first ordering below is what a pan-in-progress and an
+/// object-vs-empty-space right-click were already immune to; opening a
+/// second menu shape from the same resolved-to-nothing hit test adds no new
+/// gesture surface, so every claim in this file about drags and semantics
+/// still holds for it unchanged.
 ///
 /// **Deliberately duplicated with the overflow menu's own selection-gated
 /// items, not moved.** Touch has no right-click at all, so the overflow
@@ -127,6 +148,9 @@ class CanvasObjectContextMenu extends StatefulWidget {
     required this.onBringToFront,
     required this.onSendToBack,
     required this.onDeleteSelected,
+    required this.onPasteImageAt,
+    required this.onAddNoteAt,
+    required this.onRecenter,
   });
 
   final CanvasDocument document;
@@ -147,6 +171,21 @@ class CanvasObjectContextMenu extends StatefulWidget {
   final ValueChanged<String> onSendToBack;
   final ValueChanged<String> onDeleteSelected;
 
+  /// The empty-space menu's "Paste image" item - `CanvasImagePaste.pasteAt`,
+  /// the same clipboard-image pipeline the overflow menu's "Paste image"
+  /// runs, aimed at the clicked point instead of the view's centre.
+  final ValueChanged<Offset> onPasteImageAt;
+
+  /// The empty-space menu's "Add note" item - the exact callback
+  /// `CanvasSurface.onNotePlace` already is, so this is the same note-sheet
+  /// flow a tap with the Note tool active produces, just reached without
+  /// switching tools first.
+  final ValueChanged<Offset> onAddNoteAt;
+
+  /// The empty-space menu's "Recenter view" item - the pane's own
+  /// always-available camera reset, identical to the overflow menu's copy.
+  final VoidCallback onRecenter;
+
   @override
   State<CanvasObjectContextMenu> createState() =>
       _CanvasObjectContextMenuState();
@@ -156,6 +195,12 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
   final _controller = OverlayPortalController();
   Offset _anchor = Offset.zero;
   String? _target;
+
+  /// Non-null exactly while the open overlay is the empty-space menu rather
+  /// than the object one - the world point a paste or a note lands at once
+  /// its item is picked. `_target` and this are never both non-null: every
+  /// path that sets one clears the other first.
+  Offset? _emptySpaceWorld;
 
   @override
   void initState() {
@@ -194,9 +239,18 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
     );
   }
 
+  /// Hit-test decides which menu this click opens, never both: an object
+  /// under the cursor always wins, and only a genuine miss - the same
+  /// "nothing here" result that used to end this gesture with no menu at
+  /// all - opens the empty-space one instead.
   void _onSecondaryTapUp(TapUpDetails details) {
-    final id = _hitTest(_toWorld(details.localPosition));
-    if (id != null) _openFor(id, pointerGlobal: details.globalPosition);
+    final world = _toWorld(details.localPosition);
+    final id = _hitTest(world);
+    if (id != null) {
+      _openFor(id, pointerGlobal: details.globalPosition);
+    } else {
+      _openEmptySpace(world, details.globalPosition);
+    }
   }
 
   void _openFor(String id, {required Offset? pointerGlobal}) {
@@ -204,7 +258,23 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
     widget.onToolChanged(CanvasTool.select);
     setState(() {
       _target = id;
+      _emptySpaceWorld = null;
       _anchor = _anchorOffset(id, pointerGlobal);
+    });
+    _controller.show();
+  }
+
+  /// The empty-space menu always has a real pointer position behind it -
+  /// unlike [_openFor], nothing reaches this without a right-click already
+  /// in hand - so the anchor is a plain global-to-local conversion, the same
+  /// one [_anchorOffset]'s own pointer branch performs for the object menu.
+  void _openEmptySpace(Offset world, Offset pointerGlobal) {
+    final overlayObject = Overlay.of(context).context.findRenderObject();
+    final overlay = overlayObject is RenderBox ? overlayObject : null;
+    setState(() {
+      _target = null;
+      _emptySpaceWorld = world;
+      _anchor = overlay?.globalToLocal(pointerGlobal) ?? Offset.zero;
     });
     _controller.show();
   }
@@ -253,6 +323,23 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
     if (id != null) widget.onDeleteSelected(id);
   }
 
+  void _pasteImage() {
+    final world = _emptySpaceWorld;
+    _close();
+    if (world != null) widget.onPasteImageAt(world);
+  }
+
+  void _addNote() {
+    final world = _emptySpaceWorld;
+    _close();
+    if (world != null) widget.onAddNoteAt(world);
+  }
+
+  void _recenter() {
+    _close();
+    widget.onRecenter();
+  }
+
   @override
   Widget build(BuildContext context) {
     return OverlayPortal(
@@ -269,27 +356,7 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
             onTapOutside: (_) => _close(),
             child: ContextMenuKeyboardScope(
               onDismiss: _close,
-              child: AppMenu(
-                width: 200,
-                children: [
-                  AppMenuItem(
-                    label: 'Bring to front',
-                    leading: AppIcons.bringToFront,
-                    onTap: _bringToFront,
-                  ),
-                  AppMenuItem(
-                    label: 'Send to back',
-                    leading: AppIcons.sendToBack,
-                    onTap: _sendToBack,
-                  ),
-                  AppMenuItem(
-                    label: 'Delete',
-                    leading: AppIcons.delete,
-                    tone: AppMenuItemTone.danger,
-                    onTap: _delete,
-                  ),
-                ],
-              ),
+              child: _target != null ? _objectMenu() : _emptySpaceMenu(),
             ),
           ),
         ),
@@ -302,6 +369,52 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
         excludeFromSemantics: true,
         child: const SizedBox.expand(),
       ),
+    );
+  }
+
+  Widget _objectMenu() {
+    return AppMenu(
+      width: 200,
+      children: [
+        AppMenuItem(
+          label: 'Bring to front',
+          leading: AppIcons.bringToFront,
+          onTap: _bringToFront,
+        ),
+        AppMenuItem(
+          label: 'Send to back',
+          leading: AppIcons.sendToBack,
+          onTap: _sendToBack,
+        ),
+        AppMenuItem(
+          label: 'Delete',
+          leading: AppIcons.delete,
+          tone: AppMenuItemTone.danger,
+          onTap: _delete,
+        ),
+      ],
+    );
+  }
+
+  /// Deliberately not the object menu's three items plus these three - see
+  /// this file's own library doc for why "Clear canvas" specifically stays
+  /// out even though the overflow menu offers it too.
+  Widget _emptySpaceMenu() {
+    return AppMenu(
+      width: 200,
+      children: [
+        AppMenuItem(
+          label: 'Paste image',
+          leading: AppIcons.clipboardPaste,
+          onTap: _pasteImage,
+        ),
+        AppMenuItem(label: 'Add note', leading: AppIcons.note, onTap: _addNote),
+        AppMenuItem(
+          label: 'Recenter view',
+          leading: AppIcons.recenter,
+          onTap: _recenter,
+        ),
+      ],
     );
   }
 }

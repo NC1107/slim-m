@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-/// [CanvasObjectContextMenu]: what a right-click resolves to, why a drag
-/// past the tap slop never opens it, ownership gating, and the
-/// [CanvasObjectMenuRequests] route a screen reader or keyboard reaches it
-/// through instead of a mouse.
+/// [CanvasObjectContextMenu]: what a right-click resolves to (an object's
+/// own menu, or the empty-space menu once no object is hit), why a drag
+/// past the tap slop never opens either, ownership gating, and the
+/// [CanvasObjectMenuRequests] route a screen reader or keyboard reaches the
+/// object menu through instead of a mouse.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -45,6 +46,9 @@ class _Harness {
   final List<String> bringToFront = [];
   final List<String> sendToBack = [];
   final List<String> deleted = [];
+  final List<Offset> pastedAt = [];
+  final List<Offset> notedAt = [];
+  int recentered = 0;
 
   Widget build() => MaterialApp(
     theme: buildTheme(Brightness.dark, AppTokens.dark),
@@ -61,6 +65,9 @@ class _Harness {
           onBringToFront: bringToFront.add,
           onSendToBack: sendToBack.add,
           onDeleteSelected: deleted.add,
+          onPasteImageAt: pastedAt.add,
+          onAddNoteAt: notedAt.add,
+          onRecenter: () => recentered++,
         ),
       ),
     ),
@@ -118,7 +125,118 @@ void main() {
     );
   });
 
-  testWidgets('right-clicking empty canvas opens nothing', (tester) async {
+  testWidgets(
+    'right-clicking empty canvas opens the space menu, not the object menu',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final harness = _Harness(
+        document: document,
+        requests: CanvasObjectMenuRequests(),
+      );
+      await tester.pumpWidget(harness.build());
+
+      await tester.tapAt(const Offset(120, 120), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bring to front'), findsNothing);
+      expect(find.text('Paste image'), findsOneWidget);
+      expect(find.text('Add note'), findsOneWidget);
+      expect(find.text('Recenter view'), findsOneWidget);
+      expect(document.selectedObjectId.value, isNull);
+      expect(harness.toolChanges, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'the space menu never appears alongside the object menu, an object hit '
+    'always wins',
+    (tester) async {
+      final document = CanvasDocument()
+        ..applyPlaced(_shape('a', authorId: 'me'));
+      addTearDown(document.dispose);
+      final harness = _Harness(
+        document: document,
+        requests: CanvasObjectMenuRequests(),
+      );
+      await tester.pumpWidget(harness.build());
+
+      await tester.tapAt(const Offset(120, 120), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bring to front'), findsOneWidget);
+      expect(find.text('Paste image'), findsNothing);
+      expect(find.text('Add note'), findsNothing);
+      expect(find.text('Recenter view'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the space menu never offers Clear canvas, even with MANAGE_CANVAS',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final harness = _Harness(
+        document: document,
+        requests: CanvasObjectMenuRequests(),
+        canManage: true,
+      );
+      await tester.pumpWidget(harness.build());
+
+      await tester.tapAt(const Offset(120, 120), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clear canvas'), findsNothing);
+    },
+  );
+
+  testWidgets('picking Paste image in the space menu pastes at the clicked '
+      'world point', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final harness = _Harness(
+      document: document,
+      requests: CanvasObjectMenuRequests(),
+    );
+    await tester.pumpWidget(harness.build());
+
+    await tester.tapAt(const Offset(120, 140), buttons: kSecondaryButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Paste image'));
+    await tester.pumpAndSettle();
+
+    expect(harness.pastedAt, [const Offset(120, 140)]);
+    expect(harness.notedAt, isEmpty);
+    expect(harness.recentered, 0);
+    expect(
+      find.text('Paste image'),
+      findsNothing,
+      reason: 'picking an item must close the menu',
+    );
+  });
+
+  testWidgets('picking Add note in the space menu places a note at the '
+      'clicked world point', (tester) async {
+    final document = CanvasDocument();
+    addTearDown(document.dispose);
+    final harness = _Harness(
+      document: document,
+      requests: CanvasObjectMenuRequests(),
+    );
+    await tester.pumpWidget(harness.build());
+
+    await tester.tapAt(const Offset(150, 90), buttons: kSecondaryButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add note'));
+    await tester.pumpAndSettle();
+
+    expect(harness.notedAt, [const Offset(150, 90)]);
+    expect(harness.pastedAt, isEmpty);
+  });
+
+  testWidgets('picking Recenter view in the space menu recenters the view', (
+    tester,
+  ) async {
     final document = CanvasDocument();
     addTearDown(document.dispose);
     final harness = _Harness(
@@ -129,11 +247,46 @@ void main() {
 
     await tester.tapAt(const Offset(120, 120), buttons: kSecondaryButton);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Recenter view'));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Bring to front'), findsNothing);
-    expect(document.selectedObjectId.value, isNull);
-    expect(harness.toolChanges, isEmpty);
+    expect(harness.recentered, 1);
+    expect(harness.pastedAt, isEmpty);
+    expect(harness.notedAt, isEmpty);
   });
+
+  /// The regression this whole feature could most easily reintroduce: a
+  /// right-drag pan on empty canvas must stay a pan, never popping the new
+  /// space menu behind it - the identical property the object menu's own
+  /// drag test already proves for a right-drag over an object.
+  testWidgets(
+    'a right-button drag past the tap slop over empty canvas never opens '
+    'the space menu',
+    (tester) async {
+      final document = CanvasDocument();
+      addTearDown(document.dispose);
+      final harness = _Harness(
+        document: document,
+        requests: CanvasObjectMenuRequests(),
+      );
+      await tester.pumpWidget(harness.build());
+
+      final gesture = await tester.startGesture(
+        const Offset(120, 120),
+        buttons: kSecondaryButton,
+      );
+      await gesture.moveTo(const Offset(120, 220));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Paste image'), findsNothing);
+      expect(find.text('Add note'), findsNothing);
+      expect(find.text('Recenter view'), findsNothing);
+      expect(harness.pastedAt, isEmpty);
+      expect(harness.notedAt, isEmpty);
+      expect(harness.recentered, 0);
+    },
+  );
 
   testWidgets(
     "somebody else's object stays out of reach without MANAGE_CANVAS",

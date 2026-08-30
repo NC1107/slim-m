@@ -42,6 +42,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.document,
     required this.onClear,
     required this.onPasteImage,
+    required this.onPasteImageAt,
     required this.onRecenter,
     required this.error,
     required this.onDismissError,
@@ -96,6 +97,12 @@ class CanvasPaneBody extends StatefulWidget {
   /// fallback that works on every platform, the same shape the composer's
   /// own "+" sheet row already is.
   final VoidCallback onPasteImage;
+
+  /// The empty-canvas right-click menu's own "Paste image" item - the same
+  /// pipeline as [onPasteImage], aimed at the clicked world point instead of
+  /// the view's centre. See `CanvasObjectContextMenu`'s own doc for why that
+  /// menu exists now.
+  final ValueChanged<Offset> onPasteImageAt;
 
   /// The toolbar's "Recenter view" action, always available - see
   /// `CanvasOverflowMenu`'s own doc for the gap this closes.
@@ -421,6 +428,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onBringToFront: widget.onBringToFront,
           onSendToBack: widget.onSendToBack,
           onDeleteSelected: widget.onDeleteSelected,
+          onPasteImageAt: widget.onPasteImageAt,
+          onAddNoteAt: widget.onNotePlace,
+          onRecenter: widget.onRecenter,
         ),
         CanvasSelectionSemantics(
           document: widget.document,

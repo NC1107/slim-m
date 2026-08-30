@@ -194,6 +194,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           document: _document,
           onClear: _onClear,
           onPasteImage: () => unawaited(_imagePaste.pasteFromButton()),
+          onPasteImageAt: (world) => unawaited(_imagePaste.pasteAt(world)),
           onRecenter: _onRecenter,
           error: engineState.error,
           onDismissError: () => _engine.reportError(null),
