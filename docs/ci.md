@@ -789,9 +789,13 @@ The next run past that fix got further and hit the identical shape twice more, e
 `librsvg2-common` (confirmed against Ubuntu's own package-contents search for noble/amd64) provides the missing SVG loader; added to both `flatpak-ci.yml`'s and `release.yml`'s `build flatpak` steps, since `release.yml`'s own flatpak build had never gotten far enough to hit this either.
 `packaging/flatpak/README.md`'s sixth-defect section and its follow-up section frame all three real defects here (the appindicator soname, the libdir default, this icon loader) as one pattern: the build host leaking into the result in places the sandbox does not cover.
 
+One more failure after that was this workflow's own bug, not the manifest's: `flatpak-builder --repo=dist/flatpak-repo` failed with `Creating repo: mkdirat: No such file or directory`, because nothing in `flatpak-ci.yml` creates `dist/` first.
+`release.yml`'s own flatpak step never hits this, because its earlier "stage portable tarball" step already runs `mkdir -p dist` for the tarball; this workflow has no such step, so it needs its own `mkdir -p dist`.
+Fixed directly rather than documented as a manifest defect, since it is not one.
+
 ### What remains unverified until the fix runs for real
 
-Three fix commits landed in the same PR that introduced this workflow, each addressing exactly what the previous run's own log showed; that is what the run linked from the PR confirms or does not.
+Four fix commits landed in the same PR that introduced this workflow (three manifest defects plus this workflow's own missing `mkdir`), each addressing exactly what the previous run's own log showed; that is what the run linked from the PR confirms or does not.
 Once it is green, the build itself (the harder half of this check, and the half that just proved three times over that it can catch a real defect) is confirmed for this exact `flatpak-builder`/CMake/meson/sandbox/runner combination.
 Still unconfirmed even after a green build: the launch check's own assertions past that point.
 `flatpak-builder` was not available locally while writing the launch-check logic, so the `124`-vs-any-other-nonzero-exit split (see above) is reasoned from documented `timeout` and `flatpak run` behavior, not confirmed against a live launch of this bundle.

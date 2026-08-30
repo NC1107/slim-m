@@ -88,6 +88,7 @@ jobs:
       - name: build flatpak
         run: |
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils librsvg2-common
+          mkdir -p dist
           flatpak remote-add --user --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
           flatpak-builder --user --install-deps-from=flathub --force-clean \
