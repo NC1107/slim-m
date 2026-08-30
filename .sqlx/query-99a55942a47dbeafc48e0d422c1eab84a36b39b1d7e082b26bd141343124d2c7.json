@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM user_notes WHERE author_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "99a55942a47dbeafc48e0d422c1eab84a36b39b1d7e082b26bd141343124d2c7"
+}

@@ -44,6 +44,7 @@ import '../routing/routes.dart';
 import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
+import 'member_note_sheet.dart';
 import 'member_profile_popover.dart';
 import 'member_profile_sections.dart';
 import 'member_roles_sheet.dart';
@@ -386,6 +387,12 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
                   profile.username;
             },
           ),
+        MemberNoteMenuItem(
+          host: host,
+          subjectId: profile.id,
+          subjectName: profile.displayName,
+          onDone: widget.onDone,
+        ),
       ],
 
       if (showModeration) ...[

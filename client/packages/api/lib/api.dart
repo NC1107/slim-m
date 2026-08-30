@@ -86,5 +86,5 @@ export 'src/events.dart'
         VoiceActivityChanged,
         protocolVersion;
 export 'src/exceptions.dart';
-export 'src/limits.dart' show kMessageMaxChars;
+export 'src/limits.dart' show kMessageMaxChars, kUserNoteMaxChars;
 export 'src/models.dart';

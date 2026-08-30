@@ -115,6 +115,18 @@ Future<void> _joinShared(
   await tester.pump();
 }
 
+/// The default test window (800x600) is shorter than the call section plus
+/// the moderation section plus the private-note row can fit without
+/// scrolling; a real desktop window is taller, and `AnchoredMemberPopover`
+/// clamps and scrolls its own content, so this is a test-harness fix rather
+/// than production behavior changing. `_harness` pumps `MemberProfileBody`
+/// directly, bypassing that popover, so it needs the room itself.
+void _giveDesktopMenuRoom(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 Widget _harness(ProviderContainer container) => reducedMotionApp(
   container: container,
   child: MemberProfileBody(
@@ -148,6 +160,7 @@ void main() {
     'the base bit alone offers the deployment-wide siblings but not eject, '
     'when this channel denies it',
     (tester) async {
+      _giveDesktopMenuRoom(tester);
       final wired = _wire(
         basePermissions: Perm.kickMembers | Perm.banMembers,
         channelPermissions: 0,

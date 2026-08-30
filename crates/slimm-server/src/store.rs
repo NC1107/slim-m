@@ -66,6 +66,7 @@ mod space;
 mod thread_listing;
 mod threads;
 mod timeouts;
+mod user_notes;
 mod users;
 
 pub use account_deletion::DeleteAccountError;
@@ -119,6 +120,7 @@ pub use threads::{
     MAX_THREADS_PER_CHANNEL, OpenThreadError, OpenedThread, ThreadParent, ThreadSummary,
 };
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
+pub use user_notes::UserNote;
 
 /// Largest number of ids to bind into one `IN (...)` list, for the batched
 /// reads that build a variable-length query. Well under SQLite's default

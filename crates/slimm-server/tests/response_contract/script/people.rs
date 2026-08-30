@@ -69,6 +69,17 @@ pub(super) async fn safety_calls(c: &mut Contract, root: &str, bob_token: &str, 
     )
     .await;
 
+    c.json(
+        "putUserNote",
+        "PUT",
+        &format!("/users/{bob_id}/note"),
+        root,
+        json!({ "body": "keep an eye on this one" }),
+    )
+    .await;
+    c.get("getUserNote", &format!("/users/{bob_id}/note"), root)
+        .await;
+
     c.bare("blockUser", "POST", &format!("/blocks/{bob_id}"), root)
         .await;
     c.get("listBlocks", "/blocks", root).await;

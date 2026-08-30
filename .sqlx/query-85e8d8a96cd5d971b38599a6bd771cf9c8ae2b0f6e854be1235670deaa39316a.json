@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT body AS \"body!\", created_at AS \"created_at!\",\n                      updated_at AS \"updated_at!\"\n               FROM user_notes WHERE author_id = ? AND subject_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "body!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "updated_at!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "85e8d8a96cd5d971b38599a6bd771cf9c8ae2b0f6e854be1235670deaa39316a"
+}
