@@ -52,6 +52,21 @@ url = "2"
 # version hold are both load-bearing; see docs/dependencies.md.
 ed25519-dalek = { version = "2.2", default-features = false, features = ["zeroize"] }
 
+[profile.dev]
+# Line tables, not full DWARF. This crate builds 154 integration test files
+# into 154 separate binaries, each statically linking the whole crate and its
+# dependency tree, and measured on this tree full debug info was 78% of every
+# one of them: a single test binary was 233 MB, and 52 MB once stripped. That
+# put target/ at 84 GB, which is paid again in link time on every
+# `cargo test --all` and again per agent worktree.
+#
+# `line-tables-only` keeps the file and line in a panic backtrace, which is
+# what a failing test is actually read for. What it drops is variable and
+# type DWARF, which only an interactive debugger consumes; a developer who
+# wants that can build with `RUSTFLAGS=-Cdebuginfo=2` for the run they need
+# it, rather than every build paying for it forever.
+debug = "line-tables-only"
+
 [profile.release]
 # Small, fast self-host binary: the brief treats binary size as a budget.
 opt-level = "z"
