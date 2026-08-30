@@ -40,6 +40,13 @@ api.SlimmApi Function(Ref) _gatedGifApi(Completer<void> gate) =>
       session: ref.watch(sessionProvider),
       httpClient: MockClient((request) async {
         final path = request.url.path;
+        if (request.method == 'GET' && path == '/gifs/trending') {
+          return http.Response(
+            jsonEncode({'results': <Object?>[]}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
         if (request.method == 'GET' && path == '/gifs/search') {
           return http.Response(
             jsonEncode({

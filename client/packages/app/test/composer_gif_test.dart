@@ -27,15 +27,17 @@ final _gifBytes = base64Decode(
 );
 
 /// Answers `/version` with [gifSearchEnabled] and, unless [failOnGifRequest]
-/// is set, a full working GIF picker flow: one search result, its preview,
-/// and a select that stores it as an ordinary attachment. [failOnGifRequest]
-/// is the acceptance proof itself - a deployment reporting no provider must
-/// never have anything call one of these routes at all.
+/// is set, a full working GIF picker flow: one trending result shown on
+/// open, one search result, its preview, and a select that stores it as an
+/// ordinary attachment. [failOnGifRequest] is the acceptance proof itself -
+/// a deployment reporting no provider must never have anything call one of
+/// these routes at all.
 api.SlimmApi Function(Ref) _apiWithGifs({
   required bool gifSearchEnabled,
   bool failOnGifRequest = false,
   bool emptyResults = false,
   bool searchFails = false,
+  bool trendingFails = false,
 }) {
   return (ref) => api.SlimmApi(
     baseUrl: Uri.parse('http://localhost:8080'),
@@ -57,6 +59,29 @@ api.SlimmApi Function(Ref) _apiWithGifs({
       if (path.startsWith('/gifs/')) {
         if (failOnGifRequest) {
           fail('a request reached $path while gif search is off');
+        }
+        if (request.method == 'GET' && path == '/gifs/trending') {
+          if (trendingFails) {
+            return http.Response(
+              jsonEncode({'error': 'the provider could not be reached'}),
+              503,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'results': [
+                {
+                  'id': 'tok-trending',
+                  'title': 'a trending gif',
+                  'width': 200,
+                  'height': 150,
+                },
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
         }
         if (request.method == 'GET' && path == '/gifs/search') {
           if (searchFails) {
@@ -83,7 +108,9 @@ api.SlimmApi Function(Ref) _apiWithGifs({
             headers: {'content-type': 'application/json'},
           );
         }
-        if (request.method == 'GET' && path == '/gifs/preview/tok-1') {
+        if (request.method == 'GET' &&
+            (path == '/gifs/preview/tok-1' ||
+                path == '/gifs/preview/tok-trending')) {
           return http.Response.bytes(
             _gifBytes,
             200,
@@ -148,7 +175,7 @@ void main() {
   );
 
   testWidgets(
-    'the desktop GIF button appears and opens the picker when a provider is configured',
+    'the desktop GIF button appears and opens the picker on trending results, not a blank grid',
     (tester) async {
       await tester.pumpWidget(
         composerHarness(
@@ -164,7 +191,30 @@ void main() {
       await tester.tap(gifButton);
       await tester.pumpAndSettle();
 
-      expect(find.text('Type to search for a GIF.'), findsOneWidget);
+      final tile = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label == 'Pick: a trending gif',
+      );
+      expect(tile, findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a failed trending fetch shows an inline error, not a silent blank grid',
+    (tester) async {
+      await tester.pumpWidget(
+        composerHarness(
+          controller: controller,
+          sends: sends,
+          platform: TargetPlatform.linux,
+          apiBuilder: _apiWithGifs(gifSearchEnabled: true, trendingFails: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(gifButton);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppErrorState), findsOneWidget);
     },
   );
 
@@ -249,7 +299,6 @@ void main() {
 
       // The sheet closed and the picked GIF is staged, exactly like an upload.
       expect(find.text('gif.gif'), findsOneWidget);
-      expect(find.text('Type to search for a GIF.'), findsNothing);
 
       await tester.tap(sendButton);
       await tester.pumpAndSettle();

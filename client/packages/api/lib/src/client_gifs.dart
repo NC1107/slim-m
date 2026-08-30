@@ -24,6 +24,24 @@ extension SlimmApiGifs on SlimmApi {
         .toList(growable: false);
   }
 
+  /// The deployment's configured provider's current trending results - the
+  /// picker's own default content before a member types a query. Same
+  /// proxying and tokenizing as [searchGifs]; each result's [id] is redeemable
+  /// at [fetchGifPreview] and [selectGif] exactly the same way.
+  Future<List<GifResult>> fetchTrendingGifs({int? limit}) async {
+    final json = await _send(
+      'GET',
+      '/gifs/trending',
+      query: {
+        if (limit != null) 'limit': '$limit',
+      },
+    );
+    final results = (json as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map((r) => GifResult.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Fetches a search result's thumbnail, streamed through this server
   /// rather than a client asking the provider's own CDN directly.
   Future<FetchedBytes> fetchGifPreview(String gifId) =>

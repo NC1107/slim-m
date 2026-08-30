@@ -73,7 +73,7 @@ impl Contract {
                 voice: VoiceService::for_test("wss://sfu.invalid", "devkey", "devsecret"),
                 media: Media::for_tests(),
                 // Also configured, against a fake local provider, for the same reason.
-                gifs: GifSearch::for_test("tenor", &format!("{tenor_base}/v2/search"), "test-key"),
+                gifs: GifSearch::for_test("tenor", &tenor_base, "test-key"),
             },
             api: Api::load(repo_root),
             covered: BTreeSet::new(),
@@ -196,6 +196,19 @@ async fn spawn_fake_tenor() -> String {
             }]
         }))
     }
+    async fn trending(State(base): State<String>) -> axum::Json<Value> {
+        axum::Json(json!({
+            "next": "",
+            "results": [{
+                "id": "fake-trending-1",
+                "content_description": "a trending waffle",
+                "media_formats": {
+                    "tinygif": {"url": format!("{base}/preview.gif"), "dims": [220, 165], "size": 1},
+                    "gif": {"url": format!("{base}/full.gif"), "dims": [498, 373], "size": 2}
+                }
+            }]
+        }))
+    }
     async fn image() -> Vec<u8> {
         let mut bytes = b"GIF89a".to_vec();
         bytes.extend(std::iter::repeat_n(0u8, 8));
@@ -207,6 +220,7 @@ async fn spawn_fake_tenor() -> String {
     let base = format!("http://{addr}");
     let router = Router::new()
         .route("/v2/search", get(search))
+        .route("/v2/featured", get(trending))
         .route("/preview.gif", get(image))
         .route("/full.gif", get(image))
         .with_state(base.clone());

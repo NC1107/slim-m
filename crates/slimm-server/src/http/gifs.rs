@@ -12,14 +12,27 @@
 //! `gif_search_enabled` is what a client checks before ever showing the
 //! picker, so a disabled deployment costs it nothing: no button, no request.
 //!
-//! Three routes, one flow: [`search`] asks the provider and hands back a
+//! Four routes, one flow: [`search`] asks the provider and hands back a
 //! title plus an opaque token per result, never the provider's own CDN
-//! URLs; [`preview`] streams a thumbnail through this server for that token;
-//! [`select`] downloads the full-resolution image through this server too
-//! and stores it exactly the way [`super::attachments::upload`] stores a
-//! client-uploaded file, so the result is an ordinary, already-self-hosted
-//! attachment id a send may reference. Nothing downstream of a pick ever
-//! depends on the provider again.
+//! URLs; [`trending`] is the same shape for a deployment's "what's popular
+//! right now" screen, the picker's own default content before a member
+//! types anything - Discord's own picker opens the same way, and there is no
+//! reason to open ours to a blank grid when both supported providers already
+//! expose a dedicated endpoint for it; [`preview`] streams a thumbnail
+//! through this server for that token; [`select`] downloads the
+//! full-resolution image through this server too and stores it exactly the
+//! way [`super::attachments::upload`] stores a client-uploaded file, so the
+//! result is an ordinary, already-self-hosted attachment id a send may
+//! reference. Nothing downstream of a pick ever depends on the provider
+//! again.
+//!
+//! Klipy also exposes a `gifs/categories` endpoint (a fixed list of
+//! preset search terms, each with its own preview image) - deliberately not
+//! wired up here. It would need its own proxied-preview plumbing for a
+//! provider-hosted image that is not a search result at all, plus a second
+//! picker surface (a category chip row) to make it reachable, and nothing
+//! about "trending on open" needs it to be usable. Left as a follow-up
+//! rather than silently dropped.
 //!
 //! The token a search hands back is a key into an in-memory, bounded,
 //! TTL'd cache of the two real URLs it was minted from ([`Cache`]) - never the
@@ -78,6 +91,7 @@ const PROVIDER_TIMEOUT: Duration = Duration::from_secs(10);
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/gifs/search", get(search))
+        .route("/gifs/trending", get(trending))
         .route("/gifs/preview/{token}", get(preview))
         .route("/gifs/select", post(select))
 }
@@ -193,15 +207,26 @@ impl GifSearch {
             tracing::warn!(%err, "gif provider search failed");
             GifError::Unavailable
         })?;
-        Ok(hits
-            .iter()
-            .map(|gif| GifResultDto {
-                id: enabled.cache.insert(gif),
-                title: gif.title.clone(),
-                width: gif.width,
-                height: gif.height,
-            })
-            .collect())
+        Ok(mint_results(&enabled.cache, &hits))
+    }
+
+    /// Same wire shape and token-minting as [`Self::search`], against the
+    /// provider's own trending endpoint instead of a query.
+    async fn trending(&self, limit: u32) -> Result<Vec<GifResultDto>, GifError> {
+        let enabled = self.inner.as_deref().ok_or(GifError::NotConfigured)?;
+        let hits = provider::trending(
+            &enabled.http,
+            enabled.provider,
+            enabled.base_url.as_deref(),
+            &enabled.api_key,
+            limit,
+        )
+        .await
+        .map_err(|err| {
+            tracing::warn!(%err, "gif provider trending fetch failed");
+            GifError::Unavailable
+        })?;
+        Ok(mint_results(&enabled.cache, &hits))
     }
 
     async fn preview_bytes(&self, token: &str) -> Result<Vec<u8>, GifError> {
@@ -218,6 +243,20 @@ impl GifSearch {
         let url = enabled.cache.full_url(token).ok_or(GifError::Unavailable)?;
         fetch_capped(&enabled.http, &url, MAX_DOWNLOAD_BYTES).await
     }
+}
+
+/// Mints a token per hit and turns it into the wire shape, shared by
+/// [`GifSearch::search`] and [`GifSearch::trending`] since only where the
+/// hits came from differs between them.
+fn mint_results(cache: &Cache, hits: &[provider::ProviderGif]) -> Vec<GifResultDto> {
+    hits.iter()
+        .map(|gif| GifResultDto {
+            id: cache.insert(gif),
+            title: gif.title.clone(),
+            width: gif.width,
+            height: gif.height,
+        })
+        .collect()
 }
 
 /// Fetches `url` and refuses it past `max_bytes`, checked against
@@ -278,13 +317,18 @@ struct GifResultDto {
 }
 
 #[derive(Serialize)]
-struct SearchResponseDto {
+struct GifResultsDto {
     results: Vec<GifResultDto>,
 }
 
 #[derive(Deserialize)]
 struct SearchParams {
     q: String,
+    limit: Option<u32>,
+}
+
+#[derive(Deserialize)]
+struct TrendingParams {
     limit: Option<u32>,
 }
 
@@ -297,23 +341,32 @@ const DEFAULT_LIMIT: u32 = 20;
 
 // --- Handlers ---
 
-/// Requires deployment-wide `ATTACH_FILES`, the same bit browsing to a
-/// regular file upload needs - the whole point of this feature is to end in
-/// an attachment, so someone who could not attach one anyway gets nothing
+/// Shared by every handler below: the whole point of this feature is to end
+/// in an attachment, so someone who could not attach one anyway gets nothing
 /// to browse either.
+async fn require_attach_files(
+    state: &AppState,
+    user_id: crate::ids::UserId,
+) -> Result<(), ApiError> {
+    if state
+        .store
+        .base_permissions(user_id)
+        .await?
+        .contains(Permissions::ATTACH_FILES)
+    {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden)
+    }
+}
+
+/// Requires deployment-wide `ATTACH_FILES`; see [`require_attach_files`].
 async fn search(
     AuthedLimited(ctx): AuthedLimited<GIF>,
     Query(params): Query<SearchParams>,
     State(state): State<AppState>,
-) -> Result<Json<SearchResponseDto>, ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::ATTACH_FILES)
-    {
-        return Err(ApiError::Forbidden);
-    }
+) -> Result<Json<GifResultsDto>, ApiError> {
+    require_attach_files(&state, ctx.user_id).await?;
     let query = params.q.trim();
     if query.is_empty() {
         return Err(ApiError::BadRequest("q must not be empty"));
@@ -323,7 +376,24 @@ async fn search(
         .unwrap_or(DEFAULT_LIMIT)
         .clamp(1, provider::MAX_LIMIT);
     let results = state.gifs.search(query, limit).await?;
-    Ok(Json(SearchResponseDto { results }))
+    Ok(Json(GifResultsDto { results }))
+}
+
+/// The picker's default content before a member types a query; see this
+/// module's own doc comment for why it exists. Requires deployment-wide
+/// `ATTACH_FILES`; see [`require_attach_files`].
+async fn trending(
+    AuthedLimited(ctx): AuthedLimited<GIF>,
+    Query(params): Query<TrendingParams>,
+    State(state): State<AppState>,
+) -> Result<Json<GifResultsDto>, ApiError> {
+    require_attach_files(&state, ctx.user_id).await?;
+    let limit = params
+        .limit
+        .unwrap_or(DEFAULT_LIMIT)
+        .clamp(1, provider::MAX_LIMIT);
+    let results = state.gifs.trending(limit).await?;
+    Ok(Json(GifResultsDto { results }))
 }
 
 /// Streams a thumbnail through this server for a token `search` minted.
@@ -341,14 +411,7 @@ async fn preview(
     Path(token): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Response, ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::ATTACH_FILES)
-    {
-        return Err(ApiError::Forbidden);
-    }
+    require_attach_files(&state, ctx.user_id).await?;
     let bytes = state.gifs.preview_bytes(&token).await?;
     // Unsniffable is the provider's doing, never the caller's own token.
     let content_type = media::sniff_content_type(&bytes).ok_or(ApiError::Unavailable)?;
@@ -373,14 +436,7 @@ async fn select(
     State(state): State<AppState>,
     Json(req): Json<SelectRequest>,
 ) -> Result<(StatusCode, Json<AttachmentDto>), ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::ATTACH_FILES)
-    {
-        return Err(ApiError::Forbidden);
-    }
+    require_attach_files(&state, ctx.user_id).await?;
     let bytes = state.gifs.download_full(&req.id).await?;
     if bytes.len() as u64 > state.media.max_attachment_bytes() {
         return Err(ApiError::BadRequest("gif is too large to attach"));

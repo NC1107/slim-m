@@ -209,7 +209,7 @@ pub async fn run(c: &mut Contract) {
     safety_calls(c, root, bob_token, &bob_id).await;
 
     let channel = channel_calls(c, root, &bob_id).await;
-    // Against a fake local provider (see world.rs), so all three reach a real 2xx.
+    // Against a fake local provider (see world.rs), so all of these reach a real 2xx.
     let gif_search = c
         .bare("searchGifs", "GET", "/gifs/search?q=cat", root)
         .await;
@@ -229,6 +229,8 @@ pub async fn run(c: &mut Contract) {
         json!({ "id": gif_id }),
     )
     .await;
+    c.bare("getTrendingGifs", "GET", "/gifs/trending", root)
+        .await;
     let message = message_calls(c, root, &channel).await;
     bulk_delete_by_author_call(c, root, bob_token, &bob_id, &channel).await;
     thread_calls(c, root, &channel, &message).await;
