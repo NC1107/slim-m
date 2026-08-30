@@ -10,7 +10,7 @@
 # that raises it; a changelog kept here makes one physical line that every change
 # to the same file must edit, which is a merge conflict by construction.
 
-schema/openapi.yaml 7863 # one OpenAPI document is one document; splitting it across $ref files would give tests/openapi_contract.rs two sources to reconcile. This number rises when the API does, and the raise is the deliberate act; why each raise happened is in the commit that made it, not here.
+schema/openapi.yaml 7964 # one OpenAPI document is one document; splitting it across $ref files would give tests/openapi_contract.rs two sources to reconcile. This number rises when the API does, and the raise is the deliberate act; why each raise happened is in the commit that made it, not here.
 .github/workflows/release.yml 833 # ten publish jobs sharing release-please outputs, plus two thin verify jobs wiring every publish path to one commit-status gate; why each raise happened is in the commit that made it, not here.
 crates/slimm-server/src/store/sessions.rs 815 # tokens, refresh rotation, ws tickets and account deletion in one file; account deletion is the obvious first split
 client/packages/app/test/push_controller_test.dart 928 # one suite over registration, lifecycle reporting and revocation; new push coverage goes in a sibling file rather than growing this one

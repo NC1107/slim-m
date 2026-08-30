@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 
 use crate::ids::{ChannelId, UserId};
-use crate::notifications::NotificationPreference;
+use crate::notifications::{NotificationPreference, minute_of_day_utc};
 use crate::permissions::Permissions;
 use crate::presence::PresenceTracker;
 use crate::store::Store;
@@ -182,6 +182,17 @@ async fn narrow_for_thread(
 /// channel an `everything` default would have let through, and a `mentions`
 /// override still wakes a mentioned recipient whose account default is
 /// `nothing`.
+///
+/// Quiet hours (`store/quiet_hours.rs`) run last, over whatever this
+/// resolved: a recipient whose current UTC minute falls inside their own
+/// window has their effective preference demoted one notch, from
+/// [`NotificationPreference::Everything`] to [`NotificationPreference::Mentions`],
+/// before the match above runs - never demoted to [`NotificationPreference::Nothing`],
+/// and never touching a recipient whose preference was already `mentions`
+/// or `nothing`. That keeps the same hierarchy this function already
+/// enforces: a quiet window says "do not wake me for ordinary chatter right
+/// now", not "silence even a direct mention", which is what choosing
+/// `nothing` outright already means.
 async fn narrow_for_notification_preference(
     store: &Store,
     channel_id: ChannelId,
@@ -195,15 +206,25 @@ async fn narrow_for_notification_preference(
         .channel_notification_preferences(channel_id, &viewers)
         .await?;
     let is_dm = store.channel_notifies_as_dm(channel_id).await?;
+    let quiet_hours = store.quiet_hours_for_users(&viewers).await?;
+    let current_minute = minute_of_day_utc(crate::store::now_ms());
     Ok(viewers
         .into_iter()
-        .filter(
-            |user_id| match preferences.get(user_id).copied().unwrap_or_default() {
+        .filter(|user_id| {
+            let mut preference = preferences.get(user_id).copied().unwrap_or_default();
+            if preference == NotificationPreference::Everything
+                && quiet_hours
+                    .get(user_id)
+                    .is_some_and(|window| window.contains(current_minute))
+            {
+                preference = NotificationPreference::Mentions;
+            }
+            match preference {
                 NotificationPreference::Everything => true,
                 NotificationPreference::Nothing => false,
                 NotificationPreference::Mentions => is_dm || mentioned.contains(user_id),
-            },
-        )
+            }
+        })
         .collect())
 }
 
