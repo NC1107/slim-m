@@ -201,9 +201,11 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 /// own bottom clearance so the floating card never sits on top of its
 /// content.
 ///
-/// [isDm] withholds the dock's own canvas toggle - see `voice_call_dock.dart`
-/// for the DM half of why, and `canvas_pane_test.dart` for the header
-/// affordance this is in addition to, not a replacement for.
+/// [isDm] withholds the dock's own canvas toggle - not because a DM call has
+/// no canvas to open, but because `dm_call_pane.dart`'s `_DmCallBar` already
+/// carries one at every width; see `voice_call_dock.dart` for the full
+/// reasoning, and `canvas_pane_test.dart` for the header affordance this is
+/// in addition to, not a replacement for.
 class _InCall extends ConsumerWidget {
   const _InCall({required this.channelId, required this.isDm});
 

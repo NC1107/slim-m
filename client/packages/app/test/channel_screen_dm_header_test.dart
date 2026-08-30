@@ -4,10 +4,15 @@
 /// - `membersProvider` is deliberately deployment-wide (see `member_pane.dart`'s
 /// own doc comment), so nothing filtered it for a DM. The composer's hint
 /// also named the other person with the channel-hash convention ("Message
-/// #Alice"), and the canvas button offered a route that always 403s there
-/// (`store/dms.rs`'s `DM_BASE` never grants `USE_CANVAS`). All three are
-/// wired off `channel?.kind`, so this drives a real `ChannelScreen` for a DM
-/// channel rather than asserting on `ChannelHeader` in isolation.
+/// #Alice"). Both are wired off `channel?.kind`, so this drives a real
+/// `ChannelScreen` for a DM channel rather than asserting on `ChannelHeader`
+/// in isolation.
+///
+/// The canvas button used to belong on this list too - `store/dms.rs`'s
+/// `DM_BASE` granted no `USE_CANVAS`, so the button offered a route that
+/// always 403s. The owner has since asked for a DM canvas, which reversed
+/// that: `DM_BASE` now grants `USE_CANVAS`, and this asserts the button
+/// shows rather than hides.
 library;
 
 import 'dart:convert';
@@ -55,8 +60,8 @@ http.Response _emptyJsonList() => http.Response(
 );
 
 void main() {
-  testWidgets('a DM header offers no members toggle, no canvas button, and the '
-      'composer hint names nobody', (tester) async {
+  testWidgets('a DM header offers no members toggle, offers a canvas button, '
+      'and the composer hint names nobody', (tester) async {
     // Expanded, so ChannelHeader (the wide header, absent below compact) builds.
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
@@ -128,10 +133,10 @@ void main() {
     );
     expect(
       find.bySemanticsLabel('Open canvas'),
-      findsNothing,
+      findsOneWidget,
       reason:
-          "a DM's base permissions never grant USE_CANVAS, so this "
-          'would 403 every time it was pressed',
+          "a DM's base permissions grant USE_CANVAS, for a 1-on-1 working "
+          'session, so this must be reachable',
     );
 
     final hint = tester.widget<Text>(find.byKey(const Key('composer-hint')));

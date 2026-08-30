@@ -9,6 +9,14 @@
 /// voice channel's screen does not hang up - a call already joined keeps
 /// running via `voiceControllerProvider` (see `VoiceStripIndicator`)
 /// regardless of whether this pane is what is on screen.
+///
+/// `_DmCallBar` carries `CanvasOpenButton` at every width, unlike a voice
+/// channel's own in-call header which only wraps the call where
+/// `LayoutClass.showsBothPanes`: a DM call has no such wide-only header of
+/// its own to lean on, so this is the one place a DM call reaches the
+/// canvas without hanging up first (`voice_call_dock.dart` covers why its
+/// floating in-call toggle stays off for a DM call instead of duplicating
+/// this).
 library;
 
 import 'package:flutter/material.dart';
@@ -16,6 +24,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../widgets/voice_strip_indicator.dart' show CallChannelName;
+import 'canvas/canvas_open_button.dart';
 import 'voice_screen.dart';
 
 /// The DM channel whose call pane is open, or null.
@@ -81,6 +90,8 @@ class _DmCallBar extends StatelessWidget {
               ),
             ),
           ),
+          CanvasOpenButton(channelId: channelId, isVoice: false, isDm: true),
+          const SizedBox(width: AppSpacing.s4),
           AppIconButton(
             icon: AppIcons.dismiss,
             semanticLabel: 'Back to messages',

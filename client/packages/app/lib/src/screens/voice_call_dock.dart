@@ -9,13 +9,16 @@
 /// only entry point outside a call and still carries the reachability guard
 /// (`canvas_pane_test.dart`); this is the second, in-call one.
 ///
-/// [canvasChannelId] is null wherever canvas is not this call's to open at
-/// all - a DM, `CanvasOpenButton`'s own self-gating - and null is also what a
-/// caller already inside `CanvasCallDock` passes: that dock's own tool strip
-/// already carries "Close canvas", so a second canvas control glued onto the
-/// call row here would be a redundant close button rather than a new
-/// capability, exactly the crowding the owner already complained about this
-/// dock for once.
+/// [canvasChannelId] is null wherever this particular toggle would be
+/// redundant chrome rather than a new capability - a caller already inside
+/// `CanvasCallDock` passes null, since that dock's own tool strip already
+/// carries "Close canvas", and a DM call passes null too: `dm_call_pane.dart`'s
+/// `_DmCallBar` already carries the canvas toggle at every width (unlike a
+/// voice channel's header, which only wraps the call at a width that
+/// `LayoutClass.showsBothPanes`), so a second one glued onto this floating
+/// dock would be the same crowding the owner already complained about this
+/// dock for once, not a way to reach anything a DM call could not already
+/// reach.
 ///
 /// **Never shrinks a touch target to make room.** [CallDockButton] draws
 /// every control at a fixed size regardless of width, and the canvas toggle
