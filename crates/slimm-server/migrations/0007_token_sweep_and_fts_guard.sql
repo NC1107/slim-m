@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 --
 -- Two fixes found by an audit of the phase 3 backbone.
 --

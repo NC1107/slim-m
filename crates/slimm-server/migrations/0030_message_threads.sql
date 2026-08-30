@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- A thread is an ordinary channel whose `parent_message_id` names the
 -- message it was opened from - checked against 0002_core_schema.sql first,
 -- and nothing was waiting for this one, the way `channels.topic` and

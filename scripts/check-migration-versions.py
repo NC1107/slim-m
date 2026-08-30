@@ -26,11 +26,18 @@ so nothing here can go stale.
 """
 
 import hashlib
+import json
 import pathlib
 import re
 import subprocess
 import sys
 
+LOCKFILE = (
+    pathlib.Path(__file__).resolve().parents[1]
+    / "crates"
+    / "slimm-server"
+    / "migrations.lock.json"
+)
 MIGRATIONS = pathlib.Path("crates/slimm-server/migrations")
 NAME = re.compile(r"^(\d+)_.*\.sql$")
 
@@ -66,26 +73,30 @@ def local_migrations() -> dict[int, tuple[str, str]]:
 
 
 def published_migrations() -> dict[int, tuple[str, str]] | None:
-    listing = subprocess.run(
-        ["git", "ls-tree", "-r", "--name-only", "origin/main", str(MIGRATIONS)],
-        capture_output=True,
-        text=True,
-    )
-    if listing.returncode != 0:
+    """What deployed databases have recorded, from the lockfile.
+
+    This used to read `origin/main`, which has two holes that together took
+    the live server down on 2026-08-30. Main can only catch a pull request
+    that edits a migration: once a bad edit has MERGED, main is compared to
+    itself and reports everything consistent. And main was never the real
+    baseline anyway - a deployed database is, and it validates by a checksum
+    recorded when the migration was applied, which no branch can restate.
+
+    The relicense rewrote the SPDX header of all 54 migrations then on disk
+    and was pushed straight to main with no pull request, so this gate never
+    ran on it; afterwards it agreed with itself while every deployed database
+    refused to start. The lockfile cannot drift that way: it records what
+    each migration hashed to when it was introduced and only ever gains
+    entries.
+    """
+    if not LOCKFILE.exists():
         return None
 
     published: dict[int, tuple[str, str]] = {}
-    for line in listing.stdout.split():
-        name = pathlib.PurePath(line).name
+    for name, digest in json.loads(LOCKFILE.read_text()).items():
         version = version_of(name)
-        if version is None:
-            continue
-        blob = subprocess.run(
-            ["git", "show", f"origin/main:{line}"], capture_output=True
-        )
-        if blob.returncode != 0:
-            continue
-        published[version] = (name, hashlib.sha384(blob.stdout).hexdigest())
+        if version is not None:
+            published[version] = (name, digest)
     return published
 
 
@@ -97,14 +108,14 @@ def main() -> int:
     local = local_migrations()
     published = published_migrations()
     if published is None:
-        print("origin/main unavailable; checked duplicate versions only")
+        print("migrations.lock.json missing; checked duplicate versions only")
         return 0
 
     failed = False
     for version, (name, digest) in sorted(published.items()):
         if version not in local:
             print(
-                f"::error::migration {version:04d} ({name}) is on main and has been deleted"
+                f"::error::migration {version:04d} ({name}) is locked and has been deleted"
                 " - every deployed database has it applied and will refuse to start without it"
             )
             failed = True
@@ -115,15 +126,15 @@ def main() -> int:
                 f"renamed to {local_name}" if local_name != name else "edited in place"
             )
             print(
-                f"::error::migration {version:04d} ({name}) is on main and has been {detail}"
+                f"::error::migration {version:04d} ({name}) is locked and has been {detail}"
                 " - a deployed database validates it by checksum and will refuse to start;"
                 " add a new migration instead"
             )
             failed = True
 
     checked = len(published)
-    print(f"migrations: {len(local)} local, {checked} already on main, all consistent"
-          if not failed else f"migrations: {checked} checked against main")
+    print(f"migrations: {len(local)} local, {checked} locked, all consistent"
+          if not failed else f"migrations: {checked} checked against the lockfile")
     return 1 if failed else 0
 
 

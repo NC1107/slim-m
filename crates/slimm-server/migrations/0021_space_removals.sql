@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Removing somebody from the Space, which has to be a durable row because
 -- there is no membership row to delete.
 --

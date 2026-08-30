@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Threads resolve through their parent message, and open_thread's duplicate
 -- check (WHERE parent_message_id = ?) had no index reaching the column, so
 -- every thread open scanned the whole channels table. Partial, the same

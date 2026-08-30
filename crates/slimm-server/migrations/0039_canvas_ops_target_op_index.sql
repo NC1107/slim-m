@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- `canvas_ops.target_op BLOB REFERENCES canvas_ops(id)` is a self-referential
 -- foreign key with no index on the referencing column, so SQLite cannot
 -- confirm "does anything still point at the row I am about to delete"

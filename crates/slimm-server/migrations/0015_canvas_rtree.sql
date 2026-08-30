@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- The Voice Canvas spatial index, plus the two changes to `canvas_objects`
 -- that make it safe to keep.
 --

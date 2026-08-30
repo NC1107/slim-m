@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+-- SPDX-License-Identifier: AGPL-3.0-only
 -- Widens dm_channels' pair ordering to admit a self pair (user_a = user_b),
 -- the row `open_dm` now writes for a personal space: a DM with no second
 -- participant, used for private notes that still sync like any other
