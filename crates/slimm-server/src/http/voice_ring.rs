@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Ringing the other side of a DM call, and declining an incoming one.
 //!
 //! Split out of `voice.rs` to keep that file under the line budget, but
