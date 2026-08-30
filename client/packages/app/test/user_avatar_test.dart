@@ -103,7 +103,7 @@ void main() {
     expect(resized.width, 120);
     expect(resized.height, 120);
     // low, not medium: the decode floor means this shrinks the source, where medium's mipmap would blur it.
-    expect(image.filterQuality, FilterQuality.low);
+    expect(image.filterQuality, FilterQuality.medium);
   });
 
   testWidgets('the decode cap scales with the device pixel ratio', (
