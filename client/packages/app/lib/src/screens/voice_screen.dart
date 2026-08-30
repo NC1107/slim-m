@@ -25,10 +25,12 @@ import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
+import '../routing/breakpoints.dart';
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
 import 'voice_call_dock.dart';
 import 'voice_join_preview.dart';
+import 'voice_text_pane.dart';
 
 /// Whether [voice] describes a live call somewhere other than [channelId]:
 /// the one case an arrival still has to ask about before joining.
@@ -153,25 +155,35 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 
     if (stage == 'joining') _maybeAutoJoin(controller);
 
+    final callBody = AppFadeIn(
+      // 'joining' reads as 'connecting' here, so a fresh arrival never fades through a stage nobody would see.
+      key: ValueKey('voice-${stage == 'joining' ? 'connecting' : stage}'),
+      child: switch (stage) {
+        'call' => _InCall(channelId: channelId, isDm: widget.isDm),
+        'connecting' || 'joining' => const VoiceConnecting(),
+        'switch' => VoiceSwitchPrompt(onSwitch: () => _switchNow(controller)),
+        _ => VoiceRejoinScreen(
+          channelId: channelId,
+          isDm: widget.isDm,
+          errorMessage: errorMessage,
+          canRetry: canRetry,
+          onRetry: () => controller.join(channelId),
+          recap: recapForChannel(voice, channelId),
+        ),
+      },
+    );
+
+    // DmCallPane's own conversation already covers text for a DM's call; only a real voice channel gets the docked/tabbed pane below.
+    if (widget.isDm) {
+      return Container(color: tokens.surfaceBase, child: callBody);
+    }
+    final width = MediaQuery.sizeOf(context).width;
+    final canDock = LayoutClass.of(context).fitsThreadPane(width);
     return Container(
       color: tokens.surfaceBase,
-      child: AppFadeIn(
-        // 'joining' reads as 'connecting' here, so a fresh arrival never fades through a stage nobody would see.
-        key: ValueKey('voice-${stage == 'joining' ? 'connecting' : stage}'),
-        child: switch (stage) {
-          'call' => _InCall(channelId: channelId, isDm: widget.isDm),
-          'connecting' || 'joining' => const VoiceConnecting(),
-          'switch' => VoiceSwitchPrompt(onSwitch: () => _switchNow(controller)),
-          _ => VoiceRejoinScreen(
-            channelId: channelId,
-            isDm: widget.isDm,
-            errorMessage: errorMessage,
-            canRetry: canRetry,
-            onRetry: () => controller.join(channelId),
-            recap: recapForChannel(voice, channelId),
-          ),
-        },
-      ),
+      child: canDock
+          ? VoiceCallWithChatPane(channelId: channelId, call: callBody)
+          : VoiceCallWithChatTabs(channelId: channelId, call: callBody),
     );
   }
 }

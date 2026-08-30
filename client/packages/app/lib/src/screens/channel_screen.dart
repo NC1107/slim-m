@@ -60,6 +60,7 @@ class ChannelScreen extends ConsumerStatefulWidget {
   const ChannelScreen({
     required this.channelId,
     this.isThread = false,
+    this.showHeader = true,
     super.key,
   });
 
@@ -77,6 +78,18 @@ class ChannelScreen extends ConsumerStatefulWidget {
   /// `Open canvas` and `Toggle member list` included - exactly the chrome
   /// `ThreadScreen`'s own doc comment says must never reach a thread.
   final bool isThread;
+
+  /// False only from `voice_text_pane.dart`, which docks this beside a live
+  /// call that already carries its own header
+  /// (`_VoiceConversationHeader` in `home_shell.dart`). Left true,
+  /// [ChannelHeader] would double up there: a second name/icon row, a second
+  /// `CanvasOpenButton` for the same channel, and a "Toggle member list"
+  /// button squeezed into a pane narrower than the roster it opens -
+  /// [ThreadScreen] withholds this same header for the identical reason.
+  /// Search and pins are not reachable from the docked pane as a result;
+  /// acceptable for a secondary surface beside a live call, the same trade
+  /// [ThreadScreen] already makes for its own docked transcript.
+  final bool showHeader;
 
   @override
   ConsumerState<ChannelScreen> createState() => _ChannelScreenState();
@@ -254,6 +267,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           final isThread = widget.isThread || channel?.parentMessageId != null;
           // Only a real named channel gets "#name"; shared so the transcript and composer cannot drift.
           final hashChannelName = channel?.kind == 'text' ? channelName : null;
+          final isVoice = channel?.kind == 'voice';
           final isDm = channel?.kind == 'dm';
           final isPersonalSpace = channel?.isPersonalSpace ?? false;
 
@@ -266,7 +280,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   channelId: widget.channelId,
                   name: channelName,
                   topic: channel?.topic,
-                  isVoice: false,
+                  isVoice: isVoice,
                   isDm: isDm,
                   isPersonalSpace: isPersonalSpace,
                   searchOpen: search.open,

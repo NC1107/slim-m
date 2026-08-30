@@ -241,6 +241,69 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a voice channel with unread text shows the same unread dot a text '
+    'channel does',
+    (tester) async {
+      final channel = _channel(
+        'v1',
+        'General voice',
+        kind: 'voice',
+        cursor: 5,
+        lastReadSeq: 2,
+      );
+      await tester.pumpWidget(
+        _voiceHarness(
+          VoiceChannelRow(channel: channel, selected: false),
+          voice: const VoiceState(),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(AppListRow.unreadDotKey),
+        findsOneWidget,
+        reason:
+            'a voice channel now has its own transcript and composer '
+            '(screens/voice_text_pane.dart), so unread text there must '
+            'show the same affordance an unread text channel does',
+      );
+    },
+  );
+
+  testWidgets(
+    'a voice channel caught up on text has no unread dot even while a call '
+    'is live in it',
+    (tester) async {
+      final channel = _channel(
+        'v1',
+        'General voice',
+        kind: 'voice',
+        cursor: 2,
+        lastReadSeq: 2,
+      );
+      await tester.pumpWidget(
+        _voiceHarness(
+          VoiceChannelRow(channel: channel, selected: false),
+          voice: const VoiceState(
+            channelId: 'v1',
+            state: VoiceSessionState.connected,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(AppListRow.unreadDotKey),
+        findsNothing,
+        reason:
+            'being in the call already has its own cue (the accented mic '
+            'icon), so it must not also light the unread dot the way the '
+            'old inCall-based read used to for every member on the call',
+      );
+    },
+  );
+
   testWidgets('a phone long-press on a channel row opens its context menu', (
     tester,
   ) async {
