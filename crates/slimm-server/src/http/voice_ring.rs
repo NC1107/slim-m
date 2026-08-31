@@ -67,7 +67,7 @@ async fn ring(
     Path(channel_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<RingResponse>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    enforce(&state, &parts, Some(&ctx), Class::Ring)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
 
     if !state.voice.is_enabled() {

@@ -160,6 +160,25 @@ pub enum Class {
     /// search; see `http::gifs` for the debounce that keeps it that shape in
     /// practice.
     Gif,
+    /// Ringing someone on a DM call.
+    ///
+    /// Tighter than [`Class::Write`] for the same reason [`Class::Upload`]
+    /// is: the request's real-world cost is nothing like an ordinary write.
+    /// One ring fires an outbound push through the relay, wakes a device,
+    /// starts a looping tone, and on desktop raises and focuses the callee's
+    /// window. On `Write`'s budget a contact could legally re-ring five
+    /// times a second forever - and because a fresh ring REPLACES the
+    /// outstanding one by design (`voice::ring`), that needs no cooperation
+    /// from the callee to sustain.
+    ///
+    /// Sized for how a person actually calls: a few attempts in a row when
+    /// someone does not pick up, then a pause. The 30-second ring timeout
+    /// means a legitimate cadence is roughly one ring per half minute, so a
+    /// burst of 5 covers a redial flurry with room to spare while cutting
+    /// the sustained rate by a factor of 25. Declining is deliberately NOT
+    /// in this class: it wakes nobody and answering quickly is the behaviour
+    /// to encourage.
+    Ring,
 }
 
 impl Class {
@@ -182,6 +201,8 @@ impl Class {
             // A full member page plus a transcript's own avatars, at once.
             Class::Asset => (150.0, 25.0),
             Class::Gif => (10.0, 1.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::Ring => (5.0, 1.0 / 5.0),
             // See this variant's own doc comment for the roster and reconnect math.
             Class::AuthedRead => (40.0, 8.0),
         }
@@ -192,7 +213,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 14] = [
+    pub const ALL: [Class; 15] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -207,6 +228,7 @@ impl Class {
         Class::Asset,
         Class::Gif,
         Class::AuthedRead,
+        Class::Ring,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -226,6 +248,7 @@ impl Class {
             Class::CanvasStrokePreview => "canvas_stroke_preview",
             Class::Asset => "asset",
             Class::Gif => "gif",
+            Class::Ring => "ring",
             Class::AuthedRead => "authed_read",
         }
     }
@@ -278,5 +301,30 @@ mod all_tests {
             assert!(burst > 0.0, "{class:?} has a non-positive burst {burst}");
             assert!(refill > 0.0, "{class:?} has a non-positive refill {refill}");
         }
+    }
+
+    /// The whole point of giving a ring its own class is that it is cheaper
+    /// to send than it is to receive: one request wakes a device, starts a
+    /// looping tone and raises a window. On `Write`'s budget a contact could
+    /// sustain five of those a second, and since a fresh ring replaces the
+    /// outstanding one that needs no cooperation from the callee. If this
+    /// ever loosens back to `Write`, the throttle has quietly gone.
+    #[test]
+    fn ringing_is_throttled_harder_than_an_ordinary_write() {
+        let (ring_burst, ring_refill) = Class::Ring.budget();
+        let (write_burst, write_refill) = Class::Write.budget();
+        assert!(
+            ring_refill < write_refill,
+            "ring refill {ring_refill} is not tighter than write's {write_refill}"
+        );
+        assert!(
+            ring_burst < write_burst,
+            "ring burst {ring_burst} is not tighter than write's {write_burst}"
+        );
+        assert!(
+            write_refill / ring_refill >= 10.0,
+            "ring is only {}x tighter than write; that is not a throttle",
+            write_refill / ring_refill
+        );
     }
 }
