@@ -21,5 +21,6 @@ export 'src/screen_share_audio.dart';
 export 'src/screen_share_control.dart';
 export 'src/video_subscription_culler.dart';
 export 'src/voice_models.dart';
-export 'src/voice_roster_snapshot.dart' show passesActivationThreshold;
+export 'src/voice_roster_snapshot.dart'
+    show anyLiveVideo, passesActivationThreshold;
 export 'src/voice_session.dart';
