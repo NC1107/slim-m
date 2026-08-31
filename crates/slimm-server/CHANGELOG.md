@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.51.0](https://github.com/NC1107/slim-m/compare/server-v0.50.0...server-v0.51.0) (2026-08-31)
+
+
+### Bug Fixes
+
+* **server:** restore applied migration bytes to unbreak production ([#1001](https://github.com/NC1107/slim-m/issues/1001)) ([5f6cdf5](https://github.com/NC1107/slim-m/commit/5f6cdf5808617cdf77e825c11f7dcb8ed1a1e667))
+
 ## [0.50.0](https://github.com/NC1107/slim-m/compare/server-v0.49.0...server-v0.50.0) (2026-08-30)
 
 
