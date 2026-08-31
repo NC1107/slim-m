@@ -90,14 +90,19 @@ Future<void> _pumpDecoded(WidgetTester tester) async {
   expect(tester.getSize(find.byType(Image).first).height, greaterThan(0));
 }
 
+/// Opens the fullscreen viewer over the decoded row, then lets the viewer's
+/// OWN codec run.
+///
+/// [_pumpDecoded] only waits for the row's image. The viewer that opens on
+/// top renders a second `Image.memory`, and nothing used to wait for that
+/// one - zero-sized, `InteractiveViewer`'s child gives a pinch nothing to
+/// scale, so the transform stays at 1.0. That made the pinch case pass only
+/// when an earlier test in this file had already warmed the codec.
 Future<void> _openViewer(WidgetTester tester) async {
   await _pumpDecoded(tester);
   expect(_viewer(), findsNothing);
   await tester.tap(find.byType(Image).first);
   await tester.pumpAndSettle();
-  // The viewer renders its OWN Image.memory, which needs a real codec run
-  // exactly as the row's did; without it InteractiveViewer's child is
-  // zero-sized and a pinch has nothing to scale.
   await tester.runAsync(() async {
     await Future<void>.delayed(const Duration(milliseconds: 50));
   });
