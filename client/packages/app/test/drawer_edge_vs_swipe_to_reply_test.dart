@@ -114,8 +114,7 @@ void main() {
   testWidgets('the edge zone stays clear of the row\'s own avatar', (
     tester,
   ) async {
-    // paneGutterCompact 10 + avatarSize 36: a wider zone eats the avatar and
-    // takes a reply swipe started on it for the drawer's.
+    // Gutter 10 + avatar 36: a wider zone takes a reply swipe started on the avatar.
     expect(kDrawerEdgeZoneWidth, lessThanOrEqualTo(24));
   });
 
