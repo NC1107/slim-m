@@ -32,6 +32,10 @@ import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../desktop/desktop_window_shell.dart';
+import '../desktop/window_resize_frame.dart';
+import 'drawer_edge_swipe.dart';
+
 /// How far a swipe must travel, in logical pixels, before releasing it
 /// commits the reply - past this the reveal icon reads as armed rather than
 /// merely present.
@@ -100,8 +104,22 @@ class _SwipeToReplyState extends State<SwipeToReply>
 
   bool get _committed => _controller.value >= swipeToReplyThreshold;
 
+  /// A drag beginning in the drawer's own edge zone is the drawer's, never a
+  /// reply. Only where a drawer actually exists - at wider layouts the
+  /// transcript does not start at the screen edge and there is nothing to open.
+  bool _startedInDrawerEdge(DragStartDetails details) {
+    if (Scaffold.maybeOf(context)?.hasDrawer != true) return false;
+    final left = DesktopWindowShell.frameless
+        ? kWindowResizeHandleThickness
+        : 0.0;
+    final x = details.globalPosition.dx;
+    return x >= left && x < left + kDrawerEdgeZoneWidth;
+  }
+
   void _onStart(DragStartDetails details) {
-    _fromTouch = details.kind == PointerDeviceKind.touch;
+    _fromTouch =
+        details.kind == PointerDeviceKind.touch &&
+        !_startedInDrawerEdge(details);
   }
 
   /// Rubber-banded rather than free: clamped at 0 so a leftward flick never

@@ -23,6 +23,20 @@ import 'package:flutter/material.dart';
 import '../desktop/desktop_window_shell.dart';
 import '../desktop/window_resize_frame.dart';
 
+/// How wide the left edge zone is: the band where a horizontal drag means
+/// "open the drawer" and never anything else.
+///
+/// Wider than Flutter's own `drawerEdgeDragWidth` default of 20, and wide
+/// enough to be an actual thumb target. It has to be one shared number rather
+/// than a private one, because [SwipeToReply] has to refuse exactly this band:
+/// before it did, the two gestures split the row between them and left the
+/// drawer about four usable pixels - Flutter's `DrawerController` claims the
+/// leftmost 20 whether or not it will act on them, so the strip only won from
+/// 20 to 24, and every drag past 24 replied to a message instead. That is the
+/// bug this constant exists to close; `drawer_edge_vs_swipe_to_reply_test.dart`
+/// pins it.
+const double kDrawerEdgeZoneWidth = 40;
+
 /// Wraps [child] with the edge-drag strip; [child] still fills the space.
 class DrawerEdgeSwipe extends StatefulWidget {
   const DrawerEdgeSwipe({required this.child, super.key});
@@ -34,9 +48,8 @@ class DrawerEdgeSwipe extends StatefulWidget {
 }
 
 class _DrawerEdgeSwipeState extends State<DrawerEdgeSwipe> {
-  /// Wide enough to catch an intentional edge grab without reaching into the
-  /// body's own horizontal gestures (message selection, the composer).
-  static const double _stripWidth = 24;
+  /// The shared edge zone; see [kDrawerEdgeZoneWidth].
+  static const double _stripWidth = kDrawerEdgeZoneWidth;
 
   /// How far a drag has to travel right before it reads as "open the
   /// drawer" rather than a stray brush of the edge.
