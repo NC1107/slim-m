@@ -118,47 +118,43 @@ void main() {
     expect(kDrawerEdgeZoneWidth, greaterThan(20));
   });
 
-  testWidgets(
-    'a row inside a drawer Scaffold refuses an edge drag on its own',
-    (tester) async {
-      // Without DrawerEdgeSwipe over it, so the strip cannot be what refuses.
-      // SwipeToReply has to decline the drawer's band itself, or mounting a
-      // transcript in a drawer Scaffold anywhere else brings the bug straight
-      // back.
-      var replies = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildTheme(Brightness.light, AppTokens.light),
-          home: Scaffold(
-            drawer: const Drawer(child: SizedBox()),
-            drawerEdgeDragWidth: 0,
-            body: ListView(
-              children: [
-                SwipeToReply(
-                  enabled: true,
-                  onCommit: () => replies++,
-                  child: Container(height: 64, color: Colors.blueGrey),
-                ),
-              ],
-            ),
+  testWidgets('a row inside a drawer Scaffold refuses an edge drag on its own', (
+    tester,
+  ) async {
+    // No DrawerEdgeSwipe over it, so only SwipeToReply's own refusal can decline.
+    var replies = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(
+          drawer: const Drawer(child: SizedBox()),
+          drawerEdgeDragWidth: 0,
+          body: ListView(
+            children: [
+              SwipeToReply(
+                enabled: true,
+                onCommit: () => replies++,
+                child: Container(height: 64, color: Colors.blueGrey),
+              ),
+            ],
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final inZone = await _dragRight(tester, 10, () => replies);
-      expect(
-        inZone.replies,
-        0,
-        reason: 'a drag starting in the drawer edge zone is never a reply',
-      );
+    final inZone = await _dragRight(tester, 10, () => replies);
+    expect(
+      inZone.replies,
+      0,
+      reason: 'a drag starting in the drawer edge zone is never a reply',
+    );
 
-      final outside = await _dragRight(
-        tester,
-        kDrawerEdgeZoneWidth + 20,
-        () => replies,
-      );
-      expect(outside.replies, 1, reason: 'past the zone it still replies');
-    },
-  );
+    final outside = await _dragRight(
+      tester,
+      kDrawerEdgeZoneWidth + 20,
+      () => replies,
+    );
+    expect(outside.replies, 1, reason: 'past the zone it still replies');
+  });
 }
