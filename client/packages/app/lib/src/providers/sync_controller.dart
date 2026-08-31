@@ -14,6 +14,8 @@ import 'channel_history.dart';
 import 'channel_refresher.dart';
 import 'dm_call_activity.dart';
 import 'dm_call_ring_controller.dart';
+import 'presence_controller.dart';
+import 'voice_controller.dart';
 import 'failed_send_retry.dart';
 import 'message_ops_sync.dart';
 import 'op_adjacency.dart';
@@ -397,6 +399,17 @@ class SyncController extends StateNotifier<SyncStatus> {
   ///
   /// The DM-call ring state is cleared here too, and that is not cosmetic:
   /// see `sign_out_stops_the_ring_test.dart` for what a surviving ring does.
+  ///
+  /// Leaving the voice call belongs here rather than only in the Sign Out
+  /// button, because a session can end without the user asking for it.
+  /// `SlimmApi._refreshOnce` clears the session on a 401 while refreshing -
+  /// an expired or revoked refresh token, or another device signing this
+  /// account out - and that path reaches this method without passing through
+  /// any UI. Until it did, an involuntary end left a live microphone
+  /// publishing into a room the app itself considered signed out of, until
+  /// the server's own 40-second stale-heartbeat sweep noticed. `leave()`
+  /// bumps its own call generation and is safe to call when not in a call,
+  /// so the explicit Sign Out path calling it first costs nothing here.
   Future<void> _endSession() async {
     await stop();
     _ref.invalidate(channelHistoryProvider);
@@ -405,6 +418,9 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.read(messageExtrasProvider.notifier).clear();
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     _ref.read(dmCallActivityProvider.notifier).clear();
+    _ref.read(presenceControllerProvider.notifier).clear();
+    // A session can end without the user asking; see this method's own doc.
+    unawaited(_ref.read(voiceControllerProvider.notifier).leave());
     try {
       final store = await _ref.read(storeProvider.future);
       await store.clear();

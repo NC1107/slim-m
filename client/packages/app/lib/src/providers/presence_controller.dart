@@ -28,6 +28,19 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
   final Ref _ref;
   late final StreamSubscription<api.ServerEvent> _sub;
 
+  /// Forgets every cached status, for a session ending.
+  ///
+  /// This provider is deliberately app-lifetime rather than `autoDispose`, so
+  /// nothing else would ever empty it: a sign-out followed by a different
+  /// account signing in on the same device would show that account the
+  /// previous one's presence - plainly wrong, since a status is per-person
+  /// and the two accounts see different people online. Every sibling cache
+  /// with this shape either runs its own session listener or is cleared by
+  /// `SyncController`; this one had neither.
+  void clear() {
+    if (mounted) state = const {};
+  }
+
   /// Batch-fetches presence for [userIds] and merges it into what is already
   /// known. Best-effort: a failed refresh just leaves the map as it was
   /// rather than surfacing an error the member pane has nowhere to show.

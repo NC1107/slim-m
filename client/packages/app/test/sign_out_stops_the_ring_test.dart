@@ -19,6 +19,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_app/src/providers/dm_call_ring_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 
 const _tokens = api.TokenPair(
@@ -68,11 +69,21 @@ void main() {
         isNotNull,
         reason: 'sanity: really ringing before the sign-out',
       );
+      container.read(presenceControllerProvider.notifier).state = const {
+        'user-2': api.PresenceState.online,
+      };
 
       session.clear();
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
+      expect(
+        container.read(presenceControllerProvider),
+        isEmpty,
+        reason:
+            'presence cached under the previous account must not survive into '
+            'the next one on a shared device',
+      );
       expect(
         container.read(dmCallRingControllerProvider).incoming,
         isNull,
