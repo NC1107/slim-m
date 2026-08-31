@@ -47,6 +47,7 @@ mod extract;
 pub mod gifs;
 mod invites;
 mod members;
+mod members_bulk;
 mod message_dto;
 mod message_enrich;
 mod messages;
@@ -140,6 +141,7 @@ pub fn router(state: AppState) -> Router {
         .merge(emoji::routes())
         .merge(invites::routes())
         .merge(members::routes())
+        .merge(members_bulk::routes())
         .merge(messages::routes())
         .merge(messages_bulk::router())
         .merge(messages_bulk_window::router())

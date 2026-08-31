@@ -183,6 +183,49 @@ extension SlimmApiMemberModeration on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Removes several members at once. Requires BAN_MEMBERS.
+  ///
+  /// The batch is all or nothing: if any named member sits above the caller's
+  /// own permissions, or removing them all would leave the deployment with no
+  /// administrator, nothing is removed. Repeated ids count once.
+  ///
+  /// At most 64 members; a longer list is refused rather than truncated, the
+  /// same rule the bulk message delete keeps for its own cap.
+  Future<void> bulkRemoveMembers({
+    required List<String> userIds,
+    String? reason,
+  }) =>
+      _send(
+        'POST',
+        '/members/bulk-removal',
+        body: {
+          'user_ids': userIds,
+          if (reason != null) 'reason': reason,
+        },
+        expectNoContent: true,
+      );
+
+  /// Times several members out at once. Requires KICK_MEMBERS.
+  ///
+  /// Every member in one batch comes back at the same moment: the deadline is
+  /// computed once server-side rather than per member. All or nothing, and
+  /// capped at 64, exactly as [bulkRemoveMembers] is.
+  Future<void> bulkTimeoutMembers({
+    required List<String> userIds,
+    required Duration duration,
+    String? reason,
+  }) =>
+      _send(
+        'POST',
+        '/members/bulk-timeout',
+        body: {
+          'user_ids': userIds,
+          'duration_seconds': duration.inSeconds,
+          if (reason != null) 'reason': reason,
+        },
+        expectNoContent: true,
+      );
+
   /// Every removal in force, newest first. Requires BAN_MEMBERS.
   Future<List<SpaceRemoval>> listRemovedMembers() async {
     final json = await _send('GET', '/members/removed');

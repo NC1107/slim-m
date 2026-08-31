@@ -16,6 +16,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_presence.dart';
+import '../providers/member_selection.dart';
 import '../providers/presence_controller.dart';
 import 'member_profile.dart';
 import 'user_avatar.dart';
@@ -109,9 +110,17 @@ class MemberRow extends ConsumerWidget {
     // Only the first: a row that grew with role count would push the name out of a 236px pane.
     final badge = displayed.roles.isEmpty ? null : displayed.roles.first;
 
+    // Scoped to this row's two facts: the set is a new object per toggle, so watching it rebuilds every row.
+    final (selecting, selected) = ref.watch(
+      memberSelectionProvider.select((s) => (s.active, s.contains(profile.id))),
+    );
+    final selectable = selecting && !isSelf;
+
     void open() => unawaited(
       showMemberProfile(context, ref, profile: displayed, status: status),
     );
+    void toggle() =>
+        ref.read(memberSelectionProvider.notifier).toggle(profile.id);
 
     final row = AppListRow(
       // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
@@ -132,10 +141,18 @@ class MemberRow extends ConsumerWidget {
         size: 26,
         status: status,
       ),
+      selected: selected,
       // Opens the profile, which is where every verb about a member lives now.
-      onTap: open,
+      onTap: selectable
+          ? toggle
+          : selecting
+          ? null
+          : open,
     );
 
-    return GestureDetector(onSecondaryTapDown: (_) => open(), child: row);
+    return GestureDetector(
+      onSecondaryTapDown: selecting ? null : (_) => open(),
+      child: row,
+    );
   }
 }
