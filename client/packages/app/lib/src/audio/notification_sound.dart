@@ -45,6 +45,18 @@ enum NotificationSound {
 /// The seam a test fakes instead of touching a real audio device.
 abstract class SoundPlayer {
   Future<void> play(NotificationSound sound);
+
+  /// Starts [sound] looping until [stopLoop] - an incoming call's own shape,
+  /// where one chime for the whole ring window is the wrong sound entirely.
+  /// A separate call from [play]'s one-shot family rather than a parameter
+  /// on it: [AudioPlayersSoundPlayer] runs this on its own player, so a
+  /// message chime arriving mid-ring plays over it rather than cutting it
+  /// off, and stopping the ring later never touches an unrelated one-shot.
+  Future<void> loop(NotificationSound sound);
+
+  /// Stops whatever [loop] started. A no-op if nothing is looping.
+  Future<void> stopLoop();
+
   Future<void> dispose();
 }
 
@@ -52,9 +64,15 @@ abstract class SoundPlayer {
 /// session, route, or focus a live call already holds - see the library
 /// doc comment above for why that is this package's whole reason to exist.
 class AudioPlayersSoundPlayer implements SoundPlayer {
-  AudioPlayersSoundPlayer() : _player = AudioPlayer();
+  AudioPlayersSoundPlayer()
+    : _player = AudioPlayer(),
+      _loopPlayer = AudioPlayer();
 
   final AudioPlayer _player;
+
+  /// Its own player, never the shared [_player]: see [SoundPlayer.loop]'s
+  /// own doc for why a looping ring and a one-shot chime must not share one.
+  final AudioPlayer _loopPlayer;
 
   /// Backlog #134: the wav family is already level with itself (see
   /// `assets/audio/synth.py`'s `TARGET_LUFS`), but `audioplayers` defaults a
@@ -96,5 +114,22 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
   }
 
   @override
-  Future<void> dispose() => _player.dispose();
+  Future<void> loop(NotificationSound sound) async {
+    await _loopPlayer.stop();
+    await _loopPlayer.setReleaseMode(ReleaseMode.loop);
+    await _loopPlayer.play(
+      AssetSource(sound._playerPath),
+      volume: playbackVolume,
+      ctx: _context,
+    );
+  }
+
+  @override
+  Future<void> stopLoop() => _loopPlayer.stop();
+
+  @override
+  Future<void> dispose() async {
+    await _player.dispose();
+    await _loopPlayer.dispose();
+  }
 }

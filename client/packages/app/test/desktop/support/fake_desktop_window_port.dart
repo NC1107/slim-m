@@ -18,6 +18,7 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   WindowRect bounds = const WindowRect(x: 10, y: 10, width: 1280, height: 720);
 
   int hideCalls = 0;
+  int focusCalls = 0;
   int minimizeCalls = 0;
   int maximizeCalls = 0;
   int unmaximizeCalls = 0;
@@ -84,6 +85,8 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   Future<void> setFullScreen(bool value) async {}
   @override
   Future<void> show() async => showCalls++;
+  @override
+  Future<void> focus() async => focusCalls++;
   @override
   Future<bool> isVisible() async => visible;
   @override

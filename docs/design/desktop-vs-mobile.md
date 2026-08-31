@@ -35,8 +35,9 @@ On compact: back is `compact_channel_app_bar`, the rail becomes `channel_rail_dr
 4. **A short task with a submit** (create channel, compose a poll, crop an avatar, confirm a destructive act) -> **`showAppSheet`**: a bottom sheet under 600, a centered dialog (max 460) above it. Never a raw `AlertDialog` or hand-rolled `showDialog`.
 5. **A place with its own nav or list you return to** (settings, admin, member management) -> **`modalPage` route**: fullscreen on a phone, a floating ~860x720 panel on desktop. Sections inside are `SettingsPanes`, never their own dialogs.
 6. **Status the user did not ask for** (offline, retrying, a degraded call) -> **banner**: it pushes content, never overlays it. Amber is transient; red attaches to what failed. Snackbars/toasts are for confirmations only, never for errors.
+7. **An unsolicited, time-limited prompt that demands a decision** (an incoming call, an invite that expires) -> **full-focus overlay**: painted above the routed tree and above every dialog and sheet, never in flow - a status banner pushes content because there is nothing to decide, but this vanishes on its own timeout unless answered, so it must be seen. On desktop it also raises and focuses the window, so it reaches the user even minimized or behind another app. Below `kCompactWidth` it is a full-screen takeover, the same shape a phone's own incoming-call screen already uses; at or above it, a floating card that leaves the rest of the window usable. Escape (or its on-screen equivalent) resolves it to a less intrusive state, the same "no keyboard trap" rule every other surface here follows.
 
-Write the rule number (1-6) in the PR description.
+Write the rule number (1-7) in the PR description.
 If none fits, the design question comes back to the spec before code is written.
 
 ## Never-rules
@@ -87,6 +88,7 @@ Every desktop affordance must state its compact equivalent, or it is not done.
 | side pane (members, pins) | a drill-in route with back (180ms + 30% parallax) | overlay drawers that trap scroll |
 | inline edit-in-place | the same, composer expanded to fit | a separate edit screen |
 | drag to reorder | long-press lifts, same drop rules | reorder hidden behind an edit mode |
+| full-focus overlay (floating card) | full-screen takeover, same two actions | a desktop-only accept/decline pair |
 
 ## The review question
 

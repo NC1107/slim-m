@@ -17,7 +17,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/audio/notification_sound.dart';
 import 'package:slimm_app/src/providers/blocks_controller.dart';
-import 'package:slimm_app/src/providers/dm_call_activity.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/notification_sound_controller.dart';
 import 'package:slimm_app/src/providers/notification_sound_settings.dart';
@@ -30,13 +29,11 @@ class _NoopPlayer implements SoundPlayer {
   @override
   Future<void> play(NotificationSound sound) async {}
   @override
+  Future<void> loop(NotificationSound sound) async {}
+  @override
+  Future<void> stopLoop() async {}
+  @override
   Future<void> dispose() async {}
-}
-
-class _FakeDmCallActivity extends DmCallActivityController {
-  _FakeDmCallActivity(super.ref);
-
-  void emit(Map<String, bool> next) => state = next;
 }
 
 const _tokens = api.TokenPair(
@@ -207,18 +204,14 @@ void main() {
     await setup.dispose();
   });
 
-  test('a DM call starting live fires the call-ring haptic', () async {
-    late _FakeDmCallActivity activity;
+  test('an incoming DM call ring fires the call-ring haptic', () async {
     final callRingTicks = <int>[];
+    final events = StreamController<api.ServerEvent>.broadcast();
     final container = ProviderContainer(
       overrides: [
         keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
         sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-        liveEventsProvider.overrideWithValue(const Stream.empty()),
-        dmCallActivityProvider.overrideWith((ref) {
-          activity = _FakeDmCallActivity(ref);
-          return activity;
-        }),
+        liveEventsProvider.overrideWithValue(events.stream),
         notificationSoundControllerProvider.overrideWith(
           (ref) => NotificationSoundController(
             ref,
@@ -229,50 +222,55 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    addTearDown(events.close);
     container.read(notificationSoundControllerProvider);
     container.read(voiceSettingsControllerProvider);
     await pumpEventQueue();
 
-    activity.emit({'dm-1': false});
-    await pumpEventQueue();
-    activity.emit({'dm-1': true});
+    events.add(
+      const api.CallRinging(
+        channelId: 'dm-1',
+        ringId: 'ring-1',
+        callerId: 'alice',
+      ),
+    );
     await pumpEventQueue();
 
     expect(callRingTicks, [1]);
   });
 
-  test(
-    'the first, catch-up answer about an ongoing call fires no haptic',
-    () async {
-      late _FakeDmCallActivity activity;
-      final callRingTicks = <int>[];
-      final container = ProviderContainer(
-        overrides: [
-          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-          sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-          liveEventsProvider.overrideWithValue(const Stream.empty()),
-          dmCallActivityProvider.overrideWith((ref) {
-            activity = _FakeDmCallActivity(ref);
-            return activity;
-          }),
-          notificationSoundControllerProvider.overrideWith(
-            (ref) => NotificationSoundController(
-              ref,
-              player: _NoopPlayer(),
-              callRingHaptic: () => callRingTicks.add(1),
-            ),
+  test('this device\'s own outgoing ring fires no haptic', () async {
+    final callRingTicks = <int>[];
+    final events = StreamController<api.ServerEvent>.broadcast();
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+        liveEventsProvider.overrideWithValue(events.stream),
+        notificationSoundControllerProvider.overrideWith(
+          (ref) => NotificationSoundController(
+            ref,
+            player: _NoopPlayer(),
+            callRingHaptic: () => callRingTicks.add(1),
           ),
-        ],
-      );
-      addTearDown(container.dispose);
-      container.read(notificationSoundControllerProvider);
-      container.read(voiceSettingsControllerProvider);
-      await pumpEventQueue();
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(events.close);
+    container.read(notificationSoundControllerProvider);
+    container.read(voiceSettingsControllerProvider);
+    await pumpEventQueue();
 
-      activity.emit({'dm-1': true});
-      await pumpEventQueue();
+    events.add(
+      const api.CallRinging(
+        channelId: 'dm-1',
+        ringId: 'ring-1',
+        callerId: 'me',
+      ),
+    );
+    await pumpEventQueue();
 
-      expect(callRingTicks, isEmpty);
-    },
-  );
+    expect(callRingTicks, isEmpty);
+  });
 }

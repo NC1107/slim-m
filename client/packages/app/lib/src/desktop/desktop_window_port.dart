@@ -64,6 +64,14 @@ abstract interface class DesktopWindowPort {
   Future<void> setFullScreen(bool value);
   Future<void> hide();
   Future<void> show();
+
+  /// Raises the window and gives it input focus - `window_manager`'s own
+  /// `focus`, distinct from [show]: a hidden window needs [show] first, but
+  /// a visible one merely buried behind another app or lacking focus needs
+  /// only this. `IncomingCallOverlay` calls both, in that order, so a ring
+  /// reaches the user whether the window is minimized, hidden, or simply
+  /// not the one with focus.
+  Future<void> focus();
   Future<bool> isVisible();
   Future<void> minimize();
   Future<void> restore();
@@ -181,6 +189,9 @@ class WindowManagerDesktopWindowPort
 
   @override
   Future<void> show() => wm.windowManager.show();
+
+  @override
+  Future<void> focus() => wm.windowManager.focus();
 
   @override
   Future<bool> isVisible() => wm.windowManager.isVisible();

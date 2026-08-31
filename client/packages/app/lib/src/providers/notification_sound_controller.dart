@@ -1,14 +1,25 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Plays a notification chime for the three kinds of event this client can
 /// already see live: an incoming message, a voice roster changing while
-/// connected, and a DM call becoming active while this device is not
-/// already on it.
+/// connected, and an incoming DM call ring.
 ///
 /// A message (or mention, or DM) and a call ring also fire a matching
 /// [AppHaptics] cue on mobile - the platform's own real-time notification
 /// moments, per the owner's own list - gated by the identical conditions the
 /// sound itself already reads, since they ride the same call site rather
 /// than a second copy of the rule.
+///
+/// The ring rides [dmCallRingControllerProvider]'s own `incoming` field
+/// (the same one `IncomingCallOverlay` shows), not `dmCallActivityProvider`
+/// - that provider answers a different question, "does this DM currently
+/// have a call in progress" for `DmRow`'s own indicator, learned from
+/// `Event::VoiceActivityChanged` (somebody's heartbeat), and a heartbeat is
+/// not a ring: it fires the same way whether or not the callee was ever
+/// notified, and stays set for as long as the call runs rather than for the
+/// 30-second window a ring actually rings. Driving the chime from it meant a
+/// call joined with no ring at all still played one, silently, with no
+/// overlay to explain it, and a ring that reached the callee before the
+/// caller's own room registered played nothing.
 ///
 /// Wired at `HomeShell` (`ref.watch`, the same forced-instantiation shape
 /// [blocksProvider] already uses) so it is created once for the signed-in
@@ -27,7 +38,7 @@ import '../audio/notification_sound.dart';
 import '../widgets/message_mentions.dart' show messageMentionsUsername;
 import 'blocks_controller.dart';
 import 'channel_notification_overrides_controller.dart';
-import 'dm_call_activity.dart';
+import 'dm_call_ring_controller.dart';
 import 'live_events.dart';
 import 'notification_sound_rules.dart';
 import 'notification_sound_settings.dart';
@@ -54,9 +65,9 @@ class NotificationSoundController {
       voiceControllerProvider,
       _onVoiceStateChanged,
     );
-    _dmCallSub = _ref.listen<Map<String, bool>>(
-      dmCallActivityProvider,
-      _onDmCallActivityChanged,
+    _ringSub = _ref.listen<IncomingDmCallRing?>(
+      dmCallRingControllerProvider.select((s) => s.incoming),
+      _onIncomingRingChanged,
     );
   }
 
@@ -66,7 +77,7 @@ class NotificationSoundController {
   final HapticsCue _callRingHaptic;
   late final StreamSubscription<api.ServerEvent> _messages;
   late final ProviderSubscription<VoiceState> _voiceSub;
-  late final ProviderSubscription<Map<String, bool>> _dmCallSub;
+  late final ProviderSubscription<IncomingDmCallRing?> _ringSub;
 
   /// Who was already in the call the moment [voiceControllerProvider] last
   /// read [VoiceSessionState.connected], excluding this device's own
@@ -197,29 +208,34 @@ class NotificationSoundController {
 
   // --- An incoming DM call ---
 
-  void _onDmCallActivityChanged(
-    Map<String, bool>? previous,
-    Map<String, bool> next,
+  /// [DmCallRingController] already excludes this device's own outgoing
+  /// ring (`callerId == selfId`) from ever becoming `incoming`, so the only
+  /// guard left here is the same one the old activity-based version kept:
+  /// never ring for a channel this device is already on.
+  void _onIncomingRingChanged(
+    IncomingDmCallRing? previous,
+    IncomingDmCallRing? next,
   ) {
+    if (next != null) {
+      _startRinging(next);
+    } else if (previous != null) {
+      unawaited(_player.stopLoop());
+    }
+  }
+
+  void _startRinging(IncomingDmCallRing ring) {
     if (!_ref.read(voiceSettingsControllerProvider).callRingSoundEnabled) {
       return;
     }
-    final myCallChannel = _ref.read(voiceControllerProvider).channelId;
-    for (final entry in next.entries) {
-      // No prior answer here is a catch-up resolution, not a live start; see [diffRoster].
-      if (previous == null || !previous.containsKey(entry.key)) continue;
-      final wasActive = previous[entry.key] ?? false;
-      if (entry.value && !wasActive && entry.key != myCallChannel) {
-        unawaited(_player.play(NotificationSound.callRing));
-        _callRingHaptic();
-      }
-    }
+    if (ring.channelId == _ref.read(voiceControllerProvider).channelId) return;
+    unawaited(_player.loop(NotificationSound.callRing));
+    _callRingHaptic();
   }
 
   void dispose() {
     unawaited(_messages.cancel());
     _voiceSub.close();
-    _dmCallSub.close();
+    _ringSub.close();
     unawaited(_player.dispose());
   }
 }

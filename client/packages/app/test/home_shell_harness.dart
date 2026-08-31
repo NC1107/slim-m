@@ -36,6 +36,12 @@ class _SilentSoundPlayer implements SoundPlayer {
   Future<void> play(NotificationSound sound) async {}
 
   @override
+  Future<void> loop(NotificationSound sound) async {}
+
+  @override
+  Future<void> stopLoop() async {}
+
+  @override
   Future<void> dispose() async {}
 }
 

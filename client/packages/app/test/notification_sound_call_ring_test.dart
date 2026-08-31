@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// [NotificationSoundController]'s incoming-DM-call half: `call_ring` fires
-/// only for a DM call actually starting live, never for the first catch-up
-/// answer about one already under way, and never for a call this device is
-/// already on.
+/// [NotificationSoundController]'s incoming-DM-call half: a ring loops
+/// `call_ring` until answered, declined or timed out, never for a ring this
+/// device itself started, never for a call this device is already on, and -
+/// the phantom-ring regression this file exists to pin - never for mere
+/// voice activity with no ring behind it at all.
 library;
 
 import 'dart:async';
@@ -13,7 +14,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/audio/notification_sound.dart';
-import 'package:slimm_app/src/providers/dm_call_activity.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/notification_sound_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
@@ -21,12 +21,6 @@ import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/providers/voice_settings_controller.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
-
-class _FakeDmCallActivity extends DmCallActivityController {
-  _FakeDmCallActivity(super.ref);
-
-  void emit(Map<String, bool> next) => state = next;
-}
 
 /// A [VoiceController] whose channel can be set directly, with no SFU round
 /// trip: this file only ever needs `channelId`, never a real call.
@@ -115,17 +109,32 @@ class _DeadSession implements VoiceSession {
   Future<void> dispose() async {}
 }
 
+/// Records what a real [AudioPlayersSoundPlayer] would actually do, split
+/// into the one-shot family ([play]) and the ring's own loop, rather than
+/// just a flat list of sounds - the two run on separate players in the real
+/// implementation and this file's whole point is telling them apart.
 class _FakePlayer implements SoundPlayer {
   final played = <NotificationSound>[];
+  NotificationSound? looping;
+  int stopLoopCalls = 0;
 
   @override
   Future<void> play(NotificationSound sound) async => played.add(sound);
 
   @override
+  Future<void> loop(NotificationSound sound) async => looping = sound;
+
+  @override
+  Future<void> stopLoop() async {
+    stopLoopCalls++;
+    looping = null;
+  }
+
+  @override
   Future<void> dispose() async {}
 }
 
-const _tokens = api.TokenPair(
+const _me = api.TokenPair(
   userId: 'me',
   accessToken: 'access',
   refreshToken: 'refresh',
@@ -133,104 +142,139 @@ const _tokens = api.TokenPair(
 );
 
 class _Setup {
-  _Setup(this.container, this.activity, this.player);
+  _Setup(this.container, this.events, this.player);
 
   final ProviderContainer container;
-  final _FakeDmCallActivity activity;
+  final StreamController<api.ServerEvent> events;
   final _FakePlayer player;
+
+  Future<void> dispose() async {
+    container.dispose();
+    await events.close();
+  }
 }
 
-Future<_Setup> _wire() async {
-  late _FakeDmCallActivity activity;
+Future<_Setup> _wire({List<Override> extra = const []}) async {
+  final events = StreamController<api.ServerEvent>.broadcast();
   final player = _FakePlayer();
 
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-      sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-      liveEventsProvider.overrideWithValue(const Stream.empty()),
-      dmCallActivityProvider.overrideWith((ref) {
-        activity = _FakeDmCallActivity(ref);
-        return activity;
-      }),
+      sessionProvider.overrideWithValue(api.SessionStore(tokens: _me)),
+      liveEventsProvider.overrideWithValue(events.stream),
       notificationSoundControllerProvider.overrideWith(
         (ref) => NotificationSoundController(ref, player: player),
       ),
+      ...extra,
     ],
   );
   container.read(notificationSoundControllerProvider);
   container.read(voiceSettingsControllerProvider);
   await pumpEventQueue();
 
-  return _Setup(container, activity, player);
+  return _Setup(container, events, player);
 }
+
+void _ring(_Setup s, {String channelId = 'dm-1', String callerId = 'alice'}) =>
+    s.events.add(
+      api.CallRinging(
+        channelId: channelId,
+        ringId: 'ring-1',
+        callerId: callerId,
+      ),
+    );
+
+void _endRing(_Setup s, api.CallRingOutcome outcome) => s.events.add(
+  api.CallRingEnded(channelId: 'dm-1', ringId: 'ring-1', outcome: outcome),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test(
-    'the first, catch-up answer about an ongoing call plays nothing',
-    () async {
-      final setup = await _wire();
-      setup.activity.emit({'dm-1': true});
-      await pumpEventQueue();
-
-      expect(setup.player.played, isEmpty);
-    },
-  );
-
-  test('a DM call starting live after that plays call_ring', () async {
+  test('an incoming ring starts the looping ring sound', () async {
     final setup = await _wire();
-    setup.activity.emit({'dm-1': false});
-    await pumpEventQueue();
-    setup.activity.emit({'dm-1': true});
+    _ring(setup);
     await pumpEventQueue();
 
-    expect(setup.player.played, [NotificationSound.callRing]);
+    expect(setup.player.looping, NotificationSound.callRing);
+    await setup.dispose();
   });
 
-  test('a DM call ending plays nothing', () async {
+  test('answering stops the ring sound', () async {
     final setup = await _wire();
-    setup.activity.emit({'dm-1': true});
+    _ring(setup);
     await pumpEventQueue();
-    setup.activity.emit({'dm-1': false});
+    _endRing(setup, api.CallRingOutcome.answered);
     await pumpEventQueue();
 
+    expect(setup.player.looping, isNull);
+    expect(setup.player.stopLoopCalls, 1);
+    await setup.dispose();
+  });
+
+  test('declining stops the ring sound', () async {
+    final setup = await _wire();
+    _ring(setup);
+    await pumpEventQueue();
+    _endRing(setup, api.CallRingOutcome.declined);
+    await pumpEventQueue();
+
+    expect(setup.player.looping, isNull);
+    await setup.dispose();
+  });
+
+  test('the ring timing out stops the ring sound', () async {
+    final setup = await _wire();
+    _ring(setup);
+    await pumpEventQueue();
+    _endRing(setup, api.CallRingOutcome.timedOut);
+    await pumpEventQueue();
+
+    expect(setup.player.looping, isNull);
+    await setup.dispose();
+  });
+
+  test('voice activity with no ring behind it plays nothing - the phantom-ring '
+      'regression: a DM call becoming active used to chime on its own, with no '
+      'overlay and no ring to explain it', () async {
+    final setup = await _wire();
+    setup.events.add(const api.VoiceActivityChanged(channelId: 'dm-1'));
+    await pumpEventQueue();
+
+    expect(setup.player.looping, isNull);
     expect(setup.player.played, isEmpty);
+    await setup.dispose();
   });
 
-  test('a call this device already joined does not ring for itself', () async {
-    late _FakeDmCallActivity activity;
-    final player = _FakePlayer();
-    final container = ProviderContainer(
-      overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-        liveEventsProvider.overrideWithValue(const Stream.empty()),
-        dmCallActivityProvider.overrideWith((ref) {
-          activity = _FakeDmCallActivity(ref);
-          return activity;
+  test('this device\'s own outgoing ring never rings for itself', () async {
+    final setup = await _wire();
+    _ring(setup, callerId: 'me');
+    await pumpEventQueue();
+
+    expect(setup.player.looping, isNull);
+    await setup.dispose();
+  });
+
+  test('a call this device is already on does not ring', () async {
+    late _FixedChannelVoiceController voice;
+    final setup = await _wire(
+      extra: [
+        voiceControllerProvider.overrideWith((ref) {
+          voice = _FixedChannelVoiceController(ref);
+          return voice;
         }),
-        voiceControllerProvider.overrideWith(_FixedChannelVoiceController.new),
-        notificationSoundControllerProvider.overrideWith(
-          (ref) => NotificationSoundController(ref, player: player),
-        ),
       ],
     );
-    container.read(notificationSoundControllerProvider);
-    container.read(voiceSettingsControllerProvider);
-    (container.read(voiceControllerProvider.notifier)
-            as _FixedChannelVoiceController)
-        .setChannel('dm-1');
+    voice.setChannel('dm-1');
     await pumpEventQueue();
 
-    activity.emit({'dm-1': false});
-    await pumpEventQueue();
-    activity.emit({'dm-1': true});
+    _ring(setup);
     await pumpEventQueue();
 
-    expect(player.played, isEmpty);
+    expect(setup.player.looping, isNull);
+    await setup.dispose();
   });
 
   test('turning the incoming-call sound off silences a real ring', () async {
@@ -238,11 +282,10 @@ void main() {
     await setup.container
         .read(voiceSettingsControllerProvider.notifier)
         .setCallRingSoundEnabled(false);
-    setup.activity.emit({'dm-1': false});
-    await pumpEventQueue();
-    setup.activity.emit({'dm-1': true});
+    _ring(setup);
     await pumpEventQueue();
 
-    expect(setup.player.played, isEmpty);
+    expect(setup.player.looping, isNull);
+    await setup.dispose();
   });
 }
