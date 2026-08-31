@@ -79,16 +79,15 @@ bool isSharingScreen(lk.Participant? p) => _publishesLiveVideo(
 bool hasCameraTrack(lk.Participant? p) =>
     _publishesLiveVideo(p, lk.TrackSource.camera);
 
-bool _publishesLiveVideo(lk.Participant? p, lk.TrackSource source) =>
-    p == null
-        ? false
-        : anyLiveVideo(
-            [
-              for (final t in p.videoTrackPublications)
-                (source: t.source, muted: t.muted),
-            ],
-            source,
-          );
+bool _publishesLiveVideo(lk.Participant? p, lk.TrackSource source) => p == null
+    ? false
+    : anyLiveVideo(
+        [
+          for (final t in p.videoTrackPublications)
+            (source: t.source, muted: t.muted),
+        ],
+        source,
+      );
 
 /// Whether any of [publications] is a LIVE track of [source] - published and
 /// unmuted, rather than merely published.

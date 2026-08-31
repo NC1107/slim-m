@@ -72,7 +72,8 @@ void main() {
       );
     });
 
-    test('a muted camera alongside a live screen share still reads screen '
+    test(
+        'a muted camera alongside a live screen share still reads screen '
         'share live and camera off', () {
       final pubs = [
         (source: lk.TrackSource.camera, muted: true),
