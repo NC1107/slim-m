@@ -149,4 +149,101 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel(_selectLabel), findsNothing);
   });
+
+  testWidgets('a roster that fails mid-selection still offers a way out', (
+    tester,
+  ) async {
+    // Pins the bug: the bar lived inside the roster's `data` branch, so a failed refetch took the only Cancel with it.
+    var fails = false;
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = _fakeApi(ref.watch(sessionProvider));
+          ref.onDispose(api.close);
+          return api;
+        }),
+        membersProvider.overrideWith((ref) async {
+          if (fails) throw const TransportException('offline');
+          return [_profile('1', 'Priya')];
+        }),
+        myPermissionsProvider.overrideWithValue(Perm.banMembers),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel(_selectLabel));
+    await tester.pumpAndSettle();
+    expect(container.read(memberSelectionProvider).active, isTrue);
+
+    fails = true;
+    container.invalidate(membersProvider);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load members.'), findsOneWidget);
+    expect(
+      find.text('Cancel'),
+      findsOneWidget,
+      reason: 'the mode is still on, so its way out must still be on screen',
+    );
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(container.read(memberSelectionProvider).active, isFalse);
+  });
+
+  testWidgets('losing both moderation bits ends the mode', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = _fakeApi(ref.watch(sessionProvider));
+          ref.onDispose(api.close);
+          return api;
+        }),
+        membersProvider.overrideWith((ref) async => [_profile('1', 'Priya')]),
+        myPermissionsProvider.overrideWith((ref) => ref.watch(_perms)),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel(_selectLabel));
+    await tester.pumpAndSettle();
+    expect(container.read(memberSelectionProvider).active, isTrue);
+
+    container.read(_perms.notifier).state = 0;
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(memberSelectionProvider).active,
+      isFalse,
+      reason: 'a mode with no verb left in it should not stay open',
+    );
+  });
 }
+
+/// Stands in for whatever feeds `myPermissionsProvider`, so a test can revoke
+/// a bit mid-session the way losing a role would.
+final _perms = StateProvider<int>((ref) => Perm.banMembers);

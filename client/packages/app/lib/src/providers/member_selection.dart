@@ -76,6 +76,13 @@ class MemberSelectionController extends StateNotifier<MemberSelection> {
   }
 
   /// Ends selection mode and forgets everything picked.
+  ///
+  /// Called on the compact layout when the member drawer closes
+  /// (`home_shell.dart`'s `onEndDrawerChanged`), which the wide layout gets
+  /// for free. A `Scaffold` builds its `endDrawer` child whether or not the
+  /// drawer is open, so the pane stays mounted there and these autoDispose
+  /// providers never reset; without that call a forgotten selection would
+  /// resurface the next time the roster slid in.
   void clear() => state = const MemberSelection();
 }
 

@@ -75,6 +75,13 @@ class AppMemberPane extends ConsumerWidget {
     final canTimeOut = mine.hasPermission(Perm.kickMembers);
     final canRemove = mine.hasPermission(Perm.banMembers);
     final selecting = ref.watch(memberSelectionProvider).active;
+    // A bit revoked mid-selection leaves a mode with no verb left in it.
+    ref.listen(myPermissionsProvider, (_, next) {
+      final stillAllowed =
+          next.hasPermission(Perm.kickMembers) ||
+          next.hasPermission(Perm.banMembers);
+      if (!stillAllowed) ref.read(memberSelectionProvider.notifier).clear();
+    });
 
     return Container(
       width: width,
@@ -82,20 +89,21 @@ class AppMemberPane extends ConsumerWidget {
         color: tokens.surfaceSunken,
         border: Border(left: BorderSide(color: tokens.borderSubtle)),
       ),
-      child: membersAsync.when(
-        loading: () => Column(
-          children: [
-            const _Header(count: null),
-            const Expanded(
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
-          ],
-        ),
-        error: (error, _) => Column(
-          children: [
-            const _Header(count: null),
-            Expanded(
-              child: Center(
+      child: Column(
+        children: [
+          _Header(
+            count: membersAsync.valueOrNull?.length,
+            // Only a moderator is offered the mode; the server refuses the rest anyway.
+            onStartSelecting: (canTimeOut || canRemove) && !selecting
+                ? ref.read(memberSelectionProvider.notifier).enter
+                : null,
+          ),
+          Expanded(
+            child: membersAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              error: (error, _) => Center(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.s16),
                   child: Column(
@@ -118,28 +126,15 @@ class AppMemberPane extends ConsumerWidget {
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-        data: (members) {
-          // A read, not a watch: this build already reruns on the scoped watch above.
-          final presence = ref.read(presenceControllerProvider);
-          final statusOf = {
-            for (final entry in presence.entries)
-              entry.key: presenceOf(entry.value),
-          };
-          final grouped = groupMembersByPresence(members, statusOf);
-          return Column(
-            children: [
-              _Header(
-                count: members.length,
-                // Only a moderator is offered the mode; the server refuses the rest anyway.
-                onStartSelecting: (canTimeOut || canRemove) && !selecting
-                    ? ref.read(memberSelectionProvider.notifier).enter
-                    : null,
-              ),
-              Expanded(
-                child: ListView(
+              data: (members) {
+                // A read, not a watch: this build already reruns on the scoped watch above.
+                final presence = ref.read(presenceControllerProvider);
+                final statusOf = {
+                  for (final entry in presence.entries)
+                    entry.key: presenceOf(entry.value),
+                };
+                final grouped = groupMembersByPresence(members, statusOf);
+                return ListView(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s8,
                     vertical: AppSpacing.s8,
@@ -156,19 +151,21 @@ class AppMemberPane extends ConsumerWidget {
                         MemberRow(profile: m, isSelf: m.id == myId),
                     ],
                   ],
-                ),
-              ),
-              if (selecting)
-                MemberSelectionBar(
-                  canTimeOut: canTimeOut,
-                  canRemove: canRemove,
-                  onTimeOut: (duration) =>
-                      unawaited(timeOutSelectedMembers(ref, context, duration)),
-                  onRemove: () => confirmAndRemoveSelectedMembers(ref, context),
-                ),
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+          // Outside the async branches on purpose: a roster refetch that fails
+          // mid-selection must not take the only way out of the mode with it.
+          if (selecting)
+            MemberSelectionBar(
+              canTimeOut: canTimeOut,
+              canRemove: canRemove,
+              onTimeOut: (duration) =>
+                  unawaited(timeOutSelectedMembers(ref, context, duration)),
+              onRemove: () => confirmAndRemoveSelectedMembers(ref, context),
+            ),
+        ],
       ),
     );
   }

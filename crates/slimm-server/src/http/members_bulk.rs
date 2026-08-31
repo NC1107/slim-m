@@ -22,6 +22,8 @@
 
 use std::collections::HashSet;
 
+use futures_util::stream::{self, StreamExt};
+
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::StatusCode;
@@ -33,7 +35,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::escalation::escalation_guard;
 use super::extract::{Authed, Json, enforce};
-use super::members::{evict_from_voice, require};
+use super::members::{evict_from_rooms, require, voice_room_ids};
 use super::messages::parse_uuid;
 use super::safety::validate_reason;
 use crate::hub::Event;
@@ -56,6 +58,9 @@ const BODY_LIMIT: usize = 4 * 1024;
 /// It also bounds the voice eviction, which is the slow half: each target is
 /// swept out of every voice channel and every DM they are party to.
 pub const MAX_BULK_MEMBER_IDS: usize = 64;
+
+/// How many members are swept out of voice at once; see [`evict_all_from_voice`].
+const EVICT_CONCURRENCY: usize = 8;
 
 #[derive(Deserialize)]
 struct BulkRemovalRequest {
@@ -210,14 +215,26 @@ async fn authorize_all(
     Ok(())
 }
 
-/// Sweeps every target out of voice, one after another.
+/// Sweeps every target out of voice.
 ///
-/// Sequential rather than concurrent on purpose: each call is a request to the
-/// SFU, and sixty-four members times every voice channel and DM is already the
-/// widest fan-out this server makes. Best effort throughout, the same as the
-/// single path - the moderation act has committed either way.
+/// The shared voice room list is read once for the batch rather than once per
+/// member, and the evictions run with bounded concurrency. Sequential would be
+/// simpler, but each eviction is an SFU call carrying its own five-second
+/// timeout, so sixty-four members across a handful of rooms could hold one
+/// request open for the better part of an hour against a slow-but-answering
+/// SFU. [`EVICT_CONCURRENCY`] bounds the wall clock without letting a batch
+/// open an unbounded number of connections to the SFU at once.
+///
+/// Best effort throughout, as the single path is: the moderation act has
+/// already committed, and this runs outside its transaction.
 async fn evict_all_from_voice(state: &AppState, targets: &[UserId]) {
-    for target in targets {
-        evict_from_voice(state, *target).await;
-    }
+    let Some(rooms) = voice_room_ids(state).await else {
+        return;
+    };
+    stream::iter(targets)
+        .for_each_concurrent(EVICT_CONCURRENCY, |target| {
+            let rooms = &rooms;
+            async move { evict_from_rooms(state, *target, rooms).await }
+        })
+        .await;
 }

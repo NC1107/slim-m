@@ -19,6 +19,7 @@ import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
+import '../providers/member_selection.dart';
 import '../providers/notification_sound_controller.dart';
 import '../providers/providers.dart';
 import '../providers/retention_sweep.dart';
@@ -170,6 +171,10 @@ class HomeShell extends ConsumerWidget {
           drawer: replacesHeader
               ? null
               : CompactChannelRailDrawer(selectedChannelId: channelId),
+          // Ends member selection; see clearOnPaneHidden for why it is needed here.
+          onEndDrawerChanged: (open) {
+            if (!open) ref.read(memberSelectionProvider.notifier).clear();
+          },
           // The roster slides in from the right instead of docking beside the
           // conversation, which is the only pane there is at this width.
           endDrawer: isDm

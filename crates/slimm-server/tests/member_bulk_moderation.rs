@@ -291,3 +291,48 @@ async fn refuses_the_caller_in_their_own_batch() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(removal_count(&store).await, 0);
 }
+
+/// A batch may not empty the deployment of administrators.
+///
+/// Driven at the store rather than over HTTP, because over HTTP the guard is
+/// unreachable and that is worth stating: a caller is refused their own id by
+/// `parse_targets`, so the only batch that could empty the Space is one naming
+/// every administrator *except* the caller - which leaves the caller, an
+/// administrator. A non-administrator holding BAN_MEMBERS is stopped earlier
+/// still, by `escalation_guard`. The store-level guard is the backstop for
+/// anything that reaches `bulk_remove_members` by another road.
+#[tokio::test]
+async fn a_batch_cannot_empty_the_space_of_administrators() {
+    let (store, _guard) = new_store().await;
+    let p = people(&store).await;
+
+    let admin_role = store
+        .create_role("admin2", Permissions::ADMINISTRATOR, false)
+        .await
+        .unwrap();
+    let second = store
+        .create_account("root2", "Root2", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.assign_role(second.id, admin_role).await.unwrap();
+
+    let admin_id: uuid::Uuid = p.admin_id.parse().unwrap();
+    let both = [slimm_server::ids::UserId(admin_id), second.id];
+    let refused = store
+        .bulk_remove_members(&both, second.id, None)
+        .await
+        .expect_err("removing every administrator must refuse");
+    assert!(matches!(
+        refused,
+        slimm_server::store::RemoveMemberError::LastAdministrator
+    ));
+    // The whole batch rolled back, not just the target that tripped it.
+    assert_eq!(removal_count(&store).await, 0);
+
+    // One of the two still goes, so the refusal is about emptying the Space.
+    store
+        .bulk_remove_members(&both[..1], second.id, None)
+        .await
+        .unwrap();
+    assert_eq!(removal_count(&store).await, 1);
+}

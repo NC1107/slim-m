@@ -110,10 +110,11 @@ class MemberRow extends ConsumerWidget {
     // Only the first: a row that grew with role count would push the name out of a 236px pane.
     final badge = displayed.roles.isEmpty ? null : displayed.roles.first;
 
-    // While selection is on a row picks rather than opens; the mode replaces the verb.
-    final selection = ref.watch(memberSelectionProvider);
-    final selectable = selection.active && !isSelf;
-    final selected = selection.contains(profile.id);
+    // Scoped to this row's two facts: the set is a new object per toggle, so watching it rebuilds every row.
+    final (selecting, selected) = ref.watch(
+      memberSelectionProvider.select((s) => (s.active, s.contains(profile.id))),
+    );
+    final selectable = selecting && !isSelf;
 
     void open() => unawaited(
       showMemberProfile(context, ref, profile: displayed, status: status),
@@ -144,13 +145,13 @@ class MemberRow extends ConsumerWidget {
       // Opens the profile, which is where every verb about a member lives now.
       onTap: selectable
           ? toggle
-          : selection.active
+          : selecting
           ? null
           : open,
     );
 
     return GestureDetector(
-      onSecondaryTapDown: selection.active ? null : (_) => open(),
+      onSecondaryTapDown: selecting ? null : (_) => open(),
       child: row,
     );
   }

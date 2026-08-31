@@ -32,7 +32,7 @@ use super::extract::{Authed, Json, enforce};
 use super::messages::parse_uuid;
 use super::safety::validate_reason;
 use crate::hub::Event;
-use crate::ids::UserId;
+use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, now_ms};
@@ -309,13 +309,39 @@ async fn authorize(
 /// and there is nothing useful a caller could do with a failure here that
 /// retrying the whole request would not do worse.
 pub(super) async fn evict_from_voice(state: &AppState, target: UserId) {
-    let channels = match state.store.list_channels().await {
-        Ok(channels) => channels,
+    let Some(rooms) = voice_room_ids(state).await else {
+        return;
+    };
+    evict_from_rooms(state, target, &rooms).await;
+}
+
+/// Every deployment-wide voice room, or `None` if they could not be listed.
+///
+/// Split from [`evict_from_voice`] so the bulk path reads this once for a
+/// whole batch instead of once per member: the list is the same for all of
+/// them, and re-reading it sixty-four times is sixty-three queries answering
+/// a question already answered.
+pub(super) async fn voice_room_ids(state: &AppState) -> Option<Vec<ChannelId>> {
+    match state.store.list_channels().await {
+        Ok(channels) => Some(
+            channels
+                .into_iter()
+                .filter(|c| c.kind == "voice")
+                .map(|c| c.id)
+                .collect(),
+        ),
         Err(err) => {
             tracing::warn!(%err, "could not list channels to evict a moderated member");
-            return;
+            None
         }
-    };
+    }
+}
+
+/// Drops one member from [voice_rooms] and from every DM they are party to.
+///
+/// The DM half stays per member because it is per member; only the shared
+/// voice rooms are hoisted.
+pub(super) async fn evict_from_rooms(state: &AppState, target: UserId, voice_rooms: &[ChannelId]) {
     // Every DM, hidden ones included: see dm_channel_ids_for_user for why the sidebar list will not do.
     let dm_channel_ids = match state.store.dm_channel_ids_for_user(target).await {
         Ok(ids) => ids,
@@ -324,11 +350,7 @@ pub(super) async fn evict_from_voice(state: &AppState, target: UserId) {
             Vec::new()
         }
     };
-    let rooms = channels
-        .into_iter()
-        .filter(|c| c.kind == "voice")
-        .map(|c| c.id)
-        .chain(dm_channel_ids);
+    let rooms = voice_rooms.iter().copied().chain(dm_channel_ids);
     for channel_id in rooms {
         match state.voice.remove_participant(channel_id, target).await {
             // No SFU configured at all: there is no call to evict anyone from.
