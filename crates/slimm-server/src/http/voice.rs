@@ -155,6 +155,18 @@ async fn token(
 /// [`crate::voice::CallRings`] ring naming this caller as the callee, since
 /// nothing separate marks answering: joining a call *is* answering it. See
 /// `voice::ring`'s own module doc for why answering has no route of its own.
+///
+/// The ring is claimed BEFORE the heartbeat is recorded, and the ordering is
+/// load-bearing rather than incidental. `CallRings` and `CallHeartbeats` are
+/// separately locked, so with the record first there was a window - a few
+/// milliseconds against a 30-second timeout - in which
+/// [`crate::sweep_stale_call_rings_at`] could take the ring between the two.
+/// The callee ended up genuinely joined while the server published
+/// `TimedOut` and evicted the CALLER, leaving one person alone in a room
+/// with no `Answered` event ever sent. Claiming first makes the two outcomes
+/// exclusive: either this takes the ring and the sweep finds nothing, or the
+/// sweep took it first and this reads as an ordinary join, which is exactly
+/// what it is by then.
 async fn heartbeat(
     Authed(ctx): Authed,
     parts: Parts,
@@ -179,6 +191,9 @@ async fn heartbeat(
         return Err(ApiError::Forbidden);
     }
 
+    // Claimed before the join is recorded so the sweep cannot take it in between; see this function's own doc.
+    let answered = state.voice.rings().answer(channel_id, ctx.user_id);
+
     let is_a_real_join = state
         .voice
         .record_heartbeat_reporting_new(ctx.user_id, channel_id);
@@ -186,14 +201,13 @@ async fn heartbeat(
         state
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });
-        // See this function's own doc for why a join answers a ring.
-        if let Some(ring_id) = state.voice.rings().answer(channel_id, ctx.user_id) {
-            state.hub.publish(Event::CallRingEnded {
-                channel_id,
-                ring_id,
-                outcome: CallRingOutcome::Answered,
-            });
-        }
+    }
+    if let Some(ring_id) = answered {
+        state.hub.publish(Event::CallRingEnded {
+            channel_id,
+            ring_id,
+            outcome: CallRingOutcome::Answered,
+        });
     }
     Ok(StatusCode::NO_CONTENT)
 }
