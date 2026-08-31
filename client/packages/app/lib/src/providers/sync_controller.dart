@@ -468,12 +468,25 @@ class SyncController extends StateNotifier<SyncStatus> {
   ///
   /// [channelHistoryProvider] and [messageExtrasProvider] are reset alongside
   /// the database for the same reason; see their own doc comments.
+  ///
+  /// The DM-call ring state is cleared here too, and that one is not
+  /// cosmetic. `clear()` used to be called only from [start], so a sign-out
+  /// while a call was ringing left `incoming` set forever - and because
+  /// `NotificationSoundController` stops the looping ring tone only on the
+  /// transition of `incoming` to null, the ring kept looping for the rest of
+  /// the process's life, on an account that was no longer signed in. Desktop
+  /// makes that reachable rather than theoretical: the incoming-call surface
+  /// there is a floating card that deliberately leaves the rest of the window
+  /// interactive, so Settings and Sign Out are one click away mid-ring.
   Future<void> _endSession() async {
     await stop();
     _ref.invalidate(channelHistoryProvider);
     _ref.invalidate(meProvider);
     _ref.invalidate(initialSyncCompleteProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
+    // Signing out mid-ring otherwise leaves the tone looping for the process's life; see this method's own doc.
+    _ref.read(dmCallRingControllerProvider.notifier).clear();
+    _ref.read(dmCallActivityProvider.notifier).clear();
     try {
       final store = await _ref.read(storeProvider.future);
       await store.clear();
