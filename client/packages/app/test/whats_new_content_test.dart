@@ -109,9 +109,9 @@ void main() {
       }
     });
 
-    test('has every entry from both archives plus the live file', () {
+    test('has every entry from all three archives plus the live file', () {
       // Bump alongside every new entry; a move across the archive split must never change this on its own.
-      expect(whatsNewEntries.length, 44);
+      expect(whatsNewEntries.length, 46);
     });
   });
 }
