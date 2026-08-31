@@ -59,9 +59,24 @@ const DM_BASE: Permissions = Permissions::VIEW_CHANNEL
 /// call, or draw on the shared canvas any more than they can send a message.
 /// `VIEW_CHANNEL` survives so a block stops a conversation without erasing
 /// it; a party who blocked (or was blocked by) the other can still read what
-/// already happened (and still see the canvas as it stood), and it also
-/// means an out-of-band delete of `user_blocks` cannot double as a way to
-/// silently reopen a hidden history.
+/// already happened, and it also means an out-of-band delete of `user_blocks`
+/// cannot double as a way to silently reopen a hidden history.
+///
+/// **Message history and the canvas are NOT symmetric here, deliberately.**
+/// Reading messages needs `VIEW_CHANNEL` alone (`http/messages.rs`), so a
+/// block leaves history readable. Every canvas route, the viewport read
+/// included (`http/canvas.rs`), needs `USE_CANVAS` as well - and that bit is
+/// defined as "view and draw" in one piece (`permissions.rs`), so removing
+/// it necessarily removes viewing too. A blocked party therefore gets
+/// `Forbidden` on the canvas rather than a frozen last state.
+///
+/// That asymmetry is a consequence of the permission model, not a decision
+/// taken about blocking. Splitting `USE_CANVAS` into separate view and draw
+/// bits would let a block hide the drawing without hiding the work, and is
+/// worth considering - but it changes the meaning of the bit for every
+/// channel, not just a DM, so it is left as an open question rather than
+/// done as a side effect. `dm_canvas.rs` pins the current behaviour so it
+/// cannot drift silently either way.
 const BLOCKED_DENY: Permissions = Permissions::SEND_MESSAGES
     .union(Permissions::ADD_REACTIONS)
     .union(Permissions::ATTACH_FILES)
