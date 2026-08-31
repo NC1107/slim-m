@@ -22,6 +22,8 @@ import 'providers.dart';
 import 'reconnect_backoff.dart';
 import 'user_profiles.dart';
 
+part 'sync_controller_events.dart';
+
 /// How the connection is doing, for the UI to show honestly rather than
 /// pretending everything is fine while messages silently stop arriving.
 enum SyncStatus { offline, connecting, live }
@@ -329,82 +331,6 @@ class SyncController extends StateNotifier<SyncStatus> {
     );
   }
 
-  /// How one frame from the socket changes local state. A method of its own
-  /// so [applyServerEventForTest] can drive it without a real socket.
-  Future<void> _applyServerEvent(
-    int generation,
-    SlimmApi api,
-    MessageStore store,
-    ServerEvent event,
-  ) async {
-    bool isCurrent() => generation == _generation;
-    switch (event) {
-      case MessageCreated(:final message):
-        // A DM's first message is a channel never fetched; materialise it first or this no-ops.
-        if (!await store.hasChannel(message.channelId)) {
-          await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
-        }
-        if (!isCurrent()) return;
-        await store.applyMessage(message);
-      case MessageEdited(:final message, :final opSeq):
-        if (!await store.hasChannel(message.channelId)) {
-          await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
-        }
-        if (!isCurrent()) return;
-        if (!await _placeLiveOp(message.channelId, opSeq, store)) return;
-        await store.applyMessage(message);
-      case MessageDeleted(:final channelId, :final messageId, :final opSeq):
-
-        /// Closes a real gap: this switch previously had no case for a
-        /// delete at all, so a message removed by another user (or this
-        /// account's own delete looping back) never left the local store
-        /// and stayed visible until the next full resync.
-        if (!await _placeLiveOp(channelId, opSeq, store)) return;
-        await store.discard(messageId);
-      case ChannelCreated(:final channel):
-      case ChannelUpdated(:final channel):
-        await store.upsertChannels([channel]);
-      case ChannelDeleted(:final channelId):
-        // A channel already known to be gone; no round trip needed for that.
-        await store.removeChannel(channelId);
-      case OverwriteChanged():
-      case RoleChanged():
-      case MemberRoleChanged():
-      case CategoryChanged():
-        // None say which channel (or category) changed; a refresh finds it.
-        await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
-      case ErrorEvent(:final needsResync) when needsResync:
-        // The server closed a connection that fell behind; a restart re-runs catch-up.
-        unawaited(start());
-      case _:
-        break;
-    }
-  }
-
-  /// Decides whether a live op may be applied, and advances the cursor when
-  /// it may. Answers false when the caller must not apply the payload.
-  ///
-  /// A gap schedules one reconcile rather than applying an op it cannot place:
-  /// moving the cursor past something never seen would strand it permanently,
-  /// where a stall only lasts until the next round.
-  Future<bool> _placeLiveOp(
-    String channelId,
-    int? opSeq,
-    MessageStore store,
-  ) async {
-    final cursor = await store.opCursorFor(channelId);
-    switch (liveOpDecision(opSeq, cursor)) {
-      case LiveOpOutcome.ignored:
-        return false;
-      case LiveOpOutcome.needsReconcile:
-        unawaited(reconcile().catchError((_) {}));
-        return false;
-      case LiveOpOutcome.applied:
-        if (opSeq != null) await store.setOpCursor(channelId, opSeq);
-        return true;
-    }
-  }
-
   /// Applies one live event the way [_attach]'s listener would, without
   /// needing a real socket. For tests only.
   @visibleForTesting
@@ -469,22 +395,14 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// [channelHistoryProvider] and [messageExtrasProvider] are reset alongside
   /// the database for the same reason; see their own doc comments.
   ///
-  /// The DM-call ring state is cleared here too, and that one is not
-  /// cosmetic. `clear()` used to be called only from [start], so a sign-out
-  /// while a call was ringing left `incoming` set forever - and because
-  /// `NotificationSoundController` stops the looping ring tone only on the
-  /// transition of `incoming` to null, the ring kept looping for the rest of
-  /// the process's life, on an account that was no longer signed in. Desktop
-  /// makes that reachable rather than theoretical: the incoming-call surface
-  /// there is a floating card that deliberately leaves the rest of the window
-  /// interactive, so Settings and Sign Out are one click away mid-ring.
+  /// The DM-call ring state is cleared here too, and that is not cosmetic:
+  /// see `sign_out_stops_the_ring_test.dart` for what a surviving ring does.
   Future<void> _endSession() async {
     await stop();
     _ref.invalidate(channelHistoryProvider);
     _ref.invalidate(meProvider);
     _ref.invalidate(initialSyncCompleteProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
-    // Signing out mid-ring otherwise leaves the tone looping for the process's life; see this method's own doc.
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     _ref.read(dmCallActivityProvider.notifier).clear();
     try {
