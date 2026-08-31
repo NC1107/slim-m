@@ -28,7 +28,7 @@ Widget _harness({required VoidCallback onReply}) => MaterialApp(
   home: Scaffold(
     drawer: const Drawer(child: SizedBox()),
     // What home_shell sets, and the half of the fix that hands the edge over.
-    drawerEdgeDragWidth: 0,
+    drawerEnableOpenDragGesture: false,
     body: DrawerEdgeSwipe(
       child: ListView(
         children: [
@@ -76,7 +76,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Every one of these did nothing at all before the fix except 20.
-    for (final startX in [2.0, 6.0, 12.0, 20.0, 30.0]) {
+    for (final startX in [2.0, 6.0, 12.0, 20.0]) {
       final r = await _dragRight(tester, startX, () => replies);
       expect(
         r.drawer,
@@ -111,11 +111,12 @@ void main() {
     );
   });
 
-  testWidgets('the edge zone is wider than the built-in claim it replaces', (
+  testWidgets('the edge zone stays clear of the row\'s own avatar', (
     tester,
   ) async {
-    // Flutter's own default is 20; at or under it the strip fights for the same pixels again.
-    expect(kDrawerEdgeZoneWidth, greaterThan(20));
+    // paneGutterCompact 10 + avatarSize 36: a wider zone eats the avatar and
+    // takes a reply swipe started on it for the drawer's.
+    expect(kDrawerEdgeZoneWidth, lessThanOrEqualTo(24));
   });
 
   testWidgets('a row inside a drawer Scaffold refuses an edge drag on its own', (

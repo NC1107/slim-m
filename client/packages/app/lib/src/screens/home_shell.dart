@@ -167,8 +167,8 @@ class HomeShell extends ConsumerWidget {
                   channelId: channelId,
                   onBack: () => context.go(Routes.channels),
                 ),
-          // Zero, so DrawerEdgeSwipe owns the edge; see its own doc for why.
-          drawerEdgeDragWidth: 0,
+          // Only the start drawer's own drag; DrawerEdgeSwipe replaces it.
+          drawerEnableOpenDragGesture: false,
           // Withheld with the back button above: the open pane claims the edge.
           drawer: replacesHeader
               ? null

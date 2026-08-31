@@ -26,16 +26,18 @@ import '../desktop/window_resize_frame.dart';
 /// How wide the left edge zone is: the band where a horizontal drag means
 /// "open the drawer" and never anything else.
 ///
-/// Wider than Flutter's own `drawerEdgeDragWidth` default of 20, and wide
-/// enough to be an actual thumb target. It has to be one shared number rather
-/// than a private one, because [SwipeToReply] has to refuse exactly this band:
-/// before it did, the two gestures split the row between them and left the
-/// drawer about four usable pixels - Flutter's `DrawerController` claims the
-/// leftmost 20 whether or not it will act on them, so the strip only won from
-/// 20 to 24, and every drag past 24 replied to a message instead. That is the
-/// bug this constant exists to close; `drawer_edge_vs_swipe_to_reply_test.dart`
-/// pins it.
-const double kDrawerEdgeZoneWidth = 40;
+/// One shared number rather than a private one, because [SwipeToReply] has to
+/// refuse exactly this band. Before it did, the two gestures split the row and
+/// left the drawer about four usable pixels: Flutter's `DrawerController`
+/// claimed the leftmost 20 whether or not it would act on them, so this strip
+/// only won from 20 to 24, and every drag past 24 replied to a message
+/// instead. `home_shell` now turns that claim off, so the whole band works.
+///
+/// Deliberately not widened past 24 while fixing that. A compact row puts its
+/// avatar at x=10 through 46 (`paneGutterCompact` plus `_avatarSize`), so a
+/// zone of 40 would swallow most of the avatar and take a reply swipe started
+/// there for the drawer's - the same class of bug, moved inside the row.
+const double kDrawerEdgeZoneWidth = 24;
 
 /// Wraps [child] with the edge-drag strip; [child] still fills the space.
 class DrawerEdgeSwipe extends StatefulWidget {
