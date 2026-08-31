@@ -50,6 +50,7 @@ class MessageTranscript extends StatefulWidget {
     required this.lastReadSeq,
     required this.selfId,
     required this.knownUsernames,
+    this.knownRoleNames = const {},
     required this.customEmoji,
     required this.history,
     required this.onLoadOlder,
@@ -103,6 +104,10 @@ class MessageTranscript extends StatefulWidget {
   final String? selfId;
 
   final Set<String> knownUsernames;
+
+  /// Lower-cased role names an `@[Role Name]` mention can be matched
+  /// against; see `MessageBody.knownRoleNames` in `message_text.dart`.
+  final Set<String> knownRoleNames;
   final Map<String, String> customEmoji;
 
   /// How much of the channel is loaded. Only [ChannelHistory.atStart] lets the
@@ -373,6 +378,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                   ),
                   dayLabel: newDay ? formatMessageDay(message.createdAt) : null,
                   knownUsernames: widget.knownUsernames,
+                  knownRoleNames: widget.knownRoleNames,
                   customEmoji: widget.customEmoji,
                   onRetry: () => widget.onRetry(message),
                   onDiscard: () => widget.onDiscard(message),

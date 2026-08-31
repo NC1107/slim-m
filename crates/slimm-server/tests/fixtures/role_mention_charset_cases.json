@@ -1,0 +1,12 @@
+[
+  { "content": "hey @[Core Team] please look", "mentions": ["Core Team"] },
+  { "content": "@[mods] and @[Core Team] both", "mentions": ["mods", "Core Team"] },
+  { "content": "no role mention here", "mentions": [] },
+  { "content": "an unclosed @[Core Team here", "mentions": [] },
+  { "content": "a newline breaks it: @[Core\nTeam]", "mentions": [] },
+  { "content": "@[  Core Team  ] trims whitespace", "mentions": ["Core Team"] },
+  { "content": "@[] empty brackets are not a mention", "mentions": [] },
+  { "content": "@[dup] and @[dup] again", "mentions": ["dup"] },
+  { "content": "plain @nick is a user, not a role", "mentions": [] },
+  { "content": "@[Núñez Crew] keeps non-ascii letters", "mentions": ["Núñez Crew"] }
+]

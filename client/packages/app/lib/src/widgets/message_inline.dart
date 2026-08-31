@@ -40,6 +40,18 @@ class InlineMention extends InlineNode {
   final String raw;
 }
 
+/// A role mention's name, brackets stripped and trimmed: `@[Core Team]`
+/// parses to `Core Team`. Its own bracketed grammar rather than a widened
+/// [InlineMention] charset, so a role name can hold spaces and mixed case,
+/// and so a role and a user sharing a name are never ambiguous - `@nick` is
+/// always [InlineMention], `@[nick]` is always this. Matched the identical
+/// way in `mentioned_role_names` (`crates/slimm-server/src/push/
+/// recipients.rs`).
+class InlineRoleMention extends InlineNode {
+  const InlineRoleMention(this.name);
+  final String name;
+}
+
 /// The raw `:shortcode:` token, including both colons.
 class InlineEmoji extends InlineNode {
   const InlineEmoji(this.raw);
@@ -116,6 +128,20 @@ int _trimMentionEnd(String s, int start, int end) {
     end--;
   }
   return end;
+}
+
+/// The index just past the closing `]` of an `@[Name]` role mention opening
+/// at [start] (where `s[start] == '@'` and `s[start + 1] == '['`), or -1
+/// when there is no `]` before a newline or the end of the string - matched
+/// the identical way `mentioned_role_names` in `crates/slimm-server/src/
+/// push/recipients.rs` scans the same grammar.
+int _roleMentionEnd(String s, int start) {
+  final from = start + 2;
+  for (var j = from; j < s.length; j++) {
+    if (s[j] == '\n') return -1;
+    if (s[j] == ']') return j + 1;
+  }
+  return -1;
 }
 
 /// The index just past a backtick-delimited code span starting at [start]
@@ -263,6 +289,18 @@ List<InlineNode> parseInline(String content) {
         }
       }
     } else if (ch == '@') {
+      if (i + 1 < content.length && content[i + 1] == '[') {
+        final end = _roleMentionEnd(content, i);
+        if (end != -1) {
+          final name = content.substring(i + 2, end - 1).trim();
+          if (name.isNotEmpty) {
+            flush();
+            nodes.add(InlineRoleMention(name));
+            i = end;
+            continue;
+          }
+        }
+      }
       final m = _mentionPattern.matchAsPrefix(content, i);
       if (m != null) {
         final end = _trimMentionEnd(content, i, m.end);

@@ -41,7 +41,7 @@ import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
 import 'channel_message_actions.dart';
-import 'channel_screen.dart' show knownUsernamesFrom;
+import 'channel_screen.dart' show knownRoleNamesFrom, knownUsernamesFrom;
 import 'channel_screen_streams.dart';
 import 'channel_transcript_scroll.dart';
 
@@ -108,6 +108,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final search = ref.watch(channelSearchProvider(channelId));
     final knownUsernames = knownUsernamesFrom(ref.watch(membersProvider));
+    final knownRoleNames = knownRoleNamesFrom(ref.watch(membersProvider));
     final customEmoji = ref.watch(customEmojiIndexProvider);
     final blocked = ref.watch(blocksProvider.select((state) => state.ids));
     final history = ref.watch(channelHistoryProvider(channelId));
@@ -133,6 +134,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
             ? ChannelSearchResults(
                 results: search.results,
                 knownUsernames: knownUsernames,
+                knownRoleNames: knownRoleNames,
                 customEmoji: customEmoji,
                 loading: search.loading,
                 failed: search.failed,
@@ -188,6 +190,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
                         scrollController: scrollTracker.controller,
                         lastReadSeq: lastReadSeq,
                         knownUsernames: knownUsernames,
+                        knownRoleNames: knownRoleNames,
                         customEmoji: customEmoji,
                         // A channel with nothing delivered has no history to page, so its oldest loaded row is vacuously its first.
                         history: history.copyWith(

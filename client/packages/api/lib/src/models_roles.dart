@@ -13,6 +13,7 @@ class Role {
     required this.name,
     required this.permissions,
     required this.isEveryone,
+    this.mentionable = false,
     required this.createdAt,
   });
 
@@ -27,6 +28,11 @@ class Role {
   /// one role always carries this.
   final bool isEveryone;
 
+  /// Whether any member may wake this role's members with `@[Role Name]`
+  /// with no permission of their own. Defaults false; a member holding
+  /// `Perm.mentionEveryone` can still wake it regardless.
+  final bool mentionable;
+
   /// Unix milliseconds.
   final int createdAt;
 
@@ -35,6 +41,7 @@ class Role {
         name: json['name'] as String,
         permissions: json['permissions'] as int,
         isEveryone: json['is_everyone'] as bool,
+        mentionable: json['mentionable'] as bool? ?? false,
         createdAt: json['created_at'] as int,
       );
 }

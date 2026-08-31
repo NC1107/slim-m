@@ -64,6 +64,9 @@ struct RoleDto {
     /// what each bit means.
     permissions: i64,
     is_everyone: bool,
+    /// Whether any member may wake this role with `@[Role Name]` with no
+    /// permission of their own; see `crate::store::Role::mentionable`.
+    mentionable: bool,
     created_at: i64,
 }
 
@@ -74,6 +77,7 @@ impl From<Role> for RoleDto {
             name: role.name,
             permissions: role.permissions.bits(),
             is_everyone: role.is_everyone,
+            mentionable: role.mentionable,
             created_at: role.created_at,
         }
     }
@@ -86,12 +90,16 @@ struct CreateRoleRequest {
     id: Option<String>,
     name: String,
     permissions: i64,
+    /// Defaults false, applied only on a genuinely fresh create; see
+    /// [`create`].
+    mentionable: Option<bool>,
 }
 
 #[derive(Deserialize)]
 struct UpdateRoleRequest {
     name: Option<String>,
     permissions: Option<i64>,
+    mentionable: Option<bool>,
 }
 
 // --- Handlers: role CRUD ---
@@ -105,6 +113,10 @@ async fn list(
     Ok(Json(roles.into_iter().map(RoleDto::from).collect()))
 }
 
+/// Creates a role. `mentionable` always starts false at the store layer
+/// (`Store::create_role_with_id` takes no such parameter); when the request
+/// asks for `true` on a genuinely fresh create, this makes a second write to
+/// set it, so a retry of an already-succeeded create never reapplies it.
 async fn create(
     Authed(ctx): Authed,
     parts: Parts,
@@ -129,6 +141,14 @@ async fn create(
         .store
         .create_role_with_id(id, name, permissions, false)
         .await?;
+    // See this function's own doc comment for why this is a second write.
+    if created.fresh && req.mentionable.unwrap_or(false) {
+        state
+            .store
+            .update_role(created.id, None, None, Some(true))
+            .await
+            .map_err(role_guard_error)?;
+    }
     let role = state
         .store
         .role(created.id)
@@ -159,7 +179,7 @@ async fn update(
         .permissions
         .map(|bits| grantable(caller_permissions, bits))
         .transpose()?;
-    if name.is_none() && permissions.is_none() {
+    if name.is_none() && permissions.is_none() && req.mentionable.is_none() {
         return Err(ApiError::BadRequest("nothing to update"));
     }
 
@@ -171,7 +191,11 @@ async fn update(
         )?;
     }
 
-    match state.store.update_role(role_id, name, permissions).await {
+    match state
+        .store
+        .update_role(role_id, name, permissions, req.mentionable)
+        .await
+    {
         Ok(Some(role)) => {
             state.hub.publish(Event::RoleChanged { role_id });
             Ok(Json(role.into()))

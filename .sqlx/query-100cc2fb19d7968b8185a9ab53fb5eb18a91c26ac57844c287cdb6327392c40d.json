@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: RoleId\", name AS \"name!\",\n                      permissions AS \"permissions!: Permissions\",\n                      is_everyone AS \"is_everyone!: bool\", created_at AS \"created_at!\"\n               FROM roles WHERE id = ?",
+  "query": "SELECT id AS \"id!: RoleId\", name AS \"name!\",\n                      permissions AS \"permissions!: Permissions\",\n                      is_everyone AS \"is_everyone!: bool\",\n                      mentionable AS \"mentionable!: bool\", created_at AS \"created_at!\"\n               FROM roles WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -24,8 +24,13 @@
         "type_info": "Integer"
       },
       {
-        "name": "created_at!",
+        "name": "mentionable!: bool",
         "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 5,
         "type_info": "Integer"
       }
     ],
@@ -37,8 +42,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "fbee1f858b96bc9f0095e19caf8467b6172c49928edd4c6041a72749e10ad36b"
+  "hash": "100cc2fb19d7968b8185a9ab53fb5eb18a91c26ac57844c287cdb6327392c40d"
 }

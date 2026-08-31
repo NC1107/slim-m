@@ -415,6 +415,8 @@ async fn admin_can_create_update_list_and_the_role_takes_effect() {
     let role_id = created["id"].as_str().unwrap().to_owned();
     assert_eq!(created["name"], "mods");
     assert_eq!(created["is_everyone"], false);
+    // Not requested at creation, so it starts off like every other role.
+    assert_eq!(created["mentionable"], false);
 
     let updated = json_body(
         app.clone()

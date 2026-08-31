@@ -49,6 +49,7 @@ class MessageRow extends StatelessWidget {
     required this.showNewDivider,
     this.dayLabel,
     required this.knownUsernames,
+    this.knownRoleNames = const {},
     required this.onRetry,
     required this.onDiscard,
     this.onEditFailed,
@@ -90,6 +91,9 @@ class MessageRow extends StatelessWidget {
   /// Lower-cased usernames the mention renderer treats as real. See
   /// [MessageBody].
   final Set<String> knownUsernames;
+
+  /// See [MessageBody.knownRoleNames].
+  final Set<String> knownRoleNames;
 
   /// The deployment's custom emoji, name to id. Resolves a `:shortcode:` in
   /// the body ([MessageBody]) and on a reaction chip ([ReactionsRow]) alike.
@@ -290,6 +294,7 @@ class MessageRow extends StatelessWidget {
                                       MessageBody(
                                         content: message.content,
                                         knownUsernames: knownUsernames,
+                                        knownRoleNames: knownRoleNames,
                                         customEmoji: customEmoji,
                                         dim: message.pending,
                                         announceSending: message.pending,

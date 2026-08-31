@@ -350,6 +350,7 @@ async fn without_attach_files_the_route_is_forbidden_even_with_a_provider_config
             everyone_role.id,
             None,
             Some(Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES)),
+            None,
         )
         .await
         .unwrap();

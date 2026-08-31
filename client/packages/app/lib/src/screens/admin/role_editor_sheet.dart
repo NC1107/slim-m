@@ -41,6 +41,7 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
     text: widget.role?.name ?? '',
   );
   late int _permissions = widget.role?.permissions ?? 0;
+  late bool _mentionable = widget.role?.mentionable ?? false;
   bool _submitting = false;
   String? _error;
 
@@ -67,15 +68,21 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
       if (_isCreate) {
         await ref
             .read(apiProvider)
-            .createRole(name: _name.text.trim(), permissions: _permissions);
+            .createRole(
+              name: _name.text.trim(),
+              permissions: _permissions,
+              mentionable: _mentionable,
+            );
       } else {
-        final changed = _permissions != widget.role!.permissions;
+        final permissionsChanged = _permissions != widget.role!.permissions;
+        final mentionableChanged = _mentionable != widget.role!.mentionable;
         await ref
             .read(apiProvider)
             .updateRole(
               roleId: widget.role!.id,
               name: _name.text.trim(),
-              permissions: changed ? _permissions : null,
+              permissions: permissionsChanged ? _permissions : null,
+              mentionable: mentionableChanged ? _mentionable : null,
             );
       }
       if (context.mounted) ref.invalidate(rolesProvider);
@@ -139,6 +146,18 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
                       : (_permissions & ~bit);
                 }),
               ),
+            const SizedBox(height: AppSpacing.s16),
+            Text(
+              'Mentions',
+              style: AppText.label.copyWith(color: tokens.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            _PermissionRow(
+              label: 'Anyone can @mention this role',
+              value: _mentionable,
+              enabled: true,
+              onChanged: (v) => setState(() => _mentionable = v),
+            ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
               AppErrorState(message: _error!),

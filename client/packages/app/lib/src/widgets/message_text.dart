@@ -4,8 +4,8 @@
 ///
 /// Inline nesting (`**bold with *italic* inside**`) comes from
 /// `message_inline.dart`'s recursive-descent parser; this file walks its tree
-/// into `InlineSpan`s and is where the two leaf tokens that need data
-/// (mention, emoji) get resolved against what this message actually has.
+/// into `InlineSpan`s and is where the leaf tokens that need data (mention,
+/// role mention, emoji) get resolved against what this message actually has.
 ///
 /// There is no mention *highlighting* protocol on the wire; deciding whether
 /// an `@name` token becomes a chip is a client-side judgement, applied to an
@@ -14,7 +14,9 @@
 /// `crates/slimm-server`, gated there on `Perm.mentionEveryone` - rendering a
 /// chip here does not imply the sender actually held it, only that the word
 /// is one the server recognises). An `@` that matches neither renders as
-/// plain text, so nothing here invents a person who is not real.
+/// plain text, so nothing here invents a person who is not real. An
+/// `@[Role Name]` token follows the identical rule against a currently-known
+/// role name instead - see [_isRenderableRole].
 ///
 /// A `:shortcode:` resolves the same way and for the same reason: only a name
 /// the deployment actually holds becomes an image, and everything else stays
@@ -47,6 +49,7 @@ class MessageBody extends StatelessWidget {
     super.key,
     required this.content,
     required this.knownUsernames,
+    this.knownRoleNames = const {},
     this.customEmoji = const {},
     this.dim = false,
     this.announceSending = false,
@@ -54,6 +57,14 @@ class MessageBody extends StatelessWidget {
 
   final String content;
   final Set<String> knownUsernames;
+
+  /// Lower-cased role name to render an `@[Role Name]` token as a chip.
+  /// Defaulted to empty (every caller that has not been given a member
+  /// roster to derive it from) rather than required, so a role mention
+  /// simply renders as plain text until one is supplied - the same fallback
+  /// [knownUsernames] would want but cannot have, since that one is already
+  /// load-bearing for every existing caller and test.
+  final Set<String> knownRoleNames;
 
   /// Lower-cased emoji name to emoji id, from `customEmojiIndexProvider`.
   /// Defaulted rather than required so a caller with no emoji to resolve
@@ -98,6 +109,7 @@ class MessageBody extends StatelessWidget {
                   _buildMarkdownBlock(
                     md,
                     knownUsernames: knownUsernames,
+                    knownRoleNames: knownRoleNames,
                     customEmoji: customEmoji,
                     color: baseColor,
                   ),
@@ -139,6 +151,7 @@ class MessageBody extends StatelessWidget {
 Widget _buildMarkdownBlock(
   MarkdownBlock block, {
   required Set<String> knownUsernames,
+  required Set<String> knownRoleNames,
   required Map<String, String> customEmoji,
   required Color color,
 }) {
@@ -147,6 +160,7 @@ Widget _buildMarkdownBlock(
       return _MessageTextRun(
         text: text,
         knownUsernames: knownUsernames,
+        knownRoleNames: knownRoleNames,
         customEmoji: customEmoji,
         color: color,
       );
@@ -159,6 +173,7 @@ Widget _buildMarkdownBlock(
       return _MessageTextRun(
         text: text,
         knownUsernames: knownUsernames,
+        knownRoleNames: knownRoleNames,
         customEmoji: customEmoji,
         color: color,
         baseStyle: style,
@@ -168,6 +183,7 @@ Widget _buildMarkdownBlock(
         child: _MessageTextRun(
           text: text,
           knownUsernames: knownUsernames,
+          knownRoleNames: knownRoleNames,
           customEmoji: customEmoji,
           color: color,
         ),
@@ -181,6 +197,7 @@ Widget _buildMarkdownBlock(
             _MessageTextRun(
               text: item.text,
               knownUsernames: knownUsernames,
+              knownRoleNames: knownRoleNames,
               customEmoji: customEmoji,
               color: color,
             ),
@@ -196,6 +213,7 @@ class _MessageTextRun extends StatelessWidget {
   const _MessageTextRun({
     required this.text,
     required this.knownUsernames,
+    required this.knownRoleNames,
     required this.customEmoji,
     required this.color,
     this.baseStyle = AppText.body,
@@ -203,6 +221,7 @@ class _MessageTextRun extends StatelessWidget {
 
   final String text;
   final Set<String> knownUsernames;
+  final Set<String> knownRoleNames;
   final Map<String, String> customEmoji;
   final Color color;
   final TextStyle baseStyle;
@@ -216,6 +235,7 @@ class _MessageTextRun extends StatelessWidget {
         children: _buildSpans(
           parseInline(text),
           knownUsernames,
+          knownRoleNames,
           customEmoji,
           style,
         ),
@@ -241,6 +261,14 @@ bool _isRenderableMention(String raw, Set<String> knownUsernames) {
   return knownUsernames.contains(name) || _reservedMentions.contains(name);
 }
 
+/// Whether [name] (already brackets-stripped) should render as a role chip:
+/// it names a role in [knownRoleNames]. Unlike [_isRenderableMention] there
+/// is no reserved-word fallback - `@[everyone]` is a literal role name, not
+/// the mass mention, and `roles_for_names` on the server refuses to resolve
+/// it for exactly that reason; see its own doc comment.
+bool _isRenderableRole(String name, Set<String> knownRoleNames) =>
+    knownRoleNames.contains(name.toLowerCase());
+
 /// Walks a [parseInline] tree into `InlineSpan`s. Bold, italic and
 /// strikethrough are a style diff on a wrapping [TextSpan]; Flutter merges a
 /// child span's style onto its parent's at paint time, which is the whole
@@ -249,6 +277,7 @@ bool _isRenderableMention(String raw, Set<String> knownUsernames) {
 List<InlineSpan> _buildSpans(
   List<InlineNode> nodes,
   Set<String> knownUsernames,
+  Set<String> knownRoleNames,
   Map<String, String> customEmoji,
   TextStyle ambientStyle,
 ) => [
@@ -266,12 +295,20 @@ List<InlineSpan> _buildSpans(
                 child: _MentionChip(raw),
               )
             : TextSpan(text: raw),
+      InlineRoleMention(:final name) =>
+        _isRenderableRole(name, knownRoleNames)
+            ? WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: _MentionChip('@$name'),
+              )
+            : TextSpan(text: '@[$name]'),
       InlineEmoji(:final raw) => _emojiSpan(raw, customEmoji),
       InlineBold(:final children) => TextSpan(
         style: const TextStyle(fontWeight: AppWeights.semi),
         children: _buildSpans(
           children,
           knownUsernames,
+          knownRoleNames,
           customEmoji,
           ambientStyle,
         ),
@@ -281,6 +318,7 @@ List<InlineSpan> _buildSpans(
         children: _buildSpans(
           children,
           knownUsernames,
+          knownRoleNames,
           customEmoji,
           ambientStyle,
         ),
@@ -290,6 +328,7 @@ List<InlineSpan> _buildSpans(
         children: _buildSpans(
           children,
           knownUsernames,
+          knownRoleNames,
           customEmoji,
           ambientStyle,
         ),
@@ -301,6 +340,7 @@ List<InlineSpan> _buildSpans(
           spans: _buildSpans(
             children,
             knownUsernames,
+            knownRoleNames,
             customEmoji,
             ambientStyle,
           ),

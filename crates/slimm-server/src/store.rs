@@ -60,6 +60,7 @@ mod read_state;
 mod recovery;
 mod removals;
 mod reports;
+mod role_mentions;
 mod roles;
 mod safety;
 mod sessions;
