@@ -89,9 +89,32 @@ jobs:
         working-directory: client
         run: dart format --output=none --set-exit-if-changed .
 
-  test-web:
-    name: test and web build
+  # Sharded because one package dominates: measured on a real run, packages/app
+  # was 9m44s of a 13m9s serial loop, with rtc a distant 2m1s and the other
+  # five under 25s each. Matrixing per package would therefore have bottomed
+  # out at app's own time; splitting app itself is what actually moves it.
+  #
+  # These deliberately do NOT carry the name `test and web build`. That exact
+  # string is what release.yml's verify-client-ci waits on, and a matrix job
+  # publishes one check per leg (`... (app-1)`), none of which would match it.
+  # The aggregating job below keeps the name instead.
+  test-shards:
+    name: client tests (${{ matrix.label }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: app-1
+            shard: "--total-shards=4 --shard-index=0"
+          - label: app-2
+            shard: "--total-shards=4 --shard-index=1"
+          - label: app-3
+            shard: "--total-shards=4 --shard-index=2"
+          - label: app-4
+            shard: "--total-shards=4 --shard-index=3"
+          - label: other-packages
+            shard: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -116,17 +139,31 @@ jobs:
         working-directory: client
         run: flutter pub get --enforce-lockfile
 
+      - name: packages/app (sharded)
+        if: matrix.label != 'other-packages'
+        working-directory: client/packages/app
+        run: flutter test ${{ matrix.shard }}
+
+      # Every package with a test/ directory EXCEPT app, which the shards above
+      # own. The exclusion is by name here and the shards are named explicitly,
+      # so a new package joins this leg automatically rather than being silently
+      # untested - the failure mode a hand-listed matrix would have.
+      #
       # Goldens run inside these suites, not a job of their own, and only ever on
       # this channel and runner. design_system's pixel comparison turns itself
       # on once reference PNGs exist under its test/goldens/; see docs/ci.md
       # and update-golden-references below for how those get there.
-      - name: test (every workspace package)
+      - name: every other workspace package
+        if: matrix.label == 'other-packages'
         working-directory: client
         run: |
           set -euo pipefail
           status=0
           for pkg in . packages/*/; do
             dir="${pkg%/}"
+            if [ "$dir" = "packages/app" ]; then
+              continue
+            fi
             if [ -d "$dir/test" ]; then
               define=""
               if [ "$dir" = "packages/design_system" ] && [ -n "$(ls -A "$dir/test/goldens" 2>/dev/null)" ]; then
@@ -138,6 +175,27 @@ jobs:
             fi
           done
           exit "$status"
+
+  # Keeps the check-run name release.yml's verify-client-ci waits on. It gates
+  # on every shard above, so a red shard leaves this skipped rather than
+  # successful and the release gate still refuses the commit.
+  test-web:
+    name: test and web build
+    needs: [test-shards]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: set up flutter (stable channel)
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: resolve workspace dependencies
+        working-directory: client
+        run: flutter pub get --enforce-lockfile
 
       # dart2js resolves conditional imports that `dart analyze` never does:
       # a symbol present in one branch of a `dart.library.js_interop` export
