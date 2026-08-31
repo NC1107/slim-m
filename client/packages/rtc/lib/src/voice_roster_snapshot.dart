@@ -66,15 +66,46 @@ bool passesActivationThreshold(
 ) =>
     reported && level >= (1 - sensitivity.clamp(0.0, 1.0));
 
-/// A published screen track is the only thing that means anybody can see a
-/// screen, so it is what both the roster and a share outcome read.
-bool isSharingScreen(lk.Participant? p) =>
-    p?.videoTrackPublications
-        .any((t) => t.source == lk.TrackSource.screenShareVideo) ??
-    false;
+/// A published, unmuted screen track is the only thing that means anybody
+/// can actually see a screen, so it is what both the roster and a share
+/// outcome read.
+bool isSharingScreen(lk.Participant? p) => _publishesLiveVideo(
+      p,
+      lk.TrackSource.screenShareVideo,
+    );
 
-/// Whether a camera track is published, the same track-presence check
+/// Whether a camera track is published AND unmuted, the same check
 /// [isSharingScreen] uses for a screen share.
 bool hasCameraTrack(lk.Participant? p) =>
-    p?.videoTrackPublications.any((t) => t.source == lk.TrackSource.camera) ??
-    false;
+    _publishesLiveVideo(p, lk.TrackSource.camera);
+
+bool _publishesLiveVideo(lk.Participant? p, lk.TrackSource source) =>
+    p == null
+        ? false
+        : anyLiveVideo(
+            [
+              for (final t in p.videoTrackPublications)
+                (source: t.source, muted: t.muted),
+            ],
+            source,
+          );
+
+/// Whether any of [publications] is a LIVE track of [source] - published and
+/// unmuted, rather than merely published.
+///
+/// The muted half is load-bearing and was the bug: turning a camera off in
+/// LiveKit MUTES its publication rather than unpublishing it, so a
+/// presence-only check stayed true and the tile kept rendering a frozen last
+/// frame instead of reverting to the avatar. `camera_view.dart:149` and
+/// `screen_share_view.dart:130` already refuse a muted publication when
+/// picking a track to render, and the audio half of [_toParticipant] already
+/// reads `.muted` - this is the video half agreeing with all three.
+///
+/// Pure, and takes plain records rather than an `lk.Participant`, so it is
+/// testable: that class is abstract with private constructors, the same
+/// limitation `voice_roster_snapshot_test.dart` already documents.
+bool anyLiveVideo(
+  Iterable<({lk.TrackSource source, bool muted})> publications,
+  lk.TrackSource source,
+) =>
+    publications.any((p) => p.source == source && !p.muted);
