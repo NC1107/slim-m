@@ -151,9 +151,10 @@ async fn token(
 /// this `(user, channel)` pair - a real join - never on the routine refreshes
 /// that follow it every few seconds for as long as the call lasts.
 ///
-/// That same first join is also what answers an outstanding
+/// A FIRST join is also what answers an outstanding
 /// [`crate::voice::CallRings`] ring naming this caller as the callee, since
-/// nothing separate marks answering: joining a call *is* answering it. See
+/// nothing separate marks answering: joining a call *is* answering it. A
+/// later keepalive from someone already in the room answers nothing. See
 /// `voice::ring`'s own module doc for why answering has no route of its own.
 ///
 /// The ring is claimed BEFORE the heartbeat is recorded, and the ordering is
@@ -167,6 +168,24 @@ async fn token(
 /// exclusive: either this takes the ring and the sweep finds nothing, or the
 /// sweep took it first and this reads as an ordinary join, which is exactly
 /// what it is by then.
+///
+/// [`crate::voice::VoiceService::has_heartbeat`] gates that claim, and it is
+/// not redundant with the ordering above. Moving the claim ahead of the
+/// record also moved it out from behind `is_a_real_join`, so without this
+/// gate EVERY heartbeat would try to answer - including the routine 15-second
+/// keepalives a call sends for as long as it lasts. A caller hanging up and
+/// immediately calling back, while the callee is still sitting in the room,
+/// would then have that second ring answered by the callee's own background
+/// timer within 15 seconds, with the callee never seeing or touching it - and
+/// an explicit Decline would be racing their own keepalive to the lock.
+///
+/// The read-then-write that gate opens is the one
+/// [`crate::voice::VoiceService::has_heartbeat`]'s own doc warns about, but
+/// it is harmless here: it decides only whether to ATTEMPT the claim, and
+/// `CallRings::answer` is itself atomic, so two concurrent first heartbeats
+/// can both attempt and exactly one can win. The publish that genuinely
+/// needs the single lock-held check still uses
+/// `record_heartbeat_reporting_new`, untouched.
 async fn heartbeat(
     Authed(ctx): Authed,
     parts: Parts,
@@ -191,8 +210,12 @@ async fn heartbeat(
         return Err(ApiError::Forbidden);
     }
 
-    // Claimed before the join is recorded so the sweep cannot take it in between; see this function's own doc.
-    let answered = state.voice.rings().answer(channel_id, ctx.user_id);
+    // Only a first join answers; see this function's own doc for both halves of why.
+    let answered = if state.voice.has_heartbeat(ctx.user_id, channel_id) {
+        None
+    } else {
+        state.voice.rings().answer(channel_id, ctx.user_id)
+    };
 
     let is_a_real_join = state
         .voice
