@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.52.0](https://github.com/NC1107/slim-m/compare/server-v0.51.0...server-v0.52.0) (2026-08-31)
+
+
+### Features
+
+* add [@role](https://github.com/role) mentions ([#1010](https://github.com/NC1107/slim-m/issues/1010)) ([5aee7be](https://github.com/NC1107/slim-m/commit/5aee7be1698c4847a81d0dcd27e2e7a7a65806ac))
+
+
+### Bug Fixes
+
+* **server:** a hidden DM must not hide its call from moderation ([#1013](https://github.com/NC1107/slim-m/issues/1013)) ([c46c4cb](https://github.com/NC1107/slim-m/commit/c46c4cb1f60467f3c1acc9a1ee4805e8df890548))
+* **server:** a keepalive must not answer a ring ([#1012](https://github.com/NC1107/slim-m/issues/1012)) ([1176699](https://github.com/NC1107/slim-m/commit/11766997bc60421f39a13731fedd52759cd918fd))
+* **server:** claim a call ring before recording the join ([#1011](https://github.com/NC1107/slim-m/issues/1011)) ([69753ea](https://github.com/NC1107/slim-m/commit/69753eaf37139d232edd80586194b72662a7a71a))
+* **server:** give a DM ring its own rate-limit class ([#1009](https://github.com/NC1107/slim-m/issues/1009)) ([c930dba](https://github.com/NC1107/slim-m/commit/c930dbafe6c29261963a8d541fa2968b0215a97c))
+* **server:** keep the two anonymization promises the schema makes ([#1014](https://github.com/NC1107/slim-m/issues/1014)) ([07272a8](https://github.com/NC1107/slim-m/commit/07272a850e2970cc848aaded8c153fbf3ac107ad))
+
 ## [0.51.0](https://github.com/NC1107/slim-m/compare/server-v0.50.0...server-v0.51.0) (2026-08-31)
 
 
