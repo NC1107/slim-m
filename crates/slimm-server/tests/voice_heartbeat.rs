@@ -113,6 +113,56 @@ async fn a_heartbeat_is_recorded_against_the_caller_and_channel() {
     assert!(voice.has_heartbeat(user_id, channel.id));
 }
 
+/// A routine keepalive from somebody already in the room answers nothing.
+///
+/// `heartbeat` claims an outstanding ring before recording the join, so that
+/// the ring sweep cannot take it in between. That moved the claim out from
+/// behind the first-join check, and without a gate every keepalive - one
+/// every 15 seconds for as long as a call lasts - would try to answer. A
+/// caller hanging up and ringing straight back while the callee is still in
+/// the room would then have that ring answered by the callee's own
+/// background timer, with the callee never seeing it, and an explicit
+/// Decline would be racing their own keepalive.
+#[tokio::test]
+async fn a_keepalive_from_someone_already_in_the_call_does_not_answer_a_ring() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::CONNECT),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let voice = enabled_voice();
+    let (callee_id, callee_token) = member(&store, "bob").await;
+    let (caller_id, _caller_token) = member(&store, "alice").await;
+    let app = app(store.clone(), voice.clone());
+
+    let beat = || {
+        app.clone().oneshot(request(
+            "POST",
+            &format!("/channels/{}/voice/heartbeat", channel.id),
+            Some(&callee_token),
+        ))
+    };
+
+    // Bob is already in the call before any ring exists.
+    assert_eq!(beat().await.unwrap().status(), StatusCode::NO_CONTENT);
+    assert!(voice.has_heartbeat(callee_id, channel.id));
+
+    let ring_id = voice.rings().start(channel.id, caller_id, callee_id);
+
+    // His next routine keepalive must leave that ring outstanding.
+    assert_eq!(beat().await.unwrap().status(), StatusCode::NO_CONTENT);
+    assert_eq!(
+        voice.rings().answer(channel.id, callee_id),
+        Some(ring_id),
+        "the keepalive answered the ring; only a first join may do that"
+    );
+}
+
 #[tokio::test]
 async fn a_heartbeat_without_connect_is_refused() {
     let (store, _guard) = new_store().await;
