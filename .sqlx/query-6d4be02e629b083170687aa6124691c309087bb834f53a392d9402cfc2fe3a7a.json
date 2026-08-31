@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)\n         VALUES (?, ?, ?, ?, ?)\n         ON CONFLICT(user_id) DO UPDATE SET\n             until = excluded.until,\n             reason = excluded.reason,\n             issued_by = excluded.issued_by,\n             issued_at = excluded.issued_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "6d4be02e629b083170687aa6124691c309087bb834f53a392d9402cfc2fe3a7a"
+}

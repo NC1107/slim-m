@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO space_removals (user_id, reason, removed_by, removed_at)\n         VALUES (?, ?, ?, ?)\n         ON CONFLICT(user_id) DO UPDATE SET\n             reason = excluded.reason,\n             removed_by = excluded.removed_by,\n             removed_at = excluded.removed_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "e483230f5445cd02c59bbadd8f92a34fa7837f06e5a47d7b59c53e4ed779a4c4"
+}

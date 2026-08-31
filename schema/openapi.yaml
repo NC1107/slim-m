@@ -1870,6 +1870,106 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /members/bulk-removal:
+    post:
+      operationId: bulkRemoveMembers
+      tags: [members]
+      summary: Remove several members in one act.
+      description: >
+        Requires BAN_MEMBERS, and refuses any target whose granted permissions
+        the caller's do not contain - the same containment `removeMember`
+        applies, checked once per target before anything is written. Nothing is
+        removed unless every target passes, so a refused batch leaves the
+        deployment untouched; that includes the refusal to remove the last
+        administrator, which rolls the whole batch back. Repeated ids collapse
+        to one act with one audit row. Each removal publishes its own
+        `member.removed`, and every session it revoked its own
+        `session.revoked`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids]
+              properties:
+                user_ids:
+                  type: array
+                  description: >
+                    The members to remove. At most 64, sized against the
+                    WebSocket fan-out a removal causes rather than against
+                    politeness - see MAX_BULK_MEMBER_IDS.
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 64
+                reason:
+                  type: string
+                  description: Recorded against every member in the batch.
+      responses:
+        "204":
+          description: Every named member has been removed.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /members/bulk-timeout:
+    post:
+      operationId: bulkTimeoutMembers
+      tags: [members]
+      summary: Time several members out in one act.
+      description: >
+        Requires KICK_MEMBERS, with the same per-target containment as
+        `timeoutMember`. The deadline is computed once for the batch, so every
+        member in it comes back at the same moment. Replaces any timeout
+        already in force on a named member, as the single verb does. Nothing is
+        applied unless every target passes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids, duration_seconds]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 64
+                duration_seconds:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                  description: >
+                    From now. The deadline is computed server-side, so a skewed
+                    client clock cannot ask for one already past.
+                reason:
+                  type: string
+      responses:
+        "204":
+          description: Every named member is timed out.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /members/removed:
     get:
       operationId: listRemovedMembers

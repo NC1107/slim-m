@@ -22,6 +22,7 @@ mod content_emoji;
 mod content_media_slots;
 mod content_messages_window;
 mod gifs;
+mod members_bulk;
 mod people;
 mod threads;
 
@@ -31,6 +32,7 @@ use content_emoji::emoji_calls;
 use content_media_slots::media_slot_calls;
 use content_messages_window::bulk_delete_by_author_call;
 use gifs::gif_calls;
+use members_bulk::bulk_member_calls;
 use people::{moderation_calls, profile_calls, safety_calls};
 use threads::thread_calls;
 
@@ -462,6 +464,8 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
         root,
     )
     .await;
+
+    bulk_member_calls(c, root, &erin_id).await;
 
     let issued = c
         .bare(

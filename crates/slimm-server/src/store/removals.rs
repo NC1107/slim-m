@@ -82,72 +82,7 @@ impl Store {
     ) -> Result<Vec<SessionId>, RemoveMemberError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
-
-        let exists = sqlx::query_scalar!(
-            r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
-            user_id
-        )
-        .fetch_optional(&mut *tx)
-        .await?;
-        if exists.is_none() {
-            return Err(RemoveMemberError::UserNotFound);
-        }
-
-        sqlx::query!(
-            "INSERT INTO space_removals (user_id, reason, removed_by, removed_at)
-             VALUES (?, ?, ?, ?)
-             ON CONFLICT(user_id) DO UPDATE SET
-                 reason = excluded.reason,
-                 removed_by = excluded.removed_by,
-                 removed_at = excluded.removed_at",
-            user_id,
-            reason,
-            removed_by,
-            now
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        if administrator_count(&mut tx).await? == 0 {
-            return Err(RemoveMemberError::LastAdministrator);
-        }
-
-        let revoked: Vec<SessionId> = sqlx::query!(
-            r#"SELECT id AS "id!: SessionId" FROM sessions
-               WHERE user_id = ? AND revoked_at IS NULL"#,
-            user_id
-        )
-        .fetch_all(&mut *tx)
-        .await?
-        .into_iter()
-        .map(|row| row.id)
-        .collect();
-        for session_id in &revoked {
-            revoke_session_rows(&mut tx, *session_id, now).await?;
-        }
-
-        // Their unspent invites go too, or a removal hands out the way back in.
-        sqlx::query!(
-            "UPDATE invites SET revoked_at = ? WHERE created_by = ? AND revoked_at IS NULL",
-            now,
-            user_id
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        record_moderation_audit(
-            &mut tx,
-            ModerationAudit {
-                actor_id: removed_by,
-                subject_id: user_id,
-                action: "remove",
-                reason,
-                until: None,
-                created_at: now,
-            },
-        )
-        .await?;
-
+        let revoked = remove_one(&mut tx, user_id, removed_by, reason, now).await?;
         tx.commit().await?;
         Ok(revoked)
     }
@@ -240,4 +175,89 @@ pub(super) async fn removed(
     .fetch_optional(&mut *conn)
     .await?
     .is_some())
+}
+
+/// One removal, inside a transaction the caller owns.
+///
+/// Split out so the bulk path in [`super::members_bulk`] runs exactly this and
+/// not a second implementation of it. A bulk verb that forgot the invite
+/// revocation, or the session teardown, or the audit row, would be a quieter
+/// removal than the single one for no reason a reader could find.
+///
+/// The last-administrator check sits after the insert on purpose, so a batch
+/// removing every remaining administrator refuses as a whole rather than
+/// leaving the deployment to whichever one happened to be last in the list.
+pub(super) async fn remove_one(
+    tx: &mut SqliteConnection,
+    user_id: UserId,
+    removed_by: UserId,
+    reason: Option<&str>,
+    now: i64,
+) -> Result<Vec<SessionId>, RemoveMemberError> {
+    let exists = sqlx::query_scalar!(
+        r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
+        user_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if exists.is_none() {
+        return Err(RemoveMemberError::UserNotFound);
+    }
+
+    sqlx::query!(
+        "INSERT INTO space_removals (user_id, reason, removed_by, removed_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+             reason = excluded.reason,
+             removed_by = excluded.removed_by,
+             removed_at = excluded.removed_at",
+        user_id,
+        reason,
+        removed_by,
+        now
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    if administrator_count(tx).await? == 0 {
+        return Err(RemoveMemberError::LastAdministrator);
+    }
+
+    let revoked: Vec<SessionId> = sqlx::query!(
+        r#"SELECT id AS "id!: SessionId" FROM sessions
+           WHERE user_id = ? AND revoked_at IS NULL"#,
+        user_id
+    )
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .map(|row| row.id)
+    .collect();
+    for session_id in &revoked {
+        revoke_session_rows(tx, *session_id, now).await?;
+    }
+
+    // Their unspent invites go too, or a removal hands out the way back in.
+    sqlx::query!(
+        "UPDATE invites SET revoked_at = ? WHERE created_by = ? AND revoked_at IS NULL",
+        now,
+        user_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    record_moderation_audit(
+        tx,
+        ModerationAudit {
+            actor_id: removed_by,
+            subject_id: user_id,
+            action: "remove",
+            reason,
+            until: None,
+            created_at: now,
+        },
+    )
+    .await?;
+
+    Ok(revoked)
 }

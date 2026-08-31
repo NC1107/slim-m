@@ -258,7 +258,11 @@ async fn list_removed(
 // --- Guards ---
 
 /// The caller holds `needed` deployment-wide.
-async fn require(state: &AppState, caller: UserId, needed: Permissions) -> Result<(), ApiError> {
+pub(super) async fn require(
+    state: &AppState,
+    caller: UserId,
+    needed: Permissions,
+) -> Result<(), ApiError> {
     if state.store.base_permissions(caller).await?.contains(needed) {
         Ok(())
     } else {
@@ -304,7 +308,7 @@ async fn authorize(
 /// Best effort on purpose: the moderation act itself has already committed,
 /// and there is nothing useful a caller could do with a failure here that
 /// retrying the whole request would not do worse.
-async fn evict_from_voice(state: &AppState, target: UserId) {
+pub(super) async fn evict_from_voice(state: &AppState, target: UserId) {
     let channels = match state.store.list_channels().await {
         Ok(channels) => channels,
         Err(err) => {

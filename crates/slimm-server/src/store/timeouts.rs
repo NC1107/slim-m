@@ -74,37 +74,7 @@ impl Store {
     ) -> anyhow::Result<()> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
-
-        sqlx::query!(
-            "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)
-             VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(user_id) DO UPDATE SET
-                 until = excluded.until,
-                 reason = excluded.reason,
-                 issued_by = excluded.issued_by,
-                 issued_at = excluded.issued_at",
-            user_id,
-            until,
-            reason,
-            issued_by,
-            now
-        )
-        .execute(&mut *tx)
-        .await?;
-
-        record_moderation_audit(
-            &mut tx,
-            ModerationAudit {
-                actor_id: issued_by,
-                subject_id: user_id,
-                action: "timeout",
-                reason,
-                until: Some(until),
-                created_at: now,
-            },
-        )
-        .await?;
-
+        timeout_one(&mut tx, user_id, until, reason, issued_by, now).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -230,4 +200,48 @@ impl Store {
         }
         Ok(out)
     }
+}
+
+/// One timeout, inside a transaction the caller owns.
+///
+/// Split out for the reason [`super::removals::remove_one`] gives: the bulk
+/// path runs this rather than a second copy, so the replace-not-refuse rule
+/// and the audit row cannot drift apart between the two verbs.
+pub(super) async fn timeout_one(
+    tx: &mut sqlx::SqliteConnection,
+    user_id: UserId,
+    until: i64,
+    reason: Option<&str>,
+    issued_by: UserId,
+    now: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "INSERT INTO member_timeouts (user_id, until, reason, issued_by, issued_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+             until = excluded.until,
+             reason = excluded.reason,
+             issued_by = excluded.issued_by,
+             issued_at = excluded.issued_at",
+        user_id,
+        until,
+        reason,
+        issued_by,
+        now
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    record_moderation_audit(
+        tx,
+        ModerationAudit {
+            actor_id: issued_by,
+            subject_id: user_id,
+            action: "timeout",
+            reason,
+            until: Some(until),
+            created_at: now,
+        },
+    )
+    .await
 }
