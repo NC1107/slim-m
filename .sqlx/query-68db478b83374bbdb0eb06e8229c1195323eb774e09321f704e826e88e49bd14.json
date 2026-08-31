@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE custom_emoji SET uploader_id = NULL WHERE uploader_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "68db478b83374bbdb0eb06e8229c1195323eb774e09321f704e826e88e49bd14"
+}
