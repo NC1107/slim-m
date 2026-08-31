@@ -167,14 +167,13 @@ class HomeShell extends ConsumerWidget {
                   channelId: channelId,
                   onBack: () => context.go(Routes.channels),
                 ),
+          // Only the start drawer's own drag; DrawerEdgeSwipe replaces it.
+          drawerEnableOpenDragGesture: false,
           // Withheld with the back button above: the open pane claims the edge.
           drawer: replacesHeader
               ? null
               : CompactChannelRailDrawer(selectedChannelId: channelId),
-          // Ends member selection; see clearOnPaneHidden for why it is needed here.
-          onEndDrawerChanged: (open) {
-            if (!open) ref.read(memberSelectionProvider.notifier).clear();
-          },
+          onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
           // The roster slides in from the right instead of docking beside the
           // conversation, which is the only pane there is at this width.
           endDrawer: isDm

@@ -92,3 +92,12 @@ final memberSelectionProvider =
       MemberSelectionController,
       MemberSelection
     >((ref) => MemberSelectionController());
+
+/// Ends member selection when the compact layout's member drawer closes.
+///
+/// Lives here rather than inline in `home_shell.dart` because that file sits
+/// at the file-budget ceiling, and because the reason belongs beside the
+/// state it clears: see [MemberSelectionController.clear].
+void endSelectionOnDrawerClose(WidgetRef ref, bool opened) {
+  if (!opened) ref.read(memberSelectionProvider.notifier).clear();
+}

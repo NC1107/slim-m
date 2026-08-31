@@ -32,6 +32,10 @@ import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../desktop/desktop_window_shell.dart';
+import '../desktop/window_resize_frame.dart';
+import 'drawer_edge_swipe.dart';
+
 /// How far a swipe must travel, in logical pixels, before releasing it
 /// commits the reply - past this the reveal icon reads as armed rather than
 /// merely present.
@@ -100,8 +104,34 @@ class _SwipeToReplyState extends State<SwipeToReply>
 
   bool get _committed => _controller.value >= swipeToReplyThreshold;
 
+  /// Where the finger actually landed, recorded from the raw pointer.
+  ///
+  /// [DragStartDetails.globalPosition] cannot answer this: with the default
+  /// [DragStartBehavior.start] it reports where the drag was *recognised*,
+  /// which is a touch-slop's travel (about 18px) inboard of the touch itself.
+  /// Reading it instead put a touch at x=10 at roughly x=28, so a zone narrow
+  /// enough to clear the row's avatar stopped catching the drags it exists to
+  /// catch. Switching the recogniser to [DragStartBehavior.down] would fix the
+  /// coordinate and cost the reveal its smooth start, since the first delta
+  /// would then carry the whole slop.
+  double? _downX;
+
+  /// A drag beginning in the drawer's own edge zone is the drawer's, never a
+  /// reply. Only where a drawer actually exists - at wider layouts the
+  /// transcript does not start at the screen edge and there is nothing to open.
+  bool get _startedInDrawerEdge {
+    final x = _downX;
+    if (x == null) return false;
+    if (Scaffold.maybeOf(context)?.hasDrawer != true) return false;
+    final left = DesktopWindowShell.frameless
+        ? kWindowResizeHandleThickness
+        : 0.0;
+    return x >= left && x < left + kDrawerEdgeZoneWidth;
+  }
+
   void _onStart(DragStartDetails details) {
-    _fromTouch = details.kind == PointerDeviceKind.touch;
+    _fromTouch =
+        details.kind == PointerDeviceKind.touch && !_startedInDrawerEdge;
   }
 
   /// Rubber-banded rather than free: clamped at 0 so a leftward flick never
@@ -155,45 +185,48 @@ class _SwipeToReplyState extends State<SwipeToReply>
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return GestureDetector(
-      onHorizontalDragStart: widget.enabled ? _onStart : null,
-      onHorizontalDragUpdate: widget.enabled ? _onUpdate : null,
-      onHorizontalDragEnd: widget.enabled ? _onEnd : null,
-      onHorizontalDragCancel: widget.enabled ? _onCancel : null,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          final dragX = _controller.value;
-          final progress = (dragX / swipeToReplyThreshold).clamp(0.0, 1.0);
-          return Stack(
-            children: [
-              if (dragX > 0)
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.s16),
-                      // Decorative: the reply banner appearing is the real, announced state change, not this icon.
-                      child: ExcludeSemantics(
-                        child: Opacity(
-                          opacity: progress,
-                          child: Icon(
-                            AppIcons.reply,
-                            size: 20,
-                            color: _committed
-                                ? tokens.accent
-                                : tokens.textSecondary,
+    return Listener(
+      onPointerDown: (event) => _downX = event.position.dx,
+      child: GestureDetector(
+        onHorizontalDragStart: widget.enabled ? _onStart : null,
+        onHorizontalDragUpdate: widget.enabled ? _onUpdate : null,
+        onHorizontalDragEnd: widget.enabled ? _onEnd : null,
+        onHorizontalDragCancel: widget.enabled ? _onCancel : null,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final dragX = _controller.value;
+            final progress = (dragX / swipeToReplyThreshold).clamp(0.0, 1.0);
+            return Stack(
+              children: [
+                if (dragX > 0)
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: AppSpacing.s16),
+                        // Decorative: the reply banner appearing is the real, announced state change, not this icon.
+                        child: ExcludeSemantics(
+                          child: Opacity(
+                            opacity: progress,
+                            child: Icon(
+                              AppIcons.reply,
+                              size: 20,
+                              color: _committed
+                                  ? tokens.accent
+                                  : tokens.textSecondary,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              Transform.translate(offset: Offset(dragX, 0), child: child),
-            ],
-          );
-        },
-        child: widget.child,
+                Transform.translate(offset: Offset(dragX, 0), child: child),
+              ],
+            );
+          },
+          child: widget.child,
+        ),
       ),
     );
   }
