@@ -129,10 +129,7 @@ async fn a_mentionable_role_wakes_its_members_with_no_special_permission() {
 #[tokio::test]
 async fn a_non_mentionable_role_wakes_nobody_for_an_ungranted_author() {
     let (store, _guard) = new_store("slimm-role-mentions-not-mentionable").await;
-    // Bootstraps the deployment so alice is an ordinary member, not the
-    // administrator the first account always becomes - an administrator
-    // bypasses every permission check, including the one this test means to
-    // prove absent.
+    // Bootstraps so alice is an ordinary member: an administrator would bypass the very check this proves absent.
     account(&store, "founder").await;
     let (alice, alice_device) = account(&store, "alice").await;
     let (bob, bob_device) = account(&store, "bob").await;
@@ -235,8 +232,7 @@ async fn a_role_mention_never_reaches_a_member_who_cannot_view_the_channel() {
     register(&store, bob, bob_device, "bob-token").await;
     mentions_only(&store, bob).await;
 
-    // A private channel: @everyone is denied VIEW_CHANNEL into it, and bob
-    // gets no overwrite of his own re-granting it.
+    // A private channel: @everyone is denied VIEW_CHANNEL and bob has no overwrite re-granting it.
     let private_channel = store.create_channel("secret", "text").await.unwrap().id;
     let everyone_id = store
         .list_roles()

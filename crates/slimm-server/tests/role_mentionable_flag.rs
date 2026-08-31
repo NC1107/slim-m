@@ -161,8 +161,7 @@ async fn mentionable_at_creation_is_not_reapplied_on_a_retried_create() {
         .unwrap();
     assert_eq!(json_body(first).await["mentionable"], true);
 
-    // Same id, mentionable now omitted: a retry, not a second create, so this
-    // must not read as "unset it back to false" or as anything at all.
+    // A retry with mentionable omitted must not read as unsetting it.
     let retried = app
         .clone()
         .oneshot(request(
