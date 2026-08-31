@@ -39,43 +39,47 @@ class _OfflineSyncController extends SyncController {
 }
 
 void main() {
-  test('signing out clears an incoming ring, so its tone cannot loop on', () async {
-    final session = api.SessionStore(tokens: _tokens);
-    final container = ProviderContainer(
-      overrides: [
-        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
-        sessionProvider.overrideWithValue(session),
-        syncControllerProvider.overrideWith(_OfflineSyncController.new),
-        // Sign-out clears the local store; that failure is already swallowed.
-        storeProvider.overrideWith((ref) async => throw StateError('n/a')),
-      ],
-    );
-    addTearDown(container.dispose);
+  test(
+    'signing out clears an incoming ring, so its tone cannot loop on',
+    () async {
+      final session = api.SessionStore(tokens: _tokens);
+      final container = ProviderContainer(
+        overrides: [
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          sessionProvider.overrideWithValue(session),
+          syncControllerProvider.overrideWith(_OfflineSyncController.new),
+          // Sign-out clears the local store; that failure is already swallowed.
+          storeProvider.overrideWith((ref) async => throw StateError('n/a')),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    container.read(syncControllerProvider.notifier);
-    final ring = container.read(dmCallRingControllerProvider.notifier);
-    ring.state = const DmCallRingState(
-      incoming: IncomingDmCallRing(
-        channelId: 'dm-1',
-        ringId: 'ring-1',
-        callerId: 'user-2',
-      ),
-    );
-    expect(
-      container.read(dmCallRingControllerProvider).incoming,
-      isNotNull,
-      reason: 'sanity: really ringing before the sign-out',
-    );
+      container.read(syncControllerProvider.notifier);
+      final ring = container.read(dmCallRingControllerProvider.notifier);
+      ring.state = const DmCallRingState(
+        incoming: IncomingDmCallRing(
+          channelId: 'dm-1',
+          ringId: 'ring-1',
+          callerId: 'user-2',
+        ),
+      );
+      expect(
+        container.read(dmCallRingControllerProvider).incoming,
+        isNotNull,
+        reason: 'sanity: really ringing before the sign-out',
+      );
 
-    session.clear();
-    await Future<void>.delayed(Duration.zero);
-    await Future<void>.delayed(Duration.zero);
+      session.clear();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
-    expect(
-      container.read(dmCallRingControllerProvider).incoming,
-      isNull,
-      reason: 'a ring surviving sign-out keeps NotificationSoundController '
-          'looping the tone forever, since it stops only when incoming goes null',
-    );
-  });
+      expect(
+        container.read(dmCallRingControllerProvider).incoming,
+        isNull,
+        reason:
+            'a ring surviving sign-out keeps NotificationSoundController '
+            'looping the tone forever, since it stops only when incoming goes null',
+      );
+    },
+  );
 }
