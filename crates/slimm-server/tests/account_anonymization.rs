@@ -7,7 +7,7 @@
 
 mod support;
 
-use slimm_server::ids::MessageId;
+use slimm_server::ids::{EmojiId, MessageId};
 use slimm_server::store::Store;
 
 async fn new_store() -> (Store, sqlx::SqlitePool, support::TestDbGuard) {
@@ -88,6 +88,69 @@ async fn delete_account_anonymizes_a_report_the_deleted_user_filed() {
 /// `polls.created_by` all carry an `ON DELETE SET NULL` that can never fire
 /// (deletion is a tombstone `UPDATE`), and `removed_by` is served live on the
 /// wire via `RemovalDto`, so a deleted moderator's id persisted forever.
+#[tokio::test]
+async fn delete_account_anonymizes_a_pin_and_an_uploaded_emoji() {
+    let (store, pool, _guard) = new_store().await;
+    let admin = store
+        .create_account("root", "Root", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(admin.id).await.unwrap();
+    let channel = store.list_channels().await.unwrap()[0].id;
+
+    let bob = store
+        .create_account("bob", "Bob", "not-a-real-hash")
+        .await
+        .unwrap();
+
+    let message = store
+        .send_message(channel, admin.id, MessageId::generate(), "hi", &[], None)
+        .await
+        .unwrap()
+        .message
+        .id;
+    store.pin_message(channel, message, bob.id).await.unwrap();
+    // custom_emoji.sha256 has an FK onto attachments, so the bytes must exist first.
+    let sha = vec![7u8; 32];
+    sqlx::query(
+        "INSERT INTO attachments (sha256, size, content_type, created_at) VALUES (?, 1, 'image/png', 0)",
+    )
+    .bind(&sha)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let emoji_id = EmojiId::generate();
+    store
+        .create_custom_emoji(emoji_id, "party", &sha, Some(bob.id))
+        .await
+        .unwrap()
+        .unwrap();
+
+    store.delete_account(bob.id).await.unwrap();
+
+    let pinned_by: Option<Vec<u8>> =
+        sqlx::query_scalar("SELECT pinned_by FROM pinned_messages WHERE message_id = ?")
+            .bind(message)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        pinned_by, None,
+        "schema/openapi.yaml says pinned_by reads null once the account is anonymized"
+    );
+
+    let uploader: Option<Vec<u8>> =
+        sqlx::query_scalar("SELECT uploader_id FROM custom_emoji WHERE id = ?")
+            .bind(emoji_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        uploader, None,
+        "schema/openapi.yaml says uploader_id is null once the uploader's account is deleted"
+    );
+}
+
 #[tokio::test]
 async fn delete_account_anonymizes_moderation_and_poll_authorship() {
     let (store, pool, _guard) = new_store().await;

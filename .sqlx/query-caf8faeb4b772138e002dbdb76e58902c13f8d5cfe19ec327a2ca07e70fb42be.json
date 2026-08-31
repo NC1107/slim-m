@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE pinned_messages SET pinned_by = NULL WHERE pinned_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "caf8faeb4b772138e002dbdb76e58902c13f8d5cfe19ec327a2ca07e70fb42be"
+}

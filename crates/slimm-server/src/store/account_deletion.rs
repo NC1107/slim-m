@@ -174,6 +174,19 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // schema/openapi.yaml promises both of these read null once the account is gone.
+        sqlx::query!(
+            "UPDATE pinned_messages SET pinned_by = NULL WHERE pinned_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE custom_emoji SET uploader_id = NULL WHERE uploader_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
 
         // Purge personal data. Deleting devices cascades sessions and their tokens.
         sqlx::query!("DELETE FROM devices WHERE user_id = ?", user_id)
