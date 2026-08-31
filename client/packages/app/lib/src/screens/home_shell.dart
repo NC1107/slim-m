@@ -34,7 +34,6 @@ import '../widgets/channel_rail_frame.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/drawer_edge_swipe.dart';
-import '../widgets/incoming_call_banner.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/push_to_talk_listener.dart';
 import '../widgets/rail_slot.dart';
@@ -54,8 +53,9 @@ part 'home_shell_pane_slots.dart';
 /// The shell. One widget handles every width: at compact widths it shows one
 /// pane at a time, and above that both at once. The panes themselves are the
 /// same widgets either way, so behaviour cannot drift between layouts.
-/// [IncomingCallBanner] sits above everything else `build` returns; see its
-/// own doc comment for why.
+/// An incoming DM call is not this shell's concern any more: `IncomingCallOverlay`
+/// is mounted by `appChromeBuilder`, above the routed tree this shell is part
+/// of, rather than in flow here - see its own doc comment for why.
 class HomeShell extends ConsumerWidget {
   const HomeShell({required this.child, super.key});
 
@@ -232,12 +232,7 @@ class HomeShell extends ConsumerWidget {
         ),
       ),
     );
-    return Column(
-      children: [
-        const IncomingCallBanner(),
-        Expanded(child: body),
-      ],
-    );
+    return body;
   }
 
   /// Moves selection to the channel [direction] (1 or -1) away from the one

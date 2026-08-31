@@ -117,6 +117,12 @@ class _FakePlayer implements SoundPlayer {
   Future<void> play(NotificationSound sound) async => played.add(sound);
 
   @override
+  Future<void> loop(NotificationSound sound) async {}
+
+  @override
+  Future<void> stopLoop() async {}
+
+  @override
   Future<void> dispose() async {}
 }
 

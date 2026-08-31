@@ -32,6 +32,7 @@ import 'src/providers/sync_controller.dart';
 import 'src/providers/voice_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
+import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/toast_overlay.dart';
 
 /// Entry point.
@@ -308,11 +309,12 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
     return DesktopChrome(
       child: MediaQuery(
         data: overrideMotion(MediaQuery.of(context), motionChoice),
-        // Above the routed tree and its dialogs and sheets, under the motion override.
+        // Above the routed tree and its dialogs and sheets, under the motion override; the call overlay paints last, above the toasts too.
         child: Stack(
           children: [
             densityWrapped,
             const Positioned.fill(child: ToastOverlay()),
+            const Positioned.fill(child: IncomingCallOverlay()),
           ],
         ),
       ),
