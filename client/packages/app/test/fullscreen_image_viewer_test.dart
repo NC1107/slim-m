@@ -95,6 +95,13 @@ Future<void> _openViewer(WidgetTester tester) async {
   expect(_viewer(), findsNothing);
   await tester.tap(find.byType(Image).first);
   await tester.pumpAndSettle();
+  // The viewer renders its OWN Image.memory, which needs a real codec run
+  // exactly as the row's did; without it InteractiveViewer's child is
+  // zero-sized and a pinch has nothing to scale.
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  });
+  await tester.pumpAndSettle();
 }
 
 /// Two fingers moving apart across the open viewer.
