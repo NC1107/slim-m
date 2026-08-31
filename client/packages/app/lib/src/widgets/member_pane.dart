@@ -29,15 +29,22 @@
 /// keeps a single dot change from rebuilding every row.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../permissions.dart';
+import '../providers/admin_providers.dart';
 import '../providers/member_presence.dart';
+import '../providers/member_selection.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
+import 'member_bulk_actions.dart';
 import 'member_pane_rows.dart';
+import 'member_selection_bar.dart';
 
 /// Whether the member pane is shown, wherever it fits. Defaults open; the
 /// channel header's members toggle flips it. [HomeShell] also gates this on
@@ -64,6 +71,10 @@ class AppMemberPane extends ConsumerWidget {
     // Scoped watch: see the class doc comment above for why.
     ref.watch(presenceControllerProvider.select(reachablePresenceKey));
     final myId = ref.watch(meProvider).valueOrNull?.id;
+    final mine = ref.watch(myPermissionsProvider);
+    final canTimeOut = mine.hasPermission(Perm.kickMembers);
+    final canRemove = mine.hasPermission(Perm.banMembers);
+    final selecting = ref.watch(memberSelectionProvider).active;
 
     return Container(
       width: width,
@@ -120,7 +131,13 @@ class AppMemberPane extends ConsumerWidget {
           final grouped = groupMembersByPresence(members, statusOf);
           return Column(
             children: [
-              _Header(count: members.length),
+              _Header(
+                count: members.length,
+                // Only a moderator is offered the mode; the server refuses the rest anyway.
+                onStartSelecting: (canTimeOut || canRemove) && !selecting
+                    ? ref.read(memberSelectionProvider.notifier).enter
+                    : null,
+              ),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(
@@ -141,6 +158,14 @@ class AppMemberPane extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (selecting)
+                MemberSelectionBar(
+                  canTimeOut: canTimeOut,
+                  canRemove: canRemove,
+                  onTimeOut: (duration) =>
+                      unawaited(timeOutSelectedMembers(ref, context, duration)),
+                  onRemove: () => confirmAndRemoveSelectedMembers(ref, context),
+                ),
             ],
           );
         },
@@ -155,9 +180,13 @@ class AppMemberPane extends ConsumerWidget {
 /// Space is, and a search box quietly changing that number would answer a
 /// question nobody asked.
 class _Header extends StatelessWidget {
-  const _Header({required this.count});
+  const _Header({required this.count, this.onStartSelecting});
 
   final int? count;
+
+  /// Enters selection mode. Null when the viewer holds neither moderation
+  /// bit, or when the mode is already running.
+  final VoidCallback? onStartSelecting;
 
   @override
   Widget build(BuildContext context) {
@@ -169,9 +198,21 @@ class _Header extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
-      child: Text(
-        count == null ? 'MEMBERS' : 'MEMBERS · $count',
-        style: AppText.label.copyWith(color: tokens.textSecondary),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              count == null ? 'MEMBERS' : 'MEMBERS · $count',
+              style: AppText.label.copyWith(color: tokens.textSecondary),
+            ),
+          ),
+          if (onStartSelecting != null)
+            AppIconButton(
+              icon: AppIcons.shield,
+              semanticLabel: 'Select members to moderate',
+              onPressed: onStartSelecting,
+            ),
+        ],
       ),
     );
   }
