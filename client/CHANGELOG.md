@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.66.0](https://github.com/NC1107/slim-m/compare/client-v0.65.0...client-v0.66.0) (2026-08-31)
+
+
+### Features
+
+* add [@role](https://github.com/role) mentions ([#1010](https://github.com/NC1107/slim-m/issues/1010)) ([5aee7be](https://github.com/NC1107/slim-m/commit/5aee7be1698c4847a81d0dcd27e2e7a7a65806ac))
+* **client:** make an incoming DM call a focus-stealing overlay ([#1002](https://github.com/NC1107/slim-m/issues/1002)) ([addc661](https://github.com/NC1107/slim-m/commit/addc6617ea603ca328f093aa43de66abd5a06014))
+
+
+### Bug Fixes
+
+* **client:** leave the call and forget presence when a session ends ([#1015](https://github.com/NC1107/slim-m/issues/1015)) ([e82c9ab](https://github.com/NC1107/slim-m/commit/e82c9ab0c141eee75567ecfbda4caf1b9b2d5d2c))
+* **client:** stop a ring looping forever after sign-out ([#1007](https://github.com/NC1107/slim-m/issues/1007)) ([7715f7d](https://github.com/NC1107/slim-m/commit/7715f7d01a4c8957e05f34c8eb912c116c617240))
+* **rtc:** a muted camera track is not a live one ([#1006](https://github.com/NC1107/slim-m/issues/1006)) ([a89b03b](https://github.com/NC1107/slim-m/commit/a89b03be46a0a795844be5575ed9dcc5b7b1a3cd))
+
 ## [0.65.0](https://github.com/NC1107/slim-m/compare/client-v0.64.0...client-v0.65.0) (2026-08-30)
 
 
