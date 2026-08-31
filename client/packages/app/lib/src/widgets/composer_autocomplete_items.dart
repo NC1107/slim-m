@@ -31,6 +31,7 @@ class AutocompleteSuggestion {
     this.imageEmoji,
     this.userId,
     this.isMassMention = false,
+    this.isRoleMention = false,
   });
 
   final String insert;
@@ -55,6 +56,11 @@ class AutocompleteSuggestion {
   /// instead of the plain command-row fallback. Kept as a flag rather than an
   /// `IconData` field so this file's own vocabulary of offers stays pure Dart.
   final bool isMassMention;
+
+  /// A role (`@[Role Name]`) rather than a member or a mass mention: the
+  /// overlay draws the same shield glyph `member_roles_sheet.dart` already
+  /// uses for a role row, rather than the plain command-row fallback.
+  final bool isRoleMention;
 }
 
 /// A slash command: text substitution only.
@@ -131,13 +137,18 @@ const _massMentions = <(String name, String detail)>[
   ('here', 'Notify everyone currently online'),
 ];
 
-/// Members whose username or display name contains [term], plus
-/// `@everyone`/`@here` when [canMentionEveryone] allows offering them at all.
+/// Members whose username or display name contains [term], the roles any of
+/// them holds whose name contains it, plus `@everyone`/`@here` when
+/// [canMentionEveryone] allows offering them at all.
 ///
 /// Yourself excluded from the member half: mentioning yourself notifies
 /// nobody, and the row would sit where the person you meant to reach was
 /// about to appear. Prefix matches lead, because that is what somebody
-/// typing three letters means.
+/// typing three letters means. Roles are offered unconditionally rather than
+/// gated the way `_massMentions` is on [canMentionEveryone]: whether typing
+/// one actually wakes anyone is a per-role `mentionable` flag this list has
+/// no visibility into (see `Role.mentionable`), not a caller-wide permission
+/// this function could check up front.
 List<AutocompleteSuggestion> _mentions(
   String term,
   List<api.UserProfile> members,
@@ -167,6 +178,7 @@ List<AutocompleteSuggestion> _mentions(
             detail: detail,
             isMassMention: true,
           ),
+    ..._roleSuggestions(term, members),
     for (final m in candidates)
       AutocompleteSuggestion(
         insert: '@${m.username} ',
@@ -175,6 +187,41 @@ List<AutocompleteSuggestion> _mentions(
         userId: m.id,
       ),
   ].take(maxAutocompleteRows).toList(growable: false);
+}
+
+/// The distinct role names [term] matches across [members]' own `roles`
+/// field - the only role catalog available to an ordinary composer, since
+/// `GET /roles` itself stays MANAGE_ROLES-gated. A role nobody currently in
+/// the roster holds is therefore not offered here, the same boundary
+/// `knownRoleNamesFrom` (`channel_screen.dart`) already draws for rendering.
+/// Always inserted with the `@[Name]` bracket syntax, even for a name that
+/// would also fit the plain `@name` charset, so the rule stays simple and
+/// exceptionless: bracketed is always a role.
+List<AutocompleteSuggestion> _roleSuggestions(
+  String term,
+  List<api.UserProfile> members,
+) {
+  final byName = <String, String>{}; // lower-cased name -> its own casing
+  for (final member in members) {
+    for (final name in member.roles) {
+      byName.putIfAbsent(name.toLowerCase(), () => name);
+    }
+  }
+  final matches =
+      byName.values
+          .where((name) => term.isEmpty || name.toLowerCase().contains(term))
+          .toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+  return [
+    for (final name in matches)
+      AutocompleteSuggestion(
+        insert: '@[$name] ',
+        label: '@$name',
+        detail: 'Role',
+        isRoleMention: true,
+      ),
+  ];
 }
 
 List<AutocompleteSuggestion> _commandRows(String term) => [

@@ -17,24 +17,35 @@ extension SlimmApiRoles on SlimmApi {
   }
 
   /// Creates a role. Requires MANAGE_ROLES. [permissions] must already be a
-  /// subset of the caller's own effective permissions.
-  Future<Role> createRole(
-      {required String name, required int permissions}) async {
+  /// subset of the caller's own effective permissions. [mentionable]
+  /// defaults false, matching every other role's `@[Role Name]` waking
+  /// nobody until someone opts it in.
+  Future<Role> createRole({
+    required String name,
+    required int permissions,
+    bool? mentionable,
+  }) async {
     final json = await _send(
       'POST',
       '/roles',
-      body: {'name': name, 'permissions': permissions},
+      body: {
+        'name': name,
+        'permissions': permissions,
+        if (mentionable != null) 'mentionable': mentionable,
+      },
     );
     return Role.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Renames a role or changes its permissions. Requires MANAGE_ROLES. Both
-  /// fields are optional; a field left null is unchanged. Refused if a
-  /// permissions change would leave the deployment with no administrator.
+  /// Renames a role, changes its permissions, and/or its `mentionable`
+  /// flag. Requires MANAGE_ROLES. Every field is optional; a field left null
+  /// is unchanged. Refused if a permissions change would leave the
+  /// deployment with no administrator.
   Future<Role> updateRole({
     required String roleId,
     String? name,
     int? permissions,
+    bool? mentionable,
   }) async {
     final json = await _send(
       'PATCH',
@@ -42,6 +53,7 @@ extension SlimmApiRoles on SlimmApi {
       body: {
         if (name != null) 'name': name,
         if (permissions != null) 'permissions': permissions,
+        if (mentionable != null) 'mentionable': mentionable,
       },
     );
     return Role.fromJson(json as Map<String, dynamic>);

@@ -73,6 +73,7 @@ class ChannelSearchResults extends ConsumerWidget {
     super.key,
     required this.results,
     required this.knownUsernames,
+    this.knownRoleNames = const {},
     this.customEmoji = const {},
     required this.loading,
     required this.failed,
@@ -89,6 +90,9 @@ class ChannelSearchResults extends ConsumerWidget {
   /// means the search genuinely came back with nothing.
   final List<api.Message>? results;
   final Set<String> knownUsernames;
+
+  /// See [MessageBody.knownRoleNames].
+  final Set<String> knownRoleNames;
 
   /// The deployment's custom emoji, name to id. See [MessageBody].
   final Map<String, String> customEmoji;
@@ -182,6 +186,7 @@ class ChannelSearchResults extends ConsumerWidget {
       itemBuilder: (context, i) => SearchResultRow(
         message: list[i],
         knownUsernames: knownUsernames,
+        knownRoleNames: knownRoleNames,
         customEmoji: customEmoji,
         onSelect: onSelect,
       ),
@@ -197,12 +202,16 @@ class SearchResultRow extends ConsumerWidget {
     super.key,
     required this.message,
     required this.knownUsernames,
+    this.knownRoleNames = const {},
     required this.customEmoji,
     required this.onSelect,
   });
 
   final api.Message message;
   final Set<String> knownUsernames;
+
+  /// See [MessageBody.knownRoleNames].
+  final Set<String> knownRoleNames;
   final Map<String, String> customEmoji;
   final ValueChanged<api.Message> onSelect;
 
@@ -247,6 +256,7 @@ class SearchResultRow extends ConsumerWidget {
                   MessageBody(
                     content: message.content,
                     knownUsernames: knownUsernames,
+                    knownRoleNames: knownRoleNames,
                     customEmoji: customEmoji,
                   ),
                 ],

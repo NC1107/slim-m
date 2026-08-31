@@ -29,6 +29,7 @@ bool messageMentionsUsername(String content, String username) {
         case InlineText():
         case InlineCode():
         case InlineEmoji():
+        case InlineRoleMention():
           break;
       }
     }

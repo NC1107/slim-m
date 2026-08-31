@@ -56,6 +56,21 @@ Set<String> knownUsernamesFrom(AsyncValue<List<api.UserProfile>> members) =>
     members.valueOrNull?.map((m) => m.username.toLowerCase()).toSet() ??
     const <String>{};
 
+/// The role names an `@[Role Name]` mention can be matched against, read the
+/// same `valueOrNull` way [knownUsernamesFrom] is for the identical reason:
+/// a failed refresh must not unhighlight a role mention that was already on
+/// screen. Derived from [members]'s own `roles` field (`GET /members`,
+/// requiring no permission beyond viewing the roster) rather than a
+/// dedicated roles listing, which stays MANAGE_ROLES-gated - so a role
+/// nobody currently visible holds is not offered here, the same boundary
+/// the member-badge feature this reuses already draws.
+Set<String> knownRoleNamesFrom(AsyncValue<List<api.UserProfile>> members) =>
+    members.valueOrNull
+        ?.expand((m) => m.roles)
+        .map((name) => name.toLowerCase())
+        .toSet() ??
+    const <String>{};
+
 class ChannelScreen extends ConsumerStatefulWidget {
   const ChannelScreen({
     required this.channelId,

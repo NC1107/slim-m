@@ -92,6 +92,19 @@ pub async fn message_recipients(
 /// shape an ordinary `@nobody` already has. `@everyone` expands to every
 /// viewer; `@here` narrows that to whoever `presence` reports connected right
 /// now, which is what distinguishes the two words at all.
+///
+/// `@[Role Name]` mentions (recognised by [`mentioned_role_names`], a
+/// separate bracketed grammar from the plain `@name` one above - see that
+/// function's own doc for why) resolve the same forgiving way: each name is
+/// looked up with [`Store::roles_for_names`], and a match expands to
+/// [`Store::members_with_role`] intersected with `viewers`, but only when
+/// that role's own [`crate::store::Role::mentionable`] flag is set, or the
+/// author holds [`Permissions::MENTION_EVERYONE`] - the same override that
+/// already lets that bit bypass `@everyone`/`@here`. Deliberately not a
+/// second permission bit: a role a manager already opted in to being
+/// mentioned needs no further gate, and one they did not stays quiet for
+/// everybody except the same override that already ignores every other
+/// mention gate in this function.
 async fn resolved_mentions(
     store: &Store,
     channel_id: ChannelId,
@@ -103,6 +116,7 @@ async fn resolved_mentions(
     let mut names = mentioned_usernames(content);
     let mentions_everyone = names.remove(EVERYONE_MENTION);
     let mentions_here = names.remove(HERE_MENTION);
+    let role_names: Vec<String> = mentioned_role_names(content).into_iter().collect();
 
     let mut resolved: HashSet<UserId> = if names.is_empty() {
         HashSet::new()
@@ -115,11 +129,16 @@ async fn resolved_mentions(
             .collect()
     };
 
-    if (mentions_everyone || mentions_here)
-        && store
+    // Shared by both overrides below, so paid for once, not once per mention kind.
+    let mention_everyone_held = if mentions_everyone || mentions_here || !role_names.is_empty() {
+        store
             .has_permission(author_id, channel_id, Permissions::MENTION_EVERYONE)
             .await?
-    {
+    } else {
+        false
+    };
+
+    if (mentions_everyone || mentions_here) && mention_everyone_held {
         if mentions_everyone {
             resolved.extend(viewers.iter().copied());
         } else {
@@ -132,7 +151,50 @@ async fn resolved_mentions(
         }
     }
 
+    if !role_names.is_empty() {
+        for role in store.roles_for_names(&role_names).await? {
+            if !(role.mentionable || mention_everyone_held) {
+                continue;
+            }
+            let members = store.members_with_role(role.id).await?;
+            resolved.extend(members.into_iter().filter(|id| viewers.contains(id)));
+        }
+    }
+
     Ok(resolved)
+}
+
+/// The distinct role names inside `@[Name]` tokens in `content` - the
+/// mention syntax for a role, a separate bracketed grammar rather than a
+/// widened `@name` charset, for two reasons at once: it lets a role name
+/// hold spaces and mixed case (`@[Core Team]`) that the plain charset in
+/// [`mentioned_usernames`] cannot, and it makes a role and a user sharing a
+/// name unambiguous by construction rather than by a resolution-order
+/// tie-break - `@nick` is always the user, `@[nick]` is always the role.
+/// Matched the identical way in `message_inline.dart`'s `parseInline`.
+///
+/// A name is trimmed of surrounding whitespace and dropped if that leaves it
+/// empty; a `[` with no `]` before the next newline (or the end of the
+/// message) is not a mention at all, and scanning resumes just past it.
+fn mentioned_role_names(content: &str) -> HashSet<String> {
+    let mut names = HashSet::new();
+    let mut rest = content;
+    while let Some(open) = rest.find("@[") {
+        let after = &rest[open + 2..];
+        match after.find(['\n', ']']) {
+            Some(idx) if after.as_bytes()[idx] == b']' => {
+                let name = after[..idx].trim();
+                if !name.is_empty() {
+                    names.insert(name.to_owned());
+                }
+                rest = &after[idx + 1..];
+            }
+            // A newline before any `]` means this was never a mention.
+            Some(idx) => rest = &after[idx..],
+            None => break,
+        }
+    }
+    names
 }
 
 /// Narrows `viewers` to a thread's own audience, for a reply into a thread's
@@ -279,7 +341,62 @@ fn is_mention_continuation(b: u8) -> bool {
 mod tests {
     use std::collections::HashSet;
 
-    use super::mentioned_usernames;
+    use super::{mentioned_role_names, mentioned_usernames};
+
+    #[test]
+    fn finds_a_bracketed_role_mention_with_spaces_and_mixed_case() {
+        assert_eq!(
+            mentioned_role_names("hey @[Core Team], any update?"),
+            one("Core Team")
+        );
+    }
+
+    #[test]
+    fn an_unclosed_bracket_is_not_a_mention() {
+        assert!(mentioned_role_names("an unclosed @[Core Team here").is_empty());
+    }
+
+    #[test]
+    fn a_newline_before_the_closing_bracket_is_not_a_mention() {
+        assert!(mentioned_role_names("@[Core\nTeam]").is_empty());
+    }
+
+    #[test]
+    fn surrounding_whitespace_inside_the_brackets_is_trimmed() {
+        assert_eq!(mentioned_role_names("@[  Core Team  ]"), one("Core Team"));
+    }
+
+    #[test]
+    fn empty_brackets_are_not_a_mention() {
+        assert!(mentioned_role_names("@[]").is_empty());
+        assert!(mentioned_role_names("@[   ]").is_empty());
+    }
+
+    #[test]
+    fn a_plain_username_mention_is_never_read_as_a_role() {
+        assert!(mentioned_role_names("plain @nick is a user").is_empty());
+    }
+
+    /// Cross-checked against `crates/slimm-server/tests/fixtures/
+    /// role_mention_charset_cases.json` the same way
+    /// [the_shared_charset_fixture_agrees_with_message_inline_dart] cross-checks
+    /// the plain `@name` grammar; see that test's own doc.
+    #[test]
+    fn the_shared_role_fixture_agrees_with_message_inline_dart() {
+        for case in load_role_mention_cases() {
+            let actual = mentioned_role_names(&case.content);
+            let expected: HashSet<String> = case.mentions.into_iter().collect();
+            assert_eq!(actual, expected, "content: {:?}", case.content);
+        }
+    }
+
+    fn load_role_mention_cases() -> Vec<MentionCase> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/role_mention_charset_cases.json");
+        let raw = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+        serde_json::from_str(&raw).expect("role_mention_charset_cases.json must be valid JSON")
+    }
 
     #[test]
     fn finds_every_distinct_mention_and_nothing_else() {

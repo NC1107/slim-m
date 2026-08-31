@@ -26,6 +26,12 @@ pub struct Role {
     pub name: String,
     pub permissions: Permissions,
     pub is_everyone: bool,
+    /// Whether an ordinary member can wake this role's members with
+    /// `@[Role Name]` with no permission of their own; see
+    /// `push::recipients::resolved_mentions`. Never consulted for
+    /// `is_everyone`, which the reserved `@everyone`/`@here` words already
+    /// cover under `Permissions::MENTION_EVERYONE`.
+    pub mentionable: bool,
     pub created_at: i64,
 }
 
@@ -114,6 +120,11 @@ impl Store {
     /// client-supplied id of its own; it mints one and always sees
     /// [`CreatedRole::fresh`] true, since a freshly generated UUIDv7 id
     /// cannot already be in use.
+    /// `mentionable` always starts false (the column's own `DEFAULT 0`, not
+    /// repeated here): a role must be opted in to `@[Role Name]` waking
+    /// anyone through [`Store::update_role`] after creation, never at birth,
+    /// matching the deny-by-default posture every other permission on a new
+    /// role already has.
     pub async fn create_role_with_id(
         &self,
         id: RoleId,
@@ -195,7 +206,8 @@ impl Store {
             Role,
             r#"SELECT id AS "id!: RoleId", name AS "name!",
                       permissions AS "permissions!: Permissions",
-                      is_everyone AS "is_everyone!: bool", created_at AS "created_at!"
+                      is_everyone AS "is_everyone!: bool",
+                      mentionable AS "mentionable!: bool", created_at AS "created_at!"
                FROM roles ORDER BY position DESC, created_at"#
         )
         .fetch_all(&self.pool)
@@ -209,7 +221,8 @@ impl Store {
             Role,
             r#"SELECT id AS "id!: RoleId", name AS "name!",
                       permissions AS "permissions!: Permissions",
-                      is_everyone AS "is_everyone!: bool", created_at AS "created_at!"
+                      is_everyone AS "is_everyone!: bool",
+                      mentionable AS "mentionable!: bool", created_at AS "created_at!"
                FROM roles WHERE id = ?"#,
             role_id
         )
@@ -218,20 +231,6 @@ impl Store {
         Ok(row)
     }
 
-    /// Updates a role's name and/or permissions; `None` for a field leaves it
-    /// unchanged. `Ok(None)` if the role does not exist.
-    ///
-    /// Whether the requested permissions are something the caller may grant
-    /// is checked by `http::roles` before this runs, since that needs the
-    /// caller's own effective permissions; this only guards the structural
-    /// invariant, rolling back if the update would leave the deployment with
-    /// no administrator.
-    ///
-    /// That guard runs whenever permissions were touched at all, rather than
-    /// trying to detect whether the ADMINISTRATOR bit specifically moved. Only
-    /// a permissions change can remove an administrator, and checking the
-    /// broader condition stays correct even when the bit arrives folded into a
-    /// larger change.
     /// Who holds a role, for a caller that has to notify them about something
     /// their membership decides.
     ///
@@ -248,53 +247,67 @@ impl Store {
         Ok(rows.into_iter().map(|r| r.user_id).collect())
     }
 
+    /// Updates a role's name, permissions and/or `mentionable` flag; `None`
+    /// for a field leaves it unchanged. `Ok(None)` if the role does not
+    /// exist, and a no-op call (every field `None`) is still an existence
+    /// check rather than an error.
+    ///
+    /// Whether the requested permissions are something the caller may grant
+    /// is checked by `http::roles` before this runs, since that needs the
+    /// caller's own effective permissions; this only guards the structural
+    /// invariant, rolling back if the update would leave the deployment with
+    /// no administrator.
+    ///
+    /// That guard runs whenever permissions were touched at all, rather than
+    /// trying to detect whether the ADMINISTRATOR bit specifically moved. Only
+    /// a permissions change can remove an administrator, and checking the
+    /// broader condition stays correct even when the bit arrives folded into a
+    /// larger change.
+    ///
+    /// Built with [`QueryBuilder`] rather than one `match` arm per field
+    /// combination: three optional fields would be eight arms, and a fourth
+    /// field would double that again.
     pub async fn update_role(
         &self,
         role_id: RoleId,
         name: Option<&str>,
         permissions: Option<Permissions>,
+        mentionable: Option<bool>,
     ) -> Result<Option<Role>, RoleGuardError> {
         let mut tx = self.pool.begin().await?;
 
-        let affected: u64 = match (name, permissions) {
-            (Some(name), Some(perms)) => {
-                let bits = perms.bits();
-                sqlx::query!(
-                    "UPDATE roles SET name = ?, permissions = ? WHERE id = ?",
-                    name,
-                    bits,
-                    role_id
-                )
-                .execute(&mut *tx)
-                .await?
-                .rows_affected()
+        let affected: u64 = if name.is_none() && permissions.is_none() && mentionable.is_none() {
+            let exists = sqlx::query_scalar!(
+                r#"SELECT 1 AS "one!: i64" FROM roles WHERE id = ?"#,
+                role_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            u64::from(exists.is_some())
+        } else {
+            let mut builder = QueryBuilder::new("UPDATE roles SET ");
+            let mut first = true;
+            if let Some(name) = name {
+                builder.push("name = ").push_bind(name.to_owned());
+                first = false;
             }
-            (Some(name), None) => {
-                sqlx::query!("UPDATE roles SET name = ? WHERE id = ?", name, role_id)
-                    .execute(&mut *tx)
-                    .await?
-                    .rows_affected()
+            if let Some(perms) = permissions {
+                if !first {
+                    builder.push(", ");
+                }
+                builder.push("permissions = ").push_bind(perms.bits());
+                first = false;
             }
-            (None, Some(perms)) => {
-                let bits = perms.bits();
-                sqlx::query!(
-                    "UPDATE roles SET permissions = ? WHERE id = ?",
-                    bits,
-                    role_id
-                )
-                .execute(&mut *tx)
-                .await?
-                .rows_affected()
+            if let Some(mentionable) = mentionable {
+                if !first {
+                    builder.push(", ");
+                }
+                builder
+                    .push("mentionable = ")
+                    .push_bind(i64::from(mentionable));
             }
-            (None, None) => {
-                let exists = sqlx::query_scalar!(
-                    r#"SELECT 1 AS "one!: i64" FROM roles WHERE id = ?"#,
-                    role_id
-                )
-                .fetch_optional(&mut *tx)
-                .await?;
-                u64::from(exists.is_some())
-            }
+            builder.push(" WHERE id = ").push_bind(role_id);
+            builder.build().execute(&mut *tx).await?.rows_affected()
         };
         if affected == 0 {
             return Ok(None);

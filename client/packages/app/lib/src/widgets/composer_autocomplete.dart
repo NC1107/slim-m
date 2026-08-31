@@ -104,11 +104,15 @@ class _Row extends StatelessWidget {
         style: const TextStyle(fontSize: AppSizes.icon16, height: 1.1),
       );
     } else {
-      leading = Icon(
-        suggestion.isMassMention ? AppIcons.members : AppIcons.code,
-        size: AppSizes.icon16,
-        color: tokens.textSecondary,
-      );
+      final IconData icon;
+      if (suggestion.isMassMention) {
+        icon = AppIcons.members;
+      } else if (suggestion.isRoleMention) {
+        icon = AppIcons.shield;
+      } else {
+        icon = AppIcons.code;
+      }
+      leading = Icon(icon, size: AppSizes.icon16, color: tokens.textSecondary);
     }
 
     return Semantics(

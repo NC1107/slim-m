@@ -241,7 +241,7 @@ async fn a_caller_who_cannot_see_the_channel_is_refused() {
         .find(|r| r.is_everyone)
         .unwrap();
     store
-        .update_role(everyone.id, None, Some(Permissions::NONE))
+        .update_role(everyone.id, None, Some(Permissions::NONE), None)
         .await
         .unwrap();
 

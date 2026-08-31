@@ -1,0 +1,11 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+-- Whether an ordinary member (nobody in particular, no special permission)
+-- can wake this role's members with an `@[Role Name]` mention.
+--
+-- Defaults off, matching the deny-by-default posture `permissions.rs`
+-- documents for everything else: a freshly created role - and every role
+-- that already existed before this column did - stays quiet until whoever
+-- holds MANAGE_ROLES opts it in. `Permissions::MENTION_EVERYONE` still
+-- overrides this per-role gate the same way it already overrides
+-- `@everyone`/`@here`; see `push::recipients::resolved_mentions`.
+ALTER TABLE roles ADD COLUMN mentionable INTEGER NOT NULL DEFAULT 0;

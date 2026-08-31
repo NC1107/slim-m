@@ -6033,7 +6033,7 @@ components:
 
     Role:
       type: object
-      required: [id, name, permissions, is_everyone, created_at]
+      required: [id, name, permissions, is_everyone, mentionable, created_at]
       properties:
         id:
           type: string
@@ -6051,6 +6051,9 @@ components:
           description: >
             Whether this is the deployment's single `@everyone` base role.
             Exactly one role always carries this.
+        mentionable:
+          type: boolean
+          description: Whether any member may wake this role with `@[Role Name]` with no permission of their own. Defaults false; MENTION_EVERYONE overrides it.
         created_at:
           type: integer
           format: int64
@@ -6076,6 +6079,9 @@ components:
           description: >
             Must be a subset of the caller's own effective permissions, or
             the request is refused.
+        mentionable:
+          type: boolean
+          description: Defaults false. Applied only on a genuinely fresh create, never on a retry of one that already succeeded.
 
     UpdateRoleRequest:
       type: object
@@ -6088,6 +6094,8 @@ components:
           type: integer
           format: int64
           description: Checked the same way `CreateRoleRequest.permissions` is.
+        mentionable:
+          type: boolean
 
     SetOverwriteRequest:
       type: object

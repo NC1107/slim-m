@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Cross-checks `parseInline`'s mention extraction against the same table of
-/// tricky inputs the server asserts in `crates/slimm-server/src/push/
-/// recipients.rs`'s `the_shared_charset_fixture_agrees_with_message_inline_dart`.
+/// Cross-checks `parseInline`'s `@[Role Name]` extraction against the same
+/// table of tricky inputs the server asserts in `crates/slimm-server/src/
+/// push/recipients.rs`'s `the_shared_role_fixture_agrees_with_message_inline_dart`.
 ///
 /// Both sides read `crates/slimm-server/tests/fixtures/
-/// mention_charset_cases.json`, a single file rather than two hand-copied
-/// lists, so a charset or trimming-rule edit on one side that is not made on
-/// the other fails here or there - whichever the fixture no longer matches -
-/// instead of only showing up as a mention that silently stops notifying
-/// people on one platform.
+/// role_mention_charset_cases.json`, the same shared-fixture shape
+/// `message_inline_mention_charset_test.dart` already uses for the plain
+/// `@name` grammar.
 library;
 
 import 'dart:convert';
@@ -20,7 +18,7 @@ import 'package:slimm_app/src/widgets/message_inline.dart';
 void main() {
   final repoRoot = _findRepoRoot(Directory.current);
   final fixture = File(
-    '${repoRoot.path}/crates/slimm-server/tests/fixtures/mention_charset_cases.json',
+    '${repoRoot.path}/crates/slimm-server/tests/fixtures/role_mention_charset_cases.json',
   );
 
   test('the fixture exists and is not empty', () {
@@ -29,8 +27,8 @@ void main() {
   });
 
   for (final testCase in _loadCases(fixture)) {
-    test('mentions in ${jsonEncode(testCase.content)}', () {
-      expect(_mentionsIn(testCase.content), testCase.mentions);
+    test('role mentions in ${jsonEncode(testCase.content)}', () {
+      expect(_roleMentionsIn(testCase.content), testCase.mentions);
     });
   }
 }
@@ -52,16 +50,16 @@ List<_Case> _loadCases(File fixture) {
   ];
 }
 
-/// The `@name`s a real transcript render would resolve, collected by walking
-/// the same tree `message_text.dart` walks rather than by a second regex, so
-/// this proves what the parser actually does and not what a copy of it does.
-Set<String> _mentionsIn(String content) {
+/// The role names a real transcript render would resolve, collected by
+/// walking the same tree `message_text.dart` walks rather than by a second
+/// regex.
+Set<String> _roleMentionsIn(String content) {
   final names = <String>{};
   void visit(List<InlineNode> nodes) {
     for (final node in nodes) {
       switch (node) {
-        case InlineMention(:final raw):
-          names.add(raw.substring(1));
+        case InlineRoleMention(:final name):
+          names.add(name);
         case InlineBold(:final children):
           visit(children);
         case InlineItalic(:final children):
@@ -73,7 +71,7 @@ Set<String> _mentionsIn(String content) {
         case InlineText():
         case InlineCode():
         case InlineEmoji():
-        case InlineRoleMention():
+        case InlineMention():
           break;
       }
     }
@@ -84,9 +82,7 @@ Set<String> _mentionsIn(String content) {
 }
 
 /// Walks upward from [start] looking for schema/openapi.yaml, the same
-/// repo-root anchor `client/packages/api/test/schema_coverage_test.dart`
-/// already uses, so this test does not depend on whether it was invoked from
-/// the repo root, from client/, or from client/packages/app.
+/// repo-root anchor `message_inline_mention_charset_test.dart` already uses.
 Directory _findRepoRoot(Directory start) {
   var dir = start.absolute;
   for (var i = 0; i < 10; i++) {
