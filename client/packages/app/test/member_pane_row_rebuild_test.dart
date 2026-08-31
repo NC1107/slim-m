@@ -20,7 +20,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
+import 'package:slimm_app/src/providers/member_selection.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/member_pane.dart';
@@ -141,4 +144,68 @@ void main() {
       );
     },
   );
+
+  testWidgets('selecting one member rebuilds only that member\'s row', (
+    tester,
+  ) async {
+    debugResetMemberRowBuildCounts();
+    final members = [_profile('a', 'Anna'), _profile('b', 'Bo')];
+    final events = StreamController<ServerEvent>.broadcast();
+    addTearDown(events.close);
+
+    final container = ProviderContainer(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
+        apiProvider.overrideWith((ref) {
+          final api = _fakeApi(
+            ref.watch(sessionProvider),
+            presence: {'a': PresenceState.online, 'b': PresenceState.online},
+          );
+          ref.onDispose(api.close);
+          return api;
+        }),
+        liveEventsProvider.overrideWithValue(events.stream),
+        membersProvider.overrideWith((ref) async => members),
+        myPermissionsProvider.overrideWithValue(Perm.banMembers),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(body: AppMemberPane()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Entering the mode changes every row's `selecting`, so all rebuild once.
+    container.read(memberSelectionProvider.notifier).enter();
+    await tester.pumpAndSettle();
+    final afterEnter = {
+      'a': debugMemberRowBuildCounts['a'],
+      'b': debugMemberRowBuildCounts['b'],
+    };
+
+    container.read(memberSelectionProvider.notifier).toggle('a');
+    await tester.pumpAndSettle();
+
+    expect(
+      debugMemberRowBuildCounts['a'],
+      afterEnter['a']! + 1,
+      reason: "the row that was picked must rebuild to show it",
+    );
+    expect(
+      debugMemberRowBuildCounts['b'],
+      afterEnter['b'],
+      reason:
+          "picking one member must not rebuild the rest of the roster: the "
+          "selection set is a new object every toggle, so an unscoped watch "
+          "would rebuild all of them",
+    );
+  });
 }

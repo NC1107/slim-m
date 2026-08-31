@@ -74,7 +74,10 @@ class AppMemberPane extends ConsumerWidget {
     final mine = ref.watch(myPermissionsProvider);
     final canTimeOut = mine.hasPermission(Perm.kickMembers);
     final canRemove = mine.hasPermission(Perm.banMembers);
-    final selecting = ref.watch(memberSelectionProvider).active;
+    // Scoped: the selection is a new object per toggle, so watching it whole rebuilds every row.
+    final selecting = ref.watch(
+      memberSelectionProvider.select((s) => s.active),
+    );
     // A bit revoked mid-selection leaves a mode with no verb left in it.
     ref.listen(myPermissionsProvider, (_, next) {
       final stillAllowed =
