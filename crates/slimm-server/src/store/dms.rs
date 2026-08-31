@@ -247,6 +247,31 @@ impl Store {
     /// an outer query rather than folded into the same `WHERE` as the pair
     /// match, because SQLite cannot see a `SELECT`-list alias (`activity_at`)
     /// from its own `WHERE` clause.
+    /// Every DM channel `user_id` is a party to, hidden ones included.
+    ///
+    /// Deliberately NOT [`Self::list_dm_conversations`], which filters out
+    /// conversations the caller has hidden from their own sidebar. That
+    /// filter is a display preference and must never decide a safety act:
+    /// `http::members::evict_from_voice` used the filtered list, so a member
+    /// who hid a DM while staying connected to its call kept live audio
+    /// after being timed out or removed. Hiding is one ordinary request away,
+    /// which made moderation defeatable by anyone who saw it coming.
+    pub(crate) async fn dm_channel_ids_for_user(
+        &self,
+        user_id: UserId,
+    ) -> anyhow::Result<Vec<ChannelId>> {
+        let rows = sqlx::query!(
+            r#"SELECT channel_id AS "channel_id!: ChannelId"
+               FROM dm_channels
+               WHERE user_a = ? OR user_b = ?"#,
+            user_id,
+            user_id,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|row| row.channel_id).collect())
+    }
+
     pub async fn list_dm_conversations(
         &self,
         user_id: UserId,

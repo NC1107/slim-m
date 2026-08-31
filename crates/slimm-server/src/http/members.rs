@@ -312,8 +312,9 @@ async fn evict_from_voice(state: &AppState, target: UserId) {
             return;
         }
     };
-    let dm_channel_ids: Vec<_> = match state.store.list_dm_conversations(target).await {
-        Ok(conversations) => conversations.into_iter().map(|c| c.channel_id).collect(),
+    // Every DM, hidden ones included: see dm_channel_ids_for_user for why the sidebar list will not do.
+    let dm_channel_ids = match state.store.dm_channel_ids_for_user(target).await {
+        Ok(ids) => ids,
         Err(err) => {
             tracing::warn!(%err, "could not list a moderated member's DMs to evict them from");
             Vec::new()

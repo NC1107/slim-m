@@ -181,6 +181,62 @@ async fn a_timeout_evicts_the_target_from_a_dm_call_they_are_on() {
     );
 }
 
+/// Hiding a DM must not smuggle its call past moderation.
+///
+/// `DELETE /dms/{id}` is a sidebar-declutter preference, and
+/// `list_dm_conversations` honours it by design. `evict_from_voice` used
+/// that filtered list, so a member who hid the conversation while staying
+/// connected to its call kept live audio after being timed out - one
+/// ordinary request away from defeating moderation for anyone who saw it
+/// coming. Eviction now reads every DM the target is party to.
+#[tokio::test]
+async fn hiding_a_dm_does_not_hide_its_call_from_a_timeout() {
+    let recorder = RecordingRoomService::default();
+    let sfu_url = spawn_sfu(recorder.clone()).await;
+    let (store, _guard) = new_store().await;
+    let app = app(
+        store.clone(),
+        VoiceService::for_test(&sfu_url, "key", "a-secret-at-least-32-chars-long!"),
+    );
+
+    let (admin_token, alice_id, _alice_token, bob_id) = people(&store).await;
+    let alice = slimm_server::ids::UserId(alice_id.parse().unwrap());
+    let bob = slimm_server::ids::UserId(bob_id.parse().unwrap());
+    let dm_channel_id = store.open_dm(alice, bob).await.unwrap().id;
+
+    // Bob hides the conversation while remaining on its call.
+    store.hide_dm_conversation(bob, alice).await.unwrap();
+    assert!(
+        store
+            .list_dm_conversations(bob)
+            .await
+            .unwrap()
+            .iter()
+            .all(|c| c.channel_id != dm_channel_id),
+        "sanity: the hide really did take it out of bob's own sidebar list"
+    );
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "PUT",
+            &format!("/members/{bob_id}/timeout"),
+            &admin_token,
+            Some(json!({ "duration_seconds": 300 })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let removed = recorder.removed.lock().unwrap();
+    assert!(
+        removed.iter().any(|call| {
+            call["room"] == format!("channel-{dm_channel_id}") && call["identity"] == bob_id
+        }),
+        "a hidden DM's call must still be evicted, got {removed:?}"
+    );
+}
+
 /// The durable version of the same act: removing a member from the Space
 /// must end their DM calls too, for the same reason a timeout must.
 #[tokio::test]
