@@ -39,8 +39,7 @@ class DismissKeyboardOnDrag extends StatelessWidget {
         if (notification.dragDetails != null) {
           FocusScope.of(context).unfocus();
         }
-        // Never swallowed: the transcript's own scroll listeners are watching
-        // for the same notifications to decide about the jump-to-latest pill.
+        // Never swallowed: the jump-to-latest pill watches these same notifications.
         return false;
       },
       child: child,
