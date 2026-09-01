@@ -336,10 +336,15 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// Applies one live event the way [_attach]'s listener would, without
   /// needing a real socket. For tests only.
   @visibleForTesting
-  Future<void> applyServerEventForTest(ServerEvent event) async {
+  /// [generation] defaults to the live one; a test passes a stale value to
+  /// stand in for a sign-out or reconnect that landed mid-event.
+  Future<void> applyServerEventForTest(
+    ServerEvent event, {
+    int? generation,
+  }) async {
     final api = _ref.read(apiProvider);
     final store = await _ref.read(storeProvider.future);
-    await _applyServerEvent(_generation, api, store, event);
+    await _applyServerEvent(generation ?? _generation, api, store, event);
   }
 
   void _onDropped() {

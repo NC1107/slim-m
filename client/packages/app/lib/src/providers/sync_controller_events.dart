@@ -34,7 +34,9 @@ extension SyncControllerEvents on SyncController {
           await _channelRefresher.refreshOnce(api, store, isCurrent: isCurrent);
         }
         if (!isCurrent()) return;
-        if (!await _placeLiveOp(message.channelId, opSeq, store)) return;
+        if (!await _placeLiveOp(message.channelId, opSeq, store, isCurrent)) {
+          return;
+        }
         await store.applyMessage(message);
       case MessageDeleted(:final channelId, :final messageId, :final opSeq):
 
@@ -42,7 +44,8 @@ extension SyncControllerEvents on SyncController {
         /// delete at all, so a message removed by another user (or this
         /// account's own delete looping back) never left the local store
         /// and stayed visible until the next full resync.
-        if (!await _placeLiveOp(channelId, opSeq, store)) return;
+        if (!await _placeLiveOp(channelId, opSeq, store, isCurrent)) return;
+        if (!isCurrent()) return;
         await store.discard(messageId);
       case ChannelCreated(:final channel):
       case ChannelUpdated(:final channel):
@@ -70,12 +73,22 @@ extension SyncControllerEvents on SyncController {
   /// A gap schedules one reconcile rather than applying an op it cannot place:
   /// moving the cursor past something never seen would strand it permanently,
   /// where a stall only lasts until the next round.
+  ///
+  /// [isCurrent] is rechecked after the cursor read, not only before the call.
+  /// Reading the cursor is an await, and a sign-out or reconnect landing inside
+  /// it leaves this holding a number from a store the newer run has since moved
+  /// past - writing it back would advance a cursor over ops that run never saw,
+  /// which is the permanent stranding the paragraph above exists to avoid. It
+  /// is the guard every other checkpoint in [SyncController.start] already
+  /// applies; this one path was reading the cursor without it.
   Future<bool> _placeLiveOp(
     String channelId,
     int? opSeq,
     MessageStore store,
+    bool Function() isCurrent,
   ) async {
     final cursor = await store.opCursorFor(channelId);
+    if (!isCurrent()) return false;
     switch (liveOpDecision(opSeq, cursor)) {
       case LiveOpOutcome.ignored:
         return false;
