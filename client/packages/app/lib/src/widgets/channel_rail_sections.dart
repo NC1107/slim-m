@@ -4,6 +4,8 @@
 /// docs/decisions/0006-channel-categories.md.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -189,14 +191,24 @@ class ChannelCategorySections extends ConsumerWidget {
       final label = _SectionLabel(category?.name ?? 'Channels');
       // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
       if (category == null || !canManage) return label;
+      // Both verbs directly: deleting used to be a menu, a sheet, a danger zone and a confirmation.
       return ContextMenuRegion(
         itemsBuilder: (context, close) => [
           AppMenuItem(
-            label: 'Manage category...',
-            leading: AppIcons.settings,
+            label: 'Rename category...',
+            leading: AppIcons.edit,
             onTap: () {
               close();
               showManageCategorySheet(context, category);
+            },
+          ),
+          AppMenuItem(
+            label: 'Delete category...',
+            leading: AppIcons.delete,
+            tone: AppMenuItemTone.danger,
+            onTap: () {
+              close();
+              unawaited(confirmAndDeleteCategory(context, ref, category));
             },
           ),
         ],
