@@ -15,11 +15,16 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/widgets/dismiss_keyboard_on_drag.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 /// The pane's own arrangement in miniature: a focus node standing in for the
-/// composer, above a scrollable standing in for the transcript, under the
-/// listener the pane wraps them in.
+/// composer, above a scrollable standing in for the transcript, under the real
+/// [DismissKeyboardOnDrag] the pane wraps them in.
+///
+/// The production widget, not a copy of its logic: reproducing the listener
+/// here would have passed no matter what the pane later did, which is the one
+/// thing this test exists to prevent.
 ///
 /// A bare [Focus] rather than a real [TextField]: a focused field runs a
 /// blinking-cursor timer that keeps scheduling frames, so a `pumpAndSettle`
@@ -34,13 +39,7 @@ Widget _harness({
     body: Column(
       children: [
         Expanded(
-          child: NotificationListener<ScrollStartNotification>(
-            onNotification: (notification) {
-              if (notification.dragDetails != null) {
-                node.unfocus();
-              }
-              return false;
-            },
+          child: DismissKeyboardOnDrag(
             child: ListView.builder(
               controller: controller,
               reverse: true,

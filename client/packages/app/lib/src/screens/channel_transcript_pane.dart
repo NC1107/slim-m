@@ -37,6 +37,7 @@ import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
 import '../providers/user_profiles.dart';
 import '../widgets/channel_search.dart';
+import '../widgets/dismiss_keyboard_on_drag.dart';
 import '../widgets/jump_to_latest_button.dart';
 import '../widgets/message_jump.dart';
 import '../widgets/message_transcript.dart';
@@ -126,14 +127,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
     final jumpArrival = watchMessageJump(ref, context, channelId);
 
     return Expanded(
-      // A deliberate drag frees the reading room the keyboard is holding; dragDetails is what makes it deliberate.
-      child: NotificationListener<ScrollStartNotification>(
-        onNotification: (notification) {
-          if (notification.dragDetails != null) {
-            FocusScope.of(context).unfocus();
-          }
-          return false;
-        },
+      child: DismissKeyboardOnDrag(
         // Tapping the transcript dismisses the keyboard, which on a phone otherwise covers what the tap was aiming at.
         child: GestureDetector(
           behavior: HitTestBehavior.translucent,
