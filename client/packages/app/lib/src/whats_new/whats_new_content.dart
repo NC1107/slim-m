@@ -298,6 +298,37 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.67.0',
+    headline: 'Moderate a crowd at once, and gestures that do what you meant',
+    points: [
+      WhatsNewPoint(
+        'Select several members in the member list and remove or time out all '
+        'of them in one go. A wave of throwaway accounts used to be one '
+        'confirmation each, while they were still arriving.',
+      ),
+      WhatsNewPoint(
+        'Swiping in from the left edge to open the sidebar now works from the '
+        'whole edge rather than a few pixels of it, so it stops replying to '
+        'the message you swiped over. Carry the same swipe further and it '
+        'opens the full channel list.',
+      ),
+      WhatsNewPoint(
+        'Right-click or long-press a category to rename or delete it '
+        'directly, instead of opening a panel to find those buttons.',
+      ),
+      WhatsNewPoint(
+        'Scrolling back through a conversation puts the keyboard away and '
+        'gives you the screen to read with. A message arriving no longer '
+        'closes it under you mid-sentence.',
+      ),
+      WhatsNewPoint(
+        'A message you were sending when the app closed no longer sits as '
+        'sending forever. It comes back as failed, retries itself on the next '
+        'connection, and keeps what you typed either way.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
