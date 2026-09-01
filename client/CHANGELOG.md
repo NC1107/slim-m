@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.67.0](https://github.com/NC1107/slim-m/compare/client-v0.66.0...client-v0.67.0) (2026-09-01)
+
+
+### Features
+
+* **client:** carry the sidebar swipe through to the channel list ([#1024](https://github.com/NC1107/slim-m/issues/1024)) ([a7d3481](https://github.com/NC1107/slim-m/commit/a7d3481501a5adac021d02d12b3b44704b58e302))
+* **client:** rename or delete a category from its own context menu ([#1022](https://github.com/NC1107/slim-m/issues/1022)) ([f6b97e6](https://github.com/NC1107/slim-m/commit/f6b97e6c735e60b169fdb349cb2fa349b49330e4))
+* **client:** scrolling back through a channel puts the keyboard away ([#1023](https://github.com/NC1107/slim-m/issues/1023)) ([916d0f4](https://github.com/NC1107/slim-m/commit/916d0f47e64532e9d829f5f1ad1d9561440ca9d1))
+* moderate several members in one act ([#1019](https://github.com/NC1107/slim-m/issues/1019)) ([760c985](https://github.com/NC1107/slim-m/commit/760c985450a123be6eed70376a5d3a3ef2baadfe))
+
+
+### Bug Fixes
+
+* **client:** a send interrupted by the process ending is no longer stranded ([#1025](https://github.com/NC1107/slim-m/issues/1025)) ([9bcd7d4](https://github.com/NC1107/slim-m/commit/9bcd7d48edad9a6a4ae9ab1c3a25417624298e1d))
+* **client:** a superseded sync run must not advance an op cursor ([#1026](https://github.com/NC1107/slim-m/issues/1026)) ([6c5a754](https://github.com/NC1107/slim-m/commit/6c5a754767ba006d0a28d7f3acc215cd87a92305))
+* **client:** give the sidebar edge-swipe a real target instead of 4px ([#1021](https://github.com/NC1107/slim-m/issues/1021)) ([34f7194](https://github.com/NC1107/slim-m/commit/34f7194c2ea6481ec5d72c375921f4da11a015f2))
+
 ## [0.66.0](https://github.com/NC1107/slim-m/compare/client-v0.65.0...client-v0.66.0) (2026-08-31)
 
 
