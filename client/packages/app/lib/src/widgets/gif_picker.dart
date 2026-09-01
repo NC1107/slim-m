@@ -230,11 +230,7 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
       if (!mounted) return;
       widget.onPicked(attachment);
     } on api.NotFoundException {
-      // The results went stale under us: their tokens live in the server's
-      // memory for fifteen minutes and die with any restart, so every tile on
-      // screen is now dead and retrying this one can only fail again. Reload
-      // rather than reporting it - the person picked a gif, and fetching the
-      // same search again is what they would have had to do by hand.
+      // Every tile is stale, not just this one; reload rather than report. See gifGridCeiling's neighbours.
       if (!mounted) return;
       setState(() => _selectingId = null);
       await _reload();

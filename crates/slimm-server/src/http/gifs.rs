@@ -309,9 +309,9 @@ impl From<GifError> for ApiError {
                 ApiError::NotConfigured("this deployment has no gif search configured")
             }
             GifError::Unavailable => ApiError::Unavailable,
-            GifError::StaleToken => ApiError::NotFound(
-                "that gif result has expired; search again to refresh them",
-            ),
+            GifError::StaleToken => {
+                ApiError::NotFound("that gif result has expired; search again to refresh them")
+            }
         }
     }
 }

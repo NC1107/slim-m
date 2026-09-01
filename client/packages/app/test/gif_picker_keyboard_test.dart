@@ -77,10 +77,7 @@ Future<void> _pumpCramped(WidgetTester tester) async {
             size: Size(360, 640),
             viewInsets: EdgeInsets.only(bottom: 300),
           ),
-          // resizeToAvoidBottomInset would strip the bottom inset from the
-          // body, which is exactly what the widget needs to see. In the app
-          // this lives in a bottom-sheet overlay, where the real inset
-          // reaches it.
+          // Left on, Scaffold strips the very inset the widget must see.
           child: Scaffold(
             resizeToAvoidBottomInset: false,
             body: Align(

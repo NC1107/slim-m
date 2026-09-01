@@ -100,8 +100,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(searches, 1, reason: 'the picker opens on trending');
 
-    // The tile is an InkWell; its preview may still be a spinner, since the
-    // grid does not wait on bytes before being tappable.
+    // An InkWell, tappable before its preview bytes arrive.
     await tester.tap(find.byType(InkWell).first);
     await tester.pumpAndSettle();
 
