@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.55.0](https://github.com/NC1107/slim-m/compare/server-v0.54.0...server-v0.55.0) (2026-09-01)
+
+
+### Bug Fixes
+
+* gif panel fits beside the keyboard, and a stale pick reloads ([#1029](https://github.com/NC1107/slim-m/issues/1029)) ([00f6848](https://github.com/NC1107/slim-m/commit/00f68480db3d5ad2d4a3c1eb5217b2dbcc030f68))
+
 ## [0.54.0](https://github.com/NC1107/slim-m/compare/server-v0.53.0...server-v0.54.0) (2026-09-01)
 
 
