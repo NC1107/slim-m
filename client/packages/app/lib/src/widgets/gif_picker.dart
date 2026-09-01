@@ -28,9 +28,32 @@ import 'image_decode.dart';
 /// fast typist does not spend a request per keystroke.
 const _searchDebounce = Duration(milliseconds: 400);
 
-/// A ceiling, not a fixed height: a short result list does not force the
-/// sheet to a tall empty box, matching `_SpaceEmojiSheet`'s own precedent.
+/// The most the grid may take on a roomy screen: a ceiling, not a fixed
+/// height, so a short result list does not force the sheet to a tall empty
+/// box - `_SpaceEmojiSheet`'s own precedent.
 const double _maxGridHeight = 340;
+
+/// Below this the grid stops giving ground and scrolls instead, rather than
+/// shrinking until it shows nothing.
+const double _minGridHeight = 120;
+
+/// What the panel needs around the grid: the sheet's drag handle, its own
+/// padding, the search field and the gap under it.
+const double _chromeHeight = 140;
+
+/// The grid's ceiling for the room actually available.
+///
+/// Derived rather than constant because this picker's field autofocuses, so
+/// the keyboard is up the entire time it is open - not an edge case, every
+/// time. A fixed 340 is comfortable on a tall phone with no keyboard and
+/// overflows its column by 382 pixels on a 640-tall one with a 300-tall
+/// keyboard, which is what `gif_picker_keyboard_test.dart` pins.
+double gifGridCeiling(BuildContext context) {
+  final available =
+      MediaQuery.sizeOf(context).height -
+      MediaQuery.viewInsetsOf(context).bottom;
+  return (available - _chromeHeight).clamp(_minGridHeight, _maxGridHeight);
+}
 
 /// Opens the GIF picker as a sheet. [onPicked] runs after the sheet has
 /// popped, the same convention `showEmojiPickerSheet` already uses, so a
@@ -206,6 +229,11 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
       final attachment = await ref.read(apiProvider).selectGif(result.id);
       if (!mounted) return;
       widget.onPicked(attachment);
+    } on api.NotFoundException {
+      // Every tile is stale, not just this one; reload rather than report. See gifGridCeiling's neighbours.
+      if (!mounted) return;
+      setState(() => _selectingId = null);
+      await _reload();
     } on api.ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -213,6 +241,13 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
         _selectingId = null;
       });
     }
+  }
+
+  /// Re-runs whatever is on screen - the current search, or trending when the
+  /// box is empty - so the grid comes back with tokens that still redeem.
+  Future<void> _reload() {
+    final query = _queryController.text.trim();
+    return query.isEmpty ? _loadTrending() : _search(query);
   }
 
   @override
@@ -242,7 +277,7 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
             const SizedBox(height: AppSpacing.s12),
           ],
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: _maxGridHeight),
+            constraints: BoxConstraints(maxHeight: gifGridCeiling(context)),
             child: _content(tokens),
           ),
         ],

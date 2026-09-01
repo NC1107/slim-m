@@ -2828,6 +2828,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          description: >
+            The token names no result this server still holds; see
+            `selectGif`'s own 404. Search again rather than retrying.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "501":
@@ -2878,6 +2886,16 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          description: >
+            The id names no result this server still holds. Tokens live in
+            memory for fifteen minutes and do not survive a restart, so a
+            picker left open can hold results that are all already dead.
+            Retrying the same id cannot succeed; search again for fresh ones.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "501":
