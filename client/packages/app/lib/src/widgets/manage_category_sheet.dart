@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The sheet a category header's context menu opens: rename it, or delete it.
+/// Renaming and deleting a category: the sheet the header's context menu
+/// opens for a rename, and the confirm-then-delete the same menu runs directly.
 /// `PATCH`/`DELETE /categories/{id}` ([api.SlimmApiChannelAdmin]).
 ///
 /// The counterpart to `manage_channel_sheet.dart` for a category, which has
@@ -17,7 +18,65 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import '../providers/providers.dart';
+import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
+import 'run_guarded.dart';
+
+/// The one confirmation for deleting a category, asked the same way wherever
+/// the delete was started from.
+///
+/// Shared rather than written twice: the sheet's danger zone and the header's
+/// own context menu both reach the same irreversible act, and a warning that
+/// said something different depending on which route you took would be worse
+/// than either wording alone. The point it has to make is that the channels
+/// survive - a manager who thinks a delete takes the rooms with it will not
+/// press the button.
+Future<bool> confirmCategoryDeletion(
+  BuildContext context,
+  ChannelCategoryRow category,
+) => confirmDangerousAction(
+  context,
+  title: 'Delete "${category.name}"?',
+  message:
+      'Its channels are never deleted with it - they fall back to '
+      'uncategorised. This cannot be undone.',
+  confirmLabel: 'Delete',
+  cancelLabel: 'Keep category',
+);
+
+/// Deletes [category] and drops it from the local store.
+///
+/// The store write is not a cache nicety: the rail reads categories from
+/// drift, so leaving the row behind would keep the header on screen until the
+/// next sync told it otherwise.
+Future<void> deleteCategoryAndForget(
+  WidgetRef ref,
+  ChannelCategoryRow category,
+) async {
+  await ref.read(apiProvider).deleteCategory(category.id);
+  final store = await ref.read(storeProvider.future);
+  await store.removeCategory(category.id);
+}
+
+/// Confirms, then deletes, without opening the sheet on the way.
+///
+/// This is the header context menu's own path. It reports a failure through
+/// [runGuarded]'s sentence rather than an inline [AppErrorState], because a
+/// menu has already closed by the time the request answers and has nowhere to
+/// put one - the case `run_guarded.dart` documents as the one a SnackBar is
+/// actually for.
+Future<void> confirmAndDeleteCategory(
+  BuildContext context,
+  WidgetRef ref,
+  ChannelCategoryRow category,
+) async {
+  if (!await confirmCategoryDeletion(context, category)) return;
+  final failure = await runGuarded(
+    whatFailed: 'delete the category',
+    action: () => deleteCategoryAndForget(ref, category),
+  );
+  if (failure != null && context.mounted) showAppSnackbar(context, failure);
+}
 
 /// The server's own ceiling (`CATEGORY_NAME_MAX_CHARS` in
 /// `crates/slimm-server/src/http/categories.rs`), so the check here never
@@ -88,15 +147,7 @@ class _ManageCategorySheetState extends ConsumerState<_ManageCategorySheet> {
   }
 
   Future<void> _confirmDelete() async {
-    final confirmed = await confirmDangerousAction(
-      context,
-      title: 'Delete "${widget.category.name}"?',
-      message:
-          'Its channels are never deleted with it - they fall back to '
-          'uncategorised. This cannot be undone.',
-      confirmLabel: 'Delete',
-      cancelLabel: 'Keep category',
-    );
+    final confirmed = await confirmCategoryDeletion(context, widget.category);
     if (confirmed) await _delete();
   }
 
@@ -106,9 +157,7 @@ class _ManageCategorySheetState extends ConsumerState<_ManageCategorySheet> {
       _error = null;
     });
     try {
-      await ref.read(apiProvider).deleteCategory(widget.category.id);
-      final store = await ref.read(storeProvider.future);
-      await store.removeCategory(widget.category.id);
+      await deleteCategoryAndForget(ref, widget.category);
       if (mounted) Navigator.of(context).pop();
     } on api.ApiException catch (e) {
       if (mounted) {
