@@ -12,4 +12,5 @@ export 'src/channel_reposition.dart' show ChannelReposition;
 export 'src/connection/connection.dart' show openSlimmDatabase;
 export 'src/database.dart' show SlimmDatabase, Channel, ChannelCategoryRow;
 export 'src/message_dto.dart' show Message;
-export 'src/message_store.dart' show MessageStore;
+export 'src/message_store.dart'
+    show MessageStore, failInterruptedSends, interruptedSendReason;
