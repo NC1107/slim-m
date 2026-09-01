@@ -17,6 +17,13 @@ fn gif_error_maps_to_the_documented_status_codes() {
         ApiError::from(GifError::Unavailable),
         ApiError::Unavailable
     ));
+    // Not Unavailable: a stale token is the caller's results having gone off,
+    // and the only thing that fixes it is searching again. Collapsing the two
+    // left a picker whose every tile failed forever with "try again".
+    assert!(matches!(
+        ApiError::from(GifError::StaleToken),
+        ApiError::NotFound(_)
+    ));
 }
 
 #[test]

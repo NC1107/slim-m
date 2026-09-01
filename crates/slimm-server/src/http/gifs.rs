@@ -112,11 +112,21 @@ struct Enabled {
 enum GifError {
     /// No provider is configured at all.
     NotConfigured,
-    /// A provider request failed, or a cached token is missing or expired.
-    /// Collapsed into one variant deliberately: both read as "try again in a
-    /// moment or search again", and a client's remedy is identical either
-    /// way, so there is nothing more specific for a caller to act on.
+    /// A provider request failed. Retrying the same pick in a moment can
+    /// work, because nothing about the caller's own token is wrong.
     Unavailable,
+    /// The token names nothing this server still holds: its 15-minute TTL
+    /// lapsed, a flood evicted it, or the process restarted and took the
+    /// whole in-process cache with it.
+    ///
+    /// Split back out of [`GifError::Unavailable`], which used to carry it on
+    /// the grounds that "a client's remedy is identical either way". It is
+    /// not. A provider outage may clear on a retry of the same pick; a stale
+    /// token never does, and only a fresh search mints one that works. Told
+    /// apart, a client can reload its results instead of showing a picker
+    /// whose every tile is already dead - which is what a restart leaves
+    /// behind, and this deployment restarts on every merge to main.
+    StaleToken,
 }
 
 /// This deployment's optional GIF search, cheap to clone (an
@@ -234,13 +244,13 @@ impl GifSearch {
         let url = enabled
             .cache
             .preview_url(token)
-            .ok_or(GifError::Unavailable)?;
+            .ok_or(GifError::StaleToken)?;
         fetch_capped(&enabled.http, &url, MAX_PREVIEW_BYTES).await
     }
 
     async fn download_full(&self, token: &str) -> Result<Vec<u8>, GifError> {
         let enabled = self.inner.as_deref().ok_or(GifError::NotConfigured)?;
-        let url = enabled.cache.full_url(token).ok_or(GifError::Unavailable)?;
+        let url = enabled.cache.full_url(token).ok_or(GifError::StaleToken)?;
         fetch_capped(&enabled.http, &url, MAX_DOWNLOAD_BYTES).await
     }
 }
@@ -299,6 +309,9 @@ impl From<GifError> for ApiError {
                 ApiError::NotConfigured("this deployment has no gif search configured")
             }
             GifError::Unavailable => ApiError::Unavailable,
+            GifError::StaleToken => ApiError::NotFound(
+                "that gif result has expired; search again to refresh them",
+            ),
         }
     }
 }

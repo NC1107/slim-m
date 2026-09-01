@@ -378,3 +378,44 @@ async fn an_empty_query_is_refused_before_any_provider_call() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+/// A token this server no longer holds is the caller's results having gone
+/// stale, not the provider being down, and the two need telling apart: a
+/// stale token never works again however many times it is retried, and only
+/// a fresh search mints one that does.
+///
+/// The case is not hypothetical. The cache is in-process, so every restart
+/// empties it - and this deployment restarts on each merge to main - leaving
+/// an open picker whose every tile is already dead.
+#[tokio::test]
+async fn an_unknown_token_reads_as_expired_rather_than_unavailable() {
+    let tenor_base = spawn_fake_tenor().await;
+    let gifs = GifSearch::for_test("tenor", &tenor_base, "test-key");
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone(), gifs);
+    let (token, _user) = register(&store, "root").await;
+
+    // Never minted by any search: the shape an expired or evicted one has.
+    let response = app
+        .oneshot(post_json(
+            "/gifs/select",
+            &token,
+            json!({ "id": "01a00000-0000-7000-8000-000000000000" }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.status(),
+        StatusCode::NOT_FOUND,
+        "503 would tell a client to retry the same dead pick forever"
+    );
+    let body = json_body(response).await;
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("search again"),
+        "the message has to name the one thing that fixes it, got {body:?}"
+    );
+}
