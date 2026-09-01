@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.0](https://github.com/NC1107/slim-m/compare/server-v0.53.0...server-v0.54.0) (2026-09-01)
+
+
+### Features
+
+* moderate several members in one act ([#1019](https://github.com/NC1107/slim-m/issues/1019)) ([760c985](https://github.com/NC1107/slim-m/commit/760c985450a123be6eed70376a5d3a3ef2baadfe))
+
 ## [0.53.0](https://github.com/NC1107/slim-m/compare/server-v0.52.0...server-v0.53.0) (2026-08-31)
 
 
