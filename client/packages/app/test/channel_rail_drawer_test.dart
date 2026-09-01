@@ -3,8 +3,9 @@
 /// reachable at phone width, absent at expanded width (the rail is already
 /// docked there so a drawer would be redundant), dismissible by a scrim tap
 /// or by dragging it closed, closes itself once a row inside it picks a
-/// different channel, and withheld while the canvas is open, since the
-/// canvas claims the same screen edge for its own pan gesture.
+/// different channel, carried further opens the full-screen channel list, and
+/// withheld while the canvas is open, since the canvas claims the same screen
+/// edge for its own pan gesture.
 library;
 
 import 'package:flutter/material.dart';
@@ -148,6 +149,40 @@ void main() {
       isNull,
       reason: 'the canvas claims the same edge for its own pan gesture',
     );
+
+    await teardownFixture(tester, fixture.container, fixture.db);
+  });
+
+  testWidgets('carrying the swipe further opens the full-screen list', (
+    tester,
+  ) async {
+    // Backlog: "no way to swipe it further to return to the initial full screen channel view".
+    final fixture = await _pumpAtWidth(tester, 500);
+    await _dragFromLeftEdge(tester);
+    expect(find.byType(Drawer), findsOneWidget);
+
+    await tester.dragFrom(const Offset(120, 300), const Offset(140, 0));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(Drawer),
+      findsNothing,
+      reason: 'the drawer gives way to the list it was a peek at',
+    );
+    expect(find.byType(ChannelRail), findsOneWidget);
+
+    await teardownFixture(tester, fixture.container, fixture.db);
+  });
+
+  testWidgets('a short carry leaves the drawer where it is', (tester) async {
+    final fixture = await _pumpAtWidth(tester, 500);
+    await _dragFromLeftEdge(tester);
+
+    // Under the commit distance: a nudge is not a decision.
+    await tester.dragFrom(const Offset(120, 300), const Offset(30, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Drawer), findsOneWidget);
 
     await teardownFixture(tester, fixture.container, fixture.db);
   });

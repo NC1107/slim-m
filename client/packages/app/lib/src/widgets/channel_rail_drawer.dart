@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The compact layout's edge-swipe route to the channel rail.
+/// The compact layout's edge-swipe route to the channel rail, and the second
+/// half of that swipe: carrying it further opens the full-screen channel list.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../routing/routes.dart';
 import 'channel_rail.dart';
 
 /// [ChannelRail] behind [Scaffold.drawer], for phone width.
@@ -48,6 +51,47 @@ class _CompactChannelRailDrawerState extends State<CompactChannelRailDrawer> {
     });
   }
 
+  /// How far the drawer has been dragged on past its open edge.
+  double _carried = 0;
+
+  /// How far past open a drag has to carry before it commits to the
+  /// full-screen list.
+  ///
+  /// The same 80 [DrawerEdgeSwipe] uses to decide an edge drag meant the
+  /// drawer at all, so opening and going the rest of the way ask for the same
+  /// travel rather than two numbers a hand would have to learn separately.
+  static const double _commitDistance = 80;
+
+  void _onPointerMove(PointerMoveEvent event) {
+    // Vertical wins ties, so scrolling the rail never accumulates its jitter.
+    if (event.delta.dx.abs() <= event.delta.dy.abs()) return;
+    // Leftward is Flutter's own drag-to-close; only the far side is ours.
+    if (event.delta.dx < 0) {
+      _carried = 0;
+      return;
+    }
+    _carried += event.delta.dx;
+    if (_carried < _commitDistance) return;
+    _carried = 0;
+    Scaffold.of(context).closeDrawer();
+    context.go(Routes.channels);
+  }
+
+  /// A [Listener], never a [GestureDetector].
+  ///
+  /// A detector here would enter the gesture arena and win it, being deeper in
+  /// the tree than the whole-screen drag Flutter's own `DrawerController` uses
+  /// to pull the drawer closed - so claiming the horizontal axis to read the
+  /// rightward half would take the leftward half away with it, and dragging
+  /// the rail shut would stop working. `channel_rail_drawer_test.dart`'s own
+  /// "dragging the rail closed dismisses it" caught exactly that. A listener
+  /// observes the same pointers without claiming anything.
   @override
-  Widget build(BuildContext context) => const Drawer(child: ChannelRail());
+  Widget build(BuildContext context) => Drawer(
+    child: Listener(
+      onPointerDown: (_) => _carried = 0,
+      onPointerMove: _onPointerMove,
+      child: const ChannelRail(),
+    ),
+  );
 }
