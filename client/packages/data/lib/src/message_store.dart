@@ -10,6 +10,7 @@ import 'message_dto.dart';
 import 'rail_channel.dart';
 
 part 'message_store_batch.dart';
+part 'message_store_recovery.dart';
 part 'message_store_retention.dart';
 
 /// The local store's read and write surface.

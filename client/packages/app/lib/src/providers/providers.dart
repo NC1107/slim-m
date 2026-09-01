@@ -323,7 +323,10 @@ final databaseProvider = FutureProvider<SlimmDatabase>((ref) async {
 /// The local store, once the database is open.
 final storeProvider = FutureProvider<MessageStore>((ref) async {
   final db = await ref.watch(databaseProvider.future);
-  return MessageStore(db);
+  final store = MessageStore(db);
+  // Any row still pending belongs to a run that ended; see failInterruptedSends.
+  await failInterruptedSends(store);
+  return store;
 });
 
 /// Ordinary app settings, kept separate from [keyStoreProvider]: nothing
