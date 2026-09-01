@@ -17,6 +17,7 @@ import 'package:flutter/services.dart' show TextInputFormatter;
 import '../../app_metrics.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
+import '../../text_context_menu.dart';
 
 enum AppInputSize { sm, md, lg }
 
@@ -153,6 +154,8 @@ class _AppInputState extends State<AppInput> {
             child: TextField(
               controller: widget.controller,
               focusNode: _focusNode,
+              // Live Text is noise in every field here; see its own library.
+              contextMenuBuilder: textContextMenuWithoutScanText,
               enabled: widget.enabled,
               obscureText: widget.obscureText,
               autofocus: widget.autofocus,

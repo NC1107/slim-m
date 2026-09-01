@@ -36,6 +36,10 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:slimm_design_system/design_system.dart'
+    show
+        contextMenuButtonItemsWithoutScanText,
+        systemContextMenuItemsWithoutScanText;
 
 import 'composer_clipboard_image.dart';
 
@@ -93,31 +97,6 @@ List<IOSSystemContextMenuItem> systemContextMenuItemsWithForcedPaste(
     items.add(const IOSSystemContextMenuItemPaste());
   }
   return items;
-}
-
-/// [defaults] with the system's Live Text ("Scan Text" / capture-from-camera)
-/// item dropped - backlog #129: the composer never wants the camera-capture
-/// shortcut. Pure for the same reason as
-/// [systemContextMenuItemsWithForcedPaste].
-@visibleForTesting
-List<IOSSystemContextMenuItem> systemContextMenuItemsWithoutScanText(
-  List<IOSSystemContextMenuItem> defaults,
-) {
-  return defaults
-      .where((item) => item is! IOSSystemContextMenuItemLiveText)
-      .toList();
-}
-
-/// [defaults] with the toolbar's Live Text button dropped - the
-/// non-iOS-system-menu counterpart of
-/// [systemContextMenuItemsWithoutScanText]. Pure for the same reason.
-@visibleForTesting
-List<ContextMenuButtonItem> contextMenuButtonItemsWithoutScanText(
-  List<ContextMenuButtonItem> defaults,
-) {
-  return defaults
-      .where((item) => item.type != ContextMenuButtonType.liveTextInput)
-      .toList();
 }
 
 /// Matches `TextField`'s own default builder except for two changes: see
