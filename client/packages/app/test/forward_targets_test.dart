@@ -267,8 +267,7 @@ void main() {
       label: 'Priya',
       isDm: true,
       userId: 'u-priya',
-      // Deliberately shares no substring with the display name, or matching
-      // the label alone would satisfy the test and prove nothing.
+      // Shares no substring with the display name, or matching the label alone would satisfy the test.
       username: 'lovelace',
     );
     const channel = ForwardTarget(
