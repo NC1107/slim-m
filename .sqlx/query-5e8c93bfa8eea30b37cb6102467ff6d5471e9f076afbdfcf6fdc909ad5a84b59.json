@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT 1 AS \"hit!: i64\" FROM channel_categories WHERE id = ?",
+  "query": "SELECT 1 AS \"hit!: i64\" FROM channel_categories\n                   WHERE id = ? AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       null
     ]
   },
-  "hash": "79753325c91954ce006088fd055ad9586ae99ff2bba5777f654a8e8061b0206e"
+  "hash": "5e8c93bfa8eea30b37cb6102467ff6d5471e9f076afbdfcf6fdc909ad5a84b59"
 }
