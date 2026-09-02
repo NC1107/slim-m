@@ -40,6 +40,7 @@ import '../providers/message_extras.dart';
 import '../providers/providers.dart';
 import '../providers/toasts.dart';
 import '../providers/user_profiles.dart';
+import 'user_avatar.dart';
 import 'author_label.dart';
 import 'run_guarded.dart';
 import 'sheet_item_list.dart';
@@ -287,7 +288,15 @@ class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
         final sendingHere = _sendingToChannelId == target.channelId;
         final busy = _sendingToChannelId != null;
         return AppListRow(
-          leading: Icon(target.isDm ? AppIcons.account : AppIcons.hash),
+          // A DM is a person; one generic glyph made them all look alike.
+          leading: target.isDm && target.userId != null
+              ? UserAvatar(
+                  userId: target.userId!,
+                  avatarUpdatedAt: target.avatarUpdatedAt,
+                  name: target.label,
+                  size: 24,
+                )
+              : Icon(target.isDm ? AppIcons.account : AppIcons.hash),
           label: target.label,
           trailing: sendingHere
               ? const SizedBox(

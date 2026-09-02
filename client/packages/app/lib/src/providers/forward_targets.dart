@@ -28,6 +28,8 @@ class ForwardTarget {
     required this.channelId,
     required this.label,
     required this.isDm,
+    this.userId,
+    this.avatarUpdatedAt,
   });
 
   final String channelId;
@@ -39,6 +41,14 @@ class ForwardTarget {
   /// Whether this is a DM rather than an ordinary channel - the picker's own
   /// choice of leading glyph, nothing that changes how a send to it works.
   final bool isDm;
+
+  /// The DM partner, so the picker can draw their real picture rather than a
+  /// generic person glyph. Null for an ordinary channel, which has none.
+  final String? userId;
+
+  /// Cache-busts that picture the way every other avatar in the app does;
+  /// without it a changed picture keeps showing the old bytes here.
+  final int? avatarUpdatedAt;
 }
 
 /// What [forwardTargetsProvider] needs to answer "where can this go": the
@@ -89,6 +99,8 @@ final forwardTargetsProvider = FutureProvider.autoDispose
                   ? personalSpaceName
                   : dm.user.displayName,
               isDm: true,
+              userId: dm.user.id,
+              avatarUpdatedAt: dm.user.avatarUpdatedAt,
             ),
       ];
     });
