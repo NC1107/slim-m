@@ -63,7 +63,7 @@ Future<void> showSpaceEmojiSheet(
     context,
     (context, width) => SizedBox(
       width: width,
-      child: _SpaceEmojiSheet(
+      child: SpaceEmojiSheetBody(
         onSelect: (emoji) {
           Navigator.of(context).pop();
           onSelect(emoji);
@@ -107,8 +107,15 @@ Future<void> _sheet(
 /// The Space's own emoji as a grid, with a plain sentence in place of every
 /// state that has nothing to show: still loading, unreachable, or genuinely
 /// none uploaded yet.
-class _SpaceEmojiSheet extends ConsumerWidget {
-  const _SpaceEmojiSheet({required this.onSelect});
+/// The Space's own emoji list, exposed so the composer's tabbed touch sheet
+/// can host it under an Emoji tab beside a GIFs one.
+///
+/// Deliberately this and not `ComposerEmojiPicker`, which the pointer panel
+/// uses: that carries the whole unicode catalog and a search, and a phone
+/// already has both under the field in its own keyboard. Combining the two
+/// pickers on touch was asked for; duplicating the keyboard was not.
+class SpaceEmojiSheetBody extends ConsumerWidget {
+  const SpaceEmojiSheetBody({super.key, required this.onSelect});
 
   final ValueChanged<String> onSelect;
 

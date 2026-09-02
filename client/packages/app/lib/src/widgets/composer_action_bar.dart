@@ -7,6 +7,8 @@
 /// is a plain callback the composer's own state already owns.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' show Attachment;
@@ -15,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/threads.dart';
 import 'composer_extras.dart';
 import 'composer_picker_button.dart';
+import 'composer_picker_panel.dart' show showComposerPickerSheet;
 import 'poll_composer_sheet.dart';
 
 class ComposerActionBar extends ConsumerWidget {
@@ -134,9 +137,22 @@ class ComposerActionBar extends ConsumerWidget {
             ] else
               AppIconButton(
                 icon: AppIcons.smile,
-                semanticLabel: 'Insert emoji',
-                tooltip: 'Insert emoji',
-                onPressed: onPickEmoji,
+                // Says what it opens: the GIFs tab is absent without a provider.
+                semanticLabel: gifSearchEnabled
+                    ? 'Insert emoji or a GIF'
+                    : 'Insert emoji',
+                tooltip: gifSearchEnabled
+                    ? 'Insert emoji or a GIF'
+                    : 'Insert emoji',
+                // Same two tabs the pointer panel has; see its own sheet doc.
+                onPressed: () => unawaited(
+                  showComposerPickerSheet(
+                    context,
+                    onSelectEmoji: onInsertEmoji,
+                    onPickedGif: onStageGif,
+                    showGifTab: gifSearchEnabled,
+                  ),
+                ),
               ),
             // Always rendered, only disabled when empty or over the limit.
             AppIconButton(

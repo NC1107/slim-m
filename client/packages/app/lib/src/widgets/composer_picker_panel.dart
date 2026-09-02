@@ -23,6 +23,7 @@ import 'package:slimm_platform/platform.dart';
 
 import 'composer_emoji_browse.dart';
 import 'emoji_picker_panel.dart' show pickerWidth;
+import 'emoji_picker_sheets.dart' show SpaceEmojiSheetBody;
 import 'gif_picker.dart' show GifPickerBody;
 
 /// Which half of the panel is showing.
@@ -57,11 +58,6 @@ class ComposerPickerPanel extends StatefulWidget {
 class _ComposerPickerPanelState extends State<ComposerPickerPanel> {
   late ComposerPickerTab _tab = widget.initialTab;
 
-  static const _tabOptions = [
-    AppSegmentedOption(label: 'Emoji'),
-    AppSegmentedOption(label: 'GIFs'),
-  ];
-
   void _selectTab(int index) =>
       setState(() => _tab = ComposerPickerTab.values[index]);
 
@@ -73,33 +69,127 @@ class _ComposerPickerPanelState extends State<ComposerPickerPanel> {
       bindings: {if (close != null) close: widget.onClose},
       child: AppMenu(
         width: widget.width,
-        children: [
-          if (widget.showGifTab)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s8,
-                AppSpacing.s8,
-                AppSpacing.s8,
-                AppSpacing.s4,
-              ),
-              child: AppSegmentedControl.inline(
-                options: _tabOptions,
-                selectedIndex: ComposerPickerTab.values.indexOf(_tab),
-                onSegmentSelected: _selectTab,
-                semanticLabel: 'Emoji or GIFs',
-              ),
-            ),
-          switch (_tab) {
-            ComposerPickerTab.emoji => ComposerEmojiPicker(
-              width: widget.width,
-              onSelect: widget.onSelectEmoji,
-              onClose: widget.onClose,
-            ),
-            ComposerPickerTab.gif => GifPickerBody(
-              onPicked: widget.onPickedGif,
-            ),
-          },
+        children: _pickerBody(
+          tab: _tab,
+          onSelectTab: _selectTab,
+          showGifTab: widget.showGifTab,
+          // The richer pointer view; touch hosts SpaceEmojiSheetBody instead.
+          emojiBody: ComposerEmojiPicker(
+            width: widget.width,
+            onSelect: widget.onSelectEmoji,
+            onClose: widget.onClose,
+          ),
+          onPickedGif: widget.onPickedGif,
+        ),
+      ),
+    );
+  }
+}
+
+/// The tabs and whichever half they select, with no card around them.
+///
+/// Shared so the touch sheet and the pointer-anchored panel show the same
+/// two tabs over the same two bodies: the panel wraps this in [AppMenu]'s
+/// floating card, the sheet in [showAppSheet]'s. Duplicating the switch
+/// would let one surface grow a tab the other never got.
+List<Widget> _pickerBody({
+  required ComposerPickerTab tab,
+  required ValueChanged<int> onSelectTab,
+  required bool showGifTab,
+  required Widget emojiBody,
+  required ValueChanged<api.Attachment> onPickedGif,
+}) => [
+  if (showGifTab)
+    Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s8,
+        AppSpacing.s8,
+        AppSpacing.s8,
+        AppSpacing.s4,
+      ),
+      child: AppSegmentedControl.inline(
+        options: const [
+          AppSegmentedOption(label: 'Emoji'),
+          AppSegmentedOption(label: 'GIFs'),
         ],
+        selectedIndex: ComposerPickerTab.values.indexOf(tab),
+        onSegmentSelected: onSelectTab,
+        semanticLabel: 'Emoji or GIFs',
+      ),
+    ),
+  switch (tab) {
+    ComposerPickerTab.emoji => emojiBody,
+    ComposerPickerTab.gif => GifPickerBody(onPicked: onPickedGif),
+  },
+];
+
+/// The same two tabs as a bottom sheet, for touch.
+///
+/// The composer used to offer only a Space-emoji sheet here, on the grounds
+/// that the OS keyboard already carries every native emoji - true, but it
+/// left GIFs with no entry point on a phone at all, which is what the owner
+/// hit. Same tabs, same bodies, the surface `desktop-vs-mobile.md` rule 3
+/// prescribes for touch.
+Future<void> showComposerPickerSheet(
+  BuildContext context, {
+  required ValueChanged<String> onSelectEmoji,
+  required ValueChanged<api.Attachment> onPickedGif,
+  bool showGifTab = true,
+}) {
+  return showAppSheet<void>(
+    context,
+    builder: (context) => _ComposerPickerSheet(
+      showGifTab: showGifTab,
+      onSelectEmoji: onSelectEmoji,
+      onPickedGif: onPickedGif,
+    ),
+  );
+}
+
+class _ComposerPickerSheet extends StatefulWidget {
+  const _ComposerPickerSheet({
+    required this.showGifTab,
+    required this.onSelectEmoji,
+    required this.onPickedGif,
+  });
+
+  final bool showGifTab;
+  final ValueChanged<String> onSelectEmoji;
+  final ValueChanged<api.Attachment> onPickedGif;
+
+  @override
+  State<_ComposerPickerSheet> createState() => _ComposerPickerSheetState();
+}
+
+class _ComposerPickerSheetState extends State<_ComposerPickerSheet> {
+  ComposerPickerTab _tab = ComposerPickerTab.emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _pickerBody(
+            tab: _tab,
+            onSelectTab: (i) =>
+                setState(() => _tab = ComposerPickerTab.values[i]),
+            showGifTab: widget.showGifTab,
+            // Space list only: a phone's keyboard already has every native emoji.
+            emojiBody: SpaceEmojiSheetBody(
+              onSelect: (emoji) {
+                Navigator.of(context).pop();
+                widget.onSelectEmoji(emoji);
+              },
+            ),
+            onPickedGif: (attachment) {
+              Navigator.of(context).pop();
+              widget.onPickedGif(attachment);
+            },
+          ),
+        ),
       ),
     );
   }
