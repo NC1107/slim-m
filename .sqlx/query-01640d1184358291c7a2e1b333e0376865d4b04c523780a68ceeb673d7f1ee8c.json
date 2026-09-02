@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id?: UserId\",\n                      m.created_at AS \"created_at!: i64\",\n                      m.content AS \"content!: String\",\n                      f.origin_message_id AS \"origin_message_id?: MessageId\",\n                      f.origin_channel_id AS \"origin_channel_id?: ChannelId\",\n                      f.origin_author_id AS \"origin_author_id?: UserId\",\n                      f.origin_created_at AS \"origin_created_at?: i64\",\n                      f.origin_content AS \"origin_content?: String\"\n               FROM messages m\n               LEFT JOIN message_forwards f ON f.message_id = m.id\n               WHERE m.id = ? AND m.deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "channel_id!: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "author_id?: UserId",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "content!: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "origin_message_id?: MessageId",
+        "ordinal": 4,
+        "type_info": "Blob"
+      },
+      {
+        "name": "origin_channel_id?: ChannelId",
+        "ordinal": 5,
+        "type_info": "Blob"
+      },
+      {
+        "name": "origin_author_id?: UserId",
+        "ordinal": 6,
+        "type_info": "Blob"
+      },
+      {
+        "name": "origin_created_at?: i64",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "origin_content?: String",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "01640d1184358291c7a2e1b333e0376865d4b04c523780a68ceeb673d7f1ee8c"
+}

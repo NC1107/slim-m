@@ -96,7 +96,7 @@ pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
-pub use message_forwards::{ForwardOrigin, ForwardSummary};
+pub use message_forwards::{ForwardOrigin, ForwardSource, ForwardSummary};
 pub use message_history::MessageRevision;
 pub use message_ops::{MessageOpEntry, MessageOpKind, MessageOpsPage};
 pub use message_retention::{MAX_MESSAGE_RETENTION_DAYS, PrunedMessage, SweptMessageRetention};

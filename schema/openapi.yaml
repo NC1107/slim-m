@@ -6731,6 +6731,10 @@ components:
         was sent, not a live read: `content`, `created_at` and the author
         stay answerable after the original is edited or deleted, and an edit
         to the original never rewrites what was passed on.
+
+        Always the first original. Forwarding a forward does not nest: the
+        chain is flattened at send time, so this never names a message that
+        is itself only relaying something else.
       properties:
         message_id:
           type: string
