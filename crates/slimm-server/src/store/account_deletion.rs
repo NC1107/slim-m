@@ -210,6 +210,9 @@ impl Store {
             .execute(&mut *tx)
             .await?;
         // Which DMs this account had closed out of its own sidebar is its own preference, not the other side's.
+        sqlx::query!("DELETE FROM saved_messages WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query!("DELETE FROM dm_hides WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;

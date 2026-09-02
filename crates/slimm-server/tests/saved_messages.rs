@@ -366,3 +366,44 @@ async fn unsaving_works_even_once_the_message_is_gone() {
         .unwrap();
     assert_eq!(unsaved.status(), StatusCode::NO_CONTENT);
 }
+
+/// Deleting an account takes its saved list with it. The table's own
+/// `ON DELETE CASCADE` does not do this: account deletion is a tombstone
+/// `UPDATE`, never a row removal, so the cascade never fires and the purge
+/// has to name this table like every other per-user one.
+#[tokio::test]
+async fn deleting_an_account_purges_its_saved_list() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+    let channel_id = channel.id.to_string();
+
+    let message = send(&app, &channel_id, &token, "worth keeping").await;
+    save(&app, &token, message["id"].as_str().unwrap()).await;
+
+    let me = json_body(
+        app.clone()
+            .oneshot(request("GET", "/me", &token, None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let user_id = slimm_server::ids::UserId(Uuid::parse_str(me["id"].as_str().unwrap()).unwrap());
+    assert_eq!(store.list_saved_messages(user_id).await.unwrap().len(), 1);
+
+    store.delete_account(user_id).await.unwrap();
+
+    assert!(
+        store.list_saved_messages(user_id).await.unwrap().is_empty(),
+        "a private list must not outlive the account that made it"
+    );
+}
