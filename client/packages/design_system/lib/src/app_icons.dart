@@ -225,6 +225,10 @@ abstract final class AppIcons {
   static const IconData chevronRight = LucideIcons.chevronRight300;
   static const IconData copy = LucideIcons.copy300;
 
+  /// Copying a shareable link rather than the raw value beside it -
+  /// an invite link carries its server too, where [copy] takes the code alone.
+  static const IconData link = LucideIcons.link300;
+
   /// A fourth, distinct shape for "not known", never to be confused with
   /// [danger]'s "known not to work".
   static const IconData unknown = LucideIcons.circleHelp300;
