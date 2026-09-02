@@ -312,12 +312,22 @@ pub(super) async fn authorize(
                 message: dto,
             }
         }
-        Event::MessageEdited { message, op_seq } => ServerFrame::MessageEdited {
-            channel_id: message.channel_id.to_string(),
-            seq: message.seq.0,
-            op_seq: Some(op_seq),
-            message: MessageDto::from(message),
-        },
+        Event::MessageEdited {
+            message,
+            op_seq,
+            forwarded,
+        } => {
+            let channel_id = message.channel_id.to_string();
+            let seq = message.seq.0;
+            let mut dto = MessageDto::from(message);
+            dto.forwarded = forwarded.map(Into::into);
+            ServerFrame::MessageEdited {
+                channel_id,
+                seq,
+                op_seq: Some(op_seq),
+                message: dto,
+            }
+        }
         Event::MessageDeleted {
             channel_id,
             message_id,
