@@ -170,7 +170,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(gifButton, findsNothing);
+      await tester.tap(emojiButton);
+      await tester.pumpAndSettle();
+      expect(gifTab, findsNothing);
     },
   );
 
@@ -187,9 +189,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(gifButton, findsOneWidget);
-      await tester.tap(gifButton);
-      await tester.pumpAndSettle();
+      await openGifTab(tester);
 
       final tile = find.byWidgetPredicate(
         (w) => w is Semantics && w.properties.label == 'Pick: a trending gif',
@@ -211,8 +211,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(gifButton);
-      await tester.pumpAndSettle();
+      await openGifTab(tester);
 
       expect(find.byType(AppErrorState), findsOneWidget);
     },
@@ -281,8 +280,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(gifButton);
-      await tester.pumpAndSettle();
+      await openGifTab(tester);
 
       await tester.enterText(find.byType(TextField).last, 'cat');
       // Past the composer's own search debounce.
@@ -319,8 +317,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(gifButton);
-    await tester.pumpAndSettle();
+    await openGifTab(tester);
     await tester.enterText(find.byType(TextField).last, 'nothing at all');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
@@ -341,8 +338,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(gifButton);
-    await tester.pumpAndSettle();
+    await openGifTab(tester);
     await tester.enterText(find.byType(TextField).last, 'cat');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();

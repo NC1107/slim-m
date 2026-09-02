@@ -111,6 +111,47 @@ Map<ShortcutActivator, AppAction> resolveBindings({
 /// The single activator currently bound to [action], or null once it has been
 /// unbound. For a caller that wants one action's key rather than the whole
 /// resolved table, so a global shortcut is never hardcoded a second time.
+/// [action]'s keys as labels, in press order - `['Ctrl', 'K']`.
+///
+/// Derived from the same resolved bindings [activatorFor] reads, never
+/// written out beside them: a hint that names a key the app does not
+/// actually listen for is worse than no hint, and an override would make a
+/// hand-written one wrong the moment it was set.
+///
+/// Empty when the action has no binding, which an override removing one is
+/// allowed to produce - a caller shows nothing rather than an empty keycap.
+List<String> describeAppAction(
+  AppAction action, {
+  Map<AppAction, ShortcutActivator?> overrides = const {},
+  bool forWeb = kIsWeb,
+}) {
+  final activator = activatorFor(
+    action,
+    overrides: overrides,
+    forWeb: forWeb,
+  );
+  if (activator is! SingleActivator) return const [];
+  return [
+    if (activator.meta) 'Cmd',
+    if (activator.control) 'Ctrl',
+    if (activator.alt) 'Alt',
+    if (activator.shift) 'Shift',
+    _keyLabel(activator.trigger),
+  ];
+}
+
+/// A trigger's own printable name. [LogicalKeyboardKey.keyLabel] is already
+/// right for a letter or a digit; the handful this app binds that have none
+/// are named here rather than falling through to a debug string.
+String _keyLabel(LogicalKeyboardKey key) => switch (key) {
+      LogicalKeyboardKey.tab => 'Tab',
+      LogicalKeyboardKey.escape => 'Esc',
+      LogicalKeyboardKey.comma => ',',
+      LogicalKeyboardKey.arrowUp => 'Up',
+      LogicalKeyboardKey.arrowDown => 'Down',
+      _ => key.keyLabel,
+    };
+
 ShortcutActivator? activatorFor(
   AppAction action, {
   Map<AppAction, ShortcutActivator?> overrides = const {},

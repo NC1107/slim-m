@@ -31,8 +31,7 @@ void main() {
   });
 
   test('the splash is smaller than the floor, and so precedes it', () {
-    // The splash is applied before the floor exists, by design - a floor set
-    // first would fight the 380x460 splash shape the launch depends on.
+    // The splash precedes the floor by design; a floor first would fight it.
     expect(
       WindowGeometry.fallback.windowedSize.width,
       greaterThan(WindowGeometry.minimumWindowSize.width),

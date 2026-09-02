@@ -109,23 +109,16 @@ class _ComposerPickerButtonState extends State<ComposerPickerButton> {
           ),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.gifSearchEnabled)
-            AppIconButton(
-              icon: AppIcons.gif,
-              semanticLabel: 'Insert a GIF',
-              tooltip: 'Insert a GIF',
-              onPressed: () => _open(ComposerPickerTab.gif),
-            ),
-          AppIconButton(
-            icon: AppIcons.smile,
-            semanticLabel: 'Insert emoji',
-            tooltip: 'Insert emoji',
-            onPressed: () => _open(ComposerPickerTab.emoji),
-          ),
-        ],
+      // One button, not one per tab; the tabs already carry that choice.
+      child: AppIconButton(
+        icon: AppIcons.smile,
+        semanticLabel: widget.gifSearchEnabled
+            ? 'Insert emoji or a GIF'
+            : 'Insert emoji',
+        tooltip: widget.gifSearchEnabled
+            ? 'Insert emoji or a GIF'
+            : 'Insert emoji',
+        onPressed: () => _open(ComposerPickerTab.emoji),
       ),
     );
   }
