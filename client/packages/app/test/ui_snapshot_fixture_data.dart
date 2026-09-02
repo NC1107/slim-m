@@ -242,6 +242,7 @@ Future<http.Response> fixtureResponse(http.Request request) async {
     '/roles' => _fixtureRoleMaps,
     '/invites' => _fixtureInviteMaps,
     '/reports' => _fixtureReportMaps,
+    '/saved' => _fixtureSavedMaps,
     // A list is the right empty answer for most reads; the read marker decodes a shape.
     _ when path.endsWith('/read') => const {'last_read_seq': 3, 'unread': 0},
     _ when path.endsWith('/voice/roster') => const {'participants': <Object>[]},
@@ -284,6 +285,34 @@ Future<http.Response> fixtureResponse(http.Request request) async {
     headers: {'content-type': 'application/json'},
   );
 }
+
+/// Two saved messages from different channels, which is the shape the sheet
+/// exists to render: a saved list spans channels, so each row has to say
+/// where it came from.
+final _fixtureSavedMaps = [
+  {
+    'id': 'm-2',
+    'channel_id': 'c-design',
+    'author_id': 'user-ada',
+    'author_display_name': 'Ada Lovelace',
+    'seq': 2,
+    'content': 'The spacing on the settings pane is off by a hair at 800.',
+    'created_at': 1753600000000,
+    'edited_at': null,
+    'saved_at': 1753600500000,
+  },
+  {
+    'id': 'm-1',
+    'channel_id': 'c-general',
+    'author_id': 'user-nick',
+    'author_display_name': 'Nick',
+    'seq': 1,
+    'content': 'The rail rows line up again at every width.',
+    'created_at': 1753600060000,
+    'edited_at': null,
+    'saved_at': 1753600400000,
+  },
+];
 
 MockClient fixtureClient() => MockClient(fixtureResponse);
 

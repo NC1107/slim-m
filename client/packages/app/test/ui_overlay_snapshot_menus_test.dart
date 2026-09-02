@@ -340,6 +340,22 @@ void main() {
     await teardownFixture(tester, fixture.container, fixture.db);
   });
 
+  testWidgets('the saved messages sheet fits its viewport', (tester) async {
+    final fixture = await _pumpRail(tester, const Size(1400, 880));
+
+    await tester.tap(find.bySemanticsLabel('Space menu'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tap(find.text('Saved messages'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved messages'), findsWidgets);
+    await expectSettled(tester, 'saved-messages-sheet');
+    await writeSnapshot(tester, 'saved-messages-sheet');
+    expect(tester.takeException(), isNull);
+    await teardownFixture(tester, fixture.container, fixture.db);
+  });
+
   testWidgets('a right-click on a channel row still gets the row menu', (
     tester,
   ) async {

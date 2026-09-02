@@ -189,7 +189,11 @@ class _SavedMessageRowState extends ConsumerState<SavedMessageRow>
             name: name,
             size: AppSizes.icon28,
           ),
-          title: Text(where == null ? name : '$name  ·  $where'),
+          title: Text(
+            where == null ? name : '$name  ·  $where',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           subtitle: Text(
             message.content,
             maxLines: 2,
