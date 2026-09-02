@@ -18,6 +18,22 @@ import '../whats_new/whats_new_content.dart';
 /// technique `pinnedMessagesBodyBoxKey` uses.
 const whatsNewBodyBoxKey = Key('whats_new_body_box');
 
+/// The most of the window the body may take, and the most it may take at all.
+///
+/// The fraction alone is right on a phone and wrong on a monitor: the taller
+/// the screen the taller the dialog, so 0.6 of a 1440-tall window gave a
+/// 460-wide box 864 tall - nearly twice as tall as wide, which is a phone
+/// screen stretched rather than a desktop dialog. `desktop-vs-mobile.md`
+/// rule 4 fixes the width at 460 and says nothing about height, so the
+/// ceiling is this file's to choose; 560 keeps the proportions upright at
+/// every size this ships at while leaving the phone sheet exactly as it was.
+double _bodyCeiling(BuildContext context) {
+  final fraction = MediaQuery.sizeOf(context).height * 0.6;
+  return fraction < _maxBodyHeight ? fraction : _maxBodyHeight;
+}
+
+const double _maxBodyHeight = 560;
+
 /// Shows [entries], newest first: someone catching up after skipping a few
 /// releases cares most about the latest, and [entries] itself is kept in the
 /// chronological order it was authored in so this is the one place that
@@ -45,9 +61,7 @@ class _WhatsNewSheet extends StatelessWidget {
     // A ceiling, not a fixed size: short entries must not force a dialog tall enough for a maximum-length one.
     return ConstrainedBox(
       key: whatsNewBodyBoxKey,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.6,
-      ),
+      constraints: BoxConstraints(maxHeight: _bodyCeiling(context)),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),
         child: Column(
