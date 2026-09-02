@@ -39,23 +39,9 @@ import '../providers/forward_targets.dart';
 import '../providers/message_extras.dart';
 import '../providers/providers.dart';
 import '../providers/toasts.dart';
-import '../providers/user_profiles.dart';
 import 'user_avatar.dart';
-import 'author_label.dart';
 import 'run_guarded.dart';
 import 'sheet_item_list.dart';
-
-/// Quotes [message]'s current content as a markdown block quote, attributed
-/// to its author, the same `>`-per-line syntax `message_markdown_blocks.dart`
-/// already renders - so a forward reads correctly on every existing client
-/// with no new markup to teach any of them.
-String buildForwardedContent({
-  required String authorLabel,
-  required String content,
-}) {
-  final quoted = content.split('\n').map((line) => '> $line').join('\n');
-  return 'Forwarded from $authorLabel\n$quoted';
-}
 
 /// Opens the destination picker, then sends the forward. The picker itself
 /// runs the send and stays open on a failure (see [_ForwardTargetSheet]),
@@ -71,19 +57,13 @@ Future<void> forwardMessage(
 ) async {
   final extras = ref.read(messageExtrasProvider.notifier).extrasFor(message.id);
   final attachmentIds = [for (final a in extras.attachments) a.id];
-  final authorName = authorLabel(
-    authorId: message.authorId,
-    cachedDisplayName: message.authorDisplayName,
-    profiles: ref.read(batchProfilesControllerProvider),
-  );
 
   final target = await showAppSheet<ForwardTarget>(
     context,
     scrolls: true,
     builder: (context) => _ForwardTargetSheet(
       excludeChannelId: message.channelId,
-      content: message.content,
-      authorName: authorName,
+      forwardedFromId: message.id,
       attachmentIds: attachmentIds,
     ),
   );
@@ -103,7 +83,8 @@ Future<void> forwardMessage(
 Future<void> _sendForward(
   WidgetRef ref, {
   required ForwardTarget target,
-  required String content,
+  required String forwardedFromId,
+  required String note,
   required List<String> attachmentIds,
 }) async {
   final sent = await ref
@@ -111,8 +92,9 @@ Future<void> _sendForward(
       .sendMessage(
         channelId: target.channelId,
         id: newMessageId(),
-        content: content,
+        content: note,
         attachmentIds: attachmentIds,
+        forwardedFromId: forwardedFromId,
       );
   final store = await ref.read(storeProvider.future);
   await store.applyMessage(sent);
@@ -142,14 +124,16 @@ const _headingPadding = EdgeInsets.fromLTRB(
 class _ForwardTargetSheet extends ConsumerStatefulWidget {
   const _ForwardTargetSheet({
     required this.excludeChannelId,
-    required this.content,
-    required this.authorName,
+    required this.forwardedFromId,
     required this.attachmentIds,
   });
 
   final String excludeChannelId;
-  final String content;
-  final String authorName;
+
+  /// The message being forwarded. Only its id travels: the server reads the
+  /// original's author, timestamp and text for itself, so this sheet has
+  /// nothing to quote and no author to attribute.
+  final String forwardedFromId;
   final List<String> attachmentIds;
 
   @override
@@ -160,6 +144,7 @@ class _ForwardTargetSheet extends ConsumerStatefulWidget {
 class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
     with GuardedActionState<_ForwardTargetSheet> {
   final _searchController = TextEditingController();
+  final _noteController = TextEditingController();
   String _query = '';
 
   /// The target currently sending, or null. Disables every other row while
@@ -170,22 +155,20 @@ class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
   @override
   void dispose() {
     _searchController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
   Future<void> _send(ForwardTarget target) async {
     clearActionError();
     setState(() => _sendingToChannelId = target.channelId);
-    final content = buildForwardedContent(
-      authorLabel: widget.authorName,
-      content: widget.content,
-    );
     final ok = await guard(
       whatFailed: 'forward the message',
       action: () => _sendForward(
         ref,
         target: target,
-        content: content,
+        forwardedFromId: widget.forwardedFromId,
+        note: _noteController.text.trim(),
         attachmentIds: widget.attachmentIds,
       ),
     );
@@ -210,8 +193,18 @@ class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
         children: [
           const Padding(
             padding: _headingPadding,
-            child: Text('Forward to', style: AppText.heading),
+            child: Text('Forward message', style: AppText.heading),
           ),
+          // Before the destinations, not after: tapping a destination is what sends, so anything meant to ride along has to already be written.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+            child: AppInput(
+              controller: _noteController,
+              placeholder: 'Say something about it (optional)',
+              semanticLabel: 'A message to send with this forward',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
             child: AppInput(

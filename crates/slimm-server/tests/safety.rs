@@ -14,7 +14,7 @@ use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -301,14 +301,12 @@ async fn reporting_a_message_keeps_a_snapshot_and_resists_flooding() {
     let reporter = store.open_session(alice.id, "d").await.unwrap();
 
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel.id,
             bob.id,
             MessageId::generate(),
             "something awful",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;
@@ -399,14 +397,12 @@ async fn a_message_you_cannot_see_cannot_be_reported() {
     let bob = store.create_account("bob", "Bob", &hash).await.unwrap();
     let hidden = store.create_channel("hidden", "text").await.unwrap();
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             hidden.id,
             bob.id,
             MessageId::generate(),
             "private",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;

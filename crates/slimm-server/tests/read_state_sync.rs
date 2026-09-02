@@ -14,7 +14,7 @@ use slimm_server::ids::{MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -91,14 +91,12 @@ async fn read_state_tracks_unread_and_is_monotonic() {
     let channel = f.store.create_channel("general", "text").await.unwrap();
     for i in 0..3 {
         f.store
-            .send_message(
+            .send_message(NewMessage::plain(
                 channel.id,
                 f.user_id,
                 MessageId::generate(),
                 &format!("m{i}"),
-                &[],
-                None,
-            )
+            ))
             .await
             .unwrap();
     }
@@ -192,14 +190,12 @@ async fn sync_returns_messages_after_the_cursor() {
     let channel = f.store.create_channel("general", "text").await.unwrap();
     for i in 0..5 {
         f.store
-            .send_message(
+            .send_message(NewMessage::plain(
                 channel.id,
                 f.user_id,
                 MessageId::generate(),
                 &format!("m{i}"),
-                &[],
-                None,
-            )
+            ))
             .await
             .unwrap();
     }
@@ -254,25 +250,21 @@ async fn sync_skips_channels_without_view() {
     let visible = f.store.create_channel("visible", "text").await.unwrap();
     let hidden = f.store.create_channel("hidden", "text").await.unwrap();
     f.store
-        .send_message(
+        .send_message(NewMessage::plain(
             visible.id,
             f.user_id,
             MessageId::generate(),
             "hi",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
     f.store
-        .send_message(
+        .send_message(NewMessage::plain(
             hidden.id,
             f.user_id,
             MessageId::generate(),
             "secret",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
     // Deny alice the view of the hidden channel.
@@ -351,14 +343,12 @@ async fn sync_collapses_duplicate_scopes() {
     let channel = f.store.create_channel("general", "text").await.unwrap();
     for i in 0..5 {
         f.store
-            .send_message(
+            .send_message(NewMessage::plain(
                 channel.id,
                 f.user_id,
                 MessageId::generate(),
                 &format!("m{i}"),
-                &[],
-                None,
-            )
+            ))
             .await
             .unwrap();
     }
@@ -395,7 +385,7 @@ async fn sync_keeps_a_duplicate_scopes_op_cursor() {
     let channel = f.store.create_channel("general", "text").await.unwrap();
     let id = MessageId::generate();
     f.store
-        .send_message(channel.id, f.user_id, id, "hi", &[], None)
+        .send_message(NewMessage::plain(channel.id, f.user_id, id, "hi"))
         .await
         .unwrap();
     f.store
@@ -433,14 +423,12 @@ async fn sync_far_behind_cursor_asks_for_reset() {
     let f = setup(Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES)).await;
     let channel = f.store.create_channel("general", "text").await.unwrap();
     f.store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel.id,
             f.user_id,
             MessageId::generate(),
             "hi",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 

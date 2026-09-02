@@ -20,6 +20,7 @@
 use anyhow::Context;
 
 use super::attachments::{LinkError, link_attachments, release_message_attachments};
+use super::message_forwards::ForwardOrigin;
 use super::message_ops::insert_message_op;
 use super::message_reads::{fetch_message, fetch_message_including_deleted};
 use super::moderation_audit::{ModerationAudit, record_moderation_audit};
@@ -117,6 +118,47 @@ pub enum Edited {
     },
 }
 
+/// Everything one send carries.
+///
+/// A parameter object rather than a positional list: with provenance for
+/// both replies and forwards on it, the positional form had reached the
+/// point where an ordinary call ended in an empty slice and two bare
+/// `None`s, and adding to it meant counting commas.
+pub struct NewMessage<'a> {
+    pub channel_id: ChannelId,
+    pub author_id: UserId,
+    pub id: MessageId,
+    pub content: &'a str,
+    /// sha256 hashes of already-uploaded attachments, in display order.
+    pub attachment_ids: &'a [Vec<u8>],
+    pub reply_to_id: Option<MessageId>,
+    /// What this message forwards, already resolved by the caller with
+    /// [`Store::forward_origin`] and only after checking the sender can see
+    /// the origin's channel. The store writes what it is handed here, so
+    /// authorizing the origin is the caller's job and cannot be skipped.
+    pub forward: Option<ForwardOrigin>,
+}
+
+impl<'a> NewMessage<'a> {
+    /// An ordinary message: no attachments, not a reply, not a forward.
+    pub fn plain(
+        channel_id: ChannelId,
+        author_id: UserId,
+        id: MessageId,
+        content: &'a str,
+    ) -> Self {
+        Self {
+            channel_id,
+            author_id,
+            id,
+            content,
+            attachment_ids: &[],
+            reply_to_id: None,
+            forward: None,
+        }
+    }
+}
+
 impl Store {
     /// Sends a message. Idempotent by `id` within its `(channel, author)` scope;
     /// the per-scope `seq` is allocated in the same transaction as the insert. A
@@ -139,15 +181,17 @@ impl Store {
     /// SQLite answers that with SQLITE_BUSY straight away, ignoring
     /// `busy_timeout`, because waiting could deadlock. Taking the write lock
     /// up front makes concurrent sends queue instead.
-    pub async fn send_message(
-        &self,
-        channel_id: ChannelId,
-        author_id: UserId,
-        id: MessageId,
-        content: &str,
-        attachment_ids: &[Vec<u8>],
-        reply_to_id: Option<MessageId>,
-    ) -> Result<Sent, SendError> {
+    pub async fn send_message(&self, msg: NewMessage<'_>) -> Result<Sent, SendError> {
+        let NewMessage {
+            channel_id,
+            author_id,
+            id,
+            content,
+            attachment_ids,
+            reply_to_id,
+            forward,
+        } = msg;
+
         // Authorized before the write lock, never inside it; see `may_link`.
         for sha256 in attachment_ids {
             if !super::attachments::may_link(self, author_id, sha256).await? {
@@ -221,6 +265,10 @@ impl Store {
 
         if !attachment_ids.is_empty() {
             link_attachments(&mut tx, id, attachment_ids).await?;
+        }
+
+        if let Some(origin) = &forward {
+            super::message_forwards::insert_forward(&mut tx, id, origin).await?;
         }
 
         // Read the name inside the same transaction the insert used, so the

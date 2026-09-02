@@ -7,7 +7,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{CanvasObjectId, ChannelId, MessageId, UserId};
-use slimm_server::store::{PlaceRequest, Store};
+use slimm_server::store::{NewMessage, PlaceRequest, Store};
 use sqlx::SqlitePool;
 
 mod support;
@@ -55,14 +55,15 @@ async fn send_old(s: &Store, pool: &SqlitePool, channel: ChannelId, author: User
         vec![sha.to_vec()]
     };
     let id = s
-        .send_message(
-            channel,
-            author,
-            MessageId::generate(),
-            "old",
-            &attachments,
-            None,
-        )
+        .send_message(NewMessage {
+            channel_id: channel,
+            author_id: author,
+            id: MessageId::generate(),
+            content: "old",
+            attachment_ids: &attachments,
+            reply_to_id: None,
+            forward: None,
+        })
         .await
         .unwrap()
         .message
@@ -159,14 +160,15 @@ async fn an_attachment_a_surviving_message_still_holds_is_not_freed() {
         .unwrap();
     send_old(&s, &pool, channel, admin, &sha256).await;
     // A recent message keeps a reference the sweep must not reclaim under.
-    s.send_message(
-        channel,
-        admin,
-        MessageId::generate(),
-        "recent",
-        std::slice::from_ref(&sha256),
-        None,
-    )
+    s.send_message(NewMessage {
+        channel_id: channel,
+        author_id: admin,
+        id: MessageId::generate(),
+        content: "recent",
+        attachment_ids: std::slice::from_ref(&sha256),
+        reply_to_id: None,
+        forward: None,
+    })
     .await
     .unwrap();
 

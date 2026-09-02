@@ -8,7 +8,7 @@
 mod support;
 
 use slimm_server::ids::{EmojiId, MessageId};
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 
 async fn new_store() -> (Store, sqlx::SqlitePool, support::TestDbGuard) {
     let (path, guard) = support::TestDbGuard::new("slimm-anon");
@@ -47,7 +47,12 @@ async fn delete_account_anonymizes_a_report_the_deleted_user_filed() {
         .await
         .unwrap();
     let subject = store
-        .send_message(channel, admin.id, MessageId::generate(), "hi", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin.id,
+            MessageId::generate(),
+            "hi",
+        ))
         .await
         .unwrap()
         .message
@@ -104,7 +109,12 @@ async fn delete_account_anonymizes_a_pin_and_an_uploaded_emoji() {
         .unwrap();
 
     let message = store
-        .send_message(channel, admin.id, MessageId::generate(), "hi", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin.id,
+            MessageId::generate(),
+            "hi",
+        ))
         .await
         .unwrap()
         .message

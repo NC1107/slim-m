@@ -26,7 +26,7 @@ use slimm_server::hub::Hub;
 use slimm_server::ids::{MessageId, UserId};
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{ReportSubject, Store};
+use slimm_server::store::{NewMessage, ReportSubject, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -83,7 +83,12 @@ async fn account(store: &Store, username: &str) -> (UserId, String) {
 async fn file_report_as(store: &Store, author: UserId, reporter: UserId, body: &str) -> String {
     let channel = store.list_channels().await.unwrap()[0].id;
     let message = store
-        .send_message(channel, author, MessageId::generate(), body, &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            author,
+            MessageId::generate(),
+            body,
+        ))
         .await
         .unwrap()
         .message

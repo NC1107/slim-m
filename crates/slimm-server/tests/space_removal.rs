@@ -11,7 +11,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::permissions::Permissions;
-use slimm_server::store::{InviteCheck, OpenError, RemoveMemberError, Store};
+use slimm_server::store::{InviteCheck, NewMessage, OpenError, RemoveMemberError, Store};
 
 mod support;
 
@@ -124,14 +124,12 @@ async fn their_messages_stay_and_stay_attributed() {
     let (admin, member) = deployment(&s).await;
     let channel = s.create_channel("general", "text").await.unwrap();
 
-    s.send_message(
+    s.send_message(NewMessage::plain(
         channel.id,
         member.id,
         slimm_server::ids::MessageId::generate(),
         "said before being removed",
-        &[],
-        None,
-    )
+    ))
     .await
     .unwrap();
 

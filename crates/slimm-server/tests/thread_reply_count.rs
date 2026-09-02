@@ -23,7 +23,7 @@ use slimm_server::hub::Hub;
 use slimm_server::ids::{MessageId, UserId};
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -260,14 +260,12 @@ async fn thread_summaries_resolve_a_whole_page_of_messages_in_one_call() {
     let mut parents = Vec::new();
     for i in 0..12 {
         let parent = store
-            .send_message(
+            .send_message(NewMessage::plain(
                 channel,
                 author,
                 MessageId::generate(),
                 &format!("m{i}"),
-                &[],
-                None,
-            )
+            ))
             .await
             .unwrap()
             .message;
@@ -276,14 +274,12 @@ async fn thread_summaries_resolve_a_whole_page_of_messages_in_one_call() {
             let thread = store.open_thread(channel, parent.id).await.unwrap().channel;
             for r in 0..(i / 2) {
                 store
-                    .send_message(
+                    .send_message(NewMessage::plain(
                         thread.id,
                         author,
                         MessageId::generate(),
                         &format!("reply {r}"),
-                        &[],
-                        None,
-                    )
+                    ))
                     .await
                     .unwrap();
             }

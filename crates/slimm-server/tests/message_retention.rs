@@ -18,7 +18,7 @@ use slimm_server::ids::{ChannelId, MessageId, UserId};
 use slimm_server::media::Media;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{MAX_MESSAGE_RETENTION_DAYS, Store};
+use slimm_server::store::{MAX_MESSAGE_RETENTION_DAYS, NewMessage, Store};
 use slimm_server::voice::VoiceService;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
@@ -197,7 +197,12 @@ async fn a_disabled_window_sweeps_nothing() {
     let admin = register(&s, "root").await;
     let channel = general(&s).await;
     let id = s
-        .send_message(channel, admin, MessageId::generate(), "old", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin,
+            MessageId::generate(),
+            "old",
+        ))
         .await
         .unwrap()
         .message
@@ -224,14 +229,15 @@ async fn the_sweep_prunes_an_old_message_and_frees_its_only_attachment() {
         .await
         .unwrap();
     let old_id = s
-        .send_message(
-            channel,
-            admin,
-            MessageId::generate(),
-            "old",
-            std::slice::from_ref(&sha256),
-            None,
-        )
+        .send_message(NewMessage {
+            channel_id: channel,
+            author_id: admin,
+            id: MessageId::generate(),
+            content: "old",
+            attachment_ids: std::slice::from_ref(&sha256),
+            reply_to_id: None,
+            forward: None,
+        })
         .await
         .unwrap()
         .message
@@ -239,7 +245,12 @@ async fn the_sweep_prunes_an_old_message_and_frees_its_only_attachment() {
     backdate_message(&pool, old_id, -60 * DAY_MS).await;
 
     let recent_id = s
-        .send_message(channel, admin, MessageId::generate(), "recent", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin,
+            MessageId::generate(),
+            "recent",
+        ))
         .await
         .unwrap()
         .message
@@ -276,7 +287,12 @@ async fn the_sweep_reclaims_message_ops_older_than_the_same_cutoff() {
     s.set_message_retention_days(30).await.unwrap();
 
     let id = s
-        .send_message(channel, admin, MessageId::generate(), "one", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin,
+            MessageId::generate(),
+            "one",
+        ))
         .await
         .unwrap()
         .message
@@ -303,7 +319,12 @@ async fn the_sweep_never_reclaims_an_op_within_the_window() {
     s.set_message_retention_days(30).await.unwrap();
 
     let id = s
-        .send_message(channel, admin, MessageId::generate(), "one", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin,
+            MessageId::generate(),
+            "one",
+        ))
         .await
         .unwrap()
         .message
@@ -327,7 +348,12 @@ async fn a_freshly_written_prune_delete_op_survives_the_same_ticks_op_log_reclai
     s.set_message_retention_days(1).await.unwrap();
 
     let old_id = s
-        .send_message(channel, admin, MessageId::generate(), "old", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin,
+            MessageId::generate(),
+            "old",
+        ))
         .await
         .unwrap()
         .message
@@ -357,7 +383,12 @@ async fn an_offline_client_recovers_via_reset_once_its_cursor_falls_behind_the_r
     s.set_message_retention_days(30).await.unwrap();
 
     let id = s
-        .send_message(channel, admin, MessageId::generate(), "one", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            admin,
+            MessageId::generate(),
+            "one",
+        ))
         .await
         .unwrap()
         .message

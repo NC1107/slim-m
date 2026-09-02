@@ -299,11 +299,13 @@ pub(super) async fn authorize(
         Event::MessageCreated {
             message,
             attachments,
+            forwarded,
         } => {
             let channel_id = message.channel_id.to_string();
             let seq = message.seq.0;
             let mut dto = MessageDto::from(message);
             dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
+            dto.forwarded = forwarded.map(Into::into);
             ServerFrame::MessageCreated {
                 channel_id,
                 seq,

@@ -23,7 +23,7 @@ use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -299,14 +299,12 @@ async fn a_restricted_moderator_still_sees_reports_with_no_channel_a_dm_or_a_del
     // A report about a message in a DM.
     let dm = store.open_dm(admin_id, bob_id).await.unwrap();
     let dm_message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             dm.id,
             admin_id,
             slimm_server::ids::MessageId::generate(),
             "dm content",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;

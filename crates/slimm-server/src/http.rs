@@ -50,6 +50,7 @@ mod members;
 mod members_bulk;
 mod message_dto;
 mod message_enrich;
+mod message_forwards;
 mod messages;
 mod messages_bulk;
 mod messages_bulk_window;

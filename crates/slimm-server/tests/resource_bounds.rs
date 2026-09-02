@@ -24,7 +24,7 @@ use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -259,14 +259,12 @@ async fn an_absurd_read_marker_is_clamped_rather_than_pinned() {
     let app = app_with_hops(store.clone(), 0);
 
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel,
             author.id,
             slimm_server::ids::MessageId::generate(),
             "first",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 
@@ -284,14 +282,12 @@ async fn an_absurd_read_marker_is_clamped_rather_than_pinned() {
 
     // A later message must still count as unread, which it never did before.
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel,
             author.id,
             slimm_server::ids::MessageId::generate(),
             "second",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 

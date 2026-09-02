@@ -29,7 +29,7 @@ use slimm_server::ids::{ChannelId, MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -109,7 +109,12 @@ async fn moderator(store: &Store) -> (UserId, String) {
 /// Files a report about a fresh message in `channel`, returning its text.
 async fn report_in(store: &Store, channel: ChannelId, author: UserId, body: &str) -> String {
     let subject = store
-        .send_message(channel, author, MessageId::generate(), body, &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            author,
+            MessageId::generate(),
+            body,
+        ))
         .await
         .unwrap()
         .message

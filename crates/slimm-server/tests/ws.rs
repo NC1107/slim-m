@@ -20,7 +20,7 @@ use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use sqlx::SqlitePool;
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
@@ -281,12 +281,18 @@ async fn a_store_error_authorizing_fan_out_closes_the_connection() {
         .expect("break the column permissions_in_channel queries by name");
 
     let sent = store
-        .send_message(channel.id, alice, MessageId::generate(), "hello", &[], None)
+        .send_message(NewMessage::plain(
+            channel.id,
+            alice,
+            MessageId::generate(),
+            "hello",
+        ))
         .await
         .unwrap();
     state.hub.publish(Event::MessageCreated {
         message: sent.message,
         attachments: Vec::new(),
+        forwarded: None,
     });
 
     let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut bob_ws)).await;

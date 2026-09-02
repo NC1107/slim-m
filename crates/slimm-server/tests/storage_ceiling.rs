@@ -21,7 +21,7 @@ use slimm_server::hub::Hub;
 use slimm_server::ids::UserId;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -252,14 +252,12 @@ async fn a_report_reason_is_capped_too() {
     let (author, token) = admin(&store, "root").await;
     let channel = store.list_channels().await.unwrap()[0].id;
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel,
             author,
             slimm_server::ids::MessageId::generate(),
             "hello",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message

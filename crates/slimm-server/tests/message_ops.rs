@@ -10,7 +10,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{ChannelId, MessageId, UserId};
-use slimm_server::store::{Edited, MessageOpKind, MessageSearchFilters, Store};
+use slimm_server::store::{Edited, MessageOpKind, MessageSearchFilters, NewMessage, Store};
 
 mod support;
 
@@ -27,11 +27,16 @@ async fn store() -> (Store, support::TestDbGuard) {
 }
 
 async fn send(s: &Store, channel: ChannelId, author: UserId, body: &str) -> MessageId {
-    s.send_message(channel, author, MessageId::generate(), body, &[], None)
-        .await
-        .unwrap()
-        .message
-        .id
+    s.send_message(NewMessage::plain(
+        channel,
+        author,
+        MessageId::generate(),
+        body,
+    ))
+    .await
+    .unwrap()
+    .message
+    .id
 }
 
 /// The property everything else here protects.

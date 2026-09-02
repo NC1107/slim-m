@@ -19,7 +19,7 @@ use slimm_server::ids::{ChannelId, MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -130,14 +130,12 @@ pub(crate) async fn send_many(store: &Store, channel: &str, author_id: UserId, c
     let id = ChannelId(Uuid::parse_str(channel).unwrap());
     for i in 0..count {
         store
-            .send_message(
+            .send_message(NewMessage::plain(
                 id,
                 author_id,
                 MessageId(Uuid::now_v7()),
                 &format!("spam {i}"),
-                &[],
-                None,
-            )
+            ))
             .await
             .unwrap();
     }

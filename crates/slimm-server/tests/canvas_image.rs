@@ -18,7 +18,7 @@ use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::media::Media;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -202,14 +202,15 @@ async fn an_attachment_already_visible_in_a_message_may_be_placed_by_anyone_who_
 
     let attachment = upload(&app, &root_token).await;
     store
-        .send_message(
-            channel,
-            root_id,
-            slimm_server::ids::MessageId::generate(),
-            "look",
-            &[slimm_server::media::from_hex(&attachment).unwrap()],
-            None,
-        )
+        .send_message(NewMessage {
+            channel_id: channel,
+            author_id: root_id,
+            id: slimm_server::ids::MessageId::generate(),
+            content: "look",
+            attachment_ids: &[slimm_server::media::from_hex(&attachment).unwrap()],
+            reply_to_id: None,
+            forward: None,
+        })
         .await
         .expect("root can send with their own upload");
 

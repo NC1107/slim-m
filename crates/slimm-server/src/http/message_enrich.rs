@@ -7,7 +7,8 @@
 //! to no single route: list, full-text search, sync and the pinned-message
 //! list all enrich a page the same way, and doing it per route is how the
 //! `/sync` deltas once came back with an empty `reactions` array while the
-//! same message fetched by list carried them.
+//! same message fetched by list carried them. Forwards are attached here
+//! for that same reason.
 
 use super::AppState;
 use super::messages::{AttachmentDto, MessageDto, ReactionDto};
@@ -28,6 +29,7 @@ pub(crate) async fn with_reactions(
     let mut by_message = state.store.reactions_for_messages(&ids, viewer).await?;
     let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
     let mut threads_by_message = state.store.thread_summaries_for_messages(&ids).await?;
+    let mut forwards_by_message = super::message_forwards::for_messages(state, &ids).await?;
     // One more batched query; empty when no message on this page has a thread, which is the common case.
     let thread_channel_ids: Vec<ChannelId> = threads_by_message
         .iter()
@@ -73,6 +75,7 @@ pub(crate) async fn with_reactions(
             dto.thread_reply_count = Some(summary.reply_count);
             dto.thread_last_reply_at = summary.last_reply_at;
         }
+        dto.forwarded = forwards_by_message.remove(&id);
         dtos.push(dto);
     }
     // Paired positionally: the loop above pushes one `dtos` entry per `ids` entry.

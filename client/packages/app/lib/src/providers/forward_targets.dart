@@ -3,12 +3,12 @@
 /// holds SEND_MESSAGES in, plus every DM they have open, each already
 /// resolved to a channel id the ordinary send route works on unchanged.
 ///
-/// Forwarding has no wire shape of its own - see `buildForwardedContent`
-/// in `widgets/forward_message.dart` for why a plain send with a client-side
-/// quote block is the honest design rather than stretching `reply_to_id`
-/// across channels, which the server refuses outright
-/// (`SendError::InvalidReplyTarget` in `crates/slimm-server/src/store/
-/// messages.rs`: a reply's parent must exist in the exact same channel).
+/// A forward has its own wire shape now - `forwarded_from_id` on the
+/// ordinary send route, which may name a message in any channel the sender
+/// can see. Not `reply_to_id`, which the server refuses across channels
+/// outright (`SendError::InvalidReplyTarget` in
+/// `crates/slimm-server/src/store/messages.rs`: a reply's parent must exist
+/// in the exact same channel).
 /// This file exists only to answer "where can this go", the one question a
 /// forward genuinely needs the server for.
 library;

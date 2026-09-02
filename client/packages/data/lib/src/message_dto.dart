@@ -23,6 +23,78 @@
 /// change for the first caller that ever does, so value equality is kept.
 library;
 
+/// What a message was forwarded from, as this cache holds it.
+///
+/// A snapshot the server took when the forward was sent, so unlike
+/// [Message.replyToId] nothing here is resolved locally and nothing here can
+/// go stale: it is what was passed on, not what the original says now. The
+/// origin may well be in a channel this cache does not hold at all.
+///
+/// The origin's channel *name* is deliberately absent, on the wire and here.
+/// Resolve [channelId] against the channel list this client already holds: a
+/// channel it does not hold is one the reader cannot see, so show no origin
+/// location and offer no jump.
+class ForwardedMessage {
+  const ForwardedMessage({
+    required this.messageId,
+    required this.channelId,
+    this.authorId,
+    this.authorDisplayName,
+    this.authorAvatarUpdatedAt,
+    required this.createdAt,
+    required this.content,
+  });
+
+  final String messageId;
+  final String channelId;
+
+  /// Null once the original's author was anonymized, exactly as
+  /// [Message.authorId] is.
+  final String? authorId;
+  final String? authorDisplayName;
+  final int? authorAvatarUpdatedAt;
+
+  /// When the original was sent - not when it was forwarded, which is the
+  /// carrying message's own [Message.createdAt].
+  final int createdAt;
+
+  /// What the original said at the moment it was forwarded.
+  final String content;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ForwardedMessage &&
+          other.messageId == messageId &&
+          other.channelId == channelId &&
+          other.authorId == authorId &&
+          other.authorDisplayName == authorDisplayName &&
+          other.authorAvatarUpdatedAt == authorAvatarUpdatedAt &&
+          other.createdAt == createdAt &&
+          other.content == content);
+
+  @override
+  int get hashCode => Object.hash(
+        messageId,
+        channelId,
+        authorId,
+        authorDisplayName,
+        authorAvatarUpdatedAt,
+        createdAt,
+        content,
+      );
+
+  /// Spelled out because a failed equality between two of these is otherwise
+  /// reported as two identical "Instance of 'ForwardedMessage'" lines, which
+  /// says nothing about which of the seven fields actually differed.
+  @override
+  String toString() =>
+      'ForwardedMessage(messageId: $messageId, channelId: $channelId, '
+      'authorId: $authorId, authorDisplayName: $authorDisplayName, '
+      'authorAvatarUpdatedAt: $authorAvatarUpdatedAt, '
+      'createdAt: $createdAt, content: $content)';
+}
+
 /// One locally cached message, independent of how it is stored.
 class Message {
   const Message({
@@ -35,6 +107,7 @@ class Message {
     required this.createdAt,
     this.editedAt,
     this.replyToId,
+    this.forwarded,
     required this.pending,
     required this.failed,
     this.failureReason,
@@ -61,6 +134,12 @@ class Message {
   /// parent is copied onto this row.
   final String? replyToId;
 
+  /// What this message forwards, or null when it forwards nothing.
+  ///
+  /// [content] is the sender's own note alongside it and is often empty; the
+  /// thing being forwarded is in here and never mixed into that text.
+  final ForwardedMessage? forwarded;
+
   /// True while the send is in flight. The UI shows these differently and
   /// they are replaced in place by the server's copy on acknowledgement.
   final bool pending;
@@ -85,6 +164,7 @@ class Message {
           other.createdAt == createdAt &&
           other.editedAt == editedAt &&
           other.replyToId == replyToId &&
+          other.forwarded == forwarded &&
           other.pending == pending &&
           other.failed == failed &&
           other.failureReason == failureReason);
@@ -100,6 +180,7 @@ class Message {
         createdAt,
         editedAt,
         replyToId,
+        forwarded,
         pending,
         failed,
         failureReason,

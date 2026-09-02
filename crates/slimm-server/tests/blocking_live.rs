@@ -30,7 +30,7 @@ use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -154,14 +154,12 @@ async fn a_live_reaction_from_a_blocked_user_is_absent_for_the_blocker_alone() {
     let (_carol_access, carol_ticket, _carol) = user_ticket(&store, "carol").await;
 
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel.id,
             alice,
             slimm_server::ids::MessageId::generate(),
             "hello",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message
@@ -260,14 +258,12 @@ async fn a_live_reactions_frame_never_carries_a_reactor_id_and_mixes_blocked_wit
     let (carol_access, _carol_ticket, _carol) = user_ticket(&store, "carol").await;
 
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel.id,
             alice,
             slimm_server::ids::MessageId::generate(),
             "hello",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message
@@ -369,14 +365,12 @@ async fn a_blocked_reactors_early_timestamp_cannot_reorder_an_emoji_for_the_bloc
     let (zane_access, _zane_ticket, _zane) = user_ticket(&store, "zane").await;
 
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel.id,
             alice,
             slimm_server::ids::MessageId::generate(),
             "hello",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message

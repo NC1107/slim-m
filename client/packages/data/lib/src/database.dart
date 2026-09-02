@@ -139,6 +139,21 @@ class Messages extends Table {
   /// here for an edit or delete of the parent to leave stale.
   TextColumn get replyToId => text().nullable()();
 
+  /// What this message forwards, snapshotted by the server when the forward
+  /// was sent - all null together on a message that forwards nothing.
+  ///
+  /// Copied onto this row rather than resolved like [replyToId], because a
+  /// forward's origin is in another channel this cache may not hold at all,
+  /// and outlives being edited or deleted there. Nothing here goes stale:
+  /// the snapshot is what was passed on, not what the original says now.
+  TextColumn get forwardedMessageId => text().nullable()();
+  TextColumn get forwardedChannelId => text().nullable()();
+  TextColumn get forwardedAuthorId => text().nullable()();
+  TextColumn get forwardedAuthorDisplayName => text().nullable()();
+  IntColumn get forwardedAuthorAvatarUpdatedAt => integer().nullable()();
+  IntColumn get forwardedCreatedAt => integer().nullable()();
+  TextColumn get forwardedContent => text().nullable()();
+
   /// True while the send is in flight. The UI shows these differently and they
   /// are replaced in place by the server's copy on acknowledgement.
   BoolColumn get pending => boolean().withDefault(const Constant(false))();
@@ -168,6 +183,17 @@ extension MessageRowMapping on MessageRow {
         createdAt: createdAt,
         editedAt: editedAt,
         replyToId: replyToId,
+        forwarded: forwardedMessageId == null
+            ? null
+            : ForwardedMessage(
+                messageId: forwardedMessageId!,
+                channelId: forwardedChannelId!,
+                authorId: forwardedAuthorId,
+                authorDisplayName: forwardedAuthorDisplayName,
+                authorAvatarUpdatedAt: forwardedAuthorAvatarUpdatedAt,
+                createdAt: forwardedCreatedAt!,
+                content: forwardedContent!,
+              ),
         pending: pending,
         failed: failed,
         failureReason: failureReason,
@@ -179,7 +205,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -246,6 +272,12 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// null until the next channel refresh fills it in, and the empty
   /// categories table is populated by that same refresh
   /// ([ChannelRefresher.refresh] calling [MessageStore.replaceCategories]).
+  ///
+  /// v13 adds the seven `messages.forwarded*` columns in place, the same
+  /// "new on both sides in the same release, nothing to backfill" shape as
+  /// v9 and v10. Forwards that predate it were composed into message text
+  /// and are indistinguishable from ordinary content by design; they stay
+  /// exactly as they read today rather than being guessed at.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -281,6 +313,18 @@ class SlimmDatabase extends _$SlimmDatabase {
           if (from < 12) {
             await m.addColumn(channels, channels.categoryId);
             await m.createTable(channelCategories);
+          }
+          if (from < 13) {
+            await m.addColumn(messages, messages.forwardedMessageId);
+            await m.addColumn(messages, messages.forwardedChannelId);
+            await m.addColumn(messages, messages.forwardedAuthorId);
+            await m.addColumn(messages, messages.forwardedAuthorDisplayName);
+            await m.addColumn(
+              messages,
+              messages.forwardedAuthorAvatarUpdatedAt,
+            );
+            await m.addColumn(messages, messages.forwardedCreatedAt);
+            await m.addColumn(messages, messages.forwardedContent);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

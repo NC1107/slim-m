@@ -350,6 +350,7 @@ api.Message _message(
   String author,
   String content, {
   List<api.ReactionSummary> reactions = const [],
+  api.ForwardedMessage? forwarded,
 }) => api.Message(
   id: 'm-$seq',
   channelId: 'c-general',
@@ -360,6 +361,21 @@ api.Message _message(
   createdAt: 1753600000000 + seq * 60000,
   editedAt: null,
   reactions: reactions,
+  forwarded: forwarded,
+);
+
+/// An origin in `c-design`, a channel this fixture's own list holds - so the
+/// card resolves a location and renders its jump affordance. A forward whose
+/// origin is missing from that list is the other branch, and is covered by
+/// `forwarded_message_card_test.dart` rather than a viewport sweep.
+const _forwardedOrigin = api.ForwardedMessage(
+  messageId: 'm-2',
+  channelId: 'c-design',
+  authorId: 'user-ada',
+  authorDisplayName: 'Ada Lovelace',
+  authorAvatarUpdatedAt: null,
+  createdAt: 1753600000000,
+  content: 'The spacing on the settings pane is off by a hair at 800.',
 );
 
 /// A reply inside `c-thread`, the thread hanging off [_message]'s `m-1`.
@@ -403,6 +419,12 @@ final fixtureMessages = [
     'user-ada',
     'Long enough to wrap on a phone and prove the composer still clears '
         'the home indicator underneath it.',
+  ),
+  _message(
+    4,
+    'user-nick',
+    'Worth a look here too.',
+    forwarded: _forwardedOrigin,
   ),
   _threadMessage(1, 'user-ada', 'Good catch - filed as #341.'),
   _threadMessage(2, 'user-nick', 'Thanks, verifying the fix now.'),

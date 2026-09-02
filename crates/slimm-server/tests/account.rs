@@ -14,7 +14,7 @@ use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{OpenError, RefreshOutcome, SendError, Store};
+use slimm_server::store::{NewMessage, OpenError, RefreshOutcome, SendError, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -43,14 +43,12 @@ async fn delete_account_anonymizes_content_and_revokes_access() {
     let channel = store.create_channel("general", "text").await.unwrap();
     let tokens = store.open_session(account.id, "laptop").await.unwrap();
     let message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel.id,
             account.id,
             MessageId::generate(),
             "hello",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;
@@ -179,14 +177,15 @@ async fn delete_account_removes_attachment_uploader_rows() {
 
     // While the account exists, having uploaded the bytes is enough to link them.
     store
-        .send_message(
-            channel.id,
-            alice.id,
-            MessageId::generate(),
-            "before",
-            std::slice::from_ref(&sha256),
-            None,
-        )
+        .send_message(NewMessage {
+            channel_id: channel.id,
+            author_id: alice.id,
+            id: MessageId::generate(),
+            content: "before",
+            attachment_ids: std::slice::from_ref(&sha256),
+            reply_to_id: None,
+            forward: None,
+        })
         .await
         .expect("alice can link bytes she uploaded");
 
@@ -194,14 +193,15 @@ async fn delete_account_removes_attachment_uploader_rows() {
 
     // Nothing left grants the right back; see this test's doc comment.
     let result = store
-        .send_message(
-            channel.id,
-            alice.id,
-            MessageId::generate(),
-            "after",
-            std::slice::from_ref(&sha256),
-            None,
-        )
+        .send_message(NewMessage {
+            channel_id: channel.id,
+            author_id: alice.id,
+            id: MessageId::generate(),
+            content: "after",
+            attachment_ids: std::slice::from_ref(&sha256),
+            reply_to_id: None,
+            forward: None,
+        })
         .await;
     assert!(
         matches!(result, Err(SendError::AttachmentNotFound)),

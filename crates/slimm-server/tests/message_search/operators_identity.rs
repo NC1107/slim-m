@@ -9,6 +9,7 @@
 use axum::http::StatusCode;
 use slimm_server::ids::MessageId;
 use slimm_server::permissions::Permissions;
+use slimm_server::store::NewMessage;
 use tower::ServiceExt;
 
 use crate::fixtures::*;
@@ -228,14 +229,12 @@ async fn in_naming_an_unviewable_or_nonexistent_channel_answers_empty_either_way
         .await
         .unwrap();
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             hidden.id,
             planter.id,
             MessageId::generate(),
             "checking the vault too",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 
@@ -316,14 +315,12 @@ async fn in_naming_two_same_named_channels_searches_only_the_viewable_one() {
         .await
         .unwrap();
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             hidden.id,
             planter.id,
             MessageId::generate(),
             "narwhals hidden",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 

@@ -207,8 +207,9 @@ async fn create(
     if sent.fresh {
         state.hub.publish(Event::MessageCreated {
             message: sent.message.clone(),
-            // A poll message carries no attachment.
+            // A poll message carries no attachment, and forwards nothing.
             attachments: Vec::new(),
+            forwarded: None,
         });
         state.push.notify_message(
             state.store.clone(),

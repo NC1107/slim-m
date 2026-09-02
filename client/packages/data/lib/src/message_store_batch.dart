@@ -38,20 +38,7 @@ Future<void> _applyMessagesBatched(
 
     await db.batch((batch) {
       batch.insertAllOnConflictUpdate(db.messages, [
-        for (final message in winners.values)
-          MessagesCompanion.insert(
-            id: message.id,
-            channelId: message.channelId,
-            authorId: Value(message.authorId),
-            authorDisplayName: Value(message.authorDisplayName),
-            seq: Value(message.seq),
-            content: message.content,
-            createdAt: message.createdAt,
-            editedAt: Value(message.editedAt),
-            pending: const Value(false),
-            failed: const Value(false),
-            replyToId: Value(message.replyToId),
-          ),
+        for (final message in winners.values) _rowFor(message),
       ]);
     });
 

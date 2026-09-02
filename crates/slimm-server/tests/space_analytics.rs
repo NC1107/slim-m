@@ -17,7 +17,7 @@ use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use slimm_server::voice::VoiceService;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
@@ -124,14 +124,12 @@ async fn a_disabled_deployment_answers_with_no_stats_even_though_messages_exist(
     let (s, _pool, _guard) = store("slimm-analytics-disabled").await;
     let (admin, member) = deployment(&s).await;
     let channel = s.create_channel("general", "text").await.unwrap();
-    s.send_message(
+    s.send_message(NewMessage::plain(
         channel.id,
         member.id,
         MessageId::generate(),
         "hello",
-        &[],
-        None,
-    )
+    ))
     .await
     .unwrap();
 
@@ -160,18 +158,16 @@ async fn an_enabled_deployment_reports_the_real_counts() {
     let (s, _pool, _guard) = store("slimm-analytics-enabled").await;
     let (admin, member) = deployment(&s).await;
     let channel = s.create_channel("general", "text").await.unwrap();
-    s.send_message(
+    s.send_message(NewMessage::plain(
         channel.id,
         member.id,
         MessageId::generate(),
         "kept",
-        &[],
-        None,
-    )
+    ))
     .await
     .unwrap();
     let removed_id = MessageId::generate();
-    s.send_message(channel.id, member.id, removed_id, "gone", &[], None)
+    s.send_message(NewMessage::plain(channel.id, member.id, removed_id, "gone"))
         .await
         .unwrap();
     s.delete_message(removed_id, member.id).await.unwrap();
@@ -235,14 +231,12 @@ async fn the_analytics_response_never_names_a_member() {
     let (s, _pool, _guard) = store("slimm-analytics-privacy").await;
     let (admin, member) = deployment(&s).await;
     let channel = s.create_channel("general", "text").await.unwrap();
-    s.send_message(
+    s.send_message(NewMessage::plain(
         channel.id,
         member.id,
         MessageId::generate(),
         "hi",
-        &[],
-        None,
-    )
+    ))
     .await
     .unwrap();
     s.set_analytics_enabled(true).await.unwrap();
@@ -400,7 +394,7 @@ async fn active_hours_and_memory_samples_cover_the_full_thirtieth_day() {
     let just_inside_day_30 = now_ms() - 30 * DAY_MS + 60 * 60 * 1000;
 
     let msg_id = MessageId::generate();
-    s.send_message(channel.id, member.id, msg_id, "old", &[], None)
+    s.send_message(NewMessage::plain(channel.id, member.id, msg_id, "old"))
         .await
         .unwrap();
     sqlx::query("UPDATE messages SET created_at = ? WHERE id = ?")

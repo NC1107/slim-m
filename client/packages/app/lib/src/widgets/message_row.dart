@@ -25,6 +25,7 @@ import '../routing/breakpoints.dart';
 
 import 'attachment_view.dart';
 import 'emoji_picker.dart';
+import 'forwarded_message_card.dart';
 import 'hover_reveal.dart';
 import 'message_context_menu.dart';
 import 'message_edit_field.dart';
@@ -289,7 +290,7 @@ class MessageRow extends StatelessWidget {
                                         onSubmit: onSubmitEdit,
                                         onCancel: onCancelEdit,
                                       )
-                                    // An attachment-only message has no body; an empty one still adds a blank line above the image.
+                                    // An attachment-only message has no body; an empty one still adds a blank line above the image. A forward's own note is often empty too.
                                     else if (message.content.isNotEmpty)
                                       MessageBody(
                                         content: message.content,
@@ -298,6 +299,27 @@ class MessageRow extends StatelessWidget {
                                         customEmoji: customEmoji,
                                         dim: message.pending,
                                         announceSending: message.pending,
+                                      ),
+                                    if (message.forwarded case final forwarded?)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: ForwardedMessageCard(
+                                          forwarded: forwarded,
+                                          body: forwarded.content.isEmpty
+                                              ? null
+                                              : MessageBody(
+                                                  content: forwarded.content,
+                                                  knownUsernames:
+                                                      knownUsernames,
+                                                  knownRoleNames:
+                                                      knownRoleNames,
+                                                  customEmoji: customEmoji,
+                                                ),
+                                          attachments: attachments,
+                                          currentChannelId: message.channelId,
+                                        ),
                                       ),
                                     if (message.editedAt != null && !editing)
                                       EditedMarker(onTap: onViewEditHistory),
@@ -311,15 +333,17 @@ class MessageRow extends StatelessWidget {
                                           onVote: onVote,
                                         ),
                                       ),
-                                    for (final attachment in attachments)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: AppSpacing.s4,
+                                    // A forward's attachments are part of what was forwarded, and are drawn inside its card instead.
+                                    if (message.forwarded == null)
+                                      for (final attachment in attachments)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: AppSpacing.s4,
+                                          ),
+                                          child: AttachmentView(
+                                            attachment: attachment,
+                                          ),
                                         ),
-                                        child: AttachmentView(
-                                          attachment: attachment,
-                                        ),
-                                      ),
                                     if (!_unsent)
                                       ReactionsRow(
                                         reactions: reactions,

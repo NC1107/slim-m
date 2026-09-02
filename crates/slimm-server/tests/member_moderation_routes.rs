@@ -20,7 +20,7 @@ use slimm_server::hub::Hub;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -330,7 +330,12 @@ async fn a_timed_out_author_cannot_edit_their_way_around_the_block() {
 
     let message_id = slimm_server::ids::MessageId::generate();
     store
-        .send_message(channel, member, message_id, "the original", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            member,
+            message_id,
+            "the original",
+        ))
         .await
         .unwrap();
 

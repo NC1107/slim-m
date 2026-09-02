@@ -4,7 +4,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{MessageId, Seq};
-use slimm_server::store::{Edited, Store};
+use slimm_server::store::{Edited, NewMessage, Store};
 
 mod support;
 
@@ -28,17 +28,32 @@ async fn seq_is_monotonic_and_independent_per_channel() {
     let b = s.create_channel("gaming", "text").await.unwrap();
 
     let a1 = s
-        .send_message(a.id, author.id, MessageId::generate(), "one", &[], None)
+        .send_message(NewMessage::plain(
+            a.id,
+            author.id,
+            MessageId::generate(),
+            "one",
+        ))
         .await
         .unwrap()
         .message;
     let a2 = s
-        .send_message(a.id, author.id, MessageId::generate(), "two", &[], None)
+        .send_message(NewMessage::plain(
+            a.id,
+            author.id,
+            MessageId::generate(),
+            "two",
+        ))
         .await
         .unwrap()
         .message;
     let b1 = s
-        .send_message(b.id, author.id, MessageId::generate(), "other", &[], None)
+        .send_message(NewMessage::plain(
+            b.id,
+            author.id,
+            MessageId::generate(),
+            "other",
+        ))
         .await
         .unwrap()
         .message;
@@ -57,13 +72,13 @@ async fn send_is_idempotent_by_id() {
 
     let id = MessageId::generate();
     let first = s
-        .send_message(c.id, author.id, id, "hi", &[], None)
+        .send_message(NewMessage::plain(c.id, author.id, id, "hi"))
         .await
         .unwrap()
         .message;
     // A retry with the same id returns the stored message and wastes no sequence.
     let retry = s
-        .send_message(c.id, author.id, id, "hi again", &[], None)
+        .send_message(NewMessage::plain(c.id, author.id, id, "hi again"))
         .await
         .unwrap()
         .message;
@@ -77,7 +92,12 @@ async fn send_is_idempotent_by_id() {
 
     // The next real send is seq 2, proving the retry did not consume seq 2.
     let second = s
-        .send_message(c.id, author.id, MessageId::generate(), "second", &[], None)
+        .send_message(NewMessage::plain(
+            c.id,
+            author.id,
+            MessageId::generate(),
+            "second",
+        ))
         .await
         .unwrap()
         .message;
@@ -93,14 +113,12 @@ async fn edit_and_keyset_pagination() {
     let author = s.create_user("priya", "Priya").await.unwrap();
     let c = s.create_channel("general", "text").await.unwrap();
     for i in 0..5 {
-        s.send_message(
+        s.send_message(NewMessage::plain(
             c.id,
             author.id,
             MessageId::generate(),
             &format!("m{i}"),
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
     }
@@ -147,13 +165,13 @@ async fn a_retry_reports_itself_as_a_retry() {
     let id = MessageId::generate();
 
     let first = s
-        .send_message(c.id, author.id, id, "hi", &[], None)
+        .send_message(NewMessage::plain(c.id, author.id, id, "hi"))
         .await
         .unwrap();
     assert!(first.fresh, "a first send is fresh");
 
     let retry = s
-        .send_message(c.id, author.id, id, "hi", &[], None)
+        .send_message(NewMessage::plain(c.id, author.id, id, "hi"))
         .await
         .unwrap();
     assert!(
@@ -181,14 +199,12 @@ async fn concurrent_sends_each_take_a_distinct_sequence_number() {
         let channel = c.id;
         let author = author.id;
         tokio::spawn(async move {
-            s.send_message(
+            s.send_message(NewMessage::plain(
                 channel,
                 author,
                 MessageId::generate(),
                 &format!("m{i}"),
-                &[],
-                None,
-            )
+            ))
             .await
         })
     });

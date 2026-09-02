@@ -23,7 +23,7 @@ use slimm_server::hub::{Event, Hub};
 use slimm_server::ids::MessageId;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tokio::sync::broadcast;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -252,7 +252,7 @@ async fn create_channel_refuses_an_id_already_used_by_a_dm_or_a_thread() {
     let host = store.create_channel("host", "text").await.unwrap();
     let message_id = MessageId::generate();
     store
-        .send_message(host.id, admin_id, message_id, "hi", &[], None)
+        .send_message(NewMessage::plain(host.id, admin_id, message_id, "hi"))
         .await
         .unwrap();
     let thread = store.open_thread(host.id, message_id).await.unwrap();

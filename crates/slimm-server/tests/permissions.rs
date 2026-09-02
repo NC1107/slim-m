@@ -5,7 +5,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::permissions::Permissions;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 
 mod support;
 
@@ -323,14 +323,12 @@ async fn permissions_in_channels_matches_the_per_channel_check() {
         .unwrap();
 
     let parent_message = s
-        .send_message(
+        .send_message(NewMessage::plain(
             ordinary.id,
             alice.id,
             slimm_server::ids::MessageId::generate(),
             "start a thread here",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;
