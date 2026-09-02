@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"hit!: i64\" FROM channel_categories WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "hit!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "79753325c91954ce006088fd055ad9586ae99ff2bba5777f654a8e8061b0206e"
+}

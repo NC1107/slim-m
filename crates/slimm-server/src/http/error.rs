@@ -159,6 +159,9 @@ impl From<CreateChannelError> for ApiError {
             CreateChannelError::IdConflict => {
                 ApiError::Conflict("channel id already used by a dm or a thread")
             }
+            CreateChannelError::UnknownCategory => {
+                ApiError::BadRequest("category_id must name a category that exists")
+            }
             CreateChannelError::Internal(e) => {
                 tracing::error!(error = %e, "channel create failed");
                 ApiError::Internal

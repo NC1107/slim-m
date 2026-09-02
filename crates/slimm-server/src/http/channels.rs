@@ -26,7 +26,7 @@ use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
-use crate::ids::ChannelId;
+use crate::ids::{ChannelCategoryId, ChannelId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Channel, DM_CHANNEL_KIND, DeleteChannelError};
@@ -118,6 +118,14 @@ struct CreateRequest {
     name: String,
     /// "text" or "voice"; defaults to text.
     kind: Option<String>,
+    /// The rail section to file this channel under, or absent for
+    /// uncategorised. Lets a client create straight into the category a
+    /// person asked from, rather than creating uncategorised and following
+    /// up with a reorder - two calls whose second one can fail on its own
+    /// and leave the channel somewhere nobody chose. A category that does
+    /// not exist is a 400, never a silent fall back to uncategorised.
+    #[serde(default)]
+    category_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -196,7 +204,16 @@ async fn create(
         .transpose()?
         .unwrap_or_else(ChannelId::generate);
 
-    let created = state.store.create_channel_with_id(id, name, kind).await?;
+    let category_id = req
+        .category_id
+        .as_deref()
+        .map(|raw| parse_uuid(raw).map(ChannelCategoryId))
+        .transpose()?;
+
+    let created = state
+        .store
+        .create_channel_with_id(id, name, kind, category_id)
+        .await?;
     // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
     if created.fresh {
         state

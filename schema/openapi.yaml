@@ -6072,6 +6072,17 @@ components:
           type: string
           enum: [text, voice]
           default: text
+        category_id:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            The rail section to file this channel under, or absent for
+            uncategorised. Lets a client create straight into the category a
+            person asked from, rather than creating uncategorised and
+            following up with `reorderChannels` - two calls whose second one
+            can fail on its own and leave the channel in a section nobody
+            chose. A category that does not exist is a 400, never a silent
+            fall back to uncategorised.
 
     UpdateChannelRequest:
       type: object

@@ -298,3 +298,122 @@ async fn the_last_channel_guard_is_unaffected_by_categories() {
         "the last live channel is refused however its category is arranged"
     );
 }
+
+/// Creating straight into a category, rather than creating uncategorised and
+/// following up with a reorder - two calls whose second can fail on its own
+/// and leave the channel in a section nobody chose.
+#[tokio::test]
+async fn a_channel_can_be_created_directly_into_a_category() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let category = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/categories",
+                Some(&token),
+                Some(json!({ "name": "extras" })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let category_id = category["id"].as_str().unwrap().to_owned();
+
+    let created = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/channels",
+                Some(&token),
+                Some(json!({ "name": "notes", "category_id": category_id })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+
+    assert_eq!(created["name"], "notes");
+    assert_eq!(created["category_id"], category_id);
+}
+
+/// Refused rather than filed as uncategorised: a client that asked for a
+/// specific section and silently got a different one is worse than an error
+/// it can show.
+#[tokio::test]
+async fn creating_into_a_category_that_does_not_exist_is_refused() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/channels",
+            Some(&token),
+            Some(json!({
+                "name": "notes",
+                "category_id": uuid::Uuid::now_v7().to_string(),
+            })),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let channels = store.list_channels().await.unwrap();
+    assert!(
+        !channels.iter().any(|c| c.name == "notes"),
+        "the refused create must not have left a channel behind"
+    );
+}
+
+/// Absent means uncategorised, which is the ordinary create and must stay
+/// exactly as it was.
+#[tokio::test]
+async fn creating_without_a_category_still_lands_uncategorised() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let created = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/channels",
+                Some(&token),
+                Some(json!({ "name": "notes" })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+
+    assert!(created["category_id"].is_null());
+}

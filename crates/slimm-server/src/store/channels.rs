@@ -8,7 +8,7 @@
 use sqlx::SqliteExecutor;
 
 use super::{Channel, Store, now_ms};
-use crate::ids::ChannelId;
+use crate::ids::{ChannelCategoryId, ChannelId};
 
 /// Why deleting a channel failed.
 #[derive(Debug)]
@@ -38,6 +38,11 @@ pub enum CreateChannelError {
     /// [`super::messages::SendError::IdConflict`] refuses to alias a foreign
     /// message rather than returning it.
     IdConflict,
+    /// `category_id` named a category that does not exist. Refused rather
+    /// than filed as uncategorised: a client asking for a specific section
+    /// and silently getting a different one is worse than an error it can
+    /// show.
+    UnknownCategory,
     Internal(anyhow::Error),
 }
 
@@ -106,6 +111,7 @@ impl Store {
         id: ChannelId,
         name: &str,
         kind: &str,
+        category_id: Option<ChannelCategoryId>,
     ) -> Result<CreatedChannel, CreateChannelError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
@@ -130,13 +136,29 @@ impl Store {
         )
         .fetch_one(&mut *tx)
         .await?;
+        // Checked by hand: the column's bare `REFERENCES` fails the insert with an error the caller cannot tell from any other.
+        if let Some(category_id) = category_id {
+            let known = sqlx::query_scalar!(
+                r#"SELECT 1 AS "hit!: i64" FROM channel_categories WHERE id = ?"#,
+                category_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            if known.is_none() {
+                tx.commit().await?;
+                return Err(CreateChannelError::UnknownCategory);
+            }
+        }
+
         sqlx::query!(
-            "INSERT INTO channels (id, name, kind, position, created_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO channels (id, name, kind, position, created_at, category_id) \
+             VALUES (?, ?, ?, ?, ?, ?)",
             id,
             name,
             kind,
             position,
-            now
+            now,
+            category_id
         )
         .execute(&mut *tx)
         .await?;
@@ -157,8 +179,8 @@ impl Store {
                 topic: None,
                 position,
                 parent_message_id: None,
-                // Uncategorised until dragged; there is no default (docs/decisions/0006).
-                category_id: None,
+                // Whatever the caller filed it under; there is no default category (docs/decisions/0006).
+                category_id,
                 created_at: now,
             },
             fresh: true,
@@ -170,16 +192,20 @@ impl Store {
     /// with a client-supplied id wants instead.
     ///
     /// [`CreateChannelError::IdConflict`] cannot happen here: a freshly
-    /// generated UUIDv7 cannot already name a DM or a thread, so the only
-    /// error this ever actually surfaces is `Internal`.
+    /// generated UUIDv7 cannot already name a DM or a thread. Neither can
+    /// [`CreateChannelError::UnknownCategory`], since this form never names
+    /// a category. The only error this ever actually surfaces is `Internal`.
     pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
         match self
-            .create_channel_with_id(ChannelId::generate(), name, kind)
+            .create_channel_with_id(ChannelId::generate(), name, kind, None)
             .await
         {
             Ok(created) => Ok(created.channel),
             Err(CreateChannelError::IdConflict) => {
                 anyhow::bail!("a freshly generated channel id collided with an existing row")
+            }
+            Err(CreateChannelError::UnknownCategory) => {
+                anyhow::bail!("uncategorised create reported an unknown category")
             }
             Err(CreateChannelError::Internal(err)) => Err(err),
         }
