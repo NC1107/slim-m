@@ -35,6 +35,8 @@ class MessageActions {
     this.hasExistingThread = false,
     required this.canForward,
     required this.onForward,
+    required this.canSave,
+    required this.onSave,
     this.onStartSelecting,
   });
 
@@ -52,6 +54,14 @@ class MessageActions {
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
   /// replying is a new send, not an act on a message you already authored.
+  /// Keeping a message in your own private list. Needs no permission beyond
+  /// reading it, and is nobody else's business - so unlike [canManagePins]
+  /// there is no moderator gate, and unlike [pinned] no shared toggled state
+  /// to render: the transcript does not know what you have saved, and asking
+  /// per message would be a request per row.
+  final bool canSave;
+  final VoidCallback onSave;
+
   final bool canReply;
   final VoidCallback onReply;
 
@@ -203,6 +213,12 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
           label: 'Forward message',
           leading: AppIcons.forward,
           onTap: () => run(actions.onForward),
+        ),
+      if (actions.canSave)
+        AppMenuItem(
+          label: 'Save message',
+          leading: AppIcons.bookmark,
+          onTap: () => run(actions.onSave),
         ),
       if (actions.canEdit)
         AppMenuItem(

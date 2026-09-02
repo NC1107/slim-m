@@ -34,6 +34,10 @@ abstract final class AppIcons {
   static const IconData chevronDown = LucideIcons.chevronDown300;
   static const IconData pin = LucideIcons.pin300;
 
+  /// Keeping a message in your own private list, distinct from [pin],
+  /// which is a moderator putting one at the top of a channel for everyone.
+  static const IconData bookmark = LucideIcons.bookmark300;
+
   /// The trigger for a per-row overflow menu (a channel's manage sheet).
   static const IconData moreVertical = LucideIcons.moreVertical300;
 

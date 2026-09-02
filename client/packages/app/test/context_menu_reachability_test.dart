@@ -51,6 +51,8 @@ MessageActions _reportAndBlockOnly() => MessageActions(
   onOpenThread: () {},
   canForward: false,
   onForward: () {},
+  canSave: false,
+  onSave: () {},
 );
 
 Future<SemanticsHandle> _pump(WidgetTester tester) async {
@@ -99,6 +101,8 @@ MessageActions _editOnly(VoidCallback onEdit) => MessageActions(
   onOpenThread: () {},
   canForward: false,
   onForward: () {},
+  canSave: false,
+  onSave: () {},
 );
 
 Future<void> _pumpMessage(

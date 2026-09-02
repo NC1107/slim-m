@@ -68,6 +68,7 @@ mod reports_cursor;
 mod reports_mine;
 mod roles;
 mod safety;
+mod saved_messages;
 mod search;
 mod space;
 mod sync;
@@ -153,6 +154,7 @@ pub fn router(state: AppState) -> Router {
         .merge(push::routes())
         .merge(quiet_hours::routes())
         .merge(pins::routes())
+        .merge(saved_messages::routes())
         .merge(recovery::routes())
         .merge(reports::routes())
         .merge(roles::routes())

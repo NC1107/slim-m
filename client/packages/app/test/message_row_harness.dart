@@ -61,6 +61,8 @@ const noActions = MessageActions(
   onOpenThread: noop,
   canForward: false,
   onForward: noop,
+  canSave: true,
+  onSave: noop,
 );
 
 /// The leading avatar is provider-backed (it resolves the author's own

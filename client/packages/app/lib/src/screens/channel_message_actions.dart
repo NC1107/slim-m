@@ -20,10 +20,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/message_actions.dart';
 import '../providers/message_selection.dart';
 import '../providers/pins_controller.dart';
+import '../providers/providers.dart';
+import '../providers/toasts.dart';
 import '../providers/threads.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
@@ -117,6 +120,32 @@ Future<void> confirmAndDeleteSelectedMessages(
     return;
   }
   ref.read(messageSelectionProvider(channelId).notifier).clear();
+}
+
+/// Keeps a message in the caller's own saved list.
+///
+/// Not a toggle, unlike [toggleMessagePin]. A saved list is private, so the
+/// transcript does not know what is in it and asking per message would be a
+/// request per row; removing something is done from the saved list itself,
+/// where the state is already on screen. The toast is the acknowledgement
+/// that a silent success would otherwise leave the user guessing about.
+Future<void> saveMessageForLater(
+  WidgetRef ref,
+  BuildContext context,
+  Message message,
+) async {
+  final failure = await runGuarded(
+    whatFailed: 'save the message',
+    action: () => ref.read(apiProvider).saveMessage(message.id),
+  );
+  if (!context.mounted) return;
+  if (failure != null) {
+    showAppSnackbar(context, failure);
+    return;
+  }
+  ref
+      .read(toastsProvider.notifier)
+      .show('Saved.', severity: AppToastSeverity.success);
 }
 
 /// Pins or unpins, [pinned] being what it is now rather than what to make it.
@@ -248,6 +277,8 @@ MessageActions messageActionsFor(
     hasExistingThread: hasExistingThread,
     canForward: canForwardMessage(message),
     onForward: () => unawaited(forwardMessage(context, ref, message)),
+    canSave: canSaveMessage(message),
+    onSave: () => unawaited(saveMessageForLater(ref, context, message)),
     onStartSelecting: canStartSelectingMessages(message, myPermissions)
         ? () => ref
               .read(messageSelectionProvider(channelId).notifier)

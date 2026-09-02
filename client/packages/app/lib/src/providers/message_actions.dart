@@ -141,6 +141,12 @@ bool canReportMessage(Message message, String? myUserId) =>
 /// channel at all.
 bool canForwardMessage(Message message) => !message.pending && !message.failed;
 
+/// Saving needs a message the server already has, for the same reason
+/// forwarding does: the id is the client's, but the row it names is not
+/// there until the send is acknowledged. No permission beyond being able
+/// to read it - keeping something you can see is not a further privilege.
+bool canSaveMessage(Message message) => !message.pending && !message.failed;
+
 /// Blocking is keyed by author id, so a message with no live author (its
 /// account was deleted and the content anonymized) has nobody left to block.
 bool canBlockMessageAuthor(Message message, String? myUserId) =>
