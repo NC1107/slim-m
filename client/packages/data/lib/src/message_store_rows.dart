@@ -5,24 +5,37 @@ part of 'message_store.dart';
 /// [MessageStore.applyMessage] and the batch behind
 /// [MessageStore.applyMessages] - which built the identical companion twice
 /// until a forward gave them seven more columns to keep in step.
-MessagesCompanion _rowFor(api.Message message) => MessagesCompanion.insert(
-      id: message.id,
-      channelId: message.channelId,
-      authorId: Value(message.authorId),
-      authorDisplayName: Value(message.authorDisplayName),
-      seq: Value(message.seq),
-      content: message.content,
-      createdAt: message.createdAt,
-      editedAt: Value(message.editedAt),
-      pending: const Value(false),
-      failed: const Value(false),
-      replyToId: Value(message.replyToId),
-      forwardedMessageId: Value(message.forwarded?.messageId),
-      forwardedChannelId: Value(message.forwarded?.channelId),
-      forwardedAuthorId: Value(message.forwarded?.authorId),
-      forwardedAuthorDisplayName: Value(message.forwarded?.authorDisplayName),
-      forwardedAuthorAvatarUpdatedAt:
-          Value(message.forwarded?.authorAvatarUpdatedAt),
-      forwardedCreatedAt: Value(message.forwarded?.createdAt),
-      forwardedContent: Value(message.forwarded?.content),
-    );
+///
+/// An absent forward is left untouched rather than written as null, which is
+/// the same rule `MessageExtrasController.applyMessage` already follows for
+/// reactions, attachments and polls, and for the same reason: a live frame
+/// may simply omit what it has nothing to say about. Nothing un-forwards a
+/// message - there is no such operation - so "not mentioned" can only mean
+/// unchanged. Writing null here instead is what made an edit drop the
+/// forwarded card off its own message until the next full resync.
+MessagesCompanion _rowFor(api.Message message) {
+  final row = MessagesCompanion.insert(
+    id: message.id,
+    channelId: message.channelId,
+    authorId: Value(message.authorId),
+    authorDisplayName: Value(message.authorDisplayName),
+    seq: Value(message.seq),
+    content: message.content,
+    createdAt: message.createdAt,
+    editedAt: Value(message.editedAt),
+    pending: const Value(false),
+    failed: const Value(false),
+    replyToId: Value(message.replyToId),
+  );
+  final forwarded = message.forwarded;
+  if (forwarded == null) return row;
+  return row.copyWith(
+    forwardedMessageId: Value(forwarded.messageId),
+    forwardedChannelId: Value(forwarded.channelId),
+    forwardedAuthorId: Value(forwarded.authorId),
+    forwardedAuthorDisplayName: Value(forwarded.authorDisplayName),
+    forwardedAuthorAvatarUpdatedAt: Value(forwarded.authorAvatarUpdatedAt),
+    forwardedCreatedAt: Value(forwarded.createdAt),
+    forwardedContent: Value(forwarded.content),
+  );
+}

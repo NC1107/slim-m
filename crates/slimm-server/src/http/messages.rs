@@ -373,9 +373,18 @@ async fn edit(
         return Err(ApiError::Forbidden);
     }
 
-    // An edit carries no attachment list, so it can never be the case that a
-    // file is left standing in for the text being cleared.
-    let content = validate_content(&req.content, false)?;
+    // Read once and used three times: whether the note may be emptied, the
+    // live frame, and this response.
+    let forwarded = state
+        .store
+        .forwards_for_messages(&[message_id])
+        .await?
+        .into_iter()
+        .next()
+        .map(|(_, summary)| summary);
+
+    // An edit carries no attachment list, so nothing stands in for cleared text - unless the message forwards something.
+    let content = validate_content(&req.content, forwarded.is_some())?;
     let updated = match state
         .store
         .edit_message(message_id, content, ctx.user_id)
@@ -388,11 +397,14 @@ async fn edit(
             state.hub.publish(Event::MessageEdited {
                 message: message.clone(),
                 op_seq,
+                forwarded: forwarded.clone(),
             });
             message
         }
     };
-    Ok(Json(updated.into()))
+    let mut dto: MessageDto = updated.into();
+    dto.forwarded = forwarded.map(Into::into);
+    Ok(Json(dto))
 }
 
 /// Every version a message has held, oldest first, ending with its current

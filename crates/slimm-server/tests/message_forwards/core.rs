@@ -289,3 +289,117 @@ async fn the_live_frame_carries_the_origin() {
     assert_eq!(forwarded.origin.content, "the original text");
     assert_eq!(forwarded.author_display_name.as_deref(), Some("Alice"));
 }
+
+/// Editing the note must not cost the forward. The DTO's contract is that
+/// `forwarded` is null only when a message forwards nothing, so an edit
+/// route answering null for a message that does forward something is the
+/// DTO lying - and a client that trusts it (this one writes the field
+/// straight onto its local row) drops the origin until a full resync.
+#[tokio::test]
+async fn editing_a_forward_keeps_its_origin() {
+    let (store, _guard) = new_store().await;
+    let (channel, token) = open_deployment(&store).await;
+    let app = app(store.clone());
+    let channel = channel.to_string();
+
+    let original = send(&app, &channel, &token, "the original text").await;
+    let forward = json_body(
+        post(
+            &app,
+            &channel,
+            &token,
+            forward_body("first note", &original),
+        )
+        .await,
+    )
+    .await;
+
+    let edited = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!(
+                "/channels/{channel}/messages/{}",
+                forward["id"].as_str().unwrap()
+            ),
+            &token,
+            Some(json!({ "content": "a better note" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(edited.status(), StatusCode::OK);
+    let body = json_body(edited).await;
+
+    assert_eq!(body["content"], "a better note");
+    assert_eq!(
+        body["forwarded"]["content"], "the original text",
+        "an edit changes the note, never what was forwarded"
+    );
+    assert_eq!(body["forwarded"]["author_display_name"], "Alice");
+}
+
+/// A note is the sender's own and they may take it back. An ordinary edit
+/// refuses empty content because nothing would be left, but a forward still
+/// carries the thing it was sent to carry.
+#[tokio::test]
+async fn the_note_on_a_forward_can_be_emptied_but_a_plain_message_cannot() {
+    let (store, _guard) = new_store().await;
+    let (channel, token) = open_deployment(&store).await;
+    let app = app(store.clone());
+    let channel = channel.to_string();
+
+    let original = send(&app, &channel, &token, "the original text").await;
+    let forward = json_body(
+        post(
+            &app,
+            &channel,
+            &token,
+            forward_body("second thoughts", &original),
+        )
+        .await,
+    )
+    .await;
+
+    let cleared = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!(
+                "/channels/{channel}/messages/{}",
+                forward["id"].as_str().unwrap()
+            ),
+            &token,
+            Some(json!({ "content": "" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(cleared.status(), StatusCode::OK);
+    let body = json_body(cleared).await;
+    assert_eq!(body["content"], "");
+    assert_eq!(body["forwarded"]["content"], "the original text");
+
+    let plain = json_body(
+        post(
+            &app,
+            &channel,
+            &token,
+            json!({ "id": Uuid::now_v7().to_string(), "content": "words" }),
+        )
+        .await,
+    )
+    .await;
+    let refused = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!(
+                "/channels/{channel}/messages/{}",
+                plain["id"].as_str().unwrap()
+            ),
+            &token,
+            Some(json!({ "content": "  " })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
+}

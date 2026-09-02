@@ -72,6 +72,32 @@ void main() {
     expect(stored.forwarded, _origin.toLocal());
   });
 
+  test('a later frame that omits the forward leaves it alone', () async {
+    await store.applyMessage(_forward());
+    // What an edit looks like: same id, new content, nothing said about the forward.
+    await store.applyMessage(
+      api.Message(
+        id: 'm1',
+        channelId: 'chan-1',
+        authorId: 'user-1',
+        authorDisplayName: 'Bob',
+        seq: 1,
+        content: 'a better note',
+        createdAt: 1000,
+        editedAt: 2000,
+      ),
+    );
+
+    final stored = (await store.watchChannel('chan-1').first).single;
+
+    expect(stored.content, 'a better note');
+    expect(
+      stored.forwarded,
+      _origin.toLocal(),
+      reason: 'nothing un-forwards a message, so silence cannot mean removed',
+    );
+  });
+
   test('an ordinary message reads back as forwarding nothing', () async {
     await store.applyMessage(_forward(forwarded: null));
 
