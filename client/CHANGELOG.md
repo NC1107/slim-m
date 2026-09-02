@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.68.0](https://github.com/NC1107/slim-m/compare/client-v0.67.1...client-v0.68.0) (2026-09-02)
+
+
+### Features
+
+* **client:** give touch the same Emoji/GIFs tabs the pointer panel has ([#1036](https://github.com/NC1107/slim-m/issues/1036)) ([f653c6c](https://github.com/NC1107/slim-m/commit/f653c6c642dcb12e48ca20891d085303bdb9fb6a))
+
+
+### Bug Fixes
+
+* **client:** drop Scan Text from every field, not only the composer ([#1032](https://github.com/NC1107/slim-m/issues/1032)) ([37f0da3](https://github.com/NC1107/slim-m/commit/37f0da34c779d97bdfc14c0b1c3e514c7073d38a))
+* **client:** stop the what's-new dialog stretching on a tall monitor ([#1033](https://github.com/NC1107/slim-m/issues/1033)) ([410f84c](https://github.com/NC1107/slim-m/commit/410f84cf1cd45a2501769dd11bf5b9e1438ef881))
+* **client:** tray menu survives any failing startup step; kebab defers to its row's tint ([#1035](https://github.com/NC1107/slim-m/issues/1035)) ([8bb3ab3](https://github.com/NC1107/slim-m/commit/8bb3ab3675b986c835b77dec11aa8d63a3ca933b))
+
 ## [0.67.1](https://github.com/NC1107/slim-m/compare/client-v0.67.0...client-v0.67.1) (2026-09-01)
 
 
