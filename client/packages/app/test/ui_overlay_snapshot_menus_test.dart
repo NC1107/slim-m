@@ -62,6 +62,8 @@ const _fullActions = MessageActions(
   onOpenThread: noop,
   canForward: true,
   onForward: noop,
+  canSave: true,
+  onSave: noop,
 );
 
 /// Not `message_row_harness.dart`'s own `harness()`: that one is built for

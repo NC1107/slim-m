@@ -18,6 +18,7 @@ import '../routing/routes.dart';
 import 'animated_menu_portal.dart';
 import 'context_menu_focus.dart';
 import 'create_channel_sheet.dart';
+import 'saved_messages_sheet.dart';
 import 'space_settings_section.dart';
 
 /// Hidden entirely for a caller holding none of [spaceSettingsReachable]'s
@@ -91,6 +92,15 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
                           },
                         ),
                       ],
+                      // Above settings and outside the manage gate: keeping messages is something every member does.
+                      AppMenuItem(
+                        label: 'Saved messages',
+                        leading: AppIcons.bookmark,
+                        onTap: () {
+                          _controller.hide();
+                          showSavedMessagesSheet(context);
+                        },
+                      ),
                       AppMenuItem(
                         label: 'Space settings',
                         leading: AppIcons.settings,

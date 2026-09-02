@@ -97,6 +97,8 @@ void main() {
           onOpenThread: noop,
           canForward: false,
           onForward: noop,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );
@@ -148,6 +150,8 @@ void main() {
             onOpenThread: noop,
             canForward: false,
             onForward: noop,
+            canSave: false,
+            onSave: noop,
             hasExistingThread: true,
           ),
         ),
@@ -194,6 +198,8 @@ void main() {
           onOpenThread: noop,
           canForward: false,
           onForward: noop,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );
@@ -233,6 +239,8 @@ void main() {
           onOpenThread: noop,
           canForward: false,
           onForward: noop,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );
@@ -266,6 +274,8 @@ void main() {
           onOpenThread: noop,
           canForward: false,
           onForward: noop,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );
@@ -304,6 +314,8 @@ void main() {
           onOpenThread: noop,
           canForward: false,
           onForward: noop,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );
@@ -452,6 +464,8 @@ void main() {
                 onOpenThread: noop,
                 canForward: false,
                 onForward: noop,
+                canSave: false,
+                onSave: noop,
               ),
             ),
           ],

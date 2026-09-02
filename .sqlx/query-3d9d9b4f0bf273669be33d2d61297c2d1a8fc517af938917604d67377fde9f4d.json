@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO saved_messages (user_id, message_id, saved_at)\n             VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "3d9d9b4f0bf273669be33d2d61297c2d1a8fc517af938917604d67377fde9f4d"
+}

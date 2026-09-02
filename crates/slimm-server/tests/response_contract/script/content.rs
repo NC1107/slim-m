@@ -422,6 +422,23 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
     )
     .await;
 
+    // Saved before the list, so listSavedMessages validates a populated answer rather than an empty array.
+    c.bare(
+        "saveMessage",
+        "PUT",
+        &format!("/messages/{message}/save"),
+        root,
+    )
+    .await;
+    c.get("listSavedMessages", "/saved", root).await;
+    c.bare(
+        "unsaveMessage",
+        "DELETE",
+        &format!("/messages/{message}/save"),
+        root,
+    )
+    .await;
+
     c.bare(
         "unpinMessage",
         "DELETE",

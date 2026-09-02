@@ -33,6 +33,7 @@ export 'models_presence.dart';
 export 'models_quiet_hours.dart';
 export 'models_reactions.dart';
 export 'models_roles.dart';
+export 'models_saved.dart';
 export 'models_users.dart';
 export 'models_version.dart';
 

@@ -2947,6 +2947,91 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /messages/{messageId}/save:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: saveMessage
+      tags: [messages]
+      summary: Keep a message in your own saved list.
+      description: >
+        Private to the caller. Unlike a pin, which is a moderation act on a
+        channel, this is something anyone does to their own account: the only
+        permission it needs is VIEW_CHANNEL on the message's channel, the
+        same one that let them read it. Nobody else can read, add to, or
+        count somebody's saved list, and no live event is published - a save
+        changes nothing anyone else can observe.
+
+
+        Idempotent: saving something already saved leaves the original
+        `saved_at` alone rather than moving it to the top, so a double tap
+        cannot silently reorder the list. A message in a channel the caller
+        cannot see is a 404 rather than a 403, so this cannot probe for one.
+      responses:
+        "204":
+          description: The message was saved (or already was).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: unsaveMessage
+      tags: [messages]
+      summary: Remove a message from your own saved list.
+      description: >
+        Idempotent, and deliberately asks for no permission on the message's
+        channel and does not require the message to still exist. Letting go
+        of something is never refused: somebody removed from a channel must
+        still be able to clear their own list of it, and a save whose message
+        has since been deleted is exactly the entry they most want gone.
+      responses:
+        "204":
+          description: The message is not saved (whether or not it was).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /saved:
+    get:
+      operationId: listSavedMessages
+      tags: [messages]
+      summary: Your own saved messages, newest save first.
+      description: >
+        Ordered by when each was saved, not when it was sent, so keeping an
+        old message puts it at the top of the list rather than the bottom.
+
+
+        Filtered by what you can see *now*, not by what you could see when
+        you saved it. Access is revocable and a saved list is not a licence
+        to keep reading a channel you were removed from, so an entry whose
+        channel you can no longer view is left out of the answer. The entry
+        itself is kept rather than deleted: losing sight of a channel may be
+        temporary, and discarding somebody's saves on a permission change
+        would be destroying their data on a moderator's behalf. A deleted
+        message is left out for good, since nothing brings it back.
+      responses:
+        "200":
+          description: The caller's saved messages.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SavedMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/messages/{messageId}/pin:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -6722,6 +6807,20 @@ components:
             only referenced by it.
           items:
             $ref: "#/components/schemas/Attachment"
+
+    SavedMessage:
+      allOf:
+        - $ref: "#/components/schemas/Message"
+        - type: object
+          required: [saved_at]
+          properties:
+            saved_at:
+              type: integer
+              format: int64
+              description: >
+                When the caller saved it, unix milliseconds - not when it was
+                sent, which is the message's own `created_at`. The list is
+                ordered by this.
 
     ForwardedMessage:
       type: object

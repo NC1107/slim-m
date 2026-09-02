@@ -235,6 +235,36 @@ extension SlimmApiMessages on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Keeps a message in the caller's own saved list. Idempotent: saving
+  /// something already saved leaves the original `savedAt` alone rather than
+  /// moving it to the top, so a double tap cannot reorder the list.
+  ///
+  /// Private throughout - unlike a pin, this needs only the VIEW_CHANNEL that
+  /// let them read the message, and nobody else can see the result. A message
+  /// in a channel the caller cannot see is a 404 rather than a 403, so this
+  /// cannot probe for one.
+  Future<void> saveMessage(String messageId) =>
+      _send('PUT', '/messages/$messageId/save', expectNoContent: true);
+
+  /// Removes a message from the caller's own saved list. Idempotent, and
+  /// never refused: somebody removed from a channel must still be able to
+  /// clear their own list of it, and a save whose message has since been
+  /// deleted is exactly the entry they most want gone.
+  Future<void> unsaveMessage(String messageId) =>
+      _send('DELETE', '/messages/$messageId/save', expectNoContent: true);
+
+  /// The caller's own saved messages, newest save first.
+  ///
+  /// Filtered by what they can see now rather than when they saved it: an
+  /// entry whose channel they can no longer view is left out, though the
+  /// entry itself is kept server-side in case access returns.
+  Future<List<SavedMessage>> listSavedMessages() async {
+    final json = await _send('GET', '/saved');
+    return (json as List<dynamic>)
+        .map((s) => SavedMessage.fromJson(s as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// A channel's pinned messages, newest pin first. Requires only
   /// VIEW_CHANNEL.
   Future<List<PinnedMessage>> listPinnedMessages(String channelId) async {

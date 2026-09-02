@@ -65,6 +65,7 @@ mod reports;
 mod role_mentions;
 mod roles;
 mod safety;
+mod saved_messages;
 mod sessions;
 mod space;
 mod thread_listing;
@@ -116,6 +117,7 @@ pub use removals::{RemoveMemberError, SpaceRemoval};
 pub use reports::{Report, ReportError, ReportSubject, ReporterOwnReport};
 pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};
 pub use safety::Device;
+pub use saved_messages::SavedMessage;
 pub use sessions::{
     Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
 };

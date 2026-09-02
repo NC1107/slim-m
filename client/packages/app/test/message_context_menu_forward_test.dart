@@ -59,6 +59,8 @@ void main() {
           onOpenThread: () => opened = true,
           canForward: false,
           onForward: noop,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );
@@ -94,6 +96,8 @@ void main() {
           onOpenThread: noop,
           canForward: true,
           onForward: () => forwarded = true,
+          canSave: false,
+          onSave: noop,
         ),
       ),
     );

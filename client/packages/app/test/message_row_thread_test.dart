@@ -110,6 +110,8 @@ void main() {
         onOpenThread: () => opened = true,
         canForward: false,
         onForward: noop,
+        canSave: true,
+        onSave: noop,
       );
       await tester.pumpWidget(_rowWith(threadReplyCount: 2, actions: actions));
 

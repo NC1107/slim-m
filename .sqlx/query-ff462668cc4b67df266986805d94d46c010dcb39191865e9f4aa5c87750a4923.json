@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM saved_messages WHERE user_id = ? AND message_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ff462668cc4b67df266986805d94d46c010dcb39191865e9f4aa5c87750a4923"
+}

@@ -37,6 +37,8 @@ const _noActions = MessageActions(
   onOpenThread: _noop,
   canForward: false,
   onForward: _noop,
+  canSave: false,
+  onSave: _noop,
 );
 
 Message _message(int index) => Message(
