@@ -17,6 +17,7 @@ import '../providers/channel_notification_overrides_controller.dart';
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'context_menu_region.dart';
+import 'create_channel_sheet.dart';
 import 'manage_category_sheet.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
@@ -25,30 +26,81 @@ import 'dm_row.dart';
 import 'personal_space_row.dart';
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
+  const _SectionLabel(this.text, {this.trailing});
 
   final String text;
+
+  /// The section's add glyph, or null for a section nobody may add to. Sits
+  /// on the right edge `ChannelRow`'s kebab shares; both are
+  /// [AppIconButtonSize.sm].
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    if (text.isEmpty) return const SizedBox.shrink();
+    // Announced in its natural case and as a heading: the uppercase is a
+    // visual treatment, and some screen readers spell such a word out.
+    final label = Semantics(
+      container: true,
+      header: true,
+      label: text,
+      child: ExcludeSemantics(
+        child: Text(
+          text.toUpperCase(),
+          style: AppText.label.copyWith(color: tokens.textSecondary),
+        ),
+      ),
+    );
     return Padding(
+      // Mirrors AppListRow's horizontal padding, so header and row text share a left edge.
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
-      // Announced in its natural case and as a heading: the uppercase is a
-      // visual treatment, and some screen readers spell such a word out.
-      child: text.isEmpty
-          ? const SizedBox.shrink()
-          : Semantics(
-              container: true,
-              header: true,
-              label: text,
-              child: ExcludeSemantics(
-                child: Text(
-                  text.toUpperCase(),
-                  style: AppText.label.copyWith(color: tokens.textSecondary),
-                ),
-              ),
+      child: trailing == null
+          ? label
+          : Row(
+              children: [
+                Expanded(child: label),
+                trailing!,
+              ],
             ),
+    );
+  }
+}
+
+/// The `+` on a section header: makes a channel already filed under that
+/// section, so nobody has to create one and immediately drag it.
+///
+/// Always visible rather than revealed on hover the way a row's kebab is.
+/// A header has no hover state of its own to hang that on, and this is the
+/// only pointer-free way to create a channel in a specific place - a
+/// right-click has no touch equivalent.
+class _AddChannelGlyph extends StatelessWidget {
+  const _AddChannelGlyph({
+    required this.categoryId,
+    required this.categoryName,
+  });
+
+  /// Null for the implicit uncategorised section, which is what the create
+  /// route already means by an absent category.
+  final String? categoryId;
+  final String categoryName;
+
+  @override
+  Widget build(BuildContext context) {
+    // The exact inset ChannelRow gives its kebab, from an edge already matching AppListRow's; both glyphs land on one line.
+    final inset = AppTouchTargets.of(context) ? 0.0 : 4.0;
+    return Padding(
+      padding: EdgeInsets.only(right: inset),
+      child: AppIconButton(
+        icon: AppIcons.add,
+        semanticLabel: 'Create a channel in $categoryName',
+        size: AppIconButtonSize.sm,
+        onPressed: () => showCreateChannelSheet(
+          context,
+          initialKind: 'text',
+          categoryId: categoryId,
+        ),
+      ),
     );
   }
 }
@@ -188,7 +240,14 @@ class ChannelCategorySections extends ConsumerWidget {
         );
 
     Widget header(ChannelCategoryRow? category) {
-      final label = _SectionLabel(category?.name ?? 'Channels');
+      // Any section, the implicit uncategorised one included: it is a real place a channel can live.
+      final add = !canManage
+          ? null
+          : _AddChannelGlyph(
+              categoryId: category?.id,
+              categoryName: category?.name ?? 'Channels',
+            );
+      final label = _SectionLabel(category?.name ?? 'Channels', trailing: add);
       // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
       if (category == null || !canManage) return label;
       // Both verbs directly: deleting used to be a menu, a sheet, a danger zone and a confirmation.

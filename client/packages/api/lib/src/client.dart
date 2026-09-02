@@ -150,12 +150,23 @@ class SlimmApi {
   }
 
   /// Creates a channel. Requires the manage-channels permission.
-  Future<Channel> createChannel(
-      {required String name, String kind = 'text'}) async {
+  /// [categoryId] files the new channel straight into that rail section.
+  /// Null leaves it uncategorised. Naming a category that does not exist is
+  /// a 400 rather than a silent fall back, so a stale category id surfaces
+  /// instead of quietly putting the channel somewhere nobody chose.
+  Future<Channel> createChannel({
+    required String name,
+    String kind = 'text',
+    String? categoryId,
+  }) async {
     final json = await _send(
       'POST',
       '/channels',
-      body: {'name': name, 'kind': kind},
+      body: {
+        'name': name,
+        'kind': kind,
+        if (categoryId != null) 'category_id': categoryId,
+      },
     );
     return Channel.fromJson(json as Map<String, dynamic>);
   }

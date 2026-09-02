@@ -410,9 +410,13 @@ void main() {
       await gesture.moveTo(tester.getCenter(kebabFinder));
       await tester.pumpAndSettle();
 
+      // Scoped to the kebab's own button: a section header's add glyph is an AppIconButton too.
       final buttonFill = tester.widget<AnimatedContainer>(
         find.descendant(
-          of: find.byType(AppIconButton),
+          of: find.ancestor(
+            of: kebabFinder,
+            matching: find.byType(AppIconButton),
+          ),
           matching: find.byType(AnimatedContainer),
         ),
       );

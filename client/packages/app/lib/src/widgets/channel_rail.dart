@@ -21,6 +21,8 @@ import 'channel_rail_frame.dart';
 import 'channel_rail_selection_marker.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
+import 'context_menu_region.dart';
+import 'create_channel_sheet.dart';
 
 /// The channel id in [path], or null when [path] is not a channel route.
 String? channelIdInPath(String path) {
@@ -176,7 +178,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                           .where((c) => c.kind != dmChannelKind)
                           .toList(growable: false);
                       // A scroll view over one column, not a ListView: the selection marker layer has to span both sections to slide between them.
-                      return SingleChildScrollView(
+                      final list = SingleChildScrollView(
                         // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.s8,
@@ -205,6 +207,26 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                             ],
                           ),
                         ),
+                      );
+                      if (!canManageChannels) return list;
+                      // Wraps the whole viewport so the space under the last row is a target too; a row's own menu sits deeper and wins the arena.
+                      return ContextMenuRegion(
+                        // Pointer-only on purpose: a long press here would fight the scroll, and touch has the section headers' own + instead.
+                        enableLongPress: false,
+                        itemsBuilder: (context, close) => [
+                          AppMenuItem(
+                            label: 'Create channel...',
+                            leading: AppIcons.add,
+                            onTap: () {
+                              close();
+                              showCreateChannelSheet(
+                                context,
+                                initialKind: 'text',
+                              );
+                            },
+                          ),
+                        ],
+                        child: list,
                       );
                     },
                   );

@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The sheet the rail's Space menu "Add channel" item opens: a name and a
-/// text/voice choice, sent through `POST /channels`
-/// ([api.SlimmApi.createChannel]).
+/// The sheet for making a channel: a name and a text/voice choice, sent
+/// through `POST /channels` ([api.SlimmApi.createChannel]).
+///
+/// Opened from the Space menu's "Add channel", and from the `+` on a
+/// category header in the rail - which passes that category so the channel
+/// lands in the section the person asked from, rather than appearing
+/// uncategorised and needing a drag straight afterwards.
 library;
 
 import 'package:flutter/material.dart';
@@ -22,20 +26,30 @@ const int _nameMaxChars = 64;
 /// Opens the sheet, defaulting the kind picker to [initialKind]: still
 /// changeable inside the sheet, since it is only a starting guess, not a
 /// hard constraint the server enforces.
+///
+/// [categoryId] is not offered as a field, unlike [initialKind]. It is
+/// decided by where the sheet was opened from and is not second-guessed
+/// here: someone who pressed `+` on a category has already said which one,
+/// and someone who used the Space menu named no category at all. Moving a
+/// channel afterwards is a drag in the rail, which is a better answer than
+/// a picker duplicating it.
 Future<void> showCreateChannelSheet(
   BuildContext context, {
   required String initialKind,
+  String? categoryId,
 }) {
   return showAppSheet<void>(
     context,
-    builder: (context) => _CreateChannelSheet(initialKind: initialKind),
+    builder: (context) =>
+        _CreateChannelSheet(initialKind: initialKind, categoryId: categoryId),
   );
 }
 
 class _CreateChannelSheet extends ConsumerStatefulWidget {
-  const _CreateChannelSheet({required this.initialKind});
+  const _CreateChannelSheet({required this.initialKind, this.categoryId});
 
   final String initialKind;
+  final String? categoryId;
 
   @override
   ConsumerState<_CreateChannelSheet> createState() =>
@@ -77,7 +91,11 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
     try {
       final created = await ref
           .read(apiProvider)
-          .createChannel(name: _name.text.trim(), kind: _kind);
+          .createChannel(
+            name: _name.text.trim(),
+            kind: _kind,
+            categoryId: widget.categoryId,
+          );
       final store = await ref.read(storeProvider.future);
       await store.upsertChannels([created]);
       if (!mounted) return;

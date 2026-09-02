@@ -69,9 +69,9 @@ void main() {
     for (final size in _sizesOf(tester, find.byType(AppListRow))) {
       expect(size.height, greaterThanOrEqualTo(AppSizes.rowTouch));
     }
-    // A manage button per channel: proof the loop above had rows to walk
-    // rather than passing vacuously.
-    expect(find.byType(AppIconButton), findsNWidgets(2));
+    // A manage button per channel plus the section's own add glyph: proof
+    // the loop above had rows to walk rather than passing vacuously.
+    expect(find.byType(AppIconButton), findsNWidgets(3));
     expect(find.byType(AppListRow), findsNWidgets(2));
   });
 
@@ -79,7 +79,7 @@ void main() {
     await _pumpRail(tester, _desktop);
 
     // The same proof the compact test above keeps: a loop over nothing passes.
-    expect(find.byType(AppIconButton), findsNWidgets(2));
+    expect(find.byType(AppIconButton), findsNWidgets(3));
     expect(find.byType(AppListRow), findsNWidgets(2));
 
     for (final size in _sizesOf(tester, find.byType(AppIconButton))) {

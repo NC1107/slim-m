@@ -21,12 +21,14 @@ import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_object_context_menu.dart';
+import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/widgets/message_context_menu.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
 import 'package:slimm_app/src/widgets/space_menu_button.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:slimm_app/main.dart' show appChromeBuilder;
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'message_row_harness.dart';
@@ -234,6 +236,37 @@ Future<void> _pumpSpaceMenu(WidgetTester tester, Size window) async {
   await tester.pumpAndSettle();
 }
 
+/// The rail with the shared fixture behind it: it needs the channel store,
+/// a session and a router at once, which `ui_snapshot_support.dart` already
+/// wires. Stops short of `renderSurface` because the snapshot here has to be
+/// taken after a right-click, not on arrival.
+Future<({ProviderContainer container, SlimmDatabase db})> _pumpRail(
+  WidgetTester tester,
+  Size window,
+) async {
+  tester.view.physicalSize = window;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
+  final fixture = await fixtureContainer();
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: fixture.container,
+      child: RepaintBoundary(
+        key: snapshotBoundary,
+        child: MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          routerConfig: fixtureRouter(Routes.channel('c-general')),
+          builder: appChromeBuilder,
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return fixture;
+}
+
 void main() {
   setUpAll(loadRealFonts);
 
@@ -287,5 +320,41 @@ void main() {
     await expectSettled(tester, 'space-menu');
     await writeSnapshot(tester, 'space-menu');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the rail blank space offers creating a channel', (tester) async {
+    final fixture = await _pumpRail(tester, const Size(1400, 880));
+
+    // Below the last row: the blank space the owner asked about, not a row.
+    await tester.tapAt(const Offset(160, 780), buttons: kSecondaryButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('Create channel...'), findsOneWidget);
+    await expectSettled(tester, 'rail-blank-space-menu');
+    await writeSnapshot(tester, 'rail-blank-space-menu');
+    expect(tester.takeException(), isNull);
+    // The rail's own debounces outlive the tree otherwise; see teardownFixture.
+    await teardownFixture(tester, fixture.container, fixture.db);
+  });
+
+  testWidgets('a right-click on a channel row still gets the row menu', (
+    tester,
+  ) async {
+    final fixture = await _pumpRail(tester, const Size(1400, 880));
+
+    // The blank-space menu wraps rows too, so a row's deeper region has to win the arena or every channel's menu is gone.
+    final row = find.descendant(
+      of: find.byType(ChannelRail),
+      matching: find.text('general'),
+    );
+    await tester.tapAt(tester.getCenter(row), buttons: kSecondaryButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('Open channel'), findsOneWidget);
+    expect(find.text('Create channel...'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await teardownFixture(tester, fixture.container, fixture.db);
   });
 }
