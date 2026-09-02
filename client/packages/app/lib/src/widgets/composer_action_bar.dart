@@ -137,8 +137,13 @@ class ComposerActionBar extends ConsumerWidget {
             ] else
               AppIconButton(
                 icon: AppIcons.smile,
-                semanticLabel: 'Insert emoji or a GIF',
-                tooltip: 'Insert emoji or a GIF',
+                // Says what it opens: the GIFs tab is absent without a provider.
+                semanticLabel: gifSearchEnabled
+                    ? 'Insert emoji or a GIF'
+                    : 'Insert emoji',
+                tooltip: gifSearchEnabled
+                    ? 'Insert emoji or a GIF'
+                    : 'Insert emoji',
                 // Same two tabs the pointer panel has; see its own sheet doc.
                 onPressed: () => unawaited(
                   showComposerPickerSheet(

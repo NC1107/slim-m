@@ -23,6 +23,7 @@ import 'package:slimm_platform/platform.dart';
 
 import 'composer_emoji_browse.dart';
 import 'emoji_picker_panel.dart' show pickerWidth;
+import 'emoji_picker_sheets.dart' show SpaceEmojiSheetBody;
 import 'gif_picker.dart' show GifPickerBody;
 
 /// Which half of the panel is showing.
@@ -72,10 +73,13 @@ class _ComposerPickerPanelState extends State<ComposerPickerPanel> {
           tab: _tab,
           onSelectTab: _selectTab,
           showGifTab: widget.showGifTab,
-          width: widget.width,
-          onSelectEmoji: widget.onSelectEmoji,
+          // The richer pointer view; touch hosts SpaceEmojiSheetBody instead.
+          emojiBody: ComposerEmojiPicker(
+            width: widget.width,
+            onSelect: widget.onSelectEmoji,
+            onClose: widget.onClose,
+          ),
           onPickedGif: widget.onPickedGif,
-          onClose: widget.onClose,
         ),
       ),
     );
@@ -92,10 +96,8 @@ List<Widget> _pickerBody({
   required ComposerPickerTab tab,
   required ValueChanged<int> onSelectTab,
   required bool showGifTab,
-  required double width,
-  required ValueChanged<String> onSelectEmoji,
+  required Widget emojiBody,
   required ValueChanged<api.Attachment> onPickedGif,
-  required VoidCallback onClose,
 }) => [
   if (showGifTab)
     Padding(
@@ -116,11 +118,7 @@ List<Widget> _pickerBody({
       ),
     ),
   switch (tab) {
-    ComposerPickerTab.emoji => ComposerEmojiPicker(
-      width: width,
-      onSelect: onSelectEmoji,
-      onClose: onClose,
-    ),
+    ComposerPickerTab.emoji => emojiBody,
     ComposerPickerTab.gif => GifPickerBody(onPicked: onPickedGif),
   },
 ];
@@ -168,8 +166,6 @@ class _ComposerPickerSheetState extends State<_ComposerPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // The sheet's own width, not the panel's fixed card width.
-    final width = MediaQuery.sizeOf(context).width;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
@@ -181,16 +177,17 @@ class _ComposerPickerSheetState extends State<_ComposerPickerSheet> {
             onSelectTab: (i) =>
                 setState(() => _tab = ComposerPickerTab.values[i]),
             showGifTab: widget.showGifTab,
-            width: width,
-            onSelectEmoji: (emoji) {
-              Navigator.of(context).pop();
-              widget.onSelectEmoji(emoji);
-            },
+            // Space list only: a phone's keyboard already has every native emoji.
+            emojiBody: SpaceEmojiSheetBody(
+              onSelect: (emoji) {
+                Navigator.of(context).pop();
+                widget.onSelectEmoji(emoji);
+              },
+            ),
             onPickedGif: (attachment) {
               Navigator.of(context).pop();
               widget.onPickedGif(attachment);
             },
-            onClose: () => Navigator.of(context).pop(),
           ),
         ),
       ),
