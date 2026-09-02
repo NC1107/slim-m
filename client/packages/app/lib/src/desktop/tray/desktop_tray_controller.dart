@@ -21,6 +21,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_rtc/rtc.dart';
@@ -50,7 +51,7 @@ class DesktopTrayController with TrayListener {
 
   Future<void> start() async {
     TrayManager.instance.addListener(this);
-    await TrayManager.instance.setIcon(trayIconAssetPath);
+    await _setIcon();
     await _setToolTip();
     await _rebuildMenu();
     // Selected to the three flags this menu draws, so a roster change never fires it.
@@ -91,7 +92,33 @@ class DesktopTrayController with TrayListener {
     }
   }
 
+  /// Contained for the reason [_setToolTip] is, and it was not: the guard was
+  /// written for the one call known to fail, when the thing worth protecting
+  /// is [_rebuildMenu] running at all. Anything that throws ahead of it leaves
+  /// the icon on the plugin's own empty placeholder menu for the session -
+  /// which is the bug as a person meets it, whichever call actually threw.
+  Future<void> _setIcon() async {
+    try {
+      await TrayManager.instance.setIcon(trayIconAssetPath);
+    } catch (error) {
+      // An icon that failed to load is a worse tray than a default one, but
+      // a menu-less tray is no tray at all.
+      debugPrint('tray: setIcon failed, continuing to the menu: $error');
+    }
+  }
+
+  /// Never throws: a menu that cannot be built must not take the rest of
+  /// [start] with it, and this also runs from two provider listeners where
+  /// nothing is awaiting it to catch anything.
   Future<void> _rebuildMenu() async {
+    try {
+      await _setContextMenu();
+    } catch (error) {
+      debugPrint('tray: could not build the context menu: $error');
+    }
+  }
+
+  Future<void> _setContextMenu() async {
     final voiceFlags = container.read(voiceFlagsProvider);
     final inCall = voiceFlags.state == VoiceSessionState.connected;
     final selected = container.read(presenceVisibilityDisplayProvider);

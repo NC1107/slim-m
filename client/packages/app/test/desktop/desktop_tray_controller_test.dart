@@ -44,6 +44,77 @@ void main() {
         .setMockMethodCallHandler(_channel, null);
   });
 
+  /// The tooltip guard was written for the one call known to fail. The thing
+  /// worth protecting is that the menu gets set at all: anything throwing
+  /// ahead of it leaves the icon on the plugin's own empty placeholder menu
+  /// for the whole session, which is the bug as a person meets it - an icon
+  /// with no Show/Hide and no Quit - whichever call actually threw.
+  ///
+  /// Reported again from a real KDE session after the tooltip fix shipped,
+  /// which is what says the guard was too narrow rather than wrong.
+  test(
+    'a backend that fails setIcon still gets a populated context menu',
+    () async {
+      final harness = VoiceHarness();
+      harness.controllerWith(FakeSession(), voiceApi());
+      addTearDown(harness.dispose);
+
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_channel, (call) async {
+            calls.add(call);
+            if (call.method == 'setIcon') {
+              throw PlatformException(code: 'no such asset');
+            }
+            return true;
+          });
+
+      final controller = DesktopTrayController(
+        port: FakeDesktopWindowPort(),
+        container: harness.container,
+      );
+
+      await controller.start();
+      controller.dispose();
+
+      final menuCall = calls.firstWhere(
+        (call) => call.method == 'setContextMenu',
+        orElse: () => throw StateError('no menu was ever set'),
+      );
+      final items =
+          ((menuCall.arguments as Map)['menu'] as Map)['items'] as List;
+      expect(items.first['label'], 'Show/Hide slim-m');
+    },
+  );
+
+  /// The menu build itself is also contained, and for a second reason: it
+  /// runs from two provider listeners where nothing awaits it, so an
+  /// exception there would be unhandled rather than merely fatal to start.
+  test(
+    'a backend that fails setContextMenu does not take start down',
+    () async {
+      final harness = VoiceHarness();
+      harness.controllerWith(FakeSession(), voiceApi());
+      addTearDown(harness.dispose);
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_channel, (call) async {
+            if (call.method == 'setContextMenu') {
+              throw PlatformException(code: 'no tray host');
+            }
+            return true;
+          });
+
+      final controller = DesktopTrayController(
+        port: FakeDesktopWindowPort(),
+        container: harness.container,
+      );
+
+      await expectLater(controller.start(), completes);
+      controller.dispose();
+    },
+  );
+
   test('a backend with no setToolTip handler still gets a populated context '
       'menu', () async {
     final harness = VoiceHarness();
