@@ -105,6 +105,8 @@ class _PersonalSpaceKebabState extends ConsumerState<PersonalSpaceKebab> {
               semanticLabel: 'Personal space options',
               size: AppIconButtonSize.sm,
               onPressed: _controller.toggle,
+              // The row's own tint already covers this kebab; see the param's own doc.
+              suppressOwnHoverFill: true,
             ),
           ),
         ),
