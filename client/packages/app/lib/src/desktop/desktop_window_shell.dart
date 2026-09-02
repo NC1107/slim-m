@@ -241,6 +241,8 @@ class DesktopWindowShell {
     final geometry = clampToAttachedDisplays(saved, await _port.allDisplays());
 
     await _port.setResizable(true);
+    // After the splash, which is deliberately smaller than this floor.
+    await _port.setMinimumSize(WindowGeometry.minimumWindowSize);
     final position = geometry.position;
     if (position != null) {
       await _port.setBounds(
