@@ -75,23 +75,30 @@ impl From<ForwardSummary> for ForwardedDto {
 /// forbidden one, so this cannot be used to probe whether a given id exists
 /// in a channel they have no access to - the same stance the send route
 /// takes on a channel that does not exist.
+///
+/// The permission check is against the channel the named message lives in,
+/// never the origin it resolves to. Those differ when the named message is
+/// itself a forward, and checking the origin there would make a forward
+/// unforwardable by the very people it was sent to: they can see what was
+/// passed on to them without being able to see where it started, which is
+/// the ordinary case rather than an edge one.
 pub(crate) async fn resolve(
     state: &AppState,
     sender: UserId,
-    origin_id: MessageId,
+    named_id: MessageId,
 ) -> Result<ForwardOrigin, ApiError> {
     let invalid = ApiError::BadRequest("forwarded_from_id must name a live message you can see");
-    let Some(origin) = state.store.forward_origin(origin_id).await? else {
+    let Some(source) = state.store.forward_source(named_id).await? else {
         return Err(invalid);
     };
     if !state
         .store
-        .has_permission(sender, origin.channel_id, Permissions::VIEW_CHANNEL)
+        .has_permission(sender, source.named_in, Permissions::VIEW_CHANNEL)
         .await?
     {
         return Err(invalid);
     }
-    Ok(origin)
+    Ok(source.origin)
 }
 
 /// Batch-loads the forward carried by each message on a page, keyed by the

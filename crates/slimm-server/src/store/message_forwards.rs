@@ -26,6 +26,19 @@ pub struct ForwardOrigin {
     pub content: String,
 }
 
+/// What a send named, and what it should actually snapshot.
+///
+/// The two differ whenever the named message is itself a forward: the origin
+/// is then the first original, while [`ForwardSource::named_in`] stays the
+/// channel the sender was actually looking at. Authorization uses the
+/// latter; see [`Store::forward_source`].
+#[derive(Debug, Clone)]
+pub struct ForwardSource {
+    /// The channel holding the message the sender named.
+    pub named_in: ChannelId,
+    pub origin: ForwardOrigin,
+}
+
 /// A stored forward, joined back to whatever of its origin still resolves.
 ///
 /// The origin's channel is deliberately not joined: the client resolves the
@@ -40,38 +53,71 @@ pub struct ForwardSummary {
 }
 
 impl Store {
-    /// Resolves the message a forward is about to snapshot, or `None` if
-    /// there is nothing forwardable at that id.
+    /// Resolves what a forward should snapshot, given the id the sender
+    /// named, or `None` if there is nothing forwardable at that id.
     ///
-    /// Deleted messages are refused, which is the one place this deliberately
-    /// parts company with [`Store::send_message`]'s reply target. A reply
-    /// only points at its parent, so pointing at a since-deleted one stays
-    /// honest; a forward copies the content, so forwarding a deleted message
-    /// would republish exactly what someone removed.
+    /// Flattens: passing on something that was itself passed on carries the
+    /// first original, never the middleman. A forward's own `content` is the
+    /// note its sender wrote alongside it and is usually empty, so
+    /// snapshotting that would hand the next reader a blank card attributed
+    /// to somebody who only relayed it.
     ///
-    /// The caller still has to check that the forwarder can see the origin's
-    /// channel. This resolves an id, it does not authorize one.
-    pub async fn forward_origin(
+    /// Deleted messages are refused, which is the one place this
+    /// deliberately parts company with [`Store::send_message`]'s reply
+    /// target. A reply only points at its parent, so pointing at a
+    /// since-deleted one stays honest; a forward copies the content, so
+    /// forwarding a deleted message would republish exactly what someone
+    /// removed.
+    ///
+    /// The caller still has to check the sender can see
+    /// [`ForwardSource::named_in`] - and that channel, never the origin's.
+    /// A forward already carries content somebody with access passed on, so
+    /// relaying it needs no access to wherever it started; demanding that
+    /// would make a forward unforwardable by exactly the people it was sent
+    /// to. This resolves an id, it does not authorize one.
+    pub async fn forward_source(
         &self,
         message_id: MessageId,
-    ) -> anyhow::Result<Option<ForwardOrigin>> {
+    ) -> anyhow::Result<Option<ForwardSource>> {
         let row = sqlx::query!(
-            r#"SELECT channel_id AS "channel_id!: ChannelId",
-                      author_id AS "author_id?: UserId",
-                      created_at AS "created_at!: i64",
-                      content AS "content!: String"
-               FROM messages WHERE id = ? AND deleted_at IS NULL"#,
+            r#"SELECT m.channel_id AS "channel_id!: ChannelId",
+                      m.author_id AS "author_id?: UserId",
+                      m.created_at AS "created_at!: i64",
+                      m.content AS "content!: String",
+                      f.origin_message_id AS "origin_message_id?: MessageId",
+                      f.origin_channel_id AS "origin_channel_id?: ChannelId",
+                      f.origin_author_id AS "origin_author_id?: UserId",
+                      f.origin_created_at AS "origin_created_at?: i64",
+                      f.origin_content AS "origin_content?: String"
+               FROM messages m
+               LEFT JOIN message_forwards f ON f.message_id = m.id
+               WHERE m.id = ? AND m.deleted_at IS NULL"#,
             message_id
         )
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| ForwardOrigin {
-            message_id,
-            channel_id: r.channel_id,
-            author_id: r.author_id,
-            created_at: r.created_at,
-            content: r.content,
+        Ok(row.map(|r| {
+            let origin = match (r.origin_message_id, r.origin_channel_id) {
+                (Some(origin_id), Some(origin_channel)) => ForwardOrigin {
+                    message_id: origin_id,
+                    channel_id: origin_channel,
+                    author_id: r.origin_author_id,
+                    created_at: r.origin_created_at.unwrap_or(r.created_at),
+                    content: r.origin_content.unwrap_or_default(),
+                },
+                _ => ForwardOrigin {
+                    message_id,
+                    channel_id: r.channel_id,
+                    author_id: r.author_id,
+                    created_at: r.created_at,
+                    content: r.content,
+                },
+            };
+            ForwardSource {
+                named_in: r.channel_id,
+                origin,
+            }
         }))
     }
 
