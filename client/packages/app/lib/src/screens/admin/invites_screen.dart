@@ -13,6 +13,7 @@ import '../../api_failure.dart';
 import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/display_preferences.dart';
+import '../../invite_link.dart';
 import '../../providers/providers.dart';
 import '../../providers/toasts.dart';
 import '../../routing/routes.dart';
@@ -195,32 +196,53 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
   }
 }
 
-class _CreatedInviteCallout extends StatelessWidget {
+/// Copies the whole invite - server and code in one string - which is what
+/// somebody being invited actually needs. See `invite_link.dart` for why it
+/// is a `slimm://` link rather than an https one.
+void _copyInviteLink(BuildContext context, WidgetRef ref, String code) {
+  Clipboard.setData(
+    ClipboardData(
+      text: buildInviteLink(server: ref.read(serverUrlProvider), code: code),
+    ),
+  );
+  ref
+      .read(toastsProvider.notifier)
+      .show('Invite link copied.', severity: AppToastSeverity.success);
+}
+
+/// Copies the bare code, still worth keeping: reading six characters down a
+/// phone is sometimes the right move, and a link is unreadable aloud.
+void _copyInviteCode(BuildContext context, WidgetRef ref, String code) {
+  Clipboard.setData(ClipboardData(text: code));
+  ref
+      .read(toastsProvider.notifier)
+      .show('Invite code copied.', severity: AppToastSeverity.success);
+}
+
+class _CreatedInviteCallout extends ConsumerWidget {
   const _CreatedInviteCallout({required this.invite, required this.onDismiss});
 
   final api.Invite invite;
   final VoidCallback onDismiss;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AppCallout(
       tone: AppCalloutTone.accent,
       child: Row(
         children: [
           Expanded(child: Text(invite.code, style: AppText.code)),
           AppIconButton(
+            icon: AppIcons.link,
+            semanticLabel: 'Copy invite link',
+            size: AppIconButtonSize.sm,
+            onPressed: () => _copyInviteLink(context, ref, invite.code),
+          ),
+          AppIconButton(
             icon: AppIcons.copy,
             semanticLabel: 'Copy invite code',
             size: AppIconButtonSize.sm,
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: invite.code));
-              ProviderScope.containerOf(context, listen: false)
-                  .read(toastsProvider.notifier)
-                  .show(
-                    'Invite code copied.',
-                    severity: AppToastSeverity.success,
-                  );
-            },
+            onPressed: () => _copyInviteCode(context, ref, invite.code),
           ),
           AppIconButton(
             icon: AppIcons.dismiss,
@@ -335,17 +357,14 @@ class _InviteRowState extends ConsumerState<_InviteRow>
       // A revoked invite reserves the revoke slot rather than dropping it.
       actions: [
         AppIconButton(
+          icon: AppIcons.link,
+          semanticLabel: 'Copy invite link',
+          onPressed: () => _copyInviteLink(context, ref, invite.code),
+        ),
+        AppIconButton(
           icon: AppIcons.copy,
           semanticLabel: 'Copy invite code',
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: invite.code));
-            ref
-                .read(toastsProvider.notifier)
-                .show(
-                  'Invite code copied.',
-                  severity: AppToastSeverity.success,
-                );
-          },
+          onPressed: () => _copyInviteCode(context, ref, invite.code),
         ),
         if (!invite.revoked)
           AppIconButton(

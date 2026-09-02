@@ -58,7 +58,7 @@ What it cannot be is NameDrop itself. That is Apple's own contact-exchange flow 
 
 So the honest options, cheapest first:
 
-- **A QR code**, which works on every platform today, needs no entitlement, and is the thing people actually reach for. Show the invite as a QR, scan it to redeem. This is the one worth building, and it makes the rest optional.
+- ~~**A QR code**, which works on every platform today, needs no entitlement, and is the thing people actually reach for. Show the invite as a QR, scan it to redeem. This is the one worth building, and it makes the rest optional.~~ **Dropped 2026-09-02**, on a premise this entry never checked: a QR is only worth anything if the URL inside it resolves, and nothing serves the web client (see `docs/OPEN-QUESTIONS.md` section 21). A QR pointing at the API domain opens a 404. What shipped instead is an invite *link* - `slimm://join?server=...&code=...`, built by the invites screen and absorbed by the redeem dialog on paste - which removes the same problem this entry was really about (a code read aloud, or screenshotted into somebody's camera roll forever) without needing anywhere to host it. Revisit the QR if the web client is ever served.
 - **AirDrop**, on iOS, by exporting the invite as a file or URL. Real, supported, and a share sheet away, but it is a share sheet rather than a gesture.
 - **Nearby Interaction plus MultipeerConnectivity**, iOS to iOS, which can genuinely do "hold them together" with UWB ranging. This is the closest to the idea and by far the most work: a second transport, its own pairing and trust story, and a permission prompt. Android's equivalent is Nearby Share, and the two do not talk to each other.
 

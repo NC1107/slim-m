@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import '../default_server.dart';
+import '../invite_link.dart';
 import '../providers/providers.dart';
 import '../server_address_reduction.dart';
 import '../server_scheme_policy.dart';
@@ -231,6 +232,24 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
     super.dispose();
   }
 
+  /// Splits a pasted invite link across both fields, so somebody handed one
+  /// string does not have to pull it apart by hand.
+  ///
+  /// Only fills the fields in. The server it names is exactly as untrusted as
+  /// one typed here, so [_verify]'s scheme check, address reduction and live
+  /// probe all still run on it - a link must not become a way past guards
+  /// that typing has to clear. Anything that is not a link is left alone,
+  /// since a bare code pasted into the code field is already correct.
+  void _absorbPastedLink(String text) {
+    final invite = parseInviteLink(text);
+    if (invite == null) return;
+    setState(() {
+      _server.text = invite.server.toString();
+      _code.text = invite.code;
+      _error = null;
+    });
+  }
+
   Future<void> _verify() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
@@ -307,12 +326,15 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
             placeholder: 'https://chat.example',
             keyboardType: TextInputType.url,
             semanticLabel: 'Server',
+            onChanged: _absorbPastedLink,
           ),
           const SizedBox(height: AppSpacing.s12),
           AppInput(
             controller: _code,
-            placeholder: 'Invite code',
+            // Either field takes a whole link, because somebody pasting one has no reason to know which half it is.
+            placeholder: 'Invite code, or paste an invite link',
             semanticLabel: 'Invite code',
+            onChanged: _absorbPastedLink,
           ),
           const SizedBox(height: AppSpacing.s12),
           // Terms are accepted at the point of joining, which is where the
