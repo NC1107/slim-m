@@ -325,16 +325,37 @@ Finder get attachButton => find.byWidgetPredicate(
   (w) => w is AppIconButton && w.semanticLabel == 'Attach a file',
 );
 
+/// The composer's picker button, whichever of its two labels it carries.
+///
+/// It says "Insert emoji or a GIF" where the deployment has a gif provider
+/// and "Insert emoji" where it does not, because there is one button now and
+/// the label has to be true in both configurations. Matching either keeps
+/// this finder about the button's role rather than its wording.
 Finder get emojiButton => find.byWidgetPredicate(
-  (w) => w is AppIconButton && w.semanticLabel == 'Insert emoji',
+  (w) =>
+      w is AppIconButton &&
+      (w.semanticLabel == 'Insert emoji' ||
+          w.semanticLabel == 'Insert emoji or a GIF'),
 );
+
+/// Opens the composer's picker and switches it to the GIFs tab.
+///
+/// There is no separate GIF button any more - one button opens the panel on
+/// Emoji, and the tabs carry the rest - so a test that wants gifs takes the
+/// route a person now takes.
+Future<void> openGifTab(WidgetTester tester) async {
+  await tester.tap(emojiButton);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('GIFs'));
+  await tester.pumpAndSettle();
+}
+
+/// Whether this deployment's picker offers gifs at all: the tab is absent
+/// without a provider, which is what the vanished GIF button used to show.
+Finder get gifTab => find.text('GIFs');
 
 Finder get moreActionsButton => find.byWidgetPredicate(
   (w) => w is AppIconButton && w.semanticLabel == 'More actions',
-);
-
-Finder get gifButton => find.byWidgetPredicate(
-  (w) => w is AppIconButton && w.semanticLabel == 'Insert a GIF',
 );
 
 bool fieldHasFocus(WidgetTester tester) =>

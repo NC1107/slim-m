@@ -73,24 +73,30 @@ class EmojiCategoryRail extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: width,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            for (final category in categories)
-              Padding(
-                // 2 is literal: no token sits between nothing and s4 here.
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: AppIconButton(
-                  icon: category.icon,
-                  semanticLabel: category.label,
-                  tooltip: category.label,
-                  size: AppIconButtonSize.sm,
-                  iconSize: AppSizes.icon16,
-                  active: category == selected,
-                  onPressed: () => onSelect(category),
+      // No scrollbar: at 32 wide its track lands on the icons, not beside them.
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              for (final category in categories)
+                Padding(
+                  // 1 is literal: no token sits between nothing and s4 here.
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: AppIconButton(
+                    icon: category.icon,
+                    semanticLabel: category.label,
+                    tooltip: category.label,
+                    size: AppIconButtonSize.sm,
+                    iconSize: AppSizes.icon16,
+                    active: category == selected,
+                    // Selection is the only state worth painting in a column this narrow.
+                    suppressOwnHoverFill: true,
+                    onPressed: () => onSelect(category),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

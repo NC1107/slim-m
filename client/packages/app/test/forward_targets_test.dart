@@ -168,6 +168,31 @@ void main() {
 
     expect(targets.single.channelId, 'dm1');
     expect(targets.single.label, 'Priya');
+    expect(
+      targets.single.userId,
+      'u-priya',
+      reason:
+          'a DM is a person, and the picker draws their face from this - '
+          'without it every DM row shared one generic glyph',
+    );
+  });
+
+  test('a channel carries no user identity, having none', () async {
+    final container = _containerWith(
+      channels: [
+        _channelJson(id: 'c1', name: 'general', permissions: Perm.sendMessages),
+      ],
+      dms: const [],
+    );
+
+    final targets = await container.read(
+      forwardTargetsProvider((
+        excludeChannelId: 'nowhere',
+        hasAttachments: false,
+      )).future,
+    );
+
+    expect(targets.single.userId, isNull);
   });
 
   test('a DM with a blocked party is never offered', () async {

@@ -56,6 +56,10 @@ abstract interface class DesktopWindowPort {
   Future<WindowRect> getBounds();
   Future<void> setBounds(WindowRect rect);
   Future<void> setSize(WindowSize size);
+
+  /// The smallest the user may drag this window, so a desktop can never be
+  /// sized into the phone layout. See [kDesktopMinimumWindowSize].
+  Future<void> setMinimumSize(WindowSize size);
   Future<void> center();
   Future<bool> isMaximized();
   Future<void> maximize();
@@ -164,6 +168,10 @@ class WindowManagerDesktopWindowPort
   @override
   Future<void> setSize(WindowSize size) =>
       wm.windowManager.setSize(Size(size.width, size.height));
+
+  @override
+  Future<void> setMinimumSize(WindowSize size) =>
+      wm.windowManager.setMinimumSize(Size(size.width, size.height));
 
   @override
   Future<void> center() => wm.windowManager.center();

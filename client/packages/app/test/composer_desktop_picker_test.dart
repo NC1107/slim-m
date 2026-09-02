@@ -110,29 +110,13 @@ void main() {
     },
   );
 
-  testWidgets('the GIF button opens the same panel already on the GIFs tab', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      composerHarness(
-        controller: controller,
-        sends: sends,
-        platform: TargetPlatform.linux,
-        apiBuilder: _api(gifSearchEnabled: true),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(gifButton);
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ComposerPickerPanel), findsOneWidget);
-    final tile = find.byWidgetPredicate(
-      (w) => w is Semantics && w.properties.label == 'Pick: a trending gif',
-    );
-    expect(tile, findsOneWidget, reason: 'opened straight onto trending');
-  });
-
+  /// The composer had a second icon that opened this same panel already on
+  /// the GIFs tab. It is gone: one button, and the tabs carry the rest. The
+  /// owner read the pair as a leftover from before the panel was shared, and
+  /// it was.
+  ///
+  /// What that test actually protected - that the panel can reach trending
+  /// gifs - is covered by the tab-switching test below.
   testWidgets('switching tabs moves between emoji and GIF content', (
     tester,
   ) async {
@@ -173,7 +157,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(gifButton, findsNothing);
+    // No provider, so the one button says only what it can do.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is AppIconButton && w.semanticLabel == 'Insert emoji or a GIF',
+      ),
+      findsNothing,
+    );
 
     await tester.tap(emojiButton);
     await tester.pumpAndSettle();

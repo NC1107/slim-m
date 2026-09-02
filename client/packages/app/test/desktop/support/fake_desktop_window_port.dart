@@ -79,6 +79,10 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
 
   @override
   Future<void> setSize(WindowSize size) async => lastSize = size;
+
+  WindowSize? lastMinimumSize;
+  @override
+  Future<void> setMinimumSize(WindowSize size) async => lastMinimumSize = size;
   @override
   Future<void> center() async => centerCalls++;
   @override

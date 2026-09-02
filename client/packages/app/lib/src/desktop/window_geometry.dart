@@ -153,6 +153,22 @@ class WindowGeometry {
     windowedSize: WindowSize(width: 1280, height: 720),
   );
 
+  /// The smallest a desktop window may be dragged to.
+  ///
+  /// Above `kCompactWidth` on purpose, and not by a hair. Below that width
+  /// the shell is the phone layout - one pane, no member list, sheets where
+  /// dialogs belong - and a desktop window that reaches it reads as the app
+  /// having broken rather than adapted. Nothing stopped it before: the
+  /// layout rule is width-not-platform and correct, but no floor kept a
+  /// desktop window on the right side of it, so a window a person thought
+  /// was ordinary could sit at 580 logical pixels on a scaled display and
+  /// render as a phone.
+  ///
+  /// 800x600 leaves the rail its width and the transcript the rest, which is
+  /// the narrowest arrangement that still reads as this app. The splash is
+  /// deliberately smaller and is applied before this floor exists.
+  static const minimumWindowSize = WindowSize(width: 800, height: 600);
+
   /// The last known windowed rectangle's size. Kept even while [runState] is
   /// [WindowRunState.maximized] or [WindowRunState.fullscreen], so returning
   /// to windowed has something real to restore to rather than a guess.
