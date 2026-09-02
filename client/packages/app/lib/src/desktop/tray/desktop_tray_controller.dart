@@ -101,8 +101,7 @@ class DesktopTrayController with TrayListener {
     try {
       await TrayManager.instance.setIcon(trayIconAssetPath);
     } catch (error) {
-      // An icon that failed to load is a worse tray than a default one, but
-      // a menu-less tray is no tray at all.
+      // A default icon is a worse tray; a menu-less one is no tray at all.
       debugPrint('tray: setIcon failed, continuing to the menu: $error');
     }
   }
