@@ -29,6 +29,7 @@ class ForwardTarget {
     required this.label,
     required this.isDm,
     this.userId,
+    this.username,
     this.avatarUpdatedAt,
   });
 
@@ -46,9 +47,24 @@ class ForwardTarget {
   /// generic person glyph. Null for an ordinary channel, which has none.
   final String? userId;
 
+  /// The DM partner's `@username`, which the picker searches as well as
+  /// [label]. Null for an ordinary channel, whose name is the only thing it
+  /// has. Two people can carry the same display name, and somebody typing
+  /// looks for whichever of the two they happen to remember - matching only
+  /// the label made a search for the other one answer "No matches", which
+  /// reads as a search field that does not work.
+  final String? username;
+
   /// Cache-busts that picture the way every other avatar in the app does;
   /// without it a changed picture keeps showing the old bytes here.
   final int? avatarUpdatedAt;
+
+  /// Whether this target answers to [query], which callers pass already
+  /// trimmed and lower-cased. Lives here rather than in the picker so the
+  /// rule and the fields it reads stay in one place.
+  bool matches(String query) =>
+      label.toLowerCase().contains(query) ||
+      (username?.toLowerCase().contains(query) ?? false);
 }
 
 /// What [forwardTargetsProvider] needs to answer "where can this go": the
@@ -100,6 +116,7 @@ final forwardTargetsProvider = FutureProvider.autoDispose
                   : dm.user.displayName,
               isDm: true,
               userId: dm.user.id,
+              username: dm.user.username,
               avatarUpdatedAt: dm.user.avatarUpdatedAt,
             ),
       ];

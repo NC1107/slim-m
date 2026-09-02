@@ -261,7 +261,7 @@ class _ForwardTargetSheetState extends ConsumerState<_ForwardTargetSheet>
         ? list
         : [
             for (final target in list)
-              if (target.label.toLowerCase().contains(query)) target,
+              if (target.matches(query)) target,
           ];
     if (filtered.isEmpty) {
       return Center(
