@@ -99,38 +99,33 @@ class _ShortcutHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final keys = describeAppAction(action);
     if (keys.isEmpty) return const SizedBox.shrink();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 170,
-          child: Text(
-            action.label,
-            textAlign: TextAlign.right,
-            style: AppText.body.copyWith(color: tokens.textSecondary),
+    // Fixed columns overflowed a 600-wide pane; the keycaps are what must not cut.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              action.label,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.body.copyWith(color: tokens.textSecondary),
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.s12),
-        SizedBox(
-          width: 170,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final (i, key) in keys.indexed) ...[
-                if (i > 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Text(
-                      '+',
-                      style: AppText.micro.copyWith(color: tokens.textDisabled),
-                    ),
-                  ),
-                AppKbd(key),
-              ],
-            ],
-          ),
-        ),
-      ],
+          const SizedBox(width: AppSpacing.s12),
+          for (final (i, key) in keys.indexed) ...[
+            if (i > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Text(
+                  '+',
+                  style: AppText.micro.copyWith(color: tokens.textDisabled),
+                ),
+              ),
+            AppKbd(key),
+          ],
+        ],
+      ),
     );
   }
 }

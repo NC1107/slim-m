@@ -34,11 +34,13 @@ void main() {
   });
 
   testWidgets('names the actual next step, keyboard-aware', (tester) async {
+    // Keycaps now, not a sentence; same rule about who sees them.
     await _pump(tester, touch: false);
-    expect(find.textContaining('Ctrl+K'), findsOneWidget);
+    expect(find.byType(AppKbd), findsWidgets);
+    expect(find.text('Quick switcher'), findsOneWidget);
 
     await _pump(tester, touch: true);
-    expect(find.textContaining('Ctrl+K'), findsNothing);
+    expect(find.byType(AppKbd), findsNothing);
     expect(find.textContaining('Choose one from the list'), findsOneWidget);
   });
 }
