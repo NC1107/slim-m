@@ -38,10 +38,13 @@ pub enum CreateChannelError {
     /// [`super::messages::SendError::IdConflict`] refuses to alias a foreign
     /// message rather than returning it.
     IdConflict,
-    /// `category_id` named a category that does not exist. Refused rather
-    /// than filed as uncategorised: a client asking for a specific section
-    /// and silently getting a different one is worse than an error it can
-    /// show.
+    /// `category_id` named a category that does not exist, or one that has
+    /// been deleted - categories are soft-deleted, so the column's own
+    /// `REFERENCES` still accepts a dead id. Refused rather than filed as
+    /// uncategorised: a client asking for a specific section and silently
+    /// getting a different one is worse than an error it can show, and
+    /// deleting a category nulls `category_id` on its channels precisely so
+    /// none is left pointing at it.
     UnknownCategory,
     Internal(anyhow::Error),
 }
@@ -136,10 +139,11 @@ impl Store {
         )
         .fetch_one(&mut *tx)
         .await?;
-        // Checked by hand: the column's bare `REFERENCES` fails the insert with an error the caller cannot tell from any other.
+        // Live only, and checked by hand: categories are soft-deleted, so the column's `REFERENCES` would still accept a dead one.
         if let Some(category_id) = category_id {
             let known = sqlx::query_scalar!(
-                r#"SELECT 1 AS "hit!: i64" FROM channel_categories WHERE id = ?"#,
+                r#"SELECT 1 AS "hit!: i64" FROM channel_categories
+                   WHERE id = ? AND deleted_at IS NULL"#,
                 category_id
             )
             .fetch_optional(&mut *tx)

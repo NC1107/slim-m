@@ -417,3 +417,66 @@ async fn creating_without_a_category_still_lands_uncategorised() {
 
     assert!(created["category_id"].is_null());
 }
+
+/// Deleting a category nulls `category_id` on every channel in it, so filing
+/// a new one under that same id would resurrect exactly the dangling
+/// reference the delete cleaned up - and the rail draws channels by grouping
+/// under a live category, so the channel would simply not appear.
+#[tokio::test]
+async fn a_deleted_category_cannot_be_created_into() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    let category = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/categories",
+                Some(&token),
+                Some(json!({ "name": "doomed" })),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let category_id = category["id"].as_str().unwrap().to_owned();
+
+    let deleted = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/categories/{category_id}"),
+            Some(&token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/channels",
+            Some(&token),
+            Some(json!({ "name": "orphan", "category_id": category_id })),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let channels = store.list_channels().await.unwrap();
+    assert!(
+        !channels.iter().any(|c| c.name == "orphan"),
+        "a channel filed under a dead category would vanish from the rail"
+    );
+}
