@@ -35,9 +35,13 @@ Map<String, dynamic> _channelJson({
   'permissions': permissions,
 };
 
-Map<String, dynamic> _userJson(String id, String displayName) => {
+Map<String, dynamic> _userJson(
+  String id,
+  String displayName, {
+  String? username,
+}) => {
   'id': id,
-  'username': id,
+  'username': username ?? id,
   'display_name': displayName,
   'created_at': 0,
 };
@@ -46,9 +50,10 @@ Map<String, dynamic> _dmJson({
   required String channelId,
   required String userId,
   required String displayName,
+  String? username,
 }) => {
   'channel_id': channelId,
-  'user': _userJson(userId, displayName),
+  'user': _userJson(userId, displayName, username: username),
   'unread': 0,
   'created_at': 0,
 };
@@ -228,5 +233,72 @@ void main() {
     );
 
     expect(targets.single.label, 'You');
+  });
+
+  test(
+    'a DM target carries the partner\'s username, so it can be searched',
+    () async {
+      final container = _containerWith(
+        channels: const [],
+        dms: [
+          _dmJson(
+            channelId: 'dm1',
+            userId: 'u-priya',
+            displayName: 'Priya',
+            username: 'lovelace',
+          ),
+        ],
+      );
+
+      final targets = await container.read(
+        forwardTargetsProvider((
+          excludeChannelId: 'nowhere',
+          hasAttachments: false,
+        )).future,
+      );
+
+      expect(targets.single.username, 'lovelace');
+    },
+  );
+
+  group('matching a typed query', () {
+    const dm = ForwardTarget(
+      channelId: 'dm1',
+      label: 'Priya',
+      isDm: true,
+      userId: 'u-priya',
+      // Deliberately shares no substring with the display name, or matching
+      // the label alone would satisfy the test and prove nothing.
+      username: 'lovelace',
+    );
+    const channel = ForwardTarget(
+      channelId: 'c1',
+      label: 'general',
+      isDm: false,
+    );
+
+    test('a display name still matches, as it always did', () {
+      expect(dm.matches('priy'), isTrue);
+    });
+
+    test('the username matches too, which is the whole point', () {
+      expect(
+        dm.matches('lovel'),
+        isTrue,
+        reason:
+            'somebody who remembers the @name and not the display name '
+            'was told "No matches", which reads as a broken search field',
+      );
+    });
+
+    test('an unrelated query matches neither', () {
+      expect(dm.matches('kess'), isFalse);
+    });
+
+    test('a channel has no username and is matched on its name alone', () {
+      expect(channel.username, isNull);
+      expect(channel.matches('gene'), isTrue);
+      expect(channel.matches('c1'), isFalse);
+    });
   });
 }
