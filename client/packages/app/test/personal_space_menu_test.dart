@@ -83,6 +83,36 @@ const _personal = Channel(
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  /// The kebab sits inside a row that paints its own selection and hover
+  /// tint, so it must not paint a second one of its own on top: that lands a
+  /// `surfaceRaised` circle over a fill the row chose, at a colour the row
+  /// never accounted for, and the circle reads as a patch that does not match
+  /// the channel around it. Reported exactly that way.
+  ///
+  /// Every other kebab in the app already passes this - the rail's own does -
+  /// and this one was the single call site that did not.
+  testWidgets('the kebab lets the row own the hover tint', (tester) async {
+    final container = _container();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(_harness(container, [_personal]));
+    await tester.pumpAndSettle();
+
+    final button = tester.widget<AppIconButton>(
+      find.byWidgetPredicate(
+        (w) => w is AppIconButton && w.icon == AppIcons.moreVertical,
+      ),
+    );
+    expect(
+      button.suppressOwnHoverFill,
+      isTrue,
+      reason:
+          'left false, its own surfaceRaised circle sits on top of the '
+          "row's tint at a colour that row never chose",
+    );
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('an existing personal space carries a kebab with one action', (
     tester,
   ) async {
