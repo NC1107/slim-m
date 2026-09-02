@@ -15,6 +15,7 @@ export 'models_admin.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_emoji.dart';
+export 'models_forwards.dart';
 export 'models_gifs.dart';
 export 'models_identity.dart';
 export 'models_moderation.dart';
@@ -38,6 +39,7 @@ export 'models_version.dart';
 // Message needs these in scope here, which only `import` grants; the exports
 // above are what re-surface them to callers of this file.
 import 'models_attachments.dart';
+import 'models_forwards.dart';
 import 'models_message_ops.dart';
 import 'models_polls.dart';
 import 'models_reactions.dart';
@@ -118,6 +120,7 @@ class Message {
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
+    this.forwarded,
   });
 
   final String id;
@@ -181,6 +184,12 @@ class Message {
   /// referenced by it.
   final List<Attachment> attachments;
 
+  /// What this message forwards, or null when it forwards nothing.
+  ///
+  /// [content] is the sender's own note alongside it and is often empty; the
+  /// thing being forwarded is in here and is never mixed into that text.
+  final ForwardedMessage? forwarded;
+
   bool get isEdited => editedAt != null;
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -211,6 +220,10 @@ class Message {
                 ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
                 .toList(growable: false) ??
             const [],
+        forwarded: json['forwarded'] == null
+            ? null
+            : ForwardedMessage.fromJson(
+                json['forwarded'] as Map<String, dynamic>),
       );
 }
 

@@ -10,6 +10,7 @@ import 'message_dto.dart';
 import 'rail_channel.dart';
 
 part 'message_store_batch.dart';
+part 'message_store_rows.dart';
 part 'message_store_recovery.dart';
 part 'message_store_retention.dart';
 
@@ -321,21 +322,7 @@ class MessageStore {
         return;
       }
 
-      await db.into(db.messages).insertOnConflictUpdate(
-            MessagesCompanion.insert(
-              id: message.id,
-              channelId: message.channelId,
-              authorId: Value(message.authorId),
-              authorDisplayName: Value(message.authorDisplayName),
-              seq: Value(message.seq),
-              content: message.content,
-              createdAt: message.createdAt,
-              editedAt: Value(message.editedAt),
-              pending: const Value(false),
-              failed: const Value(false),
-              replyToId: Value(message.replyToId),
-            ),
-          );
+      await db.into(db.messages).insertOnConflictUpdate(_rowFor(message));
 
       await _advanceCursor(message.channelId, message.seq);
     });

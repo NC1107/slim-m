@@ -47,12 +47,14 @@ class ListBlock extends MarkdownBlock {
 
 final RegExp _heading = RegExp(r'^(#{1,3})[ \t]+(.*)$');
 
-/// `(?:>[ \t]?)+` rather than one `>`: a forward of a forward requotes an
-/// already-quoted line, stacking a `>` per hop (`buildForwardedContent` in
-/// `forward_message.dart`). Stripping only the outermost one left every
-/// deeper hop's marker sitting in the rendered text as a literal `>`
-/// character; consuming every leading marker in one match flattens the
-/// whole chain into a single quote box instead.
+/// `(?:>[ \t]?)+` rather than one `>`: quotes nest, and stripping only the
+/// outermost marker left every deeper one sitting in the rendered text as a
+/// literal `>` character. Consuming every leading marker in one match
+/// flattens the whole chain into a single quote box instead. This began as a
+/// forwarding bug, back when a forward was a client-composed quote block
+/// that a second forward would requote; forwards are modelled now
+/// (`forwarded_message_card.dart`) and no longer produce these, but ordinary
+/// hand-typed nested quotes still do.
 final RegExp _quote = RegExp(r'^(?:>[ \t]?)+(.*)$');
 final RegExp _bullet = RegExp(r'^( {2})?[-*][ \t]+(.*)$');
 final RegExp _ordered = RegExp(r'^( {2})?\d+\.[ \t]+(.*)$');

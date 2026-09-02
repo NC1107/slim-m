@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// The forwarded-message container, and the access check hiding inside it.
+///
+/// The server sends a forward's origin channel as an id and never a name, so
+/// what a reader is told about where a forward came from is decided entirely
+/// by whether their own channel cache can name it. A channel this client does
+/// not hold is one the reader cannot see, and the card must then show no
+/// location and offer no jump - not a label they were never entitled to, and
+/// not a tap that would only be refused.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/channel_by_id_provider.dart';
+import 'package:slimm_app/src/widgets/forwarded_message_card.dart';
+import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+const _forwarded = ForwardedMessage(
+  messageId: 'm-origin',
+  channelId: 'c-origin',
+  authorId: 'u-alice',
+  authorDisplayName: 'Alice',
+  authorAvatarUpdatedAt: null,
+  createdAt: 0,
+  content: 'the original text',
+);
+
+Channel _channel({required String name, String? dmParticipantId}) => Channel(
+  id: 'c-origin',
+  name: name,
+  kind: 'text',
+  createdAt: 0,
+  cursor: 0,
+  lastReadSeq: 0,
+  isPersonalSpace: false,
+  dmParticipantId: dmParticipantId,
+  position: 0,
+);
+
+/// [origin] is what this client's channel cache holds for the forward's
+/// origin - null for a channel it does not hold at all.
+Future<void> _pump(WidgetTester tester, {Channel? origin}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        channelByIdProvider(
+          'c-origin',
+        ).overrideWith((ref) => Stream.value(origin)),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: const Scaffold(
+          body: ForwardedMessageCard(
+            forwarded: _forwarded,
+            body: Text('the original text'),
+            attachments: [],
+            currentChannelId: 'c-here',
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('draws the original author, its own text, and where it came '
+      'from', (tester) async {
+    await _pump(tester, origin: _channel(name: 'general'));
+
+    expect(find.text('Alice'), findsOneWidget);
+    expect(find.text('the original text'), findsOneWidget);
+    expect(find.text('#general'), findsOneWidget);
+  });
+
+  testWidgets('a DM origin is named by the person, never prefixed like a '
+      'channel', (tester) async {
+    await _pump(
+      tester,
+      origin: _channel(name: 'Priya', dmParticipantId: 'u-priya'),
+    );
+
+    expect(find.text('Priya'), findsOneWidget);
+    expect(find.text('#Priya'), findsNothing);
+  });
+
+  testWidgets('an origin this client does not hold shows no location and no '
+      'jump', (tester) async {
+    await _pump(tester);
+
+    expect(
+      find.text('the original text'),
+      findsOneWidget,
+      reason:
+          'what was forwarded is still shown; only where it came from is not',
+    );
+    expect(find.text('Alice'), findsOneWidget);
+    expect(find.text('#general'), findsNothing);
+    expect(
+      find.byType(InkWell),
+      findsNothing,
+      reason: 'no tap target at all, rather than one that would be refused',
+    );
+  });
+
+  testWidgets('a reachable origin is announced as one that can be opened', (
+    tester,
+  ) async {
+    await _pump(tester, origin: _channel(name: 'general'));
+
+    expect(find.byType(InkWell), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Forwarded message from Alice in #general')),
+      findsOneWidget,
+    );
+  });
+}

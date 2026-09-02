@@ -757,6 +757,50 @@ class $MessagesTable extends Messages
   late final GeneratedColumn<String> replyToId = GeneratedColumn<String>(
       'reply_to_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedMessageIdMeta =
+      const VerificationMeta('forwardedMessageId');
+  @override
+  late final GeneratedColumn<String> forwardedMessageId =
+      GeneratedColumn<String>('forwarded_message_id', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedChannelIdMeta =
+      const VerificationMeta('forwardedChannelId');
+  @override
+  late final GeneratedColumn<String> forwardedChannelId =
+      GeneratedColumn<String>('forwarded_channel_id', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedAuthorIdMeta =
+      const VerificationMeta('forwardedAuthorId');
+  @override
+  late final GeneratedColumn<String> forwardedAuthorId =
+      GeneratedColumn<String>('forwarded_author_id', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedAuthorDisplayNameMeta =
+      const VerificationMeta('forwardedAuthorDisplayName');
+  @override
+  late final GeneratedColumn<String> forwardedAuthorDisplayName =
+      GeneratedColumn<String>(
+          'forwarded_author_display_name', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedAuthorAvatarUpdatedAtMeta =
+      const VerificationMeta('forwardedAuthorAvatarUpdatedAt');
+  @override
+  late final GeneratedColumn<int> forwardedAuthorAvatarUpdatedAt =
+      GeneratedColumn<int>(
+          'forwarded_author_avatar_updated_at', aliasedName, true,
+          type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedCreatedAtMeta =
+      const VerificationMeta('forwardedCreatedAt');
+  @override
+  late final GeneratedColumn<int> forwardedCreatedAt = GeneratedColumn<int>(
+      'forwarded_created_at', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _forwardedContentMeta =
+      const VerificationMeta('forwardedContent');
+  @override
+  late final GeneratedColumn<String> forwardedContent = GeneratedColumn<String>(
+      'forwarded_content', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _pendingMeta =
       const VerificationMeta('pending');
   @override
@@ -793,6 +837,13 @@ class $MessagesTable extends Messages
         createdAt,
         editedAt,
         replyToId,
+        forwardedMessageId,
+        forwardedChannelId,
+        forwardedAuthorId,
+        forwardedAuthorDisplayName,
+        forwardedAuthorAvatarUpdatedAt,
+        forwardedCreatedAt,
+        forwardedContent,
         pending,
         failed,
         failureReason
@@ -854,6 +905,50 @@ class $MessagesTable extends Messages
           replyToId.isAcceptableOrUnknown(
               data['reply_to_id']!, _replyToIdMeta));
     }
+    if (data.containsKey('forwarded_message_id')) {
+      context.handle(
+          _forwardedMessageIdMeta,
+          forwardedMessageId.isAcceptableOrUnknown(
+              data['forwarded_message_id']!, _forwardedMessageIdMeta));
+    }
+    if (data.containsKey('forwarded_channel_id')) {
+      context.handle(
+          _forwardedChannelIdMeta,
+          forwardedChannelId.isAcceptableOrUnknown(
+              data['forwarded_channel_id']!, _forwardedChannelIdMeta));
+    }
+    if (data.containsKey('forwarded_author_id')) {
+      context.handle(
+          _forwardedAuthorIdMeta,
+          forwardedAuthorId.isAcceptableOrUnknown(
+              data['forwarded_author_id']!, _forwardedAuthorIdMeta));
+    }
+    if (data.containsKey('forwarded_author_display_name')) {
+      context.handle(
+          _forwardedAuthorDisplayNameMeta,
+          forwardedAuthorDisplayName.isAcceptableOrUnknown(
+              data['forwarded_author_display_name']!,
+              _forwardedAuthorDisplayNameMeta));
+    }
+    if (data.containsKey('forwarded_author_avatar_updated_at')) {
+      context.handle(
+          _forwardedAuthorAvatarUpdatedAtMeta,
+          forwardedAuthorAvatarUpdatedAt.isAcceptableOrUnknown(
+              data['forwarded_author_avatar_updated_at']!,
+              _forwardedAuthorAvatarUpdatedAtMeta));
+    }
+    if (data.containsKey('forwarded_created_at')) {
+      context.handle(
+          _forwardedCreatedAtMeta,
+          forwardedCreatedAt.isAcceptableOrUnknown(
+              data['forwarded_created_at']!, _forwardedCreatedAtMeta));
+    }
+    if (data.containsKey('forwarded_content')) {
+      context.handle(
+          _forwardedContentMeta,
+          forwardedContent.isAcceptableOrUnknown(
+              data['forwarded_content']!, _forwardedContentMeta));
+    }
     if (data.containsKey('pending')) {
       context.handle(_pendingMeta,
           pending.isAcceptableOrUnknown(data['pending']!, _pendingMeta));
@@ -895,6 +990,22 @@ class $MessagesTable extends Messages
           .read(DriftSqlType.int, data['${effectivePrefix}edited_at']),
       replyToId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}reply_to_id']),
+      forwardedMessageId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}forwarded_message_id']),
+      forwardedChannelId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}forwarded_channel_id']),
+      forwardedAuthorId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}forwarded_author_id']),
+      forwardedAuthorDisplayName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}forwarded_author_display_name']),
+      forwardedAuthorAvatarUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}forwarded_author_avatar_updated_at']),
+      forwardedCreatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}forwarded_created_at']),
+      forwardedContent: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}forwarded_content']),
       pending: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}pending'])!,
       failed: attachedDatabase.typeMapping
@@ -932,6 +1043,21 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   /// here for an edit or delete of the parent to leave stale.
   final String? replyToId;
 
+  /// What this message forwards, snapshotted by the server when the forward
+  /// was sent - all null together on a message that forwards nothing.
+  ///
+  /// Copied onto this row rather than resolved like [replyToId], because a
+  /// forward's origin is in another channel this cache may not hold at all,
+  /// and outlives being edited or deleted there. Nothing here goes stale:
+  /// the snapshot is what was passed on, not what the original says now.
+  final String? forwardedMessageId;
+  final String? forwardedChannelId;
+  final String? forwardedAuthorId;
+  final String? forwardedAuthorDisplayName;
+  final int? forwardedAuthorAvatarUpdatedAt;
+  final int? forwardedCreatedAt;
+  final String? forwardedContent;
+
   /// True while the send is in flight. The UI shows these differently and they
   /// are replaced in place by the server's copy on acknowledgement.
   final bool pending;
@@ -953,6 +1079,13 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       required this.createdAt,
       this.editedAt,
       this.replyToId,
+      this.forwardedMessageId,
+      this.forwardedChannelId,
+      this.forwardedAuthorId,
+      this.forwardedAuthorDisplayName,
+      this.forwardedAuthorAvatarUpdatedAt,
+      this.forwardedCreatedAt,
+      this.forwardedContent,
       required this.pending,
       required this.failed,
       this.failureReason});
@@ -975,6 +1108,29 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     }
     if (!nullToAbsent || replyToId != null) {
       map['reply_to_id'] = Variable<String>(replyToId);
+    }
+    if (!nullToAbsent || forwardedMessageId != null) {
+      map['forwarded_message_id'] = Variable<String>(forwardedMessageId);
+    }
+    if (!nullToAbsent || forwardedChannelId != null) {
+      map['forwarded_channel_id'] = Variable<String>(forwardedChannelId);
+    }
+    if (!nullToAbsent || forwardedAuthorId != null) {
+      map['forwarded_author_id'] = Variable<String>(forwardedAuthorId);
+    }
+    if (!nullToAbsent || forwardedAuthorDisplayName != null) {
+      map['forwarded_author_display_name'] =
+          Variable<String>(forwardedAuthorDisplayName);
+    }
+    if (!nullToAbsent || forwardedAuthorAvatarUpdatedAt != null) {
+      map['forwarded_author_avatar_updated_at'] =
+          Variable<int>(forwardedAuthorAvatarUpdatedAt);
+    }
+    if (!nullToAbsent || forwardedCreatedAt != null) {
+      map['forwarded_created_at'] = Variable<int>(forwardedCreatedAt);
+    }
+    if (!nullToAbsent || forwardedContent != null) {
+      map['forwarded_content'] = Variable<String>(forwardedContent);
     }
     map['pending'] = Variable<bool>(pending);
     map['failed'] = Variable<bool>(failed);
@@ -1003,6 +1159,29 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       replyToId: replyToId == null && nullToAbsent
           ? const Value.absent()
           : Value(replyToId),
+      forwardedMessageId: forwardedMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forwardedMessageId),
+      forwardedChannelId: forwardedChannelId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forwardedChannelId),
+      forwardedAuthorId: forwardedAuthorId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forwardedAuthorId),
+      forwardedAuthorDisplayName:
+          forwardedAuthorDisplayName == null && nullToAbsent
+              ? const Value.absent()
+              : Value(forwardedAuthorDisplayName),
+      forwardedAuthorAvatarUpdatedAt:
+          forwardedAuthorAvatarUpdatedAt == null && nullToAbsent
+              ? const Value.absent()
+              : Value(forwardedAuthorAvatarUpdatedAt),
+      forwardedCreatedAt: forwardedCreatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forwardedCreatedAt),
+      forwardedContent: forwardedContent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forwardedContent),
       pending: Value(pending),
       failed: Value(failed),
       failureReason: failureReason == null && nullToAbsent
@@ -1025,6 +1204,18 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       editedAt: serializer.fromJson<int?>(json['editedAt']),
       replyToId: serializer.fromJson<String?>(json['replyToId']),
+      forwardedMessageId:
+          serializer.fromJson<String?>(json['forwardedMessageId']),
+      forwardedChannelId:
+          serializer.fromJson<String?>(json['forwardedChannelId']),
+      forwardedAuthorId:
+          serializer.fromJson<String?>(json['forwardedAuthorId']),
+      forwardedAuthorDisplayName:
+          serializer.fromJson<String?>(json['forwardedAuthorDisplayName']),
+      forwardedAuthorAvatarUpdatedAt:
+          serializer.fromJson<int?>(json['forwardedAuthorAvatarUpdatedAt']),
+      forwardedCreatedAt: serializer.fromJson<int?>(json['forwardedCreatedAt']),
+      forwardedContent: serializer.fromJson<String?>(json['forwardedContent']),
       pending: serializer.fromJson<bool>(json['pending']),
       failed: serializer.fromJson<bool>(json['failed']),
       failureReason: serializer.fromJson<String?>(json['failureReason']),
@@ -1043,6 +1234,15 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       'createdAt': serializer.toJson<int>(createdAt),
       'editedAt': serializer.toJson<int?>(editedAt),
       'replyToId': serializer.toJson<String?>(replyToId),
+      'forwardedMessageId': serializer.toJson<String?>(forwardedMessageId),
+      'forwardedChannelId': serializer.toJson<String?>(forwardedChannelId),
+      'forwardedAuthorId': serializer.toJson<String?>(forwardedAuthorId),
+      'forwardedAuthorDisplayName':
+          serializer.toJson<String?>(forwardedAuthorDisplayName),
+      'forwardedAuthorAvatarUpdatedAt':
+          serializer.toJson<int?>(forwardedAuthorAvatarUpdatedAt),
+      'forwardedCreatedAt': serializer.toJson<int?>(forwardedCreatedAt),
+      'forwardedContent': serializer.toJson<String?>(forwardedContent),
       'pending': serializer.toJson<bool>(pending),
       'failed': serializer.toJson<bool>(failed),
       'failureReason': serializer.toJson<String?>(failureReason),
@@ -1059,6 +1259,13 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           int? createdAt,
           Value<int?> editedAt = const Value.absent(),
           Value<String?> replyToId = const Value.absent(),
+          Value<String?> forwardedMessageId = const Value.absent(),
+          Value<String?> forwardedChannelId = const Value.absent(),
+          Value<String?> forwardedAuthorId = const Value.absent(),
+          Value<String?> forwardedAuthorDisplayName = const Value.absent(),
+          Value<int?> forwardedAuthorAvatarUpdatedAt = const Value.absent(),
+          Value<int?> forwardedCreatedAt = const Value.absent(),
+          Value<String?> forwardedContent = const Value.absent(),
           bool? pending,
           bool? failed,
           Value<String?> failureReason = const Value.absent()}) =>
@@ -1074,6 +1281,27 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
         createdAt: createdAt ?? this.createdAt,
         editedAt: editedAt.present ? editedAt.value : this.editedAt,
         replyToId: replyToId.present ? replyToId.value : this.replyToId,
+        forwardedMessageId: forwardedMessageId.present
+            ? forwardedMessageId.value
+            : this.forwardedMessageId,
+        forwardedChannelId: forwardedChannelId.present
+            ? forwardedChannelId.value
+            : this.forwardedChannelId,
+        forwardedAuthorId: forwardedAuthorId.present
+            ? forwardedAuthorId.value
+            : this.forwardedAuthorId,
+        forwardedAuthorDisplayName: forwardedAuthorDisplayName.present
+            ? forwardedAuthorDisplayName.value
+            : this.forwardedAuthorDisplayName,
+        forwardedAuthorAvatarUpdatedAt: forwardedAuthorAvatarUpdatedAt.present
+            ? forwardedAuthorAvatarUpdatedAt.value
+            : this.forwardedAuthorAvatarUpdatedAt,
+        forwardedCreatedAt: forwardedCreatedAt.present
+            ? forwardedCreatedAt.value
+            : this.forwardedCreatedAt,
+        forwardedContent: forwardedContent.present
+            ? forwardedContent.value
+            : this.forwardedContent,
         pending: pending ?? this.pending,
         failed: failed ?? this.failed,
         failureReason:
@@ -1092,6 +1320,28 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
       replyToId: data.replyToId.present ? data.replyToId.value : this.replyToId,
+      forwardedMessageId: data.forwardedMessageId.present
+          ? data.forwardedMessageId.value
+          : this.forwardedMessageId,
+      forwardedChannelId: data.forwardedChannelId.present
+          ? data.forwardedChannelId.value
+          : this.forwardedChannelId,
+      forwardedAuthorId: data.forwardedAuthorId.present
+          ? data.forwardedAuthorId.value
+          : this.forwardedAuthorId,
+      forwardedAuthorDisplayName: data.forwardedAuthorDisplayName.present
+          ? data.forwardedAuthorDisplayName.value
+          : this.forwardedAuthorDisplayName,
+      forwardedAuthorAvatarUpdatedAt:
+          data.forwardedAuthorAvatarUpdatedAt.present
+              ? data.forwardedAuthorAvatarUpdatedAt.value
+              : this.forwardedAuthorAvatarUpdatedAt,
+      forwardedCreatedAt: data.forwardedCreatedAt.present
+          ? data.forwardedCreatedAt.value
+          : this.forwardedCreatedAt,
+      forwardedContent: data.forwardedContent.present
+          ? data.forwardedContent.value
+          : this.forwardedContent,
       pending: data.pending.present ? data.pending.value : this.pending,
       failed: data.failed.present ? data.failed.value : this.failed,
       failureReason: data.failureReason.present
@@ -1112,6 +1362,14 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('replyToId: $replyToId, ')
+          ..write('forwardedMessageId: $forwardedMessageId, ')
+          ..write('forwardedChannelId: $forwardedChannelId, ')
+          ..write('forwardedAuthorId: $forwardedAuthorId, ')
+          ..write('forwardedAuthorDisplayName: $forwardedAuthorDisplayName, ')
+          ..write(
+              'forwardedAuthorAvatarUpdatedAt: $forwardedAuthorAvatarUpdatedAt, ')
+          ..write('forwardedCreatedAt: $forwardedCreatedAt, ')
+          ..write('forwardedContent: $forwardedContent, ')
           ..write('pending: $pending, ')
           ..write('failed: $failed, ')
           ..write('failureReason: $failureReason')
@@ -1130,6 +1388,13 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       createdAt,
       editedAt,
       replyToId,
+      forwardedMessageId,
+      forwardedChannelId,
+      forwardedAuthorId,
+      forwardedAuthorDisplayName,
+      forwardedAuthorAvatarUpdatedAt,
+      forwardedCreatedAt,
+      forwardedContent,
       pending,
       failed,
       failureReason);
@@ -1146,6 +1411,14 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.createdAt == this.createdAt &&
           other.editedAt == this.editedAt &&
           other.replyToId == this.replyToId &&
+          other.forwardedMessageId == this.forwardedMessageId &&
+          other.forwardedChannelId == this.forwardedChannelId &&
+          other.forwardedAuthorId == this.forwardedAuthorId &&
+          other.forwardedAuthorDisplayName == this.forwardedAuthorDisplayName &&
+          other.forwardedAuthorAvatarUpdatedAt ==
+              this.forwardedAuthorAvatarUpdatedAt &&
+          other.forwardedCreatedAt == this.forwardedCreatedAt &&
+          other.forwardedContent == this.forwardedContent &&
           other.pending == this.pending &&
           other.failed == this.failed &&
           other.failureReason == this.failureReason);
@@ -1161,6 +1434,13 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
   final Value<int> createdAt;
   final Value<int?> editedAt;
   final Value<String?> replyToId;
+  final Value<String?> forwardedMessageId;
+  final Value<String?> forwardedChannelId;
+  final Value<String?> forwardedAuthorId;
+  final Value<String?> forwardedAuthorDisplayName;
+  final Value<int?> forwardedAuthorAvatarUpdatedAt;
+  final Value<int?> forwardedCreatedAt;
+  final Value<String?> forwardedContent;
   final Value<bool> pending;
   final Value<bool> failed;
   final Value<String?> failureReason;
@@ -1175,6 +1455,13 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     this.createdAt = const Value.absent(),
     this.editedAt = const Value.absent(),
     this.replyToId = const Value.absent(),
+    this.forwardedMessageId = const Value.absent(),
+    this.forwardedChannelId = const Value.absent(),
+    this.forwardedAuthorId = const Value.absent(),
+    this.forwardedAuthorDisplayName = const Value.absent(),
+    this.forwardedAuthorAvatarUpdatedAt = const Value.absent(),
+    this.forwardedCreatedAt = const Value.absent(),
+    this.forwardedContent = const Value.absent(),
     this.pending = const Value.absent(),
     this.failed = const Value.absent(),
     this.failureReason = const Value.absent(),
@@ -1190,6 +1477,13 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     required int createdAt,
     this.editedAt = const Value.absent(),
     this.replyToId = const Value.absent(),
+    this.forwardedMessageId = const Value.absent(),
+    this.forwardedChannelId = const Value.absent(),
+    this.forwardedAuthorId = const Value.absent(),
+    this.forwardedAuthorDisplayName = const Value.absent(),
+    this.forwardedAuthorAvatarUpdatedAt = const Value.absent(),
+    this.forwardedCreatedAt = const Value.absent(),
+    this.forwardedContent = const Value.absent(),
     this.pending = const Value.absent(),
     this.failed = const Value.absent(),
     this.failureReason = const Value.absent(),
@@ -1208,6 +1502,13 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     Expression<int>? createdAt,
     Expression<int>? editedAt,
     Expression<String>? replyToId,
+    Expression<String>? forwardedMessageId,
+    Expression<String>? forwardedChannelId,
+    Expression<String>? forwardedAuthorId,
+    Expression<String>? forwardedAuthorDisplayName,
+    Expression<int>? forwardedAuthorAvatarUpdatedAt,
+    Expression<int>? forwardedCreatedAt,
+    Expression<String>? forwardedContent,
     Expression<bool>? pending,
     Expression<bool>? failed,
     Expression<String>? failureReason,
@@ -1223,6 +1524,18 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       if (createdAt != null) 'created_at': createdAt,
       if (editedAt != null) 'edited_at': editedAt,
       if (replyToId != null) 'reply_to_id': replyToId,
+      if (forwardedMessageId != null)
+        'forwarded_message_id': forwardedMessageId,
+      if (forwardedChannelId != null)
+        'forwarded_channel_id': forwardedChannelId,
+      if (forwardedAuthorId != null) 'forwarded_author_id': forwardedAuthorId,
+      if (forwardedAuthorDisplayName != null)
+        'forwarded_author_display_name': forwardedAuthorDisplayName,
+      if (forwardedAuthorAvatarUpdatedAt != null)
+        'forwarded_author_avatar_updated_at': forwardedAuthorAvatarUpdatedAt,
+      if (forwardedCreatedAt != null)
+        'forwarded_created_at': forwardedCreatedAt,
+      if (forwardedContent != null) 'forwarded_content': forwardedContent,
       if (pending != null) 'pending': pending,
       if (failed != null) 'failed': failed,
       if (failureReason != null) 'failure_reason': failureReason,
@@ -1240,6 +1553,13 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       Value<int>? createdAt,
       Value<int?>? editedAt,
       Value<String?>? replyToId,
+      Value<String?>? forwardedMessageId,
+      Value<String?>? forwardedChannelId,
+      Value<String?>? forwardedAuthorId,
+      Value<String?>? forwardedAuthorDisplayName,
+      Value<int?>? forwardedAuthorAvatarUpdatedAt,
+      Value<int?>? forwardedCreatedAt,
+      Value<String?>? forwardedContent,
       Value<bool>? pending,
       Value<bool>? failed,
       Value<String?>? failureReason,
@@ -1254,6 +1574,15 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       replyToId: replyToId ?? this.replyToId,
+      forwardedMessageId: forwardedMessageId ?? this.forwardedMessageId,
+      forwardedChannelId: forwardedChannelId ?? this.forwardedChannelId,
+      forwardedAuthorId: forwardedAuthorId ?? this.forwardedAuthorId,
+      forwardedAuthorDisplayName:
+          forwardedAuthorDisplayName ?? this.forwardedAuthorDisplayName,
+      forwardedAuthorAvatarUpdatedAt:
+          forwardedAuthorAvatarUpdatedAt ?? this.forwardedAuthorAvatarUpdatedAt,
+      forwardedCreatedAt: forwardedCreatedAt ?? this.forwardedCreatedAt,
+      forwardedContent: forwardedContent ?? this.forwardedContent,
       pending: pending ?? this.pending,
       failed: failed ?? this.failed,
       failureReason: failureReason ?? this.failureReason,
@@ -1291,6 +1620,29 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     if (replyToId.present) {
       map['reply_to_id'] = Variable<String>(replyToId.value);
     }
+    if (forwardedMessageId.present) {
+      map['forwarded_message_id'] = Variable<String>(forwardedMessageId.value);
+    }
+    if (forwardedChannelId.present) {
+      map['forwarded_channel_id'] = Variable<String>(forwardedChannelId.value);
+    }
+    if (forwardedAuthorId.present) {
+      map['forwarded_author_id'] = Variable<String>(forwardedAuthorId.value);
+    }
+    if (forwardedAuthorDisplayName.present) {
+      map['forwarded_author_display_name'] =
+          Variable<String>(forwardedAuthorDisplayName.value);
+    }
+    if (forwardedAuthorAvatarUpdatedAt.present) {
+      map['forwarded_author_avatar_updated_at'] =
+          Variable<int>(forwardedAuthorAvatarUpdatedAt.value);
+    }
+    if (forwardedCreatedAt.present) {
+      map['forwarded_created_at'] = Variable<int>(forwardedCreatedAt.value);
+    }
+    if (forwardedContent.present) {
+      map['forwarded_content'] = Variable<String>(forwardedContent.value);
+    }
     if (pending.present) {
       map['pending'] = Variable<bool>(pending.value);
     }
@@ -1318,6 +1670,14 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('replyToId: $replyToId, ')
+          ..write('forwardedMessageId: $forwardedMessageId, ')
+          ..write('forwardedChannelId: $forwardedChannelId, ')
+          ..write('forwardedAuthorId: $forwardedAuthorId, ')
+          ..write('forwardedAuthorDisplayName: $forwardedAuthorDisplayName, ')
+          ..write(
+              'forwardedAuthorAvatarUpdatedAt: $forwardedAuthorAvatarUpdatedAt, ')
+          ..write('forwardedCreatedAt: $forwardedCreatedAt, ')
+          ..write('forwardedContent: $forwardedContent, ')
           ..write('pending: $pending, ')
           ..write('failed: $failed, ')
           ..write('failureReason: $failureReason, ')
@@ -1873,6 +2233,13 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required int createdAt,
   Value<int?> editedAt,
   Value<String?> replyToId,
+  Value<String?> forwardedMessageId,
+  Value<String?> forwardedChannelId,
+  Value<String?> forwardedAuthorId,
+  Value<String?> forwardedAuthorDisplayName,
+  Value<int?> forwardedAuthorAvatarUpdatedAt,
+  Value<int?> forwardedCreatedAt,
+  Value<String?> forwardedContent,
   Value<bool> pending,
   Value<bool> failed,
   Value<String?> failureReason,
@@ -1888,6 +2255,13 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<int> createdAt,
   Value<int?> editedAt,
   Value<String?> replyToId,
+  Value<String?> forwardedMessageId,
+  Value<String?> forwardedChannelId,
+  Value<String?> forwardedAuthorId,
+  Value<String?> forwardedAuthorDisplayName,
+  Value<int?> forwardedAuthorAvatarUpdatedAt,
+  Value<int?> forwardedCreatedAt,
+  Value<String?> forwardedContent,
   Value<bool> pending,
   Value<bool> failed,
   Value<String?> failureReason,
@@ -1930,6 +2304,34 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<String> get replyToId => $composableBuilder(
       column: $table.replyToId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get forwardedMessageId => $composableBuilder(
+      column: $table.forwardedMessageId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get forwardedChannelId => $composableBuilder(
+      column: $table.forwardedChannelId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get forwardedAuthorId => $composableBuilder(
+      column: $table.forwardedAuthorId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get forwardedAuthorDisplayName => $composableBuilder(
+      column: $table.forwardedAuthorDisplayName,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get forwardedAuthorAvatarUpdatedAt => $composableBuilder(
+      column: $table.forwardedAuthorAvatarUpdatedAt,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get forwardedCreatedAt => $composableBuilder(
+      column: $table.forwardedCreatedAt,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get forwardedContent => $composableBuilder(
+      column: $table.forwardedContent,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get pending => $composableBuilder(
       column: $table.pending, builder: (column) => ColumnFilters(column));
@@ -1978,6 +2380,34 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<String> get replyToId => $composableBuilder(
       column: $table.replyToId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get forwardedMessageId => $composableBuilder(
+      column: $table.forwardedMessageId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get forwardedChannelId => $composableBuilder(
+      column: $table.forwardedChannelId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get forwardedAuthorId => $composableBuilder(
+      column: $table.forwardedAuthorId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get forwardedAuthorDisplayName => $composableBuilder(
+      column: $table.forwardedAuthorDisplayName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get forwardedAuthorAvatarUpdatedAt => $composableBuilder(
+      column: $table.forwardedAuthorAvatarUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get forwardedCreatedAt => $composableBuilder(
+      column: $table.forwardedCreatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get forwardedContent => $composableBuilder(
+      column: $table.forwardedContent,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get pending => $composableBuilder(
       column: $table.pending, builder: (column) => ColumnOrderings(column));
 
@@ -2025,6 +2455,28 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<String> get replyToId =>
       $composableBuilder(column: $table.replyToId, builder: (column) => column);
 
+  GeneratedColumn<String> get forwardedMessageId => $composableBuilder(
+      column: $table.forwardedMessageId, builder: (column) => column);
+
+  GeneratedColumn<String> get forwardedChannelId => $composableBuilder(
+      column: $table.forwardedChannelId, builder: (column) => column);
+
+  GeneratedColumn<String> get forwardedAuthorId => $composableBuilder(
+      column: $table.forwardedAuthorId, builder: (column) => column);
+
+  GeneratedColumn<String> get forwardedAuthorDisplayName => $composableBuilder(
+      column: $table.forwardedAuthorDisplayName, builder: (column) => column);
+
+  GeneratedColumn<int> get forwardedAuthorAvatarUpdatedAt => $composableBuilder(
+      column: $table.forwardedAuthorAvatarUpdatedAt,
+      builder: (column) => column);
+
+  GeneratedColumn<int> get forwardedCreatedAt => $composableBuilder(
+      column: $table.forwardedCreatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get forwardedContent => $composableBuilder(
+      column: $table.forwardedContent, builder: (column) => column);
+
   GeneratedColumn<bool> get pending =>
       $composableBuilder(column: $table.pending, builder: (column) => column);
 
@@ -2067,6 +2519,13 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<int> createdAt = const Value.absent(),
             Value<int?> editedAt = const Value.absent(),
             Value<String?> replyToId = const Value.absent(),
+            Value<String?> forwardedMessageId = const Value.absent(),
+            Value<String?> forwardedChannelId = const Value.absent(),
+            Value<String?> forwardedAuthorId = const Value.absent(),
+            Value<String?> forwardedAuthorDisplayName = const Value.absent(),
+            Value<int?> forwardedAuthorAvatarUpdatedAt = const Value.absent(),
+            Value<int?> forwardedCreatedAt = const Value.absent(),
+            Value<String?> forwardedContent = const Value.absent(),
             Value<bool> pending = const Value.absent(),
             Value<bool> failed = const Value.absent(),
             Value<String?> failureReason = const Value.absent(),
@@ -2082,6 +2541,13 @@ class $$MessagesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             editedAt: editedAt,
             replyToId: replyToId,
+            forwardedMessageId: forwardedMessageId,
+            forwardedChannelId: forwardedChannelId,
+            forwardedAuthorId: forwardedAuthorId,
+            forwardedAuthorDisplayName: forwardedAuthorDisplayName,
+            forwardedAuthorAvatarUpdatedAt: forwardedAuthorAvatarUpdatedAt,
+            forwardedCreatedAt: forwardedCreatedAt,
+            forwardedContent: forwardedContent,
             pending: pending,
             failed: failed,
             failureReason: failureReason,
@@ -2097,6 +2563,13 @@ class $$MessagesTableTableManager extends RootTableManager<
             required int createdAt,
             Value<int?> editedAt = const Value.absent(),
             Value<String?> replyToId = const Value.absent(),
+            Value<String?> forwardedMessageId = const Value.absent(),
+            Value<String?> forwardedChannelId = const Value.absent(),
+            Value<String?> forwardedAuthorId = const Value.absent(),
+            Value<String?> forwardedAuthorDisplayName = const Value.absent(),
+            Value<int?> forwardedAuthorAvatarUpdatedAt = const Value.absent(),
+            Value<int?> forwardedCreatedAt = const Value.absent(),
+            Value<String?> forwardedContent = const Value.absent(),
             Value<bool> pending = const Value.absent(),
             Value<bool> failed = const Value.absent(),
             Value<String?> failureReason = const Value.absent(),
@@ -2112,6 +2585,13 @@ class $$MessagesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             editedAt: editedAt,
             replyToId: replyToId,
+            forwardedMessageId: forwardedMessageId,
+            forwardedChannelId: forwardedChannelId,
+            forwardedAuthorId: forwardedAuthorId,
+            forwardedAuthorDisplayName: forwardedAuthorDisplayName,
+            forwardedAuthorAvatarUpdatedAt: forwardedAuthorAvatarUpdatedAt,
+            forwardedCreatedAt: forwardedCreatedAt,
+            forwardedContent: forwardedContent,
             pending: pending,
             failed: failed,
             failureReason: failureReason,

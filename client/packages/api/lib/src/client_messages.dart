@@ -34,12 +34,20 @@ extension SlimmApiMessages on SlimmApi {
   /// in display order; a non-empty list needs ATTACH_FILES in addition to
   /// SEND_MESSAGES. [replyToId] must already name a message in this same
   /// channel (live or deleted) or the send is refused.
+  ///
+  /// [forwardedFromId] may name a message in any channel the sender can see,
+  /// but it must be live: forwarding copies the text, so a deleted original
+  /// is refused rather than republished. Only the id goes over the wire - the
+  /// server reads the original's author, timestamp and text itself, so a
+  /// forward can never be dressed up as something the original never said.
+  /// [content] is then the sender's own note and may be empty.
   Future<Message> sendMessage({
     required String channelId,
     required String id,
     required String content,
     List<String> attachmentIds = const [],
     String? replyToId,
+    String? forwardedFromId,
   }) async {
     final json = await _send(
       'POST',
@@ -49,6 +57,7 @@ extension SlimmApiMessages on SlimmApi {
         'content': content,
         if (attachmentIds.isNotEmpty) 'attachment_ids': attachmentIds,
         if (replyToId != null) 'reply_to_id': replyToId,
+        if (forwardedFromId != null) 'forwarded_from_id': forwardedFromId,
       },
     );
     return Message.fromJson(json as Map<String, dynamic>);

@@ -2,11 +2,10 @@
 /// The forward picker driven end to end: opening it, picking a target, and
 /// what actually leaves for the server.
 ///
-/// `forward_message_test.dart` covers `buildForwardedContent` in isolation;
-/// this is the layer above it, the same split
-/// `channel_screen_attachment_send_test.dart` draws for the composer - a
-/// pure function proving its own shape is not proof the widget that calls
-/// it ever reaches the network correctly.
+/// A forward is a wire field now, not composed text, so what leaves has to
+/// be checked here rather than against a pure function: the id of the
+/// original goes up as `forwarded_from_id` and the sender's own note is the
+/// `content`, which is empty whenever they wrote none.
 library;
 
 import 'dart:convert';
@@ -220,8 +219,8 @@ void main() {
     expect(harness.postedBodies.single['attachment_ids'], ['aaaa', 'bbbb']);
   });
 
-  testWidgets('the forwarded content quotes the original, multi-line '
-      'content intact', (tester) async {
+  testWidgets('a forward names the original and quotes nothing into its own '
+      'content', (tester) async {
     final harness = _Harness();
     addTearDown(harness.dispose);
     await _pump(tester, harness);
@@ -231,10 +230,35 @@ void main() {
     // Flushes the success toast's auto-dismiss timer so it never outlives the widget tree.
     await tester.pump(const Duration(seconds: 5));
 
+    final body = harness.postedBodies.single;
+    expect(body['forwarded_from_id'], 'm1');
     expect(
-      harness.postedBodies.single['content'],
-      'Forwarded from Alice\n> hello\n> world',
+      body['content'],
+      '',
+      reason: 'the note is the sender\'s own, and they wrote none',
     );
+  });
+
+  testWidgets('a note typed in the picker is sent as the message content, '
+      'with the forward still named', (tester) async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    await _pump(tester, harness);
+
+    await tester.enterText(
+      find.ancestor(
+        of: find.text('Say something about it (optional)'),
+        matching: find.byType(TextField),
+      ),
+      '  look at this  ',
+    );
+    await tester.tap(find.text('general'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+
+    final body = harness.postedBodies.single;
+    expect(body['content'], 'look at this');
+    expect(body['forwarded_from_id'], 'm1');
   });
 
   testWidgets('a forward that fails shows an AppErrorState, never a '
