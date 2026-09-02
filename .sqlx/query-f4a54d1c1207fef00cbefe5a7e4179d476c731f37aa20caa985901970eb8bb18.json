@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO message_forwards\n               (message_id, origin_message_id, origin_channel_id,\n                origin_author_id, origin_created_at, origin_content)\n           VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "f4a54d1c1207fef00cbefe5a7e4179d476c731f37aa20caa985901970eb8bb18"
+}

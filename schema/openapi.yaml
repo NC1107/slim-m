@@ -6645,6 +6645,17 @@ components:
             channel. Carries only the id: resolve the parent's own content,
             author and liveness by looking that id up like any other message,
             never trust a cached copy of them here.
+        forwarded:
+          oneOf:
+            - type: "null"
+            - $ref: '#/components/schemas/ForwardedMessage'
+          description: >-
+            What this message forwards, or null when it forwards nothing.
+            Always present as a key, the same "null means genuinely none"
+            convention `poll` follows. A forwarding message's own `content`
+            is whatever the sender chose to say alongside it and is often
+            empty; the thing being forwarded is in here and is never mixed
+            into that text.
         thread_channel_id:
           type: [string, "null"]
           format: uuid
@@ -6700,6 +6711,56 @@ components:
             only referenced by it.
           items:
             $ref: "#/components/schemas/Attachment"
+
+    ForwardedMessage:
+      type: object
+      required: [message_id, channel_id, created_at, content]
+      description: >
+        What a message was forwarded from. A snapshot taken when the forward
+        was sent, not a live read: `content`, `created_at` and the author
+        stay answerable after the original is edited or deleted, and an edit
+        to the original never rewrites what was passed on.
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          description: >
+            The original, for jumping to it in place. Resolve `channel_id`
+            against your own channel list first: an origin you have no
+            access to names a channel you do not hold, so offer no jump
+            rather than a request that would be refused.
+        channel_id:
+          type: string
+          format: uuid
+          description: >
+            The channel the original lives in. Deliberately sent without its
+            name - resolve that from the channel list you already hold, so a
+            name you are not entitled to is never sent in the first place.
+            An id you cannot resolve is an origin you cannot reach.
+        author_id:
+          type: [string, "null"]
+          format: uuid
+          description: >
+            Who wrote the original. Null once that account is anonymized,
+            the same convention a message's own author_id follows.
+        author_display_name:
+          type: [string, "null"]
+          description: Null under the same conditions as author_id.
+        author_avatar_updated_at:
+          type: [integer, "null"]
+          format: int64
+          description: >
+            Builds the author's avatar URL without a second lookup, and
+            busts the cache when they change it.
+        created_at:
+          type: integer
+          format: int64
+          description: >
+            When the original was sent, not when it was forwarded - that is
+            the carrying message's own created_at.
+        content:
+          type: string
+          description: What the original said at the moment it was forwarded.
 
     Attachment:
       type: object
@@ -6973,9 +7034,10 @@ components:
           type: string
           maxLength: 4000
           description: >
-            Must not be blank unless `attachment_ids` is non-empty: a message
-            carrying a file needs no text, and a blank one carrying neither is
-            a 400.
+            Must not be blank unless the message carries something else:
+            `attachment_ids` is non-empty, or `forwarded_from_id` is set. A
+            message carrying a file or a forward needs no text of its own,
+            and a blank one carrying neither is a 400.
         attachment_ids:
           type: array
           description: >
@@ -6992,6 +7054,19 @@ components:
           description: >-
             The message this one replies to. Must already exist (live or
             soft-deleted) in this same channel, or the send is a 400.
+        forwarded_from_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            The message this one forwards. Unlike `reply_to_id` it may live
+            in any channel you can see, but it must be live: forwarding a
+            deleted message is a 400, because a forward copies the text and
+            would republish what someone removed. Only the id is accepted -
+            the server reads the original's author, timestamp and text
+            itself, so a request cannot dress its own text up as another
+            account's. A target that does not exist, or that you cannot see,
+            is refused identically so this cannot probe for private
+            messages.
 
     EditMessageRequest:
       type: object

@@ -7,6 +7,7 @@
 
 use serde::Serialize;
 
+use super::message_forwards::ForwardedDto;
 use super::polls::PollDto;
 use crate::store::{AttachmentSummary, Message, MessageRevision};
 
@@ -58,6 +59,15 @@ pub(crate) struct MessageDto {
     /// [`crate::store::Store::thread_unread_counts`] - the read-tracking
     /// every channel already has, surfaced here for the first time.
     pub(crate) thread_unread_count: Option<i64>,
+    /// What this message forwards, or `null` when it forwards nothing.
+    /// Always present as a key, the same convention `poll` follows. Set by
+    /// [`super::message_forwards::for_messages`] and by the send route,
+    /// never by this conversion, which has nowhere to read an origin from.
+    ///
+    /// A forwarding message's own `content` is whatever the forwarder chose
+    /// to say alongside it, and is empty when they said nothing. The thing
+    /// being forwarded is in here and never mixed into that text.
+    pub(crate) forwarded: Option<ForwardedDto>,
     /// Empty unless the caller asked for a list, which is the only path that
     /// batch-loads them; a single echoed message carries none because it
     /// cannot have any yet.
@@ -134,6 +144,7 @@ impl From<Message> for MessageDto {
             thread_reply_count: None,
             thread_last_reply_at: None,
             thread_unread_count: None,
+            forwarded: None,
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),

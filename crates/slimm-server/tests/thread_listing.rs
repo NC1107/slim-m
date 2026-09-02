@@ -18,7 +18,7 @@ use slimm_server::ids::{ChannelId, MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{MAX_THREADS_PER_CHANNEL, OpenThreadError, Store};
+use slimm_server::store::{MAX_THREADS_PER_CHANNEL, NewMessage, OpenThreadError, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -327,14 +327,12 @@ async fn a_channel_refuses_a_new_thread_past_its_ceiling() {
     let mut first_parent: Option<MessageId> = None;
     for index in 0..MAX_THREADS_PER_CHANNEL {
         let parent = store
-            .send_message(
+            .send_message(NewMessage::plain(
                 channel,
                 author,
                 MessageId::generate(),
                 &format!("root {index}"),
-                &[],
-                None,
-            )
+            ))
             .await
             .unwrap()
             .message;
@@ -345,14 +343,12 @@ async fn a_channel_refuses_a_new_thread_past_its_ceiling() {
     }
 
     let one_more = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel,
             author,
             MessageId::generate(),
             "one too many",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;

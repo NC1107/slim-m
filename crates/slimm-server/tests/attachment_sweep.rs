@@ -12,7 +12,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{CanvasObjectId, EmojiId};
-use slimm_server::store::{PlaceRequest, Store};
+use slimm_server::store::{NewMessage, PlaceRequest, Store};
 use sqlx::SqlitePool;
 
 mod support;
@@ -251,14 +251,15 @@ async fn deleting_a_message_whose_image_is_also_an_emoji_still_works() {
 
     let message = MessageId::generate();
     store
-        .send_message(
-            channel.id,
-            author,
-            message,
-            "look at this",
-            &[shared.to_vec()],
-            None,
-        )
+        .send_message(NewMessage {
+            channel_id: channel.id,
+            author_id: author,
+            id: message,
+            content: "look at this",
+            attachment_ids: &[shared.to_vec()],
+            reply_to_id: None,
+            forward: None,
+        })
         .await
         .expect("the message is sent with its attachment");
 

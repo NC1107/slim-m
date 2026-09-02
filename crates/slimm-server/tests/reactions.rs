@@ -14,7 +14,7 @@ use slimm_server::hub::Hub;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -189,7 +189,7 @@ async fn reacting_cannot_probe_for_messages_you_cannot_see() {
     let author = store.create_user("author", "Author").await.unwrap();
     let real = slimm_server::ids::MessageId::generate();
     store
-        .send_message(channel.id, author.id, real, "secret", &[], None)
+        .send_message(NewMessage::plain(channel.id, author.id, real, "secret"))
         .await
         .unwrap();
     let hidden_status = app

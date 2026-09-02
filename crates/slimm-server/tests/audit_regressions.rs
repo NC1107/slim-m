@@ -18,7 +18,7 @@ use slimm_server::ids::UserId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -160,7 +160,7 @@ async fn a_report_filed_in_a_dm_reaches_the_moderators() {
     let dm = store.open_dm(bob, carol).await.expect("open dm");
     let message_id = slimm_server::ids::MessageId(Uuid::now_v7());
     store
-        .send_message(dm.id, bob, message_id, "abuse", &[], None)
+        .send_message(NewMessage::plain(dm.id, bob, message_id, "abuse"))
         .await
         .expect("send in dm");
 

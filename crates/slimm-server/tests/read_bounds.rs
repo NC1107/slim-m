@@ -23,7 +23,7 @@ use slimm_server::hub::Hub;
 use slimm_server::ids::{ChannelId, MessageId, UserId};
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{MAX_PINS_PER_CHANNEL, PinError, Store};
+use slimm_server::store::{MAX_PINS_PER_CHANNEL, NewMessage, PinError, Store};
 use tower::ServiceExt;
 
 mod support;
@@ -89,7 +89,12 @@ async fn admin(store: &Store, username: &str) -> (UserId, String, ChannelId) {
 
 async fn message(store: &Store, channel: ChannelId, author: UserId, body: &str) -> MessageId {
     store
-        .send_message(channel, author, MessageId::generate(), body, &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            author,
+            MessageId::generate(),
+            body,
+        ))
         .await
         .unwrap()
         .message

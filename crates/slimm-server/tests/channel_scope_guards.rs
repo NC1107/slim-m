@@ -20,7 +20,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{ChannelId, MessageId};
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use sqlx::SqlitePool;
 
 mod support;
@@ -48,7 +48,12 @@ async fn thread_fixture(store: &Store) -> (ChannelId, ChannelId) {
     store.bootstrap_deployment(admin.id).await.unwrap();
     let parent = store.list_channels().await.unwrap()[0].id;
     let message = store
-        .send_message(parent, admin.id, MessageId::generate(), "hi", &[], None)
+        .send_message(NewMessage::plain(
+            parent,
+            admin.id,
+            MessageId::generate(),
+            "hi",
+        ))
         .await
         .unwrap()
         .message
@@ -151,14 +156,12 @@ async fn a_pin_naming_another_channels_message_is_not_returned() {
     let elsewhere = store.create_channel("secret", "text").await.unwrap().id;
 
     let foreign = store
-        .send_message(
+        .send_message(NewMessage::plain(
             elsewhere,
             admin.id,
             MessageId::generate(),
             "not for here",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message

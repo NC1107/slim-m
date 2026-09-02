@@ -14,7 +14,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
-use slimm_server::store::{PushRegistration, Store};
+use slimm_server::store::{NewMessage, PushRegistration, Store};
 
 mod support;
 use support::wake_recipients;
@@ -80,7 +80,12 @@ async fn a_mention_wakes_its_target_regardless_of_letter_case() {
     }
 
     let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            alice,
+            MessageId::generate(),
+            "root",
+        ))
         .await
         .unwrap();
     let thread = store
@@ -89,14 +94,12 @@ async fn a_mention_wakes_its_target_regardless_of_letter_case() {
         .unwrap()
         .channel;
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             thread.id,
             bob,
             MessageId::generate(),
             "first reply",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 
@@ -151,7 +154,12 @@ async fn a_case_insensitive_mention_can_resolve_to_two_differently_cased_account
     }
 
     let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            alice,
+            MessageId::generate(),
+            "root",
+        ))
         .await
         .unwrap();
     let thread = store
@@ -160,14 +168,12 @@ async fn a_case_insensitive_mention_can_resolve_to_two_differently_cased_account
         .unwrap()
         .channel;
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             thread.id,
             bob,
             MessageId::generate(),
             "first reply",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 

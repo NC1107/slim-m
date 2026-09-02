@@ -18,7 +18,7 @@ use std::fs;
 use std::path::Path;
 
 use slimm_server::ids::UserId;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use sqlx::{Row, SqlitePool};
 
 async fn new_store(name: &str) -> (Store, SqlitePool, support::TestDbGuard) {
@@ -45,14 +45,12 @@ async fn register(store: &Store, name: &str) -> UserId {
 
 async fn send(store: &Store, channel: slimm_server::ids::ChannelId, author: UserId, text: &str) {
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel,
             author,
             slimm_server::ids::MessageId::generate(),
             text,
-            &[],
-            None,
-        )
+        ))
         .await
         .expect("send");
 }
@@ -150,7 +148,7 @@ async fn a_deleted_newest_message_does_not_carry_the_ordering() {
     send(&store, with_carol, carol, "carol speaks").await;
     let id = slimm_server::ids::MessageId::generate();
     store
-        .send_message(with_bob, bob, id, "bob speaks last", &[], None)
+        .send_message(NewMessage::plain(with_bob, bob, id, "bob speaks last"))
         .await
         .expect("send");
     store.delete_message(id, bob).await.expect("delete");

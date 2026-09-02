@@ -25,7 +25,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::Edited;
+use crate::store::{Edited, NewMessage};
 
 pub(crate) use super::message_dto::{AttachmentDto, MessageDto, MessageRevisionDto, ReactionDto};
 
@@ -70,6 +70,14 @@ struct SendRequest {
     /// same channel (live or soft-deleted); anything else is a 400.
     #[serde(default)]
     reply_to_id: Option<String>,
+    /// The message this one forwards, if any. Unlike `reply_to_id` it may
+    /// live in any channel the sender can see, and only its id is accepted:
+    /// the server reads the original's author, timestamp and text for
+    /// itself, so a request cannot dress its own text up as someone else's.
+    /// `content` stays the sender's own note alongside the forward, and may
+    /// be empty.
+    #[serde(default)]
+    forwarded_from_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -131,23 +139,34 @@ async fn send(
         return Err(ApiError::Forbidden);
     }
 
-    let content = validate_content(&req.content, !attachment_ids.is_empty())?;
+    // A forward with no note of its own is a complete message; so is one
+    // that is only attachments.
+    let carries_more = !attachment_ids.is_empty() || req.forwarded_from_id.is_some();
+    let content = validate_content(&req.content, carries_more)?;
     let id = MessageId(parse_uuid(&req.id)?);
     let reply_to_id = req
         .reply_to_id
         .as_deref()
         .map(|raw| parse_uuid(raw).map(MessageId))
         .transpose()?;
+    let forward = match &req.forwarded_from_id {
+        Some(raw) => Some(
+            super::message_forwards::resolve(&state, ctx.user_id, MessageId(parse_uuid(raw)?))
+                .await?,
+        ),
+        None => None,
+    };
     let sent = state
         .store
-        .send_message(
+        .send_message(NewMessage {
             channel_id,
-            ctx.user_id,
+            author_id: ctx.user_id,
             id,
             content,
-            &attachment_ids,
+            attachment_ids: &attachment_ids,
             reply_to_id,
-        )
+            forward,
+        })
         .await?;
 
     // Read once and used twice: the live frame and this response need the
@@ -161,12 +180,21 @@ async fn send(
         .map(|(_, summaries)| summaries)
         .unwrap_or_default();
 
+    let forwarded = state
+        .store
+        .forwards_for_messages(&[id])
+        .await?
+        .into_iter()
+        .next()
+        .map(|(_, summary)| summary);
+
     // An idempotent retry must not fan out or push again; see the note on
     // this function.
     if sent.fresh {
         state.hub.publish(Event::MessageCreated {
             message: sent.message.clone(),
             attachments: attachments.clone(),
+            forwarded: forwarded.clone(),
         });
 
         // Cheap in-memory decision only, real work detached; see the note on
@@ -188,6 +216,7 @@ async fn send(
 
     let mut dto: MessageDto = sent.message.into();
     dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
+    dto.forwarded = forwarded.map(Into::into);
     Ok(Json(dto))
 }
 

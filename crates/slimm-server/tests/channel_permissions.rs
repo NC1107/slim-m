@@ -19,7 +19,7 @@ use slimm_server::ids::{ChannelId, MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -174,14 +174,12 @@ async fn a_thread_answers_exactly_like_its_parent_channel() {
     let everyone = everyone_role_id(&store).await;
 
     let parent_message = store
-        .send_message(
+        .send_message(NewMessage::plain(
             channel_id,
             admin_id,
             MessageId::generate(),
             "start a thread here",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap()
         .message;

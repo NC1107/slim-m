@@ -12,7 +12,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::MessageId;
-use slimm_server::store::Store;
+use slimm_server::store::{NewMessage, Store};
 
 mod support;
 
@@ -38,14 +38,12 @@ async fn a_thread_with_a_nonzero_position_does_not_inflate_the_next_real_channel
     store.bootstrap_deployment(account.id).await.unwrap();
     let general = &store.list_channels().await.unwrap()[0];
     let sent = store
-        .send_message(
+        .send_message(NewMessage::plain(
             general.id,
             account.id,
             MessageId::generate(),
             "start",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
     let thread = store

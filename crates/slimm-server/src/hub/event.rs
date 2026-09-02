@@ -9,7 +9,9 @@
 use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
-use crate::store::{AttachmentSummary, CanvasObject, Channel, MediaSlotKind, Message};
+use crate::store::{
+    AttachmentSummary, CanvasObject, Channel, ForwardSummary, MediaSlotKind, Message,
+};
 use crate::voice::CallRingOutcome;
 
 /// Something that happened and should reach interested connections.
@@ -25,6 +27,11 @@ pub enum Event {
     MessageCreated {
         message: Message,
         attachments: Vec<AttachmentSummary>,
+        /// Present when the message forwards something. Rides along for the
+        /// same reason `attachments` does: the row cannot express it, and a
+        /// forward that arrived live without it rendered as a bare note
+        /// until the next sync filled the origin in.
+        forwarded: Option<ForwardSummary>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,
     /// a different sequence from the message's own `seq`, which an edit does

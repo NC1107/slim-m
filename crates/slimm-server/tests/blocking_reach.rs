@@ -15,7 +15,7 @@
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
-use slimm_server::store::{PushRegistration, Store};
+use slimm_server::store::{NewMessage, PushRegistration, Store};
 
 mod support;
 use support::wake_recipients;
@@ -62,7 +62,12 @@ async fn a_blocked_users_reaction_is_not_counted_for_the_blocker_alone() {
     let channel = store.list_channels().await.unwrap()[0].id;
 
     let message = store
-        .send_message(channel, alice, MessageId::generate(), "hello", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            alice,
+            MessageId::generate(),
+            "hello",
+        ))
         .await
         .unwrap();
 
@@ -121,7 +126,12 @@ async fn a_viewers_own_reaction_survives_the_filter() {
     let channel = store.list_channels().await.unwrap()[0].id;
 
     let message = store
-        .send_message(channel, bob, MessageId::generate(), "hello", &[], None)
+        .send_message(NewMessage::plain(
+            channel,
+            bob,
+            MessageId::generate(),
+            "hello",
+        ))
         .await
         .unwrap();
     store

@@ -17,8 +17,8 @@
 
 use slimm_server::config::Config;
 use slimm_server::db;
-use slimm_server::ids::{DeviceId, MessageId, UserId};
-use slimm_server::store::{PushRegistration, Store};
+use slimm_server::ids::{ChannelId, DeviceId, MessageId, UserId};
+use slimm_server::store::{NewMessage, PushRegistration, Sent, Store};
 
 mod support;
 use support::wake_recipients;
@@ -35,6 +35,20 @@ async fn new_store(name: &str) -> (Store, support::TestDbGuard) {
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
     (Store::new(pool), guard)
+}
+
+/// A plain message with a fresh id, which is every send in this file: these
+/// tests are about who gets woken, never about the message itself.
+async fn send(store: &Store, channel: ChannelId, author: UserId, body: &str) -> Sent {
+    store
+        .send_message(NewMessage::plain(
+            channel,
+            author,
+            MessageId::generate(),
+            body,
+        ))
+        .await
+        .unwrap()
 }
 
 async fn account(store: &Store, username: &str) -> (UserId, DeviceId) {
@@ -82,26 +96,13 @@ async fn a_reply_wakes_only_the_parent_author_and_actual_repliers() {
     }
 
     // Alice opens the thread and bob replies; carol never touches it.
-    let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
+    let parent = send(&store, channel, alice, "root").await;
     let thread = store
         .open_thread(channel, parent.message.id)
         .await
         .unwrap()
         .channel;
-    store
-        .send_message(
-            thread.id,
-            bob,
-            MessageId::generate(),
-            "first reply",
-            &[],
-            None,
-        )
-        .await
-        .unwrap();
+    send(&store, thread.id, bob, "first reply").await;
 
     // A second reply from bob: alice (the parent author) must be woken, carol must not.
     let recipients = wake_recipients(&store, thread.id, bob, "again")
@@ -117,17 +118,7 @@ async fn a_reply_wakes_only_the_parent_author_and_actual_repliers() {
     );
 
     // Carol replying herself makes her a participant from here on.
-    store
-        .send_message(
-            thread.id,
-            carol,
-            MessageId::generate(),
-            "joining in",
-            &[],
-            None,
-        )
-        .await
-        .unwrap();
+    send(&store, thread.id, carol, "joining in").await;
     let recipients = wake_recipients(&store, thread.id, alice, "reply")
         .await
         .unwrap();
@@ -177,10 +168,7 @@ async fn the_first_reply_in_an_empty_thread_still_wakes_the_parent_author() {
         .await
         .unwrap();
 
-    let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
+    let parent = send(&store, channel, alice, "root").await;
     let thread = store
         .open_thread(channel, parent.message.id)
         .await
@@ -228,26 +216,13 @@ async fn a_mention_wakes_a_bystander_the_thread_would_otherwise_exclude() {
             .unwrap();
     }
 
-    let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
+    let parent = send(&store, channel, alice, "root").await;
     let thread = store
         .open_thread(channel, parent.message.id)
         .await
         .unwrap()
         .channel;
-    store
-        .send_message(
-            thread.id,
-            bob,
-            MessageId::generate(),
-            "first reply",
-            &[],
-            None,
-        )
-        .await
-        .unwrap();
+    send(&store, thread.id, bob, "first reply").await;
 
     let without_mention = wake_recipients(&store, thread.id, bob, "no mention here")
         .await
@@ -305,10 +280,7 @@ async fn a_mention_never_reaches_somebody_without_view_permission() {
         .await
         .unwrap();
 
-    let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
+    let parent = send(&store, channel, alice, "root").await;
     let thread = store
         .open_thread(channel, parent.message.id)
         .await
@@ -361,23 +333,14 @@ async fn blocking_still_holds_inside_a_thread() {
             .unwrap();
     }
 
-    let parent = store
-        .send_message(channel, bob, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
+    let parent = send(&store, channel, bob, "root").await;
     let thread = store
         .open_thread(channel, parent.message.id)
         .await
         .unwrap()
         .channel;
-    store
-        .send_message(thread.id, alice, MessageId::generate(), "hi", &[], None)
-        .await
-        .unwrap();
-    store
-        .send_message(thread.id, carol, MessageId::generate(), "hi", &[], None)
-        .await
-        .unwrap();
+    send(&store, thread.id, alice, "hi").await;
+    send(&store, thread.id, carol, "hi").await;
 
     let before = wake_recipients(&store, thread.id, bob, "reply")
         .await
@@ -448,19 +411,13 @@ async fn a_view_denial_on_the_parent_excludes_a_push_recipient_from_the_thread()
         .await
         .unwrap();
 
-    let parent = store
-        .send_message(channel, alice, MessageId::generate(), "root", &[], None)
-        .await
-        .unwrap();
+    let parent = send(&store, channel, alice, "root").await;
     let thread = store
         .open_thread(channel, parent.message.id)
         .await
         .unwrap()
         .channel;
-    store
-        .send_message(thread.id, bob, MessageId::generate(), "hi", &[], None)
-        .await
-        .unwrap();
+    send(&store, thread.id, bob, "hi").await;
 
     let before = wake_recipients(&store, thread.id, alice, "reply")
         .await

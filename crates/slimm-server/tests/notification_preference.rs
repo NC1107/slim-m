@@ -13,7 +13,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::ids::{DeviceId, MessageId, UserId};
 use slimm_server::notifications::NotificationPreference;
-use slimm_server::store::{PushRegistration, Store};
+use slimm_server::store::{NewMessage, PushRegistration, Store};
 
 mod support;
 use support::wake_recipients;
@@ -322,7 +322,12 @@ async fn a_thread_hanging_off_a_dm_message_still_counts_as_a_dm() {
 
     let dm = store.open_dm(alice, bob).await.unwrap();
     let parent = store
-        .send_message(dm.id, alice, MessageId::generate(), "root", &[], None)
+        .send_message(NewMessage::plain(
+            dm.id,
+            alice,
+            MessageId::generate(),
+            "root",
+        ))
         .await
         .unwrap();
     let thread = store
@@ -331,14 +336,12 @@ async fn a_thread_hanging_off_a_dm_message_still_counts_as_a_dm() {
         .unwrap()
         .channel;
     store
-        .send_message(
+        .send_message(NewMessage::plain(
             thread.id,
             bob,
             MessageId::generate(),
             "first reply",
-            &[],
-            None,
-        )
+        ))
         .await
         .unwrap();
 
