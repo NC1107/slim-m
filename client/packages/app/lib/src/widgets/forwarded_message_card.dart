@@ -93,12 +93,19 @@ class ForwardedMessageCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _Header(
-            forwarded: forwarded,
-            name: name,
-            time: time,
-            originLabel: originLabel,
-            jumpable: onJump != null,
+          // One sentence over the header's own spans, which read as a pile of fragments; the body below keeps its natural semantics and stays readable.
+          Semantics(
+            button: onJump != null,
+            label: _describe(name, time, originLabel, jumpable: onJump != null),
+            child: ExcludeSemantics(
+              child: _Header(
+                forwarded: forwarded,
+                name: name,
+                time: time,
+                originLabel: originLabel,
+                jumpable: onJump != null,
+              ),
+            ),
           ),
           if (body case final body?)
             Padding(
@@ -114,27 +121,16 @@ class ForwardedMessageCard extends ConsumerWidget {
       ),
     );
 
-    if (onJump == null) {
-      return Semantics(
-        label: _describe(name, time, originLabel, jumpable: false),
-        child: ExcludeSemantics(child: card),
-      );
-    }
-    return Semantics(
-      button: true,
-      label: _describe(name, time, originLabel, jumpable: true),
-      child: ExcludeSemantics(
-        child: AppFocusRing(
-          radius: AppRadii.control,
-          builder: (context, onFocusChange) => InkWell(
-            onTap: onJump,
-            // AppFocusRing replaces this overlay; see its own doc comment.
-            focusColor: Colors.transparent,
-            onFocusChange: onFocusChange,
-            borderRadius: BorderRadius.circular(AppRadii.control),
-            child: card,
-          ),
-        ),
+    if (onJump == null) return card;
+    return AppFocusRing(
+      radius: AppRadii.control,
+      builder: (context, onFocusChange) => InkWell(
+        onTap: onJump,
+        // AppFocusRing replaces this overlay; see its own doc comment.
+        focusColor: Colors.transparent,
+        onFocusChange: onFocusChange,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: card,
       ),
     );
   }
@@ -181,56 +177,67 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(AppIcons.forward, size: 13, color: tokens.textSecondary),
-        const SizedBox(width: AppSpacing.s4),
-        UserAvatar(
-          name: name,
-          userId: forwarded.authorId,
-          avatarUpdatedAt: forwarded.authorAvatarUpdatedAt,
-          size: _avatarSize,
-        ),
-        const SizedBox(width: AppSpacing.s4),
-        Flexible(
-          child: Text(
-            name,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.caption.copyWith(
-              color: tokens.textPrimary,
-              fontWeight: AppWeights.semi,
+        // Says what the container is, in a word. Without it the box reads as a reply quote, which is a different thing rendered a different way.
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(AppIcons.forward, size: 13, color: tokens.textSecondary),
+            const SizedBox(width: AppSpacing.s4),
+            Text(
+              originLabel == null ? 'Forwarded' : 'Forwarded from',
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s8),
-        Text(
-          time,
-          style: AppText.caption.copyWith(color: tokens.textSecondary),
-        ),
-        if (originLabel case final label?) ...[
-          const SizedBox(width: AppSpacing.s8),
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.caption.copyWith(
-                      color: jumpable ? tokens.accent : tokens.textSecondary,
-                    ),
+            if (originLabel case final label?) ...[
+              const SizedBox(width: AppSpacing.s4),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(
+                    color: jumpable ? tokens.accent : tokens.textSecondary,
+                    fontWeight: AppWeights.semi,
                   ),
                 ),
-                if (jumpable) ...[
-                  const SizedBox(width: AppSpacing.s4),
-                  Icon(AppIcons.shapeArrow, size: 12, color: tokens.accent),
-                ],
+              ),
+              if (jumpable) ...[
+                const SizedBox(width: AppSpacing.s4),
+                Icon(AppIcons.shapeArrow, size: 12, color: tokens.accent),
               ],
+            ],
+          ],
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            UserAvatar(
+              name: name,
+              userId: forwarded.authorId,
+              avatarUpdatedAt: forwarded.authorAvatarUpdatedAt,
+              size: _avatarSize,
             ),
-          ),
-        ],
+            const SizedBox(width: AppSpacing.s8),
+            Flexible(
+              child: Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.copyWith(
+                  color: tokens.textPrimary,
+                  fontWeight: AppWeights.semi,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Text(
+              time,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ],
+        ),
       ],
     );
   }

@@ -116,4 +116,15 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('what was forwarded stays readable to a screen reader', (
+    tester,
+  ) async {
+    await _pump(tester, origin: _channel(name: 'general'));
+
+    // The header collapses to one sentence; what was forwarded must survive into the announcement with it.
+    final node = tester.getSemantics(find.text('the original text'));
+    expect(node.label, contains('Forwarded message from Alice in #general'));
+    expect(node.label, contains('the original text'));
+  });
 }
