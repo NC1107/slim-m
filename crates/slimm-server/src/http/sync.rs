@@ -177,8 +177,7 @@ async fn sync(
     // multiply the per-scope database work.
     let cursors = dedupe_scopes(req.scopes);
 
-    // Parse every id up front, so a malformed one still fails the whole
-    // request the way it did when parsing happened inside the loop.
+    // Parse every id up front, so a malformed one still fails the whole request as it did when parsing was inside the loop.
     let parsed: Vec<(ScopeCursor, ChannelId)> = cursors
         .into_iter()
         .map(|cursor| {
@@ -187,11 +186,7 @@ async fn sync(
         })
         .collect::<Result<_, _>>()?;
 
-    // One batched permission fetch for every scope, not four-to-five queries
-    // per channel in the loop: a reconnect after a long absence holds up to
-    // MAX_SCOPES channels, and permissions_in_channels resolves them all
-    // against one roles/timeout load. The channel-rail, report and
-    // saved-messages paths already read permissions this way.
+    // One batched permission fetch, not four-to-five queries per channel in the loop; permissions_in_channels resolves up to MAX_SCOPES channels against one roles/timeout load, as the rail, report and saved-messages paths already do.
     let channel_ids: Vec<ChannelId> = parsed.iter().map(|(_, id)| *id).collect();
     let permissions = state
         .store
