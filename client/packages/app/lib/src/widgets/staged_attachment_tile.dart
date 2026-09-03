@@ -8,6 +8,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'composer_attachments.dart';
@@ -184,7 +185,12 @@ class _AttachmentThumbnail extends StatelessWidget {
 }
 
 /// A small icon-only control on a tile: remove always, retry once failed.
-class _TileButton extends StatelessWidget {
+///
+/// Stateful for one reason: it lights a hover background so the target reads
+/// as tappable before it is clicked (it had a bare cursor-less GestureDetector
+/// before, which the owner reported as not looking noticeable), and it fires a
+/// selection haptic on tap so a touch device confirms the removal.
+class _TileButton extends StatefulWidget {
   const _TileButton({
     required this.icon,
     required this.semanticLabel,
@@ -196,16 +202,41 @@ class _TileButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_TileButton> createState() => _TileButtonState();
+}
+
+class _TileButtonState extends State<_TileButton> {
+  bool _hovered = false;
+
+  void _handleTap() {
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Semantics(
       button: true,
-      label: semanticLabel,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(2),
-          child: Icon(icon, size: AppSizes.icon16, color: tokens.textSecondary),
+      label: widget.semanticLabel,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: _handleTap,
+          child: Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: _hovered ? tokens.surfaceSunken : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: Icon(
+              widget.icon,
+              size: AppSizes.icon16,
+              color: _hovered ? tokens.textPrimary : tokens.textSecondary,
+            ),
+          ),
         ),
       ),
     );
