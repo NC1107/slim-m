@@ -210,7 +210,8 @@ class _ChatToggleChip extends StatelessWidget {
         color: tokens.surfaceRaised,
         borderRadius: BorderRadius.circular(AppRadii.window),
         border: Border.all(color: tokens.borderSubtle),
-        boxShadow: AppShadows.float,
+        // AppShadows.canvasTile, not float: this chip rests here permanently, and a permanent floater takes the resting lift (see canvas_presence_bubble.dart).
+        boxShadow: AppShadows.canvasTile,
       ),
       child: AppIconButton(
         icon: AppIcons.hash,
