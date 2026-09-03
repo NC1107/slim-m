@@ -50,10 +50,10 @@ class AppAsyncView<T> extends StatelessWidget {
     this.center = true,
   });
 
-  /// The fetch, as Riverpod's own three-state value. Typed loosely so this
-  /// package does not depend on Riverpod: pass `(value: async.valueOrNull,
-  /// isLoading: async.isLoading, error: async.error)`-shaped state through
-  /// [AppAsyncState].
+  /// The fetch, as an [AppAsyncState]. Typed loosely so this package does not
+  /// depend on Riverpod: build one at the call site from an `AsyncValue` as
+  /// `AppAsyncState(data: async.valueOrNull, error: async.error)` - a null
+  /// [AppAsyncState.data] with no error renders the loading state.
   final AppAsyncState<T> value;
 
   final Widget Function(BuildContext context, T data) data;
