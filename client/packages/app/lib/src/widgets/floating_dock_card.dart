@@ -3,13 +3,17 @@
 /// both sit inside, so "the voice bar" and "the canvas toolbar" read as one
 /// idea rather than two competing bars.
 ///
-/// [AppRadii.window] and [AppShadows.float]: both tokens already existed and
-/// both were already reserved, by their own doc comments, for exactly this -
-/// a floating canvas window and a menu or a dragged object. A control
-/// surface that floats over live content rather than reserving a permanent
-/// strip at the edge of the screen is the same kind of thing, so it draws
-/// from the same two tokens rather than inventing a third shadow the design
-/// language's own motion doc explicitly rules out.
+/// [AppRadii.window] and [AppShadows.canvasTile]: both tokens already
+/// existed, and neither is invented for this card - the design language's
+/// own motion doc rules out a third shadow. An earlier version reached for
+/// [AppShadows.float] on the argument that a control surface floating over
+/// live content is the same kind of thing as a dragged object; the token
+/// set has since drawn a finer line, in [AppShadows.canvasTile]'s own doc
+/// and in `canvas_presence_bubble.dart`: a surface that floats
+/// *permanently* takes the resting lift, and float's deep picked-up cast
+/// belongs only to something transiently above the plane (a menu, a modal,
+/// a drag in progress). This dock sits over the call for its whole
+/// duration, so it rests.
 ///
 /// **A right-click anywhere on this card is absorbed and does nothing**,
 /// the identical no-op `onSecondaryTapUp` `canvas_self_presence_overlay.dart`
@@ -116,7 +120,7 @@ class FloatingDockCard extends StatelessWidget {
           color: tokens.surfaceRaised,
           borderRadius: BorderRadius.circular(AppRadii.window),
           border: Border.all(color: tokens.borderSubtle),
-          boxShadow: AppShadows.float,
+          boxShadow: AppShadows.canvasTile,
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: divided),
       ),
