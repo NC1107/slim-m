@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The desktop splash on/off and duration preferences: both default to the
-/// existing behaviour (on, standard = 900ms), a choice persists and restores,
-/// an unknown stored value degrades to the default, and [SplashDurationX]
-/// maps each named choice to a concrete, distinct duration with [standard]
-/// tied to [minSplashDuration] itself.
+/// The desktop startup-splash preference: one duration choice, with Disabled
+/// standing in for the old on/off toggle. Defaults to standard (900ms), a
+/// choice persists and restores, an unknown stored value degrades to the
+/// default, an install that had the old toggle off migrates to Disabled, and
+/// [SplashDurationX] maps each choice to a concrete duration - Disabled to
+/// zero, standard to [minSplashDuration] itself.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,37 +31,6 @@ void main() {
     return c;
   }
 
-  group('SplashEnabledController', () {
-    test('defaults to on, so it changes nothing on its own', () {
-      expect(container().read(splashEnabledControllerProvider), isTrue);
-    });
-
-    test('selecting off persists, and restore reads it back', () async {
-      final c = container();
-      await c.read(splashEnabledControllerProvider.notifier).select(false);
-      expect(
-        (await SharedPreferences.getInstance()).getBool(
-          desktopSplashEnabledKey,
-        ),
-        isFalse,
-      );
-
-      final c2 = container();
-      await c2.read(splashEnabledControllerProvider.notifier).restore();
-      expect(c2.read(splashEnabledControllerProvider), isFalse);
-    });
-
-    test('turning it back on persists too, not just turning it off', () async {
-      SharedPreferences.setMockInitialValues({desktopSplashEnabledKey: false});
-      final c = container();
-      await c.read(splashEnabledControllerProvider.notifier).select(true);
-
-      final c2 = container();
-      await c2.read(splashEnabledControllerProvider.notifier).restore();
-      expect(c2.read(splashEnabledControllerProvider), isTrue);
-    });
-  });
-
   group('SplashDurationController', () {
     test('defaults to standard, so it changes nothing on its own', () {
       expect(
@@ -69,7 +39,8 @@ void main() {
       );
     });
 
-    test('every named choice honours its own concrete duration', () {
+    test('every choice honours its own concrete duration', () {
+      expect(SplashDuration.disabled.duration, Duration.zero);
       expect(SplashDuration.brief.duration, const Duration(milliseconds: 500));
       expect(SplashDuration.standard.duration, minSplashDuration);
       expect(SplashDuration.long.duration, const Duration(milliseconds: 1500));
@@ -83,7 +54,8 @@ void main() {
       );
     });
 
-    test('only standard names itself as the default in its label', () {
+    test('the labels name Disabled and the default distinctly', () {
+      expect(SplashDuration.disabled.label, 'Disabled');
       expect(SplashDuration.standard.label, contains('default'));
       expect(SplashDuration.brief.label, isNot(contains('default')));
       expect(SplashDuration.long.label, isNot(contains('default')));
@@ -106,6 +78,22 @@ void main() {
       expect(c2.read(splashDurationControllerProvider), SplashDuration.long);
     });
 
+    test(
+      'selecting Disabled persists and restores like any other choice',
+      () async {
+        final c = container();
+        await c
+            .read(splashDurationControllerProvider.notifier)
+            .select(SplashDuration.disabled);
+        final c2 = container();
+        await c2.read(splashDurationControllerProvider.notifier).restore();
+        expect(
+          c2.read(splashDurationControllerProvider),
+          SplashDuration.disabled,
+        );
+      },
+    );
+
     test('an unknown stored value degrades to the default', () async {
       SharedPreferences.setMockInitialValues({
         desktopSplashDurationKey: 'glacial',
@@ -114,40 +102,63 @@ void main() {
       await c.read(splashDurationControllerProvider.notifier).restore();
       expect(c.read(splashDurationControllerProvider), SplashDuration.standard);
     });
+
+    test(
+      'an install that had the old toggle off migrates to Disabled',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          desktopSplashEnabledKey: false,
+        });
+        final c = container();
+        await c.read(splashDurationControllerProvider.notifier).restore();
+        expect(
+          c.read(splashDurationControllerProvider),
+          SplashDuration.disabled,
+          reason: 'a splash turned off under the old toggle stays off',
+        );
+      },
+    );
+
+    test(
+      'the old toggle left on (or unset) keeps the default, not Disabled',
+      () async {
+        SharedPreferences.setMockInitialValues({desktopSplashEnabledKey: true});
+        final c = container();
+        await c.read(splashDurationControllerProvider.notifier).restore();
+        expect(
+          c.read(splashDurationControllerProvider),
+          SplashDuration.standard,
+        );
+      },
+    );
+
+    test('a stored duration wins over the legacy toggle', () async {
+      SharedPreferences.setMockInitialValues({
+        desktopSplashEnabledKey: false,
+        desktopSplashDurationKey: 'long',
+      });
+      final c = container();
+      await c.read(splashDurationControllerProvider.notifier).restore();
+      expect(
+        c.read(splashDurationControllerProvider),
+        SplashDuration.long,
+        reason: 'an explicit new choice is not overridden by the old key',
+      );
+    });
   });
 
   group('splashFloorFor', () {
-    test('off means Duration.zero, no dwell at all, regardless of the '
-        'stored duration', () {
-      for (final duration in SplashDuration.values) {
-        expect(
-          splashFloorFor(enabled: false, duration: duration),
-          Duration.zero,
-          reason: '$duration must not matter once the splash is off',
-        );
-      }
+    test('Disabled means Duration.zero, no dwell at all', () {
+      expect(splashFloorFor(SplashDuration.disabled), Duration.zero);
     });
 
-    test('on means the chosen duration, distinctly, for every choice', () {
+    test('every other choice is its own duration', () {
       expect(
-        splashFloorFor(enabled: true, duration: SplashDuration.brief),
+        splashFloorFor(SplashDuration.brief),
         SplashDuration.brief.duration,
       );
-      expect(
-        splashFloorFor(enabled: true, duration: SplashDuration.standard),
-        SplashDuration.standard.duration,
-      );
-      expect(
-        splashFloorFor(enabled: true, duration: SplashDuration.long),
-        SplashDuration.long.duration,
-      );
-    });
-
-    test('on with standard is exactly the pre-existing minSplashDuration', () {
-      expect(
-        splashFloorFor(enabled: true, duration: SplashDuration.standard),
-        minSplashDuration,
-      );
+      expect(splashFloorFor(SplashDuration.standard), minSplashDuration);
+      expect(splashFloorFor(SplashDuration.long), SplashDuration.long.duration);
     });
   });
 }

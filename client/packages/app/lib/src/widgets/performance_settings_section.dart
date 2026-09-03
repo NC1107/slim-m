@@ -14,7 +14,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:slimm_design_system/design_system.dart' show AppSpacing;
 import 'package:slimm_platform/platform.dart' show isDesktopHost;
 
 import '../providers/attachment_preview_quality.dart';
@@ -24,7 +23,6 @@ import '../providers/media_preferences.dart';
 import '../providers/message_page_size.dart';
 import 'settings_section_header.dart';
 import 'settings_select_row.dart';
-import 'settings_toggle_row.dart';
 
 class PerformanceSettingsSection extends ConsumerWidget {
   const PerformanceSettingsSection({super.key});
@@ -120,42 +118,29 @@ class PerformanceSettingsSection extends ConsumerWidget {
     );
   }
 
-  /// Absent on a phone or the web, where neither row does anything: the
-  /// splash this pref governs only ever runs on the desktop window shell.
-  /// The duration row only appears once the splash is on - there is nothing
-  /// to time otherwise.
+  /// Absent on a phone or the web, where it does nothing: the splash this
+  /// pref governs only ever runs on the desktop window shell. One row rather
+  /// than a separate on/off toggle - Disabled is just the first duration
+  /// choice, so off and how-long are the same control.
   List<Widget> _splashRows(WidgetRef ref) {
-    final enabled = ref.watch(splashEnabledControllerProvider);
     return [
-      SettingsToggleRow(
+      SettingsSelectRow<SplashDuration>(
         label: 'Startup splash',
-        description:
-            'Show a small splash while slim-m starts up, instead of the '
-            'window opening straight into its real size the moment it is '
-            'ready.',
-        value: enabled,
-        semanticLabel: 'Startup splash',
-        onChanged: (value) =>
-            ref.read(splashEnabledControllerProvider.notifier).select(value),
+        sheetTitle: 'Startup splash',
+        value: ref.watch(splashDurationControllerProvider),
+        choices: [
+          for (final value in SplashDuration.values)
+            SettingsChoice(value: value, label: value.label),
+        ],
+        sheetFootnote:
+            'A small splash while slim-m starts up, instead of the window '
+            'opening straight into its real size. Disabled turns it off; '
+            'otherwise the value is how long it stays up at minimum - a start '
+            'slower than that is never held back, only a faster one waits out '
+            'the rest.',
+        onChanged: (next) =>
+            ref.read(splashDurationControllerProvider.notifier).select(next),
       ),
-      if (enabled) ...[
-        const SizedBox(height: AppSpacing.s8),
-        SettingsSelectRow<SplashDuration>(
-          label: 'Splash duration',
-          sheetTitle: 'Splash duration',
-          value: ref.watch(splashDurationControllerProvider),
-          choices: [
-            for (final value in SplashDuration.values)
-              SettingsChoice(value: value, label: value.label),
-          ],
-          sheetFootnote:
-              'How long the splash stays up at minimum. A slower start is '
-              'never held back by this - only a start faster than the '
-              'chosen duration waits out the rest of it.',
-          onChanged: (next) =>
-              ref.read(splashDurationControllerProvider.notifier).select(next),
-        ),
-      ],
     ];
   }
 }

@@ -149,12 +149,8 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
 /// this restore completes would see, which already matches the fallback this
 /// function needs: nothing here has to special-case "not loaded yet".
 Future<Duration> _resolveSplashFloor(ProviderContainer container) async {
-  await container.read(splashEnabledControllerProvider.notifier).restore();
   await container.read(splashDurationControllerProvider.notifier).restore();
-  return splashFloorFor(
-    enabled: container.read(splashEnabledControllerProvider),
-    duration: container.read(splashDurationControllerProvider),
-  );
+  return splashFloorFor(container.read(splashDurationControllerProvider));
 }
 
 Future<void> _runBootstrapSequence(ProviderContainer container) async {
