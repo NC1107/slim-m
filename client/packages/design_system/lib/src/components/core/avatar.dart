@@ -34,9 +34,9 @@ const List<Color> _avatarTints = [
   Color(0xFF4F5B66),
 ];
 
-Color _tintFor(String name) {
+Color _tintFor(String source) {
   var n = 0;
-  for (final unit in name.codeUnits) {
+  for (final unit in source.codeUnits) {
     n = (n + unit) % _avatarTints.length;
   }
   return _avatarTints[n];
@@ -87,6 +87,7 @@ class AppAvatar extends StatelessWidget {
   const AppAvatar({
     super.key,
     required this.name,
+    this.tintKey,
     this.image,
     this.size = 36,
     this.shape = AppAvatarShape.circle,
@@ -97,9 +98,18 @@ class AppAvatar extends StatelessWidget {
     this.semanticLabel,
   });
 
-  /// The display name a round avatar's tint and initials are derived from,
-  /// and the fallback accessible label.
+  /// The display name a round avatar's initials are derived from, the
+  /// fallback accessible label, and - only when [tintKey] is null - the
+  /// tint hash source.
   final String name;
+
+  /// The stable identity the tint is hashed from: a user id, wherever the
+  /// caller knows one. Tint is an identity cue, and hashing it from the
+  /// display string gave the same person two colours on one screen (the
+  /// member list's "Ada Lovelace" beside the call recap's "Ada") and
+  /// recoloured anyone who edited their name. Null falls back to [name],
+  /// for content with no author identity - a channel, a system row.
+  final String? tintKey;
   final ImageProvider? image;
 
   /// Diameter. Avatars appear at several sizes across the app (a message
@@ -139,7 +149,7 @@ class AppAvatar extends StatelessWidget {
             initials: initials,
             tokens: tokens,
             size: size,
-            name: name,
+            tintSource: tintKey ?? name,
             placeholder: placeholder)
         : Image(
             image: image!,
@@ -152,7 +162,7 @@ class AppAvatar extends StatelessWidget {
               initials: initials,
               tokens: tokens,
               size: size,
-              name: name,
+              tintSource: tintKey ?? name,
               placeholder: placeholder,
             ),
           );
@@ -237,7 +247,7 @@ class _Face extends StatelessWidget {
     required this.initials,
     required this.tokens,
     required this.size,
-    required this.name,
+    required this.tintSource,
     required this.placeholder,
   });
 
@@ -245,7 +255,9 @@ class _Face extends StatelessWidget {
   final String initials;
   final AppTokens tokens;
   final double size;
-  final String name;
+
+  /// What [_tintFor] hashes: [AppAvatar.tintKey] resolved against the name.
+  final String tintSource;
   final Widget? placeholder;
 
   @override
@@ -261,7 +273,7 @@ class _Face extends StatelessWidget {
 
     final fontSize = _atLeast9(size * 0.36);
     return ColoredBox(
-      color: _tintFor(name),
+      color: _tintFor(tintSource),
       child: Center(
         child: initials.isEmpty
             ? null

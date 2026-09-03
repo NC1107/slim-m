@@ -162,7 +162,11 @@ class DmRow extends ConsumerWidget {
         selected: selected,
         unread: channel.cursor > channel.lastReadSeq,
         muted: muted,
-        leading: AppAvatar(name: channel.name, size: 20),
+        leading: AppAvatar(
+          name: channel.name,
+          tintKey: channel.dmParticipantId,
+          size: 20,
+        ),
         trailing: inCall
             ? Icon(
                 AppIcons.startCall,

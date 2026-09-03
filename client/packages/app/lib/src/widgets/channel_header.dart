@@ -26,6 +26,7 @@ class ChannelHeader extends ConsumerWidget {
     required this.name,
     required this.isVoice,
     this.isDm = false,
+    this.dmParticipantId,
     this.isPersonalSpace = false,
     this.topic,
     required this.searchOpen,
@@ -34,6 +35,10 @@ class ChannelHeader extends ConsumerWidget {
 
   final String channelId;
   final String name;
+
+  /// The DM peer's user id, so the header avatar's tint keys off identity
+  /// the way every member-naming surface does; see [AppAvatar.tintKey].
+  final String? dmParticipantId;
   final bool isVoice;
 
   /// The self-DM. Its name is "You" (`personalSpaceName`), so it takes the same
@@ -88,7 +93,7 @@ class ChannelHeader extends ConsumerWidget {
                     color: tokens.textSecondary,
                   )
                 else if (isDm)
-                  AppAvatar(name: name, size: 24)
+                  AppAvatar(name: name, tintKey: dmParticipantId, size: 24)
                 else
                   Icon(
                     isVoice ? AppIcons.voice : AppIcons.hash,

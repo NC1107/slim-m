@@ -311,6 +311,36 @@ void main() {
       );
     });
 
+    testWidgets('tintKey pins the tint to identity, not to the display string',
+        (tester) async {
+      Future<Color> tintOf(AppAvatar avatar) async {
+        await _pump(tester, avatar);
+        final coloredBox = tester.widget<ColoredBox>(
+          find.descendant(
+              of: find.byType(AppAvatar), matching: find.byType(ColoredBox)),
+        );
+        return coloredBox.color;
+      }
+
+      final fullName = await tintOf(
+          const AppAvatar(name: 'Ada Lovelace', tintKey: 'user-1'));
+      final shortName =
+          await tintOf(const AppAvatar(name: 'Ada', tintKey: 'user-1'));
+      final renamed =
+          await tintOf(const AppAvatar(name: 'Countess', tintKey: 'user-1'));
+      expect(shortName, fullName,
+          reason:
+              'one person, one colour, whichever name form a surface shows');
+      expect(renamed, fullName,
+          reason: 'a display-name edit must not recolour the person');
+
+      final other = await tintOf(
+          const AppAvatar(name: 'Ada Lovelace', tintKey: 'user-2'));
+      expect(other, isNot(fullName),
+          reason:
+              'a different identity behind the same name is a different person');
+    });
+
     testWidgets('a square avatar never shows generated initials',
         (tester) async {
       await _pump(tester,
