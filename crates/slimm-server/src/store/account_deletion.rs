@@ -102,6 +102,13 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // A forward's snapshot stays visible to whoever it reached, so its author id goes the way a message's does.
+        sqlx::query!(
+            "UPDATE message_forwards SET origin_author_id = NULL WHERE origin_author_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         sqlx::query!(
             "UPDATE canvas_objects SET author_id = NULL WHERE author_id = ?",
             user_id
@@ -210,12 +217,30 @@ impl Store {
             .execute(&mut *tx)
             .await?;
         // Which DMs this account had closed out of its own sidebar is its own preference, not the other side's.
-        sqlx::query!("DELETE FROM saved_messages WHERE user_id = ?", user_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query!("DELETE FROM dm_hides WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        sqlx::query!("DELETE FROM saved_messages WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        // How somebody voted is theirs, like the emoji they reacted with; the tally moves as a reaction count would.
+        sqlx::query!("DELETE FROM poll_votes WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        // Both directions: a deleted account cannot come back to be blocked again.
+        sqlx::query!(
+            "DELETE FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?",
+            user_id,
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "DELETE FROM channel_notification_prefs WHERE user_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // Which inviter's code this account joined with is theirs to forget too; the tombstone never fires its CASCADE.
         sqlx::query!("DELETE FROM invite_redemptions WHERE user_id = ?", user_id)
             .execute(&mut *tx)
