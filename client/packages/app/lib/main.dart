@@ -162,26 +162,24 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   await restoreSession(container);
 
   container.read(startupStatusProvider.notifier).state = 'Loading preferences';
-  await container.read(themeControllerProvider.notifier).restore();
-  await container.read(timeFormatControllerProvider.notifier).restore();
-  await container.read(motionPreferenceControllerProvider.notifier).restore();
-  await container.read(highContrastControllerProvider.notifier).restore();
-  await container.read(imageCacheLimitControllerProvider.notifier).restore();
-  await container
-      .read(attachmentPreviewQualityControllerProvider.notifier)
-      .restore();
-  await container.read(mediaAutoDownloadControllerProvider.notifier).restore();
-  await container.read(gifAutoplayControllerProvider.notifier).restore();
-  await container.read(messagePageSizeControllerProvider.notifier).restore();
-  await container
-      .read(voiceControllerProvider.notifier)
-      .restoreCameraPreference();
-  await container
-      .read(voiceControllerProvider.notifier)
-      .restoreVoiceActivitySensitivity();
-  await container
-      .read(voiceControllerProvider.notifier)
-      .restorePushToTalkPreference();
+  // Independent restores off one cached SharedPreferences future: concurrent rather than an event-loop turn apiece, paid on every launch.
+  final voice = container.read(voiceControllerProvider.notifier);
+  await Future.wait([
+    container.read(themeControllerProvider.notifier).restore(),
+    container.read(timeFormatControllerProvider.notifier).restore(),
+    container.read(motionPreferenceControllerProvider.notifier).restore(),
+    container.read(highContrastControllerProvider.notifier).restore(),
+    container.read(imageCacheLimitControllerProvider.notifier).restore(),
+    container
+        .read(attachmentPreviewQualityControllerProvider.notifier)
+        .restore(),
+    container.read(mediaAutoDownloadControllerProvider.notifier).restore(),
+    container.read(gifAutoplayControllerProvider.notifier).restore(),
+    container.read(messagePageSizeControllerProvider.notifier).restore(),
+    voice.restoreCameraPreference(),
+    voice.restoreVoiceActivitySensitivity(),
+    voice.restorePushToTalkPreference(),
+  ]);
 
   container.read(startupStatusProvider.notifier).state = 'Connecting';
   container.read(syncControllerProvider);

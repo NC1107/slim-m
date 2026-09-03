@@ -53,10 +53,15 @@ class ChannelRefresher {
     MessageStore store, {
     required bool Function() isCurrent,
   }) async {
-    final channels = await api.listChannels();
-    final categories = await api.listCategories();
-    final dms = await api.listDirectMessages();
+    // Three independent reads issued concurrently, then awaited together (see this method's own per-channel Future.wait below); Future.wait rethrows the first failure and consumes the rest, abandoning the write as the sequential version did.
+    final channelsFuture = api.listChannels();
+    final categoriesFuture = api.listCategories();
+    final dmsFuture = api.listDirectMessages();
+    await Future.wait([channelsFuture, categoriesFuture, dmsFuture]);
     if (!isCurrent()) return;
+    final channels = await channelsFuture;
+    final categories = await categoriesFuture;
+    final dms = await dmsFuture;
     final selfId = api.session.tokens?.userId;
     final all = [
       ...channels,
