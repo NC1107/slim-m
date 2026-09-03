@@ -222,3 +222,52 @@ async fn a_non_image_attachment_is_served_as_a_forced_download() {
         "everything but an allowlisted image type must force a download: {disposition}"
     );
 }
+
+/// The uploader may fetch their own attachment before it is on any message -
+/// the staged-GIF preview flow, which selects (uploads) then immediately
+/// fetches for the composer's local preview, and used to 404 every time
+/// because the fetch only checked message-referenced channels. A different
+/// user still 404s on those same unreferenced bytes: existence follows
+/// permission for everyone but the uploader.
+#[tokio::test]
+async fn the_uploader_can_fetch_their_own_not_yet_attached_upload() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::ATTACH_FILES),
+            true,
+        )
+        .await
+        .unwrap();
+    let app = app(store.clone());
+    let (alice_token, _alice_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+
+    // Uploaded, never attached to a message: exactly the mid-compose state.
+    let uploaded = upload(&app, &alice_token, "staged.png", png(16)).await;
+    let attachment_id = uploaded["id"].as_str().unwrap().to_owned();
+    let fetch_uri = format!("/attachments/{attachment_id}");
+
+    let mine = app
+        .clone()
+        .oneshot(request_plain("GET", &fetch_uri, &alice_token))
+        .await
+        .unwrap();
+    assert_eq!(
+        mine.status(),
+        StatusCode::OK,
+        "the uploader must be able to preview what they just uploaded"
+    );
+
+    let theirs = app
+        .clone()
+        .oneshot(request_plain("GET", &fetch_uri, &bob_token))
+        .await
+        .unwrap();
+    assert_eq!(
+        theirs.status(),
+        StatusCode::NOT_FOUND,
+        "a non-uploader still cannot fetch unreferenced bytes"
+    );
+}
