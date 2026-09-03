@@ -212,4 +212,54 @@ void main() {
       expect(healSplashCorruption(legitimate), same(legitimate));
     });
   });
+
+  group('clampSizeToMinimum', () {
+    test('a size below the floor is enlarged to it', () {
+      const small = WindowGeometry(
+        windowedSize: WindowSize(width: 580, height: 400),
+      );
+      final clamped = clampSizeToMinimum(small);
+      expect(
+        clamped.windowedSize.width,
+        WindowGeometry.minimumWindowSize.width,
+      );
+      expect(
+        clamped.windowedSize.height,
+        WindowGeometry.minimumWindowSize.height,
+      );
+    });
+
+    test('only the dimension below the floor is raised', () {
+      const wideButShort = WindowGeometry(
+        windowedSize: WindowSize(width: 1400, height: 400),
+      );
+      final clamped = clampSizeToMinimum(wideButShort);
+      expect(
+        clamped.windowedSize.width,
+        1400,
+        reason: 'already above the floor',
+      );
+      expect(
+        clamped.windowedSize.height,
+        WindowGeometry.minimumWindowSize.height,
+      );
+    });
+
+    test('a size at or above the floor passes through unchanged', () {
+      const ok = WindowGeometry(
+        windowedSize: WindowSize(width: 1280, height: 720),
+      );
+      expect(identical(clampSizeToMinimum(ok), ok), isTrue);
+    });
+
+    test('position is preserved when the size is clamped', () {
+      const small = WindowGeometry(
+        windowedSize: WindowSize(width: 500, height: 500),
+        position: WindowRect(x: 10, y: 20, width: 500, height: 500),
+      );
+      final clamped = clampSizeToMinimum(small);
+      expect(clamped.position?.x, 10);
+      expect(clamped.position?.y, 20);
+    });
+  });
 }

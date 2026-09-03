@@ -7,6 +7,8 @@
 /// that record names as fully automatable with no display involved.
 library;
 
+import 'dart:math' as math;
+
 /// The desktop splash window's own fixed footprint - the canonical value
 /// behind `DesktopWindowShell.splashWindowSize`, defined here rather than
 /// there because this file is deliberately platform-channel-free per
@@ -232,4 +234,27 @@ WindowGeometry clampToAttachedDisplays(
   if (position == null) return geometry;
   final stillAttached = displays.any(position.overlaps);
   return stillAttached ? geometry : geometry.copyWith(clearPosition: true);
+}
+
+/// A [geometry] whose [WindowGeometry.windowedSize] is never below
+/// [WindowGeometry.minimumWindowSize].
+///
+/// The OS minimum ([DesktopWindowPort.setMinimumSize]) is meant to keep a
+/// window off the phone-layout side of `kCompactWidth`, but it is not honored
+/// everywhere - notably a window_manager running over XWayland/Wayland, where
+/// a saved size below the floor (from an older build, or a compositor that let
+/// the drag through) is then restored verbatim and the desktop opens compact
+/// "again". Clamping the size the app itself sets closes that path regardless
+/// of whether the OS enforces its own minimum. Only ever enlarges an
+/// undersized window; a size already at or above the floor passes through.
+WindowGeometry clampSizeToMinimum(WindowGeometry geometry) {
+  final min = WindowGeometry.minimumWindowSize;
+  final size = geometry.windowedSize;
+  if (size.width >= min.width && size.height >= min.height) return geometry;
+  return geometry.copyWith(
+    windowedSize: WindowSize(
+      width: math.max(size.width, min.width),
+      height: math.max(size.height, min.height),
+    ),
+  );
 }

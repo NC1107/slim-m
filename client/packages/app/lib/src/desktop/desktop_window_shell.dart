@@ -238,7 +238,11 @@ class DesktopWindowShell {
 
     final prefs = await container.read(preferencesProvider.future);
     final saved = WindowGeometryStore(prefs).read() ?? WindowGeometry.fallback;
-    final geometry = clampToAttachedDisplays(saved, await _port.allDisplays());
+    // Size clamp before the display clamp so a saved size below the floor is never restored where the OS minimum is not honored (Wayland); see clampSizeToMinimum.
+    final geometry = clampToAttachedDisplays(
+      clampSizeToMinimum(saved),
+      await _port.allDisplays(),
+    );
 
     await _port.setResizable(true);
     // After the splash, which is deliberately smaller than this floor.
