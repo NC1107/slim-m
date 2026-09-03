@@ -33,20 +33,20 @@ Each item is a real backlog entry with the segments that asked for it and a roug
 **Swept 2026-08-11, because "none are scheduled yet" above had stopped being true and a table of thirteen unbuilt features that is really a table of six is worse than no table.**
 Rows left as they are rather than deleted, since the segment and sizing reasoning is still what a future contributor wants; what follows is what the tree actually says today.
 
-Shipped, in whole or in the part that matters: pinned messages (the saved-items half is not built); in-chat polls; rich markdown and code blocks, hand-rolled rather than packaged, client 0.19.0; the command palette, on Ctrl/Cmd+K with the shortcut table bound into the shell; temporary member timeout with auto-expiry, which lapses by arithmetic at read time so nothing has to run on schedule; colour-blind-safe redundant cues (five presence states, five silhouettes, with a desaturation test proving it) and the density setting in `AppDensity`; the backup and restore half of the operator item, as `scripts/backup.py` and `scripts/restore-drill.py`; and the screen-share quality toggle, though not its audio capture.
+Shipped, in whole or in the part that matters: pinned messages and personal saved items (migration 0060, `store/saved_messages.rs`, capped at 500 per user); in-chat polls; rich markdown and code blocks, hand-rolled rather than packaged, client 0.19.0; the command palette, on Ctrl/Cmd+K with the shortcut table bound into the shell; temporary member timeout with auto-expiry, which lapses by arithmetic at read time so nothing has to run on schedule; colour-blind-safe redundant cues (five presence states, five silhouettes, with a desaturation test proving it) and the density setting in `AppDensity`; the backup and restore half of the operator item, as `scripts/backup.py` and `scripts/restore-drill.py`; and the screen-share quality toggle, though not its audio capture.
 
 Partly shipped: per-user volume is built and works on three of six platforms for reasons `audio_gain.dart` records.
 Push-to-talk and voice-activity sensitivity are built too, in Voice settings: push-to-talk is desktop only (`push_to_talk_listener.dart`), holds the mic closed until its key is held, and now joins a call closed rather than open-until-the-first-press.
 Voice-activity sensitivity only moves the speaking-indicator threshold, never the SFU's own transmit decision; `passesActivationThreshold` records why it can narrow that decision but not invent one.
 
-Not started, checked rather than assumed: low-bandwidth and data-saver mode, personal saved items, webhooks, and tap-to-add in any of its three shapes.
+Not started, checked rather than assumed: low-bandwidth and data-saver mode, webhooks, and tap-to-add in any of its three shapes.
 
 **Swept again 2026-09-02.** Two rows above had gone stale in the other direction - listed as unbuilt when the tree already had them - which is the expensive kind of stale, because it sends somebody to build a second copy.
 
 - *Advanced search operators* are built. `http::search` parses `from:`, `in:`, `has:` and `before:`/`after:`, with `in:` and `from:` carrying an oracle-safety obligation the module documents; `tests/message_search/` splits its coverage along that same line. Only `filename:` from the original row is absent.
 - *Message edit history* is built, both halves: `store::message_history` holds the revisions and `edit_history_sheet.dart` shows them behind the "(edited)" marker.
 
-What that leaves genuinely unbuilt from this table: low-bandwidth/data-saver mode, personal saved items (pinned messages shipped without them), webhooks, `filename:` search, screen-share *audio* capture, and tap-to-add.
+What that leaves genuinely unbuilt from this table: low-bandwidth/data-saver mode, webhooks, `filename:` search, screen-share *audio* capture, and tap-to-add.
 
 ### Tap-to-add, in more detail
 

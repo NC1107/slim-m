@@ -13,6 +13,5 @@
 
 client/packages/app/lib/main.dart # overrideMotion copies the ambient MediaQueryData with one field replaced; it needs the whole object to copy.
 client/packages/app/test/app_snackbar_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
-client/packages/app/test/member_profile_sheet_motion_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
 client/packages/design_system/test/components/sheet_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
 client/packages/design_system/test/components/surfaces_test.dart # test harness copies the ambient MediaQueryData with textScaler overridden.
