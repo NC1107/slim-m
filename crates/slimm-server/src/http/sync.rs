@@ -177,17 +177,31 @@ async fn sync(
     // multiply the per-scope database work.
     let cursors = dedupe_scopes(req.scopes);
 
+    // Parse every id up front, so a malformed one still fails the whole request as it did when parsing was inside the loop.
+    let parsed: Vec<(ScopeCursor, ChannelId)> = cursors
+        .into_iter()
+        .map(|cursor| {
+            let channel_id = ChannelId(parse_uuid(&cursor.channel_id)?);
+            Ok::<_, ApiError>((cursor, channel_id))
+        })
+        .collect::<Result<_, _>>()?;
+
+    // One batched permission fetch, not four-to-five queries per channel in the loop; permissions_in_channels resolves up to MAX_SCOPES channels against one roles/timeout load, as the rail, report and saved-messages paths already do.
+    let channel_ids: Vec<ChannelId> = parsed.iter().map(|(_, id)| *id).collect();
+    let permissions = state
+        .store
+        .permissions_in_channels(ctx.user_id, &channel_ids)
+        .await?;
+
     let mut scopes = Vec::new();
     let mut budget = AGGREGATE_LIMIT;
     let mut bytes = SYNC_RESPONSE_BYTES;
-    for cursor in cursors {
-        let channel_id = ChannelId(parse_uuid(&cursor.channel_id)?);
+    for (cursor, channel_id) in parsed {
         // Silently skip scopes the caller cannot view, so sync never confirms a
         // hidden channel exists.
-        if !state
-            .store
-            .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
-            .await?
+        if !permissions
+            .get(&channel_id)
+            .is_some_and(|p| p.contains(Permissions::VIEW_CHANNEL))
         {
             continue;
         }
