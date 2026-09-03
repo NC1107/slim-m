@@ -4,6 +4,7 @@
 /// code/mention handling untouched.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/message_text.dart';
@@ -148,4 +149,33 @@ void main() {
     );
     expect(richTexts.any((r) => r.softWrap == false), isTrue);
   });
+
+  testWidgets(
+    'a URL renders as an accent-coloured span with a tap recognizer',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const MessageBody(
+            content: 'read https://example.com/x today',
+            knownUsernames: {},
+          ),
+        ),
+      );
+
+      const tokens = AppTokens.light;
+      final richText = tester.widget<RichText>(find.byType(RichText).first);
+      TextSpan? linkSpan;
+      (richText.text as TextSpan).visitChildren((span) {
+        if (span is TextSpan && span.text == 'https://example.com/x') {
+          linkSpan = span;
+          return false;
+        }
+        return true;
+      });
+      expect(linkSpan, isNotNull, reason: 'the URL is its own span');
+      expect(linkSpan!.style?.color, tokens.accent);
+      expect(linkSpan!.style?.decoration, TextDecoration.underline);
+      expect(linkSpan!.recognizer, isA<TapGestureRecognizer>());
+    },
+  );
 }

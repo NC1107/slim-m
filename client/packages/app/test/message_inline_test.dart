@@ -168,4 +168,63 @@ void main() {
     expect(nodes, [isA<InlineText>()]);
     expect((nodes.single as InlineText).text, 'standup at 10:30:45 today');
   });
+
+  group('links', () {
+    String? onlyLink(String content) {
+      final nodes = parseInline(content);
+      final links = nodes.whereType<InlineLink>().toList();
+      return links.length == 1 ? links.single.url : null;
+    }
+
+    test('a bare https URL becomes a link node', () {
+      final nodes = parseInline('see https://example.com/x here');
+      expect(nodes.whereType<InlineLink>().single.url, 'https://example.com/x');
+      expect(nodes.first, isA<InlineText>());
+      expect((nodes.first as InlineText).text, 'see ');
+    });
+
+    test('http is linked too', () {
+      expect(onlyLink('http://a.test'), 'http://a.test');
+    });
+
+    test('trailing sentence punctuation stays out of the link', () {
+      expect(onlyLink('go to https://example.com.'), 'https://example.com');
+      expect(onlyLink('(see https://example.com)'), 'https://example.com');
+      expect(onlyLink('really https://example.com?!'), 'https://example.com');
+    });
+
+    test('a balanced trailing paren is kept', () {
+      expect(
+        onlyLink('https://en.wikipedia.org/wiki/Dart_(language)'),
+        'https://en.wikipedia.org/wiki/Dart_(language)',
+      );
+    });
+
+    test('a URL inside inline code stays literal', () {
+      final nodes = parseInline('`https://example.com`');
+      expect(nodes.whereType<InlineLink>(), isEmpty);
+      expect(nodes.single, isA<InlineCode>());
+    });
+
+    test('a URL inside bold still links', () {
+      final nodes = parseInline('**https://example.com**');
+      final bold = nodes.single as InlineBold;
+      expect(
+        bold.children.whereType<InlineLink>().single.url,
+        'https://example.com',
+      );
+    });
+
+    test('a word ending in h before ttp is not a link', () {
+      expect(parseInline('ahttp://x').whereType<InlineLink>(), isEmpty);
+    });
+
+    test('a non-http scheme is not linked', () {
+      expect(
+        parseInline('file:///etc/passwd').whereType<InlineLink>(),
+        isEmpty,
+      );
+      expect(parseInline('slimm://join?x=1').whereType<InlineLink>(), isEmpty);
+    });
+  });
 }

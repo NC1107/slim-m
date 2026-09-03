@@ -74,6 +74,7 @@ Set<String> _mentionsIn(String content) {
         case InlineCode():
         case InlineEmoji():
         case InlineRoleMention():
+        case InlineLink():
           break;
       }
     }
