@@ -109,23 +109,33 @@ class _PluginPermissionRequester implements AndroidPermissionRequester {
 /// Displays the fixed local notification a data-only push needs on Android,
 /// and creates the versioned channel it displays through.
 ///
-/// A clean no-op on iOS, Linux and the web: iOS shows its alert straight from
-/// APNs with no app code involved (a `kind` that should alert already carries
-/// a plain-text `aps.alert` the OS renders itself), and neither Linux nor a
-/// browser has a push channel to display anything from. flutter_local_
-/// notifications ships no web implementation either, so there is nothing
-/// behind the plugin to call there.
+/// Android and Linux only. iOS shows its alert straight from APNs with no
+/// app code involved (a `kind` that should alert already carries a plain-text
+/// `aps.alert` the OS renders itself), and the web has no notification plugin
+/// behind this to call. Linux has no remote push, so nothing wakes a closed
+/// app - but a running desktop app posts through org.freedesktop.Notifications
+/// (the flutter_local_notifications_linux D-Bus backend, pure Dart, no native
+/// registration) when a message arrives unfocused; see `push_controller.dart`.
+/// macOS and Windows are not wired yet: each needs its own init settings
+/// (a GUID on Windows, entitlements on macOS) and is a separate change.
 class LocalNotifications {
   LocalNotifications({
     FlutterLocalNotificationsPlugin? plugin,
     bool? isAndroid,
+    bool? isLinux,
     AndroidPermissionRequester? permissionRequester,
   })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
         _isAndroid = isAndroid ?? isAndroidHost,
+        _isLinux = isLinux ?? isLinuxHost,
         _permissionRequester = permissionRequester;
 
   final FlutterLocalNotificationsPlugin _plugin;
   final bool _isAndroid;
+  final bool _isLinux;
+
+  /// The platforms this actually displays on today. iOS/web render (or do
+  /// not) without this class; macOS/Windows are not wired yet.
+  bool get _supported => _isAndroid || _isLinux;
 
   /// Nullable rather than defaulted in the initializer list: the default wraps
   /// `_plugin`, and an initializer list cannot read a field it is still in the
@@ -148,22 +158,26 @@ class LocalNotifications {
   /// backgrounded notification. See [requestPermission] for where the ask
   /// actually belongs.
   Future<void> _ensureReady() async {
-    if (!_isAndroid || _ready) return;
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    for (final channel in LocalAlertChannel.values) {
-      await android?.createNotificationChannel(
-        AndroidNotificationChannel(
-          channel.id,
-          channel.name,
-          description: channel.description,
-          importance: Importance.high,
-        ),
-      );
+    if (!_supported || _ready) return;
+    if (_isAndroid) {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      // Channels are an Android concept; Linux has no per-kind channel here.
+      for (final channel in LocalAlertChannel.values) {
+        await android?.createNotificationChannel(
+          AndroidNotificationChannel(
+            channel.id,
+            channel.name,
+            description: channel.description,
+            importance: Importance.high,
+          ),
+        );
+      }
     }
     await _plugin.initialize(
       const InitializationSettings(
         android: AndroidInitializationSettings('@drawable/ic_stat_notify'),
+        linux: LinuxInitializationSettings(defaultActionName: 'Open slim-m'),
       ),
     );
     _ready = true;
@@ -197,7 +211,7 @@ class LocalNotifications {
   /// messages into at most one wake per idle recipient (see `PushSender`)
   /// rather than one push per message.
   Future<void> show(String text, {required LocalAlertChannel channel}) async {
-    if (!_isAndroid) return;
+    if (!_supported) return;
     await _ensureReady();
     await _plugin.show(
       channel.notificationId,
@@ -210,6 +224,8 @@ class LocalNotifications {
           importance: Importance.high,
           priority: Priority.high,
         ),
+        // Linux takes no channel; the per-channel notification id still makes a mention replace the last mention rather than stack, matching Android.
+        linux: const LinuxNotificationDetails(),
       ),
     );
   }

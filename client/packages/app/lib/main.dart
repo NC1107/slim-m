@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'src/deep_links.dart';
+import 'src/providers/desktop_message_notifier.dart';
 import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
@@ -185,6 +186,7 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
   container.read(deepLinkControllerProvider);
+  container.read(desktopMessageNotifierProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
 }
 

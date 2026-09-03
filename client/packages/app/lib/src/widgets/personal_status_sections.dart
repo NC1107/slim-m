@@ -4,14 +4,19 @@
 /// voice preferences screen.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart'
+    show LocalAlertChannel, isAndroidHost, isLinuxHost;
 
 import '../providers/notification_sound_settings.dart';
 import '../providers/presence_controller.dart';
 import '../providers/push_controller.dart';
+import '../providers/toasts.dart';
 import 'notification_settings_rows.dart';
 import 'presence_menu.dart' show applyPresenceVisibility, presenceOptions;
 import 'run_guarded.dart';
@@ -113,7 +118,38 @@ class NotificationsSection extends ConsumerWidget {
         const PushContentPreviewRow(),
         const NotificationPreferenceRow(),
         const QuietHoursRow(),
+        // Only where a local notification actually displays (Android, Linux desktop); a pipe test via the same LocalNotifications.show path a real alert uses.
+        if (isAndroidHost || isLinuxHost) const _TestNotificationRow(),
       ],
+    );
+  }
+}
+
+/// A button that posts a local notification straight away, so someone can
+/// confirm slim-m's notifications reach their OS - most useful on the Linux
+/// desktop, where there is no remote push to fall back on and a silent
+/// failure is otherwise invisible.
+class _TestNotificationRow extends ConsumerWidget {
+  const _TestNotificationRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return AppListRow(
+      leading: Icon(AppIcons.notificationsOn, color: tokens.textSecondary),
+      label: 'Send a test notification',
+      onTap: () {
+        unawaited(
+          ref
+              .read(localNotificationsProvider)
+              .show(
+                'Test notification - if you can see this, slim-m can reach '
+                'your notifications.',
+                channel: LocalAlertChannel.messages,
+              ),
+        );
+        ref.read(toastsProvider.notifier).show('Test notification sent.');
+      },
     );
   }
 }

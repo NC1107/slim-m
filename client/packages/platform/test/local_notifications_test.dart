@@ -53,14 +53,37 @@ void main() {
   });
 
   group('LocalNotifications.show', () {
-    test('a non-Android platform never touches the plugin', () async {
-      // No mock handler is installed, so a call reaching the plugin would throw
-      // MissingPluginException; completing proves the platform gate ran first.
-      final notifications = LocalNotifications(isAndroid: false);
+    test('a fully unsupported platform never touches the plugin', () async {
+      // iOS/web/macOS/Windows: no mock handler is installed, so a call
+      // reaching the plugin would throw MissingPluginException; completing
+      // proves the platform gate ran first.
+      final notifications = LocalNotifications(isAndroid: false, isLinux: false);
 
       await expectLater(
         notifications.show('New message', channel: LocalAlertChannel.messages),
         completes,
+      );
+    });
+
+    test('Linux initializes and posts through the plugin, with no channels',
+        () async {
+      final calledMethods = <String>[];
+      _mockPlugin((call) async {
+        calledMethods.add(call.method);
+        return true;
+      });
+      addTearDown(() => _mockPlugin(null));
+
+      final notifications = LocalNotifications(isAndroid: false, isLinux: true);
+      await notifications.show('New message',
+          channel: LocalAlertChannel.messages);
+
+      expect(calledMethods, contains('initialize'));
+      expect(calledMethods, contains('show'));
+      expect(
+        calledMethods,
+        isNot(contains('createNotificationChannel')),
+        reason: 'channels are an Android concept; Linux has none',
       );
     });
 
