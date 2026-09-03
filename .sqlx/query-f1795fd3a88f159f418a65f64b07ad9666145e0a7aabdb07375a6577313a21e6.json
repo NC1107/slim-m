@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM channel_notification_prefs WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f1795fd3a88f159f418a65f64b07ad9666145e0a7aabdb07375a6577313a21e6"
+}
