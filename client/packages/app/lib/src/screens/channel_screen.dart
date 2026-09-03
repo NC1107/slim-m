@@ -297,6 +297,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   topic: channel?.topic,
                   isVoice: isVoice,
                   isDm: isDm,
+                  dmParticipantId: dmPartnerId,
                   isPersonalSpace: isPersonalSpace,
                   searchOpen: search.open,
                   onToggleSearch: _toggleSearch,

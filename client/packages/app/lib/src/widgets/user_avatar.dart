@@ -64,6 +64,8 @@ class UserAvatar extends ConsumerWidget {
     }
     return AppAvatar(
       name: name,
+      // The id, so one person keeps one colour across every name form and every rename; see AppAvatar.tintKey.
+      tintKey: id,
       image: image,
       size: size,
       shape: shape,
