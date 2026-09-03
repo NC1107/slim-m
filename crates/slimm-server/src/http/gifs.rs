@@ -248,10 +248,13 @@ impl GifSearch {
         fetch_capped(&enabled.http, &url, MAX_PREVIEW_BYTES).await
     }
 
-    async fn download_full(&self, token: &str) -> Result<Vec<u8>, GifError> {
+    async fn download_full(&self, token: &str) -> Result<(Vec<u8>, String), GifError> {
         let enabled = self.inner.as_deref().ok_or(GifError::NotConfigured)?;
         let url = enabled.cache.full_url(token).ok_or(GifError::StaleToken)?;
-        fetch_capped(&enabled.http, &url, MAX_DOWNLOAD_BYTES).await
+        // The title rides back with the bytes so `select` can name the stored file after it, from the same entry the url came from.
+        let title = enabled.cache.title(token).unwrap_or_default();
+        let bytes = fetch_capped(&enabled.http, &url, MAX_DOWNLOAD_BYTES).await?;
+        Ok((bytes, title))
     }
 }
 
@@ -450,15 +453,15 @@ async fn select(
     Json(req): Json<SelectRequest>,
 ) -> Result<(StatusCode, Json<AttachmentDto>), ApiError> {
     require_attach_files(&state, ctx.user_id).await?;
-    let bytes = state.gifs.download_full(&req.id).await?;
+    let (bytes, title) = state.gifs.download_full(&req.id).await?;
     if bytes.len() as u64 > state.media.max_attachment_bytes() {
         return Err(ApiError::BadRequest("gif is too large to attach"));
     }
     room_for(&state, bytes.len() as i64).await?;
     // Unsniffable is the provider's doing, never the caller's own token.
     let content_type = media::sniff_content_type(&bytes).ok_or(ApiError::Unavailable)?;
-    let filename = media::sanitize_filename("gif");
-    let filename = format!("{filename}.{}", extension_for(content_type));
+    // Named after the provider's title (slugged, falling back to "gif"), so a saved GIF is findable later rather than a wall of identical "gif.gif".
+    let filename = format!("{}.{}", slug_filename(&title), extension_for(content_type));
 
     let sha256 = Sha256::digest(&bytes).to_vec();
     let hex_id = media::to_hex(&sha256);
@@ -487,6 +490,36 @@ async fn select(
         })),
     ))
 }
+
+/// A lowercase, underscore-joined slug of a GIF's title, for a stored
+/// filename that is findable later rather than a wall of identical
+/// "gif.gif". Runs of anything but ASCII letters and digits collapse to a
+/// single `_`; the result is trimmed of leading/trailing `_` and capped so a
+/// verbose provider title cannot make an unwieldy name. Empty (a title of
+/// only punctuation, or no title at all) falls back to "gif".
+fn slug_filename(title: &str) -> String {
+    let mut slug = String::new();
+    let mut pending_underscore = false;
+    for c in title.chars() {
+        if c.is_ascii_alphanumeric() {
+            if pending_underscore && !slug.is_empty() {
+                slug.push('_');
+            }
+            pending_underscore = false;
+            slug.extend(c.to_lowercase());
+            if slug.len() >= GIF_SLUG_MAX_CHARS {
+                break;
+            }
+        } else {
+            pending_underscore = true;
+        }
+    }
+    if slug.is_empty() { "gif".to_owned() } else { slug }
+}
+
+/// Caps [`slug_filename`] so a long provider title (some run to a sentence)
+/// cannot produce an unwieldy attachment name.
+const GIF_SLUG_MAX_CHARS: usize = 48;
 
 /// A plain filename extension for the two content types a GIF ever sniffs
 /// to; unreachable for anything else because `sniff_content_type` already

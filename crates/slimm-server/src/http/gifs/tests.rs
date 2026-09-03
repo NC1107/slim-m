@@ -118,3 +118,27 @@ fn new_is_case_insensitive_and_enables_on_either_recognized_name() {
         assert!(gifs.is_enabled());
     }
 }
+
+#[test]
+fn slug_filename_makes_a_useful_name_from_a_title() {
+    assert_eq!(
+        slug_filename("When You Realize Tomorrow is Friday Meme"),
+        "when_you_realize_tomorrow_is_friday_meme"
+    );
+    // Punctuation and runs of separators collapse to one underscore.
+    assert_eq!(slug_filename("Dat Boi  --  o'RLY?!"), "dat_boi_o_rly");
+    // Leading/trailing separators never become edge underscores.
+    assert_eq!(slug_filename("  hello  "), "hello");
+}
+
+#[test]
+fn slug_filename_falls_back_when_there_is_nothing_usable() {
+    assert_eq!(slug_filename(""), "gif");
+    assert_eq!(slug_filename("!!! ???"), "gif");
+}
+
+#[test]
+fn slug_filename_caps_a_verbose_title() {
+    let long = "a".repeat(200);
+    assert!(slug_filename(&long).len() <= GIF_SLUG_MAX_CHARS);
+}

@@ -221,6 +221,8 @@ async fn search_preview_select_and_send_round_trip_through_the_fake_provider() {
     let attachment = json_body(select_response).await;
     assert_eq!(attachment["content_type"], "image/gif");
     assert_eq!(attachment["size"], gif_bytes(64).len());
+    // Named after the provider's title, not a bare "gif.gif", so a saved GIF is findable later.
+    assert_eq!(attachment["filename"], "a_cat_waving.gif");
     let attachment_id = attachment["id"].as_str().unwrap().to_owned();
 
     // Send: the id from `selectGif` is an ordinary attachment id, usable exactly like one from `uploadAttachment`.
