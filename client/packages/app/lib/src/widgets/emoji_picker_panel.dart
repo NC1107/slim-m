@@ -63,7 +63,13 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   /// Null until a tab is tapped, so the panel can open on whichever one
   /// leads; see [effectiveCategory].
   EmojiCategory? _category;
-  int _highlighted = 0;
+
+  /// -1 is "no cell highlighted", the state the picker opens in: index 0
+  /// would otherwise paint an accent border on the first tile the moment
+  /// the panel appears, before the user has searched or pressed a key. A
+  /// search highlights its first result (so Enter picks it) and an arrow
+  /// key moves into the grid; browsing a category idles at -1.
+  int _highlighted = -1;
 
   /// The last frame's flat result list, so a key handler (which runs outside
   /// build) can act on exactly what is on screen, the same convention the
@@ -80,7 +86,8 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   void _onQueryChanged(String value) {
     setState(() {
       _query = value;
-      _highlighted = 0;
+      // First result highlighted while searching so Enter picks it; none when the query is empty.
+      _highlighted = value.trim().isEmpty ? -1 : 0;
     });
   }
 
@@ -89,13 +96,18 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
       _category = category;
       _query = '';
       _searchController.clear();
-      _highlighted = 0;
+      _highlighted = -1;
     });
   }
 
   void _move(int delta) {
     if (_visible.isEmpty) return;
     setState(() {
+      // From the no-highlight state, down enters at the first cell and up at the last.
+      if (_highlighted < 0) {
+        _highlighted = delta > 0 ? 0 : _visible.length - 1;
+        return;
+      }
       _highlighted = (_highlighted + delta) % _visible.length;
       if (_highlighted < 0) _highlighted += _visible.length;
     });
@@ -107,7 +119,7 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   }
 
   void _pickHighlighted() {
-    if (_visible.isEmpty) return;
+    if (_visible.isEmpty || _highlighted < 0) return;
     _pick(_visible[_highlighted]);
   }
 
@@ -154,7 +166,7 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
     );
     _visible = results;
     if (_highlighted >= results.length) {
-      _highlighted = results.isEmpty ? 0 : results.length - 1;
+      _highlighted = results.isEmpty ? -1 : results.length - 1;
     }
 
     return CallbackShortcuts(
