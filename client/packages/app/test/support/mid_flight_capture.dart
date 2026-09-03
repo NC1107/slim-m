@@ -14,13 +14,24 @@
 ///
 /// [expectSettled] does not trust the settle budget either: it reads every
 /// visible string right where the budget says "done", pumps a further
-/// [extraSettlePumps] bare frames (no [Duration], so nothing here can hang
-/// the way `pumpAndSettle` does on a perpetual spinner - a bare pump only
-/// flushes already-completed microtasks and paints one more frame, it does
-/// not wait for a running ticker to finish), and reads the same strings
-/// again. A real, finished product state cannot change what it says just
-/// because the event loop got one more turn; a placeholder still waiting on
-/// its own async hop can.
+/// [extraSettlePumps] frames of [extraSettleFrame] each (a timed pump
+/// cannot hang the way `pumpAndSettle` does on a perpetual spinner - it
+/// advances the clock once and paints one frame, it never loops waiting for
+/// quiescence), and reads the same strings again. A real, finished product
+/// state cannot change what it says just because time passed; a placeholder
+/// still waiting on its own async hop, or content fading in from a ticker
+/// that only started on the budget's final frame, can.
+///
+/// The frames are timed, not bare, because of the second shape this caught
+/// shipping invisibly: `AppAsyncView` mounts its resolved content inside an
+/// `AppFadeIn`, whose ticker starts when the DATA mounts, not when the
+/// screen does. A fetch landing on the settle budget's final frame put the
+/// whole admin pane on screen at opacity zero - present in the widget tree,
+/// absent from the pixels - and bare pumps advance no time, so the fade
+/// never moved and the capture read as stable. [renderedText] therefore
+/// also skips text a person cannot see (any ancestor at ~zero opacity):
+/// with timed frames, such content transitions invisible-to-visible during
+/// the extra pumps and fails as the mid-flight capture it is.
 ///
 /// A settled surface can still be wrong in a way the comparison above can
 /// never catch: a stable BLANK. `before == after == []` reads as
@@ -42,19 +53,30 @@ library;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Bare frames pumped past the declared settle budget before deciding a
-/// surface is actually done. Each one only flushes microtasks already
-/// completed by the time it runs, so this is headroom for a resolve chained
-/// a couple of hops deep (the report card's own shape), not a wait.
+/// Frames pumped past the declared settle budget before deciding a surface
+/// is actually done: headroom for a resolve chained a couple of hops deep
+/// (the report card's own shape) and, timed, for an entrance fade whose
+/// ticker started on the budget's last frame.
 const extraSettlePumps = 3;
+
+/// Together the [extraSettlePumps] advance 360ms, past `AppMotion.slow`'s
+/// 280ms ceiling, so no chrome entrance can still be mid-flight after them.
+const extraSettleFrame = Duration(milliseconds: 120);
 
 /// Every string a person reading the screen would see, in tree order:
 /// [Text.data], or [Text.textSpan]'s own plain-text rendering for a rich
 /// span (mentions, inline code, and the markdown-rendered message body all
 /// go through [Text.rich]).
+///
+/// "Would see" is literal: text under an ancestor faded to (near) zero -
+/// an `AppFadeIn` at its own t=0, an [Opacity] or [FadeTransition] holding
+/// zero - is skipped, because pixels are what a snapshot captures and a
+/// tree-only read is exactly how a whole invisible admin pane once passed
+/// as settled.
 List<String> renderedText(WidgetTester tester) {
   final strings = <String>[];
   for (final element in tester.elementList(find.byType(Text))) {
+    if (_hiddenByOpacity(element)) continue;
     final text = element.widget as Text;
     final data = text.data;
     if (data != null) {
@@ -64,6 +86,27 @@ List<String> renderedText(WidgetTester tester) {
     }
   }
   return strings;
+}
+
+/// Whether any ancestor paints [element] at effectively zero opacity. The
+/// threshold is 1%: nothing legible is deliberately shown below that, and
+/// an entrance fade's first frame sits at exactly zero.
+bool _hiddenByOpacity(Element element) {
+  var hidden = false;
+  element.visitAncestorElements((ancestor) {
+    final widget = ancestor.widget;
+    final opacity = switch (widget) {
+      Opacity() => widget.opacity,
+      FadeTransition() => widget.opacity.value,
+      _ => null,
+    };
+    if (opacity != null && opacity < 0.01) {
+      hidden = true;
+      return false;
+    }
+    return true;
+  });
+  return hidden;
 }
 
 /// Reads [tester]'s visible text, pumps [extraSettlePumps] further bare
@@ -90,7 +133,7 @@ Future<void> expectSettled(
 }) async {
   final before = renderedText(tester);
   for (var i = 0; i < extraSettlePumps; i++) {
-    await tester.pump();
+    await tester.pump(extraSettleFrame);
   }
   final after = renderedText(tester);
   if (!knownTransient && !_sameText(before, after)) {
@@ -110,10 +153,19 @@ Future<void> expectSettled(
   }
 }
 
+/// A running readout like a call timer's `1:23` or `673:52:42`. Now that
+/// the settle pumps advance real time, a live clock ticking across them is
+/// the one text change that IS a correctly settled state rather than a
+/// placeholder resolving, so the comparison masks exactly this shape - and
+/// nothing else - before deciding.
+final _clockPattern = RegExp(r'\d+:\d{2}(?::\d{2})?');
+
+String _withClocksMasked(String s) => s.replaceAll(_clockPattern, '0:00');
+
 bool _sameText(List<String> a, List<String> b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
+    if (_withClocksMasked(a[i]) != _withClocksMasked(b[i])) return false;
   }
   return true;
 }
