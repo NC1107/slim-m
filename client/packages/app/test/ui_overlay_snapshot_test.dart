@@ -217,6 +217,8 @@ void main() {
         await tester.tap(find.text('open overlay'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
+        // A fetch landing on the frame above mounts its fade at t=0; one more timed frame lets it land - see renderSurface's own doc.
+        await tester.pump(const Duration(milliseconds: 350));
 
         final snapshotName = '${overlay.key}-${viewport.key}';
         await expectSettled(tester, snapshotName);

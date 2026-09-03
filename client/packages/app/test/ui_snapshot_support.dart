@@ -378,6 +378,15 @@ Future<void> teardownFixture(
 /// function's own doc for the one surface this is true of today.
 /// [allowNoText] passes straight through to [expectSettled]'s own blank
 /// check, for the rare surface that is genuinely text-free.
+///
+/// The last timed pump below exists for the fade-behind-the-capture shape:
+/// `AppAsyncView` mounts resolved content inside an `AppFadeIn` whose ticker
+/// starts when the DATA mounts, so a fetch resolving on the budget's final
+/// frame put a whole admin pane on screen at opacity zero - present in the
+/// tree, absent from the pixels, and stable enough to pass a bare-pump
+/// settle check. Four of five probed admin routes were captured that way
+/// (2026-09-03). The frame is 350ms, past `AppMotion.slow`'s 280ms ceiling,
+/// and [expectSettled]'s own timed pumps now fail anything still later.
 Future<void> renderSurface(
   WidgetTester tester,
   String route,
@@ -427,6 +436,8 @@ Future<void> renderSurface(
   if (settleNestedResolve) {
     await tester.pump();
   }
+  // A fetch landing on the final frame above mounts its fade at t=0; one more timed frame lets it land - see this function's own doc.
+  await tester.pump(const Duration(milliseconds: 350));
 
   // Before writeSnapshot: its own extra pumps could mask what this looks for.
   await expectSettled(
