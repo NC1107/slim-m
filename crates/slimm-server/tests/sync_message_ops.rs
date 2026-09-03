@@ -255,6 +255,54 @@ async fn only_the_last_edit_of_a_message_in_a_page_carries_content() {
     assert_eq!(seqs, vec![1, 2, 3, 4, 5], "collapsing must leave no hole");
 }
 
+/// Batching the permission check must not collapse per-channel visibility: a
+/// caller who can see one channel of a multi-scope sync but not another gets
+/// exactly the first and never the second. This is the risk the batched
+/// `permissions_in_channels` introduces over the old per-scope check, so it
+/// gets its own test rather than trusting the single-scope one above.
+#[tokio::test]
+async fn a_mixed_sync_returns_only_the_channels_the_caller_can_view() {
+    let (store, app, _guard) = world().await;
+    let (_root, owner) = register(&store, "root").await;
+    let visible = store.list_channels().await.unwrap()[0].id;
+    let hidden = store.create_channel("secret", "text").await.unwrap().id;
+    send(&store, visible, owner, "seen").await;
+    send(&store, hidden, owner, "unseen").await;
+
+    let stranger = store
+        .create_account("bystander", "bystander", "not-a-real-hash")
+        .await
+        .unwrap();
+    store
+        .set_member_overwrite(
+            hidden,
+            stranger.id,
+            Permissions::NONE,
+            Permissions::VIEW_CHANNEL,
+        )
+        .await
+        .unwrap();
+    let token = store
+        .open_session(stranger.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+
+    let (status, body) = sync(
+        &app,
+        &token,
+        json!([
+            { "channel_id": visible.to_string(), "after_seq": 0, "after_op_seq": 0 },
+            { "channel_id": hidden.to_string(), "after_seq": 0, "after_op_seq": 0 }
+        ]),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let scopes = body["scopes"].as_array().unwrap();
+    assert_eq!(scopes.len(), 1, "only the visible channel: {body}");
+    assert_eq!(scopes[0]["channel_id"], visible.to_string(), "{body}");
+}
+
 /// The scope is skipped entirely before anything is read, so a caller with no
 /// view of the channel learns nothing about its op stream either.
 #[tokio::test]
