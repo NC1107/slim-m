@@ -343,10 +343,7 @@ class _InlineContext {
   final TapGestureRecognizer Function(String url) makeLinkRecognizer;
 }
 
-List<InlineSpan> _buildSpans(
-  List<InlineNode> nodes,
-  _InlineContext ctx,
-) => [
+List<InlineSpan> _buildSpans(List<InlineNode> nodes, _InlineContext ctx) => [
   for (final node in nodes)
     switch (node) {
       InlineText(:final text) => TextSpan(text: text),
