@@ -220,24 +220,14 @@ async fn fetch(
         .filter(|bytes| bytes.len() == 32)
         .ok_or(ApiError::BadRequest("invalid attachment id"))?;
 
-    // The uploader may always fetch what they uploaded, even before it is on
-    // any message: previewing a just-staged attachment (a picked GIF) needs
-    // this, and `may_link` already lets them attach it, so fetch has to agree.
-    let mut allowed = state
-        .store
-        .is_attachment_uploader(ctx.user_id, &sha256)
-        .await?;
-
-    // Otherwise, unreferenced bytes 404 rather than 403, for everyone; see the
-    // access control note on this function.
+    // Unreferenced bytes 404 rather than 403, for everyone; see the access
+    // control note on this function.
     let channels = state.store.channels_referencing_attachment(&sha256).await?;
-    if !allowed && channels.is_empty() {
+    if channels.is_empty() {
         return Err(ApiError::NotFound("attachment not found"));
     }
+    let mut allowed = false;
     for channel_id in channels {
-        if allowed {
-            break;
-        }
         if state
             .store
             .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)

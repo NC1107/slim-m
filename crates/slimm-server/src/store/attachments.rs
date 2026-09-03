@@ -186,31 +186,6 @@ impl Store {
         Ok(rows.into_iter().map(|r| r.channel_id).collect())
     }
 
-    /// Whether `user_id` uploaded `sha256` themselves, recorded in
-    /// `attachment_uploaders`. The fetch handler uses this so someone can
-    /// preview an attachment they just uploaded but have not yet put on a
-    /// message - a GIF staged in the composer, most visibly - which
-    /// [`may_link`] already lets them attach. The two must agree: the send
-    /// path allowing what the fetch path refuses is exactly the mismatch that
-    /// made a picked GIF fail to stage. Leaks nothing an uploader does not
-    /// already have; a non-uploader still falls to the channel-reference
-    /// check.
-    pub async fn is_attachment_uploader(
-        &self,
-        user_id: UserId,
-        sha256: &[u8],
-    ) -> anyhow::Result<bool> {
-        let row = sqlx::query_scalar!(
-            r#"SELECT 1 AS "one!: i64" FROM attachment_uploaders
-               WHERE sha256 = ? AND uploaded_by = ?"#,
-            sha256,
-            user_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.is_some())
-    }
-
     /// Attachment summaries for a page of messages, in one query, ordered by
     /// the position they were sent with. Mirrors
     /// `Store::reactions_for_messages`: a message with no attachments is
