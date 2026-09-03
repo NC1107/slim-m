@@ -149,11 +149,17 @@ async fn send(
         .as_deref()
         .map(|raw| parse_uuid(raw).map(MessageId))
         .transpose()?;
+    // A retry must not re-authorize what already succeeded; the authoritative check still runs in the transaction.
+    let stored_already = state.store.message_including_deleted(id).await?.is_some();
     let forward = match &req.forwarded_from_id {
-        Some(raw) => Some(
-            super::message_forwards::resolve(&state, ctx.user_id, MessageId(parse_uuid(raw)?))
-                .await?,
-        ),
+        // Parsed even on a retry, so a malformed id is still a 400.
+        Some(raw) => {
+            let named = MessageId(parse_uuid(raw)?);
+            match stored_already {
+                true => None,
+                false => Some(super::message_forwards::resolve(&state, ctx.user_id, named).await?),
+            }
+        }
         None => None,
     };
     let sent = state

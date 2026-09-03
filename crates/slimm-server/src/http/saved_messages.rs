@@ -30,6 +30,7 @@ use super::messages::{MessageDto, parse_uuid};
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
+use crate::store::SaveError;
 
 /// The saved-message routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
@@ -76,10 +77,15 @@ async fn save(
     {
         return Err(missing);
     }
-    if !state.store.save_message(ctx.user_id, message_id).await? {
-        return Err(missing);
+    // Mapped here the way pins::pin does: a ceiling is a 400, a missing message keeps the 404 an unviewable one gets.
+    match state.store.save_message(ctx.user_id, message_id).await {
+        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Err(SaveError::UnknownMessage) => Err(missing),
+        Err(SaveError::TooMany) => Err(ApiError::BadRequest(
+            "you already have as many saved messages as an account can hold",
+        )),
+        Err(SaveError::Internal(e)) => Err(e.into()),
     }
-    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Removes a message from the caller's own list.
