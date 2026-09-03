@@ -57,7 +57,8 @@ void main() {
       // iOS/web/macOS/Windows: no mock handler is installed, so a call
       // reaching the plugin would throw MissingPluginException; completing
       // proves the platform gate ran first.
-      final notifications = LocalNotifications(isAndroid: false, isLinux: false);
+      final notifications =
+          LocalNotifications(isAndroid: false, isLinux: false);
 
       await expectLater(
         notifications.show('New message', channel: LocalAlertChannel.messages),

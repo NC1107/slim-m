@@ -48,7 +48,9 @@ final desktopMessageNotifierProvider = Provider<void>((ref) {
     if (foreground) return;
 
     // A muted channel asked for silence.
-    if (ref.read(channelNotificationOverridesProvider).isMuted(message.channelId)) {
+    if (ref
+        .read(channelNotificationOverridesProvider)
+        .isMuted(message.channelId)) {
       return;
     }
 
