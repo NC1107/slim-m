@@ -31,6 +31,10 @@ const MAX_CACHE_ENTRIES: usize = 5_000;
 struct CachedGif {
     preview_url: String,
     full_url: String,
+    /// The provider's own title for this hit, kept so a selected GIF can be
+    /// stored under a useful filename (slugged from this) instead of a bare
+    /// "gif.gif" - see `gifs::select`.
+    title: String,
     inserted_at: i64,
 }
 
@@ -71,6 +75,7 @@ impl Cache {
             CachedGif {
                 preview_url: gif.preview_url.clone(),
                 full_url: gif.full_url.clone(),
+                title: gif.title.clone(),
                 inserted_at: now,
             },
         );
@@ -85,6 +90,10 @@ impl Cache {
 
     pub(super) fn full_url(&self, token: &str) -> Option<String> {
         self.lock().get(token).map(|cached| cached.full_url.clone())
+    }
+
+    pub(super) fn title(&self, token: &str) -> Option<String> {
+        self.lock().get(token).map(|cached| cached.title.clone())
     }
 
     fn lock(&self) -> MutexGuard<'_, HashMap<String, CachedGif>> {
@@ -103,6 +112,7 @@ mod tests {
         CachedGif {
             preview_url: preview.to_owned(),
             full_url: full.to_owned(),
+            title: "a title".to_owned(),
             inserted_at: now_ms() - ago_ms,
         }
     }
