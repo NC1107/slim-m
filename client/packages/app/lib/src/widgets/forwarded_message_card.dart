@@ -28,6 +28,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/channel_by_id_provider.dart';
 import '../providers/display_preferences.dart' show watchUse24Hour;
 import 'attachment_view.dart';
+import 'channel_label.dart';
 import 'message_jump.dart';
 import 'message_row_identity.dart' show formatMessageTime;
 import 'user_avatar.dart';
@@ -70,7 +71,7 @@ class ForwardedMessageCard extends ConsumerWidget {
     final name = forwarded.authorDisplayName ?? 'Unknown user';
     final time = formatMessageTime(forwarded.createdAt, use24Hour: use24Hour);
     final origin = ref.watch(channelByIdProvider(forwarded.channelId));
-    final originLabel = _labelFor(origin.valueOrNull);
+    final originLabel = channelDisplayLabel(origin.valueOrNull);
     // On tap, not on build: eager lookup would demand a router from every surface a message renders on.
     final onJump = originLabel == null
         ? null
@@ -134,16 +135,6 @@ class ForwardedMessageCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// How a resolved origin channel is named, or null for one this client does
-/// not hold - see this file's own doc comment for why that is the access
-/// check. A DM is named by the person rather than prefixed, since a DM has no
-/// channel name a `#` would make sense of.
-String? _labelFor(Channel? channel) {
-  if (channel == null) return null;
-  if (channel.dmParticipantId != null) return channel.name;
-  return '#${channel.name}';
 }
 
 /// One sentence for a screen reader, in place of the card's own many spans -

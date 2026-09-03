@@ -403,3 +403,57 @@ async fn the_note_on_a_forward_can_be_emptied_but_a_plain_message_cannot() {
         .unwrap();
     assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
 }
+
+/// A retry of a send that already succeeded must return the stored message,
+/// even when the thing it forwarded has since gone.
+///
+/// `reply_to_id` gets this right by being validated inside `send_message`,
+/// after the idempotency short-circuit. `forwarded_from_id` was resolved in
+/// the route before that check ever ran, so a client retrying an uncertain
+/// send - the exact situation idempotency exists for - could be told its
+/// message was invalid while the message sat in the channel.
+#[tokio::test]
+async fn retrying_a_forward_still_works_after_the_original_is_deleted() {
+    let (store, _guard) = new_store().await;
+    let (channel, token) = open_deployment(&store).await;
+    let app = app(store.clone());
+    let channel = channel.to_string();
+
+    let original = send(&app, &channel, &token, "the original text").await;
+    let send_id = Uuid::now_v7().to_string();
+    let body = json!({
+        "id": send_id,
+        "content": "look at this",
+        "forwarded_from_id": original["id"],
+    });
+
+    let first = post(&app, &channel, &token, body.clone()).await;
+    assert_eq!(first.status(), StatusCode::OK);
+
+    // The original goes before the client gets around to retrying.
+    let deleted = app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!(
+                "/channels/{channel}/messages/{}",
+                original["id"].as_str().unwrap()
+            ),
+            &token,
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+    let retry = post(&app, &channel, &token, body).await;
+
+    assert_eq!(
+        retry.status(),
+        StatusCode::OK,
+        "the retry must return the stored message, not refuse it"
+    );
+    let retried = json_body(retry).await;
+    assert_eq!(retried["id"], send_id);
+    assert_eq!(retried["forwarded"]["content"], "the original text");
+}

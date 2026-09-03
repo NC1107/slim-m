@@ -2973,9 +2973,18 @@ paths:
         `saved_at` alone rather than moving it to the top, so a double tap
         cannot silently reorder the list. A message in a channel the caller
         cannot see is a 404 rather than a 403, so this cannot probe for one.
+
+
+        An account holds at most 500 saved messages. Saving past that is a
+        400; re-saving something already held is not, since it adds no row.
+        The ceiling is at the write rather than a page at the read for the
+        reason `pinMessage`'s own limit is: `listSavedMessages` serves the
+        set whole, so the set has to stay small enough to serve whole.
       responses:
         "204":
           description: The message was saved (or already was).
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -3018,6 +3027,11 @@ paths:
         temporary, and discarding somebody's saves on a permission change
         would be destroying their data on a moderator's behalf. A deleted
         message is left out for good, since nothing brings it back.
+
+
+        Returned whole, with no paging, which `saveMessage`'s ceiling of 500
+        is what makes safe - the same arrangement `listPinnedMessages` and
+        `pinMessage` have.
       responses:
         "200":
           description: The caller's saved messages.

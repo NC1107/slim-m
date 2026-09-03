@@ -108,6 +108,13 @@ async fn saved_list(app: &Router, token: &str) -> Vec<Value> {
 }
 
 async fn save(app: &Router, token: &str, message_id: &str) -> StatusCode {
+    save_response(app, token, message_id).await.status()
+}
+
+/// The whole response, for a test that has to compare bodies rather than just
+/// status codes - a refusal that leaks its reason in the body is invisible to
+/// a status-only assertion.
+async fn save_response(app: &Router, token: &str, message_id: &str) -> axum::response::Response {
     app.clone()
         .oneshot(request(
             "PUT",
@@ -117,7 +124,6 @@ async fn save(app: &Router, token: &str, message_id: &str) -> StatusCode {
         ))
         .await
         .unwrap()
-        .status()
 }
 
 /// The ordinary path, and the ordering rule: keeping an old message puts it
@@ -305,11 +311,17 @@ async fn saving_something_you_cannot_see_is_indistinguishable_from_missing() {
         .await
         .unwrap();
 
-    let refused = save(&app, &token, &secret.to_string()).await;
-    let unknown = save(&app, &token, &Uuid::now_v7().to_string()).await;
+    let refused = save_response(&app, &token, &secret.to_string()).await;
+    let unknown = save_response(&app, &token, &Uuid::now_v7().to_string()).await;
 
-    assert_eq!(refused, StatusCode::NOT_FOUND);
-    assert_eq!(refused, unknown);
+    assert_eq!(refused.status(), StatusCode::NOT_FOUND);
+    assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+    // Bodies too: a refusal naming its reason would leak the distinction, and a status-only assertion cannot see that.
+    assert_eq!(
+        json_body(refused).await,
+        json_body(unknown).await,
+        "a hidden message and a nonexistent one must be indistinguishable"
+    );
     assert!(saved_list(&app, &token).await.is_empty());
 }
 
@@ -405,5 +417,66 @@ async fn deleting_an_account_purges_its_saved_list() {
     assert!(
         store.list_saved_messages(user_id).await.unwrap().is_empty(),
         "a private list must not outlive the account that made it"
+    );
+}
+
+/// A ceiling at the write, the call `MAX_PINS_PER_CHANNEL` already made: the
+/// list is served whole, so it has to stay small enough to serve whole.
+/// Without this `GET /saved` had no bound at all.
+#[tokio::test]
+async fn saving_stops_at_the_ceiling_but_re_saving_never_does() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    // Straight to the store; sending MAX_SAVED_MESSAGES+1 through the route would be a slow way to the same state.
+    let me = json_body(
+        app.clone()
+            .oneshot(request("GET", "/me", &token, None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let user_id = slimm_server::ids::UserId(Uuid::parse_str(me["id"].as_str().unwrap()).unwrap());
+
+    let mut first = None;
+    for i in 0..slimm_server::store::MAX_SAVED_MESSAGES {
+        let id = slimm_server::ids::MessageId::generate();
+        store
+            .send_message(slimm_server::store::NewMessage::plain(
+                channel.id,
+                user_id,
+                id,
+                &format!("message {i}"),
+            ))
+            .await
+            .unwrap();
+        store.save_message(user_id, id).await.unwrap();
+        if first.is_none() {
+            first = Some(id);
+        }
+    }
+
+    let one_more = send(&app, &channel.id.to_string(), &token, "one too many").await;
+    assert_eq!(
+        save(&app, &token, one_more["id"].as_str().unwrap()).await,
+        StatusCode::BAD_REQUEST,
+        "the ceiling holds"
+    );
+
+    // Re-saving something already held adds no row, so it must not be refused for a ceiling it does not push against.
+    assert_eq!(
+        save(&app, &token, &first.unwrap().to_string()).await,
+        StatusCode::NO_CONTENT,
+        "an idempotent re-save is not a new save"
     );
 }

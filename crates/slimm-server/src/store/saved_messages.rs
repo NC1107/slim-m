@@ -14,6 +14,44 @@ use anyhow::Result;
 use super::{Message, Store, now_ms};
 use crate::ids::{ChannelId, MessageId, Seq, UserId};
 
+/// Most messages one account may keep at once.
+///
+/// A ceiling at the write rather than a page at the read, the same call
+/// [`super::pins::MAX_PINS_PER_CHANNEL`] makes and for the same reason: it
+/// keeps the set small enough that a reader can have all of it, instead of
+/// making every reader page through something one person can grow without
+/// limit. Without it `GET /saved` had no bound at all - and past SQLite's
+/// `SQLITE_MAX_VARIABLE_NUMBER` the enrich batch stops preparing its
+/// statements rather than merely slowing down.
+///
+/// Higher than the pin ceiling because this is one person's whole keep-list
+/// across every channel rather than one channel's highlights, and still far
+/// enough under [`super::MAX_IDS_PER_QUERY`] that the batched reads behind
+/// the list never need to chunk.
+pub const MAX_SAVED_MESSAGES: i64 = 500;
+
+/// Why a save was refused.
+#[derive(Debug)]
+pub enum SaveError {
+    /// No live message at that id.
+    UnknownMessage,
+    /// The caller already holds [`MAX_SAVED_MESSAGES`] saves.
+    TooMany,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for SaveError {
+    fn from(err: sqlx::Error) -> Self {
+        SaveError::Internal(err.into())
+    }
+}
+
+impl From<anyhow::Error> for SaveError {
+    fn from(err: anyhow::Error) -> Self {
+        SaveError::Internal(err)
+    }
+}
+
 /// One entry in somebody's saved list: the message, and when they kept it.
 #[derive(Debug, Clone)]
 pub struct SavedMessage {
@@ -29,9 +67,17 @@ impl Store {
     /// saved leaves the original `saved_at` alone rather than moving it to
     /// the top, so a double-tap cannot silently reorder somebody's list.
     ///
-    /// Answers `false` if there is no live message at that id. Authorizing
-    /// the read is the caller's job; this does not check permissions.
-    pub async fn save_message(&self, user_id: UserId, message_id: MessageId) -> Result<bool> {
+    /// Refuses with [`SaveError::UnknownMessage`] if there is no live message
+    /// at that id, and [`SaveError::TooMany`] at the ceiling. Authorizing the
+    /// read is the caller's job; this does not check permissions.
+    ///
+    /// The count is taken inside the same write transaction as the insert, so
+    /// two saves racing at the ceiling cannot both pass it.
+    pub async fn save_message(
+        &self,
+        user_id: UserId,
+        message_id: MessageId,
+    ) -> std::result::Result<(), SaveError> {
         let mut tx = self.begin_write().await?;
         let live = sqlx::query_scalar!(
             r#"SELECT 1 AS "hit!: i64" FROM messages
@@ -42,7 +88,27 @@ impl Store {
         .await?;
         if live.is_none() {
             tx.commit().await?;
-            return Ok(false);
+            return Err(SaveError::UnknownMessage);
+        }
+        // Counted only for a save that would add a row, so somebody at the ceiling can still re-save what they hold.
+        let held = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) AS "n!: i64" FROM saved_messages WHERE user_id = ?"#,
+            user_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let already = sqlx::query_scalar!(
+            r#"SELECT 1 AS "hit!: i64" FROM saved_messages
+               WHERE user_id = ? AND message_id = ?"#,
+            user_id,
+            message_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .is_some();
+        if !already && held >= MAX_SAVED_MESSAGES {
+            tx.commit().await?;
+            return Err(SaveError::TooMany);
         }
         let now = now_ms();
         sqlx::query!(
@@ -55,7 +121,7 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(true)
+        Ok(())
     }
 
     /// Removes a save. A no-op on something that was never saved, so this

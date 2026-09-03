@@ -199,7 +199,7 @@ class _CreateInviteCardState extends ConsumerState<_CreateInviteCard> {
 /// Copies the whole invite - server and code in one string - which is what
 /// somebody being invited actually needs. See `invite_link.dart` for why it
 /// is a `slimm://` link rather than an https one.
-void _copyInviteLink(BuildContext context, WidgetRef ref, String code) {
+void _copyInviteLink(WidgetRef ref, String code) {
   Clipboard.setData(
     ClipboardData(
       text: buildInviteLink(server: ref.read(serverUrlProvider), code: code),
@@ -212,7 +212,7 @@ void _copyInviteLink(BuildContext context, WidgetRef ref, String code) {
 
 /// Copies the bare code, still worth keeping: reading six characters down a
 /// phone is sometimes the right move, and a link is unreadable aloud.
-void _copyInviteCode(BuildContext context, WidgetRef ref, String code) {
+void _copyInviteCode(WidgetRef ref, String code) {
   Clipboard.setData(ClipboardData(text: code));
   ref
       .read(toastsProvider.notifier)
@@ -236,13 +236,13 @@ class _CreatedInviteCallout extends ConsumerWidget {
             icon: AppIcons.link,
             semanticLabel: 'Copy invite link',
             size: AppIconButtonSize.sm,
-            onPressed: () => _copyInviteLink(context, ref, invite.code),
+            onPressed: () => _copyInviteLink(ref, invite.code),
           ),
           AppIconButton(
             icon: AppIcons.copy,
             semanticLabel: 'Copy invite code',
             size: AppIconButtonSize.sm,
-            onPressed: () => _copyInviteCode(context, ref, invite.code),
+            onPressed: () => _copyInviteCode(ref, invite.code),
           ),
           AppIconButton(
             icon: AppIcons.dismiss,
@@ -359,12 +359,12 @@ class _InviteRowState extends ConsumerState<_InviteRow>
         AppIconButton(
           icon: AppIcons.link,
           semanticLabel: 'Copy invite link',
-          onPressed: () => _copyInviteLink(context, ref, invite.code),
+          onPressed: () => _copyInviteLink(ref, invite.code),
         ),
         AppIconButton(
           icon: AppIcons.copy,
           semanticLabel: 'Copy invite code',
-          onPressed: () => _copyInviteCode(context, ref, invite.code),
+          onPressed: () => _copyInviteCode(ref, invite.code),
         ),
         if (!invite.revoked)
           AppIconButton(

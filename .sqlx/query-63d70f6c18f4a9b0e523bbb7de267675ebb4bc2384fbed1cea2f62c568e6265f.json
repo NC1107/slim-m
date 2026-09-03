@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT 1 AS \"hit!: i64\" FROM saved_messages\n               WHERE user_id = ? AND message_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "hit!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "63d70f6c18f4a9b0e523bbb7de267675ebb4bc2384fbed1cea2f62c568e6265f"
+}

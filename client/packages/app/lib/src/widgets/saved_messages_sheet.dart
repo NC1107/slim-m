@@ -24,6 +24,7 @@ import '../providers/providers.dart';
 import '../providers/saved_messages_controller.dart';
 import '../providers/user_profiles.dart';
 import 'author_label.dart';
+import 'channel_label.dart';
 import 'channel_rail.dart' show selectedChannelId;
 import 'message_jump.dart';
 import 'run_guarded.dart';
@@ -156,9 +157,7 @@ class _SavedMessageRowState extends ConsumerState<SavedMessageRow>
     final channel = ref
         .watch(channelByIdProvider(message.channelId))
         .valueOrNull;
-    final where = channel == null
-        ? null
-        : (channel.dmParticipantId != null ? channel.name : '#${channel.name}');
+    final where = channelDisplayLabel(channel);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

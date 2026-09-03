@@ -133,7 +133,7 @@ pub struct NewMessage<'a> {
     pub attachment_ids: &'a [Vec<u8>],
     pub reply_to_id: Option<MessageId>,
     /// What this message forwards, already resolved by the caller with
-    /// [`Store::forward_origin`] and only after checking the sender can see
+    /// [`Store::forward_source`] and only after checking the sender can see
     /// the origin's channel. The store writes what it is handed here, so
     /// authorizing the origin is the caller's job and cannot be skipped.
     pub forward: Option<ForwardOrigin>,
