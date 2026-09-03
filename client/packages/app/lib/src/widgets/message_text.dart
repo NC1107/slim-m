@@ -23,7 +23,9 @@
 /// the text that was typed.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'custom_emoji_image.dart';
@@ -209,7 +211,7 @@ Widget _buildMarkdownBlock(
 /// One run of text with inline markdown, mentions and custom emoji picked
 /// out. [baseStyle] carries size and weight; [color] is applied on top of it
 /// so dimmed (pending/failed) messages still work at any heading level.
-class _MessageTextRun extends StatelessWidget {
+class _MessageTextRun extends StatefulWidget {
   const _MessageTextRun({
     required this.text,
     required this.knownUsernames,
@@ -227,17 +229,60 @@ class _MessageTextRun extends StatelessWidget {
   final TextStyle baseStyle;
 
   @override
+  State<_MessageTextRun> createState() => _MessageTextRunState();
+}
+
+class _MessageTextRunState extends State<_MessageTextRun> {
+  /// Link tap recognizers built for the current spans. A `TextSpan`'s
+  /// recognizer is not disposed for you, so they are owned here, rebuilt on
+  /// each build and released in [dispose] - a link inside a message row that
+  /// scrolls off would otherwise leak one per rebuild.
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  void _disposeRecognizers() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  TapGestureRecognizer _makeLinkRecognizer(String url) {
+    final recognizer = TapGestureRecognizer()..onTap = () => _open(url);
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  Future<void> _open(String url) async {
+    final uri = Uri.tryParse(url);
+    // Parsed defensively though _urlPattern already guarantees an http(s) scheme; a link should never open anything else.
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final style = baseStyle.copyWith(color: color);
+    _disposeRecognizers();
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final style = widget.baseStyle.copyWith(color: widget.color);
     return Text.rich(
       TextSpan(
         style: style,
         children: _buildSpans(
-          parseInline(text),
-          knownUsernames,
-          knownRoleNames,
-          customEmoji,
-          style,
+          parseInline(widget.text),
+          _InlineContext(
+            knownUsernames: widget.knownUsernames,
+            knownRoleNames: widget.knownRoleNames,
+            customEmoji: widget.customEmoji,
+            ambientStyle: style,
+            linkColor: tokens.accent,
+            makeLinkRecognizer: _makeLinkRecognizer,
+          ),
         ),
       ),
     );
@@ -274,12 +319,33 @@ bool _isRenderableRole(String name, Set<String> knownRoleNames) =>
 /// child span's style onto its parent's at paint time, which is the whole
 /// mechanism nesting rides on: an [InlineBold] wrapping an [InlineItalic]
 /// needs no combined style computed here, each node states only its own diff.
+/// Everything [_buildSpans] needs beyond the nodes themselves, bundled so the
+/// recursion passes one value rather than six and so a link can reach both
+/// its colour and the recognizer owner that will dispose it.
+class _InlineContext {
+  const _InlineContext({
+    required this.knownUsernames,
+    required this.knownRoleNames,
+    required this.customEmoji,
+    required this.ambientStyle,
+    required this.linkColor,
+    required this.makeLinkRecognizer,
+  });
+
+  final Set<String> knownUsernames;
+  final Set<String> knownRoleNames;
+  final Map<String, String> customEmoji;
+  final TextStyle ambientStyle;
+  final Color linkColor;
+
+  /// Creates a tap recognizer for [url] and hands it to whoever owns the
+  /// run's lifecycle, so it is disposed with the widget rather than leaked.
+  final TapGestureRecognizer Function(String url) makeLinkRecognizer;
+}
+
 List<InlineSpan> _buildSpans(
   List<InlineNode> nodes,
-  Set<String> knownUsernames,
-  Set<String> knownRoleNames,
-  Map<String, String> customEmoji,
-  TextStyle ambientStyle,
+  _InlineContext ctx,
 ) => [
   for (final node in nodes)
     switch (node) {
@@ -289,61 +355,47 @@ List<InlineSpan> _buildSpans(
         child: AppInlineCode(text),
       ),
       InlineMention(:final raw) =>
-        _isRenderableMention(raw, knownUsernames)
+        _isRenderableMention(raw, ctx.knownUsernames)
             ? WidgetSpan(
                 alignment: PlaceholderAlignment.middle,
                 child: _MentionChip(raw),
               )
             : TextSpan(text: raw),
       InlineRoleMention(:final name) =>
-        _isRenderableRole(name, knownRoleNames)
+        _isRenderableRole(name, ctx.knownRoleNames)
             ? WidgetSpan(
                 alignment: PlaceholderAlignment.middle,
                 child: _MentionChip('@$name'),
               )
             : TextSpan(text: '@[$name]'),
-      InlineEmoji(:final raw) => _emojiSpan(raw, customEmoji),
+      InlineEmoji(:final raw) => _emojiSpan(raw, ctx.customEmoji),
+      InlineLink(:final url) => TextSpan(
+        text: url,
+        style: TextStyle(
+          color: ctx.linkColor,
+          decoration: TextDecoration.underline,
+          decorationColor: ctx.linkColor,
+        ),
+        recognizer: ctx.makeLinkRecognizer(url),
+        mouseCursor: SystemMouseCursors.click,
+      ),
       InlineBold(:final children) => TextSpan(
         style: const TextStyle(fontWeight: AppWeights.semi),
-        children: _buildSpans(
-          children,
-          knownUsernames,
-          knownRoleNames,
-          customEmoji,
-          ambientStyle,
-        ),
+        children: _buildSpans(children, ctx),
       ),
       InlineItalic(:final children) => TextSpan(
         style: const TextStyle(fontStyle: FontStyle.italic),
-        children: _buildSpans(
-          children,
-          knownUsernames,
-          knownRoleNames,
-          customEmoji,
-          ambientStyle,
-        ),
+        children: _buildSpans(children, ctx),
       ),
       InlineStrikethrough(:final children) => TextSpan(
         style: const TextStyle(decoration: TextDecoration.lineThrough),
-        children: _buildSpans(
-          children,
-          knownUsernames,
-          knownRoleNames,
-          customEmoji,
-          ambientStyle,
-        ),
+        children: _buildSpans(children, ctx),
       ),
       InlineSpoiler(:final children) => WidgetSpan(
         alignment: PlaceholderAlignment.middle,
         child: MessageSpoiler(
-          style: ambientStyle,
-          spans: _buildSpans(
-            children,
-            knownUsernames,
-            knownRoleNames,
-            customEmoji,
-            ambientStyle,
-          ),
+          style: ctx.ambientStyle,
+          spans: _buildSpans(children, ctx),
         ),
       ),
     },

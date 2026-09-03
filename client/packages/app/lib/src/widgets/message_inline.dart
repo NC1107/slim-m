@@ -58,6 +58,16 @@ class InlineEmoji extends InlineNode {
   final String raw;
 }
 
+/// A bare http/https URL typed into a message, to render as a tappable link.
+/// [url] is exactly the matched text with trailing sentence punctuation
+/// trimmed off (see [_trimUrlEnd]); the scheme is guaranteed http or https by
+/// [_urlPattern], so nothing here can smuggle a `file:` or app scheme past
+/// the opener.
+class InlineLink extends InlineNode {
+  const InlineLink(this.url);
+  final String url;
+}
+
 class InlineBold extends InlineNode {
   const InlineBold(this.children);
   final List<InlineNode> children;
@@ -85,6 +95,11 @@ class InlineSpoiler extends InlineNode {
 /// of trailing `.`/`-` by [_trimMentionEnd] below, since a username cannot
 /// be told apart from sentence punctuation by charset alone.
 final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_][A-Za-z0-9_.-]*');
+
+/// A bare URL: http or https only, up to the next whitespace. Trailing
+/// sentence punctuation is trimmed afterward by [_trimUrlEnd] rather than
+/// excluded here, since a `)` or `.` can be genuinely part of a URL.
+final RegExp _urlPattern = RegExp(r'https?://[^\s]+');
 final RegExp _emojiPattern = RegExp(r':[A-Za-z0-9_]{1,32}:');
 final RegExp _digitsOnly = RegExp(r'^[0-9]+$');
 final RegExp _wordChar = RegExp(r'[A-Za-z0-9_]');
@@ -128,6 +143,46 @@ int _trimMentionEnd(String s, int start, int end) {
     end--;
   }
   return end;
+}
+
+/// Trims trailing characters off a greedy `[start, end)` URL match that read
+/// as sentence punctuation rather than part of the address: `.`, `,`, `;`,
+/// `:`, `!`, `?`, and a `)`/`]`/`}` that has no matching opener inside the
+/// URL (so `(en.wikipedia.org/wiki/Dart_(language))` keeps its balanced
+/// parens, but `(see https://x.com)` drops the closer). Never trims below
+/// `start + 1`, so a URL is never emptied to nothing.
+int _trimUrlEnd(String s, int start, int end) {
+  const trailing = '.,;:!?';
+  while (end > start + 1) {
+    final c = s[end - 1];
+    if (trailing.contains(c)) {
+      end--;
+      continue;
+    }
+    if (c == ')' || c == ']' || c == '}') {
+      final open = c == ')'
+          ? '('
+          : c == ']'
+          ? '['
+          : '{';
+      final opens = _countChar(s, start, end - 1, open);
+      final closes = _countChar(s, start, end - 1, c);
+      if (closes >= opens) {
+        end--;
+        continue;
+      }
+    }
+    break;
+  }
+  return end;
+}
+
+int _countChar(String s, int start, int end, String ch) {
+  var n = 0;
+  for (var k = start; k < end; k++) {
+    if (s[k] == ch) n++;
+  }
+  return n;
 }
 
 /// The index just past the closing `]` of an `@[Name]` role mention opening
@@ -315,6 +370,16 @@ List<InlineNode> parseInline(String content) {
         flush();
         nodes.add(InlineEmoji(m.group(0)!));
         i = m.end;
+        continue;
+      }
+    } else if (ch == 'h' && !_isWordAt(content, i - 1)) {
+      // A URL only starts a token, never mid-word, so a word ending in "...h" before "ttp" is not one. Trailing punctuation is trimmed off the greedy match.
+      final m = _urlPattern.matchAsPrefix(content, i);
+      if (m != null) {
+        final end = _trimUrlEnd(content, i, m.end);
+        flush();
+        nodes.add(InlineLink(content.substring(i, end)));
+        i = end;
         continue;
       }
     }
