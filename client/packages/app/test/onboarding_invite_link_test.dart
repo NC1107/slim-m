@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/deep_links.dart';
 import 'package:slimm_app/src/invite_link.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/onboarding_screen.dart';
@@ -92,6 +93,31 @@ Future<({Uri? chosen, Uri? probed, String? invite})> _pasteIntoDialog(
   return (chosen: chosen, probed: probed, invite: invite);
 }
 
+/// The tapped-link half: a pending [tappedInviteProvider] opens the redeem
+/// dialog with both fields prefilled, exactly as a paste would have, and
+/// consumes itself so a rebuild does not reopen the dialog.
+Future<void> _pumpWithTappedInvite(WidgetTester tester) async {
+  final container = ProviderContainer(
+    overrides: [
+      keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      tappedInviteProvider.overrideWith(
+        (ref) => (server: Uri.parse('https://chat.example:8443'), code: 'C1'),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: OnboardingScreen(onServerChosen: (server, code) {}),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('a pasted link fills in both the server and the code', (
     tester,
@@ -130,5 +156,17 @@ void main() {
 
     expect(result.chosen, isNull);
     expect(find.textContaining('server address'), findsOneWidget);
+  });
+
+  testWidgets('a tapped invite link opens the redeem dialog prefilled and '
+      'consumes itself', (tester) async {
+    await _pumpWithTappedInvite(tester);
+
+    final fields = tester
+        .widgetList<TextField>(find.byType(TextField))
+        .toList();
+    expect(fields, hasLength(2), reason: 'the redeem dialog is open');
+    expect(fields[0].controller?.text, 'https://chat.example:8443');
+    expect(fields[1].controller?.text, 'C1');
   });
 }

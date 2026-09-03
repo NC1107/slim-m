@@ -11,6 +11,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'src/deep_links.dart';
 import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
@@ -185,6 +186,7 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   container.read(startupStatusProvider.notifier).state = 'Connecting';
   container.read(syncControllerProvider);
   container.read(pushControllerProvider);
+  container.read(deepLinkControllerProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
 }
 

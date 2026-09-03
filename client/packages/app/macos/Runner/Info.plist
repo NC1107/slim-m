@@ -37,5 +37,18 @@
 	<string>slim-m uses the camera when you turn on video in a call.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>slim-m uses the microphone when you join a voice call.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>top.npcserver.slimm.invite</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>slimm</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
