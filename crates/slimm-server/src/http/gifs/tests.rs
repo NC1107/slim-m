@@ -140,5 +140,5 @@ fn slug_filename_falls_back_when_there_is_nothing_usable() {
 #[test]
 fn slug_filename_caps_a_verbose_title() {
     let long = "a".repeat(200);
-    assert!(slug_filename(&long).len() <= GIF_SLUG_MAX_CHARS);
+    assert!(slug_filename(&long).len() <= filename::GIF_SLUG_MAX_CHARS);
 }
