@@ -49,6 +49,13 @@ allow = ["MPL-2.0"]
 name = "nm"
 allow = ["MPL-2.0"]
 
+# The Dart pub package behind app_links_linux's GTK binding (invite deep
+# links). Same posture as dbus/nm above: per-file copyleft we depend on and
+# do not modify, so it reaches the built client no differently than they do.
+[[licenses.exceptions]]
+name = "gtk"
+allow = ["MPL-2.0"]
+
 # Checked on a schedule by advisory-watchdog.yml, never on a pull request.
 # docs/ci.md's licenses section explains the split: a CVE published upstream
 # would otherwise turn every unrelated pull request red through no fault of

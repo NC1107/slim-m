@@ -6,7 +6,9 @@ Type=Application
 Name=slim-m
 GenericName=Messaging
 Comment=Chat, voice, and screen share on a slim-m server
-Exec=slim-m
+# %u hands a tapped slimm:// invite link to the app; MimeType below is what routes the scheme here.
+Exec=slim-m %u
+MimeType=x-scheme-handler/slimm;
 # Names the hicolor icons the spec installs, which are keyed on the application
 # id rather than a filename. Renaming this without renaming those breaks both.
 Icon=top.npcserver.slimm
