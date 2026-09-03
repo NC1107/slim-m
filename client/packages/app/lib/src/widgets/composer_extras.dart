@@ -269,15 +269,30 @@ class _ComposerFieldState extends State<ComposerField> {
 /// when [onDismiss] is given; the over-limit band below has nothing to
 /// dismiss to, since editing the text back under the limit is what clears it.
 class ComposerInlineError extends StatelessWidget {
-  const ComposerInlineError({super.key, required this.message, this.onDismiss});
+  const ComposerInlineError({
+    super.key,
+    required this.message,
+    this.onDismiss,
+    this.autoDismissAfter,
+  });
 
   final String message;
   final VoidCallback? onDismiss;
 
+  /// Set for a transient action failure (a gif that would not attach) so it
+  /// clears itself; left null for a live state like the over-limit band,
+  /// which clears when the text is edited back under the limit. See
+  /// `AppErrorState.autoDismissAfter`.
+  final Duration? autoDismissAfter;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-    child: AppErrorState(message: message, onDismiss: onDismiss),
+    child: AppErrorState(
+      message: message,
+      onDismiss: onDismiss,
+      autoDismissAfter: autoDismissAfter,
+    ),
   );
 }
 
@@ -323,6 +338,8 @@ class ComposerBanners extends StatelessWidget {
               : ComposerInlineError(
                   message: error,
                   onDismiss: onDismissAttachmentError,
+                  // A gif/attachment action failure is transient and self-correcting - clear it after a beat, unlike the over-limit band below which is a live state.
+                  autoDismissAfter: const Duration(seconds: 6),
                 ),
         ),
         AppRevealBand(

@@ -8,11 +8,22 @@
 /// exactly how a failed account deletion or a failed block became invisible
 /// a few seconds later.
 ///
+/// [autoDismissAfter] is the one deliberate exception, and a narrow one: a
+/// low-stakes, self-correcting action failure the user does not have to act
+/// on - a gif that would not attach, say - may fade itself after a beat
+/// rather than sitting until dismissed. This stays an `AppErrorState`, not a
+/// `SnackBar`: it still appears at the point of the action and still ships a
+/// verb, it just does not outlive its own relevance. Never set it for a
+/// failure the user must notice or resolve (a failed send, deletion or
+/// block); those are exactly the "invisible a few seconds later" case above.
+///
 /// Red is outlined, never filled: a destructive or failed state must be
 /// unmistakable without being the brightest thing on the screen. That is why
 /// this draws a hairline in [AppTokens.dangerBorder] over the ordinary
 /// surface rather than a red fill.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -28,7 +39,7 @@ import '../core/button.dart';
 /// (a status code, a limit, a host) and renders in mono: present, not
 /// shouting. [onRetry] and [onDismiss] are both optional, but a failure with
 /// neither is usually a failure the caller should not be showing at all.
-class AppErrorState extends StatelessWidget {
+class AppErrorState extends StatefulWidget {
   const AppErrorState({
     super.key,
     required this.message,
@@ -37,6 +48,7 @@ class AppErrorState extends StatelessWidget {
     this.retryLabel = 'Retry',
     this.onDismiss,
     this.dismissLabel = 'Dismiss',
+    this.autoDismissAfter,
   });
 
   /// What happened, in plain words, and what it means for the user. Never a
@@ -50,6 +62,49 @@ class AppErrorState extends StatelessWidget {
   final String retryLabel;
   final VoidCallback? onDismiss;
   final String dismissLabel;
+
+  /// When set (with [onDismiss]), fires [onDismiss] itself after this delay,
+  /// so a transient failure clears without a click. See the library doc for
+  /// the narrow case this is meant for; leave it null for anything the user
+  /// must act on.
+  final Duration? autoDismissAfter;
+
+  @override
+  State<AppErrorState> createState() => _AppErrorStateState();
+}
+
+class _AppErrorStateState extends State<AppErrorState> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _armAutoDismiss();
+  }
+
+  @override
+  void didUpdateWidget(AppErrorState old) {
+    super.didUpdateWidget(old);
+    // A new message (or a newly-armed timer) restarts the countdown, so a second failure gets its own full delay rather than inheriting the first's remainder.
+    if (old.message != widget.message ||
+        old.autoDismissAfter != widget.autoDismissAfter) {
+      _timer?.cancel();
+      _armAutoDismiss();
+    }
+  }
+
+  void _armAutoDismiss() {
+    final after = widget.autoDismissAfter;
+    final onDismiss = widget.onDismiss;
+    if (after == null || onDismiss == null) return;
+    _timer = Timer(after, onDismiss);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,36 +133,36 @@ class AppErrorState extends StatelessWidget {
                 const SizedBox(width: AppSpacing.s8),
                 Expanded(
                   child: Text(
-                    message,
+                    widget.message,
                     style: AppText.caption.copyWith(color: tokens.dangerText),
                   ),
                 ),
               ],
             ),
-            if (detail != null) ...[
+            if (widget.detail != null) ...[
               const SizedBox(height: AppSpacing.s8),
               Text(
-                detail!,
+                widget.detail!,
                 style: AppText.code.copyWith(color: tokens.textSecondary),
               ),
             ],
-            if (onRetry != null || onDismiss != null) ...[
+            if (widget.onRetry != null || widget.onDismiss != null) ...[
               const SizedBox(height: AppSpacing.s12),
               Wrap(
                 spacing: AppSpacing.s8,
                 children: [
-                  if (onRetry != null)
+                  if (widget.onRetry != null)
                     AppButton(
-                      label: retryLabel,
+                      label: widget.retryLabel,
                       size: AppButtonSize.sm,
                       variant: AppButtonVariant.danger,
-                      onPressed: onRetry,
+                      onPressed: widget.onRetry,
                     ),
-                  if (onDismiss != null)
+                  if (widget.onDismiss != null)
                     AppButton(
-                      label: dismissLabel,
+                      label: widget.dismissLabel,
                       size: AppButtonSize.sm,
-                      onPressed: onDismiss,
+                      onPressed: widget.onDismiss,
                     ),
                 ],
               ),
