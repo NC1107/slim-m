@@ -26,6 +26,7 @@ class Version {
     this.pushEnabled,
     this.inviteRequired,
     this.gifSearchEnabled,
+    this.linkPreviewsEnabled,
     this.screenShareMaxHeight,
     this.capabilities,
     this.identity,
@@ -51,6 +52,12 @@ class Version {
   /// `false`: unlike push or invites there is nothing to warn anyone about
   /// either way, so the picker is simply absent - no button, no request.
   final bool? gifSearchEnabled;
+
+  /// Whether this deployment unfurls pasted links into preview cards. Null on
+  /// a server too old to report it, and a client treats that the same as
+  /// `false`: the same "no button, no request" fallback [gifSearchEnabled]
+  /// gets, for the same reason.
+  final bool? linkPreviewsEnabled;
 
   /// The tallest resolution a screen share may publish at. Null on servers
   /// older than this field, which a client must treat as no ceiling: this
@@ -92,6 +99,7 @@ class Version {
         pushEnabled: json['push_enabled'] as bool?,
         inviteRequired: json['invite_required'] as bool?,
         gifSearchEnabled: json['gif_search_enabled'] as bool?,
+        linkPreviewsEnabled: json['link_previews_enabled'] as bool?,
         screenShareMaxHeight: json['screen_share_max_height'] as int?,
         // A non-list here is a foreign or broken server, which is unknown
         // rather than a reason to crash sign-in.

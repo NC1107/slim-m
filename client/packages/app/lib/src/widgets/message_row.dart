@@ -27,8 +27,10 @@ import 'attachment_view.dart';
 import 'emoji_picker.dart';
 import 'forwarded_message_card.dart';
 import 'hover_reveal.dart';
+import 'link_preview_card.dart';
 import 'message_context_menu.dart';
 import 'message_edit_field.dart';
+import 'message_inline.dart' show extractLinkPreviewUrls;
 import 'message_row_identity.dart';
 import 'message_row_parts.dart';
 import 'reactions_row.dart';
@@ -299,6 +301,12 @@ class MessageRow extends StatelessWidget {
                                         customEmoji: customEmoji,
                                         dim: message.pending,
                                         announceSending: message.pending,
+                                      ),
+                                    if (!editing && message.content.isNotEmpty)
+                                      LinkPreviewList(
+                                        urls: extractLinkPreviewUrls(
+                                          message.content,
+                                        ),
                                       ),
                                     if (message.forwarded case final forwarded?)
                                       Padding(

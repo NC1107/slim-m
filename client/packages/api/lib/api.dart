@@ -30,6 +30,7 @@ export 'src/client.dart'
         SlimmApiDms,
         SlimmApiEmoji,
         SlimmApiGifs,
+        SlimmApiLinkPreview,
         SlimmApiMemberModeration,
         SlimmApiMessages,
         SlimmApiModeration,

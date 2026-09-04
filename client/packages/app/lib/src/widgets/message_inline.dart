@@ -391,3 +391,35 @@ List<InlineNode> parseInline(String content) {
   flush();
   return nodes;
 }
+
+/// The `http(s)` URLs in [content], in order of first appearance and
+/// deduplicated, capped at [max]. Reuses [parseInline] rather than
+/// re-running [_urlPattern] directly, so a link preview sees exactly the
+/// same URLs the message body itself renders as tappable links - including
+/// the same trailing-punctuation trim - even one nested inside `**bold**` or
+/// similar.
+List<String> extractLinkPreviewUrls(String content, {int max = 2}) {
+  final urls = <String>[];
+  void walk(List<InlineNode> nodes) {
+    for (final node in nodes) {
+      if (urls.length >= max) return;
+      switch (node) {
+        case InlineLink(:final url):
+          if (!urls.contains(url)) urls.add(url);
+        case InlineBold(:final children):
+          walk(children);
+        case InlineItalic(:final children):
+          walk(children);
+        case InlineStrikethrough(:final children):
+          walk(children);
+        case InlineSpoiler(:final children):
+          walk(children);
+        default:
+          break;
+      }
+    }
+  }
+
+  walk(parseInline(content));
+  return urls;
+}
