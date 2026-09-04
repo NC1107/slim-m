@@ -78,4 +78,24 @@ void main() {
       expect(_version({}).gifSearchEnabled, isNull);
     });
   });
+
+  group('link previews', () {
+    test('a server offering it reports true', () {
+      expect(
+        _version({'link_previews_enabled': true}).linkPreviewsEnabled,
+        true,
+      );
+    });
+
+    test('a server without it configured reports false', () {
+      expect(
+        _version({'link_previews_enabled': false}).linkPreviewsEnabled,
+        false,
+      );
+    });
+
+    test('a server too old to report it is null, not false', () {
+      expect(_version({}).linkPreviewsEnabled, isNull);
+    });
+  });
 }

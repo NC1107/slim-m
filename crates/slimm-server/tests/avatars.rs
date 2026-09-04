@@ -43,6 +43,7 @@ fn app(store: Store) -> Router {
         voice: slimm_server::voice::VoiceService::disabled(),
         media: Media::for_tests(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
     })
 }
 
@@ -220,6 +221,7 @@ async fn deleting_an_account_removes_its_avatar_file() {
         voice: slimm_server::voice::VoiceService::disabled(),
         media,
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
     });
     let token = register(&store, "alice").await;
 

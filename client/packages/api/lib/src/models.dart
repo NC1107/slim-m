@@ -18,6 +18,7 @@ export 'models_emoji.dart';
 export 'models_forwards.dart';
 export 'models_gifs.dart';
 export 'models_identity.dart';
+export 'models_link_preview.dart';
 export 'models_moderation.dart';
 export 'models_moderation_history.dart';
 export 'models_canvas.dart';

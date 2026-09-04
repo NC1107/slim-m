@@ -179,6 +179,14 @@ pub enum Class {
     /// in this class: it wakes nobody and answering quickly is the behaviour
     /// to encourage.
     Ring,
+    /// Unfurling a pasted link into a preview.
+    ///
+    /// Tight for the same reason as [`Class::Gif`]: each request is a real
+    /// outbound fetch to a member-supplied URL, so a client bug or a paste
+    /// loop should not be able to make the server hammer a third party as
+    /// fast as it can open connections. Sized for a person pasting a handful
+    /// of links, not a per-keystroke re-fetch; the client caches per URL.
+    LinkPreview,
 }
 
 impl Class {
@@ -201,6 +209,7 @@ impl Class {
             // A full member page plus a transcript's own avatars, at once.
             Class::Asset => (150.0, 25.0),
             Class::Gif => (10.0, 1.0),
+            Class::LinkPreview => (10.0, 1.0),
             // See this variant's own doc comment for how these were sized.
             Class::Ring => (5.0, 1.0 / 5.0),
             // See this variant's own doc comment for the roster and reconnect math.
@@ -213,7 +222,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 15] = [
+    pub const ALL: [Class; 16] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -229,6 +238,7 @@ impl Class {
         Class::Gif,
         Class::AuthedRead,
         Class::Ring,
+        Class::LinkPreview,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -248,6 +258,7 @@ impl Class {
             Class::CanvasStrokePreview => "canvas_stroke_preview",
             Class::Asset => "asset",
             Class::Gif => "gif",
+            Class::LinkPreview => "link_preview",
             Class::Ring => "ring",
             Class::AuthedRead => "authed_read",
         }

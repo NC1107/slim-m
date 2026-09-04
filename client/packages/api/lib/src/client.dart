@@ -20,6 +20,7 @@ part 'client_canvas.dart';
 part 'client_dms.dart';
 part 'client_emoji.dart';
 part 'client_gifs.dart';
+part 'client_link_preview.dart';
 part 'client_messages.dart';
 part 'client_moderation.dart';
 part 'client_presence.dart';

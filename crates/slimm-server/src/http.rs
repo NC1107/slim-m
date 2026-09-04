@@ -46,6 +46,7 @@ mod escalation;
 mod extract;
 pub mod gifs;
 mod invites;
+pub mod link_preview;
 mod members;
 mod members_bulk;
 mod message_dto;
@@ -124,6 +125,7 @@ pub struct AppState {
     pub voice: VoiceService,
     pub media: Media,
     pub gifs: gifs::GifSearch,
+    pub link_previews: link_preview::LinkPreviews,
 }
 
 /// Builds the router over the shared application state.
@@ -170,6 +172,7 @@ pub fn router(state: AppState) -> Router {
         .merge(users::routes())
         .merge(user_notes::routes())
         .merge(gifs::routes())
+        .merge(link_preview::routes())
         .merge(attachments::routes())
         // Bounded, and the socket is deliberately outside this: see below.
         .layer(ConcurrencyLimitLayer::new(MAX_INFLIGHT_REQUESTS))
@@ -211,6 +214,11 @@ struct Version {
     /// this field always exists, so a client reads `false` as "no GIF picker
     /// on this deployment" rather than needing a third "unknown" state.
     gif_search_enabled: bool,
+    /// Whether this deployment unfurls pasted links into preview cards
+    /// (`SLIMM_LINK_PREVIEWS` is set). Same two-state shape as
+    /// `gif_search_enabled`: a client reads `false` as "do not ask this
+    /// deployment for link previews".
+    link_previews_enabled: bool,
     /// The tallest resolution a screen share may publish at. Enforcement is
     /// entirely client-side (see `client/packages/rtc/lib/src/screen_share_control.dart`),
     /// so every client - not only one with MANAGE_SERVER, which is all
@@ -298,6 +306,7 @@ async fn version(
         push_enabled: state.push.is_enabled(),
         invite_required: state.store.join_policy().await? == JoinPolicy::Invite,
         gif_search_enabled: state.gifs.is_enabled(),
+        link_previews_enabled: state.link_previews.is_enabled(),
         screen_share_max_height: state.store.screen_share_max_height().await?,
         capabilities: capabilities(state).await,
         identity: ServerIdentityDto {
