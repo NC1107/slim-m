@@ -8,10 +8,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'src/deep_links.dart';
+import 'src/desktop/update_check.dart';
 import 'src/providers/desktop_message_notifier.dart';
 import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
@@ -125,6 +128,7 @@ Future<void> main() async {
 /// native runner before any preference can be read, so even "off" cannot
 /// skip that first small frame, only the added dwell on top of it.
 Future<void> _bootstrapApp(ProviderContainer container) async {
+  await _maybePromptForUpdate(container);
   final floor = await _resolveSplashFloor(container);
   await awaitBootstrapWithSplashFloor(
     () => _runBootstrapSequence(container),
@@ -133,6 +137,51 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   await DesktopWindowShell.prepareHandoff(container);
   container.read(appReadyProvider.notifier).state = true;
   await DesktopWindowShell.revealAfterHandoff();
+}
+
+/// Phase 1 of the desktop update notifier (decision 0020): during the splash,
+/// check GitHub for a newer client release and, if there is one, offer it and
+/// wait on the user's choice before loading the current client. Never blocks
+/// or fails startup - the check is timeout-bounded and best-effort, only the
+/// desktop reaches here, and any error just falls through to launching.
+///
+/// "Get update" opens the release (or its package-manager hint); it does not
+/// self-apply yet, which is Phase 2 and needs signed artifacts. "Not now"
+/// loads the current client immediately.
+Future<void> _maybePromptForUpdate(ProviderContainer container) async {
+  if (!isDesktopHost || updateChecksDisabled()) return;
+  try {
+    container.read(startupStatusProvider.notifier).state =
+        'Checking for updates';
+    final version = (await PackageInfo.fromPlatform()).version;
+    final update = await checkForClientUpdate(currentVersion: version);
+    if (update == null) return;
+
+    final choice = Completer<bool>();
+    void respond(bool accepted) {
+      if (!choice.isCompleted) choice.complete(accepted);
+    }
+
+    container.read(startupUpdateProvider.notifier).state = StartupUpdate(
+      version: update.version,
+      format: update.format,
+      onGet: () => respond(true),
+      onDismiss: () => respond(false),
+    );
+    final accepted = await choice.future;
+    container.read(startupUpdateProvider.notifier).state = null;
+    if (accepted) {
+      final uri = Uri.tryParse(update.releaseUrl);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+  } catch (error) {
+    container
+        .read(debugLogProvider.notifier)
+        .record('update', 'update check failed: $error');
+    container.read(startupUpdateProvider.notifier).state = null;
+  }
 }
 
 /// Restores the splash on/off and duration preferences and turns them into
@@ -202,6 +251,11 @@ final startupStatusProvider = StateProvider<String>(
   (ref) => defaultStartupStatus,
 );
 
+/// The update offer shown in the splash while [_maybePromptForUpdate] waits on
+/// the user, or null when there is nothing to offer. The splash renders the
+/// offer's buttons; their callbacks resolve the wait. See decision 0020.
+final startupUpdateProvider = StateProvider<StartupUpdate?>((ref) => null);
+
 /// Wires Firebase and the FCM background message handler Android needs to
 /// ever show a notification while backgrounded or killed - the relay sends
 /// data-only messages, so nothing appears unless this app builds it (see
@@ -242,7 +296,10 @@ class SlimMApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!ref.watch(appReadyProvider)) {
-      return StartupApp(status: ref.watch(startupStatusProvider));
+      return StartupApp(
+        status: ref.watch(startupStatusProvider),
+        update: ref.watch(startupUpdateProvider),
+      );
     }
 
     final choice = ref.watch(themeControllerProvider);

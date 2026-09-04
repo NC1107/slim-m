@@ -34,30 +34,72 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 
 /// The default [StartupScreen.status] text, and the only one every existing
 /// test and every non-desktop launch ever sees: `main.dart` overrides it
 /// with `startupStatusProvider`'s live value once bootstrap actually starts.
 const defaultStartupStatus = 'Starting slim-m';
 
+/// A newer version offered in the splash, and the two things the user can do
+/// about it. Phase 1 of decision 0020: [onGet] opens the release rather than
+/// self-applying, and [onDismiss] launches the current client unchanged.
+class StartupUpdate {
+  const StartupUpdate({
+    required this.version,
+    required this.format,
+    required this.onGet,
+    required this.onDismiss,
+  });
+
+  final String version;
+  final InstallFormat format;
+  final VoidCallback onGet;
+  final VoidCallback onDismiss;
+}
+
+/// How this install actually gets the update, in one line - because the app
+/// cannot apply it the same way for every format (see decision 0020).
+String updateActionHint(InstallFormat format) => switch (format) {
+  InstallFormat.flatpak => 'Update with: flatpak update top.npcserver.slimm',
+  InstallFormat.rpm || InstallFormat.deb =>
+    'Update through your package manager, or open the release.',
+  InstallFormat.appImage ||
+  InstallFormat.tarball ||
+  InstallFormat.unknown => 'Open the release page to download the new version.',
+};
+
 class StartupApp extends StatelessWidget {
-  const StartupApp({super.key, this.status = defaultStartupStatus});
+  const StartupApp({
+    super.key,
+    this.status = defaultStartupStatus,
+    this.update,
+  });
 
   final String status;
+  final StartupUpdate? update;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'slim-m',
     debugShowCheckedModeBanner: false,
     theme: buildTheme(Brightness.dark, AppTokens.dark),
-    home: StartupScreen(status: status),
+    home: StartupScreen(status: status, update: update),
   );
 }
 
 class StartupScreen extends StatelessWidget {
-  const StartupScreen({super.key, this.status = defaultStartupStatus});
+  const StartupScreen({
+    super.key,
+    this.status = defaultStartupStatus,
+    this.update,
+  });
 
   final String status;
+
+  /// When set, the splash shows an update offer instead of the plain status
+  /// line, and waits on the user rather than proceeding on its own.
+  final StartupUpdate? update;
 
   @override
   Widget build(BuildContext context) {
@@ -82,13 +124,63 @@ class StartupScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.s24),
-              Text(
-                status,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
+              if (update case final offer?)
+                _UpdateOffer(offer: offer, tokens: tokens)
+              else
+                Text(
+                  status,
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _UpdateOffer extends StatelessWidget {
+  const _UpdateOffer({required this.offer, required this.tokens});
+
+  final StartupUpdate offer;
+  final AppTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Version ${offer.version} is available',
+            textAlign: TextAlign.center,
+            style: AppText.body.copyWith(color: tokens.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.s4),
+          Text(
+            updateActionHint(offer.format),
+            textAlign: TextAlign.center,
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppButton(
+                label: 'Not now',
+                variant: AppButtonVariant.ghost,
+                onPressed: offer.onDismiss,
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              AppButton(
+                label: 'Get update',
+                variant: AppButtonVariant.primary,
+                onPressed: offer.onGet,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
