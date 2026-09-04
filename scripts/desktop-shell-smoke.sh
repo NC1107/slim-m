@@ -52,6 +52,10 @@ BUNDLE="${1:?usage: desktop-shell-smoke.sh <bundle-dir>}"
 BIN="${BUNDLE}/slimm_app"
 export DISPLAY=:99
 export LIBGL_ALWAYS_SOFTWARE=1
+# This test drives the splash-to-app handoff, not the update notifier; leave
+# the GitHub update check off so it never reaches out or, if a newer release
+# exists, blocks the handoff on a prompt no one is here to answer (decision 0020).
+export SLIMM_NO_UPDATE_CHECK=1
 STATE_DIR="$(mktemp -d)"
 export HOME="${STATE_DIR}/home"
 export XDG_CONFIG_HOME="${STATE_DIR}/config"
