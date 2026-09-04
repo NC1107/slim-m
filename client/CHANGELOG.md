@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.69.0](https://github.com/NC1107/slim-m/compare/client-v0.68.0...client-v0.69.0) (2026-09-04)
+
+
+### Features
+
+* **client:** a URL in a message is a tappable link ([#1057](https://github.com/NC1107/slim-m/issues/1057)) ([ee59879](https://github.com/NC1107/slim-m/commit/ee598790762d1649644f5534887a71e622aea7a7))
+* **client:** an invite is one link, not a server plus a code ([#1047](https://github.com/NC1107/slim-m/issues/1047)) ([dbe2140](https://github.com/NC1107/slim-m/commit/dbe2140a17b346fc4bb4795636160e3f99a93215))
+* **client:** desktop notifications and a test-notification button ([#1065](https://github.com/NC1107/slim-m/issues/1065)) ([e38ef3d](https://github.com/NC1107/slim-m/commit/e38ef3dda6351b23d68aa31fb3df5722f42f628b))
+* **client:** the startup splash is one duration choice, Disabled included ([#1064](https://github.com/NC1107/slim-m/issues/1064)) ([c9bffe8](https://github.com/NC1107/slim-m/commit/c9bffe86ac5c2c6047f0b3630aec3755f3376285))
+* create a channel from the rail, in the section you asked from ([#1040](https://github.com/NC1107/slim-m/issues/1040)) ([1bc0e6c](https://github.com/NC1107/slim-m/commit/1bc0e6cc9c1e0cd5203305439eaab0d89b93a807))
+* keep a message for yourself ([#1045](https://github.com/NC1107/slim-m/issues/1045)) ([466a9c7](https://github.com/NC1107/slim-m/commit/466a9c7ecb3c7eb133d2f7d66464968df7cfb1ee))
+* link previews (unfurl) behind an SSRF guard ([#1067](https://github.com/NC1107/slim-m/issues/1067)) ([0c267fe](https://github.com/NC1107/slim-m/commit/0c267fe3fdd756a4aebeb1f8ac11ed110d405ac8))
+* model forwarded messages instead of composing them into text ([#1039](https://github.com/NC1107/slim-m/issues/1039)) ([bee7e20](https://github.com/NC1107/slim-m/commit/bee7e2084d746c7120e587adbf1fd278dfb1de23))
+
+
+### Bug Fixes
+
+* an edit keeps the forward, and may empty a forward's note ([#1044](https://github.com/NC1107/slim-m/issues/1044)) ([a8a0c51](https://github.com/NC1107/slim-m/commit/a8a0c512c2922aa156d247dd3e0b12483baa4b03))
+* **client:** a resting surface takes the resting shadow ([#1050](https://github.com/NC1107/slim-m/issues/1050)) ([8ebbaf8](https://github.com/NC1107/slim-m/commit/8ebbaf8ef999e201dedfb3f94618334eb9c4cee4))
+* **client:** a restored desktop window is clamped to the minimum size ([#1063](https://github.com/NC1107/slim-m/issues/1063)) ([630959e](https://github.com/NC1107/slim-m/commit/630959e96470ac9679eb7452ba155e0e626097b4))
+* **client:** a transient attachment error clears itself instead of sticking forever ([#1055](https://github.com/NC1107/slim-m/issues/1055)) ([56b5548](https://github.com/NC1107/slim-m/commit/56b55485dd2362f90ed9d75f76cd7be143c7dcde))
+* **client:** avatar tint keys off identity, not the display string ([#1051](https://github.com/NC1107/slim-m/issues/1051)) ([4aff1cc](https://github.com/NC1107/slim-m/commit/4aff1cc14011227228efd24467bbf9d64488b259))
+* **client:** center onboarding content on tall windows ([#1066](https://github.com/NC1107/slim-m/issues/1066)) ([3c51990](https://github.com/NC1107/slim-m/commit/3c5199004737418ed0261c31bf130ae80bd002cc))
+* **client:** five desktop UI reports from one session ([#1037](https://github.com/NC1107/slim-m/issues/1037)) ([e4d51d2](https://github.com/NC1107/slim-m/commit/e4d51d27b7b47d06b8d94eebf7aa2689b77569ef))
+* **client:** tapping an invite link opens the app on the join flow ([#1053](https://github.com/NC1107/slim-m/issues/1053)) ([7f2c376](https://github.com/NC1107/slim-m/commit/7f2c376172fe7dbe5cb9c301a5540e4d9f712760))
+* **client:** the emoji picker opens with no cell highlighted ([#1054](https://github.com/NC1107/slim-m/issues/1054)) ([f6213ef](https://github.com/NC1107/slim-m/commit/f6213ef2e51d215bf2569ade29fdade03748b781))
+* **client:** the forward picker searches usernames, not only display names ([#1046](https://github.com/NC1107/slim-m/issues/1046)) ([fa24835](https://github.com/NC1107/slim-m/commit/fa2483516a7e791658d7efc6720a805b1af5c8c4))
+* **client:** the staged-attachment remove button reads as a target ([#1056](https://github.com/NC1107/slim-m/issues/1056)) ([7cd1fae](https://github.com/NC1107/slim-m/commit/7cd1fae7dc527aa4710b940c182f5bd1334bb9e1))
+* six findings from a multi-agent audit of this session's work ([#1049](https://github.com/NC1107/slim-m/issues/1049)) ([7092c33](https://github.com/NC1107/slim-m/commit/7092c3395c04fde56a89d4c4d814b69ee9c1a5a8))
+* **test:** a snapshot capture lands the entrance fade it is about to photograph ([#1052](https://github.com/NC1107/slim-m/issues/1052)) ([57bc60e](https://github.com/NC1107/slim-m/commit/57bc60ede6e2b8a0e98fdf100d8a1ac03ae24e40))
+
+
+### Performance Improvements
+
+* **client:** independent awaits run concurrently at bootstrap and refresh ([#1060](https://github.com/NC1107/slim-m/issues/1060)) ([8fdc8a3](https://github.com/NC1107/slim-m/commit/8fdc8a34c908b5319cc1c33470d45e774a652157))
+
 ## [0.68.0](https://github.com/NC1107/slim-m/compare/client-v0.67.1...client-v0.68.0) (2026-09-02)
 
 
