@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.56.0](https://github.com/NC1107/slim-m/compare/server-v0.55.0...server-v0.56.0) (2026-09-04)
+
+
+### Features
+
+* create a channel from the rail, in the section you asked from ([#1040](https://github.com/NC1107/slim-m/issues/1040)) ([1bc0e6c](https://github.com/NC1107/slim-m/commit/1bc0e6cc9c1e0cd5203305439eaab0d89b93a807))
+* keep a message for yourself ([#1045](https://github.com/NC1107/slim-m/issues/1045)) ([466a9c7](https://github.com/NC1107/slim-m/commit/466a9c7ecb3c7eb133d2f7d66464968df7cfb1ee))
+* link previews (unfurl) behind an SSRF guard ([#1067](https://github.com/NC1107/slim-m/issues/1067)) ([0c267fe](https://github.com/NC1107/slim-m/commit/0c267fe3fdd756a4aebeb1f8ac11ed110d405ac8))
+* model forwarded messages instead of composing them into text ([#1039](https://github.com/NC1107/slim-m/issues/1039)) ([bee7e20](https://github.com/NC1107/slim-m/commit/bee7e2084d746c7120e587adbf1fd278dfb1de23))
+* **server:** a selected GIF is stored under a name from its title ([#1062](https://github.com/NC1107/slim-m/issues/1062)) ([e10b87b](https://github.com/NC1107/slim-m/commit/e10b87b62be97e7972e587ea9b5cc7454ffc05fb))
+
+
+### Bug Fixes
+
+* an edit keeps the forward, and may empty a forward's note ([#1044](https://github.com/NC1107/slim-m/issues/1044)) ([a8a0c51](https://github.com/NC1107/slim-m/commit/a8a0c512c2922aa156d247dd3e0b12483baa4b03))
+* **server:** a deleted category cannot be created into ([#1042](https://github.com/NC1107/slim-m/issues/1042)) ([056f3b9](https://github.com/NC1107/slim-m/commit/056f3b9359f01adda8696c0427f150316525d6a0))
+* **server:** deleting an account takes everything it should, and a gate says so ([#1048](https://github.com/NC1107/slim-m/issues/1048)) ([b328d46](https://github.com/NC1107/slim-m/commit/b328d469bad07fec5f83240140b2d7bfcb757873))
+* **server:** forwarding a forward carries the first original ([#1041](https://github.com/NC1107/slim-m/issues/1041)) ([1faa5d4](https://github.com/NC1107/slim-m/commit/1faa5d45df4bdbf324c065551412d42812b72abe))
+* **server:** the uploader can fetch their own not-yet-attached upload ([#1061](https://github.com/NC1107/slim-m/issues/1061)) ([0d2e236](https://github.com/NC1107/slim-m/commit/0d2e23627e605c20f5b4a3781724bbe77786a403))
+* six findings from a multi-agent audit of this session's work ([#1049](https://github.com/NC1107/slim-m/issues/1049)) ([7092c33](https://github.com/NC1107/slim-m/commit/7092c3395c04fde56a89d4c4d814b69ee9c1a5a8))
+
+
+### Performance Improvements
+
+* **server:** /sync batches its permission checks ([#1059](https://github.com/NC1107/slim-m/issues/1059)) ([b062fdd](https://github.com/NC1107/slim-m/commit/b062fdd07281ef2e9df5f6843a8bc1663f1ed718))
+
 ## [0.55.0](https://github.com/NC1107/slim-m/compare/server-v0.54.0...server-v0.55.0) (2026-09-01)
 
 
