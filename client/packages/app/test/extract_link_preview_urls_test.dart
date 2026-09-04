@@ -60,4 +60,13 @@ void main() {
       'https://example.com',
     ]);
   });
+
+  test('a URL hidden in a spoiler is not previewed', () {
+    // An open card would show the title/image the spoiler exists to hide.
+    expect(extractLinkPreviewUrls('||https://example.com||'), isEmpty);
+    expect(
+      extractLinkPreviewUrls('before ||https://secret.example|| after'),
+      isEmpty,
+    );
+  });
 }

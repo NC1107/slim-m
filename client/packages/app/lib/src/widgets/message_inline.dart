@@ -398,6 +398,10 @@ List<InlineNode> parseInline(String content) {
 /// same URLs the message body itself renders as tappable links - including
 /// the same trailing-punctuation trim - even one nested inside `**bold**` or
 /// similar.
+///
+/// A URL inside a spoiler is deliberately skipped: an open preview card below
+/// the message would show the title and image the `||spoiler||` exists to
+/// hide, so a spoilered link gets no card.
 List<String> extractLinkPreviewUrls(String content, {int max = 2}) {
   final urls = <String>[];
   void walk(List<InlineNode> nodes) {
@@ -411,8 +415,6 @@ List<String> extractLinkPreviewUrls(String content, {int max = 2}) {
         case InlineItalic(:final children):
           walk(children);
         case InlineStrikethrough(:final children):
-          walk(children);
-        case InlineSpoiler(:final children):
           walk(children);
         default:
           break;
