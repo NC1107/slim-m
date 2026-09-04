@@ -137,6 +137,49 @@ void main() {
       expect(find.byKey(marker), findsOneWidget);
     });
 
+    testWidgets('a wide, ordinary-height window keeps the top-ish bias', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          const OnboardingShell(child: SizedBox(height: 40)),
+          size: const Size(1200, 700),
+        ),
+      );
+      expect(
+        tester.widget<AnimatedAlign>(find.byType(AnimatedAlign)).alignment,
+        const Alignment(0, -0.55),
+      );
+    });
+
+    testWidgets('a wide, tall window centres instead of leaving room empty', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          const OnboardingShell(child: SizedBox(height: 40)),
+          size: const Size(1200, 1100),
+        ),
+      );
+      expect(
+        tester.widget<AnimatedAlign>(find.byType(AnimatedAlign)).alignment,
+        Alignment.center,
+      );
+    });
+
+    testWidgets('a narrow window centres regardless of height', (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          const OnboardingShell(child: SizedBox(height: 40)),
+          size: const Size(420, 1400),
+        ),
+      );
+      expect(
+        tester.widget<AnimatedAlign>(find.byType(AnimatedAlign)).alignment,
+        Alignment.center,
+      );
+    });
+
     testWidgets('a screen outside the join flow gets no stepper', (
       tester,
     ) async {

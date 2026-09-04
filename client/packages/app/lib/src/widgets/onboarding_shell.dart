@@ -21,6 +21,17 @@ import 'package:slimm_design_system/design_system.dart';
 /// for a 260px brand rail and a 440px form with gutters; below it, there is not.
 const double _panelFloor = 900;
 
+/// Height past which the top-biased alignment below stops and centering
+/// starts.
+///
+/// The bias reads as "starting near the top with room to grow" on an
+/// ordinary desktop window, but the gap it leaves below the content grows
+/// with the window, not with the content: past this height it read as a
+/// filled top 60% and an empty bottom 40% rather than a screen with room to
+/// spare. Centering fixes the balance without touching the shorter case,
+/// where the same math never produced enough leftover space to notice.
+const double _tallWindowFloor = 900;
+
 /// One step in the join flow, and how far along it the caller is.
 ///
 /// Numbered rather than named-only because the number is the part that says
@@ -56,10 +67,13 @@ class OnboardingShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final wide = MediaQuery.sizeOf(context).width >= _panelFloor;
+    final tall = MediaQuery.sizeOf(context).height >= _tallWindowFloor;
 
-    final content = Align(
-      // Top-ish with room; centred on a phone, which has no height to spare.
-      alignment: wide ? const Alignment(0, -0.55) : Alignment.center,
+    final content = AnimatedAlign(
+      // Top-ish with room; centred on a phone or once the window is tall.
+      alignment: !wide || tall ? Alignment.center : const Alignment(0, -0.55),
+      duration: AppMotion.reduced(context, AppMotion.base),
+      curve: AppMotion.entrance,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.s24),
         child: Column(
