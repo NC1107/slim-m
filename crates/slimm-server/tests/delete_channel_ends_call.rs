@@ -84,6 +84,7 @@ fn app(store: Store, voice: VoiceService) -> Router {
         voice,
         media: slimm_server::media::Media::for_tests(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
     })
 }
 

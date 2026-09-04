@@ -142,6 +142,9 @@ pub(crate) const GIF: u8 = 8;
 /// the budget and the workload it is sized against.
 pub(crate) const AUTHED_READ: u8 = 9;
 
+/// Unfurling a pasted link; see [`Class::LinkPreview`].
+pub(crate) const LINK_PREVIEW: u8 = 10;
+
 /// Panics on an unknown code rather than falling back.
 ///
 /// It used to end `_ => Class::Refresh`, which meant a new code compiled clean
@@ -160,6 +163,7 @@ fn class_of(code: u8) -> Class {
         CANVAS => Class::Canvas,
         ASSET => Class::Asset,
         GIF => Class::Gif,
+        LINK_PREVIEW => Class::LinkPreview,
         AUTHED_READ => Class::AuthedRead,
         other => unreachable!("no rate-limit class for code {other}"),
     }
@@ -255,8 +259,8 @@ impl FromRequest<AppState> for Bytes {
 #[cfg(test)]
 mod tests {
     use super::{
-        ASSET, AUTHED_READ, CANVAS, GIF, INVITE_CHECK, PASSWORD, READ, REFRESH, UPLOAD, WRITE,
-        class_of, forwarded_for,
+        ASSET, AUTHED_READ, CANVAS, GIF, INVITE_CHECK, LINK_PREVIEW, PASSWORD, READ, REFRESH,
+        UPLOAD, WRITE, class_of, forwarded_for,
     };
     use crate::ratelimit::Class;
     use axum::http::Request;
@@ -277,6 +281,7 @@ mod tests {
             (CANVAS, Class::Canvas),
             (ASSET, Class::Asset),
             (GIF, Class::Gif),
+            (LINK_PREVIEW, Class::LinkPreview),
             (AUTHED_READ, Class::AuthedRead),
         ];
         let mut seen = std::collections::HashSet::new();

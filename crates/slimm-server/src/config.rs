@@ -100,6 +100,14 @@ pub struct Config {
     /// The operator's API key for whichever provider `gif_provider` names.
     pub gif_api_key: Option<String>,
 
+    /// Whether the server unfurls pasted links into preview cards. Off by
+    /// default because it makes the server issue outbound requests to
+    /// arbitrary, member-supplied URLs; every such fetch runs behind the
+    /// SSRF guard described in decision 0019. Set `SLIMM_LINK_PREVIEWS=true`
+    /// to turn it on.
+    #[serde(default)]
+    pub link_previews: bool,
+
     /// Browser origins allowed to call this deployment cross-origin, comma
     /// separated, for example `https://app.example.com,http://localhost:8099`.
     ///
@@ -172,6 +180,7 @@ impl Default for Config {
             max_total_attachment_bytes: None,
             gif_provider: None,
             gif_api_key: None,
+            link_previews: false,
             cors_allowed_origins: None,
             trust_proxy_hops: 0,
         }

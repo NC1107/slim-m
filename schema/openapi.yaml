@@ -2847,6 +2847,112 @@ paths:
         "503":
           $ref: "#/components/responses/Unavailable"
 
+  /link-preview:
+    get:
+      operationId: getLinkPreview
+      tags: [gifs]
+      summary: Unfurl a pasted URL into a title/description/image preview.
+      description: >
+        Fetches `url` server-side, behind an SSRF guard (decision 0019), and
+        returns its OpenGraph/title metadata. Enabled only when the operator
+        set `SLIMM_LINK_PREVIEWS` (see `/version`'s `link_previews_enabled`),
+        which a client is expected to check first. Any preview image is
+        returned as an opaque `image_token` redeemed at `getLinkPreviewImage`,
+        never the upstream URL.
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: The http(s) URL to unfurl. Refused with 400 if malformed or pointing at a non-public address.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The link's preview metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkPreview"
+        "400":
+          description: The URL is malformed, not http(s), or resolves to a blocked address.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The URL is public and well-formed but yielded no usable preview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment does not have link previews enabled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
+  /link-preview/image/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        description: An opaque id from a getLinkPreview result's image_token.
+        schema:
+          type: string
+    get:
+      operationId: getLinkPreviewImage
+      tags: [gifs]
+      summary: Fetch a preview's image, proxied through this server.
+      description: >
+        Streams the image a token stands for, so a card never loads an image
+        straight from the third-party host. The token gates it: only an image
+        a real preview surfaced can be proxied, never an arbitrary URL.
+      responses:
+        "200":
+          description: The image's raw bytes, sniffed rather than trusting the upstream content type.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The token names no image this server still holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment does not have link previews enabled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+
   /gifs/select:
     post:
       operationId: selectGif
@@ -5153,6 +5259,12 @@ components:
             expected to check this before ever showing a GIF picker button,
             so a disabled deployment costs it nothing: no button, no
             request.
+        link_previews_enabled:
+          type: boolean
+          description: >
+            Whether this deployment unfurls pasted links into preview cards
+            (SLIMM_LINK_PREVIEWS is set). A client checks this before asking
+            for any link preview, so a disabled deployment makes no request.
         screen_share_max_height:
           type: integer
           description: >
@@ -6936,6 +7048,30 @@ components:
         height:
           type: integer
           description: Paired with width; see that field's own description.
+
+    LinkPreview:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: The URL this preview is for, echoed back so a client can key its own cache.
+        title:
+          type: [string, "null"]
+          description: The page's OpenGraph or plain title, if any.
+        description:
+          type: [string, "null"]
+          description: The page's OpenGraph or meta description, if any.
+        site_name:
+          type: [string, "null"]
+          description: The page's OpenGraph site name, if any.
+        image_token:
+          type: [string, "null"]
+          description: >
+            An opaque token for the preview image, redeemable at
+            getLinkPreviewImage. Never the upstream image URL, so the image is
+            always proxied through this server. Null when the page had no
+            usable image.
 
     PinnedMessage:
       description: >-

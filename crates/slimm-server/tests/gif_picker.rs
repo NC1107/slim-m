@@ -57,6 +57,7 @@ fn app(store: Store, gifs: GifSearch) -> Router {
         voice: slimm_server::voice::VoiceService::disabled(),
         media: Media::for_tests(),
         gifs,
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
     })
 }
 

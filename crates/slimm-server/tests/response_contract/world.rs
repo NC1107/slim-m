@@ -39,6 +39,9 @@ pub struct Contract {
     api: Api,
     covered: BTreeSet<String>,
     problems: Vec<String>,
+    /// The fake upstream's base URL, so the link-preview pass can point at its
+    /// `/page`.
+    pub upstream: String,
     /// Held, not read: its drop removes the temp database.
     _db: crate::support::TestDbGuard,
 }
@@ -74,10 +77,12 @@ impl Contract {
                 media: Media::for_tests(),
                 // Also configured, against a fake local provider, for the same reason.
                 gifs: GifSearch::for_test("tenor", &tenor_base, "test-key"),
+                link_previews: slimm_server::http::link_preview::LinkPreviews::for_test(),
             },
             api: Api::load(repo_root),
             covered: BTreeSet::new(),
             problems: Vec::new(),
+            upstream: tenor_base,
             _db: db_guard,
         }
     }
@@ -209,10 +214,21 @@ async fn spawn_fake_tenor() -> String {
             }]
         }))
     }
-    async fn image() -> Vec<u8> {
+    async fn image() -> impl axum::response::IntoResponse {
         let mut bytes = b"GIF89a".to_vec();
         bytes.extend(std::iter::repeat_n(0u8, 8));
-        bytes
+        ([(axum::http::header::CONTENT_TYPE, "image/gif")], bytes)
+    }
+    // An OpenGraph page for the link-preview pass; og:image is this server's gif.
+    async fn page(State(base): State<String>) -> axum::response::Html<String> {
+        axum::response::Html(format!(
+            "<html><head>\
+             <meta property=\"og:title\" content=\"A cat waving\">\
+             <meta property=\"og:description\" content=\"A fake page for the contract test\">\
+             <meta property=\"og:image\" content=\"{base}/preview.gif\">\
+             <meta property=\"og:site_name\" content=\"Fake\">\
+             </head><body>hi</body></html>"
+        ))
     }
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -223,6 +239,7 @@ async fn spawn_fake_tenor() -> String {
         .route("/v2/featured", get(trending))
         .route("/preview.gif", get(image))
         .route("/full.gif", get(image))
+        .route("/page", get(page))
         .with_state(base.clone());
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();

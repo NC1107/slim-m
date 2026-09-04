@@ -55,6 +55,7 @@ pub async fn run() -> anyhow::Result<()> {
     spawn_ring_sweep(voice.clone(), hub.clone());
     spawn_message_retention_sweep(store.clone(), media.clone(), hub.clone());
     let gifs = http::gifs::GifSearch::new(&config)?;
+    let link_previews = http::link_preview::LinkPreviews::new(&config);
     let app = cors.apply(http::router(http::AppState {
         store,
         auth,
@@ -64,6 +65,7 @@ pub async fn run() -> anyhow::Result<()> {
         voice,
         media,
         gifs,
+        link_previews,
     }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;

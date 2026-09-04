@@ -47,6 +47,7 @@ pub(crate) fn app(store: Store) -> Router {
         voice: VoiceService::disabled(),
         media: Media::for_tests(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
     })
 }
 
