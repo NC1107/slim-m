@@ -21,12 +21,12 @@ use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::put;
-use serde::Deserialize;
+use axum::routing::{get, put};
+use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{ChannelId, RoleId, UserId};
@@ -39,11 +39,54 @@ const BODY_LIMIT: usize = 1024;
 /// The channel overwrite routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/channels/{channel_id}/overwrites", get(list))
         .route(
             "/channels/{channel_id}/overwrites/{kind}/{id}",
             put(set).delete(clear),
         )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
+}
+
+/// One overwrite on the wire: which role or member it targets and its
+/// allow/deny bit pair.
+#[derive(Serialize)]
+struct OverwriteDto {
+    kind: String,
+    id: String,
+    allow: i64,
+    deny: i64,
+}
+
+#[derive(Serialize)]
+struct OverwritesDto {
+    overwrites: Vec<OverwriteDto>,
+}
+
+/// Lists every overwrite on a channel, so an editor sees the current
+/// allow/deny pairs rather than rewriting one blind and silently re-granting
+/// a deliberate denial. Gated on MANAGE_ROLES in this channel - the same
+/// permission [`set`] and [`clear`] require, and the same refuse-identically
+/// treatment of a channel the caller cannot manage or that does not exist.
+async fn list(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<OverwritesDto>, ApiError> {
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    require_manage_roles_here(&state, ctx.user_id, channel_id).await?;
+    let overwrites = state
+        .store
+        .channel_overwrites(channel_id)
+        .await?
+        .into_iter()
+        .map(|o| OverwriteDto {
+            kind: o.target_type,
+            id: o.target_id.to_string(),
+            allow: o.allow.bits(),
+            deny: o.deny.bits(),
+        })
+        .collect();
+    Ok(Json(OverwritesDto { overwrites }))
 }
 
 #[derive(Deserialize)]

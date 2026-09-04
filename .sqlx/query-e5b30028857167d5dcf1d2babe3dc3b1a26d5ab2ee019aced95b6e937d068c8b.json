@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT target_type AS \"target_type!\",\n                      target_id AS \"target_id!: Uuid\",\n                      allow AS \"allow!: Permissions\",\n                      deny AS \"deny!: Permissions\"\n               FROM channel_overwrites\n               WHERE channel_id = ?\n               ORDER BY target_type, target_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "target_type!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "target_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "allow!: Permissions",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "deny!: Permissions",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e5b30028857167d5dcf1d2babe3dc3b1a26d5ab2ee019aced95b6e937d068c8b"
+}
