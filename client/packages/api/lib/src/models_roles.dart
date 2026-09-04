@@ -53,4 +53,43 @@ enum OverwriteTarget {
   member;
 
   String get wire => name;
+
+  /// An unrecognised kind reads as [member]: a channel that could not
+  /// resolve to a role stays put on the narrower, single-account reading
+  /// rather than one this client would apply to a whole group of members.
+  static OverwriteTarget parse(String value) =>
+      value == 'role' ? OverwriteTarget.role : OverwriteTarget.member;
+}
+
+/// One permission overwrite already set on a channel: the current allow/deny
+/// pair for one role or member, as `GET /channels/{channelId}/overwrites`
+/// returns it. This is the read [SlimmApiRoles.setChannelOverwrite] never
+/// had - without it, a routine edit could only replace an overwrite sight
+/// unseen, silently re-granting a deliberate denial.
+class ChannelOverwrite {
+  const ChannelOverwrite({
+    required this.kind,
+    required this.id,
+    required this.allow,
+    required this.deny,
+  });
+
+  final OverwriteTarget kind;
+
+  /// The role's or member's UUID, matching [kind].
+  final String id;
+
+  /// The permission bits this overwrite forces on.
+  final int allow;
+
+  /// The permission bits this overwrite forces off.
+  final int deny;
+
+  factory ChannelOverwrite.fromJson(Map<String, dynamic> json) =>
+      ChannelOverwrite(
+        kind: OverwriteTarget.parse(json['kind'] as String),
+        id: json['id'] as String,
+        allow: json['allow'] as int,
+        deny: json['deny'] as int,
+      );
 }

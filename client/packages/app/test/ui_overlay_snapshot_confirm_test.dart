@@ -94,10 +94,10 @@ final _confirms = <String, FutureOr<void> Function(BuildContext)>{
     context,
     title: 'Replace this overwrite?',
     message:
-        'There is no way to see what @moderator already has set in '
-        '"#general", so this replaces the whole thing: any '
-        'permission left at "Inherit" above goes back to inheriting from '
-        'their roles, even if it was allowed or denied before.',
+        'This replaces the whole overwrite for @moderator in '
+        '"#general": any permission left at "Inherit" above goes '
+        'back to inheriting from their roles, even if it was allowed or '
+        'denied before.',
     confirmLabel: 'Set overwrite',
   ),
   'confirm-clear-overwrite': (context) => confirmDangerousAction(
