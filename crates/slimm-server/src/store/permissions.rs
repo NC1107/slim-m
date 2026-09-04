@@ -10,6 +10,17 @@ use super::Store;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::{Overwrite, Permissions, evaluate};
 
+/// One overwrite as stored on a channel: which role or member it targets, and
+/// the allow/deny pair. The listing shape [`Store::channel_overwrites`]
+/// returns, so an editor can read the current rules before changing one.
+pub struct ChannelOverwrite {
+    /// `"role"` or `"member"`.
+    pub target_type: String,
+    pub target_id: Uuid,
+    pub allow: Permissions,
+    pub deny: Permissions,
+}
+
 /// A user's roles, resolved once and reused by both permission read paths.
 pub(super) struct RoleContext {
     pub(super) everyone_id: Option<Uuid>,
@@ -108,6 +119,36 @@ impl Store {
                 Permissions::from_bits(r.deny),
             )
         }))
+    }
+
+    /// Every overwrite set on a channel, role and member alike, so an editor
+    /// can see the current allow/deny pairs before changing one rather than
+    /// overwriting blind. Ordered stably for a deterministic response.
+    pub async fn channel_overwrites(
+        &self,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<Vec<ChannelOverwrite>> {
+        let rows = sqlx::query!(
+            r#"SELECT target_type AS "target_type!",
+                      target_id AS "target_id!: Uuid",
+                      allow AS "allow!: Permissions",
+                      deny AS "deny!: Permissions"
+               FROM channel_overwrites
+               WHERE channel_id = ?
+               ORDER BY target_type, target_id"#,
+            channel_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| ChannelOverwrite {
+                target_type: r.target_type,
+                target_id: r.target_id,
+                allow: r.allow,
+                deny: r.deny,
+            })
+            .collect())
     }
 
     /// Clears a channel's role overwrite. Idempotent: clearing one that is

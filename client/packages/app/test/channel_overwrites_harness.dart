@@ -66,11 +66,15 @@ Future<void> settleUntilFound(WidgetTester tester, Finder finder) async {
 /// [channelPermissions] answers `GET /channels/c1/permissions` - the "Allow"
 /// gate's real source since docs/decisions/0011-per-channel-permissions.md -
 /// defaulting to [channelOverwritesMe]'s own base set so a test naming
-/// neither still reads as "this caller can do anything".
+/// neither still reads as "this caller can do anything". [overwrites]
+/// answers `GET /channels/c1/overwrites` the same centralized way, each
+/// entry a raw `{kind, id, allow, deny}` map; empty by default so a test not
+/// exercising [CurrentOverwritesSection] does not have to know its route.
 Future<void> pumpToTargetPicker(
   WidgetTester tester, {
   required http.Response Function(http.Request) handler,
   int channelPermissions = channelOverwritesMePermissions,
+  List<Map<String, dynamic>> overwrites = const [],
   Channel? initialChannel,
 }) async {
   final db = SlimmDatabase(NativeDatabase.memory());
@@ -95,6 +99,14 @@ Future<void> pumpToTargetPicker(
                 request.url.path == '/channels/c1/permissions') {
               return http.Response(
                 jsonEncode({'permissions': channelPermissions}),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            if (request.method == 'GET' &&
+                request.url.path == '/channels/c1/overwrites') {
+              return http.Response(
+                jsonEncode({'overwrites': overwrites}),
                 200,
                 headers: {'content-type': 'application/json'},
               );

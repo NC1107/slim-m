@@ -47,6 +47,17 @@ final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),
 );
 
+/// Every permission overwrite currently set on one channel: the read
+/// [ChannelOverwritesPane] never had until now, so it can show what a target
+/// already carries instead of opening every editor at "Inherit" sight
+/// unseen. Invalidated below alongside [channelPermissionsProvider] whenever
+/// an [api.OverwriteChanged] names this channel.
+final channelOverwritesProvider = FutureProvider.autoDispose
+    .family<List<api.ChannelOverwrite>, String>(
+      (ref, channelId) =>
+          ref.watch(apiProvider).getChannelOverwrites(channelId),
+    );
+
 /// Refetches [rolesProvider] and [meProvider] when a role's own definition
 /// changes or a member's assignment does: either can change what a role
 /// means for whoever is looking at this screen right now, and the caller's
@@ -67,7 +78,10 @@ final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
 /// where a moderator timed out mid-session kept a stale reading until some
 /// unrelated refetch; an [api.OverwriteChanged] invalidates only the one
 /// channel's permissions it names, plus the visible list, since an overwrite
-/// can grant or revoke VIEW_CHANNEL and so change the list's membership.
+/// can grant or revoke VIEW_CHANNEL and so change the list's membership -
+/// and, if [channelOverwritesProvider] is already mounted for that channel
+/// (its editor is open), that too, so a change from elsewhere never leaves
+/// the editor showing a stale allow/deny pair.
 final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
   final selfId = ref.read(sessionProvider).tokens?.userId;
   // ref.invalidate on a never-watched provider mounts and fetches it.
@@ -89,6 +103,9 @@ final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
       refreshVisibleChannels();
     } else if (event is api.OverwriteChanged) {
       ref.invalidate(channelPermissionsProvider(event.channelId));
+      if (ref.exists(channelOverwritesProvider(event.channelId))) {
+        ref.invalidate(channelOverwritesProvider(event.channelId));
+      }
       refreshVisibleChannels();
     }
   });

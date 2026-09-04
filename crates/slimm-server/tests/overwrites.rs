@@ -446,3 +446,84 @@ async fn clearing_a_deny_you_do_not_hold_is_refused() {
         "clearing an overwrite grants back everything it denied"
     );
 }
+
+// --- Listing ---
+
+/// The GET a blind editor never had: every overwrite on a channel, role and
+/// member alike, so a change can see what it is replacing.
+#[tokio::test]
+async fn listing_shows_every_overwrite_set_on_the_channel() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (admin_token, _admin_id) = register(&store, "alice").await;
+    let (_bob_token, bob_id) = register(&store, "bob").await;
+    let channel_id = general_channel_id(&store).await;
+    let everyone = everyone_role_id(&store).await;
+
+    let role_path = format!("/channels/{channel_id}/overwrites/role/{everyone}");
+    let member_path = format!("/channels/{channel_id}/overwrites/member/{bob_id}");
+    for (path, allow, deny) in [
+        (&role_path, Permissions::ADD_REACTIONS.bits(), 0),
+        (&member_path, 0, Permissions::SEND_MESSAGES.bits()),
+    ] {
+        let set = app
+            .clone()
+            .oneshot(request(
+                "PUT",
+                path,
+                Some(&admin_token),
+                Some(json!({ "allow": allow, "deny": deny })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(set.status(), StatusCode::NO_CONTENT);
+    }
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/channels/{channel_id}/overwrites"),
+            Some(&admin_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    let list = body["overwrites"].as_array().unwrap();
+    assert_eq!(list.len(), 2);
+
+    let role = list.iter().find(|o| o["kind"] == "role").unwrap();
+    assert_eq!(role["id"], everyone);
+    assert_eq!(role["allow"], Permissions::ADD_REACTIONS.bits());
+    assert_eq!(role["deny"], 0);
+
+    let member = list.iter().find(|o| o["kind"] == "member").unwrap();
+    assert_eq!(member["id"], bob_id);
+    assert_eq!(member["allow"], 0);
+    assert_eq!(member["deny"], Permissions::SEND_MESSAGES.bits());
+}
+
+/// Reading the overwrites reveals the channel's permission config, so it needs
+/// the same MANAGE_ROLES-here gate that changing them does.
+#[tokio::test]
+async fn listing_requires_manage_roles_here() {
+    let (store, _guard) = new_store().await;
+    let app = app(store.clone());
+    let (_admin_token, _admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let channel_id = general_channel_id(&store).await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            "GET",
+            &format!("/channels/{channel_id}/overwrites"),
+            Some(&bob_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}

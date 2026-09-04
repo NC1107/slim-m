@@ -297,6 +297,12 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
         json!({ "allow": Permissions::VIEW_CHANNEL.bits(), "deny": 0 }),
     )
     .await;
+    c.get(
+        "getChannelOverwrites",
+        &format!("/channels/{channel}/overwrites"),
+        root,
+    )
+    .await;
     c.bare("deleteChannelOverwrite", "DELETE", &overwrite, root)
         .await;
 

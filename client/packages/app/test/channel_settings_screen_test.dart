@@ -70,6 +70,13 @@ Widget _harness(int permissions) => UncontrolledProviderScope(
                 headers: {'content-type': 'application/json'},
               );
             }
+            if (request.url.path == '/channels/c1/overwrites') {
+              return http.Response(
+                jsonEncode({'overwrites': const <Object>[]}),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             return http.Response('{}', 200);
           }),
         );
@@ -94,7 +101,7 @@ Widget _harness(int permissions) => UncontrolledProviderScope(
 /// A phrase from `ChannelOverwritesPane`'s own always-shown callout, unique
 /// to the permissions section, used as this suite's marker for "the
 /// permissions pane rendered" without depending on its internal structure.
-const _permissionsMarker = 'there is no way to read back what is already set';
+const _permissionsMarker = 'Picking a target pre-fills what it already has set';
 
 void main() {
   testWidgets(

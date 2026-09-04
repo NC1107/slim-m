@@ -105,4 +105,19 @@ extension SlimmApiRoles on SlimmApi {
         '/channels/$channelId/overwrites/${kind.wire}/$id',
         expectNoContent: true,
       );
+
+  /// Every permission overwrite currently set on a channel: the read
+  /// [setChannelOverwrite] never had, so an editor can see what it would
+  /// replace instead of silently re-granting a deliberate denial. Requires
+  /// MANAGE_ROLES in this channel specifically, the same gate
+  /// [setChannelOverwrite] uses, and refuses a channel the caller cannot
+  /// manage identically to one that does not exist.
+  Future<List<ChannelOverwrite>> getChannelOverwrites(
+    String channelId,
+  ) async {
+    final json = await _send('GET', '/channels/$channelId/overwrites');
+    return ((json as Map<String, dynamic>)['overwrites'] as List<dynamic>)
+        .map((o) => ChannelOverwrite.fromJson(o as Map<String, dynamic>))
+        .toList(growable: false);
+  }
 }

@@ -10,7 +10,7 @@
 # that raises it; a changelog kept here makes one physical line that every change
 # to the same file must edit, which is a merge conflict by construction.
 
-schema/openapi.yaml 8659 # one OpenAPI document is one document; splitting it across $ref files would give tests/openapi_contract.rs two sources to reconcile. This number rises when the API does, and the raise is the deliberate act; why each raise happened is in the commit that made it, not here.
+schema/openapi.yaml 8715 # one OpenAPI document is one document; splitting it across $ref files would give tests/openapi_contract.rs two sources to reconcile. This number rises when the API does, and the raise is the deliberate act; why each raise happened is in the commit that made it, not here.
 .github/workflows/release.yml 833 # ten publish jobs sharing release-please outputs, plus two thin verify jobs wiring every publish path to one commit-status gate; why each raise happened is in the commit that made it, not here.
 crates/slimm-server/src/store/sessions.rs 815 # tokens, refresh rotation, ws tickets and account deletion in one file; account deletion is the obvious first split
 client/packages/app/test/push_controller_test.dart 928 # one suite over registration, lifecycle reporting and revocation; new push coverage goes in a sibling file rather than growing this one
@@ -18,6 +18,7 @@ crates/slimm-server/tests/invites.rs 676 # issue, check, redeem and revoke, plus
 client/packages/api/test/new_routes_test.dart 580 # the REST routes of PR #36 in one file; the WebSocket frames split to new_routes_ws_frames_test.dart
 crates/slimm-server/tests/polls.rs 603 # create, vote, close and the permission matrix
 crates/slimm-server/tests/dms.rs 592 # pair membership, the deliberately skipped ADMINISTRATOR bypass, and fan-out
+crates/slimm-server/tests/overwrites.rs 529 # set/clear/list plus the escalation and refuse-identically matrix in one file; the listing tests would need the shared harness extracted to split cleanly
 client/packages/app/test/session_persistence_test.dart 588 # restore, refresh and revocation paths
 crates/slimm-server/tests/message_endpoints.rs 535 # send, list, edit and delete with their permission cases
 client/packages/app/lib/src/widgets/composer.dart 562 # autocomplete, focus, paste and drop-target registration together; grew by 12 lines wiring the desktop Emoji/GIFs picker, still not safe to split under an unrelated change

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Per-channel permission overwrites: `PUT`/`DELETE
-/// /channels/{channelId}/overwrites/{kind}/{id}`. Requires MANAGE_ROLES in
+/// Per-channel permission overwrites: `GET`/`PUT`/`DELETE
+/// /channels/{channelId}/overwrites[/{kind}/{id}]`. Requires MANAGE_ROLES in
 /// the target channel.
 ///
-/// There is no endpoint to read an existing overwrite back, only to set
-/// (replace) or clear one, so this screen never claims to show current
-/// state: every permission opens on "inherit" and a submit always replaces
-/// whatever was there, sight unseen.
+/// A submit always replaces the whole overwrite rather than patching one
+/// bit, so [CurrentOverwritesSection] fetches what is already set and both
+/// it and [_pickTarget] pre-fill the editor from that instead of opening
+/// every target at "Inherit" sight unseen - see `channelOverwritesProvider`.
 library;
 
 import 'package:flutter/material.dart';
@@ -16,6 +16,7 @@ import 'package:slimm_data/data.dart' show Channel;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../permissions.dart';
+import '../../providers/admin_providers.dart';
 import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
 import '../../providers/toasts.dart';
@@ -24,6 +25,7 @@ import '../settings_screen_scaffold.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
+import 'current_overwrites_section.dart';
 import 'overwrite_target_picker_sheets.dart';
 import 'permission_overwrite_row.dart';
 
@@ -96,6 +98,42 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
 
   void _resetState() => _state.updateAll((_, __) => OverwriteState.inherit);
 
+  /// Sets each permission's tri-state from [overwrite]'s allow/deny pair, or
+  /// back to "Inherit" for every bit when null - the shared tail of picking a
+  /// target, whichever of the two ways this screen offers to pick one.
+  void _applyOverwrite(api.ChannelOverwrite? overwrite) {
+    _state.updateAll((bit, _) {
+      if (overwrite == null) return OverwriteState.inherit;
+      if (overwrite.allow & bit != 0) return OverwriteState.allow;
+      if (overwrite.deny & bit != 0) return OverwriteState.deny;
+      return OverwriteState.inherit;
+    });
+  }
+
+  /// The already-set overwrite matching [kind]/[id], from whatever
+  /// [channelOverwritesProvider] currently holds for [_channel] - null while
+  /// it is still loading, has failed, or simply has nothing for this target.
+  api.ChannelOverwrite? _existingOverwrite(
+    api.OverwriteTarget kind,
+    String id,
+  ) => ref
+      .read(channelOverwritesProvider(_channel!.id))
+      .valueOrNull
+      ?.where((o) => o.kind == kind && o.id == id)
+      .firstOrNull;
+
+  /// Selects a target through [CurrentOverwritesSection] rather than
+  /// [_pickTarget]'s pickers: the row itself already carries the overwrite,
+  /// so this pre-fills straight from it instead of looking it up again.
+  void _selectExisting(api.ChannelOverwrite overwrite, String label) {
+    setState(() {
+      _kind = overwrite.kind;
+      _targetId = overwrite.id;
+      _targetLabel = label;
+      _applyOverwrite(overwrite);
+    });
+  }
+
   Future<void> _pickChannel() async {
     final store = await ref.read(storeProvider.future);
     final channels = await store.watchChannels().first;
@@ -121,7 +159,7 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
       setState(() {
         _targetId = picked.id;
         _targetLabel = picked.name;
-        _resetState();
+        _applyOverwrite(_existingOverwrite(_kind, picked.id));
       });
     } else {
       final picked = await showAppSheet<api.UserProfile>(
@@ -132,7 +170,7 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
       setState(() {
         _targetId = picked.id;
         _targetLabel = picked.displayName;
-        _resetState();
+        _applyOverwrite(_existingOverwrite(_kind, picked.id));
       });
     }
   }
@@ -144,14 +182,18 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
   /// The server's escalation check is `granted = allow.remove(old_allow)
   /// .union(old_deny.remove(deny))`, and it requires the caller's own
   /// permissions to contain that. The second half is the trap: if the target
-  /// already carries a bit *denied* by a prior overwrite - invisible here by
-  /// design, since there is no read-back endpoint - then resubmitting with it
+  /// already carries a bit *denied* by a prior overwrite, resubmitting with it
   /// at Inherit rather than Deny un-denies it, and un-denying counts as
-  /// granting exactly as Allow does. A caller who does not hold that bit at
-  /// their own base level has the whole call refused with a generic 403.
-  /// `PermissionOverwriteRow`'s own doc says Deny "carries no such check and
-  /// is always offered" and said nothing about Inherit's identical implicit
-  /// cost; Clear (see [_clear]) has the same exposure.
+  /// granting exactly as Allow does. [_pickTarget] and
+  /// [CurrentOverwritesSection] pre-fill Deny for exactly that bit once
+  /// `channelOverwritesProvider` has resolved, but a target picked while that
+  /// fetch is still loading or has failed still opens at Inherit
+  /// indistinguishably from "nothing was ever set here." A caller who does
+  /// not hold that bit at their own base level has the whole call refused
+  /// with a generic 403. `PermissionOverwriteRow`'s own doc says Deny
+  /// "carries no such check and is always offered" and said nothing about
+  /// Inherit's identical implicit cost; Clear (see [_clear]) has the same
+  /// exposure.
   Future<void> _set() async {
     var allow = 0;
     var deny = 0;
@@ -169,10 +211,10 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
       context,
       title: 'Replace this overwrite?',
       message:
-          'There is no way to see what $_targetLabel already has set in '
-          '"${_channel!.name}", so this replaces the whole thing: any '
-          'permission left at "Inherit" above goes back to inheriting from '
-          'their roles, even if it was allowed or denied before.',
+          'This replaces the whole overwrite for $_targetLabel in '
+          '"${_channel!.name}": any permission left at "Inherit" above goes '
+          'back to inheriting from their roles, even if it was allowed or '
+          'denied before.',
       confirmLabel: 'Set overwrite',
     );
     if (!confirmed || !mounted) return;
@@ -259,9 +301,9 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
         const AppCallout(
           tone: AppCalloutTone.info,
           child: Text(
-            'This always starts from "Inherit": there is no way to read '
-            'back what is already set. Setting an overwrite replaces every '
-            'permission at once.',
+            'Picking a target pre-fills what it already has set. Setting an '
+            'overwrite still replaces every permission at once, including '
+            'any left at "Inherit".',
           ),
         ),
         const SizedBox(height: AppSpacing.s8),
@@ -290,6 +332,11 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
             ],
           ),
         if (_channel != null) ...[
+          const SizedBox(height: AppSpacing.s12),
+          CurrentOverwritesSection(
+            channelId: _channel!.id,
+            onSelect: _selectExisting,
+          ),
           const SizedBox(height: AppSpacing.s12),
           AppSegmentedControl.inline(
             semanticLabel: 'Overwrite target kind',

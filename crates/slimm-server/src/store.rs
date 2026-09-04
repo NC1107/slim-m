@@ -105,6 +105,7 @@ pub use message_search::{MessageSearchFilters, SearchError};
 pub use messages::{Edited, MessageDeletion, NewMessage, SendError, Sent};
 pub use messages_bulk::{BulkDeleteError, BulkDeletion, DeletedMessage};
 pub use moderation_history::{AuditLogEntry, HistoryCursor, ModerationHistoryItem};
+pub use permissions::ChannelOverwrite;
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
     CreatePollError, MAX_OPTION_CHARS, MAX_OPTIONS, MAX_QUESTION_CHARS, MIN_OPTIONS, Poll,

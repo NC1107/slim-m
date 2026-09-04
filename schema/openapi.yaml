@@ -2142,6 +2142,34 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/overwrites:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: getChannelOverwrites
+      tags: [roles]
+      summary: List every permission overwrite set on a channel.
+      description: >
+        The read a blind editor never had: the current allow/deny pair for
+        every role and member overwritten on this channel, so a change can see
+        what it is replacing rather than silently re-granting a deliberate
+        denial. Requires MANAGE_ROLES in this channel specifically - the same
+        gate setChannelOverwrite uses - and refuses a channel the caller
+        cannot manage identically to one that does not exist.
+      responses:
+        "200":
+          description: The channel's overwrites.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelOverwrites"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/overwrites/{kind}/{id}:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -7477,6 +7505,34 @@ components:
             timeout subtracted - see `getChannelPermissions`. Zero whenever
             the caller lacks VIEW_CHANNEL here, including for a channel that
             does not exist at all.
+
+    ChannelOverwrites:
+      type: object
+      required: [overwrites]
+      properties:
+        overwrites:
+          type: array
+          description: Every overwrite set on the channel, role and member alike.
+          items:
+            type: object
+            required: [kind, id, allow, deny]
+            properties:
+              kind:
+                type: string
+                enum: [role, member]
+                description: Which kind of target `id` names.
+              id:
+                type: string
+                format: uuid
+                description: The role's or member's UUID, matching `kind`.
+              allow:
+                type: integer
+                format: int64
+                description: The permission bits this overwrite forces on.
+              deny:
+                type: integer
+                format: int64
+                description: The permission bits this overwrite forces off.
 
     ThreadParent:
       type: object
