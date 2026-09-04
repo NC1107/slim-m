@@ -8,6 +8,8 @@
 /// survived that for the channels asked about.
 library;
 
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -132,5 +134,45 @@ void main() {
 
     expect(await store.reachableMessageIds(['c1']), {'c1-m1'});
     expect(await store.reachableMessageIds([]), isEmpty);
+  });
+
+  test('a large prune returns the freed pages to disk, not just the free list',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('slimm-vacuum-test');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/store.sqlite');
+    final db = SlimmDatabase(NativeDatabase(file));
+    addTearDown(db.close);
+    final store = MessageStore(db);
+    await store.upsertChannels([
+      const api.Channel(id: 'c1', name: 'c1', kind: 'text', createdAt: 0),
+    ]);
+
+    // ~4 MiB of history, well past the vacuum's ~2 MiB floor once pruned.
+    final big = 'x' * 2048;
+    await store.applyMessages([
+      for (var s = 1; s <= 2000; s++)
+        api.Message(
+          id: 'c1-m$s',
+          channelId: 'c1',
+          authorId: 'user-1',
+          authorDisplayName: 'User One',
+          seq: s,
+          content: big,
+          createdAt: s * 1000,
+          editedAt: null,
+        ),
+    ]);
+    final before = await file.length();
+
+    await store.pruneToRetentionCeiling(50);
+    final after = await file.length();
+
+    expect(await _seqsOf(store, 'c1'), hasLength(50));
+    expect(
+      after,
+      lessThan(before),
+      reason: 'the vacuum should hand the pruned pages back to the OS',
+    );
   });
 }

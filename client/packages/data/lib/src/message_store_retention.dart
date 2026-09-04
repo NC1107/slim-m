@@ -45,6 +45,25 @@ Future<void> _pruneToRetentionCeiling(MessageStore store, int ceiling) async {
           .go();
     }
   });
+  await _reclaimFreedPages(store.db);
+}
+
+/// SQLite parks the pages a delete frees on its own free list rather than
+/// handing them back to the OS, so a pruned cache never shrinks on disk until
+/// something runs VACUUM. VACUUM rewrites the whole database, so it is worth
+/// doing only once the free list has grown enough to reclaim - not after
+/// every sweep, most of which prune little or nothing.
+///
+/// The floor is 512 pages, roughly 2 MiB at SQLite's 4 KiB default page size:
+/// below that there is nothing worth a full rewrite for.
+const _vacuumFreePageFloor = 512;
+
+Future<void> _reclaimFreedPages(SlimmDatabase db) async {
+  final row = await db.customSelect('PRAGMA freelist_count').getSingle();
+  final freePages = row.data.values.first as int? ?? 0;
+  if (freePages < _vacuumFreePageFloor) return;
+  // Must run outside a transaction; the prune's own transaction has committed.
+  await db.customStatement('VACUUM');
 }
 
 /// [MessageStore.reachableMessageIds]'s body: every message id already held
