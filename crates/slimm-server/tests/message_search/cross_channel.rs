@@ -252,3 +252,56 @@ async fn search_excludes_the_callers_own_dms() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0]["channel_id"], lobby.id.to_string());
 }
+
+/// Cross-channel results are ordered newest-first by wall-clock time, not by
+/// per-channel `seq`. `seq` is per-channel, so ordering a multi-channel result
+/// by it would rank a chatty channel's older message above a quiet channel's
+/// newer one. The chatty channel here holds `seq` 1 and 2; the quiet channel's
+/// single message (`seq` 1) is sent last and must come back first.
+#[tokio::test]
+async fn cross_channel_results_are_ordered_by_time_not_per_channel_seq() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+    let chatty = store.create_channel("chatty", "text").await.unwrap();
+    let quiet = store.create_channel("quiet", "text").await.unwrap();
+    let app = app(store.clone());
+    let token = register(&store, "alice").await;
+
+    // Distinct milliseconds so created_at, not the seq tiebreak, decides order.
+    send(&app, &chatty.id.to_string(), &token, "beluga one").await;
+    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    send(&app, &chatty.id.to_string(), &token, "beluga two").await;
+    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    send(&app, &quiet.id.to_string(), &token, "beluga three").await;
+
+    let results = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                "/search/messages?q=beluga",
+                Some(&token),
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let contents: Vec<&str> = results
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["content"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        contents,
+        vec!["beluga three", "beluga two", "beluga one"],
+        "newest by time first, not the chatty channel's higher seq"
+    );
+}
