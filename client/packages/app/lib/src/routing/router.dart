@@ -22,6 +22,7 @@ import '../screens/admin/performance_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/roles_screen.dart';
+import '../screens/admin/storage_screen.dart';
 import '../screens/channel_settings_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/debug_log_screen.dart';
@@ -163,6 +164,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminPerformance,
         pageBuilder: (context, state) =>
             modalPage(context, const PerformanceScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminStorage,
+        pageBuilder: (context, state) =>
+            modalPage(context, const StorageScreen()),
       ),
       GoRoute(
         path: Routes.debugLog,

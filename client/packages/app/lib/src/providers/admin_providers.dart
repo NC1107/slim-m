@@ -150,3 +150,10 @@ final spaceCanvasCapProvider = FutureProvider.autoDispose<int>(
 final spaceScreenShareCeilingProvider = FutureProvider.autoDispose<int>(
   (ref) => ref.watch(apiProvider).spaceScreenShareMaxHeight(),
 );
+
+/// Operator-visible storage usage and sweep health, `GET /space/storage`.
+/// Always computed - unlike [spaceAnalyticsProvider] there is no toggle. See
+/// `screens/admin/storage_screen.dart`.
+final spaceStorageProvider = FutureProvider.autoDispose<api.SpaceStorage>(
+  (ref) => ref.watch(apiProvider).fetchSpaceStorage(),
+);

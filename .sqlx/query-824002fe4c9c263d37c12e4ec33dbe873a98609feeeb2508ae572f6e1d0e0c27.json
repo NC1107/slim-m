@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sweep_status (name, last_run_at, last_reclaimed) VALUES (?, ?, ?)\n             ON CONFLICT (name) DO UPDATE SET\n                 last_run_at = excluded.last_run_at,\n                 last_reclaimed = excluded.last_reclaimed",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "824002fe4c9c263d37c12e4ec33dbe873a98609feeeb2508ae572f6e1d0e0c27"
+}

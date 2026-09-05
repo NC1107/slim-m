@@ -4825,6 +4825,33 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /space/storage:
+    get:
+      operationId: getSpaceStorage
+      tags: [space]
+      summary: Read operator-visible storage usage and background sweep health.
+      description: >
+        Gated on MANAGE_SERVER, the same bit as `/space/analytics`, and always
+        computes - there is no on/off toggle. `database_bytes` and
+        `database_reclaimable_bytes` come from SQLite's own page accounting,
+        not a filesystem stat or directory walk. `attachment_bytes` is the
+        same total `/space/analytics` reports. `top_channels` excludes DMs
+        and threads, the same scope `/space/analytics`'s `channel_count`
+        uses. `sweeps` lists every background sweep that has recorded at
+        least one run; a sweep that has never run is simply absent.
+      responses:
+        "200":
+          description: Current storage usage and sweep status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpaceStorage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /space/retention:
     get:
       operationId: getSpaceRetention
@@ -5876,6 +5903,66 @@ components:
               items:
                 $ref: "#/components/schemas/SpaceAnalyticsMemberStorage"
             - type: "null"
+    SpaceStorageChannel:
+      type: object
+      required: [channel_id, name, attachment_bytes]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        attachment_bytes:
+          type: integer
+    SpaceSweepStatus:
+      type: object
+      required: [name, last_run_at, last_reclaimed]
+      properties:
+        name:
+          type: string
+          description: >
+            Stable snake_case identifier, for example `token`, `attachments`,
+            `canvas_ops`, `message_retention`.
+        last_run_at:
+          type: integer
+          description: Unix milliseconds of the sweep's most recent pass.
+        last_reclaimed:
+          type: integer
+          description: >
+            What that pass reclaimed, in whatever unit that sweep counts
+            (rows removed, files freed): sweep-specific, not always bytes.
+    SpaceStorage:
+      type: object
+      required:
+        [
+          database_bytes,
+          database_reclaimable_bytes,
+          attachment_bytes,
+          top_channels,
+          sweeps,
+        ]
+      properties:
+        database_bytes:
+          type: integer
+          description: The database file's logical size, from SQLite's page count.
+        database_reclaimable_bytes:
+          type: integer
+          description: How much of that a `VACUUM` could reclaim.
+        attachment_bytes:
+          type: integer
+          description: Current total bytes stored across every attachment.
+        top_channels:
+          type: array
+          description: >
+            Channels holding the most attachment bytes, heaviest first. DMs
+            and threads are excluded.
+          items:
+            $ref: "#/components/schemas/SpaceStorageChannel"
+        sweeps:
+          type: array
+          description: Every background sweep that has recorded at least one run.
+          items:
+            $ref: "#/components/schemas/SpaceSweepStatus"
     SpaceRetention:
       type: object
       required: [retention_days]

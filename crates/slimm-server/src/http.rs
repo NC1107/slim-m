@@ -74,6 +74,7 @@ mod safety;
 mod saved_messages;
 mod search;
 mod space;
+mod storage;
 mod sync;
 mod sync_ops;
 mod threads;
@@ -166,6 +167,7 @@ pub fn router(state: AppState) -> Router {
         .merge(dms::routes())
         .merge(search::routes())
         .merge(space::routes())
+        .merge(storage::routes())
         .merge(sync::routes())
         .merge(threads::routes())
         .merge(voice::routes())

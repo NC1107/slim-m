@@ -92,6 +92,13 @@ extension SlimmApiSpace on SlimmApi {
     );
     return (json as Map<String, dynamic>)['max_height'] as int;
   }
+
+  /// Operator-visible storage usage and sweep health. Always computes -
+  /// there is no on/off toggle the way `spaceAnalytics` has.
+  Future<SpaceStorage> fetchSpaceStorage() async {
+    final json = await _send('GET', '/space/storage');
+    return SpaceStorage._fromJson(json as Map<String, dynamic>);
+  }
 }
 
 /// One calendar day's Space-wide message count, UTC, zero-filled for a day
@@ -218,5 +225,89 @@ class SpaceAnalytics {
                 .map((e) =>
                     MemberAttachmentUsage._fromJson(e as Map<String, dynamic>))
                 .toList(),
+      );
+}
+
+/// One channel's share of attachment storage, from [SpaceStorage.topChannels].
+class ChannelStorage {
+  const ChannelStorage({
+    required this.channelId,
+    required this.name,
+    required this.attachmentBytes,
+  });
+
+  final String channelId;
+  final String name;
+  final int attachmentBytes;
+
+  factory ChannelStorage._fromJson(Map<String, dynamic> json) => ChannelStorage(
+        channelId: json['channel_id'] as String,
+        name: json['name'] as String,
+        attachmentBytes: json['attachment_bytes'] as int,
+      );
+}
+
+/// One background sweep's last recorded run, from [SpaceStorage.sweeps].
+class SweepStatus {
+  const SweepStatus({
+    required this.name,
+    required this.lastRunAt,
+    required this.lastReclaimed,
+  });
+
+  /// Stable snake_case identifier: `token`, `attachments`, `canvas_ops`, or
+  /// `message_retention`.
+  final String name;
+  final int lastRunAt;
+
+  /// What that pass reclaimed, in whatever unit that sweep counts (rows
+  /// removed, files freed) - sweep-specific, not always bytes.
+  final int lastReclaimed;
+
+  factory SweepStatus._fromJson(Map<String, dynamic> json) => SweepStatus(
+        name: json['name'] as String,
+        lastRunAt: json['last_run_at'] as int,
+        lastReclaimed: json['last_reclaimed'] as int,
+      );
+}
+
+/// Operator-visible storage usage and sweep health, from
+/// [SlimmApiSpace.fetchSpaceStorage]. Always computed; unlike
+/// [SpaceAnalytics] there is no toggle to turn this off.
+class SpaceStorage {
+  const SpaceStorage({
+    required this.databaseBytes,
+    required this.databaseReclaimableBytes,
+    required this.attachmentBytes,
+    required this.topChannels,
+    required this.sweeps,
+  });
+
+  /// The database file's logical size, from SQLite's own page count.
+  final int databaseBytes;
+
+  /// How much of [databaseBytes] a `VACUUM` could reclaim.
+  final int databaseReclaimableBytes;
+
+  /// The same total [SpaceAnalytics.stats]' `attachmentBytes` reports.
+  final int attachmentBytes;
+
+  /// Channels holding the most attachment bytes, heaviest first. DMs and
+  /// threads are excluded.
+  final List<ChannelStorage> topChannels;
+
+  /// Every background sweep that has recorded at least one run.
+  final List<SweepStatus> sweeps;
+
+  factory SpaceStorage._fromJson(Map<String, dynamic> json) => SpaceStorage(
+        databaseBytes: json['database_bytes'] as int,
+        databaseReclaimableBytes: json['database_reclaimable_bytes'] as int,
+        attachmentBytes: json['attachment_bytes'] as int,
+        topChannels: (json['top_channels'] as List<dynamic>)
+            .map((e) => ChannelStorage._fromJson(e as Map<String, dynamic>))
+            .toList(),
+        sweeps: (json['sweeps'] as List<dynamic>)
+            .map((e) => SweepStatus._fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
