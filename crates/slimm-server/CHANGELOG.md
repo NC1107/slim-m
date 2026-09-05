@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.57.0](https://github.com/NC1107/slim-m/compare/server-v0.56.0...server-v0.57.0) (2026-09-05)
+
+
+### Features
+
+* read a channel's permission overwrites before editing them ([#1071](https://github.com/NC1107/slim-m/issues/1071)) ([94f9dcd](https://github.com/NC1107/slim-m/commit/94f9dcd229d49bb909bbe915cbe000491052b1ff))
+* **server:** cross-channel message search (GET /search/messages) ([#1074](https://github.com/NC1107/slim-m/issues/1074)) ([1f7b8bd](https://github.com/NC1107/slim-m/commit/1f7b8bdff99ee4d8b182e134b816b98b47e779a7))
+* unread mention badge on the channel rail ([#1075](https://github.com/NC1107/slim-m/issues/1075)) ([2eb27cf](https://github.com/NC1107/slim-m/commit/2eb27cf5691dfcf000b44f98b6cd6df3b3dd5140))
+
+
+### Performance Improvements
+
+* **server:** cache presence visibility per connection ([#1073](https://github.com/NC1107/slim-m/issues/1073)) ([046a20c](https://github.com/NC1107/slim-m/commit/046a20cb01152ec8c5786ef17ce472d668ec9e78))
+
 ## [0.56.0](https://github.com/NC1107/slim-m/compare/server-v0.55.0...server-v0.56.0) (2026-09-04)
 
 
