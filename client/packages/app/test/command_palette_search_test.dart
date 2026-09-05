@@ -71,6 +71,41 @@ void main() {
     await teardown(tester, setup.container, setup.db);
   });
 
+  /// The palette used to scope message search to whichever channel was
+  /// open, and skip it entirely with none open at all - there was no
+  /// cross-channel search endpoint to call. `GET /search/messages` changed
+  /// that: a hit surfaces here with no channel selected.
+  testWidgets('message search runs with no channel open at all', (
+    tester,
+  ) async {
+    final setup = setupPalette(
+      hits: [
+        {
+          'id': 'm1',
+          'channel_id': 'ch1',
+          'author_id': 'other',
+          'author_display_name': 'Ren',
+          'seq': 1,
+          'content': 'found from nowhere in particular',
+          'created_at': 0,
+          'edited_at': null,
+        },
+      ],
+    );
+    await pump(tester, setup.container, initial: '/channels');
+    await pressCtrlK(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('command-palette-input')),
+      'nowhere',
+    );
+    await tester.pumpAndSettle();
+
+    expect(inPalette('found from nowhere in particular'), findsOneWidget);
+
+    await teardown(tester, setup.container, setup.db);
+  });
+
   /// The palette used to collapse every message-search failure to an empty
   /// result; it now gains the 403 distinction `channelSearchProvider` already
   /// had, through the shared `searchChannelMessages` helper.

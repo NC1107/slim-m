@@ -9,10 +9,13 @@
 //! [`operators_identity`] (`from:`/`in:`, both of which resolve a caller-
 //! supplied name and so both carry an oracle-safety obligation) and
 //! [`operators_content`] (`has:`/`before:`/`after:`, which read a message's
-//! own bytes rather than resolving anything). [`fixtures`] is the temp
-//! database, router and request builders they all share.
+//! own bytes rather than resolving anything). [`cross_channel`] is the
+//! deployment-wide `GET /search/messages` scope instead of the per-channel
+//! route the rest of this suite pins. [`fixtures`] is the temp database,
+//! router and request builders they all share.
 
 mod basic;
+mod cross_channel;
 mod fixtures;
 mod operators_content;
 mod operators_identity;

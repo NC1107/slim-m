@@ -141,8 +141,9 @@ List<PaletteResultItem> buildMemberItems(
     ),
 ];
 
-/// Messages already matched server-side by full-text search, scoped to
-/// whichever channel is open (there is no cross-channel search endpoint).
+/// Messages already matched server-side by full-text search across every
+/// channel the caller can view (`GET /search/messages`), not only whichever
+/// one is open.
 ///
 /// [currentChannelId] is the palette's own `widget.currentChannelId`, taken
 /// from the caller rather than read here with `selectedChannelId(context)`:

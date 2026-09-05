@@ -56,6 +56,12 @@ api.UserProfile profile(String id, String name) => api.UserProfile(
 /// the rest of this test suite's convention of an otherwise-always-failing
 /// client so an unexpected call surfaces immediately instead of returning
 /// something plausible-looking.
+///
+/// The palette only ever calls `GET /search/messages` (its cross-channel
+/// scope), never the per-channel `.../messages/search` route
+/// `channelSearchProvider` uses; both are matched here so this fixture stays
+/// useful if a future test drives the per-channel route through the same
+/// client.
 http.Client fakeClient({
   List<String> blocked = const [],
   List<Map<String, dynamic>> hits = const [],
@@ -64,7 +70,8 @@ http.Client fakeClient({
   if (request.url.path == '/blocks') {
     return http.Response(jsonEncode(blocked), 200);
   }
-  if (request.url.path.endsWith('/messages/search')) {
+  if (request.url.path == '/search/messages' ||
+      request.url.path.endsWith('/messages/search')) {
     if (searchForbidden) {
       return http.Response(jsonEncode({'error': 'denied'}), 403);
     }
@@ -134,8 +141,8 @@ Future<void> teardown(
   await db.close();
 }
 
-/// [initial] lets a test start inside a channel: the palette only searches
-/// messages when one is selected, which is why that path had no coverage.
+/// [initial] lets a test start inside a channel, so a message-jump result
+/// can assert whether the jump had to navigate at all.
 GoRouter testRouter({String initial = '/channels'}) => GoRouter(
   initialLocation: initial,
   routes: [

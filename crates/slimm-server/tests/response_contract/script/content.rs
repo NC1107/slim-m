@@ -417,6 +417,12 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         root,
     )
     .await;
+    c.get(
+        "searchMessagesAll",
+        "/search/messages?q=message&limit=10",
+        root,
+    )
+    .await;
     c.get("getReadState", &format!("/channels/{channel}/read"), root)
         .await;
     c.json(
