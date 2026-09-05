@@ -122,6 +122,8 @@ async fn set_visibility(
     {
         return Err(ApiError::Unauthorized);
     }
+    // Refresh the cache before announcing, so the fan-out reads the new choice.
+    state.hub.presence().set_visibility(ctx.user_id, visibility);
     state.hub.publish(Event::PresenceChanged(ctx.user_id));
 
     Ok(Json(VisibilityDto {

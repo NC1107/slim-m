@@ -433,15 +433,17 @@ async fn a_store_error_resolving_presence_withholds_typing() {
     let (bob_ticket, _bob_id) = user_ticket(&store, "bob").await;
 
     let addr = serve(state.clone()).await;
-    let mut alice_ws = connect(addr, &alice_ticket).await;
-    let mut bob_ws = connect(addr, &bob_ticket).await;
 
+    // Broken before anyone connects so the visibility cache never loads and authorize falls through to the erroring store - the genuine fail-closed case (a cache hit resolves it correctly; see the presence unit tests).
     sqlx::query(
         "ALTER TABLE users RENAME COLUMN presence_visibility TO presence_visibility_broken",
     )
     .execute(&pool)
     .await
     .expect("break the column the store queries by name");
+
+    let mut alice_ws = connect(addr, &alice_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
 
     send_typing(&mut alice_ws, &channel.id.to_string()).await;
 
