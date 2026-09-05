@@ -7060,6 +7060,14 @@ components:
             only referenced by it.
           items:
             $ref: "#/components/schemas/Attachment"
+        mentions_me:
+          type: boolean
+          description: >-
+            Whether this message mentions the caller - by @name, by a role
+            the caller holds, or by @everyone/@here when the author held
+            that permission. Per-viewer exactly like `reacted`, and always
+            false on the sender's own send or edit response: an author is
+            never resolved as mentioning themselves.
 
     SavedMessage:
       allOf:

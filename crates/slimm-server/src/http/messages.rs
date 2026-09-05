@@ -21,13 +21,14 @@ use super::AppState;
 use super::attachment_ids::parse_attachment_ids;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
+use super::message_history::history;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Edited, NewMessage};
 
-pub(crate) use super::message_dto::{AttachmentDto, MessageDto, MessageRevisionDto, ReactionDto};
+pub(crate) use super::message_dto::{AttachmentDto, MessageDto, ReactionDto};
 
 /// Message bodies carry one text field; cap it generously but bounded.
 const MESSAGE_BODY_LIMIT: usize = 64 * 1024;
@@ -197,6 +198,15 @@ async fn send(
     // An idempotent retry must not fan out or push again; see the note on
     // this function.
     if sent.fresh {
+        super::message_mentions::resolve_and_store(
+            &state,
+            channel_id,
+            ctx.user_id,
+            sent.message.id,
+            &sent.message.content,
+        )
+        .await?;
+
         state.hub.publish(Event::MessageCreated {
             message: sent.message.clone(),
             attachments: attachments.clone(),
@@ -400,6 +410,16 @@ async fn edit(
         // No op row was written, so nothing changed for anybody to be told about.
         Edited::Unchanged(message) => message,
         Edited::Edited { message, op_seq } => {
+            // Content changed, so the mention set may have too; see resolve_and_store's own doc for the author-vs-editor choice below.
+            super::message_mentions::resolve_and_store(
+                &state,
+                channel_id,
+                message.author_id.unwrap_or(ctx.user_id),
+                message.id,
+                &message.content,
+            )
+            .await?;
+
             state.hub.publish(Event::MessageEdited {
                 message: message.clone(),
                 op_seq,
@@ -411,50 +431,6 @@ async fn edit(
     let mut dto: MessageDto = updated.into();
     dto.forwarded = forwarded.map(Into::into);
     Ok(Json(dto))
-}
-
-/// Every version a message has held, oldest first, ending with its current
-/// content. Gated on VIEW_CHANNEL like reading the message itself; a message
-/// that does not exist, is not in this channel, or is deleted answers 404,
-/// exactly as [`list`] and [`edit`] do.
-async fn history(
-    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
-    Path((channel_id, message_id)): Path<(String, String)>,
-    State(state): State<AppState>,
-) -> Result<Json<Vec<MessageRevisionDto>>, ApiError> {
-    let channel_id = ChannelId(parse_uuid(&channel_id)?);
-    let message_id = MessageId(parse_uuid(&message_id)?);
-
-    // Not being able to see the channel hides whether the message exists.
-    if !state
-        .store
-        .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
-        .await?
-    {
-        return Err(ApiError::Forbidden);
-    }
-
-    // A live message in this channel, not merely a real id in some other one.
-    let in_channel = state
-        .store
-        .message(message_id)
-        .await?
-        .is_some_and(|message| message.channel_id == channel_id);
-    if !in_channel {
-        return Err(ApiError::NotFound("message not found"));
-    }
-
-    let revisions = state
-        .store
-        .message_edit_history(message_id)
-        .await?
-        .ok_or(ApiError::NotFound("message not found"))?;
-    Ok(Json(
-        revisions
-            .into_iter()
-            .map(MessageRevisionDto::from)
-            .collect(),
-    ))
 }
 
 // --- Validation ---

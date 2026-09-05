@@ -202,6 +202,10 @@ impl Store {
         sqlx::query!("DELETE FROM reactions WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        // A mention marker names the account it was mentioning, not the message's own content - nothing left to anonymize.
+        sqlx::query!("DELETE FROM message_mentions WHERE user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query!("DELETE FROM read_states WHERE user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;

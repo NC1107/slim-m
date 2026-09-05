@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: UserId\" FROM users\n               WHERE deleted_at IS NULL\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2ea9d180b2825cbb9561af32eafc7ee719802ad0c8ff2617b6b33135c67b0c73"
+}

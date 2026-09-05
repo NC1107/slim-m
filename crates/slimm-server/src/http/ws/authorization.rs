@@ -8,10 +8,10 @@
 
 use std::time::Instant;
 
+use super::ChannelDto;
 use super::frames::{PollOptionCountDto, ReactionCountDto, ServerFrame};
 use super::permission_cache::PermissionCache;
 use super::signals;
-use super::{AttachmentDto, ChannelDto, MessageDto};
 use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
@@ -300,34 +300,28 @@ pub(super) async fn authorize(
             message,
             attachments,
             forwarded,
-        } => {
-            let channel_id = message.channel_id.to_string();
-            let seq = message.seq.0;
-            let mut dto = MessageDto::from(message);
-            dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
-            dto.forwarded = forwarded.map(Into::into);
-            ServerFrame::MessageCreated {
-                channel_id,
-                seq,
-                message: dto,
-            }
-        }
+        } => match super::message_frames::created(
+            store,
+            ctx.user_id,
+            message,
+            attachments,
+            forwarded,
+        )
+        .await
+        {
+            Ok(frame) => frame,
+            Err(()) => return Authorization::Unknown,
+        },
         Event::MessageEdited {
             message,
             op_seq,
             forwarded,
-        } => {
-            let channel_id = message.channel_id.to_string();
-            let seq = message.seq.0;
-            let mut dto = MessageDto::from(message);
-            dto.forwarded = forwarded.map(Into::into);
-            ServerFrame::MessageEdited {
-                channel_id,
-                seq,
-                op_seq: Some(op_seq),
-                message: dto,
-            }
-        }
+        } => match super::message_frames::edited(store, ctx.user_id, message, op_seq, forwarded)
+            .await
+        {
+            Ok(frame) => frame,
+            Err(()) => return Authorization::Unknown,
+        },
         Event::MessageDeleted {
             channel_id,
             message_id,

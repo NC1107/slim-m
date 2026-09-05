@@ -40,6 +40,7 @@ use permission_cache::PermissionCache;
 mod authorization;
 mod canvas_frames;
 mod frames;
+mod message_frames;
 mod permission_cache;
 mod signals;
 
