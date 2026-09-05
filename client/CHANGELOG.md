@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.70.0](https://github.com/NC1107/slim-m/compare/client-v0.69.0...client-v0.70.0) (2026-09-05)
+
+
+### Features
+
+* **client:** desktop update notifier in the splash, install-format aware ([#1069](https://github.com/NC1107/slim-m/issues/1069)) ([426df9a](https://github.com/NC1107/slim-m/commit/426df9ab8eac6de105295ac75483f62ef824e4cb))
+* read a channel's permission overwrites before editing them ([#1071](https://github.com/NC1107/slim-m/issues/1071)) ([94f9dcd](https://github.com/NC1107/slim-m/commit/94f9dcd229d49bb909bbe915cbe000491052b1ff))
+* **server:** cross-channel message search (GET /search/messages) ([#1074](https://github.com/NC1107/slim-m/issues/1074)) ([1f7b8bd](https://github.com/NC1107/slim-m/commit/1f7b8bdff99ee4d8b182e134b816b98b47e779a7))
+* unread mention badge on the channel rail ([#1075](https://github.com/NC1107/slim-m/issues/1075)) ([2eb27cf](https://github.com/NC1107/slim-m/commit/2eb27cf5691dfcf000b44f98b6cd6df3b3dd5140))
+
+
+### Performance Improvements
+
+* **client:** vacuum the local cache after a large retention prune ([#1072](https://github.com/NC1107/slim-m/issues/1072)) ([c81b41a](https://github.com/NC1107/slim-m/commit/c81b41a633a6792c6aeb3bbcf4648d0d0cc9b4a6))
+
 ## [0.69.0](https://github.com/NC1107/slim-m/compare/client-v0.68.0...client-v0.69.0) (2026-09-04)
 
 
