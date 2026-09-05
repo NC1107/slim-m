@@ -134,6 +134,11 @@ pub struct PresenceTracker {
 struct Entry {
     connections: u32,
     last_active: Instant,
+    /// The user's durable visibility choice, cached from SQLite for this
+    /// connection's lifetime so authorizing a presence change reads it from
+    /// memory instead of a per-viewer database round trip. `None` until the
+    /// connection loads it; readers fall back to the store in that window.
+    visibility: Option<Visibility>,
 }
 
 impl Default for PresenceTracker {
@@ -164,6 +169,7 @@ impl PresenceTracker {
         let entry = state.entry(user_id).or_insert(Entry {
             connections: 0,
             last_active: now,
+            visibility: None,
         });
         entry.connections += 1;
         entry.last_active = now;
@@ -202,6 +208,22 @@ impl PresenceTracker {
         if let Some(entry) = lock(&self.state).get_mut(&user_id) {
             entry.last_active = now;
         }
+    }
+
+    /// Caches [user_id]'s visibility choice, if they are connected. A no-op
+    /// otherwise: nothing off a live connection needs it, and the entry that
+    /// would hold it is created and removed with the connection.
+    pub fn set_visibility(&self, user_id: UserId, visibility: Visibility) {
+        if let Some(entry) = lock(&self.state).get_mut(&user_id) {
+            entry.visibility = Some(visibility);
+        }
+    }
+
+    /// [user_id]'s cached visibility, or `None` when it is not connected or
+    /// has not loaded yet - the caller then reads the durable value from the
+    /// store, so a miss is exactly the old behaviour, never a wrong answer.
+    pub fn visibility(&self, user_id: UserId) -> Option<Visibility> {
+        lock(&self.state).get(&user_id).and_then(|e| e.visibility)
     }
 
     pub fn is_connected(&self, user_id: UserId) -> bool {
@@ -344,5 +366,30 @@ mod tests {
         // A touch resets the clock even past the old timeout.
         tracker.touch_at(alice, past_timeout);
         assert!(!tracker.is_idle_at(alice, past_timeout));
+    }
+
+    #[test]
+    fn visibility_is_cached_only_while_connected() {
+        let tracker = PresenceTracker::new();
+        let alice = uid();
+
+        // Nothing to cache into before connecting: a no-op, still a miss.
+        tracker.set_visibility(alice, Visibility::Hidden);
+        assert_eq!(tracker.visibility(alice), None);
+
+        tracker.connect(alice);
+        // Connected but not loaded yet: a miss, so the caller reads the store.
+        assert_eq!(tracker.visibility(alice), None);
+
+        tracker.set_visibility(alice, Visibility::Hidden);
+        assert_eq!(tracker.visibility(alice), Some(Visibility::Hidden));
+
+        // A later change is reflected at once, never a stale cached choice.
+        tracker.set_visibility(alice, Visibility::Online);
+        assert_eq!(tracker.visibility(alice), Some(Visibility::Online));
+
+        // Dropped with the last connection, so the next connect reloads fresh.
+        tracker.disconnect(alice);
+        assert_eq!(tracker.visibility(alice), None);
     }
 }

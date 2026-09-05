@@ -25,8 +25,13 @@ impl PresenceGuard {
     /// Records a new live connection for `user_id` and publishes a change if
     /// this is their first (see [`crate::presence::PresenceTracker::connect`]).
     /// The returned guard must be held for the connection's whole lifetime.
-    pub(super) fn connect(hub: Hub, store: Store, user_id: UserId) -> Self {
-        if hub.presence().connect(user_id) {
+    pub(super) async fn connect(hub: Hub, store: Store, user_id: UserId) -> Self {
+        let first = hub.presence().connect(user_id);
+        // Cache it once here so per-viewer authorize reads it from memory, not the DB.
+        if let Ok(Some(visibility)) = store.presence_visibility(user_id).await {
+            hub.presence().set_visibility(user_id, visibility);
+        }
+        if first {
             hub.publish(Event::PresenceChanged(user_id));
         }
         let idle_watch = tokio::spawn(watch_idle(hub.clone(), store, user_id)).abort_handle();
@@ -107,10 +112,15 @@ pub(super) async fn presence_status(
     viewer: UserId,
     target: UserId,
 ) -> anyhow::Result<Option<Status>> {
-    let Some(visibility) = store.presence_visibility(target).await? else {
-        return Ok(None);
-    };
     let tracker = hub.presence();
+    // Prefer the cache; a miss falls back to the exact store query this always made (its `None` still means a gone account).
+    let visibility = match tracker.visibility(target) {
+        Some(cached) => cached,
+        None => match store.presence_visibility(target).await? {
+            Some(visibility) => visibility,
+            None => return Ok(None),
+        },
+    };
     Ok(Some(presence::status_for(
         viewer,
         target,
