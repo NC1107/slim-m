@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT name AS \"name!\", last_run_at AS \"last_run_at!: i64\",\n                      last_reclaimed AS \"last_reclaimed!: i64\"\n               FROM sweep_status",
+  "describe": {
+    "columns": [
+      {
+        "name": "name!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_run_at!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_reclaimed!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "aa48f94fe5dc2f43ed2d90997867d61aaa4ef52009a5268751fb017c95382443"
+}

@@ -22,12 +22,17 @@ mod process_metrics;
 pub mod push;
 pub mod ratelimit;
 pub mod store;
+mod sweeps;
 pub mod typing;
 pub mod voice;
 
+pub use sweeps::{
+    sweep_stale_call_rings, sweep_stale_call_rings_at, sweep_stale_voice_calls,
+    sweep_stale_voice_calls_at,
+};
+
 use std::net::SocketAddr;
 
-use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -42,19 +47,19 @@ pub async fn run() -> anyhow::Result<()> {
     let pool = db::connect(&config).await?;
 
     let store = store::Store::new(pool);
-    spawn_token_sweep(store.clone());
+    sweeps::spawn_token_sweep(store.clone());
     let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?
         .with_total_ceiling(config.max_total_attachment_bytes);
-    spawn_attachment_sweep(store.clone(), media.clone());
-    spawn_canvas_op_sweep(store.clone());
+    sweeps::spawn_attachment_sweep(store.clone(), media.clone());
+    sweeps::spawn_canvas_op_sweep(store.clone());
     let auth = auth::Auth::new(config.hash_concurrency)?;
     let hub = hub::Hub::new();
     let limiter = ratelimit::RateLimiter::with_trusted_hops(config.trust_proxy_hops);
     let push = push::PushSender::new(&config)?;
     let voice = voice::VoiceService::new(&config)?;
-    spawn_call_sweep(voice.clone(), hub.clone());
-    spawn_ring_sweep(voice.clone(), hub.clone());
-    spawn_message_retention_sweep(store.clone(), media.clone(), hub.clone());
+    sweeps::spawn_call_sweep(voice.clone(), hub.clone());
+    sweeps::spawn_ring_sweep(voice.clone(), hub.clone());
+    sweeps::spawn_message_retention_sweep(store.clone(), media.clone(), hub.clone());
     let gifs = http::gifs::GifSearch::new(&config)?;
     let link_previews = http::link_preview::LinkPreviews::new(&config);
     let app = cors.apply(http::router(http::AppState {
@@ -79,311 +84,6 @@ pub async fn run() -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     Ok(())
-}
-
-/// How often expired token rows are swept. Long, because nothing depends on
-/// the rows going promptly: they are already refused by their own `expires_at`
-/// checks, and this only reclaims the space and keeps the indexes over them
-/// from growing without bound for the life of a deployment.
-const TOKEN_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
-
-/// Runs the token sweep in the background for the life of the process.
-///
-/// Detached and best-effort: a failed sweep is logged and retried on the next
-/// tick, never propagated, because nothing a request does depends on it. The
-/// first tick waits out the interval rather than running at startup, so a
-/// container that crash-loops does not hammer the same delete on every boot.
-fn spawn_token_sweep(store: store::Store) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(TOKEN_SWEEP_INTERVAL);
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            match store.sweep_expired_tokens().await {
-                Ok(swept) if swept.total() > 0 => {
-                    tracing::info!(
-                        access_tokens = swept.access_tokens,
-                        refresh_tokens = swept.refresh_tokens,
-                        ws_tickets = swept.ws_tickets,
-                        "swept expired token rows"
-                    );
-                }
-                Ok(_) => {}
-                Err(err) => tracing::warn!(error = %err, "token sweep failed"),
-            }
-        }
-    });
-}
-
-/// How often an uploaded-but-never-attached attachment is swept. Uploading is
-/// two-phase (bytes first, a message reference second), so an interrupted
-/// compose leaves a real, if bounded, class of orphan this reclaims; see
-/// `store::attachments` for the grace window and per-pass batch size.
-const ATTACHMENT_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-/// Runs the orphaned-attachment sweep in the background for the life of the
-/// process, on the same detached, best-effort, wait-first model as
-/// [`spawn_token_sweep`]. The database rows are removed first (inside the
-/// store call); this only cleans up the backing files that removal freed,
-/// which is why it needs `media` and not just `store`.
-fn spawn_attachment_sweep(store: store::Store, media: media::Media) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(ATTACHMENT_SWEEP_INTERVAL);
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            match store.sweep_orphaned_attachments().await {
-                Ok(freed) if !freed.is_empty() => {
-                    tracing::info!(count = freed.len(), "swept orphaned attachment rows");
-                    for hex in freed {
-                        if let Err(err) = media.delete_attachment(&hex).await {
-                            tracing::warn!(error = %err, attachment = %hex, "failed to delete a swept attachment file");
-                        }
-                    }
-                }
-                Ok(_) => {}
-                Err(err) => tracing::warn!(error = %err, "attachment sweep failed"),
-            }
-        }
-    });
-}
-
-/// How often the canvas op log is compacted. Long, the same reasoning
-/// [`TOKEN_SWEEP_INTERVAL`] gives: nothing depends on a `remove`, `clear` or
-/// `restore` row going away promptly, this only bounds how far the log grows
-/// for the life of a deployment. A read-triggered sweep (the analytics
-/// sampling model) was considered and rejected: this is a real `DELETE` with
-/// a cost proportional to what it reclaims, not a cheap read, and a channel
-/// drawn in continuously but never read through whatever request would
-/// trigger it would never be swept at all - the opposite of what bounding
-/// growth needs.
-const CANVAS_OP_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
-
-/// Runs the canvas op compaction sweep in the background for the life of the
-/// process, on the same detached, best-effort, wait-first model as
-/// [`spawn_token_sweep`].
-fn spawn_canvas_op_sweep(store: store::Store) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(CANVAS_OP_SWEEP_INTERVAL);
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            match store.sweep_canvas_ops().await {
-                Ok(swept) if swept.total() > 0 => {
-                    tracing::info!(
-                        restores = swept.restores,
-                        removes = swept.removes,
-                        clears = swept.clears,
-                        "compacted canvas op rows"
-                    );
-                }
-                Ok(_) => {}
-                Err(err) => tracing::warn!(error = %err, "canvas op sweep failed"),
-            }
-        }
-    });
-}
-
-/// How often a stale voice heartbeat is checked for. Short, unlike the token
-/// and attachment sweeps: this bounds how long a terminated app's ghost
-/// participant lingers, so the interval is part of that bound rather than
-/// housekeeping on its own schedule; see `voice::heartbeat`.
-const CALL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
-
-/// Runs the stale-voice-call sweep in the background for the life of the
-/// process, on the same detached, best-effort, wait-first model as
-/// [`spawn_token_sweep`]. A deployment with no SFU configured never has
-/// anything to sweep, so this is safe to spawn unconditionally.
-fn spawn_call_sweep(voice: voice::VoiceService, hub: hub::Hub) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(CALL_SWEEP_INTERVAL);
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            sweep_stale_voice_calls(&voice, &hub).await;
-        }
-    });
-}
-
-/// One pass of the stale-call sweep, evicting every call whose heartbeat has
-/// gone stale as of now.
-pub async fn sweep_stale_voice_calls(voice: &voice::VoiceService, hub: &hub::Hub) {
-    sweep_stale_voice_calls_at(voice, hub, std::time::Instant::now()).await;
-}
-
-/// [`sweep_stale_voice_calls`] with an explicit clock.
-///
-/// Split out of [`spawn_call_sweep`]'s loop, and `pub` rather than private,
-/// so a test can drive the real coupling between
-/// [`voice::VoiceService::sweep_stale_calls_at`] and
-/// [`voice::VoiceService::remove_participant`] against a controlled clock,
-/// rather than re-implementing the loop and risking the copy drifting from
-/// what actually runs.
-///
-/// Publishes [`hub::Event::VoiceActivityChanged`] for every evicted
-/// `(user, channel)` pair regardless of whether the best-effort SFU removal
-/// below it succeeds: the heartbeat going stale is already the real
-/// transition, committed by [`voice::VoiceService::sweep_stale_calls_at`]
-/// before this ever runs, so bystanders are told up front rather than behind
-/// the removal round trips.
-///
-/// The removals themselves fan out with bounded concurrency. Each is a real
-/// HTTP POST to LiveKit, so a blip that expires many heartbeats in one tick
-/// would otherwise serialise N round trips end to end; [`STALE_SWEEP_CONCURRENCY`]
-/// collapses that burst without opening an unbounded number of connections at
-/// once (SRV6).
-pub async fn sweep_stale_voice_calls_at(
-    voice: &voice::VoiceService,
-    hub: &hub::Hub,
-    now: std::time::Instant,
-) {
-    let stale = voice.sweep_stale_calls_at(now);
-    for (_, channel_id) in &stale {
-        hub.publish(hub::Event::VoiceActivityChanged {
-            channel_id: *channel_id,
-        });
-    }
-    futures_util::stream::iter(stale)
-        .for_each_concurrent(
-            STALE_SWEEP_CONCURRENCY,
-            |(user_id, channel_id)| async move {
-                match voice.remove_participant(channel_id, user_id).await {
-                    Ok(()) => tracing::info!(
-                        %user_id,
-                        %channel_id,
-                        "removed a voice participant with no recent heartbeat"
-                    ),
-                    Err(voice::VoiceError::Unavailable) => {}
-                    Err(voice::VoiceError::Internal(err)) => tracing::warn!(
-                        error = %err,
-                        %user_id,
-                        %channel_id,
-                        "failed to remove a stale voice participant"
-                    ),
-                }
-            },
-        )
-        .await;
-}
-
-/// How many stale-participant removals the sweep runs at once. A burst that
-/// expires many heartbeats in one tick is rare, so this only has to keep that
-/// burst from serialising while staying well under a thundering herd of
-/// simultaneous connections to the SFU.
-const STALE_SWEEP_CONCURRENCY: usize = 16;
-
-/// How often an outstanding DM call ring is checked for having gone past
-/// [`voice::RING_TIMEOUT`]. Short, the same reasoning [`CALL_SWEEP_INTERVAL`]
-/// gives: this bounds how long a caller can sit alone on an open SFU room
-/// after nobody answered, so the interval is part of that bound rather than
-/// housekeeping on its own schedule.
-const RING_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
-
-/// Runs the stale-call-ring sweep in the background for the life of the
-/// process, on the same detached, best-effort, wait-first model as
-/// [`spawn_token_sweep`]. A deployment with no SFU configured, or one that
-/// never rings, never has anything to sweep, so this is safe to spawn
-/// unconditionally.
-fn spawn_ring_sweep(voice: voice::VoiceService, hub: hub::Hub) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(RING_SWEEP_INTERVAL);
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            sweep_stale_call_rings(&voice, &hub).await;
-        }
-    });
-}
-
-/// One pass of the stale-call-ring sweep: every ring nobody answered inside
-/// [`voice::RING_TIMEOUT`] is ended, and the caller's own SFU participant -
-/// left dangling in a room they may well have joined alone while it rang -
-/// is released.
-///
-/// A distinct sweep from [`sweep_stale_voice_calls`] rather than folded into
-/// it: a heartbeat going stale means a participant's own connection went
-/// quiet, which says nothing about whether anybody else ever joined them.
-/// This one instead asks "did a call that was never joined by a second
-/// person ever get answered", the condition the owner actually flagged as
-/// wasting resources - a caller sitting alone with a perfectly live
-/// heartbeat is exactly the case [`sweep_stale_voice_calls`] cannot see.
-pub async fn sweep_stale_call_rings(voice: &voice::VoiceService, hub: &hub::Hub) {
-    sweep_stale_call_rings_at(voice, hub, std::time::Instant::now()).await;
-}
-
-/// [`sweep_stale_call_rings`] with an explicit clock, `pub` for the same
-/// testing reason [`sweep_stale_voice_calls_at`] is.
-pub async fn sweep_stale_call_rings_at(
-    voice: &voice::VoiceService,
-    hub: &hub::Hub,
-    now: std::time::Instant,
-) {
-    for (channel_id, ring_id, caller_id) in voice.rings().sweep_stale_at(now) {
-        hub.publish(hub::Event::CallRingEnded {
-            channel_id,
-            ring_id,
-            outcome: voice::CallRingOutcome::TimedOut,
-        });
-        match voice.remove_participant(channel_id, caller_id).await {
-            Ok(()) => tracing::info!(
-                %channel_id,
-                %caller_id,
-                "released a dm call room nobody answered before the ring timed out"
-            ),
-            Err(voice::VoiceError::Unavailable) => {}
-            Err(voice::VoiceError::Internal(err)) => tracing::warn!(
-                error = %err,
-                %channel_id,
-                "failed to release an unanswered dm call room"
-            ),
-        }
-    }
-}
-
-/// How often the message retention window is applied. Long, the same
-/// reasoning [`TOKEN_SWEEP_INTERVAL`] gives: a day-granularity setting has
-/// no reason to be checked more often than this, and a deployment with the
-/// window off pays only the one cheap config read every tick.
-const MESSAGE_RETENTION_SWEEP_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(6 * 60 * 60);
-
-/// Runs the message retention sweep in the background for the life of the
-/// process, on the same detached, best-effort, wait-first model as
-/// [`spawn_token_sweep`]. Unlike the other sweeps here, a pruned message is a
-/// state change a live connection needs to see now, not merely reclaimed
-/// space, so this publishes [`hub::Event::MessageDeleted`] for every message
-/// the sweep touched before reclaiming its freed attachment files.
-fn spawn_message_retention_sweep(store: store::Store, media: media::Media, hub: hub::Hub) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(MESSAGE_RETENTION_SWEEP_INTERVAL);
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            match store.sweep_message_retention().await {
-                Ok(swept) if !swept.pruned.is_empty() || swept.ops_reclaimed > 0 => {
-                    tracing::info!(
-                        pruned = swept.pruned.len(),
-                        ops_reclaimed = swept.ops_reclaimed,
-                        "pruned messages past the retention window"
-                    );
-                    for message in swept.pruned {
-                        hub.publish(hub::Event::MessageDeleted {
-                            channel_id: message.channel_id,
-                            message_id: message.message_id,
-                            op_seq: message.op_seq,
-                        });
-                        for hex in message.freed_attachments {
-                            if let Err(err) = media.delete_attachment(&hex).await {
-                                tracing::warn!(error = %err, attachment = %hex, "failed to delete a retention-freed attachment file");
-                            }
-                        }
-                    }
-                }
-                Ok(_) => {}
-                Err(err) => tracing::warn!(error = %err, "message retention sweep failed"),
-            }
-        }
-    });
 }
 
 /// Imports a directory of images as custom emoji, printing a line per file.

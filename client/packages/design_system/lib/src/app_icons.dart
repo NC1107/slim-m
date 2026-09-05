@@ -22,6 +22,10 @@ abstract final class AppIcons {
   /// gear.
   static const IconData performance = LucideIcons.gauge300;
 
+  /// The operator storage view: disk usage and sweep health. Distinct from
+  /// [performance]'s gauge - this is what is on disk, not how fast it runs.
+  static const IconData storage = LucideIcons.hardDrive300;
+
   /// The collapsible channel rail, drawn as a panel rather than a hamburger:
   /// it toggles one region of a visible layout rather than opening a drawer.
   /// Also the collapsed rail's own edge handle (backlog item 54): a panel

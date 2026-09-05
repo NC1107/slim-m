@@ -237,6 +237,9 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
 
+    c.bare("getSpaceStorage", "GET", "/space/storage", root)
+        .await;
+
     c.json(
         "sync",
         "POST",

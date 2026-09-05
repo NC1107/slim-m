@@ -29,6 +29,7 @@ import '../screens/admin/performance_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
+import '../screens/admin/storage_screen.dart';
 import 'join_policy_row.dart';
 import 'settings_panes.dart';
 import 'settings_section_header.dart';
@@ -167,6 +168,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.analytics,
             compactRoute: Routes.adminAnalytics,
             builder: (_) => const AnalyticsPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'storage',
+            label: 'Storage',
+            icon: AppIcons.storage,
+            compactRoute: Routes.adminStorage,
+            builder: (_) => const StoragePane(),
           ),
       ],
     ),
