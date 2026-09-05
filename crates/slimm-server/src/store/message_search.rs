@@ -93,7 +93,19 @@ impl Store {
     }
 
     /// Full-text searches live messages across `channel_ids`, newest match
-    /// first, keyset-paginated on `seq` exactly like [`Store::list_messages`].
+    /// first by `created_at` (server-assigned at insert), with `seq` as the
+    /// tiebreak. Ordering by wall-clock time rather than `seq` matters once
+    /// `channel_ids` spans more than one channel: `seq` is per-channel, so
+    /// ordering a cross-channel result by it would rank a chatty channel's old
+    /// message above a quiet channel's newer one. Within a single channel the
+    /// two orders are identical, since a later insert takes both a higher `seq`
+    /// and a `created_at` no earlier than the row before it.
+    ///
+    /// The `before_seq` cursor is a per-channel keyset like
+    /// [`Store::list_messages`], correct for the single-channel search panel.
+    /// The command palette's cross-channel search fetches a single page and
+    /// passes no cursor; paginating a cross-channel result would need a
+    /// `created_at` keyset, not this per-channel `seq` one.
     ///
     /// `query` reaches FTS5 close to as-is, so a caller may use its mini query
     /// language (`AND`/`OR`/`NOT`, `"phrase"`, a trailing `*` prefix). That is
@@ -185,7 +197,7 @@ impl Store {
             builder.push(" AND m.created_at < ");
             builder.push_bind(before_ms);
         }
-        builder.push(" ORDER BY m.seq DESC LIMIT ");
+        builder.push(" ORDER BY m.created_at DESC, m.seq DESC LIMIT ");
         builder.push_bind(limit);
 
         let rows = builder.build().fetch_all(&self.pool).await?;

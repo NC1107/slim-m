@@ -178,6 +178,40 @@ extension SlimmApiMessages on SlimmApi {
         .toList(growable: false);
   }
 
+  /// [searchMessages], scoped to every channel the caller can view instead
+  /// of one named by a path. Same query language, same operators
+  /// ([q]/[from]/[inChannel]/[has]/[afterDate]/[beforeDate], the same
+  /// at-least-one-set rule), same permission filtering, same keyset
+  /// pagination - only the default scope differs: with no [inChannel], this
+  /// searches every channel `VIEW_CHANNEL` grants rather than one path
+  /// channel, DMs and threads excluded the same way `GET /channels` excludes
+  /// them.
+  Future<List<Message>> searchAllMessages({
+    String? q,
+    int? before,
+    int? limit,
+    String? from,
+    String? inChannel,
+    String? has,
+    String? afterDate,
+    String? beforeDate,
+  }) async {
+    final query = <String, String>{
+      if (q != null) 'q': q,
+      if (before != null) 'before': '$before',
+      if (limit != null) 'limit': '$limit',
+      if (from != null) 'from': from,
+      if (inChannel != null) 'in': inChannel,
+      if (has != null) 'has': has,
+      if (afterDate != null) 'after_date': afterDate,
+      if (beforeDate != null) 'before_date': beforeDate,
+    };
+    final json = await _send('GET', '/search/messages', query: query);
+    return (json as List<dynamic>)
+        .map((m) => Message.fromJson(m as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Reacts to a message with one [emoji]. Idempotent: reacting twice with
   /// the same emoji leaves one reaction. [emoji] is user content, never
   /// chrome, so it is a plain runtime string rather than a literal in source.

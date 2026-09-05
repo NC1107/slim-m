@@ -14,12 +14,19 @@
 /// re-reading the store right after capping it, rather than maintaining a
 /// second, parallel notion of what is current.
 ///
-/// Search, pins and the command palette's message results are all scoped to
-/// whichever channel is open (`command_palette_items.dart`'s own doc: "there
-/// is no cross-channel search endpoint"), so nothing in this app ever renders
-/// an extras entry for a channel that is not open. That is what makes
-/// dropping every extras entry outside the open channels' rows safe, not
-/// merely convenient.
+/// Search (now cross-channel; see `http::search`'s `/search/messages`),
+/// pins and the command palette's message results all render straight off
+/// the `Message`/`MessageDto` the server already returned - author
+/// resolution goes through `resolveAuthorProfiles`, reactions arrive
+/// pre-embedded via `with_reactions` - and never read or write
+/// [messageExtrasProvider], regardless of which channel a hit belongs to.
+/// Only paging a channel's own history (`channel_history.dart`,
+/// `channel_screen.dart`) and acting in the open channel's composer
+/// (`message_actions.dart`, `forward_message.dart`,
+/// `poll_composer_sheet.dart`) ever call `applyMessage(s)`, and both only
+/// ever do that for the channel presently open. That is what makes dropping
+/// every extras entry outside the open channels' rows safe, not merely
+/// convenient.
 ///
 /// **Trigger: periodic**, chosen over app-resume or post-sync. CD2's own
 /// growth comes from `channel_history.dart` paging a channel's history

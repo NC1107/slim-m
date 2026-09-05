@@ -1,7 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Full-text search over one channel's live messages, backed by the FTS5
-//! index kept current by the triggers in migration 0002, plus a Slack-style
-//! operator layer over it: `from:`, `in:`, `has:`, `before:`/`after:`.
+//! Full-text search over messages, backed by the FTS5 index kept current by
+//! the triggers in migration 0002, plus a Slack-style operator layer over
+//! it: `from:`, `in:`, `has:`, `before:`/`after:`.
+//!
+//! Two routes share every bit of this file beyond their own permission
+//! scoping: `GET /channels/{channelId}/messages/search` (the channel
+//! header's search panel) searches one channel, named in the path or by
+//! `in:`, and requires `VIEW_CHANNEL` on the path channel up front; `GET
+//! /search/messages` (the command palette's cross-channel scope) has no path
+//! channel to check and instead searches every channel
+//! [`crate::store::Store::visible_channels`] says the caller can view, or the
+//! subset of those named by `in:` when given. Neither ever reaches a channel
+//! the caller cannot view: [`resolve_scope`] is the one place `in:` is
+//! resolved and permission-filtered for both, and the cross-channel
+//! route's default scope is `visible_channels` itself, which only ever
+//! returns channels `VIEW_CHANNEL` already grants. `visible_channels` also
+//! excludes DMs and threads (see its own doc comment), so cross-channel
+//! search never reaches a DM the caller was not searching directly.
 //!
 //! `q` reaches FTS5 close to as-is, so a caller may use its mini query
 //! language (`AND`/`OR`/`NOT`, `"phrase"`, a trailing `*` prefix). That is
@@ -18,6 +33,15 @@
 //! is why this file only ever sees them as already-split query parameters -
 //! `q` never carries `from:nick` as literal text a caller could exploit to
 //! widen a channel restriction the way `q` itself cannot.
+//!
+//! Channel and member search need no route here at all: both are already
+//! answered from data the client already holds permission-correctly. `GET
+//! /channels` only ever lists what [`crate::store::Store::visible_channels`]
+//! grants, so the client's local channel list is never wider than that; the
+//! member list (`GET /members`) is deployment-wide by design (see
+//! `http::users`'s own doc comment), not scoped to a channel, so there is no
+//! per-channel visibility question to get wrong there. The command palette
+//! (`command_palette_items.dart`) filters both lists by name locally.
 
 use axum::Router;
 use axum::extract::{Path, State};
@@ -29,7 +53,7 @@ use super::error::ApiError;
 use super::extract::{AUTHED_READ, AuthedLimited, Json, Query};
 use super::message_enrich::with_reactions;
 use super::messages::{MessageDto, parse_uuid};
-use crate::ids::ChannelId;
+use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::store::{MessageSearchFilters, SearchError};
 
@@ -39,9 +63,11 @@ const MAX_QUERY_CHARS: usize = 200;
 const DEFAULT_LIMIT: i64 = 50;
 const MAX_LIMIT: i64 = 100;
 
-/// The search route, mounted by [`super::router`].
+/// The search routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/channels/{channel_id}/messages/search", get(search))
+    Router::new()
+        .route("/channels/{channel_id}/messages/search", get(search))
+        .route("/search/messages", get(search_all))
 }
 
 #[derive(Deserialize)]
@@ -100,6 +126,80 @@ async fn search(
         return Err(ApiError::Forbidden);
     }
 
+    let (query, filters, limit) = parse_request(&params)?;
+    let scope = resolve_scope(
+        &state,
+        ctx.user_id,
+        params.in_channel.as_deref(),
+        vec![channel_id],
+    )
+    .await?;
+    // No such `in:` channel, or none viewable - both answer empty; see this fn's own doc.
+    let Some(channel_ids) = scope else {
+        return Ok(Json(Vec::new()));
+    };
+
+    run_search(
+        &state,
+        ctx.user_id,
+        &channel_ids,
+        query,
+        &filters,
+        params.before,
+        limit,
+    )
+    .await
+}
+
+/// Full-text search across every channel the caller can view, or within an
+/// `in:`-named subset of them.
+///
+/// Unlike [`search`], there is no path channel to gate on: the scope itself
+/// *is* the permission check. With no `in:`, the scope is
+/// [`crate::store::Store::visible_channels`], which by construction never
+/// contains a channel the caller cannot view. With `in:`, it goes through
+/// the same [`resolve_scope`] helper [`search`] uses for its own `in:`, so a
+/// name that resolves to nothing viewable answers empty rather than a 403 or
+/// 404, for the same oracle-safety reason documented there.
+async fn search_all(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+    Query(params): Query<SearchParams>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<MessageDto>>, ApiError> {
+    let (query, filters, limit) = parse_request(&params)?;
+    let default = state
+        .store
+        .visible_channels(ctx.user_id)
+        .await?
+        .into_iter()
+        .map(|c| c.id)
+        .collect();
+    let scope = resolve_scope(&state, ctx.user_id, params.in_channel.as_deref(), default).await?;
+    let Some(channel_ids) = scope else {
+        return Ok(Json(Vec::new()));
+    };
+
+    run_search(
+        &state,
+        ctx.user_id,
+        &channel_ids,
+        query,
+        &filters,
+        params.before,
+        limit,
+    )
+    .await
+}
+
+/// Parses and validates the parts of a search request both routes share: the
+/// optional free-text query, the Slack-style content filters, and the
+/// clamped page size. Refuses a request naming neither a query nor any
+/// filter (including `in:`, itself not a content filter but still a reason
+/// to run), the one validation rule that predates either route having an
+/// `in:` scope at all.
+fn parse_request(
+    params: &SearchParams,
+) -> Result<(Option<&str>, MessageSearchFilters, i64), ApiError> {
     let query = validate_query(params.q.as_deref())?;
     let (has_attachment, has_link) = parse_has(params.has.as_deref())?;
     let after_ms = params
@@ -127,43 +227,78 @@ async fn search(
     }
 
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-
-    let channel_ids = match params.in_channel.as_deref() {
-        Some(name) => {
-            let candidates = state.store.search_channel_ids_by_name(name).await?;
-            // One batched check for every candidate, not one `has_permission` call each.
-            let permissions = state
-                .store
-                .permissions_in_channels(ctx.user_id, &candidates)
-                .await?;
-            let viewable: Vec<ChannelId> = candidates
-                .into_iter()
-                .filter(|candidate| {
-                    permissions
-                        .get(candidate)
-                        .is_some_and(|p| p.contains(Permissions::VIEW_CHANNEL))
-                })
-                .collect();
-            if viewable.is_empty() {
-                // No such channel, or none viewable - both answer empty; see this fn's own doc.
-                return Ok(Json(Vec::new()));
-            }
-            viewable
-        }
-        None => vec![channel_id],
-    };
-
     let filters = MessageSearchFilters {
-        author_username: params.from,
+        author_username: params.from.clone(),
         has_attachment,
         has_link,
         after_ms,
         before_ms,
     };
+    Ok((query, filters, limit))
+}
 
+/// Resolves a request's channel scope: `in_channel_name`, when given, names a
+/// channel to search instead of `default` and is resolved the same way for
+/// both routes - every live channel with that name (never unique, see
+/// [`crate::store::Store::search_channel_ids_by_name`]), narrowed to the
+/// ones the caller holds `VIEW_CHANNEL` in with one batched permission check
+/// rather than one per candidate. `None` means nothing came out the other
+/// end viewable - no such name, or a real one entirely hidden from this
+/// caller - which both routes turn into an empty result rather than a 403 or
+/// 404, so `in:` can never be used to learn a hidden channel exists.
+///
+/// With no `in:`, `default` is used as-is, empty included: [`search_all`]
+/// passes its own already-permission-scoped list here, so an empty one
+/// (nothing visible at all) belongs in the same empty-result branch as a
+/// hidden `in:` name, not a separate check.
+async fn resolve_scope(
+    state: &AppState,
+    user_id: UserId,
+    in_channel_name: Option<&str>,
+    default: Vec<ChannelId>,
+) -> Result<Option<Vec<ChannelId>>, ApiError> {
+    let Some(name) = in_channel_name else {
+        return Ok(if default.is_empty() {
+            None
+        } else {
+            Some(default)
+        });
+    };
+    let candidates = state.store.search_channel_ids_by_name(name).await?;
+    let permissions = state
+        .store
+        .permissions_in_channels(user_id, &candidates)
+        .await?;
+    let viewable: Vec<ChannelId> = candidates
+        .into_iter()
+        .filter(|candidate| {
+            permissions
+                .get(candidate)
+                .is_some_and(|p| p.contains(Permissions::VIEW_CHANNEL))
+        })
+        .collect();
+    Ok(if viewable.is_empty() {
+        None
+    } else {
+        Some(viewable)
+    })
+}
+
+/// The shared tail both routes run once their channel scope and filters are
+/// resolved: run the FTS5 query over `channel_ids`, then enrich with
+/// reactions exactly like plain message history does.
+async fn run_search(
+    state: &AppState,
+    user_id: UserId,
+    channel_ids: &[ChannelId],
+    query: Option<&str>,
+    filters: &MessageSearchFilters,
+    before: Option<i64>,
+    limit: i64,
+) -> Result<Json<Vec<MessageDto>>, ApiError> {
     let messages = match state
         .store
-        .search_messages(&channel_ids, query, &filters, params.before, limit)
+        .search_messages(channel_ids, query, filters, before, limit)
         .await
     {
         Ok(rows) => rows,
@@ -173,7 +308,7 @@ async fn search(
         Err(SearchError::Internal(e)) => return Err(e.into()),
     };
 
-    let dtos = with_reactions(&state, ctx.user_id, messages).await?;
+    let dtos = with_reactions(state, user_id, messages).await?;
     Ok(Json(dtos))
 }
 

@@ -40,9 +40,11 @@ import 'command_palette_items.dart';
 const double _paletteWidth = 480;
 const double _resultsMaxHeight = 360;
 
-/// Opens the palette over whatever is on screen, scoping message search to
-/// the channel already open (there is no cross-channel search endpoint), and
-/// restores focus to wherever it was once the palette closes.
+/// Opens the palette over whatever is on screen and restores focus to
+/// wherever it was once the palette closes. Message search covers every
+/// channel the caller can view, not just whichever one is already open;
+/// `currentChannelId` is passed through only so a hit in the channel already
+/// open jumps in place instead of navigating to itself.
 Future<void> openCommandPalette(BuildContext context) async {
   final previousFocus = FocusManager.instance.primaryFocus;
   final channelId = selectedChannelId(context);
@@ -127,26 +129,25 @@ class _CommandPaletteContentState
       _query = value;
       _highlighted = 0;
     });
-    final channelId = widget.currentChannelId;
-    if (value.isEmpty || channelId == null) {
+    if (value.isEmpty) {
       setState(() {
         _messageResults = const [];
         _messagesForbidden = false;
       });
       return;
     }
-    _search(channelId, value);
+    _search(value);
   }
 
-  /// The same call `channelSearchProvider` makes, through the one shared
-  /// helper: identical blocked-author filtering, and the same 403-versus-any-
-  /// other-failure distinction, so the two cannot diverge again the way they
-  /// already had.
-  Future<void> _search(String channelId, String query) async {
+  /// The command palette's own cross-channel scope: every channel the caller
+  /// can view, through the same shared helper `channelSearchProvider` uses
+  /// for its own single-channel search - identical blocked-author filtering,
+  /// and the same 403-versus-any-other-failure distinction, so the two
+  /// cannot diverge again the way they already had.
+  Future<void> _search(String query) async {
     final generation = ++_searchGeneration;
-    final result = await searchChannelMessages(
+    final result = await searchAllMessages(
       ref.read,
-      channelId,
       query,
       limit: paletteResultLimit,
     );
@@ -303,7 +304,7 @@ class _CommandPaletteContentState
         ),
       ),
       ('Members', buildMemberItems(members, _query, me?.id)),
-      if (widget.currentChannelId != null && !_messagesForbidden)
+      if (!_messagesForbidden)
         (
           'Messages',
           buildMessageItems(
@@ -315,10 +316,7 @@ class _CommandPaletteContentState
     ].where((g) => g.$2.isNotEmpty).toList();
 
     // An empty result and a refusal are different things; so says search too.
-    final showForbiddenNotice =
-        widget.currentChannelId != null &&
-        _messagesForbidden &&
-        _query.isNotEmpty;
+    final showForbiddenNotice = _messagesForbidden && _query.isNotEmpty;
 
     final flat = [for (final group in groups) ...group.$2];
     _visible = flat;
