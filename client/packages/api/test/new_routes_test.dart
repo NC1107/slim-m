@@ -25,6 +25,7 @@ Map<String, dynamic> _messageJson({
   List<Map<String, dynamic>>? reactions,
   Map<String, dynamic>? poll,
   List<Map<String, dynamic>>? attachments,
+  bool? mentionsMe,
 }) =>
     {
       'id': 'm',
@@ -37,6 +38,7 @@ Map<String, dynamic> _messageJson({
       if (reactions != null) 'reactions': reactions,
       if (poll != null) 'poll': poll,
       if (attachments != null) 'attachments': attachments,
+      if (mentionsMe != null) 'mentions_me': mentionsMe,
     };
 
 void main() {
@@ -159,6 +161,20 @@ void main() {
         () {
       final message = Message.fromJson(_messageJson());
       expect(message.reactions, isEmpty);
+    });
+
+    test(
+        'mentionsMe parses per-viewer and defaults false when the key is absent',
+        () {
+      expect(Message.fromJson(_messageJson()).mentionsMe, isFalse);
+      expect(
+        Message.fromJson(_messageJson(mentionsMe: false)).mentionsMe,
+        isFalse,
+      );
+      expect(
+        Message.fromJson(_messageJson(mentionsMe: true)).mentionsMe,
+        isTrue,
+      );
     });
 
     test('a poll message carries its tally and the viewer\'s own vote', () {

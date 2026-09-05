@@ -43,6 +43,7 @@ Channel _dm(
   position: 0,
   cursor: cursor,
   lastReadSeq: lastReadSeq,
+  mentionedSeq: 0,
   isPersonalSpace: isPersonalSpace,
 );
 

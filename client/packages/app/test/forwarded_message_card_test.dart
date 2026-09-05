@@ -34,6 +34,7 @@ Channel _channel({required String name, String? dmParticipantId}) => Channel(
   createdAt: 0,
   cursor: 0,
   lastReadSeq: 0,
+  mentionedSeq: 0,
   isPersonalSpace: false,
   dmParticipantId: dmParticipantId,
   position: 0,

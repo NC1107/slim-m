@@ -24,6 +24,7 @@ Channel _channel(String id) => Channel(
   position: 0,
   cursor: 0,
   lastReadSeq: 0,
+  mentionedSeq: 0,
   isPersonalSpace: false,
 );
 

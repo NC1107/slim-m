@@ -123,6 +123,7 @@ class Message {
     this.attachments = const [],
     this.poll,
     this.forwarded,
+    this.mentionsMe = false,
   });
 
   final String id;
@@ -192,6 +193,14 @@ class Message {
   /// thing being forwarded is in here and is never mixed into that text.
   final ForwardedMessage? forwarded;
 
+  /// Whether this message mentions the caller - by name, by a role they
+  /// hold, or by @everyone/@here. Per-viewer exactly like a reaction's
+  /// `reacted`; always false on the sender's own send or edit response.
+  /// Never persisted locally: it only ever drives the channel rail's own
+  /// mention cursor at the moment a message is applied - see
+  /// `MessageStore.applyMessage`.
+  final bool mentionsMe;
+
   bool get isEdited => editedAt != null;
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -226,6 +235,8 @@ class Message {
             ? null
             : ForwardedMessage.fromJson(
                 json['forwarded'] as Map<String, dynamic>),
+        // Not in the schema's `required` list either, the same tolerance `reactions` above already needs.
+        mentionsMe: json['mentions_me'] as bool? ?? false,
       );
 }
 

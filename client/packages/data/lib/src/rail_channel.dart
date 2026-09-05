@@ -11,10 +11,10 @@ import 'database.dart';
 /// compare structurally, so two keys are `==` exactly when the rail would
 /// render them identically.
 ///
-/// `unread` is the derived boolean the rail shows, not the raw
-/// `cursor`/`lastReadSeq` behind it: a channel already unread stays unread
-/// through every further message, so only the flip in or out of that state
-/// belongs in the key.
+/// `unread` and `mentioned` are the derived booleans the rail shows, not the
+/// raw `cursor`/`mentionedSeq`/`lastReadSeq` behind them: a channel already
+/// unread (or already mentioned) stays that way through every further
+/// message, so only the flip in or out of either state belongs in the key.
 typedef RailChannelKey = ({
   String id,
   String name,
@@ -24,6 +24,7 @@ typedef RailChannelKey = ({
   bool isPersonalSpace,
   String? dmParticipantId,
   bool unread,
+  bool mentioned,
 });
 
 RailChannelKey railChannelKey(Channel channel) => (
@@ -35,6 +36,7 @@ RailChannelKey railChannelKey(Channel channel) => (
       isPersonalSpace: channel.isPersonalSpace,
       dmParticipantId: channel.dmParticipantId,
       unread: channel.cursor > channel.lastReadSeq,
+      mentioned: channel.mentionedSeq > channel.lastReadSeq,
     );
 
 /// `Stream.distinct`'s callback for `MessageStore.watchRailChannels`: true

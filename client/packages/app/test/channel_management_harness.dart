@@ -48,6 +48,7 @@ Channel channel(
   categoryId: categoryId,
   cursor: 0,
   lastReadSeq: 0,
+  mentionedSeq: 0,
   isPersonalSpace: false,
 );
 

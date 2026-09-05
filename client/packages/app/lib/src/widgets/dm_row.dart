@@ -161,6 +161,7 @@ class DmRow extends ConsumerWidget {
         label: channel.name,
         selected: selected,
         unread: channel.cursor > channel.lastReadSeq,
+        mentioned: channel.mentionedSeq > channel.lastReadSeq,
         muted: muted,
         leading: AppAvatar(
           name: channel.name,
