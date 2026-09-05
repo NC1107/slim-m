@@ -41,6 +41,7 @@ Channel _channel(
   position: 0,
   cursor: cursor,
   lastReadSeq: lastReadSeq,
+  mentionedSeq: 0,
   isPersonalSpace: false,
 );
 

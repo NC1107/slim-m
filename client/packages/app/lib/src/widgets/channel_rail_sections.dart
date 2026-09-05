@@ -307,6 +307,7 @@ class _TextChannelRow extends ConsumerWidget {
       label: channel.name,
       selected: selected,
       unread: channel.cursor > channel.lastReadSeq,
+      mentioned: channel.mentionedSeq > channel.lastReadSeq,
       muted: muted,
       leading: Icon(
         AppIcons.hash,

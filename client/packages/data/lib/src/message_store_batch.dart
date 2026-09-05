@@ -43,14 +43,23 @@ Future<void> _applyMessagesBatched(
     });
 
     final furthest = <String, int>{};
+    final furthestMention = <String, int>{};
     for (final message in winners.values) {
       final current = furthest[message.channelId];
       if (current == null || message.seq > current) {
         furthest[message.channelId] = message.seq;
       }
+      if (!message.mentionsMe) continue;
+      final currentMention = furthestMention[message.channelId];
+      if (currentMention == null || message.seq > currentMention) {
+        furthestMention[message.channelId] = message.seq;
+      }
     }
     for (final entry in furthest.entries) {
       await store._advanceCursor(entry.key, entry.value);
+    }
+    for (final entry in furthestMention.entries) {
+      await store._advanceMentionCursor(entry.key, entry.value);
     }
   });
 }

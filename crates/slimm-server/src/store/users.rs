@@ -196,6 +196,25 @@ impl Store {
         Ok(count)
     }
 
+    /// Every live, non-removed account's id, unpaginated - the candidate
+    /// pool [`crate::mentions::mentioned_viewers`] narrows with
+    /// [`super::permissions_batch`]'s own `viewers_among` to decide who a
+    /// message actually mentions. Deployment-wide like
+    /// [`super::push::users_with_push_devices`] for the same reason: a
+    /// mention badge is not limited to whoever has registered for push, and
+    /// a self-host's whole membership is the bound this project already
+    /// accepts for that query.
+    pub async fn all_live_user_ids(&self) -> anyhow::Result<Vec<UserId>> {
+        let rows = sqlx::query_scalar!(
+            r#"SELECT id AS "id!: UserId" FROM users
+               WHERE deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// The deployment's live members, oldest first, keyset-paginated by id.
     /// UUIDv7 sorts chronologically, so id order is already creation order
     /// and no separate cursor column is needed.

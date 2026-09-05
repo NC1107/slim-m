@@ -325,6 +325,9 @@ class MessageStore {
       await db.into(db.messages).insertOnConflictUpdate(_rowFor(message));
 
       await _advanceCursor(message.channelId, message.seq);
+      if (message.mentionsMe) {
+        await _advanceMentionCursor(message.channelId, message.seq);
+      }
     });
   }
 
@@ -351,6 +354,7 @@ class MessageStore {
       await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
           .write(const ChannelsCompanion(
         cursor: Value(0),
+        mentionedSeq: Value(0),
         opCursor: Value(null),
       ));
     });
@@ -481,5 +485,16 @@ class MessageStore {
     if (row == null || row.cursor >= seq) return;
     await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
         .write(ChannelsCompanion(cursor: Value(seq)));
+  }
+
+  /// [_advanceCursor]'s own shape for `mentionedSeq`, only ever called for a
+  /// message whose `mentionsMe` is true.
+  Future<void> _advanceMentionCursor(String channelId, int seq) async {
+    final row = await (db.select(db.channels)
+          ..where((c) => c.id.equals(channelId)))
+        .getSingleOrNull();
+    if (row == null || row.mentionedSeq >= seq) return;
+    await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
+        .write(ChannelsCompanion(mentionedSeq: Value(seq)));
   }
 }

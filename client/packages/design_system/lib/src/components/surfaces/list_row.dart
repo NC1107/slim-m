@@ -29,6 +29,12 @@ import '../../touch_targets.dart';
 ///   alike, so unread's *distinguishing* cue from selected is the dot, shown
 ///   only when [trailing] is absent (a trailing count badge already carries
 ///   the same meaning, so the dot would be redundant next to it).
+/// - [mentioned]: the same dot, painted in [AppTokens.accentFill] instead of
+///   [AppTokens.textPrimary] - "unread badge" and "mentions of you" are two
+///   of the seven closed accent roles (`docs/decisions/0004-visual-identity-
+///   review.md`), and this is what tells them apart without a second glyph.
+///   Implies [unread] visually (a mention is always unread) but is read
+///   independently, so a caller need not also pass `unread: true`.
 /// - [muted]: dims the leading and trailing content to `opacity: 0.62`, but
 ///   deliberately not the label. The source dimmed the whole row, and doing
 ///   that here dragged an offline member's name below the AA contrast floor
@@ -53,6 +59,7 @@ class AppListRow extends StatefulWidget {
     this.trailingExtra,
     this.selected = false,
     this.unread = false,
+    this.mentioned = false,
     this.muted = false,
     this.touch,
     this.height,
@@ -87,6 +94,7 @@ class AppListRow extends StatefulWidget {
   final Widget? trailingExtra;
   final bool selected;
   final bool unread;
+  final bool mentioned;
   final bool muted;
 
   /// Null means "whatever this subtree is at", read from [AppTouchTargets].
@@ -124,6 +132,10 @@ class AppListRow extends StatefulWidget {
 
   /// Exposed so a test can find the unread dot without depending on colour.
   static const Key unreadDotKey = Key('app_list_row_unread_dot');
+
+  /// [unreadDotKey]'s own sibling for [mentioned]'s accent-coloured dot, so
+  /// a test can tell the two apart by key rather than by reading colour.
+  static const Key mentionDotKey = Key('app_list_row_mention_dot');
 
   /// The height a row built here takes, for a sibling that must line up with
   /// one rather than centre against the taller column it sits in.
@@ -189,9 +201,9 @@ class _AppListRowState extends State<AppListRow> {
       hasSubtitle: widget.subtitle != null,
     );
 
-    // The source lifts colour and weight together for `selected || unread`, so
-    // the dot below is what keeps unread legible when both are set at once.
-    final emphasised = widget.selected || widget.unread;
+    // The source lifts colour and weight together for `selected || unread`;
+    // `mentioned` joins that same group, since a mention is always unread.
+    final emphasised = widget.selected || widget.unread || widget.mentioned;
     final labelStyle = AppText.ui.copyWith(
       color: emphasised ? tokens.textPrimary : tokens.textSecondary,
       fontWeight: emphasised ? AppWeights.medium : AppWeights.regular,
@@ -200,7 +212,7 @@ class _AppListRowState extends State<AppListRow> {
     Widget? trailingContent = widget.trailing;
     // The dot pops in (scale and fade) to confirm the state change, then sits
     // still: the motion spec forbids it ever pulsing while resting.
-    trailingContent ??= widget.unread
+    trailingContent ??= (widget.unread || widget.mentioned)
         ? TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: 1),
             duration: AppMotion.reduced(context, AppMotion.base),
@@ -210,9 +222,12 @@ class _AppListRowState extends State<AppListRow> {
               child: Transform.scale(scale: 0.85 + 0.15 * t, child: child),
             ),
             child: DecoratedBox(
-              key: AppListRow.unreadDotKey,
+              key: widget.mentioned
+                  ? AppListRow.mentionDotKey
+                  : AppListRow.unreadDotKey,
               decoration: BoxDecoration(
-                color: tokens.textPrimary,
+                color:
+                    widget.mentioned ? tokens.accentFill : tokens.textPrimary,
                 borderRadius: BorderRadius.circular(AppRadii.full),
               ),
               child: const SizedBox(width: 6, height: 6),
@@ -352,7 +367,7 @@ class _AppListRowState extends State<AppListRow> {
     final semanticParts = <String>[
       widget.semanticLabel ?? widget.label,
       if (widget.subtitle != null) widget.subtitle!,
-      if (widget.unread) 'unread',
+      if (widget.mentioned) 'mentioned' else if (widget.unread) 'unread',
       if (widget.stateDescription != null) widget.stateDescription!,
     ];
 

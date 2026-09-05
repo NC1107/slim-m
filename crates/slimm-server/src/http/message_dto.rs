@@ -87,6 +87,16 @@ pub(crate) struct MessageDto {
     /// `reactions` is left empty for a message that cannot have any yet.
     #[serde(default)]
     pub(crate) attachments: Vec<AttachmentDto>,
+    /// Whether this message mentions the caller - by `@name`, by a
+    /// `@[Role]` the caller holds, or by `@everyone`/`@here` when the author
+    /// held `MENTION_EVERYONE` - per-viewer exactly like `reacted`, and
+    /// resolved the same way: `false` by default on this bare conversion,
+    /// overwritten by `store::mentioned_messages_for` wherever a page of
+    /// messages is enriched (`http::message_enrich::with_reactions`) and by
+    /// `store::is_mentioned` on the live `message.created`/`message.edited`
+    /// frames. Always `false` on a caller's own send or edit response: the
+    /// resolver that fills this in never mentions its own author.
+    pub(crate) mentions_me: bool,
 }
 
 /// One attachment as it appears on a message.
@@ -148,6 +158,7 @@ impl From<Message> for MessageDto {
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),
+            mentions_me: false,
         }
     }
 }

@@ -91,6 +91,7 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
         ),
     ),
     ("message_forwards", "origin_author_id", OnDelete::Anonymize),
+    ("message_mentions", "user_id", OnDelete::Purge),
     ("message_ops", "actor_id", OnDelete::Anonymize),
     ("messages", "author_id", OnDelete::Anonymize),
     ("moderation_audit_log", "actor_id", OnDelete::Anonymize),

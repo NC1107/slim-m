@@ -205,6 +205,16 @@ async fn create(
     }
 
     if sent.fresh {
+        // A poll's caption can carry a mention exactly like an ordinary message's content.
+        super::message_mentions::resolve_and_store(
+            &state,
+            channel_id,
+            ctx.user_id,
+            sent.message.id,
+            &sent.message.content,
+        )
+        .await?;
+
         state.hub.publish(Event::MessageCreated {
             message: sent.message.clone(),
             // A poll message carries no attachment, and forwards nothing.

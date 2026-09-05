@@ -38,6 +38,14 @@ class Channels extends Table {
   /// How far the user has read, mirrored from the server.
   IntColumn get lastReadSeq => integer().withDefault(const Constant(0))();
 
+  /// The highest `seq` of a message in this channel that mentioned the
+  /// caller, the same "sync cursor" shape [cursor] already is: advanced by
+  /// [MessageStore.applyMessage] whenever an applied `api.Message` carries
+  /// `mentionsMe`, never lowered. `mentionedSeq > lastReadSeq` is the rail's
+  /// unread-mention flag, the same `cursor > lastReadSeq` comparison already
+  /// drives the plain unread dot - see `rail_channel.dart`.
+  IntColumn get mentionedSeq => integer().withDefault(const Constant(0))();
+
   /// Whether this is the caller's own personal space, set only by
   /// `channelFromDm` from `dm.user.id == selfId` - never from `name`, which
   /// is a display string another member's own display name can collide with.
@@ -205,7 +213,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -278,6 +286,14 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// v9 and v10. Forwards that predate it were composed into message text
   /// and are indistinguishable from ordinary content by design; they stay
   /// exactly as they read today rather than being guessed at.
+  ///
+  /// v14 adds `channels.mentionedSeq` in place, defaulting every existing
+  /// row to 0 like v8's `position`. An unread mention already sitting in a
+  /// channel's cache from before this version stays unbadged until the next
+  /// message, edit, or full resync touches that channel - the same gap v2's
+  /// own doc comment describes for a keyset sync that only ever asks for
+  /// messages newer than what is already cached, accepted here for the same
+  /// reason: nothing server-side can be paged back through to backfill it.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -325,6 +341,9 @@ class SlimmDatabase extends _$SlimmDatabase {
             );
             await m.addColumn(messages, messages.forwardedCreatedAt);
             await m.addColumn(messages, messages.forwardedContent);
+          }
+          if (from < 14) {
+            await m.addColumn(channels, channels.mentionedSeq);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

@@ -69,6 +69,7 @@ final _localChannel = Channel(
   topic: 'General chat for the whole Space.',
   cursor: 0,
   lastReadSeq: 0,
+  mentionedSeq: 0,
   isPersonalSpace: false,
 );
 

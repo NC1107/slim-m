@@ -30,6 +30,7 @@ pub(crate) async fn with_reactions(
     let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
     let mut threads_by_message = state.store.thread_summaries_for_messages(&ids).await?;
     let mut forwards_by_message = super::message_forwards::for_messages(state, &ids).await?;
+    let mentioned = state.store.mentioned_messages_for(viewer, &ids).await?;
     // One more batched query; empty when no message on this page has a thread, which is the common case.
     let thread_channel_ids: Vec<ChannelId> = threads_by_message
         .iter()
@@ -76,6 +77,7 @@ pub(crate) async fn with_reactions(
             dto.thread_last_reply_at = summary.last_reply_at;
         }
         dto.forwarded = forwards_by_message.remove(&id);
+        dto.mentions_me = mentioned.contains(&id);
         dtos.push(dto);
     }
     // Paired positionally: the loop above pushes one `dtos` entry per `ids` entry.

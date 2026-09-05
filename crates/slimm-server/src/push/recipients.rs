@@ -53,6 +53,13 @@ const HERE_MENTION: &str = "here";
 ///
 /// `presence` answers `@here`'s "currently connected" question; see
 /// [`resolved_mentions`].
+///
+/// [`crate::mentions::mentioned_viewers`] is the sibling entry point that
+/// calls [`resolved_mentions`] directly rather than through this function:
+/// this one's `candidates` starts from push-registered accounts, which is
+/// the right pool for "who to wake" but the wrong one for "who this message
+/// mentions" - a mention is true of an account whether or not it has ever
+/// registered a device.
 pub async fn message_recipients(
     store: &Store,
     channel_id: ChannelId,
@@ -105,7 +112,7 @@ pub async fn message_recipients(
 /// mentioned needs no further gate, and one they did not stays quiet for
 /// everybody except the same override that already ignores every other
 /// mention gate in this function.
-async fn resolved_mentions(
+pub(crate) async fn resolved_mentions(
     store: &Store,
     channel_id: ChannelId,
     author_id: UserId,

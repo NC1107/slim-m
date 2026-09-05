@@ -41,7 +41,8 @@ mod call_ring;
 mod debounce;
 mod deliver;
 mod envelope;
-mod recipients;
+// pub(crate): crate::mentions reuses resolved_mentions directly rather than reimplementing it.
+pub(crate) mod recipients;
 mod relay;
 
 use std::sync::Arc;

@@ -45,6 +45,7 @@ Channel _dm(int i) => Channel(
   position: 0,
   cursor: 0,
   lastReadSeq: 0,
+  mentionedSeq: 0,
   isPersonalSpace: false,
   dmParticipantId: 'user-$i',
 );

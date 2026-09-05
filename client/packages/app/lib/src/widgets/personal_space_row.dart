@@ -103,6 +103,9 @@ class _PersonalSpaceRowState extends ConsumerState<PersonalSpaceRow>
             label: personalSpaceName,
             selected: widget.selected,
             unread: existing != null && existing.cursor > existing.lastReadSeq,
+            mentioned:
+                existing != null &&
+                existing.mentionedSeq > existing.lastReadSeq,
             // Matches AppAvatar(size: 20)'s 20x20 footprint; a bare 16px icon left the label 4dp misaligned.
             leading: SizedBox(
               width: 20,

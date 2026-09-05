@@ -40,6 +40,7 @@ mod invites;
 mod members_bulk;
 mod message_forwards;
 mod message_history;
+mod message_mentions;
 mod message_ops;
 mod message_reads;
 mod message_retention;

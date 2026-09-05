@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n                   SELECT 1 FROM message_mentions WHERE message_id = ? AND user_id = ?\n               ) AS \"found!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "found!: bool",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a3ba9bb101db42eb3ab741b0dfd29a6ee4f8c93fc0507041caf5e0f63af5f642"
+}
