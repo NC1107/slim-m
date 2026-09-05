@@ -27,9 +27,9 @@ impl PresenceGuard {
     /// The returned guard must be held for the connection's whole lifetime.
     pub(super) async fn connect(hub: Hub, store: Store, user_id: UserId) -> Self {
         let first = hub.presence().connect(user_id);
-        // Cache it once here so per-viewer authorize reads it from memory, not the DB.
+        // Fill the cache without clobbering a concurrent visibility change (see load_visibility).
         if let Ok(Some(visibility)) = store.presence_visibility(user_id).await {
-            hub.presence().set_visibility(user_id, visibility);
+            hub.presence().load_visibility(user_id, visibility);
         }
         if first {
             hub.publish(Event::PresenceChanged(user_id));

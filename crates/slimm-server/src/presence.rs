@@ -210,12 +210,24 @@ impl PresenceTracker {
         }
     }
 
-    /// Caches [user_id]'s visibility choice, if they are connected. A no-op
-    /// otherwise: nothing off a live connection needs it, and the entry that
-    /// would hold it is created and removed with the connection.
+    /// Authoritatively caches [user_id]'s visibility choice, if connected. The
+    /// visibility endpoint calls this the instant a user changes their choice,
+    /// so it always overwrites. A no-op when not connected: nothing off a live
+    /// connection needs it, and the entry is created and removed with the
+    /// connection.
     pub fn set_visibility(&self, user_id: UserId, visibility: Visibility) {
         if let Some(entry) = lock(&self.state).get_mut(&user_id) {
             entry.visibility = Some(visibility);
+        }
+    }
+
+    /// Fills in [user_id]'s cached visibility on connect, but only if nothing
+    /// is cached yet. A concurrent [`Self::set_visibility`] from the endpoint
+    /// is the authoritative choice; a connect whose store read raced ahead of
+    /// that write must never clobber it back to the stale value.
+    pub fn load_visibility(&self, user_id: UserId, visibility: Visibility) {
+        if let Some(entry) = lock(&self.state).get_mut(&user_id) {
+            entry.visibility.get_or_insert(visibility);
         }
     }
 
@@ -391,5 +403,24 @@ mod tests {
         // Dropped with the last connection, so the next connect reloads fresh.
         tracker.disconnect(alice);
         assert_eq!(tracker.visibility(alice), None);
+    }
+
+    #[test]
+    fn a_racing_connect_load_never_clobbers_an_authoritative_change() {
+        let tracker = PresenceTracker::new();
+        let alice = uid();
+        tracker.connect(alice);
+
+        // The endpoint's authoritative write lands first.
+        tracker.set_visibility(alice, Visibility::Hidden);
+        // A racing connect load with the old value must not overwrite it.
+        tracker.load_visibility(alice, Visibility::Online);
+        assert_eq!(tracker.visibility(alice), Some(Visibility::Hidden));
+
+        // A load into an empty slot still fills it, the ordinary connect path.
+        tracker.disconnect(alice);
+        tracker.connect(alice);
+        tracker.load_visibility(alice, Visibility::Away);
+        assert_eq!(tracker.visibility(alice), Some(Visibility::Away));
     }
 }
