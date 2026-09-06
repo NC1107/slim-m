@@ -112,79 +112,103 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _isCreate ? 'New role' : 'Edit role',
-              style: AppText.heading.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.semi,
+      // Header and the action button stay pinned; only the middle scrolls, so
+      // there is always a reachable way out even when the form is taller than
+      // the sheet and the drag handle is buried under a scrolling list.
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _isCreate ? 'New role' : 'Edit role',
+                  style: AppText.heading.copyWith(
+                    color: tokens.textPrimary,
+                    fontWeight: AppWeights.semi,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.s12),
-            AppInput(
-              controller: _name,
-              placeholder: 'Role name',
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: AppSpacing.s16),
-            Text(
-              'Permissions',
-              style: AppText.label.copyWith(color: tokens.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            for (final (bit, label) in Perm.editable)
-              _PermissionRow(
-                label: label,
-                value: _permissions.hasPermission(bit),
-                enabled: myPermissions.hasPermission(bit),
-                onChanged: (v) => setState(() {
-                  _permissions = v
-                      ? (_permissions | bit)
-                      : (_permissions & ~bit);
-                }),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(AppIcons.dismiss, color: tokens.textSecondary),
+                tooltip: 'Close',
               ),
-            const SizedBox(height: AppSpacing.s16),
-            Text(
-              'Mentions',
-              style: AppText.label.copyWith(color: tokens.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            _PermissionRow(
-              label: 'Anyone can @mention this role',
-              value: _mentionable,
-              enabled: true,
-              onChanged: (v) => setState(() => _mentionable = v),
-            ),
-            // A role being created has no id yet to grant a module permission against.
-            if (!_isCreate) ...[
-              const SizedBox(height: AppSpacing.s16),
-              Text(
-                'Module permissions',
-                style: AppText.label.copyWith(color: tokens.textSecondary),
-              ),
-              const SizedBox(height: AppSpacing.s4),
-              ModulePermissionsSection(roleId: widget.role!.id),
             ],
-            if (_error != null) ...[
-              const SizedBox(height: AppSpacing.s8),
-              AppErrorState(message: _error!),
-            ],
-            const SizedBox(height: AppSpacing.s12),
-            AppButton(
-              label: _submitting
-                  ? 'Saving...'
-                  : (_isCreate ? 'Create role' : 'Save changes'),
-              variant: AppButtonVariant.primary,
-              full: true,
-              disabled: !_canSubmit,
-              onPressed: _submit,
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.s4),
+                  AppInput(
+                    controller: _name,
+                    placeholder: 'Role name',
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: AppSpacing.s16),
+                  Text(
+                    'Permissions',
+                    style: AppText.label.copyWith(color: tokens.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  for (final (bit, label) in Perm.editable)
+                    _PermissionRow(
+                      label: label,
+                      value: _permissions.hasPermission(bit),
+                      enabled: myPermissions.hasPermission(bit),
+                      onChanged: (v) => setState(() {
+                        _permissions = v
+                            ? (_permissions | bit)
+                            : (_permissions & ~bit);
+                      }),
+                    ),
+                  const SizedBox(height: AppSpacing.s16),
+                  Text(
+                    'Mentions',
+                    style: AppText.label.copyWith(color: tokens.textSecondary),
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  _PermissionRow(
+                    label: 'Anyone can @mention this role',
+                    value: _mentionable,
+                    enabled: true,
+                    onChanged: (v) => setState(() => _mentionable = v),
+                  ),
+                  // A role being created has no id yet to grant a module permission against.
+                  if (!_isCreate) ...[
+                    const SizedBox(height: AppSpacing.s16),
+                    Text(
+                      'Module permissions',
+                      style: AppText.label.copyWith(
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s4),
+                    ModulePermissionsSection(roleId: widget.role!.id),
+                  ],
+                ],
+              ),
             ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppErrorState(message: _error!),
           ],
-        ),
+          const SizedBox(height: AppSpacing.s12),
+          AppButton(
+            label: _submitting
+                ? 'Saving...'
+                : (_isCreate ? 'Create role' : 'Save changes'),
+            variant: AppButtonVariant.primary,
+            full: true,
+            disabled: !_canSubmit,
+            onPressed: _submit,
+          ),
+        ],
       ),
     );
   }
