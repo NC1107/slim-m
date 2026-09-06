@@ -259,3 +259,29 @@ the Dock (already `MANAGE_SERVER`-gated) and a caller lacking the module's
 own permission simply sees the 403 surface inline, the same as any other
 transport failure - never a second, weaker permission model bolted onto the
 client to avoid that one round trip.
+
+## Rendering: the scene contract (scene/1)
+
+A module returns one opaque `output` string; ABI v1 carries no content type, and deliberately gains none.
+Rich output is instead a client-side reading of that string: when the output parses as a JSON object tagged `{"$slim":"scene/1", ...}`, the client paints it as a scene; anything else stays plain monospace text exactly as before.
+So a module opts into drawing purely by choosing to emit a scene, and slim keeps zero module-specific rendering knowledge - the same principle as the rest of this record, applied to output.
+
+A scene is a logical canvas (`width` x `height`) plus a bounded list of ops - `cells` (a colour grid, the workhorse for boards, heatmaps and automata), `rect`, `circle`, `line`, `text` - drawn by a single `CustomPainter` that scales the logical coordinates to whatever box it is given.
+Colours are named, not baked: an op may name a theme token (`accent`, `surface`, `sunken`, `muted`, `text`, `border`, `danger`) which the painter resolves against the viewer's theme, so a module's drawing is native to light and dark without the module choosing either; a `#rrggbb` literal still passes through.
+
+Interaction is what makes a scene a game rather than a picture, and it reuses the module's own stateless nature rather than adding a session.
+A scene may carry an opaque `state` string, a set of `controls` (`play`, `step`, `random`, `clear`, `reset`), a one-line `status`, a `live` flag, and per-op `tap` targets.
+`ModuleSceneView` supplies the continuity a pure function lacks: it holds the current scene, and every control press or tap is an ordinary `{"action":...,"state":...}` call back to the same `(module_id, command)`, whose returned scene replaces the current one.
+`play` is the only client-side control - a timer that keeps asking the module to `step` until `live` goes false or the viewer pauses.
+The board therefore lives in the scene's `state` and rides the wire on every step; the module never holds it.
+
+This is a general capability, not a Game of Life feature; game-of-life is only its first consumer.
+The contract is versioned (`scene/1`) so it grows without breaking installed modules, and the intent is that slim is not the limit on what a visual, interactive, stateful module can be.
+Two ceilings are known and deliberate:
+
+- It is a retained-scene model over a request/response round trip, not a framebuffer: each frame is one sandboxed run, which suits turn-based and steppable modules (Life plays at roughly 8fps) but is not a path to real-time or high-framerate rendering.
+  That would need the module's wasm running client-side in the browser, or a streaming tick channel - a larger step left for later.
+- The op set is bounded (`cells`/`rect`/`circle`/`line`/`text`) with no images, arbitrary paths, gradients or text-input widgets yet.
+  These are additive to `scene/1` (a `path` op, an `image` op carrying base64, an `input` op) and grow the client painter without a wire change; expressiveness is capped only by which ops the painter currently understands.
+
+Rendering is also separate from side effects: a scene lets a module draw anything, but a module is still pure compute with zero imports, so it cannot fetch or persist - that remains the capabilities system's job, declared but not yet wired.
