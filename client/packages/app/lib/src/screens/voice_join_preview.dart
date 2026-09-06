@@ -39,10 +39,44 @@ class VoiceConnecting extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s16),
           Text('Connecting', style: TextStyle(color: tokens.textSecondary)),
+          const SizedBox(height: AppSpacing.s24),
+          _EmptySeats(tokens: tokens),
         ],
       ),
     );
   }
+}
+
+/// Faint outlined seats standing in for the roster that has not arrived yet
+/// - the same circle a participant tile's own avatar takes, so the room
+/// this spinner is about to fill reads as a room waiting to seat people
+/// rather than an empty pane.
+class _EmptySeats extends StatelessWidget {
+  const _EmptySeats({required this.tokens});
+
+  final AppTokens tokens;
+
+  static const int _seats = 3;
+  static const double _diameter = 40;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < _seats; i++)
+        Padding(
+          padding: EdgeInsets.only(left: i == 0 ? 0 : AppSpacing.s8),
+          child: Container(
+            width: _diameter,
+            height: _diameter,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: tokens.borderSubtle),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 /// Shown instead of an automatic join when the caller is already connected

@@ -252,24 +252,38 @@ class _ParticipantGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: constraints.maxHeight),
-        child: Center(
-          // Capped like a settings column: a 1:1 call was two small tiles adrift in a full-bleed void, and a bounded room reads as designed.
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: kContentColumnMax),
-            child: AnimatedRosterWrap(
-              participants: participants,
-              spacing: AppSpacing.s16,
-              runSpacing: AppSpacing.s16,
-              tileFor: (context, p) =>
-                  participantTile(context, p, controller, onOpenProfile),
+    builder: (context, constraints) {
+      // Bounded to the same width the wrap itself is capped to below, so the tile size matches what actually fits rather than the wider unbounded pane.
+      final tileWidth = callGridTileWidth(
+        constraints.copyWith(
+          maxWidth: constraints.maxWidth.clamp(0, kContentColumnMax),
+        ),
+        participants.length,
+      );
+      return SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            // Capped like a settings column: a 1:1 call was two small tiles adrift in a full-bleed void, and a bounded room reads as designed.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: kContentColumnMax),
+              child: AnimatedRosterWrap(
+                participants: participants,
+                spacing: AppSpacing.s16,
+                runSpacing: AppSpacing.s16,
+                tileFor: (context, p) => participantTile(
+                  context,
+                  p,
+                  controller,
+                  onOpenProfile,
+                  width: tileWidth,
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
@@ -281,11 +295,13 @@ Widget participantTile(
   BuildContext context,
   VoiceParticipant participant,
   VoiceController controller,
-  ValueChanged<VoiceParticipant> onOpenProfile,
-) {
+  ValueChanged<VoiceParticipant> onOpenProfile, {
+  double width = kCallTileMinWidth,
+}) {
   final showsCamera = participant.isCameraOn;
   return CallParticipantTile(
     participant: participant,
+    width: width,
     onTap: () => onOpenProfile(participant),
     cameraView: showsCamera
         ? controller.cameraViewFor(participant.identity)
