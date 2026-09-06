@@ -378,6 +378,11 @@ Future<void> teardownFixture(
 /// function's own doc for the one surface this is true of today.
 /// [allowNoText] passes straight through to [expectSettled]'s own blank
 /// check, for the rare surface that is genuinely text-free.
+/// [textScaler] layers a scale over the ambient one (a copy of it, one field
+/// changed - the same shape `design_system`'s `surfaces_test.dart` already
+/// uses and is allowlisted for) rather than replacing it, so dark/light and
+/// platform brightness stay whatever the ambient `MediaQueryData` says;
+/// `ui_snapshot_text_scale_test.dart` is what actually sets it.
 ///
 /// The last timed pump below exists for the fade-behind-the-capture shape:
 /// `AppAsyncView` mounts resolved content inside an `AppFadeIn` whose ticker
@@ -398,6 +403,7 @@ Future<void> renderSurface(
   bool settleNestedResolve = false,
   bool knownTransient = false,
   bool allowNoText = false,
+  TextScaler? textScaler,
 }) async {
   tester.view.physicalSize = viewports[viewportName]!;
   tester.view.devicePixelRatio = 1.0;
@@ -405,20 +411,28 @@ Future<void> renderSurface(
 
   final fixture = await fixtureContainer(extraOverrides: overrides);
   final router = fixtureRouter(route);
+  final app = MaterialApp.router(
+    debugShowCheckedModeBanner: false,
+    theme: theme == 'dark'
+        ? buildTheme(Brightness.dark, AppTokens.dark)
+        : buildTheme(Brightness.light, AppTokens.light),
+    routerConfig: router,
+    // The same wrapper main.dart ships, so density matches the app.
+    builder: appChromeBuilder,
+  );
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: fixture.container,
       child: RepaintBoundary(
         key: snapshotBoundary,
-        child: MaterialApp.router(
-          debugShowCheckedModeBanner: false,
-          theme: theme == 'dark'
-              ? buildTheme(Brightness.dark, AppTokens.dark)
-              : buildTheme(Brightness.light, AppTokens.light),
-          routerConfig: router,
-          // The same wrapper main.dart ships, so density matches the app.
-          builder: appChromeBuilder,
-        ),
+        child: textScaler == null
+            ? app
+            : Builder(
+                builder: (context) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+                  child: app,
+                ),
+              ),
       ),
     ),
   );

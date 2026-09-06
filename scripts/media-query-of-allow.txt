@@ -15,3 +15,4 @@ client/packages/app/lib/main.dart # overrideMotion copies the ambient MediaQuery
 client/packages/app/test/app_snackbar_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
 client/packages/design_system/test/components/sheet_test.dart # test harness copies the ambient MediaQueryData with disableAnimations overridden.
 client/packages/design_system/test/components/surfaces_test.dart # test harness copies the ambient MediaQueryData with textScaler overridden.
+client/packages/app/test/ui_snapshot_support.dart # renderSurface copies the ambient MediaQueryData with textScaler overridden for the 200% text-scale pass.
