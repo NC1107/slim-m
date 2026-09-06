@@ -42,6 +42,7 @@ Channel _channel() => Channel(
   cursor: 0,
   lastReadSeq: 0,
   mentionedSeq: 0,
+  slowModeSeconds: 0,
   isPersonalSpace: false,
   categoryId: 'cat1',
 );

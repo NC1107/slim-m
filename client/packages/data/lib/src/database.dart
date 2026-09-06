@@ -91,6 +91,13 @@ class Channels extends Table {
   /// id with no local `Users` table to reference.
   TextColumn get categoryId => text().nullable()();
 
+  /// The minimum interval, in seconds, a non-`MANAGE_CHANNELS` member must
+  /// wait between their own messages here, mirroring the server's
+  /// `channels.slow_mode_seconds`. 0 means off, and is also what every
+  /// existing row defaults to on upgrade until the next channel refresh
+  /// fills in the real value.
+  IntColumn get slowModeSeconds => integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -213,7 +220,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -294,6 +301,12 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// own doc comment describes for a keyset sync that only ever asks for
   /// messages newer than what is already cached, accepted here for the same
   /// reason: nothing server-side can be paged back through to backfill it.
+  ///
+  /// v15 adds `channels.slowModeSeconds` in place, the same shape as v8's
+  /// `position` and v14's `mentionedSeq`: every existing row defaults to 0
+  /// (off), and the next channel refresh replaces it with the server's real
+  /// value, since channels are refetched whole rather than paged by a
+  /// cursor.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -344,6 +357,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 14) {
             await m.addColumn(channels, channels.mentionedSeq);
+          }
+          if (from < 15) {
+            await m.addColumn(channels, channels.slowModeSeconds);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

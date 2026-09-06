@@ -14,8 +14,8 @@ use url::Url;
 /// exists; the enum exists so the wire schema and a client already carry a
 /// `provider` slot for whatever comes next (Vimeo, say).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
 pub(super) enum VideoProvider {
+    #[serde(rename = "youtube")]
     Youtube,
 }
 

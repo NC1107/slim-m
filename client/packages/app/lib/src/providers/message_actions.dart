@@ -22,6 +22,7 @@ import '../permissions.dart';
 import 'message_extras.dart';
 import 'message_search.dart' show ProviderReader;
 import 'providers.dart';
+import 'slow_mode_controller.dart';
 
 /// Toggles a reaction: off if [wasActive], on otherwise. Applied
 /// optimistically before the request, so a chip responds immediately; a
@@ -257,6 +258,11 @@ Future<void> sendOptimistically(
     // Lands on the same row, because it carries the same id.
     await store.applyMessage(sent);
     read(messageExtrasProvider.notifier).applyMessage(sent);
+    // The server's own timestamp, not the client clock, since that is what `enforce_slow_mode` measures the next send against.
+    read(slowModeLastSentProvider.notifier).recordSent(
+      channelId,
+      DateTime.fromMillisecondsSinceEpoch(sent.createdAt),
+    );
   } on api.ApiException catch (e) {
     await store.markFailed(
       id,

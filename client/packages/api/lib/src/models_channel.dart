@@ -16,6 +16,7 @@ class Channel {
     this.parentMessageId,
     this.categoryId,
     this.permissions,
+    this.slowModeSeconds = 0,
   });
 
   final String id;
@@ -74,7 +75,14 @@ class Channel {
   /// caller must treat as unknown rather than as zero permissions.
   final int? permissions;
 
+  /// The minimum interval, in seconds, a non-`MANAGE_CHANNELS` member must
+  /// wait between their own messages here. 0 (the default, and what a
+  /// server too old to send this field reads as) means off.
+  final int slowModeSeconds;
+
   bool get isVoice => kind == 'voice';
+
+  bool get slowModeEnabled => slowModeSeconds > 0;
 
   /// Whether this row is a thread rather than an ordinary channel - see
   /// [parentMessageId].
@@ -90,6 +98,7 @@ class Channel {
         parentMessageId: json['parent_message_id'] as String?,
         categoryId: json['category_id'] as String?,
         permissions: json['permissions'] as int?,
+        slowModeSeconds: json['slow_mode_seconds'] as int? ?? 0,
       );
 }
 

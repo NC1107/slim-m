@@ -24,6 +24,7 @@ use axum::routing::{get, patch};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
+use super::channel_slow_mode::validate_slow_mode_seconds;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
@@ -94,6 +95,13 @@ pub(crate) struct ChannelDto {
     /// holding different permissions.
     #[serde(skip_serializing_if = "Option::is_none")]
     permissions: Option<i64>,
+    /// The minimum interval, in seconds, a non-`MANAGE_CHANNELS` member must
+    /// wait between their own messages here. 0 means off - see
+    /// `channel_slow_mode::enforce_slow_mode`. Always present, unlike
+    /// `permissions`: every channel has one value for this, not one per
+    /// caller, so there is no reason to omit it anywhere `ChannelDto`
+    /// appears.
+    slow_mode_seconds: i64,
 }
 
 impl From<Channel> for ChannelDto {
@@ -108,6 +116,7 @@ impl From<Channel> for ChannelDto {
             category_id: channel.category_id.map(|id| id.to_string()),
             created_at: channel.created_at,
             permissions: None,
+            slow_mode_seconds: channel.slow_mode_seconds,
         }
     }
 }
@@ -142,6 +151,11 @@ struct UpdateChannelRequest {
     /// trimmed value is blank - see [`validate_channel_topic`].
     #[serde(default)]
     topic: Option<String>,
+    /// Absent leaves the slow-mode interval unchanged; present replaces it.
+    /// 0 turns slow mode off. Refused, not clamped, outside
+    /// `0..=SLOW_MODE_MAX_SECONDS` - see [`validate_slow_mode_seconds`].
+    #[serde(default)]
+    slow_mode_seconds: Option<i64>,
 }
 
 /// Lists the channels the caller can view. One batched store call: the
@@ -225,9 +239,10 @@ async fn create(
     Ok(Json(created.channel.into()))
 }
 
-/// Renames a channel and/or replaces its topic. Requires MANAGE_CHANNELS at
-/// the deployment level - the same gate `create` and `delete` use, not a new
-/// one for the topic half of this route.
+/// Renames a channel, replaces its topic, and/or sets its slow-mode interval.
+/// Requires MANAGE_CHANNELS at the deployment level - the same gate `create`
+/// and `delete` use, not a new one for the topic or slow-mode half of this
+/// route.
 async fn update(
     Authed(ctx): Authed,
     parts: Parts,
@@ -253,15 +268,34 @@ async fn update(
         .as_deref()
         .map(validate_channel_topic)
         .transpose()?;
-    if name.is_none() && topic.is_none() {
+    let slow_mode_seconds = req
+        .slow_mode_seconds
+        .map(validate_slow_mode_seconds)
+        .transpose()?;
+    if name.is_none() && topic.is_none() && slow_mode_seconds.is_none() {
         return Err(ApiError::BadRequest("nothing to update"));
     }
 
-    let channel = state
-        .store
-        .update_channel(channel_id, name, topic.as_ref().map(|t| t.as_deref()))
-        .await?
-        .ok_or(ApiError::NotFound("channel not found"))?;
+    let mut channel = if name.is_some() || topic.is_some() {
+        state
+            .store
+            .update_channel(channel_id, name, topic.as_ref().map(|t| t.as_deref()))
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?
+    } else {
+        state
+            .store
+            .channel(channel_id)
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?
+    };
+    if let Some(seconds) = slow_mode_seconds {
+        channel = state
+            .store
+            .update_channel_slow_mode(channel_id, seconds)
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?;
+    }
     state
         .hub
         .publish(Event::ChannelUpdated(Arc::new(channel.clone())));

@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use super::AppState;
 use super::attachment_ids::parse_attachment_ids;
+use super::channel_slow_mode::enforce_slow_mode;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::message_history::history;
@@ -117,6 +118,11 @@ struct ListParams {
 /// created (they were uploaded before this call and just linked inside it), so
 /// the echoed response needs its own lookup rather than staying empty the way
 /// a fresh message's reactions correctly do.
+///
+/// A fresh send is also where the channel's slow mode is enforced (see
+/// `channel_slow_mode::enforce_slow_mode`), gated on the same `stored_already`
+/// this function already computes for the forward check: a retry of a send
+/// that already landed must never be refused for arriving "too soon".
 async fn send(
     Authed(ctx): Authed,
     Path(channel_id): Path<String>,
@@ -154,6 +160,10 @@ async fn send(
         .transpose()?;
     // A retry must not re-authorize what already succeeded; the authoritative check still runs in the transaction.
     let stored_already = state.store.message_including_deleted(id).await?.is_some();
+    // Never on a retry: see `enforce_slow_mode`'s own doc for why a second attempt at an id that already landed must not be refused.
+    if !stored_already {
+        enforce_slow_mode(&state, channel_id, ctx.user_id).await?;
+    }
     let forward = match &req.forwarded_from_id {
         // Parsed even on a retry, so a malformed id is still a 400.
         Some(raw) => {

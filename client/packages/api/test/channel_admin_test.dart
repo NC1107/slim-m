@@ -24,6 +24,7 @@ Map<String, dynamic> _channelJson({
   String name = 'general',
   String kind = 'text',
   String? topic,
+  int slowModeSeconds = 0,
 }) =>
     {
       'id': id,
@@ -31,6 +32,7 @@ Map<String, dynamic> _channelJson({
       'kind': kind,
       'topic': topic,
       'created_at': 1,
+      'slow_mode_seconds': slowModeSeconds,
     };
 
 void main() {
@@ -108,6 +110,29 @@ void main() {
       );
       expect(sentBody, {'name': 'general', 'topic': 'announcements only'});
       expect(updated.topic, 'announcements only');
+    });
+
+    test('a slow-mode-only update omits name and topic and round-trips',
+        () async {
+      Map<String, dynamic>? sentBody;
+      final api = SlimmApi(
+        baseUrl: _base,
+        session: SessionStore(tokens: _tokens()),
+        httpClient: MockClient((request) async {
+          sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode(_channelJson(slowModeSeconds: 30)),
+            200,
+          );
+        }),
+      );
+      final updated = await api.updateChannel(
+        channelId: 'chan-1',
+        slowModeSeconds: 30,
+      );
+      expect(sentBody, {'slow_mode_seconds': 30});
+      expect(updated.slowModeSeconds, 30);
+      expect(updated.slowModeEnabled, isTrue);
     });
   });
 

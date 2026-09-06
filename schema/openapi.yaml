@@ -5375,6 +5375,14 @@ components:
         error:
           type: string
           description: A short, stable, human-readable reason.
+        retry_after_seconds:
+          type: integer
+          format: int64
+          description: >
+            How many seconds remain before the request would succeed. Present
+            only on a slow-mode 429 from `sendMessage` (also echoed as a
+            `Retry-After` header on that same response); absent everywhere
+            else, including every other 429.
 
     Version:
       type: object
@@ -6413,6 +6421,15 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        slow_mode_seconds:
+          type: integer
+          format: int64
+          description: >
+            The minimum interval, in seconds, a non-MANAGE_CHANNELS member
+            must wait between their own messages in this channel; 0 means
+            off. Set with `updateChannel`. Absent on servers older than this
+            field, which a client must treat as unknown rather than
+            assuming 0.
         permissions:
           type: integer
           format: int64
@@ -6514,9 +6531,9 @@ components:
     UpdateChannelRequest:
       type: object
       description: >
-        At least one of `name` and `topic` must be present; a request with
-        neither is a 400. Each is independent: sending only `topic` leaves
-        the name untouched, and vice versa.
+        At least one of `name`, `topic` and `slow_mode_seconds` must be
+        present; a request with none of them is a 400. Each is independent:
+        sending only one leaves the others untouched.
       properties:
         name:
           type: string
@@ -6528,6 +6545,13 @@ components:
           description: >
             A blank or whitespace-only value clears the topic back to null
             rather than storing an empty string.
+        slow_mode_seconds:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 21600
+          description: >
+            0 turns slow mode off. Refused, not clamped, outside this range.
 
     ReorderChannelsRequest:
       type: object

@@ -236,12 +236,11 @@ String _withoutDotSegment(String segment) => (segment == '.' || segment == '..')
 /// The delay a `Retry-After` header names, or null if there is none or it
 /// does not parse.
 ///
-/// Only the delta-seconds form (RFC 9110 10.2.3) is read; the server sends
-/// nothing here today, so this is forward-compatible plumbing rather than a
-/// path anything currently exercises. The alternative HTTP-date form is
-/// deliberately not parsed: nothing this server or a caller of it would ever
-/// send needs it, and a caller with no value here already falls back to its
-/// own backoff.
+/// Only the delta-seconds form (RFC 9110 10.2.3) is read. `sendMessage`'s own
+/// slow-mode 429 sends this header; every other 429 on this server still
+/// does not, so a caller with no value here falls back to its own backoff.
+/// The alternative HTTP-date form is deliberately not parsed: nothing this
+/// server or a caller of it would ever send needs it.
 Duration? _retryAfter(http.Response response) {
   final header = response.headers['retry-after'];
   if (header == null) return null;

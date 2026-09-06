@@ -100,4 +100,18 @@ void main() {
       );
     }
   });
+
+  test('a slow-mode refusal shows the server\'s own wait time, not the '
+      'generic rate-limit copy', () {
+    final message = describeApiFailure(
+      'send the message',
+      const api.RateLimitedException(
+        'slow mode: wait 4s before sending again',
+        retryAfter: Duration(seconds: 4),
+      ),
+    );
+    expect(message, contains('Slow mode'));
+    expect(message, contains('4s'));
+    expect(message, isNot(contains('too many requests')));
+  });
 }

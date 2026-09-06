@@ -19,6 +19,7 @@ import '../providers/composer_attachment_drop.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
+import '../providers/slow_mode_controller.dart';
 import '../providers/typing_controller.dart';
 import 'attachment_picker.dart';
 import 'channel_rail_frame.dart' show serverInfoProvider;
@@ -98,6 +99,10 @@ class _ComposerState extends ConsumerState<Composer> {
   /// `Version.gifSearchEnabled`, refreshed in [build]; see [_openActions].
   bool _gifSearchEnabled = false;
 
+  /// Seconds left before slow mode allows another send, refreshed in
+  /// [build] from [slowModeRemainingSecondsProvider]; see [_canSend].
+  int _slowModeRemaining = 0;
+
   /// Captured once rather than read from `ref` in [dispose]: by then
   /// Riverpod has already detached this element's `ref`, and reading it
   /// throws "Cannot use ref after the widget was disposed". Every write to
@@ -133,7 +138,8 @@ class _ComposerState extends ConsumerState<Composer> {
   bool get _canSend =>
       (_hasSendableText || !_attachments.isEmpty) &&
       !_attachments.hasBlockingAttachment &&
-      _overBy == null;
+      _overBy == null &&
+      _slowModeRemaining <= 0;
 
   @override
   void initState() {
@@ -491,6 +497,9 @@ class _ComposerState extends ConsumerState<Composer> {
     _suggestions = _buildSuggestions();
     _gifSearchEnabled =
         ref.watch(serverInfoProvider).valueOrNull?.gifSearchEnabled ?? false;
+    _slowModeRemaining = ref.watch(
+      slowModeRemainingSecondsProvider(widget.channelId),
+    );
 
     // top: false because the composer only ever touches the bottom edge; the
     // padding self-cancels when the keyboard covers the home indicator.
@@ -513,6 +522,7 @@ class _ComposerState extends ConsumerState<Composer> {
               onDismissAttachmentError: () =>
                   setState(() => _attachmentError = null),
               overLimitBy: _overBy,
+              slowModeRemainingSeconds: _slowModeRemaining,
               stagedAttachments: _attachments.items,
               onRemoveAttachment: _removeAttachment,
               onRetryAttachment: _retryAttachment,

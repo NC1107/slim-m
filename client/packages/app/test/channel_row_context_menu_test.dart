@@ -60,6 +60,7 @@ Channel _channel(String id, String name) => Channel(
   cursor: 0,
   lastReadSeq: 0,
   mentionedSeq: 0,
+  slowModeSeconds: 0,
   isPersonalSpace: false,
 );
 

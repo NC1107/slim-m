@@ -10,6 +10,7 @@ import 'message_dto.dart';
 import 'rail_channel.dart';
 
 part 'message_store_batch.dart';
+part 'message_store_channels.dart';
 part 'message_store_rows.dart';
 part 'message_store_recovery.dart';
 part 'message_store_retention.dart';
@@ -237,73 +238,19 @@ class MessageStore {
   // --- Writes ---
 
   /// Replaces the known channel list, keeping each channel's local cursor and
-  /// read marker, which the server's channel list does not carry.
-  Future<void> upsertChannels(List<api.Channel> channels) async {
-    await db.batch((batch) {
-      for (final channel in channels) {
-        batch.insert(
-          db.channels,
-          ChannelsCompanion.insert(
-            id: channel.id,
-            name: channel.name,
-            kind: channel.kind,
-            createdAt: channel.createdAt,
-            topic: Value(channel.topic),
-            position: Value(channel.position),
-            isPersonalSpace: Value(channel.isPersonalSpace),
-            dmParticipantId: Value(channel.dmParticipantId),
-            parentMessageId: Value(channel.parentMessageId),
-            categoryId: Value(channel.categoryId),
-          ),
-          onConflict: DoUpdate(
-            (_) => ChannelsCompanion.custom(
-              name: Variable(channel.name),
-              kind: Variable(channel.kind),
-              topic: Variable(channel.topic),
-              position: Variable(channel.position),
-              isPersonalSpace: Variable(channel.isPersonalSpace),
-              dmParticipantId: Variable(channel.dmParticipantId),
-              parentMessageId: Variable(channel.parentMessageId),
-              categoryId: Variable(channel.categoryId),
-            ),
-          ),
-        );
-      }
-    });
-  }
+  /// read marker, which the server's channel list does not carry. The body
+  /// lives in `message_store_channels.dart`, alongside [replaceChannels].
+  Future<void> upsertChannels(List<api.Channel> channels) =>
+      _upsertChannels(this, channels);
 
   /// Replaces the whole known channel list with exactly what the server
   /// returned, pruning any channel (and its cached messages) that dropped
   /// out - a permission revoked live, or a delete this device did not
   /// perform itself. [upsertChannels] must never gain this: a single-channel
   /// call (a rename, a freshly created channel) would wipe every other row.
-  ///
-  /// A thread is deliberately spared this pruning: `GET /channels` never
-  /// lists one (see [watchChannels]), so it can never appear in [channels]
-  /// even while its parent is still fully visible, and pruning on that
-  /// absence alone would wipe a thread's cached messages on every routine
-  /// refresh (any role or overwrite edit anywhere in the deployment
-  /// triggers one). A thread already known locally is kept until an
-  /// explicit `ChannelDeleted` event removes it - the same event any other
-  /// channel's deletion is learned through.
-  Future<void> replaceChannels(List<api.Channel> channels) async {
-    await db.transaction(() async {
-      await upsertChannels(channels);
-      final threadIds = await (db.select(db.channels)
-            ..where((c) => c.parentMessageId.isNotNull()))
-          .map((c) => c.id)
-          .get();
-      final keep = {...channels.map((c) => c.id), ...threadIds};
-      final stale = await (db.select(db.channels)
-            ..where((c) => c.id.isNotIn(keep)))
-          .get();
-      for (final row in stale) {
-        await (db.delete(db.messages)..where((m) => m.channelId.equals(row.id)))
-            .go();
-        await (db.delete(db.channels)..where((c) => c.id.equals(row.id))).go();
-      }
-    });
-  }
+  /// The body lives in `message_store_channels.dart`.
+  Future<void> replaceChannels(List<api.Channel> channels) =>
+      _replaceChannels(this, channels);
 
   /// Applies one message from the server, whichever route it arrived by.
   ///

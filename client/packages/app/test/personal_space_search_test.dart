@@ -53,6 +53,7 @@ const _personalChannel = Channel(
   cursor: 0,
   lastReadSeq: 0,
   mentionedSeq: 0,
+  slowModeSeconds: 0,
   isPersonalSpace: true,
 );
 

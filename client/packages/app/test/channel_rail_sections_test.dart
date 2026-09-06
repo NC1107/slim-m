@@ -44,6 +44,7 @@ Channel _dm(
   cursor: cursor,
   lastReadSeq: lastReadSeq,
   mentionedSeq: 0,
+  slowModeSeconds: 0,
   isPersonalSpace: isPersonalSpace,
 );
 
