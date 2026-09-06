@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO installed_modules\n                 (id, name, version, artifact_sha256, approved_capabilities,\n                  runtime_limits, extension_points, enabled, installed_at)\n             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)\n             ON CONFLICT(id) DO UPDATE SET\n                 name = excluded.name,\n                 version = excluded.version,\n                 artifact_sha256 = excluded.artifact_sha256,\n                 approved_capabilities = excluded.approved_capabilities,\n                 runtime_limits = excluded.runtime_limits,\n                 extension_points = excluded.extension_points",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "f97327033df7b36dc01da90587f6b25a70a6a2a850d64e4e0025265a62af4509"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sha256 AS \"sha256!\", bytes AS \"bytes!\" FROM module_artifacts WHERE module_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sha256!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "bytes!",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3f75f072a7f3bf12667b1554bdc2785470c336c7f206f766f2ad5965143674a4"
+}

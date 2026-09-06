@@ -60,6 +60,7 @@ mod messages;
 mod messages_bulk;
 mod messages_bulk_window;
 mod metrics;
+mod module_commands;
 mod module_permissions;
 mod overwrites;
 mod pins;
@@ -158,6 +159,7 @@ pub fn router(state: AppState) -> Router {
         .merge(messages_bulk::router())
         .merge(messages_bulk_window::router())
         .merge(metrics::routes())
+        .merge(module_commands::routes())
         .merge(module_permissions::routes())
         .merge(overwrites::routes())
         .merge(presence::routes())

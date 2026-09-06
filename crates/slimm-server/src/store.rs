@@ -51,6 +51,7 @@ mod messages_bulk;
 mod messages_bulk_window;
 mod moderation_audit;
 mod moderation_history;
+mod module_artifacts;
 mod module_permissions;
 mod modules;
 mod notifications;
@@ -113,7 +114,10 @@ pub use moderation_history::{AuditLogEntry, HistoryCursor, ModerationHistoryItem
 pub use module_permissions::{
     GrantModulePermissionError, GrantedModulePermission, ModulePermission,
 };
-pub use modules::{InstallModuleRequest, InstalledModule, ModulePermissionSpec};
+pub use modules::{
+    InstallModuleRequest, InstalledModule, ModuleExtensionPoint, ModuleExtensionPointSpec,
+    ModulePermissionSpec, ModuleRuntimeLimits,
+};
 pub use permissions::ChannelOverwrite;
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", name AS \"name!\", version AS \"version!\",\n                      artifact_sha256 AS \"artifact_sha256!\",\n                      approved_capabilities AS \"approved_capabilities!\",\n                      enabled AS \"enabled!: bool\", installed_at AS \"installed_at!\"\n               FROM installed_modules ORDER BY installed_at DESC",
+  "query": "SELECT id AS \"id!\", name AS \"name!\", version AS \"version!\",\n                      artifact_sha256 AS \"artifact_sha256!\",\n                      approved_capabilities AS \"approved_capabilities!\",\n                      runtime_limits AS \"runtime_limits!\",\n                      extension_points AS \"extension_points!\",\n                      enabled AS \"enabled!: bool\", installed_at AS \"installed_at!\"\n               FROM installed_modules ORDER BY installed_at DESC",
   "describe": {
     "columns": [
       {
@@ -29,13 +29,23 @@
         "type_info": "Text"
       },
       {
-        "name": "enabled!: bool",
+        "name": "runtime_limits!",
         "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "extension_points!",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "enabled!: bool",
+        "ordinal": 7,
         "type_info": "Integer"
       },
       {
         "name": "installed_at!",
-        "ordinal": 6,
+        "ordinal": 8,
         "type_info": "Integer"
       }
     ],
@@ -49,8 +59,10 @@
       false,
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "91c815f2089413c2401977008968b4373e199095f1ba99b3cbf483f448f5118d"
+  "hash": "c9be3334361760e155def9c1d27e7d67fb2227a8f9bc7ce7f82274e388e940df"
 }

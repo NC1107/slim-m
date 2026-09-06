@@ -29,7 +29,7 @@ const GOOD_MANIFEST: &str = r#"{
     ],
     "capabilities": ["command.register", "message.post"],
     "extension_points": [
-        {"kind": "command", "name": "run", "description": "runs it"}
+        {"kind": "command", "name": "run", "description": "runs it", "permission": "run"}
     ]
 }"#;
 
@@ -44,6 +44,28 @@ fn parses_the_live_registry_shapes() {
     assert_eq!(manifest.permissions.len(), 1);
     assert_eq!(manifest.permissions[0].key, "run");
     assert_eq!(manifest.artifact.sha256.len(), 64);
+    assert_eq!(
+        manifest.extension_points[0].permission.as_deref(),
+        Some("run")
+    );
+}
+
+#[test]
+fn rejects_a_command_extension_point_with_no_permission() {
+    let bad = GOOD_MANIFEST.replace(r#", "permission": "run""#, "");
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
+fn rejects_a_command_extension_point_naming_an_undeclared_permission() {
+    let bad = GOOD_MANIFEST.replace(r#""permission": "run""#, r#""permission": "ghost""#);
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
 }
 
 #[test]

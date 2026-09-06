@@ -140,6 +140,13 @@ struct RawExtensionPoint {
     name: String,
     #[serde(default)]
     description: Option<String>,
+    /// The declared permission key (see `permissions` above) a caller must
+    /// hold to reach this extension point. Required for `kind: "command"`,
+    /// per the module runtime's own permission gate
+    /// (`http::module_commands`); optional for any future kind that adds no
+    /// permission of its own.
+    #[serde(default)]
+    permission: Option<String>,
 }
 
 /// A module's declared permission, validated: `key` is a safe slug, `name`
@@ -176,6 +183,7 @@ pub(super) struct ManifestExtensionPoint {
     pub(super) kind: String,
     pub(super) name: String,
     pub(super) description: Option<String>,
+    pub(super) permission: Option<String>,
 }
 
 /// A fully parsed and validated module manifest.
@@ -245,7 +253,7 @@ fn validate_manifest(raw: RawManifest) -> Result<Manifest, ManifestError> {
     let extension_points = raw
         .extension_points
         .into_iter()
-        .map(validate_extension_point)
+        .map(|ep| validate_extension_point(ep, &seen_keys))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Manifest {
@@ -316,8 +324,14 @@ fn validate_permission(raw: RawPermission) -> Result<ManifestPermission, Manifes
     })
 }
 
+/// `permission_keys` is the manifest's own declared permission keys
+/// (`permissions[].key`, already validated), checked against here so a
+/// command cannot name a permission the manifest never declares - the
+/// module runtime otherwise has no way to tell an admin's `MANAGE_ROLES`
+/// grant surface apart from a typo.
 fn validate_extension_point(
     raw: RawExtensionPoint,
+    permission_keys: &std::collections::HashSet<String>,
 ) -> Result<ManifestExtensionPoint, ManifestError> {
     let kind = bounded(&raw.kind, MAX_SLUG, "extension_points[].kind")?;
     let name = bounded(&raw.name, MAX_SHORT_FIELD, "extension_points[].name")?;
@@ -325,10 +339,30 @@ fn validate_extension_point(
         .description
         .map(|d| bounded(&d, MAX_LONG_FIELD, "extension_points[].description"))
         .transpose()?;
+    let permission = raw
+        .permission
+        .map(|p| bounded(&p, MAX_SLUG, "extension_points[].permission"))
+        .transpose()?;
+    if kind == "command" {
+        match &permission {
+            Some(key) if permission_keys.contains(key) => {}
+            Some(_) => {
+                return Err(malformed(
+                    "a command extension point's permission must name a permission this manifest declares",
+                ));
+            }
+            None => {
+                return Err(malformed(
+                    "a command extension point must declare which permission it requires",
+                ));
+            }
+        }
+    }
     Ok(ManifestExtensionPoint {
         kind,
         name,
         description,
+        permission,
     })
 }
 

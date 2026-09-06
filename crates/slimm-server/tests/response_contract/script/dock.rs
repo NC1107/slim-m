@@ -10,7 +10,7 @@ use serde_json::json;
 use super::text;
 use crate::world::Contract;
 
-pub(super) async fn dock_calls(c: &mut Contract, root: &str) {
+pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str) {
     let modules = c.get("listDockModules", "/space/dock/modules", root).await;
     let id = text(&modules.as_array().expect("an array")[0], "id");
 
@@ -34,13 +34,6 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str) {
         "enableDockModule",
         "POST",
         &format!("/space/dock/modules/{id}/enable"),
-        root,
-    )
-    .await;
-    c.bare(
-        "disableDockModule",
-        "POST",
-        &format!("/space/dock/modules/{id}/disable"),
         root,
     )
     .await;
@@ -72,6 +65,31 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str) {
         root,
     )
     .await;
+
+    // ADMINISTRATOR does not carry module permissions (decision 0021), so the admin needs the role assigned to actually hold `run`.
+    c.bare(
+        "assignRole",
+        "PUT",
+        &format!("/members/{admin_id}/roles/{role_id}"),
+        root,
+    )
+    .await;
+    c.json(
+        "runModuleCommand",
+        "POST",
+        &format!("/modules/{id}/commands/run"),
+        root,
+        json!({ "input": "hello" }),
+    )
+    .await;
+    c.bare(
+        "unassignRole",
+        "DELETE",
+        &format!("/members/{admin_id}/roles/{role_id}"),
+        root,
+    )
+    .await;
+
     c.bare(
         "revokeModulePermission",
         "DELETE",
@@ -82,6 +100,13 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str) {
     c.bare("deleteRole", "DELETE", &format!("/roles/{role_id}"), root)
         .await;
 
+    c.bare(
+        "disableDockModule",
+        "POST",
+        &format!("/space/dock/modules/{id}/disable"),
+        root,
+    )
+    .await;
     c.bare(
         "uninstallDockModule",
         "DELETE",

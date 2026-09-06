@@ -51,6 +51,10 @@ url = "2"
 # The server's trust-on-first-use identity keypair. Feature cuts and the 2.x
 # version hold are both load-bearing; see docs/dependencies.md.
 ed25519-dalek = { version = "2.2", default-features = false, features = ["zeroize"] }
+# Pure-Rust WASM interpreter for the module runtime host (decision 0021,
+# Phase 3): no JIT, small binary footprint, and fuel metering for CPU limits.
+# Chosen over wasmtime specifically to protect the release-binary size budget.
+wasmi = "0.51"
 
 [profile.dev]
 # Line tables, not full DWARF. This crate builds 154 integration test files

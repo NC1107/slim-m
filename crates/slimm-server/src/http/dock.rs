@@ -24,15 +24,20 @@ use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, post};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use url::Url;
 
 use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use crate::config::Config;
+use crate::media::to_hex;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{InstallModuleRequest, ModulePermissionSpec, SessionContext};
+use crate::store::{
+    InstallModuleRequest, ModuleExtensionPointSpec, ModulePermissionSpec, ModuleRuntimeLimits,
+    SessionContext,
+};
 
 use fetch::{FetchError, fetch_capped};
 use manifest::{Manifest, ManifestError, parse_index, parse_manifest, validate_slug};
@@ -144,7 +149,10 @@ impl From<ManifestError> for ApiError {
     }
 }
 
-fn validate_module_id(id: &str) -> Result<(), ApiError> {
+/// `pub(crate)` rather than `pub(self)`: `http::module_commands` validates a
+/// command route's own `moduleId` path segment the same way, and a second
+/// slug validator there could silently drift from this one's rules.
+pub(crate) fn validate_module_id(id: &str) -> Result<(), ApiError> {
     validate_slug(id, MAX_MODULE_ID_LEN).map_err(|_| ApiError::BadRequest("invalid module id"))
 }
 
@@ -235,6 +243,7 @@ async fn install(
             "the module's current version no longer matches the one requested; reopen it in the Dock",
         ));
     }
+    let artifact = fetch_artifact(dock, &manifest).await?;
 
     let permissions: Vec<ModulePermissionSpec> = manifest
         .permissions
@@ -245,6 +254,21 @@ async fn install(
             description: &p.description,
         })
         .collect();
+    let extension_points: Vec<ModuleExtensionPointSpec> = manifest
+        .extension_points
+        .iter()
+        .map(|e| ModuleExtensionPointSpec {
+            kind: &e.kind,
+            name: &e.name,
+            description: e.description.as_deref(),
+            permission: e.permission.as_deref(),
+        })
+        .collect();
+    let runtime_limits = ModuleRuntimeLimits {
+        memory_mb: manifest.runtime.limits.memory_mb,
+        wall_ms: manifest.runtime.limits.wall_ms,
+        fuel: manifest.runtime.limits.fuel,
+    };
     let installed = state
         .store
         .install_module(InstallModuleRequest {
@@ -253,10 +277,42 @@ async fn install(
             version: &manifest.version,
             artifact_sha256: &manifest.artifact.sha256,
             approved_capabilities: &manifest.capabilities,
+            runtime_limits: &runtime_limits,
             permissions: &permissions,
+            extension_points: &extension_points,
         })
         .await?;
+    state
+        .store
+        .store_module_artifact(&manifest.id, &manifest.artifact.sha256, &artifact)
+        .await?;
     Ok(Json(InstalledModuleDto::from(installed)))
+}
+
+/// Fetches the module's own artifact bytes at `manifest.artifact.path`,
+/// relative to the same allowlisted base the manifest itself came from, and
+/// refuses them if their sha256 does not match what the manifest declared -
+/// the fetch-time half of the check `crate::module_runtime::ModuleHost`
+/// repeats again, defense in depth, right before it ever runs them.
+async fn fetch_artifact(dock: &Enabled, manifest: &Manifest) -> Result<Vec<u8>, ApiError> {
+    let url = dock
+        .base_url
+        .join(&manifest.artifact.path)
+        .map_err(|_| ApiError::Internal)?;
+    let bytes = fetch_capped(
+        &dock.client,
+        &url,
+        &dock.allowed_host,
+        fetch::MAX_ARTIFACT_BYTES,
+    )
+    .await?;
+    let digest = to_hex(&Sha256::digest(&bytes));
+    if digest != manifest.artifact.sha256 {
+        return Err(ApiError::UpstreamInvalid(
+            "the module artifact's sha256 does not match its manifest".to_owned(),
+        ));
+    }
+    Ok(bytes)
 }
 
 async fn uninstall(

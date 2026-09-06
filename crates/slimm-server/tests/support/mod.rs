@@ -14,6 +14,11 @@ use slimm_server::store::Store;
 /// `tests/openapi_429_coverage.rs`.
 pub mod openapi;
 
+/// Wasm fixtures for `crate::module_runtime`, shared by every test that
+/// installs a module and actually invokes it.
+#[allow(dead_code)]
+pub mod wasm_fixtures;
+
 /// [`slimm_server::push::message_recipients`] against a fresh, empty
 /// [`PresenceTracker`] - shared by every push-recipient test that has no
 /// opinion about `@here`, so a perpetually-disconnected tracker is a correct

@@ -223,7 +223,7 @@ pub async fn run(c: &mut Contract) {
     gif_calls(c, root).await;
     let upstream = c.upstream.clone();
     link_preview_calls(c, root, &upstream).await;
-    dock_calls(c, root).await;
+    dock_calls(c, root, &admin_id).await;
     let message = message_calls(c, root, &channel).await;
     bulk_delete_by_author_call(c, root, bob_token, &bob_id, &channel).await;
     thread_calls(c, root, &channel, &message).await;
