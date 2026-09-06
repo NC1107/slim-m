@@ -9,6 +9,8 @@
 //! either attribute order, single or double quotes, and HTML entities in the
 //! extracted values - and takes the first value seen for each field.
 
+use super::video::VideoInfo;
+
 /// The metadata a preview card is built from. Every field is optional: a page
 /// with only a `<title>` still previews, and a page with nothing usable
 /// previews as nothing rather than an error.
@@ -18,6 +20,15 @@ pub(super) struct Preview {
     pub description: Option<String>,
     pub image: Option<String>,
     pub site_name: Option<String>,
+    /// A raw `og:video` URL, if the page declared one - not yet resolved to
+    /// an absolute URL or checked against the SSRF guard. [`super::fetch`]
+    /// does both before handing it to [`super::video::detect`], which fills
+    /// in [`Self::video`].
+    pub video_url: Option<String>,
+    /// The playable video this page was recognized as, if any. Always `None`
+    /// straight out of [`extract`]; [`super::fetch::fetch_preview`] fills it
+    /// in once it has this page's final, redirect-resolved URL to check.
+    pub video: Option<VideoInfo>,
 }
 
 impl Preview {
@@ -26,6 +37,7 @@ impl Preview {
             && self.description.is_none()
             && self.image.is_none()
             && self.site_name.is_none()
+            && self.video_url.is_none()
     }
 }
 
@@ -45,6 +57,9 @@ pub(super) fn extract(html: &str) -> Option<Preview> {
                 "og:description" => set(&mut p.description, content),
                 "og:image" | "og:image:url" => set(&mut p.image, content),
                 "og:site_name" => set(&mut p.site_name, content),
+                "og:video" | "og:video:url" | "og:video:secure_url" => {
+                    set(&mut p.video_url, content)
+                }
                 "twitter:title" => set(&mut p.title, content),
                 "twitter:description" => set(&mut p.description, content),
                 "twitter:image" | "twitter:image:src" => set(&mut p.image, content),
@@ -241,5 +256,22 @@ mod tests {
         let long = "x".repeat(2000);
         let html = format!("<meta property=\"og:title\" content=\"{long}\">");
         assert_eq!(extract(&html).unwrap().title.unwrap().chars().count(), 500);
+    }
+
+    #[test]
+    fn reads_an_og_video_url() {
+        let html =
+            r#"<meta property="og:video" content="https://www.youtube.com/embed/dQw4w9WgXcQ">"#;
+        assert_eq!(
+            extract(html).unwrap().video_url.as_deref(),
+            Some("https://www.youtube.com/embed/dQw4w9WgXcQ")
+        );
+    }
+
+    #[test]
+    fn a_page_with_only_an_og_video_url_still_previews() {
+        let html =
+            r#"<meta property="og:video:url" content="https://www.youtube.com/embed/dQw4w9WgXcQ">"#;
+        assert!(extract(html).is_some());
     }
 }

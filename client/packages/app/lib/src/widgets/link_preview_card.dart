@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The card a pasted URL unfurls into below a message: the linked page's
-/// site name, title, description and proxied image, one card per link.
+/// site name, title, description and proxied image, one card per link - or,
+/// for a link recognized as a playable video (YouTube today), the same card
+/// with a click-to-play affordance over the thumbnail instead of a static
+/// image.
+///
+/// Privacy is the point of the click-to-play affordance: nothing from the
+/// video provider loads on render, only when the reader taps. On web that
+/// tap swaps the thumbnail for an inline `youtube-nocookie.com` iframe
+/// (`youtube_inline_player.dart`, loaded only then). Every other platform
+/// has no iframe host off the web engine and this app carries no webview
+/// dependency to fake one, so a tap there opens [url] in the system browser
+/// instead - the same [_open] path an ordinary link preview already uses.
 ///
 /// A missing or failed preview renders nothing - never an error surface -
 /// since a link that fails to unfurl is not something the reader did wrong,
@@ -8,17 +19,23 @@
 /// body above this.
 library;
 
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' show LinkPreview;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/attachment_preview_quality.dart';
 import '../providers/link_preview.dart';
 import '../providers/media_preferences.dart';
+import '../routing/modal_page.dart' show kScrimColor;
 import 'attachment_reveal.dart';
 import 'attachment_view.dart' show kInlineImageMax;
 import 'image_decode.dart';
+import 'youtube_inline_player.dart';
 
 /// One card per URL, below a message's own text. Callers cap [urls] before
 /// handing them here; this renders exactly what it is given.
@@ -57,10 +74,28 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
   /// field of the same name and reason.
   bool _revealed = false;
 
+  /// Set once the reader taps a playable video's card, on web only - see
+  /// [_handlePlayTap]. Always false on every other platform, since there the
+  /// tap opens the system browser instead of swapping in an inline player.
+  bool _playing = false;
+
   Future<void> _open() async {
     final uri = Uri.tryParse(widget.url);
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// The click-to-play action for a recognized video: on web, swap the
+  /// thumbnail for an inline `youtube-nocookie.com` iframe with nothing
+  /// fetched from the provider until now; everywhere else, Flutter has no
+  /// iframe host, so this opens [url] in the system browser exactly like an
+  /// ordinary link preview's tap already does.
+  void _handlePlayTap() {
+    if (kIsWeb) {
+      setState(() => _playing = true);
+    } else {
+      unawaited(_open());
+    }
   }
 
   @override
@@ -71,19 +106,22 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
         preview.siteName != null ||
         preview.title != null ||
         preview.description != null;
-    if (!hasText && preview.imageToken == null) {
+    if (!hasText && preview.imageToken == null && !preview.isPlayableVideo) {
       return const SizedBox.shrink();
     }
+    final onCardTap = preview.isPlayableVideo ? _handlePlayTap : _open;
 
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Semantics(
       button: true,
-      label: 'Open link preview for ${preview.title ?? widget.url}',
-      onTap: _open,
+      label: preview.isPlayableVideo
+          ? 'Play video preview for ${preview.title ?? widget.url}'
+          : 'Open link preview for ${preview.title ?? widget.url}',
+      onTap: onCardTap,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
-          onTap: _open,
+          onTap: onCardTap,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: kMessageColumnMax),
             child: Container(
@@ -142,13 +180,15 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
                         ),
                       ),
                     ),
-                  if (preview.imageToken case final token?)
+                  if (preview.imageToken != null || preview.isPlayableVideo)
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.s8),
-                      child: _LinkPreviewImage(
-                        token: token,
+                      child: _LinkPreviewMedia(
+                        preview: preview,
                         revealed: _revealed,
                         onReveal: () => setState(() => _revealed = true),
+                        playing: _playing,
+                        onPlay: _handlePlayTap,
                       ),
                     ),
                 ],
@@ -161,25 +201,49 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
   }
 }
 
-/// The preview image, honoring the same media auto-download and preview
-/// quality settings [AttachmentView] applies to an inline attachment image -
-/// text above this always shows, but a fetch this large only happens when
-/// the reader's own settings allow it.
-class _LinkPreviewImage extends ConsumerWidget {
-  const _LinkPreviewImage({
-    required this.token,
+/// The preview's media area: a static thumbnail for an ordinary link, or,
+/// for a recognized video, the same thumbnail under a play glyph (tap calls
+/// [onPlay]) that becomes an inline web player once [playing]. The
+/// auto-download reveal gate below applies to the thumbnail exactly as it
+/// always has - the click-to-play affordance is a second, separate action on
+/// top of it, never a way around it.
+class _LinkPreviewMedia extends ConsumerWidget {
+  const _LinkPreviewMedia({
+    required this.preview,
     required this.revealed,
     required this.onReveal,
+    required this.playing,
+    required this.onPlay,
   });
 
-  final String token;
+  final LinkPreview preview;
   final bool revealed;
   final VoidCallback onReveal;
+  final bool playing;
+  final VoidCallback onPlay;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (playing) {
+      final embedUrl = preview.embedUrl;
+      if (embedUrl == null) return const SizedBox.shrink();
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kInlineImageMax),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            child: buildYoutubeInlinePlayer(embedUrl),
+          ),
+        ),
+      );
+    }
+
+    final token = preview.imageToken;
     final autoDownload = ref.watch(mediaAutoDownloadControllerProvider);
-    if (autoDownload == MediaAutoDownload.manual && !revealed) {
+    if (token != null &&
+        autoDownload == MediaAutoDownload.manual &&
+        !revealed) {
       return AttachmentRevealTile(
         icon: AppIcons.image,
         line: 'Tap to load preview',
@@ -189,6 +253,33 @@ class _LinkPreviewImage extends ConsumerWidget {
       );
     }
 
+    final thumbnail = token == null
+        ? const _LinkPreviewVideoPlaceholder()
+        : _LinkPreviewThumbnail(token: token);
+    if (!preview.isPlayableVideo) return thumbnail;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onPlay,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [thumbnail, const _PlayGlyph()],
+        ),
+      ),
+    );
+  }
+}
+
+/// The decoded thumbnail image, honoring the same preview-quality setting
+/// [AttachmentView] applies to an inline attachment image.
+class _LinkPreviewThumbnail extends ConsumerWidget {
+  const _LinkPreviewThumbnail({required this.token});
+
+  final String token;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final previewScale = ref
         .watch(attachmentPreviewQualityControllerProvider)
         .decodeScale;
@@ -221,6 +312,57 @@ class _LinkPreviewImage extends ConsumerWidget {
                 const SizedBox.shrink(),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Stands in for a video preview with no thumbnail of its own (an og:video
+/// page with no og:image) so the play glyph still has something to sit on.
+class _LinkPreviewVideoPlaceholder extends StatelessWidget {
+  const _LinkPreviewVideoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: kInlineImageMax),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: tokens.stripe,
+            border: Border.all(color: tokens.borderSubtle),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The play glyph centred over a video preview's thumbnail, the same shape
+/// `attachment_reveal.dart`'s own play badge uses for a held gif's first
+/// frame.
+class _PlayGlyph extends StatelessWidget {
+  const _PlayGlyph();
+
+  /// Opaque white regardless of theme: this sits on an arbitrary decoded
+  /// thumbnail, not a themed surface.
+  static const _glyphOnDark = Color(0xFFFFFFFF);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s12),
+      decoration: const BoxDecoration(
+        color: kScrimColor,
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        AppIcons.play,
+        size: AppSizes.icon28,
+        color: _glyphOnDark,
       ),
     );
   }

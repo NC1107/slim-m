@@ -15,6 +15,7 @@ use url::Url;
 
 use super::extract::{Preview, extract};
 use super::ssrf::{GuardResolver, UrlError, validate};
+use super::video;
 
 /// Identifies the fetch as this server's link-preview bot; many sites only
 /// emit OpenGraph tags to a real-looking agent, and it is honest about who is
@@ -122,8 +123,10 @@ fn content_type(response: &reqwest::Response) -> String {
 }
 
 /// Fetches [start]'s HTML and extracts a preview, with any relative
-/// `og:image` resolved to an absolute, re-validated URL so the caller can
-/// proxy it later. `Ok(None)` when the page loaded but offered no preview.
+/// `og:image`/`og:video` resolved to an absolute, re-validated URL (an
+/// embed URL is normally already absolute, but resolved the same way for
+/// consistency) so the caller can proxy the image and [`video::detect`] can
+/// check the video. `Ok(None)` when the page loaded but offered no preview.
 pub(super) async fn fetch_preview(
     client: &Client,
     start: &str,
@@ -141,9 +144,16 @@ pub(super) async fn fetch_preview(
     };
     preview.image = preview
         .image
-        .and_then(|img| final_url.join(&img).ok())
+        .as_ref()
+        .and_then(|img| final_url.join(img).ok())
         .filter(|abs| validate(abs.as_str(), allow_private).is_ok())
         .map(|abs| abs.to_string());
+    let video_url = preview
+        .video_url
+        .as_ref()
+        .and_then(|v| final_url.join(v).ok())
+        .map(|abs| abs.to_string());
+    preview.video = video::detect(final_url.as_str(), video_url.as_deref());
     Ok(Some(preview))
 }
 

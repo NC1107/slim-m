@@ -6,6 +6,7 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -110,6 +111,97 @@ void main() {
 
       expect(find.text('Tap to load preview'), findsNothing);
       expect(find.byType(Image), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a recognized video preview shows a play control over its image',
+    (tester) async {
+      final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
+      final container = _container([
+        linkPreviewProvider(_url).overrideWith(
+          (ref) async => const LinkPreview(
+            url: _url,
+            title: 'A talk',
+            imageToken: 'tok1',
+            videoProvider: LinkPreviewVideoProvider.youtube,
+            videoId: 'dQw4w9WgXcQ',
+          ),
+        ),
+        linkPreviewImageBytesProvider(
+          'tok1',
+        ).overrideWith((ref) async => bytes),
+      ]);
+      await _pump(tester, container);
+
+      expect(find.byIcon(AppIcons.play), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+    },
+  );
+
+  testWidgets('an ordinary preview shows no play control', (tester) async {
+    final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
+    final container = _container([
+      linkPreviewProvider(_url).overrideWith(
+        (ref) async => const LinkPreview(
+          url: _url,
+          title: 'An article',
+          imageToken: 'tok1',
+        ),
+      ),
+      linkPreviewImageBytesProvider('tok1').overrideWith((ref) async => bytes),
+    ]);
+    await _pump(tester, container);
+
+    expect(find.byIcon(AppIcons.play), findsNothing);
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('a video preview with no thumbnail still offers a play control', (
+    tester,
+  ) async {
+    final container = _container([
+      linkPreviewProvider(_url).overrideWith(
+        (ref) async => const LinkPreview(
+          url: _url,
+          title: 'A talk with no thumbnail',
+          videoProvider: LinkPreviewVideoProvider.youtube,
+          videoId: 'dQw4w9WgXcQ',
+        ),
+      ),
+    ]);
+    await _pump(tester, container);
+
+    expect(find.byIcon(AppIcons.play), findsOneWidget);
+  });
+
+  testWidgets(
+    'tapping a video preview on web swaps its thumbnail for the inline player',
+    (tester) async {
+      // Off web the tap opens the browser via a platform channel this VM test lacks; see link_preview_card.dart's _handlePlayTap.
+      if (!kIsWeb) return;
+      final bytes = Uint8List.fromList(const [1, 2, 3, 4]);
+      final container = _container([
+        linkPreviewProvider(_url).overrideWith(
+          (ref) async => const LinkPreview(
+            url: _url,
+            title: 'A talk',
+            imageToken: 'tok1',
+            videoProvider: LinkPreviewVideoProvider.youtube,
+            videoId: 'dQw4w9WgXcQ',
+          ),
+        ),
+        linkPreviewImageBytesProvider(
+          'tok1',
+        ).overrideWith((ref) async => bytes),
+      ]);
+      await _pump(tester, container);
+
+      await tester.tap(find.byIcon(AppIcons.play));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(AppIcons.play), findsNothing);
+      expect(find.byType(HtmlElementView), findsOneWidget);
     },
   );
 }

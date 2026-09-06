@@ -2886,7 +2886,9 @@ paths:
         set `SLIMM_LINK_PREVIEWS` (see `/version`'s `link_previews_enabled`),
         which a client is expected to check first. Any preview image is
         returned as an opaque `image_token` redeemed at `getLinkPreviewImage`,
-        never the upstream URL.
+        never the upstream URL. If the page is recognized as a playable video
+        (YouTube today), `video_provider`/`video_id` are set so a client can
+        render a click-to-play affordance instead - see those fields.
       parameters:
         - name: url
           in: query
@@ -7294,6 +7296,21 @@ components:
             getLinkPreviewImage. Never the upstream image URL, so the image is
             always proxied through this server. Null when the page had no
             usable image.
+        video_provider:
+          type: [string, "null"]
+          description: >
+            Set together with video_id when the linked page was recognized as
+            a playable video during unfurl (from its URL or an og:video tag,
+            no extra request made). Only "youtube" exists today. When set, a
+            client should render a click-to-play affordance instead of the
+            static card, and must not contact the provider until the reader
+            taps. Null for an ordinary link.
+        video_id:
+          type: [string, "null"]
+          description: >
+            The provider's own canonical video id (paired with
+            video_provider), never a URL - a client builds its own playback
+            URL from provider and id. Null unless video_provider is set.
 
     PinnedMessage:
       description: >-

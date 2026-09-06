@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+//! The click-to-play video flag on a link preview: a page whose `og:video`
+//! names a YouTube embed is flagged playable with the video's id, and an
+//! ordinary page is not. The fake upstream here never is youtube.com - only
+//! the id-parsing in `http::link_preview::video` needs to run for this, so
+//! the og:video URL string is enough; no real network reaches Google.
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use axum::routing::get;
+use serde_json::Value;
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::link_preview::LinkPreviews;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::media::Media;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use tokio::net::TcpListener;
+use tower::ServiceExt;
+
+mod support;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-link-preview-video-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn app(store: Store) -> Router {
+    http::router(AppState {
+        store,
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: LinkPreviews::for_test(),
+    })
+}
+
+async fn register(store: &Store, username: &str) -> String {
+    let account = store
+        .create_account(username, username, "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(account.id).await.unwrap();
+    store
+        .open_session(account.id, "cli")
+        .await
+        .unwrap()
+        .access_token
+}
+
+fn req_get(uri: &str, token: &str) -> Request<Body> {
+    Request::builder()
+        .method("GET")
+        .uri(uri)
+        .header("authorization", format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap()
+}
+
+/// A minimal fake upstream serving one page at `/page`, with [body] as its
+/// full HTML.
+async fn fake_upstream(body: &'static str) -> String {
+    let router = Router::new().route(
+        "/page",
+        get(move || async move { axum::response::Html(body) }),
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    format!("http://{addr}")
+}
+
+async fn preview_json(store: Store, token: &str, upstream: &str) -> Value {
+    let response = app(store)
+        .oneshot(req_get(
+            &format!("/link-preview?url={upstream}/page"),
+            token,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+#[tokio::test]
+async fn a_page_whose_og_video_is_a_youtube_embed_is_flagged_playable() {
+    let (store, _guard) = new_store().await;
+    let token = register(&store, "video_watcher").await;
+    let upstream = fake_upstream(
+        "<meta property=\"og:title\" content=\"A talk\">\
+         <meta property=\"og:video\" content=\"https://www.youtube.com/embed/dQw4w9WgXcQ\">",
+    )
+    .await;
+
+    let json = preview_json(store, &token, &upstream).await;
+    assert_eq!(json["video_provider"], "youtube");
+    assert_eq!(json["video_id"], "dQw4w9WgXcQ");
+}
+
+#[tokio::test]
+async fn an_ordinary_page_is_not_flagged_playable() {
+    let (store, _guard) = new_store().await;
+    let token = register(&store, "reader").await;
+    let upstream = fake_upstream("<meta property=\"og:title\" content=\"Just a blog post\">").await;
+
+    let json = preview_json(store, &token, &upstream).await;
+    assert_eq!(json["video_provider"], Value::Null);
+    assert_eq!(json["video_id"], Value::Null);
+}
+
+#[tokio::test]
+async fn a_youtube_watch_url_pasted_directly_is_flagged_playable() {
+    let (store, _guard) = new_store().await;
+    let token = register(&store, "paster").await;
+    // The page itself is the fake upstream (so the fetch stays local), but its
+    // own canonical/og:video tag is a real watch URL - the same shape a real
+    // YouTube watch page serves, exercising the URL-path branch of detection
+    // rather than the og:video fallback the other tests use.
+    let upstream = fake_upstream(
+        "<meta property=\"og:title\" content=\"Rick Astley - Never Gonna Give You Up\">\
+         <meta property=\"og:video\" content=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">",
+    )
+    .await;
+
+    let json = preview_json(store, &token, &upstream).await;
+    assert_eq!(json["video_provider"], "youtube");
+    assert_eq!(json["video_id"], "dQw4w9WgXcQ");
+}
