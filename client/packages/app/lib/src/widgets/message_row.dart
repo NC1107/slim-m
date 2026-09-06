@@ -296,6 +296,7 @@ class MessageRow extends StatelessWidget {
                                     else if (message.content.isNotEmpty)
                                       MessageBody(
                                         content: message.content,
+                                        messageId: message.id,
                                         knownUsernames: knownUsernames,
                                         knownRoleNames: knownRoleNames,
                                         customEmoji: customEmoji,

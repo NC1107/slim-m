@@ -25,6 +25,7 @@ export 'models_moderation_history.dart';
 export 'models_canvas.dart';
 export 'models_canvas_ops.dart';
 export 'models_channel.dart';
+export 'models_code_runs.dart';
 export 'models_channel_notification_override.dart';
 export 'models_message_history.dart';
 export 'models_message_ops.dart';
@@ -43,6 +44,7 @@ export 'models_version.dart';
 // Message needs these in scope here, which only `import` grants; the exports
 // above are what re-surface them to callers of this file.
 import 'models_attachments.dart';
+import 'models_code_runs.dart';
 import 'models_forwards.dart';
 import 'models_message_ops.dart';
 import 'models_polls.dart';
@@ -123,6 +125,7 @@ class Message {
     // every construction site bought no safety and broke every caller.
     this.reactions = const [],
     this.attachments = const [],
+    this.codeRuns = const [],
     this.poll,
     this.forwarded,
     this.mentionsMe = false,
@@ -189,6 +192,12 @@ class Message {
   /// referenced by it.
   final List<Attachment> attachments;
 
+  /// The shared result of each fenced code block that has been run in this
+  /// message, one entry per block that has a run. Always present: an empty
+  /// list means none. Everyone viewing the message sees the same list; a
+  /// re-run replaces its block's entry.
+  final List<CodeRun> codeRuns;
+
   /// What this message forwards, or null when it forwards nothing.
   ///
   /// [content] is the sender's own note alongside it and is often empty; the
@@ -231,6 +240,10 @@ class Message {
             : Poll.fromJson(json['poll'] as Map<String, dynamic>),
         attachments: (json['attachments'] as List<dynamic>?)
                 ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
+                .toList(growable: false) ??
+            const [],
+        codeRuns: (json['code_runs'] as List<dynamic>?)
+                ?.map((r) => CodeRun.fromJson(r as Map<String, dynamic>))
                 .toList(growable: false) ??
             const [],
         forwarded: json['forwarded'] == null

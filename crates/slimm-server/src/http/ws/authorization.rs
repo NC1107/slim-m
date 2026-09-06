@@ -68,6 +68,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
+        | Event::CodeRunChanged { .. }
         | Event::ThreadUpdated { .. }
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
@@ -199,6 +200,7 @@ pub(super) async fn authorize(
             Event::MessageEdited { message, .. } => message.channel_id,
             Event::MessageDeleted { channel_id, .. } => *channel_id,
             Event::ReactionsChanged { channel_id, .. } => *channel_id,
+            Event::CodeRunChanged { channel_id, .. } => *channel_id,
             Event::ThreadUpdated { channel_id, .. } => *channel_id,
             Event::MessagePinned { channel_id, .. } => *channel_id,
             Event::MessageUnpinned { channel_id, .. } => *channel_id,
@@ -370,6 +372,28 @@ pub(super) async fn authorize(
                     .collect(),
             }
         }
+        // No per-viewer derivation: the output is the same for everyone past the VIEW_CHANNEL gate above, so it is delivered as-is.
+        Event::CodeRunChanged {
+            channel_id,
+            message_id,
+            block_index,
+            module_id,
+            command,
+            ok,
+            output,
+            ran_by,
+            ran_at,
+        } => ServerFrame::CodeRunChanged {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            block_index,
+            module_id,
+            command,
+            ok,
+            output,
+            ran_by: ran_by.map(|u| u.to_string()),
+            ran_at,
+        },
         Event::ThreadUpdated {
             channel_id,
             parent_message_id,

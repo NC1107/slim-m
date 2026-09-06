@@ -6,11 +6,12 @@
 //! here reaches a genuine 2xx rather than a 501 or 502.
 
 use serde_json::json;
+use uuid::Uuid;
 
 use super::text;
 use crate::world::Contract;
 
-pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str) {
+pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str, channel: &str) {
     let modules = c.get("listDockModules", "/space/dock/modules", root).await;
     let id = text(&modules.as_array().expect("an array")[0], "id");
 
@@ -82,6 +83,26 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str) {
         json!({ "input": "hello" }),
     )
     .await;
+    // A shared code-block run (stored + broadcast, unlike runModuleCommand): the admin holds `run` and can view, so it is a real 200.
+    let msg = c
+        .json(
+            "sendMessage",
+            "POST",
+            &format!("/channels/{channel}/messages"),
+            root,
+            json!({ "id": Uuid::now_v7().to_string(), "content": "```js\nx\n```" }),
+        )
+        .await;
+    let msg_id = text(&msg, "id");
+    c.json(
+        "runCodeBlock",
+        "POST",
+        &format!("/messages/{msg_id}/blocks/0/run"),
+        root,
+        json!({ "module_id": id, "command": "run", "input": "x" }),
+    )
+    .await;
+
     // The admin now holds `run`, so this comes back a real pair to validate against CodeBlockRunner, not just the empty-list case.
     c.get("listCodeBlockRunners", "/modules/code-block-runners", root)
         .await;

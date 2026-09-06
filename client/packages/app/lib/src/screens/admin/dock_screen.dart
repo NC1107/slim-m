@@ -72,15 +72,20 @@ class _ModuleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     final installed = this.installed;
     return SettingsEntityRow(
-      leading: const Icon(AppIcons.dock),
+      // Accent leading when installed, so it reads as installed down the list at a glance, not only from its badge.
+      leading: Icon(
+        AppIcons.dock,
+        color: installed == null ? null : tokens.accent,
+      ),
       headline: entry.name,
       badge: installed == null
           ? null
           : AppBadge(
-              variant: AppBadgeVariant.tag,
-              label: installed.enabled ? 'Enabled' : 'Disabled',
+              variant: AppBadgeVariant.role,
+              label: installed.enabled ? 'Installed' : 'Installed · Off',
             ),
       details: [
         SettingsEntityDetail('v${entry.version}'),

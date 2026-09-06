@@ -51,6 +51,7 @@ class MessageBody extends StatelessWidget {
     super.key,
     required this.content,
     required this.knownUsernames,
+    this.messageId,
     this.knownRoleNames = const {},
     this.customEmoji = const {},
     this.dim = false,
@@ -58,6 +59,12 @@ class MessageBody extends StatelessWidget {
   });
 
   final String content;
+
+  /// The message these blocks belong to, so a fenced code block's Run result
+  /// is shared against `(messageId, block index)` and seen by everyone. Null
+  /// where there is no stable message to key against (a forwarded body,
+  /// tests), which leaves a run ephemeral and per-viewer, as it was before.
+  final String? messageId;
   final Set<String> knownUsernames;
 
   /// Lower-cased role name to render an `@[Role Name]` token as a chip.
@@ -103,6 +110,8 @@ class MessageBody extends StatelessWidget {
         )!;
 
         final widgets = <Widget>[];
+        // Counts only fenced blocks, so a block's index (the shared-run key) is stable regardless of the text around it.
+        var codeBlockIndex = 0;
         for (final block in splitMessageBlocks(content)) {
           switch (block) {
             case TextBlock(:final text):
@@ -119,7 +128,12 @@ class MessageBody extends StatelessWidget {
               }
             case CodeBlock(:final language, :final code):
               widgets.add(
-                MessageCodeBlockRunner(language: language, code: code),
+                MessageCodeBlockRunner(
+                  language: language,
+                  code: code,
+                  messageId: messageId,
+                  blockIndex: codeBlockIndex++,
+                ),
               );
           }
         }

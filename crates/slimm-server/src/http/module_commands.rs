@@ -32,6 +32,7 @@ use super::AppState;
 use super::dock::validate_module_id;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, AuthedLimited, Json, WRITE};
+use crate::ids::UserId;
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
 use crate::store::InstalledModule;
 
@@ -115,60 +116,95 @@ fn required_permission<'a>(module: &'a InstalledModule, command: &str) -> Option
         .and_then(|e| e.permission.as_deref())
 }
 
+/// A command's result: `ok` plus a single payload - the module's output when
+/// ok, or an error message when not. A refusal to even attempt the run (not
+/// installed, not enabled, no permission) is an [`ApiError`] instead; a
+/// host-level failure while running is `Ok` with `ok: false`, the same split
+/// [`run_command`]'s own doc explains.
+pub(crate) struct CommandOutcome {
+    pub(crate) ok: bool,
+    pub(crate) payload: String,
+}
+
+/// Gates and runs `command` on `module_id` for `user_id`, the one place a
+/// module is ever executed. Shared by [`run_command`] (the generic route) and
+/// the message-scoped code-block run (`super::code_runs`), so both apply the
+/// exact same install/enable/permission checks before `ModuleHost::run`.
+pub(crate) async fn execute_command(
+    state: &AppState,
+    user_id: UserId,
+    module_id: &str,
+    command: &str,
+    input: &str,
+) -> Result<CommandOutcome, ApiError> {
+    validate_module_id(module_id)?;
+    validate_command_name(command)?;
+
+    let module = state
+        .store
+        .installed_module(module_id)
+        .await?
+        .ok_or(ApiError::NotFound("module not installed"))?;
+    if !module.enabled {
+        return Err(ApiError::Conflict("module is not enabled"));
+    }
+    let permission = required_permission(&module, command)
+        .ok_or(ApiError::NotFound("module declares no such command"))?;
+    if !state
+        .store
+        .user_has_module_permission(user_id, module_id, permission)
+        .await?
+    {
+        return Err(ApiError::Forbidden);
+    }
+
+    let Some((sha256, wasm)) = state.store.module_artifact(module_id).await? else {
+        return Err(ApiError::Conflict(
+            "module has no stored artifact; reinstall it from the Dock",
+        ));
+    };
+    let limits = RunLimits::from(&module.runtime_limits);
+    let request_json = serde_json::to_vec(&ModuleWireRequest { command, input })
+        .map_err(|_| ApiError::Internal)?;
+
+    let outcome = match ModuleHost::run(wasm, sha256, limits, request_json).await {
+        Ok(bytes) => match serde_json::from_slice::<ModuleWireResponse>(&bytes) {
+            Ok(wire) if wire.ok && wire.output.is_some() => CommandOutcome {
+                ok: true,
+                payload: wire.output.unwrap_or_default(),
+            },
+            Ok(wire) if !wire.ok && wire.error.is_some() => CommandOutcome {
+                ok: false,
+                payload: wire.error.unwrap_or_default(),
+            },
+            _ => CommandOutcome {
+                ok: false,
+                payload: "module returned a malformed response".to_string(),
+            },
+        },
+        Err(err) => CommandOutcome {
+            ok: false,
+            payload: describe(&err),
+        },
+    };
+    Ok(outcome)
+}
+
 async fn run_command(
     AuthedLimited(ctx): AuthedLimited<WRITE>,
     State(state): State<AppState>,
     Path((module_id, command)): Path<(String, String)>,
     Json(req): Json<RunCommandRequest>,
 ) -> Result<Json<RunCommandResponse>, ApiError> {
-    validate_module_id(&module_id)?;
-    validate_command_name(&command)?;
-
-    let module = state
-        .store
-        .installed_module(&module_id)
-        .await?
-        .ok_or(ApiError::NotFound("module not installed"))?;
-    if !module.enabled {
-        return Err(ApiError::Conflict("module is not enabled"));
-    }
-    let permission = required_permission(&module, &command)
-        .ok_or(ApiError::NotFound("module declares no such command"))?;
-    if !state
-        .store
-        .user_has_module_permission(ctx.user_id, &module_id, permission)
-        .await?
-    {
-        return Err(ApiError::Forbidden);
-    }
-
-    let Some((sha256, wasm)) = state.store.module_artifact(&module_id).await? else {
-        return Err(ApiError::Conflict(
-            "module has no stored artifact; reinstall it from the Dock",
-        ));
-    };
-    let limits = RunLimits::from(&module.runtime_limits);
-    let request_json = serde_json::to_vec(&ModuleWireRequest {
-        command: &command,
-        input: &req.input,
-    })
-    .map_err(|_| ApiError::Internal)?;
-
-    let response = match ModuleHost::run(wasm, sha256, limits, request_json).await {
-        Ok(bytes) => match serde_json::from_slice::<ModuleWireResponse>(&bytes) {
-            Ok(wire) if wire.ok && wire.output.is_some() => RunCommandResponse {
-                ok: true,
-                output: wire.output,
-                error: None,
-            },
-            Ok(wire) if !wire.ok && wire.error.is_some() => RunCommandResponse {
-                ok: false,
-                output: None,
-                error: wire.error,
-            },
-            _ => RunCommandResponse::failure("module returned a malformed response"),
-        },
-        Err(err) => RunCommandResponse::failure(describe(&err)),
+    let outcome = execute_command(&state, ctx.user_id, &module_id, &command, &req.input).await?;
+    let response = if outcome.ok {
+        RunCommandResponse {
+            ok: true,
+            output: Some(outcome.payload),
+            error: None,
+        }
+    } else {
+        RunCommandResponse::failure(outcome.payload)
     };
     Ok(Json(response))
 }

@@ -106,6 +106,23 @@ pub enum Event {
         message_id: MessageId,
         reactors: Vec<(String, Vec<(UserId, i64)>)>,
     },
+    /// A fenced code block was run and its shared output changed. Carries the
+    /// whole current result (the [`Event::ThreadUpdated`] shape), overwriting
+    /// the one `(message_id, block_index)` row everywhere. Nothing per-viewer,
+    /// unlike [`Event::ReactionsChanged`]: the output is the same for everyone
+    /// with VIEW_CHANNEL, so it is delivered as-is. No seq, eventually
+    /// consistent; a reconnect refetches via `message_enrich::with_reactions`.
+    CodeRunChanged {
+        channel_id: ChannelId,
+        message_id: MessageId,
+        block_index: i64,
+        module_id: String,
+        command: String,
+        ok: bool,
+        output: String,
+        ran_by: Option<UserId>,
+        ran_at: i64,
+    },
     /// A thread's reply summary changed: it was just opened, or gained a
     /// reply. Carries the current `reply_count`/`last_reply_at` rather than a
     /// delta, the "whole current answer" shape [`Event::PollVoted`] already

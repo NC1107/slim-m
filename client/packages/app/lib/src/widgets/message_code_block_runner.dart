@@ -6,14 +6,15 @@
 /// The affordance itself is driven entirely by [codeBlockRunnerProvider] and
 /// [matchCodeBlockRunner]: this file has no notion of what running code
 /// means, only of "match this block's own language tag to a discovered
-/// runner, then POST its text to whatever (module_id, command) that runner
-/// named" - see docs/decisions/0021-modules-and-the-dock.md's
-/// module-agnostic principle. No Run affordance shows at all when no runner
-/// matches this block's language.
+/// runner, then run whatever (module_id, command) that runner named" - see
+/// docs/decisions/0021-modules-and-the-dock.md's module-agnostic principle.
 ///
-/// The output is ephemeral and per-viewer: it lives only in this widget's own
-/// state, is never persisted or broadcast, and a second run replaces it
-/// rather than appending to it.
+/// Output is shared when the block has a [messageId]: Run posts to
+/// `runCodeBlock`, which stores the result against `(messageId, blockIndex)`
+/// and broadcasts it, so everyone viewing the message sees the latest run
+/// inline (read here from [messageExtrasProvider]) without rerunning it - a
+/// long job runs once for all. Without a [messageId] (a forwarded body, a
+/// test) it falls back to the old per-viewer ephemeral run.
 library;
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/code_block_runner.dart';
+import '../providers/message_extras.dart';
 import '../providers/providers.dart';
 import 'message_code_lexer.dart';
 import 'module_command_output.dart';
@@ -32,10 +34,17 @@ class MessageCodeBlockRunner extends ConsumerStatefulWidget {
     super.key,
     required this.language,
     required this.code,
+    this.messageId,
+    this.blockIndex = 0,
   });
 
   final String? language;
   final String code;
+
+  /// The message this block is in, so its Run result is shared. Null leaves
+  /// the run ephemeral and per-viewer - see the file doc comment.
+  final String? messageId;
+  final int blockIndex;
 
   @override
   ConsumerState<MessageCodeBlockRunner> createState() =>
@@ -45,38 +54,72 @@ class MessageCodeBlockRunner extends ConsumerStatefulWidget {
 class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
     with GuardedActionState<MessageCodeBlockRunner> {
   bool _running = false;
-  api.RunModuleCommandResult? _result;
+
+  /// Only used for the ephemeral (no [messageId]) path; a shared run is read
+  /// from [messageExtrasProvider] instead of held here.
+  api.RunModuleCommandResult? _ephemeralResult;
+
+  bool get _shared => widget.messageId != null;
 
   Future<void> _run(api.CodeBlockRunner runner) async {
     setState(() {
       _running = true;
-      _result = null;
+      if (!_shared) _ephemeralResult = null;
     });
     api.RunModuleCommandResult? result;
     final ok = await guard(
       whatFailed: 'run this code block',
       action: () async {
-        result = await ref
-            .read(apiProvider)
-            .runModuleCommand(
-              moduleId: runner.moduleId,
-              command: runner.command,
-              input: widget.code,
-            );
+        if (_shared) {
+          await ref
+              .read(apiProvider)
+              .runCodeBlock(
+                messageId: widget.messageId!,
+                blockIndex: widget.blockIndex,
+                moduleId: runner.moduleId,
+                command: runner.command,
+                input: widget.code,
+              );
+        } else {
+          result = await ref
+              .read(apiProvider)
+              .runModuleCommand(
+                moduleId: runner.moduleId,
+                command: runner.command,
+                input: widget.code,
+              );
+        }
       },
     );
     if (!mounted) return;
     setState(() {
       _running = false;
-      if (ok) _result = result;
+      if (ok && !_shared) _ephemeralResult = result;
     });
+  }
+
+  api.CodeRun? _sharedRun() {
+    final messageId = widget.messageId;
+    if (messageId == null) return null;
+    final runs =
+        ref.watch(
+          messageExtrasProvider.select((m) => m[messageId]?.codeRuns),
+        ) ??
+        const <api.CodeRun>[];
+    for (final run in runs) {
+      if (run.blockIndex == widget.blockIndex) return run;
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     final runners = ref.watch(codeBlockRunnerProvider).valueOrNull ?? const [];
     final runner = matchCodeBlockRunner(runners, widget.language);
-    final result = _result;
+    final sharedRun = _shared ? _sharedRun() : null;
+    final result = _shared
+        ? (sharedRun == null ? null : _asResult(sharedRun))
+        : _ephemeralResult;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -93,6 +136,7 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         ],
         if (result != null) ...[
           const SizedBox(height: AppSpacing.s4),
+          if (sharedRun != null) const _SharedRunLabel(),
           ModuleCommandOutput(
             result: result,
             moduleId: runner?.moduleId,
@@ -100,6 +144,36 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
           ),
         ],
       ],
+    );
+  }
+
+  /// A [CodeRun]'s single `output` is the module's output when it succeeded,
+  /// or its error otherwise - the same split [ModuleCommandOutput] renders.
+  static api.RunModuleCommandResult _asResult(api.CodeRun run) =>
+      api.RunModuleCommandResult(
+        ok: run.ok,
+        output: run.ok ? run.output : null,
+        error: run.ok ? null : run.output,
+      );
+}
+
+/// A muted line above a shared result, so a viewer who did not run it sees
+/// that this output is shared rather than their own private run.
+class _SharedRunLabel extends StatelessWidget {
+  const _SharedRunLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+      child: Text(
+        'Shared result',
+        style: AppText.micro.copyWith(
+          fontFamily: AppFonts.mono,
+          color: tokens.textSecondary,
+        ),
+      ),
     );
   }
 }

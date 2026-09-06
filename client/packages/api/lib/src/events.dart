@@ -61,6 +61,16 @@ sealed class ServerEvent {
               .map((r) => ReactionTally.fromJson(r as Map<String, dynamic>))
               .toList(growable: false),
         ),
+      // The frame's fields are a CodeRun plus the channel/message it belongs to.
+      'code_run.changed'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String &&
+              decoded['block_index'] is int =>
+        CodeRunChanged(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+          run: CodeRun.fromJson(decoded),
+        ),
       'thread.updated'
           when decoded['channel_id'] is String &&
               decoded['parent_message_id'] is String &&

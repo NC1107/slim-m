@@ -64,6 +64,7 @@ class MessageExtras {
   const MessageExtras({
     this.reactions = const [],
     this.attachments = const [],
+    this.codeRuns = const [],
     this.poll,
     this.threadChannelId,
     this.threadReplyCount,
@@ -73,6 +74,12 @@ class MessageExtras {
 
   final List<api.ReactionSummary> reactions;
   final List<api.Attachment> attachments;
+
+  /// The shared result of each fenced code block run in this message, one
+  /// entry per block, ordered by block index. Follows [reactions]' merge
+  /// rule: a REST fetch replaces the list, a bare live frame cannot clobber
+  /// it, and a `code_run.changed` broadcast replaces the one block's entry.
+  final List<api.CodeRun> codeRuns;
   final api.Poll? poll;
 
   /// The thread opened from this message, or null if none is known yet -
@@ -91,10 +98,12 @@ class MessageExtras {
   MessageExtras copyWith({
     List<api.ReactionSummary>? reactions,
     List<api.Attachment>? attachments,
+    List<api.CodeRun>? codeRuns,
     api.Poll? poll,
   }) => MessageExtras(
     reactions: reactions ?? this.reactions,
     attachments: attachments ?? this.attachments,
+    codeRuns: codeRuns ?? this.codeRuns,
     poll: poll ?? this.poll,
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
@@ -125,6 +134,8 @@ class MessageExtrasController
         applyMessage(message);
       case api.ReactionsChanged(:final messageId, :final reactions):
         _applyReactionsChanged(messageId, reactions);
+      case api.CodeRunChanged(:final messageId, :final run):
+        _applyCodeRunChanged(messageId, run);
       case api.PollVoted(:final messageId, :final options):
         _applyPollTally(messageId, options);
       case api.ThreadUpdated(
@@ -201,6 +212,10 @@ class MessageExtrasController
     attachments: message.attachments.isNotEmpty
         ? message.attachments
         : existing?.attachments ?? const [],
+    // Same rule as reactions: a REST fetch replaces; a bare live frame (no code_runs) cannot clobber a result already held.
+    codeRuns: authoritative || message.codeRuns.isNotEmpty
+        ? message.codeRuns
+        : existing?.codeRuns ?? const [],
     poll: message.poll ?? existing?.poll,
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
@@ -230,6 +245,19 @@ class MessageExtrasController
     _set(messageId, extrasFor(messageId).copyWith(reactions: next));
   }
 
+  /// Replaces the one block's shared result from a broadcast, so everyone
+  /// viewing sees a run someone else triggered without rerunning it. Keyed by
+  /// block index; a re-run of the same block overwrites its entry.
+  void _applyCodeRunChanged(String messageId, api.CodeRun run) {
+    final existing = extrasFor(messageId).codeRuns;
+    final next = [
+      for (final r in existing)
+        if (r.blockIndex != run.blockIndex) r,
+      run,
+    ]..sort((a, b) => a.blockIndex.compareTo(b.blockIndex));
+    _set(messageId, extrasFor(messageId).copyWith(codeRuns: next));
+  }
+
   /// A thread just opened, or gained a reply: what makes the "N replies"
   /// affordance appear, or its count move, on a screen nobody reloaded.
   /// Never reduces `replyCount`: the server publishes this only for a fresh
@@ -248,6 +276,7 @@ class MessageExtrasController
       MessageExtras(
         reactions: existing.reactions,
         attachments: existing.attachments,
+        codeRuns: existing.codeRuns,
         poll: existing.poll,
         threadChannelId: threadChannelId,
         threadReplyCount: replyCount,

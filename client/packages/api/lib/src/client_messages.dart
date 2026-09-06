@@ -244,6 +244,26 @@ extension SlimmApiMessages on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Runs the fenced code block at [blockIndex] in a message and shares the
+  /// result: unlike [runModuleCommand], the output is stored against the block
+  /// and broadcast, so everyone viewing the message sees it inline without
+  /// rerunning. Requires being able to view the message's channel and holding
+  /// the command's declared permission.
+  Future<RunModuleCommandResult> runCodeBlock({
+    required String messageId,
+    required int blockIndex,
+    required String moduleId,
+    required String command,
+    required String input,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/messages/$messageId/blocks/$blockIndex/run',
+      body: {'module_id': moduleId, 'command': command, 'input': input},
+    );
+    return RunModuleCommandResult.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Pins a message. Idempotent: pinning an already-pinned message leaves the
   /// original pin's timestamp and pinner in place. Requires MANAGE_MESSAGES,
   /// evaluated in this channel specifically.

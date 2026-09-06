@@ -3708,6 +3708,60 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /messages/{messageId}/blocks/{blockIndex}/run:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        description: The message's UUID.
+        schema:
+          type: string
+          format: uuid
+      - name: blockIndex
+        in: path
+        required: true
+        description: The index of the fenced code block within the message.
+        schema:
+          type: integer
+          format: int64
+    post:
+      operationId: runCodeBlock
+      tags: [messages]
+      summary: Run a fenced code block in a message and share the result.
+      description: >
+        Like runModuleCommand, but the result is stored against this
+        (message, block) and broadcast, so everyone viewing the message sees
+        the latest run inline without rerunning it. Requires being able to
+        view the message's channel (a hidden message answers as a missing one)
+        as well as the permission the named command declares. A re-run
+        replaces the block's stored result. A resource-limit or module error
+        still answers 200 with `ok: false`, the same as runModuleCommand.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunCodeBlockRequest"
+      responses:
+        "200":
+          description: The block ran; see `ok` for whether it succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunModuleCommandResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /messages/{messageId}/polls/vote:
     parameters:
       - name: messageId
@@ -6606,6 +6660,19 @@ components:
           description: >
             The module ABI's own request `input` field, passed through
             verbatim. What it means is entirely up to the module.
+    RunCodeBlockRequest:
+      type: object
+      required: [module_id, command, input]
+      properties:
+        module_id:
+          type: string
+          description: The installed module whose command runs the block.
+        command:
+          type: string
+          description: The `command` extension point's own name to run.
+        input:
+          type: string
+          description: The block's own text, passed through as the ABI `input`.
     RunModuleCommandResponse:
       type: object
       required: [ok]
@@ -7860,6 +7927,16 @@ components:
             only referenced by it.
           items:
             $ref: "#/components/schemas/Attachment"
+        code_runs:
+          type: array
+          description: >-
+            The shared result of each fenced code block that has been run in
+            this message, one entry per block that has a run. Always present,
+            empty means none - same convention as `reactions`. A re-run
+            replaces its block's entry; everyone viewing the message sees the
+            latest.
+          items:
+            $ref: "#/components/schemas/CodeRun"
         mentions_me:
           type: boolean
           description: >-
@@ -8763,6 +8840,7 @@ components:
         - $ref: "#/components/schemas/MessageEdited"
         - $ref: "#/components/schemas/MessageDeleted"
         - $ref: "#/components/schemas/ReactionsChanged"
+        - $ref: "#/components/schemas/CodeRunChanged"
         - $ref: "#/components/schemas/ThreadUpdated"
         - $ref: "#/components/schemas/MessagePinned"
         - $ref: "#/components/schemas/MessageUnpinned"
@@ -9169,6 +9247,45 @@ components:
           items:
             $ref: "#/components/schemas/ReactionCount"
 
+    CodeRunChanged:
+      type: object
+      required:
+        [type, channel_id, message_id, block_index, module_id, command, ok, output, ran_at]
+      description: >
+        A fenced code block in a message was run and its shared result
+        changed. Carries the whole current result, replacing whatever the
+        client held for that block rather than describing a delta. Not
+        per-viewer: the output is the same for everyone who can see the
+        message, so it is delivered as-is.
+      properties:
+        type:
+          type: string
+          enum: [code_run.changed]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        block_index:
+          type: integer
+          format: int64
+        module_id:
+          type: string
+        command:
+          type: string
+        ok:
+          type: boolean
+        output:
+          type: string
+        ran_by:
+          type: string
+          format: uuid
+          nullable: true
+        ran_at:
+          type: integer
+          format: int64
+
     ReactionCount:
       type: object
       required: [emoji, count]
@@ -9177,6 +9294,36 @@ components:
         emoji:
           type: string
         count:
+          type: integer
+          format: int64
+
+    CodeRun:
+      type: object
+      required: [block_index, module_id, command, ok, output, ran_at]
+      description: >-
+        One fenced code block's shared run result. `output` holds the module's
+        output when `ok`, or its error message when not - the same `{ok,
+        output}` / `{ok, error}` outcome the run route answers with, flattened
+        to one field since a stored run is always one or the other.
+      properties:
+        block_index:
+          type: integer
+          format: int64
+          description: The index of the fenced code block within the message.
+        module_id:
+          type: string
+        command:
+          type: string
+        ok:
+          type: boolean
+        output:
+          type: string
+        ran_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: Who ran it, or null once their account is anonymized.
+        ran_at:
           type: integer
           format: int64
 

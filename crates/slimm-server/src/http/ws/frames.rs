@@ -45,6 +45,18 @@ pub(super) enum ServerFrame {
         message_id: String,
         reactions: Vec<ReactionCountDto>,
     },
+    #[serde(rename = "code_run.changed")]
+    CodeRunChanged {
+        channel_id: String,
+        message_id: String,
+        block_index: i64,
+        module_id: String,
+        command: String,
+        ok: bool,
+        output: String,
+        ran_by: Option<String>,
+        ran_at: i64,
+    },
     #[serde(rename = "thread.updated")]
     ThreadUpdated {
         channel_id: String,
