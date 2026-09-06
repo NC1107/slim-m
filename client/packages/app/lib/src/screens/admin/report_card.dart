@@ -241,12 +241,17 @@ class _ReportCardState extends ConsumerState<ReportCard>
               ),
             ),
             const SizedBox(width: AppSpacing.s8),
-            Text(
-              formatDateTime(
-                report.createdAt,
-                use24Hour: watchUse24Hour(ref, context),
+            // Flexible so this can ellipsize rather than overflow at a large text scale.
+            Flexible(
+              child: Text(
+                formatDateTime(
+                  report.createdAt,
+                  use24Hour: watchUse24Hour(ref, context),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
             ),
           ],
         ),

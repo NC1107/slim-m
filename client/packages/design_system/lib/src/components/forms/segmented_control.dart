@@ -97,7 +97,8 @@ class AppSegmentedControl extends StatelessWidget {
           children: [
             for (var i = 0; i < options.length; i++) ...[
               if (i > 0) const SizedBox(width: AppSpacing.s4),
-              _inlineSegment(context, tokens, i),
+              // Flexible so a segment can shrink and wrap its label rather than overflow the row.
+              Flexible(child: _inlineSegment(context, tokens, i)),
             ],
           ],
         ),
@@ -118,7 +119,8 @@ class AppSegmentedControl extends StatelessWidget {
         return AnimatedContainer(
           duration:
               AppMotion.reduced(context, const Duration(milliseconds: 150)),
-          height: AppSizes.controlSm,
+          // minHeight, not height: a wrapped label needs more than one line at a large text scale.
+          constraints: const BoxConstraints(minHeight: AppSizes.controlSm),
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
           decoration: BoxDecoration(

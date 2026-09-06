@@ -65,8 +65,9 @@ class RailHeader extends ConsumerWidget {
         bottom: false,
         // Right is only the physical edge when nothing sits beside the rail.
         right: !_railHasNeighbour(context),
-        child: SizedBox(
-          height: 52,
+        // minHeight, not height: the two text lines grow under a larger OS text scale.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 52),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
             child: Row(
