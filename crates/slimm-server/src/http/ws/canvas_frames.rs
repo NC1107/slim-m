@@ -38,10 +38,11 @@ pub(super) fn channel_id(event: &Event) -> Option<ChannelId> {
 /// common case) would otherwise pay for that on every call.
 pub(super) fn to_frame(event: Event) -> Result<ServerFrame, Box<Event>> {
     Ok(match event {
+        // Cloned only here, past every filter in `authorize`; see `Event::MessageCreated`'s own note.
         Event::CanvasObjectPlaced { channel_id, object } => ServerFrame::CanvasObjectPlaced {
             channel_id: channel_id.to_string(),
             seq: object.seq.0,
-            object: CanvasObjectDto::from(object),
+            object: CanvasObjectDto::from((*object).clone()),
         },
         Event::CanvasObjectsRemoved {
             channel_id,

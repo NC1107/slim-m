@@ -12,6 +12,8 @@
 //! who voted for what; only the voter's own request response (and their own
 //! later read) tells them their own choice.
 
+use std::sync::Arc;
+
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
@@ -216,9 +218,9 @@ async fn create(
         .await?;
 
         state.hub.publish(Event::MessageCreated {
-            message: sent.message.clone(),
+            message: Arc::new(sent.message.clone()),
             // A poll message carries no attachment, and forwards nothing.
-            attachments: Vec::new(),
+            attachments: Arc::new(Vec::new()),
             forwarded: None,
         });
         state.push.notify_message(

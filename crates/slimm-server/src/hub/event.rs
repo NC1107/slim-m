@@ -6,6 +6,8 @@
 //! spec for what a live frame may say, which is why none of them were
 //! shortened to make room instead.
 
+use std::sync::Arc;
+
 use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
@@ -23,15 +25,17 @@ pub enum Event {
     /// Attachments ride along because a brand new message can already have
     /// them and the row cannot express them. The sender reads them once for
     /// its own response, so this costs no extra query; leaving them out sent
-    /// an image that only appeared on the next sync.
+    /// an image that only appeared on the next sync. `message`, `attachments`
+    /// and `forwarded` are `Arc`-wrapped so a `broadcast` fan-out clones a
+    /// refcount, not this whole row, for a connection that filters it out.
     MessageCreated {
-        message: Message,
-        attachments: Vec<AttachmentSummary>,
+        message: Arc<Message>,
+        attachments: Arc<Vec<AttachmentSummary>>,
         /// Present when the message forwards something. Rides along for the
         /// same reason `attachments` does: the row cannot express it, and a
         /// forward that arrived live without it rendered as a bare note
         /// until the next sync filled the origin in.
-        forwarded: Option<ForwardSummary>,
+        forwarded: Option<Arc<ForwardSummary>>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,
     /// a different sequence from the message's own `seq`, which an edit does
@@ -211,15 +215,18 @@ pub enum Event {
     /// [`Event::MessageCreated`] carries its message: a fresh channel has no
     /// prior state to reconcile against, so whoever can view it right now is
     /// exactly who should be told, the same channel-scoped check every
-    /// message event already uses.
-    ChannelCreated(Channel),
+    /// message event already uses. `Arc`-wrapped for the same reason.
+    ChannelCreated(Arc<Channel>),
     /// A channel was renamed, had its topic replaced, or moved in the
     /// deployment's order. Never changes what a channel's permission model
     /// allows, so the ordinary current-state channel-scoped check is exact
     /// here too: nobody's view of the channel changes, only its name, topic
     /// or position. `PUT /channels/order` publishes one of these per channel
     /// whose position actually moved, reusing this rather than a new variant.
-    ChannelUpdated(Channel),
+    /// `Arc`-wrapped like [`Event::ChannelCreated`]: the two are matched
+    /// together everywhere in `http::ws::authorization`, so only one of them
+    /// staying a plain `Channel` would reintroduce the deep clone anyway.
+    ChannelUpdated(Arc<Channel>),
     /// A channel was soft-deleted. Carries only the id: there is nothing left
     /// to show once it is gone. Gated specially in `http::ws::authorize`
     /// rather than through the ordinary channel-scoped check, which would
@@ -317,9 +324,10 @@ pub enum Event {
     ///
     /// Published only for a fresh write. An idempotent replay answers from the
     /// stored row and publishes nothing, so a retry cannot fan a duplicate out.
+    /// `object` is `Arc`-wrapped for the same reason [`Event::MessageCreated`]'s are.
     CanvasObjectPlaced {
         channel_id: ChannelId,
-        object: CanvasObject,
+        object: Arc<CanvasObject>,
     },
     /// Objects were removed from a channel's canvas.
     ///

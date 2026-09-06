@@ -40,6 +40,8 @@
 //! this - `can_publish_data` is derived from `USE_CANVAS`, which the mask
 //! spares.
 
+use std::sync::Arc;
+
 use axum::extract::{Path, State};
 use serde::Deserialize;
 use serde_json::Value;
@@ -192,7 +194,7 @@ pub(super) async fn place(
     if placement.fresh {
         state.hub.publish(Event::CanvasObjectPlaced {
             channel_id,
-            object: placement.object.clone(),
+            object: Arc::new(placement.object.clone()),
         });
     }
 

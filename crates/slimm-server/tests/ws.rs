@@ -5,6 +5,7 @@
 //! it. Session-lifecycle closes (logout, device removal, account deletion, a
 //! bad ticket) live in `tests/ws_session_lifecycle.rs`.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Body;
@@ -291,8 +292,8 @@ async fn a_store_error_authorizing_fan_out_closes_the_connection() {
         .await
         .unwrap();
     state.hub.publish(Event::MessageCreated {
-        message: sent.message,
-        attachments: Vec::new(),
+        message: Arc::new(sent.message),
+        attachments: Arc::new(Vec::new()),
         forwarded: None,
     });
 

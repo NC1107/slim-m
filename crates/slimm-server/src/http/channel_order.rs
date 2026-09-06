@@ -8,6 +8,8 @@
 //! client posting `channel_ids` alone still reorders positions and never
 //! has any channel's `category_id` touched.
 
+use std::sync::Arc;
+
 use axum::Router;
 use axum::extract::State;
 use axum::http::request::Parts;
@@ -133,7 +135,9 @@ fn finish(
         Ok(outcome) => {
             for channel in &outcome.channels {
                 if outcome.moved.contains(&channel.id) {
-                    state.hub.publish(Event::ChannelUpdated(channel.clone()));
+                    state
+                        .hub
+                        .publish(Event::ChannelUpdated(Arc::new(channel.clone())));
                 }
             }
             Ok(Json(

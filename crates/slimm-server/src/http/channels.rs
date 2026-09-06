@@ -14,6 +14,8 @@
 //! actually protecting against; an existing channel manager is not an
 //! attacker this needs to hide anything from.
 
+use std::sync::Arc;
+
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
@@ -218,7 +220,7 @@ async fn create(
     if created.fresh {
         state
             .hub
-            .publish(Event::ChannelCreated(created.channel.clone()));
+            .publish(Event::ChannelCreated(Arc::new(created.channel.clone())));
     }
     Ok(Json(created.channel.into()))
 }
@@ -260,7 +262,9 @@ async fn update(
         .update_channel(channel_id, name, topic.as_ref().map(|t| t.as_deref()))
         .await?
         .ok_or(ApiError::NotFound("channel not found"))?;
-    state.hub.publish(Event::ChannelUpdated(channel.clone()));
+    state
+        .hub
+        .publish(Event::ChannelUpdated(Arc::new(channel.clone())));
     Ok(Json(channel.into()))
 }
 
