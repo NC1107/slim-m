@@ -8,7 +8,7 @@ use uuid::Uuid;
 use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::store::{CANVAS_OP_PAGE_BYTES, CanvasOpBody};
 
-use crate::fixtures::{new_store, new_store_and_pool, place};
+use crate::fixtures::{new_store, new_store_and_pool, place, place_many};
 
 /// A page bounded only by row count still varies three orders of magnitude
 /// in bytes, since a `place` op carries whole props at up to `MAX_PROPS_BYTES`
@@ -255,9 +255,7 @@ async fn a_clear_writes_no_target_rows_and_costs_nothing_in_the_page_budget() {
 
     // Comfortably past what CANVAS_OP_TARGET_BYTES_ESTIMATE would need to blow the budget alone.
     let touched = 15_000;
-    for _ in 0..touched {
-        place(&store, channel, author, 0).await;
-    }
+    place_many(&pool, channel, author, touched).await;
     let latest = store.latest_canvas_seq(channel).await.unwrap();
 
     let clear_outcome = store
