@@ -120,7 +120,11 @@ class _DockCommandPanelState extends ConsumerState<DockCommandPanel>
         ],
         if (result != null) ...[
           const SizedBox(height: AppSpacing.s8),
-          ModuleCommandOutput(result: result),
+          ModuleCommandOutput(
+            result: result,
+            moduleId: widget.moduleId,
+            command: widget.extensionPoint.name,
+          ),
         ],
       ],
     );

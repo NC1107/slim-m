@@ -1,22 +1,59 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// One module command's result, notebook-style: its own bordered panel,
-/// monospace, tinted for an error rather than only labelled. Shared by
-/// [MessageCodeBlockRunner] and the Dock's command panel so a module's
-/// output reads the same wherever it is triggered from.
+/// One module command's result. When the module returned a scene (see
+/// `module_scene.dart`), this paints it interactively; otherwise it shows the
+/// output notebook-style: its own bordered panel, monospace, tinted for an
+/// error rather than only labelled. Shared by [MessageCodeBlockRunner] and the
+/// Dock's command panel so a module's output reads the same wherever it is
+/// triggered from.
+///
+/// [moduleId] and [command] are what a scene needs to run its own follow-up
+/// actions (step, tap, ...) back against the same module; without them a scene
+/// still renders, just as a static first frame with no controls.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-class ModuleCommandOutput extends StatelessWidget {
-  const ModuleCommandOutput({super.key, required this.result});
+import '../providers/providers.dart';
+import 'module_scene.dart';
+import 'module_scene_view.dart';
+
+class ModuleCommandOutput extends ConsumerWidget {
+  const ModuleCommandOutput({
+    super.key,
+    required this.result,
+    this.moduleId,
+    this.command,
+  });
 
   final api.RunModuleCommandResult result;
+  final String? moduleId;
+  final String? command;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final output = result.output;
+    final moduleId = this.moduleId;
+    final command = this.command;
+    if (result.ok && output != null && moduleId != null && command != null) {
+      final scene = parseModuleScene(output);
+      if (scene != null) {
+        return ModuleSceneView(
+          initial: scene,
+          runCommand: (input) => ref
+              .read(apiProvider)
+              .runModuleCommand(
+                moduleId: moduleId,
+                command: command,
+                input: input,
+              ),
+        );
+      }
+    }
+
     final isError = !result.ok;
     final text = (isError ? result.error : result.output) ?? '';
     return Container(

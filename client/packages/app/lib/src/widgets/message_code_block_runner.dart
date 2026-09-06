@@ -93,7 +93,11 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         ],
         if (result != null) ...[
           const SizedBox(height: AppSpacing.s4),
-          ModuleCommandOutput(result: result),
+          ModuleCommandOutput(
+            result: result,
+            moduleId: runner?.moduleId,
+            command: runner?.command,
+          ),
         ],
       ],
     );
