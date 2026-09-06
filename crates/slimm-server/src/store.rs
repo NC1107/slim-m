@@ -51,6 +51,8 @@ mod messages_bulk;
 mod messages_bulk_window;
 mod moderation_audit;
 mod moderation_history;
+mod module_permissions;
+mod modules;
 mod notifications;
 mod permissions;
 mod permissions_batch;
@@ -108,6 +110,10 @@ pub use message_search::{MessageSearchFilters, SearchError};
 pub use messages::{Edited, MessageDeletion, NewMessage, SendError, Sent};
 pub use messages_bulk::{BulkDeleteError, BulkDeletion, DeletedMessage};
 pub use moderation_history::{AuditLogEntry, HistoryCursor, ModerationHistoryItem};
+pub use module_permissions::{
+    GrantModulePermissionError, GrantedModulePermission, ModulePermission,
+};
+pub use modules::{InstallModuleRequest, InstalledModule, ModulePermissionSpec};
 pub use permissions::ChannelOverwrite;
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{

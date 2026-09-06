@@ -136,6 +136,15 @@ pub struct Config {
     /// only the second is a bypass, which is why the default is zero.
     #[serde(default)]
     pub trust_proxy_hops: usize,
+
+    /// The `owner/repo` the Dock's marketplace browses and installs from
+    /// (see docs/decisions/0021-modules-and-the-dock.md). The Dock always
+    /// reaches it at `https://raw.githubusercontent.com/<repo>/main/`; only
+    /// the repo slug is configurable, never the host, so the marketplace
+    /// fetch stays inside the same fixed allowlist regardless of what an
+    /// operator sets here.
+    #[serde(default = "default_addons_repo")]
+    pub addons_repo: String,
 }
 
 fn default_port() -> u16 {
@@ -164,6 +173,10 @@ fn default_attachment_max_bytes() -> u64 {
     1024 * 1024 * 1024
 }
 
+fn default_addons_repo() -> String {
+    "NC1107/slim-addons".to_owned()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -183,6 +196,7 @@ impl Default for Config {
             link_previews: false,
             cors_allowed_origins: None,
             trust_proxy_hops: 0,
+            addons_repo: default_addons_repo(),
         }
     }
 }
@@ -234,6 +248,7 @@ mod tests {
             from_empty_env.cors_allowed_origins,
             defaulted.cors_allowed_origins
         );
+        assert_eq!(from_empty_env.addons_repo, defaulted.addons_repo);
     }
 
     /// An unset origin list and an explicitly empty one must be the same

@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", name AS \"name!\", version AS \"version!\",\n                      artifact_sha256 AS \"artifact_sha256!\",\n                      approved_capabilities AS \"approved_capabilities!\",\n                      enabled AS \"enabled!: bool\", installed_at AS \"installed_at!\"\n               FROM installed_modules WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "version!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "artifact_sha256!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "approved_capabilities!",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "enabled!: bool",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "installed_at!",
+        "ordinal": 6,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "376b11ca18e8d8d979ffa326a1f6295adfb4bc1c04a56db2450c819913829cc1"
+}

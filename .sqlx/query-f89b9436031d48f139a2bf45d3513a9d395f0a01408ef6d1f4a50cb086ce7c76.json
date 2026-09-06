@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO module_permissions (module_id, perm_key, name, description)\n                 VALUES (?, ?, ?, ?)\n                 ON CONFLICT(module_id, perm_key) DO UPDATE SET\n                     name = excluded.name, description = excluded.description",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "f89b9436031d48f139a2bf45d3513a9d395f0a01408ef6d1f4a50cb086ce7c76"
+}

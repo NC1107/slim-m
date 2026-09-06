@@ -41,6 +41,7 @@ mod channel_permissions;
 mod channel_slow_mode;
 mod channels;
 mod dms;
+pub mod dock;
 mod emoji;
 mod error;
 mod escalation;
@@ -59,6 +60,7 @@ mod messages;
 mod messages_bulk;
 mod messages_bulk_window;
 mod metrics;
+mod module_permissions;
 mod overwrites;
 mod pins;
 mod polls;
@@ -130,6 +132,7 @@ pub struct AppState {
     pub media: Media,
     pub gifs: gifs::GifSearch,
     pub link_previews: link_preview::LinkPreviews,
+    pub dock: dock::Dock,
 }
 
 /// Builds the router over the shared application state.
@@ -146,6 +149,7 @@ pub fn router(state: AppState) -> Router {
         .merge(channels::routes())
         .merge(channel_order::routes())
         .merge(channel_permissions::routes())
+        .merge(dock::routes())
         .merge(emoji::routes())
         .merge(invites::routes())
         .merge(members::routes())
@@ -154,6 +158,7 @@ pub fn router(state: AppState) -> Router {
         .merge(messages_bulk::router())
         .merge(messages_bulk_window::router())
         .merge(metrics::routes())
+        .merge(module_permissions::routes())
         .merge(overwrites::routes())
         .merge(presence::routes())
         .merge(reactions::routes())

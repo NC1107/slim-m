@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT module_id AS \"module_id!\", perm_key AS \"perm_key!\"\n               FROM role_module_permissions WHERE role_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "module_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "perm_key!",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "924df7ad9190fe06e342393a5629fccdfec4427930c4a98ba1fca178bea2e7fc"
+}

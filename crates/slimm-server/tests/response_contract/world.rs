@@ -63,6 +63,7 @@ impl Contract {
             .expect("crates/slimm-server sits two directories below the repo root");
 
         let tenor_base = spawn_fake_tenor().await;
+        let dock_base = spawn_fake_dock_registry().await;
 
         Contract {
             state: AppState {
@@ -78,6 +79,8 @@ impl Contract {
                 // Also configured, against a fake local provider, for the same reason.
                 gifs: GifSearch::for_test("tenor", &tenor_base, "test-key"),
                 link_previews: slimm_server::http::link_preview::LinkPreviews::for_test(),
+                // Also configured, against a fake local registry, for the same reason.
+                dock: slimm_server::http::dock::Dock::for_test(&dock_base),
             },
             api: Api::load(repo_root),
             covered: BTreeSet::new(),
@@ -241,6 +244,59 @@ async fn spawn_fake_tenor() -> String {
         .route("/full.gif", get(image))
         .route("/page", get(page))
         .with_state(base.clone());
+    tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+    base
+}
+
+/// A fake addons repo the Dock pass installs from, standing in for
+/// raw.githubusercontent.com; `Dock::for_test` points the host allowlist at
+/// whatever this binds to. One module, `code-exec`, with the same shape the
+/// real registry publishes (see docs/decisions/0021 and
+/// `http::dock::manifest`'s own tests).
+async fn spawn_fake_dock_registry() -> String {
+    async fn index() -> axum::Json<Value> {
+        axum::Json(json!({
+            "schema": 1,
+            "modules": [
+                {"id": "code-exec", "name": "Code Blocks", "version": "0.1.0", "summary": "runs code"}
+            ]
+        }))
+    }
+    async fn manifest() -> axum::Json<Value> {
+        axum::Json(json!({
+            "schema": 1,
+            "id": "code-exec",
+            "name": "Code Blocks",
+            "version": "0.1.0",
+            "summary": "runs code",
+            "author": "slim-m",
+            "artifact": {
+                "kind": "wasm",
+                "path": "modules/code-exec/0.1.0/module.wasm",
+                "sha256": "0".repeat(64)
+            },
+            "runtime": {
+                "backend": "wasm",
+                "limits": {"memory_mb": 64, "wall_ms": 2000, "fuel": 500000000}
+            },
+            "permissions": [
+                {"key": "run", "name": "Execute code blocks", "description": "run a snippet"}
+            ],
+            "capabilities": ["command.register", "message.post"],
+            "extension_points": [
+                {"kind": "command", "name": "run", "description": "runs it"}
+            ]
+        }))
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base = format!("http://{addr}/");
+    let router = Router::new()
+        .route("/index.json", get(index))
+        .route("/modules/code-exec/manifest.json", get(manifest));
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });

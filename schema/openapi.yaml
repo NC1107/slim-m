@@ -1816,6 +1816,110 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /roles/module-permissions:
+    get:
+      operationId: listModulePermissions
+      tags: [roles]
+      summary: >
+        List every module-scoped permission any installed module currently
+        declares. Requires MANAGE_ROLES.
+      description: >
+        The dynamic half of the permission model (docs/decisions/0021): the
+        grantable rows a role editor lists alongside core permissions,
+        namespaced by `module_id`.
+      responses:
+        "200":
+          description: The catalog of grantable module permissions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModulePermission"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /roles/{roleId}/module-permissions:
+    parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: listRoleModulePermissions
+      tags: [roles]
+      summary: List the module permissions a role currently holds. Requires MANAGE_ROLES.
+      responses:
+        "200":
+          description: The role's module-permission grants.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GrantedModulePermission"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /roles/{roleId}/module-permissions/{moduleId}/{permKey}:
+    parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: permKey
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      operationId: grantModulePermission
+      tags: [roles]
+      summary: Grant a module permission to a role. Requires MANAGE_ROLES.
+      description: >
+        Idempotent. Refused with 404 if no installed module currently
+        declares `(moduleId, permKey)`.
+      responses:
+        "204":
+          description: The role now holds the permission.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: revokeModulePermission
+      tags: [roles]
+      summary: Revoke a module permission from a role. Requires MANAGE_ROLES.
+      description: Idempotent - revoking one not held still succeeds.
+      responses:
+        "204":
+          description: The role no longer holds the permission.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /members/{userId}/roles/{roleId}:
     parameters:
       - name: userId
@@ -5016,6 +5120,201 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /space/dock/modules:
+    get:
+      operationId: listDockModules
+      tags: [space]
+      summary: Browse the module marketplace's index. Requires MANAGE_SERVER.
+      description: >
+        Fetches `index.json` from the addons repo (docs/decisions/0021) over
+        a host-allowlisted client. Nothing is installed by this call.
+      responses:
+        "200":
+          description: The marketplace listing.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DockIndexEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "502":
+          $ref: "#/components/responses/UpstreamInvalid"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /space/dock/modules/{moduleId}:
+    parameters:
+      - name: moduleId
+        in: path
+        required: true
+        description: The module's slug id from the registry's index.
+        schema:
+          type: string
+    get:
+      operationId: getDockModule
+      tags: [space]
+      summary: Read a module's full manifest before installing it. Requires MANAGE_SERVER.
+      description: >
+        Shows every permission the module will register and every capability
+        it asks for, so an admin reviews both before installing.
+      responses:
+        "200":
+          description: The module's manifest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DockManifest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "502":
+          $ref: "#/components/responses/UpstreamInvalid"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /space/dock/modules/{moduleId}/install:
+    parameters:
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: installDockModule
+      tags: [space]
+      summary: Install a module at a pinned version. Requires MANAGE_SERVER.
+      description: >
+        Re-fetches the module's manifest, refuses if its version no longer
+        matches the one requested, and records the install, its declared
+        permissions, and its approved capabilities. No runtime executes the
+        module; see docs/decisions/0021's phasing. Off (disabled) by default -
+        a separate enable call turns it on.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallDockModuleRequest"
+      responses:
+        "200":
+          description: The installed module.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstalledDockModule"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "502":
+          $ref: "#/components/responses/UpstreamInvalid"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      operationId: uninstallDockModule
+      tags: [space]
+      summary: Uninstall a module. Requires MANAGE_SERVER.
+      description: >
+        Removes the install, its registered permissions, and every role
+        grant of them - nothing dangles.
+      responses:
+        "204":
+          description: The module was uninstalled.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /space/dock/modules/{moduleId}/enable:
+    parameters:
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: enableDockModule
+      tags: [space]
+      summary: Enable an installed module. Requires MANAGE_SERVER.
+      responses:
+        "200":
+          description: The module after enabling.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstalledDockModule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /space/dock/modules/{moduleId}/disable:
+    parameters:
+      - name: moduleId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: disableDockModule
+      tags: [space]
+      summary: Disable an installed module without losing its config. Requires MANAGE_SERVER.
+      responses:
+        "200":
+          description: The module after disabling.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstalledDockModule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /space/dock/installed:
+    get:
+      operationId: listInstalledDockModules
+      tags: [space]
+      summary: List every installed module. Requires MANAGE_SERVER.
+      responses:
+        "200":
+          description: Every installed module.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InstalledDockModule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -5343,6 +5642,15 @@ components:
             $ref: "#/components/schemas/Error"
     Unavailable:
       description: The server shed the request under load; retry shortly.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UpstreamInvalid:
+      description: >
+        The Dock reached the module registry, but what it returned was
+        malformed, oversized, or otherwise not a manifest this server is
+        willing to install.
       content:
         application/json:
           schema:
@@ -6003,6 +6311,152 @@ components:
             Client-advertised: a client reads this and caps its own capture
             parameters, rather than the server inspecting published tracks.
             Settable range is 360 to 2160; the default is 2160.
+    DockIndexEntry:
+      type: object
+      required: [id, name, version, summary]
+      properties:
+        id:
+          type: string
+          description: The module's slug id, safe for a URL path segment.
+        name:
+          type: string
+        version:
+          type: string
+        summary:
+          type: string
+    DockArtifact:
+      type: object
+      required: [kind, path, sha256]
+      properties:
+        kind:
+          type: string
+        path:
+          type: string
+        sha256:
+          type: string
+          description: 64 lowercase hex characters. See docs/decisions/0021.
+    DockLimits:
+      type: object
+      properties:
+        memory_mb:
+          type: integer
+          nullable: true
+        wall_ms:
+          type: integer
+          nullable: true
+        fuel:
+          type: integer
+          nullable: true
+    DockRuntime:
+      type: object
+      required: [backend, limits]
+      properties:
+        backend:
+          type: string
+        limits:
+          $ref: "#/components/schemas/DockLimits"
+    DockPermission:
+      type: object
+      required: [key, name, description]
+      properties:
+        key:
+          type: string
+          description: Safe slug, namespaced by the module id once installed.
+        name:
+          type: string
+        description:
+          type: string
+    DockExtensionPoint:
+      type: object
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+    DockManifest:
+      type: object
+      required:
+        [
+          id,
+          name,
+          version,
+          summary,
+          artifact,
+          runtime,
+          permissions,
+          capabilities,
+          extension_points,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        summary:
+          type: string
+        author:
+          type: string
+          nullable: true
+        artifact:
+          $ref: "#/components/schemas/DockArtifact"
+        runtime:
+          $ref: "#/components/schemas/DockRuntime"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DockPermission"
+        capabilities:
+          type: array
+          items:
+            type: string
+        extension_points:
+          type: array
+          items:
+            $ref: "#/components/schemas/DockExtensionPoint"
+    InstallDockModuleRequest:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: string
+          description: >
+            The version reviewed in the Dock before installing. Refused with
+            409 if the registry's current manifest no longer matches it.
+    InstalledDockModule:
+      type: object
+      required:
+        [
+          id,
+          name,
+          version,
+          artifact_sha256,
+          approved_capabilities,
+          enabled,
+          installed_at,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        artifact_sha256:
+          type: string
+        approved_capabilities:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        installed_at:
+          type: integer
     PresenceStatus:
       type: object
       required: [user_id, status]
@@ -6638,6 +7092,33 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+
+    ModulePermission:
+      type: object
+      required: [module_id, module_name, perm_key, name, description]
+      description: >
+        A grantable module-scoped permission, registered by the Dock's
+        install handler. See docs/decisions/0021-modules-and-the-dock.md.
+      properties:
+        module_id:
+          type: string
+        module_name:
+          type: string
+        perm_key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+
+    GrantedModulePermission:
+      type: object
+      required: [module_id, perm_key]
+      properties:
+        module_id:
+          type: string
+        perm_key:
+          type: string
 
     CreateRoleRequest:
       type: object

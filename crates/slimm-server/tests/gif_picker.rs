@@ -58,6 +58,7 @@ fn app(store: Store, gifs: GifSearch) -> Router {
         media: Media::for_tests(),
         gifs,
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
+        dock: slimm_server::http::dock::Dock::disabled(),
     })
 }
 
