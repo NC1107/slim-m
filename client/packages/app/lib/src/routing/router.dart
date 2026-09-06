@@ -14,8 +14,11 @@ import '../providers/providers.dart';
 import '../providers/threads.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/categories_screen.dart';
+
 import 'package:slimm_data/data.dart' show Channel;
+
 import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/dock_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
 import '../screens/admin/performance_screen.dart';
@@ -169,6 +172,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminStorage,
         pageBuilder: (context, state) =>
             modalPage(context, const StorageScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminDock,
+        pageBuilder: (context, state) => modalPage(context, const DockScreen()),
       ),
       GoRoute(
         path: Routes.debugLog,

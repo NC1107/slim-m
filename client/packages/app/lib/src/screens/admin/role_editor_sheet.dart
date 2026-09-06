@@ -18,6 +18,7 @@ import '../../api_failure.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import 'module_permissions_section.dart';
 
 Future<void> showRoleEditorSheet(BuildContext context, {api.Role? role}) {
   return showAppSheet<void>(
@@ -158,6 +159,16 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
               enabled: true,
               onChanged: (v) => setState(() => _mentionable = v),
             ),
+            // A role being created has no id yet to grant a module permission against.
+            if (!_isCreate) ...[
+              const SizedBox(height: AppSpacing.s16),
+              Text(
+                'Module permissions',
+                style: AppText.label.copyWith(color: tokens.textSecondary),
+              ),
+              const SizedBox(height: AppSpacing.s4),
+              ModulePermissionsSection(roleId: widget.role!.id),
+            ],
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
               AppErrorState(message: _error!),

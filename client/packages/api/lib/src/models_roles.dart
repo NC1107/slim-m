@@ -93,3 +93,49 @@ class ChannelOverwrite {
         deny: json['deny'] as int,
       );
 }
+
+/// A grantable module-scoped permission, registered by the Dock's install
+/// handler - the dynamic half of the permission model alongside the fixed
+/// bitmask [Role.permissions]. See
+/// `docs/decisions/0021-modules-and-the-dock.md`.
+class ModulePermission {
+  const ModulePermission({
+    required this.moduleId,
+    required this.moduleName,
+    required this.permKey,
+    required this.name,
+    required this.description,
+  });
+
+  final String moduleId;
+  final String moduleName;
+  final String permKey;
+  final String name;
+  final String description;
+
+  factory ModulePermission.fromJson(Map<String, dynamic> json) =>
+      ModulePermission(
+        moduleId: json['module_id'] as String,
+        moduleName: json['module_name'] as String,
+        permKey: json['perm_key'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String,
+      );
+}
+
+/// One module permission a role currently holds.
+class GrantedModulePermission {
+  const GrantedModulePermission({
+    required this.moduleId,
+    required this.permKey,
+  });
+
+  final String moduleId;
+  final String permKey;
+
+  factory GrantedModulePermission.fromJson(Map<String, dynamic> json) =>
+      GrantedModulePermission(
+        moduleId: json['module_id'] as String,
+        permKey: json['perm_key'] as String,
+      );
+}
