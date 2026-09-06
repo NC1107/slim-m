@@ -9,11 +9,20 @@
 //! `SLIMM_LINK_PREVIEWS=true`, off by default, so an outbound-fetch surface
 //! is never exposed unless the operator asked for it. `GET /version`'s
 //! `link_previews_enabled` is what a client checks before ever asking.
+//!
+//! [`video`] recognizes a playable video link (YouTube today) during this
+//! same unfurl, from the page's own URL/OpenGraph tags - no extra request.
+//! The privacy point of a click-to-play affordance is that a client loads
+//! nothing from the video provider until the reader taps, so detection has
+//! to happen here rather than the client guessing from the URL alone: this
+//! is already the one place an SSRF-guarded fetch and an allowlist decision
+//! are made for a pasted link.
 
 mod cache;
 mod extract;
 mod fetch;
 mod ssrf;
+mod video;
 
 use std::sync::Arc;
 
@@ -108,7 +117,10 @@ struct PreviewParams {
 
 /// The wire shape of a preview. `image_token` (when present) is redeemed at
 /// `GET /link-preview/image/{token}`; the client never sees the upstream
-/// image URL.
+/// image URL. `video_provider`/`video_id` are set together, only when the
+/// linked page was recognized as a playable video (YouTube today): the
+/// client renders a click-to-play affordance instead of the static card, and
+/// nothing about that provider is ever contacted until the reader taps.
 #[derive(Serialize)]
 struct LinkPreviewDto {
     url: String,
@@ -116,15 +128,21 @@ struct LinkPreviewDto {
     description: Option<String>,
     site_name: Option<String>,
     image_token: Option<String>,
+    video_provider: Option<video::VideoProvider>,
+    video_id: Option<String>,
 }
 
 fn to_dto(url: &str, cached: CachedPreview) -> LinkPreviewDto {
+    let video_provider = cached.video.as_ref().map(|v| v.provider);
+    let video_id = cached.video.map(|v| v.id);
     LinkPreviewDto {
         url: url.to_owned(),
         title: cached.title,
         description: cached.description,
         site_name: cached.site_name,
         image_token: cached.image_token,
+        video_provider,
+        video_id,
     }
 }
 

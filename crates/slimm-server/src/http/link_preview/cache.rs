@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::store::now_ms;
 
 use super::extract::Preview;
+use super::video::VideoInfo;
 
 const CACHE_TTL_MS: i64 = 30 * 60 * 1000;
 const MAX_ENTRIES: usize = 5_000;
@@ -29,6 +30,7 @@ pub(super) struct CachedPreview {
     pub description: Option<String>,
     pub site_name: Option<String>,
     pub image_token: Option<String>,
+    pub video: Option<VideoInfo>,
     inserted_at: i64,
 }
 
@@ -83,6 +85,7 @@ impl Cache {
             description: preview.description,
             site_name: preview.site_name,
             image_token,
+            video: preview.video,
             inserted_at: now,
         };
         let mut previews = lock(&self.previews);
@@ -141,6 +144,7 @@ mod tests {
             description: Some("D".to_owned()),
             image: Some("https://cdn.example.com/a.png".to_owned()),
             site_name: Some("S".to_owned()),
+            ..Preview::default()
         }
     }
 
@@ -186,5 +190,26 @@ mod tests {
         let (bytes, ctype) = cache.image_bytes(&token).unwrap();
         assert_eq!(bytes, vec![1, 2, 3]);
         assert_eq!(ctype, "image/png");
+    }
+
+    #[test]
+    fn a_detected_video_survives_the_round_trip() {
+        use super::super::video::{VideoInfo, VideoProvider};
+
+        let cache = Cache::new();
+        let cached = cache.insert(
+            "https://example.com",
+            Preview {
+                title: Some("T".to_owned()),
+                video: Some(VideoInfo {
+                    provider: VideoProvider::Youtube,
+                    id: "dQw4w9WgXcQ".to_owned(),
+                }),
+                ..Preview::default()
+            },
+        );
+        let video = cached.video.expect("a video was set");
+        assert_eq!(video.provider, VideoProvider::Youtube);
+        assert_eq!(video.id, "dQw4w9WgXcQ");
     }
 }
