@@ -2,20 +2,29 @@
 //! The in-process fan-out hub.
 //!
 //! Durable writes happen over REST; this hub carries the resulting events to
-//! every connected WebSocket. It is a single broadcast channel: publishers (the
-//! REST handlers) send an [`Event`], and each connection subscribes and filters
-//! events down to what its user is allowed to see. That is ample for the small
-//! self-hosted deployments this targets, and a per-scope router can replace it
-//! later without changing the publish side.
+//! every connected WebSocket. It is two broadcast channels, one per event
+//! class rather than one per scope: publishers (the REST handlers, and a few
+//! WebSocket-originated signals) send an [`Event`], [`Hub::publish`] routes it
+//! to the durable or the ephemeral channel by [`is_ephemeral`], and each
+//! connection subscribes to both and filters events down to what its user is
+//! allowed to see. Two class-based channels is ample for the small
+//! self-hosted deployments this targets, and a per-scope router can replace
+//! either half later without changing the publish side.
 //!
 //! Delivery order across concurrent writers is best-effort: two racing sends to
-//! the same channel may fan out in either order. Clients apply events strictly
-//! by their per-scope `seq`, so a brief out-of-order arrival is reconciled on
-//! the client and never surfaces as reordering.
+//! the same channel may fan out in either order, and the two channels carry no
+//! ordering relative to each other at all. Clients apply durable events
+//! strictly by their per-scope `seq`, so a brief out-of-order arrival is
+//! reconciled on the client and never surfaces as reordering; ephemeral events
+//! carry no `seq` and no ordering guarantee to begin with.
 //!
-//! A subscriber that falls too far behind is dropped by the channel (a `Lagged`
-//! receive); the connection treats that as backpressure and closes, and the
-//! client resyncs over REST. Nothing here blocks a publisher.
+//! A durable subscriber that falls too far behind is dropped by its channel (a
+//! `Lagged` receive); the connection treats that as backpressure and closes,
+//! and the client resyncs over REST. An ephemeral subscriber that falls behind
+//! is *not* treated as backpressure: the connection skips forward and keeps
+//! running, because losing a stale cursor position or stroke preview is
+//! strictly better than forcing a full resync over it. Nothing here blocks a
+//! publisher on either channel.
 //!
 //! The hub also hands out connection slots, capping how many WebSockets can be
 //! open at once so a connection flood cannot exhaust the process.
@@ -32,11 +41,26 @@ use crate::typing::TypingTracker;
 mod event;
 pub use event::Event;
 
-/// How many events the channel buffers per subscriber before the slowest one
-/// starts losing the oldest and receives a `Lagged` error. Referenced from
-/// [`Event`]'s own doc comments, in `hub/event.rs`, as the bound a canvas
-/// frame is sized against.
+/// How many events the durable channel buffers per subscriber before the
+/// slowest one starts losing the oldest and receives a `Lagged` error.
+/// Referenced from [`Event`]'s own doc comments, in `hub/event.rs`, as the
+/// bound a canvas frame is sized against.
 pub(crate) const CHANNEL_CAPACITY: usize = 1024;
+
+/// How many events the ephemeral channel buffers per subscriber before the
+/// slowest one starts losing the oldest.
+///
+/// Sized against the two event classes it carries, both rate-limited (see
+/// `crate::ratelimit::Class::CanvasCursor` and `::CanvasStrokePreview`):
+/// `CanvasCursorMoved` sustains at most 15/sec/drawer, and a stroke preview is
+/// metered by bytes rather than count but a well-behaved client flushes on the
+/// order of once per animation frame, so it never dominates. A phone
+/// backgrounded during an active canvas session with, say, 4 other drawers
+/// each cursoring at the full 15/sec rate produces 60 events/sec; 512 gives
+/// that roughly 8.5 seconds of buffer before the *oldest* (never the newest,
+/// see `Class::CanvasCursor`'s own budget) frame is dropped - and dropping
+/// here costs nothing more than a slightly stale cursor, never a resync.
+pub(crate) const EPHEMERAL_CHANNEL_CAPACITY: usize = 512;
 
 /// Ceiling on simultaneously open WebSocket connections.
 const MAX_CONNECTIONS: usize = 1024;
@@ -51,6 +75,7 @@ const MAX_CONNECTIONS: usize = 1024;
 #[derive(Clone)]
 pub struct Hub {
     sender: broadcast::Sender<Event>,
+    ephemeral_sender: broadcast::Sender<Event>,
     slots: Arc<Semaphore>,
     presence: PresenceTracker,
     typing: TypingTracker,
@@ -116,6 +141,68 @@ fn moves_permissions(event: &Event) -> bool {
     }
 }
 
+/// Whether this event belongs on the ephemeral channel rather than the
+/// durable one - see this module's own doc comment for what that split means.
+///
+/// Exhaustive on purpose, the same discipline [`moves_permissions`] already
+/// uses: a new variant does not compile until somebody decides which channel
+/// it fans out on, and the safe default is durable, not ephemeral, since a
+/// dropped durable event is a much larger surprise than a slightly stale
+/// cursor.
+///
+/// Only [`Event::CanvasCursorMoved`] and [`Event::CanvasStrokePreview`]
+/// qualify: both are rate-limited well above what a human notices, carry no
+/// `seq`, are never persisted, and have no catch-up path a reconnect could use
+/// anyway (see their own doc comments in `hub/event.rs`). `TypingStarted`/
+/// `TypingStopped` are ephemeral in the same sense but stay durable here: they
+/// are rate-limited far lower (`Class::Typing`: 2/sec sustained against
+/// `CanvasCursor`'s 15/sec), they come in explicit start/stop pairs rather
+/// than a stream a receiver ages out on its own, and a dropped `Stopped` on a
+/// lossy channel would leave a "someone is typing" indicator stuck until the
+/// next unrelated typing refresh from that user - worse than the bounded
+/// staleness a lost cursor produces. Moving them costs a decision with a real
+/// downside for a rate that page rarely approaches the durable channel's own
+/// capacity in the first place.
+fn is_ephemeral(event: &Event) -> bool {
+    match event {
+        Event::CanvasCursorMoved { .. } | Event::CanvasStrokePreview { .. } => true,
+        Event::MessageCreated { .. }
+        | Event::MessageEdited { .. }
+        | Event::MessageDeleted { .. }
+        | Event::ReactionsChanged { .. }
+        | Event::ThreadUpdated { .. }
+        | Event::MessagePinned { .. }
+        | Event::MessageUnpinned { .. }
+        | Event::PollVoted { .. }
+        | Event::TypingStarted { .. }
+        | Event::TypingStopped { .. }
+        | Event::PresenceChanged(_)
+        | Event::ProfileChanged(_)
+        | Event::RoleChanged { .. }
+        | Event::MemberRoleChanged { .. }
+        | Event::MemberTimeoutChanged { .. }
+        | Event::MemberRemoved(_)
+        | Event::MemberRestored(_)
+        | Event::OverwriteChanged { .. }
+        | Event::ChannelCreated(_)
+        | Event::ChannelUpdated(_)
+        | Event::ChannelDeleted { .. }
+        | Event::CategoryChanged
+        | Event::CanvasObjectPlaced { .. }
+        | Event::CanvasObjectsRemoved { .. }
+        | Event::CanvasCleared { .. }
+        | Event::CanvasObjectsRestored { .. }
+        | Event::CanvasObjectMoved { .. }
+        | Event::CanvasObjectReordered { .. }
+        | Event::CanvasMediaSlotChanged { .. }
+        | Event::SessionRevoked(_)
+        | Event::VoiceActivityChanged { .. }
+        | Event::CallRinging { .. }
+        | Event::CallRingEnded { .. }
+        | Event::ReportsChanged => false,
+    }
+}
+
 impl Default for Hub {
     fn default() -> Self {
         Self::new()
@@ -125,8 +212,11 @@ impl Default for Hub {
 impl Hub {
     pub fn new() -> Self {
         let (sender, _receiver) = broadcast::channel(CHANNEL_CAPACITY);
+        let (ephemeral_sender, _ephemeral_receiver) =
+            broadcast::channel(EPHEMERAL_CHANNEL_CAPACITY);
         Self {
             sender,
+            ephemeral_sender,
             slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
             presence: PresenceTracker::new(),
             typing: TypingTracker::new(),
@@ -167,14 +257,20 @@ impl Hub {
         self.idle_poll_interval
     }
 
-    /// Publishes an event to every current subscriber. Does nothing if there are
-    /// none; never blocks or errors from the caller's point of view.
+    /// Publishes an event to every current subscriber, on the durable or the
+    /// ephemeral channel according to [`is_ephemeral`]. Does nothing if there
+    /// are no subscribers on that channel; never blocks or errors from the
+    /// caller's point of view.
     pub fn publish(&self, event: Event) {
         // Bumped before the send, so no subscriber can act on a stale answer.
         if moves_permissions(&event) {
             self.permissions_epoch.fetch_add(1, Ordering::Release);
         }
-        let _ = self.sender.send(event);
+        if is_ephemeral(&event) {
+            let _ = self.ephemeral_sender.send(event);
+        } else {
+            let _ = self.sender.send(event);
+        }
     }
 
     /// A counter bumped whenever a published event means permissions moved.
@@ -194,9 +290,20 @@ impl Hub {
         self.permissions_epoch.load(Ordering::Acquire)
     }
 
-    /// Subscribes a new connection to the event stream.
+    /// Subscribes a new connection to the durable event stream: messages,
+    /// channel/role/presence changes, and durable canvas state. A subscriber
+    /// that falls behind on this channel is expected to resync; see
+    /// [`Self::subscribe_ephemeral`] for the channel where that is not true.
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.sender.subscribe()
+    }
+
+    /// Subscribes a new connection to the ephemeral event stream: live canvas
+    /// cursor and stroke-preview frames. A subscriber that falls behind here
+    /// must skip forward and keep running rather than resync - see this
+    /// module's own doc comment.
+    pub fn subscribe_ephemeral(&self) -> broadcast::Receiver<Event> {
+        self.ephemeral_sender.subscribe()
     }
 
     /// Claims a connection slot, or `None` if the ceiling is reached. The permit
