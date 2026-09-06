@@ -56,8 +56,16 @@ jobs:
         run: cargo fmt --all --check
       - name: clippy
         run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: install nextest
+        # Pinned version, official installer. nextest runs the workspace's test
+        # binaries in parallel; plain `cargo test` runs them one at a time, so
+        # this is a large wall-clock win on a suite of many integration bins.
+        run: curl -LsSf https://get.nexte.st/0.9.143/linux | tar zxf - -C "${CARGO_HOME:-$HOME/.cargo}/bin"
       - name: test
-        run: cargo test --locked --all
+        run: cargo nextest run --locked --workspace
+      - name: doctests
+        # nextest does not run doctests; run them separately so they stay covered.
+        run: cargo test --locked --workspace --doc
       - name: build (release)
         run: cargo build --locked --release --bin slimm-server
       - name: binary size budget
