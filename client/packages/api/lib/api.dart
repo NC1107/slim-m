@@ -87,6 +87,7 @@ export 'src/events.dart'
         ProfileChanged,
         ReactionsChanged,
         ReactionTally,
+        CodeRunChanged,
         ReportsChanged,
         RoleChanged,
         ServerEvent,

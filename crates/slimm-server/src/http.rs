@@ -40,6 +40,7 @@ mod channel_order;
 mod channel_permissions;
 mod channel_slow_mode;
 mod channels;
+mod code_runs;
 mod dms;
 pub mod dock;
 mod emoji;
@@ -159,6 +160,7 @@ pub fn router(state: AppState) -> Router {
         .merge(messages_bulk::router())
         .merge(messages_bulk_window::router())
         .merge(metrics::routes())
+        .merge(code_runs::routes())
         .merge(module_commands::routes())
         .merge(module_permissions::routes())
         .merge(overwrites::routes())

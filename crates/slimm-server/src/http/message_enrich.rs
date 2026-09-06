@@ -11,6 +11,7 @@
 //! for that same reason.
 
 use super::AppState;
+use super::message_dto::CodeRunDto;
 use super::messages::{AttachmentDto, MessageDto, ReactionDto};
 use crate::ids::{ChannelId, MessageId, UserId};
 use crate::store::Message;
@@ -30,6 +31,7 @@ pub(crate) async fn with_reactions(
     let mut attachments_by_message = state.store.attachments_for_messages(&ids).await?;
     let mut threads_by_message = state.store.thread_summaries_for_messages(&ids).await?;
     let mut forwards_by_message = super::message_forwards::for_messages(state, &ids).await?;
+    let mut code_runs_by_message = state.store.code_runs_for_messages(&ids).await?;
     let mentioned = state.store.mentioned_messages_for(viewer, &ids).await?;
     // One more batched query; empty when no message on this page has a thread, which is the common case.
     let thread_channel_ids: Vec<ChannelId> = threads_by_message
@@ -75,6 +77,21 @@ pub(crate) async fn with_reactions(
             dto.thread_channel_id = Some(summary.channel_id.to_string());
             dto.thread_reply_count = Some(summary.reply_count);
             dto.thread_last_reply_at = summary.last_reply_at;
+        }
+        if let Some(pos) = code_runs_by_message.iter().position(|(mid, _)| *mid == id) {
+            let (_, runs) = code_runs_by_message.swap_remove(pos);
+            dto.code_runs = runs
+                .into_iter()
+                .map(|r| CodeRunDto {
+                    block_index: r.block_index,
+                    module_id: r.module_id,
+                    command: r.command,
+                    ok: r.ok,
+                    output: r.output,
+                    ran_by: r.ran_by.map(|u| u.to_string()),
+                    ran_at: r.ran_at,
+                })
+                .collect();
         }
         dto.forwarded = forwards_by_message.remove(&id);
         dto.mentions_me = mentioned.contains(&id);

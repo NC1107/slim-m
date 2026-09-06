@@ -55,6 +55,21 @@ class ReactionTally {
       );
 }
 
+/// A fenced code block's shared run result changed: someone ran it, and the
+/// output everyone sees under that block is now [run]. The whole current
+/// result, replacing whatever was there for that block rather than a delta.
+class CodeRunChanged extends ServerEvent {
+  const CodeRunChanged({
+    required this.channelId,
+    required this.messageId,
+    required this.run,
+  });
+
+  final String channelId;
+  final String messageId;
+  final CodeRun run;
+}
+
 /// A thread's reply summary changed: it was just opened, or gained a reply.
 /// Carries the current count rather than a delta, the same "whole current
 /// answer" shape [PollVoted] already uses, so a client that missed a frame

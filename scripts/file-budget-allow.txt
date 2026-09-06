@@ -10,7 +10,7 @@
 # that raises it; a changelog kept here makes one physical line that every change
 # to the same file must edit, which is a merge conflict by construction.
 
-schema/openapi.yaml 9637 # +47 for the /modules/slash-commands route and its SlashCommand schema; one OpenAPI document is one document; splitting it across $ref files would give tests/openapi_contract.rs two sources to reconcile. This number rises when the API does, and the raise is the deliberate act; why each raise happened is in the commit that made it, not here.
+schema/openapi.yaml 9784 # +147 for the /messages/{messageId}/blocks/{blockIndex}/run route, the CodeRun/CodeRunChanged/RunCodeBlockRequest schemas, and the code_runs field on Message (shared code-block output); one OpenAPI document is one document; splitting it across $ref files would give tests/openapi_contract.rs two sources to reconcile. This number rises when the API does, and the raise is the deliberate act; why each raise happened is in the commit that made it, not here.
 .github/workflows/release.yml 833 # ten publish jobs sharing release-please outputs, plus two thin verify jobs wiring every publish path to one commit-status gate; why each raise happened is in the commit that made it, not here.
 crates/slimm-server/src/store/sessions.rs 815 # tokens, refresh rotation, ws tickets and account deletion in one file; account deletion is the obvious first split
 client/packages/app/test/push_controller_test.dart 928 # one suite over registration, lifecycle reporting and revocation; new push coverage goes in a sibling file rather than growing this one
@@ -22,3 +22,6 @@ crates/slimm-server/tests/overwrites.rs 530 # set/clear/list plus the escalation
 client/packages/app/test/session_persistence_test.dart 588 # restore, refresh and revocation paths
 crates/slimm-server/tests/message_endpoints.rs 536 # send, list, edit and delete with their permission cases; +1 for the AppState.dock field the modules-foundation change added to every fn app()
 client/packages/app/lib/src/widgets/composer.dart 597 # autocomplete, focus, paste and drop-target registration together; +25 wiring module slash commands into send (the run itself lives in composer_slash.dart), still not safe to split the State class under an unrelated change
+crates/slimm-server/src/hub/event.rs 517 # one exhaustive Event enum; a new broadcast (CodeRunChanged, for shared code-block output) grows it by one variant and cannot be split out of the enum. Rises when the protocol adds an event, like openapi.yaml above.
+crates/slimm-server/src/http/ws/authorization.rs 508 # the exhaustive per-connection frame authorization + build match; a new event adds one arm here and cannot be split from the match. Rises when the protocol adds an event.
+client/packages/api/lib/src/events.dart 505 # the client's exhaustive ServerEvent.parse switch; a new frame (code_run.changed) adds one arm. The frame classes already live in the events_frames.dart part; the parse switch itself must stay whole.

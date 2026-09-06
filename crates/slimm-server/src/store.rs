@@ -35,6 +35,7 @@ mod channel_notification_prefs;
 mod channel_order;
 mod channel_slow_mode;
 mod channels;
+mod code_runs;
 mod dms;
 mod emoji;
 mod invites;
@@ -99,6 +100,7 @@ pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError
 pub use categories::CreatedCategory;
 pub use channel_order::{ChannelOrderGroup, ReorderChannelsError, ReorderOutcome};
 pub use channels::{CreateChannelError, CreatedChannel, DeleteChannelError};
+pub use code_runs::{CodeRunSummary, MAX_SHARED_OUTPUT_BYTES, clamp_output};
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};

@@ -87,6 +87,14 @@ pub(crate) struct MessageDto {
     /// `reactions` is left empty for a message that cannot have any yet.
     #[serde(default)]
     pub(crate) attachments: Vec<AttachmentDto>,
+    /// The shared result of each fenced code block that has been run in this
+    /// message, empty when none have. Always present, empty means none - the
+    /// same convention as `reactions`. Set by
+    /// [`super::message_enrich::with_reactions`]'s batch lookup, never by this
+    /// conversion: a freshly sent message carries none because nobody has run
+    /// a block in it yet, exactly like `reactions`.
+    #[serde(default)]
+    pub(crate) code_runs: Vec<CodeRunDto>,
     /// Whether this message mentions the caller - by `@name`, by a
     /// `@[Role]` the caller holds, or by `@everyone`/`@here` when the author
     /// held `MENTION_EVERYONE` - per-viewer exactly like `reacted`, and
@@ -129,6 +137,22 @@ pub(crate) struct ReactionDto {
     pub(crate) reacted: bool,
 }
 
+/// One fenced code block's shared run result. `output` holds the module's
+/// output when `ok`, or its error message when not - the same `{ok, output}`
+/// / `{ok, error}` shape the run route answers with, flattened to one field
+/// since a stored row is always one or the other.
+#[derive(Serialize)]
+pub(crate) struct CodeRunDto {
+    pub(crate) block_index: i64,
+    pub(crate) module_id: String,
+    pub(crate) command: String,
+    pub(crate) ok: bool,
+    pub(crate) output: String,
+    /// Who ran it, or `null` once their account is anonymized.
+    pub(crate) ran_by: Option<String>,
+    pub(crate) ran_at: i64,
+}
+
 impl MessageDto {
     /// Roughly what this row costs a `/sync` response, for the shared byte
     /// budget. The body dominates; the fixed addend stands in for the ids and
@@ -158,6 +182,7 @@ impl From<Message> for MessageDto {
             reactions: Vec::new(),
             poll: None,
             attachments: Vec::new(),
+            code_runs: Vec::new(),
             mentions_me: false,
         }
     }
