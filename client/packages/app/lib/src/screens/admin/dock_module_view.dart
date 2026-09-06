@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../widgets/attachment_view.dart' show formatByteSize;
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
 
@@ -173,22 +172,34 @@ class _CapabilitiesCard extends StatelessWidget {
           ),
         const SizedBox(height: AppSpacing.s12),
         Text(
-          'Runtime: ${manifest.runtime.backend}'
-          '${_limitsSummary(limits)}',
+          _runtimeSummary(limits),
           style: AppText.caption.copyWith(color: tokens.textSecondary),
         ),
       ],
     );
   }
 
-  static String _limitsSummary(api.DockLimits limits) {
-    final parts = <String>[
-      if (limits.memoryMb != null)
-        formatByteSize(limits.memoryMb! * 1024 * 1024),
-      if (limits.wallMs != null) '${limits.wallMs} ms',
-      if (limits.fuel != null) '${limits.fuel} fuel',
+  /// A generalized, human summary of the module's resource ceilings. The
+  /// specific runtime (wasm) and its raw units (fuel) are implementation
+  /// detail an admin should not have to reason about, so this shows only what
+  /// a limit means - how much memory and how long - not how it is enforced.
+  static String _runtimeSummary(api.DockLimits limits) {
+    final caps = <String>[
+      if (limits.memoryMb != null) '${limits.memoryMb} MB of memory',
+      if (limits.wallMs != null) _duration(limits.wallMs!),
     ];
-    return parts.isEmpty ? '' : ' · ${parts.join(' · ')}';
+    return caps.isEmpty
+        ? 'Runs sandboxed in this space.'
+        : 'Runs sandboxed, capped at ${caps.join(' and ')}.';
+  }
+
+  static String _duration(int ms) {
+    if (ms < 1000) return '$ms ms';
+    final seconds = ms / 1000;
+    final text = seconds == seconds.roundToDouble()
+        ? seconds.toStringAsFixed(0)
+        : seconds.toStringAsFixed(1);
+    return '$text seconds';
   }
 }
 
