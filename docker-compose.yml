@@ -40,6 +40,9 @@ services:
       # it; deploy/README.md.
       SLIMM_GIF_PROVIDER: ${SLIMM_GIF_PROVIDER:-}
       SLIMM_GIF_API_KEY: ${SLIMM_GIF_API_KEY:-}
+      # Off by default: unfurling makes the server fetch member-supplied URLs
+      # (behind the SSRF guard, decision 0019). Set true to show link previews.
+      SLIMM_LINK_PREVIEWS: ${SLIMM_LINK_PREVIEWS:-false}
       # Unset means no SFU and 501 for every voice request. The URL is the one
       # clients reach from outside, not the internal name; deploy/README.md.
       SLIMM_LIVEKIT_URL: wss://${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env}
