@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.70.0](https://github.com/NC1107/slim-m/compare/client-v0.69.0...client-v0.70.0) (2026-09-06)
+
+
+### Features
+
+* **client:** add the Dock UI for browsing, installing and enabling modules ([#1090](https://github.com/NC1107/slim-m/issues/1090)) ([bc12be5](https://github.com/NC1107/slim-m/commit/bc12be5e4ee7a1d14e2372d9fe0683781592bd34))
+* **client:** desktop update notifier in the splash, install-format aware ([#1069](https://github.com/NC1107/slim-m/issues/1069)) ([426df9a](https://github.com/NC1107/slim-m/commit/426df9ab8eac6de105295ac75483f62ef824e4cb))
+* **link-preview:** click-to-play for YouTube video links ([#1084](https://github.com/NC1107/slim-m/issues/1084)) ([c091db8](https://github.com/NC1107/slim-m/commit/c091db83fa938d2639a6b53b1e7df4af71d2e98b))
+* per-channel slow mode ([#1085](https://github.com/NC1107/slim-m/issues/1085)) ([5da23c3](https://github.com/NC1107/slim-m/commit/5da23c30f89aa6931eeb7c8d92b109a7bd94f981))
+* read a channel's permission overwrites before editing them ([#1071](https://github.com/NC1107/slim-m/issues/1071)) ([94f9dcd](https://github.com/NC1107/slim-m/commit/94f9dcd229d49bb909bbe915cbe000491052b1ff))
+* run a code block and see its output ([#1092](https://github.com/NC1107/slim-m/issues/1092)) ([1355afa](https://github.com/NC1107/slim-m/commit/1355afad31ce1cc616158514d39717df443ab551))
+* **server,client:** operator-visible storage view ([#1077](https://github.com/NC1107/slim-m/issues/1077)) ([57bed6b](https://github.com/NC1107/slim-m/commit/57bed6bd8a7bb325f38f2dd1bd30ae21a778dce0))
+* **server:** cross-channel message search (GET /search/messages) ([#1074](https://github.com/NC1107/slim-m/issues/1074)) ([1f7b8bd](https://github.com/NC1107/slim-m/commit/1f7b8bdff99ee4d8b182e134b816b98b47e779a7))
+* unread mention badge on the channel rail ([#1075](https://github.com/NC1107/slim-m/issues/1075)) ([2eb27cf](https://github.com/NC1107/slim-m/commit/2eb27cf5691dfcf000b44f98b6cd6df3b3dd5140))
+
+
+### Bug Fixes
+
+* **client:** scale call tiles with room and participant count ([#1081](https://github.com/NC1107/slim-m/issues/1081)) ([3f32b2c](https://github.com/NC1107/slim-m/commit/3f32b2c7b50e7c33ee58071baca5e5fe75550662))
+
+
+### Performance Improvements
+
+* **client:** vacuum the local cache after a large retention prune ([#1072](https://github.com/NC1107/slim-m/issues/1072)) ([c81b41a](https://github.com/NC1107/slim-m/commit/c81b41a633a6792c6aeb3bbcf4648d0d0cc9b4a6))
+
 ## [0.69.0](https://github.com/NC1107/slim-m/compare/client-v0.68.0...client-v0.69.0) (2026-09-04)
 
 
