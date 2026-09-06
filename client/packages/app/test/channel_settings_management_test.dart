@@ -44,6 +44,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Channel settings...'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Delete channel'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete permanently'));
@@ -145,6 +147,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Channel settings...'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Delete channel'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete permanently'));
@@ -190,6 +194,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Channel settings...'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Delete channel'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();
 
@@ -234,6 +240,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Manage random'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Channel settings...'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Delete channel'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Delete channel'));
       await tester.pumpAndSettle();

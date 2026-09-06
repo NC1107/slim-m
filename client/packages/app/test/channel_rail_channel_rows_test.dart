@@ -52,6 +52,7 @@ Channel _channel(
   cursor: cursor,
   lastReadSeq: lastReadSeq,
   mentionedSeq: 0,
+  slowModeSeconds: 0,
   isPersonalSpace: false,
 );
 

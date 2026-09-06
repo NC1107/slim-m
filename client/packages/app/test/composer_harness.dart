@@ -251,6 +251,12 @@ Widget composerHarness({
   /// `composer_attachment_drop_test.dart` proves the registration a
   /// composer makes is also the one it clears on its own way out.
   bool mountComposer = true,
+
+  /// Appended after this harness's own fixed overrides, so a suite that
+  /// needs one more (`composer_slow_mode_test.dart`'s own
+  /// `slowModeRemainingSecondsProvider`) does not have to rebuild the whole
+  /// tree by hand.
+  List<Override> extraOverrides = const [],
 }) {
   return ProviderScope(
     overrides: [
@@ -260,6 +266,7 @@ Widget composerHarness({
       if (customEmoji != null)
         customEmojiProvider.overrideWith((ref) => customEmoji),
       customEmojiImageProvider.overrideWith((ref, id) => _png),
+      ...extraOverrides,
     ],
     child: MaterialApp(
       theme: buildTheme(

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE channels SET slow_mode_seconds = ? WHERE id = ? AND deleted_at IS NULL AND kind != 'dm' AND parent_message_id IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8ae608f6764d37e73aae59801a37c3ed81570eb0b8ef341ac2b91e3bc72618f0"
+}

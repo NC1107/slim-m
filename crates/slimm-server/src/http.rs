@@ -38,6 +38,7 @@ mod categories;
 mod channel_notification_prefs;
 mod channel_order;
 mod channel_permissions;
+mod channel_slow_mode;
 mod channels;
 mod dms;
 mod emoji;

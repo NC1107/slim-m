@@ -186,6 +186,8 @@ impl Store {
                 // Whatever the caller filed it under; there is no default category (docs/decisions/0006).
                 category_id,
                 created_at: now,
+                // The column default; a fresh channel has no slow mode set yet.
+                slow_mode_seconds: 0,
             },
             fresh: true,
         })
@@ -222,7 +224,8 @@ impl Store {
                       position AS "position!: i64",
                       parent_message_id AS "parent_message_id: crate::ids::MessageId",
                       category_id AS "category_id: crate::ids::ChannelCategoryId",
-                      created_at AS "created_at!"
+                      created_at AS "created_at!",
+                      slow_mode_seconds AS "slow_mode_seconds!: i64"
                FROM channels WHERE id = ? AND deleted_at IS NULL"#,
             id
         )
@@ -237,6 +240,7 @@ impl Store {
             parent_message_id: r.parent_message_id,
             category_id: r.category_id,
             created_at: r.created_at,
+            slow_mode_seconds: r.slow_mode_seconds,
         }))
     }
 
@@ -431,7 +435,8 @@ where
                   position AS "position!: i64",
                   parent_message_id AS "parent_message_id: crate::ids::MessageId",
                   category_id AS "category_id: crate::ids::ChannelCategoryId",
-                  created_at AS "created_at!"
+                  created_at AS "created_at!",
+                  slow_mode_seconds AS "slow_mode_seconds!: i64"
            FROM channels WHERE id = ?"#,
         id
     )
@@ -446,5 +451,6 @@ where
         parent_message_id: r.parent_message_id,
         category_id: r.category_id,
         created_at: r.created_at,
+        slow_mode_seconds: r.slow_mode_seconds,
     }))
 }

@@ -24,6 +24,9 @@ String describeApiFailure(String whatFailed, api.ApiException e) => switch (e) {
     'Could not $whatFailed: you are not allowed to do that.',
   api.UnauthorizedException() =>
     'Could not $whatFailed: you are signed out. Sign in and try again.',
+  // A slow-mode refusal names its own wait; show it verbatim rather than the generic rate-limit wording below.
+  api.RateLimitedException(retryAfter: final Duration _) =>
+    'Could not $whatFailed: ${sentenceCase(e.message)}',
   api.RateLimitedException() =>
     'Could not $whatFailed: too many requests just now. '
         'Wait a moment and try again.',

@@ -33,6 +33,7 @@ mod canvas_ops_write;
 mod categories;
 mod channel_notification_prefs;
 mod channel_order;
+mod channel_slow_mode;
 mod channels;
 mod dms;
 mod emoji;
@@ -184,6 +185,11 @@ pub struct Channel {
     /// [`Store::permission_channel`] or anything it calls.
     pub category_id: Option<ChannelCategoryId>,
     pub created_at: i64,
+    /// The minimum interval, in seconds, a non-`MANAGE_CHANNELS` member must
+    /// wait between their own messages here. 0 means off. Never read for a DM
+    /// or a thread, neither of which exposes a setter for it - see
+    /// [`super::channel_slow_mode::Store::update_channel_slow_mode`].
+    pub slow_mode_seconds: i64,
 }
 
 /// A rail section: a channel of any kind may be filed under one, per

@@ -12,6 +12,7 @@ use std::error::Error as StdError;
 use axum::Json;
 use axum::extract::rejection::{BytesRejection, JsonRejection, QueryRejection};
 use axum::http::StatusCode;
+use axum::http::header::RETRY_AFTER;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
@@ -37,6 +38,16 @@ pub(crate) enum ApiError {
     NotFound(&'static str),
     Conflict(&'static str),
     TooManyRequests,
+    /// A fresh send arrived before the channel's slow-mode interval elapsed
+    /// since the author's own last message here. Carries how many seconds
+    /// are left, echoed both as a `Retry-After` header (the same header
+    /// [`ApiError::TooManyRequests`] leaves unset today, per
+    /// `client_transport.dart`'s own forward-compatible parsing of it) and in
+    /// the body, so a client with no header support still gets a number to
+    /// count down from.
+    SlowMode {
+        retry_after_seconds: i64,
+    },
     /// The deployment does not offer this feature at all, as opposed to
     /// offering it and being briefly unable to serve it. Distinct from
     /// [`ApiError::Unavailable`] so a client can hide the feature rather than
@@ -58,10 +69,20 @@ pub(crate) enum ApiError {
 #[derive(Serialize)]
 struct ErrorBody {
     error: Cow<'static, str>,
+    /// Only [`ApiError::SlowMode`] sets this; every other variant omits the
+    /// field entirely rather than sending `null`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retry_after_seconds: Option<i64>,
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        let retry_after_seconds = match &self {
+            ApiError::SlowMode {
+                retry_after_seconds,
+            } => Some(*retry_after_seconds),
+            _ => None,
+        };
         let (status, error): (StatusCode, Cow<'static, str>) = match self {
             ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message.into()),
             ApiError::BadRequestDetail(message) => (StatusCode::BAD_REQUEST, message.into()),
@@ -72,6 +93,12 @@ impl IntoResponse for ApiError {
             ApiError::TooManyRequests => {
                 (StatusCode::TOO_MANY_REQUESTS, "slow down and retry".into())
             }
+            ApiError::SlowMode {
+                retry_after_seconds,
+            } => (
+                StatusCode::TOO_MANY_REQUESTS,
+                format!("slow mode: wait {retry_after_seconds}s before sending again").into(),
+            ),
             ApiError::NotConfigured(message) => (StatusCode::NOT_IMPLEMENTED, message.into()),
             ApiError::Unavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -90,7 +117,20 @@ impl IntoResponse for ApiError {
                 INTERNAL_ERROR_MESSAGE.into(),
             ),
         };
-        (status, Json(ErrorBody { error })).into_response()
+        let mut response = (
+            status,
+            Json(ErrorBody {
+                error,
+                retry_after_seconds,
+            }),
+        )
+            .into_response();
+        if let Some(seconds) = retry_after_seconds
+            && let Ok(value) = seconds.to_string().parse()
+        {
+            response.headers_mut().insert(RETRY_AFTER, value);
+        }
+        response
     }
 }
 

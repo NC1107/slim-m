@@ -131,10 +131,7 @@ async fn an_ordinary_page_is_not_flagged_playable() {
 async fn a_youtube_watch_url_pasted_directly_is_flagged_playable() {
     let (store, _guard) = new_store().await;
     let token = register(&store, "paster").await;
-    // The page itself is the fake upstream (so the fetch stays local), but its
-    // own canonical/og:video tag is a real watch URL - the same shape a real
-    // YouTube watch page serves, exercising the URL-path branch of detection
-    // rather than the og:video fallback the other tests use.
+    // A real watch URL in the page's own og:video, exercising the URL-path branch, not the og:video fallback.
     let upstream = fake_upstream(
         "<meta property=\"og:title\" content=\"Rick Astley - Never Gonna Give You Up\">\
          <meta property=\"og:video\" content=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">",

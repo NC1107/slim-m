@@ -25,6 +25,7 @@ import '../widgets/settings_notice.dart';
 import 'admin/channel_overwrites_screen.dart';
 import 'channel_settings_danger_zone.dart';
 import 'channel_settings_general_section.dart';
+import 'channel_settings_slow_mode_section.dart';
 import 'settings_screen_scaffold.dart';
 
 /// What the row's kebab hands the route: the channel, and whether it was the
@@ -107,6 +108,10 @@ class ChannelSettingsPane extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (canManageChannels) ChannelGeneralSection(channel: channel),
+        if (canManageChannels) ...[
+          const SizedBox(height: AppSpacing.s16),
+          ChannelSlowModeSection(channel: channel),
+        ],
         if (canManageChannels && canManageRoles)
           const SizedBox(height: AppSpacing.s16),
         if (canManageRoles)

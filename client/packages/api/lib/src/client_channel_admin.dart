@@ -6,14 +6,18 @@ part of 'client.dart';
 /// [SlimmApi.createChannel] do not cover. See
 /// docs/decisions/0006-channel-categories.md for the category half.
 extension SlimmApiChannelAdmin on SlimmApi {
-  /// Renames a channel and/or replaces its topic. Requires MANAGE_CHANNELS at
-  /// the deployment level, the same check creating a channel uses. At least
-  /// one of [name] and [topic] must be given; a blank or whitespace-only
-  /// [topic] clears it back to none rather than storing an empty string.
+  /// Renames a channel, replaces its topic, and/or sets its slow-mode
+  /// interval. Requires MANAGE_CHANNELS at the deployment level, the same
+  /// check creating a channel uses. At least one of [name], [topic] and
+  /// [slowModeSeconds] must be given; a blank or whitespace-only [topic]
+  /// clears it back to none rather than storing an empty string.
+  /// [slowModeSeconds] of 0 turns slow mode off; the server refuses, rather
+  /// than clamps, a value outside 0 to 21600 (six hours).
   Future<Channel> updateChannel({
     required String channelId,
     String? name,
     String? topic,
+    int? slowModeSeconds,
   }) async {
     final json = await _send(
       'PATCH',
@@ -21,6 +25,7 @@ extension SlimmApiChannelAdmin on SlimmApi {
       body: {
         if (name != null) 'name': name,
         if (topic != null) 'topic': topic,
+        if (slowModeSeconds != null) 'slow_mode_seconds': slowModeSeconds,
       },
     );
     return Channel.fromJson(json as Map<String, dynamic>);

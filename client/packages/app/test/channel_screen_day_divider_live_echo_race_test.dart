@@ -239,6 +239,8 @@ void main() {
     } finally {
       container.dispose();
       await tester.pump();
+      // A beat for the composer's slow-mode countdown to close out its channel-row subscription before the pending-timer check runs.
+      await tester.pump(const Duration(milliseconds: 50));
       // `runAsync` again, for the same reason `SyncTestServer.start` needed it above.
       await tester.runAsync(server.close);
     }

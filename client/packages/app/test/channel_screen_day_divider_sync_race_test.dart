@@ -236,6 +236,9 @@ void main() {
       }
     } finally {
       container.dispose();
+      await tester.pump();
+      // A beat for the composer's slow-mode countdown to close out its channel-row subscription before the pending-timer check runs.
+      await tester.pump(const Duration(milliseconds: 50));
     }
   });
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\",\n                      parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      created_at AS \"created_at!\"\n               FROM channels WHERE id = ? AND deleted_at IS NULL",
+  "query": "SELECT c.id AS \"id!: ChannelId\", c.name AS \"name!\", c.kind AS \"kind!\", c.topic,\n                      c.position AS \"position!: i64\",\n                      c.parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      c.category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      c.created_at AS \"created_at!\",\n                      c.slow_mode_seconds AS \"slow_mode_seconds!: i64\"\n               FROM channels c\n               LEFT JOIN channel_categories cc ON cc.id = c.category_id\n               WHERE c.deleted_at IS NULL AND c.kind != 'dm' AND c.parent_message_id IS NULL\n               ORDER BY CASE WHEN c.category_id IS NULL THEN -1 ELSE cc.position END,\n                        c.position, c.created_at",
   "describe": {
     "columns": [
       {
@@ -42,10 +42,15 @@
         "name": "created_at!",
         "ordinal": 7,
         "type_info": "Integer"
+      },
+      {
+        "name": "slow_mode_seconds!: i64",
+        "ordinal": 8,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       false,
@@ -55,8 +60,9 @@
       false,
       true,
       true,
+      false,
       false
     ]
   },
-  "hash": "f6c4b78c7b9f9933f3415b5fe4eacc31603ad29299a15d6fcfa8e0fa8464b6fa"
+  "hash": "efc5c44f3acb018b0a538b28f3927f36b9752721b0178ddbff06911c0601118d"
 }

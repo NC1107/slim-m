@@ -178,6 +178,8 @@ impl Store {
                 // Never read: a thread is excluded from every category grouping.
                 category_id: None,
                 created_at: now,
+                // Never read: a thread has no slow-mode setter of its own.
+                slow_mode_seconds: 0,
             },
             fresh: true,
         })

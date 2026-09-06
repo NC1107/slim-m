@@ -309,6 +309,7 @@ class ComposerBanners extends StatelessWidget {
     required this.attachmentError,
     required this.onDismissAttachmentError,
     required this.overLimitBy,
+    required this.slowModeRemainingSeconds,
     required this.stagedAttachments,
     required this.onRemoveAttachment,
     required this.onRetryAttachment,
@@ -321,6 +322,13 @@ class ComposerBanners extends StatelessWidget {
   /// null when it is within the limit. Non-null both disables the send
   /// button and shows this band, so the refusal is never silent.
   final int? overLimitBy;
+
+  /// Seconds left before the channel's slow mode allows another send, or 0
+  /// while it is off, this device is exempt, or the interval has already
+  /// elapsed - see `slow_mode_controller.dart`. Non-zero both disables the
+  /// send button and shows this band, the same "never silent" rule
+  /// [overLimitBy] follows.
+  final int slowModeRemainingSeconds;
   final List<StagedAttachment> stagedAttachments;
   final ValueChanged<String> onRemoveAttachment;
   final ValueChanged<String> onRetryAttachment;
@@ -349,6 +357,15 @@ class ComposerBanners extends StatelessWidget {
                   message:
                       'Message is $overBy characters over the '
                       '$kMessageMaxChars-character limit.',
+                ),
+        ),
+        AppRevealBand(
+          child: slowModeRemainingSeconds <= 0
+              ? null
+              : ComposerInlineError(
+                  message:
+                      'Slow mode: wait ${slowModeRemainingSeconds}s '
+                      'before sending again.',
                 ),
         ),
         AppRevealBand(
