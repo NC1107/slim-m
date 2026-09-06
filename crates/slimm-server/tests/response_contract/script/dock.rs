@@ -82,6 +82,9 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str) {
         json!({ "input": "hello" }),
     )
     .await;
+    // The admin now holds `run`, so this comes back a real pair to validate against CodeBlockRunner, not just the empty-list case.
+    c.get("listCodeBlockRunners", "/modules/code-block-runners", root)
+        .await;
     c.bare(
         "unassignRole",
         "DELETE",

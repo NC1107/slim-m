@@ -29,7 +29,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'custom_emoji_image.dart';
-import 'message_code_lexer.dart';
+import 'message_code_block_runner.dart';
 import 'message_fences.dart';
 import 'message_inline.dart';
 import 'message_markdown_blocks.dart';
@@ -119,10 +119,7 @@ class MessageBody extends StatelessWidget {
               }
             case CodeBlock(:final language, :final code):
               widgets.add(
-                AppCodeBlock(
-                  language: language,
-                  lines: lexCodeBlock(code, language),
-                ),
+                MessageCodeBlockRunner(language: language, code: code),
               );
           }
         }

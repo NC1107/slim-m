@@ -51,6 +51,9 @@ pub struct ModuleExtensionPoint {
     pub name: String,
     pub description: Option<String>,
     pub permission: Option<String>,
+    /// For a `code-block-runner`: the `command` extension point's own name
+    /// it invokes. See `http::dock::manifest`'s own validation of this.
+    pub command: Option<String>,
 }
 
 /// One permission a module's manifest declares, as install registers it into
@@ -68,6 +71,7 @@ pub struct ModuleExtensionPointSpec<'a> {
     pub name: &'a str,
     pub description: Option<&'a str>,
     pub permission: Option<&'a str>,
+    pub command: Option<&'a str>,
 }
 
 /// Everything an install call needs, bundled so `Store::install_module` stays
@@ -145,6 +149,7 @@ impl Store {
                 name: e.name.to_owned(),
                 description: e.description.map(str::to_owned),
                 permission: e.permission.map(str::to_owned),
+                command: e.command.map(str::to_owned),
             })
             .collect();
         let extension_points_json = serde_json::to_string(&extension_points)?;

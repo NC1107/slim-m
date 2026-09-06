@@ -29,6 +29,8 @@ const _exceptions = {
   'lib/src/components/forms/chip.dart',
   // AppCodeBlock's fenced-block body: its own doc comment names the literal.
   'lib/src/components/surfaces/code_block.dart',
+  // Matches AppCodeBlock's own body size exactly; its own comment names it.
+  '../app/lib/src/widgets/message_code_block_runner.dart',
   // FingerprintDisplay's read-aloud hex groups: ported as-is from the source design.
   '../app/lib/src/widgets/server_fingerprint_step.dart',
 };

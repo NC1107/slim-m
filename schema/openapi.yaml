@@ -5365,6 +5365,31 @@ paths:
           $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /modules/code-block-runners:
+    get:
+      operationId: listCodeBlockRunners
+      tags: [space]
+      summary: Discover which code-block runner, if any, this caller may use.
+      description: >
+        One entry per installed and enabled module that declares a
+        `code-block-runner` extension point and whose declared permission the
+        caller holds (Store::user_has_module_permission). Never names a
+        runner the caller cannot reach; an empty list means the client should
+        offer no Run affordance at all. slim has no notion of what any
+        runner does - see docs/decisions/0021's module-agnostic principle.
+      responses:
+        "200":
+          description: The code-block runners this caller may use, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CodeBlockRunner"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -6433,9 +6458,18 @@ components:
           description: >
             The declared permission key (see DockPermission) a caller must
             hold to reach this extension point. Always present for a
-            `command`; the module host checks it via
-            Store::user_has_module_permission before ever running the
+            `command` or a `code-block-runner`; the module host checks it
+            via Store::user_has_module_permission before ever running the
             module. See docs/decisions/0021's "Module ABI v1" section.
+        command:
+          type: string
+          nullable: true
+          description: >
+            For a `code-block-runner` only: the `command` extension point's
+            own name it invokes, so `GET /modules/code-block-runners` can
+            hand a client a `(module_id, command)` pair
+            `POST /modules/{moduleId}/commands/{command}` is guaranteed to
+            accept.
     DockManifest:
       type: object
       required:
@@ -6552,6 +6586,17 @@ components:
             failure, or a clean description of a host-level refusal (a
             resource limit, a malformed module response). Never a 500 and
             never a hang; see docs/decisions/0021's "Module ABI v1" section.
+    CodeBlockRunner:
+      type: object
+      required: [module_id, command]
+      properties:
+        module_id:
+          type: string
+        command:
+          type: string
+          description: >
+            The `command` extension point's own name to POST to via
+            /modules/{moduleId}/commands/{command}.
     PresenceStatus:
       type: object
       required: [user_id, status]

@@ -14,16 +14,24 @@
 //! installed, enabled, does the caller hold its permission) use a distinct
 //! status code, because those are refusals to even attempt the call rather
 //! than an outcome of attempting it.
+//!
+//! `GET /modules/code-block-runners` lives here too: the general mechanism a
+//! client uses to learn whether it may offer "Run" on a fenced code block,
+//! per docs/decisions/0021-modules-and-the-dock.md's module-agnostic
+//! principle. slim has no notion of "code execution" anywhere in this file -
+//! it only surfaces, per caller, which installed and enabled module declared
+//! a `code-block-runner` extension point the caller holds the permission
+//! for. A deployment with no such module installed answers an empty list.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::routing::post;
+use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::dock::validate_module_id;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, WRITE};
+use super::extract::{AUTHED_READ, AuthedLimited, Json, WRITE};
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
 use crate::store::InstalledModule;
 
@@ -41,6 +49,7 @@ const BODY_LIMIT: usize = 256 * 1024;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/modules/{moduleId}/commands/{command}", post(run_command))
+        .route("/modules/code-block-runners", get(list_code_block_runners))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -168,4 +177,50 @@ async fn run_command(
 /// a stack trace or an internal type path.
 fn describe(err: &RunError) -> String {
     err.to_string()
+}
+
+/// One `(module_id, command)` pair a client may `POST` to
+/// `/modules/{moduleId}/commands/{command}` to run a fenced code block.
+#[derive(Serialize)]
+struct CodeBlockRunnerDto {
+    module_id: String,
+    command: String,
+}
+
+/// Every `code-block-runner` extension point the caller may currently reach:
+/// installed, enabled, and the caller holds the permission it declared. This
+/// is the whole of how a client learns whether to offer "Run" on a fenced
+/// code block - never a hardcoded module id, per docs/decisions/0021's
+/// module-agnostic principle. Possibly empty, which means no Run affordance
+/// anywhere in the client.
+async fn list_code_block_runners(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<CodeBlockRunnerDto>>, ApiError> {
+    let modules = state.store.list_installed_modules().await?;
+    let mut runners = Vec::new();
+    for module in modules {
+        if !module.enabled {
+            continue;
+        }
+        for ep in &module.extension_points {
+            if ep.kind != "code-block-runner" {
+                continue;
+            }
+            let (Some(command), Some(permission)) = (&ep.command, &ep.permission) else {
+                continue;
+            };
+            if state
+                .store
+                .user_has_module_permission(ctx.user_id, &module.id, permission)
+                .await?
+            {
+                runners.push(CodeBlockRunnerDto {
+                    module_id: module.id.clone(),
+                    command: command.clone(),
+                });
+            }
+        }
+    }
+    Ok(Json(runners))
 }

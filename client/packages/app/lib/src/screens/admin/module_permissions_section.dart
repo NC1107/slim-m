@@ -17,6 +17,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/code_block_runner.dart';
 import '../../providers/providers.dart';
 import '../../widgets/run_guarded.dart';
 
@@ -60,7 +61,10 @@ class _ModulePermissionsSectionState
     );
     if (!mounted) return;
     setState(() => _pending.remove(key));
-    if (ok) ref.invalidate(roleModulePermissionsProvider(widget.roleId));
+    if (ok) {
+      ref.invalidate(roleModulePermissionsProvider(widget.roleId));
+      ref.invalidate(codeBlockRunnerProvider);
+    }
   }
 
   @override

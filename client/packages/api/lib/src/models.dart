@@ -28,6 +28,7 @@ export 'models_channel.dart';
 export 'models_channel_notification_override.dart';
 export 'models_message_history.dart';
 export 'models_message_ops.dart';
+export 'models_module_commands.dart';
 export 'models_notification_preference.dart';
 export 'models_pins.dart';
 export 'models_polls.dart';
