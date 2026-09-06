@@ -112,9 +112,7 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
-      // Header and the action button stay pinned; only the middle scrolls, so
-      // there is always a reachable way out even when the form is taller than
-      // the sheet and the drag handle is buried under a scrolling list.
+      // Header and Save stay pinned, only the middle scrolls, so there is always a reachable exit.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
