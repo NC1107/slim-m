@@ -10,7 +10,9 @@
 //! Delivery is authorized per event: a `message.created` reaches a connection
 //! only if that user can view the channel it happened in, so the socket never
 //! leaks a channel the caller could not read over REST. If the connection falls
-//! behind the broadcast buffer it is closed and the client resyncs over REST.
+//! behind the durable broadcast buffer it is closed and the client resyncs
+//! over REST; falling behind the ephemeral one (cursors, stroke previews)
+//! never closes anything, see `crate::hub`'s own doc comment.
 
 use std::time::Duration;
 
@@ -87,8 +89,12 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
     };
 
     // Subscribe before acking the hello, so an event published during the
-    // handshake is buffered rather than missed.
+    // handshake is buffered rather than missed. Two channels, matching
+    // `Hub`'s own split: `events` is durable and a `Lagged` closes the
+    // connection below, `ephemeral_events` is not and a `Lagged` there is
+    // skipped in place.
     let mut events = state.hub.subscribe();
+    let mut ephemeral_events = state.hub.subscribe_ephemeral();
 
     // Per connection, and dropped with it; see `permission_cache`.
     let mut cache = PermissionCache::new();
@@ -217,6 +223,24 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                         .await;
                         break;
                     }
+                    Err(RecvError::Closed) => break,
+                }
+            }
+            ephemeral_event = ephemeral_events.recv() => {
+                match ephemeral_event {
+                    Ok(event) => {
+                        match authorize(&state.store, &state.hub, &ctx, &mut cache, event).await {
+                            Authorization::Deliver(frame) => {
+                                if send_frame(&mut sink, &frame).await.is_err() {
+                                    break;
+                                }
+                            }
+                            // Withheld or undecidable: a lost cursor/preview costs nothing either way.
+                            Authorization::Withhold | Authorization::Unknown => {}
+                        }
+                    }
+                    // The whole point: falling behind here never closes the connection or resyncs.
+                    Err(RecvError::Lagged(_)) => {}
                     Err(RecvError::Closed) => break,
                 }
             }
