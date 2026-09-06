@@ -68,6 +68,11 @@ pub(super) struct ExtensionPointDto {
     /// property does not.
     #[serde(skip_serializing_if = "Option::is_none")]
     command: Option<String>,
+    /// For a `code-block-runner` only: the fenced-block language it
+    /// matches, or absent for a wildcard that matches any block. Omitted
+    /// rather than sent as `null`, for the same reason as `command` above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    language: Option<String>,
 }
 
 /// A module's full manifest, as the Dock shows an admin before install: every
@@ -126,6 +131,7 @@ impl From<Manifest> for ManifestDto {
                     description: e.description,
                     permission: e.permission,
                     command: e.command,
+                    language: e.language,
                 })
                 .collect(),
         }
@@ -166,6 +172,7 @@ impl From<InstalledModule> for InstalledModuleDto {
                     description: e.description,
                     permission: e.permission,
                     command: e.command,
+                    language: e.language,
                 })
                 .collect(),
             enabled: m.enabled,

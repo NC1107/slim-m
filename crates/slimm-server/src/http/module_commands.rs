@@ -185,6 +185,14 @@ fn describe(err: &RunError) -> String {
 struct CodeBlockRunnerDto {
     module_id: String,
     command: String,
+    /// The fenced-block language this runner matches, or absent for a
+    /// wildcard the client offers on any block (a module installed before
+    /// this field existed, or one that deliberately declares none). The
+    /// client normalizes case and applies its own small alias map (js ->
+    /// javascript, and so on) before comparing this against a block's own
+    /// fence tag.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    language: Option<String>,
 }
 
 /// Every `code-block-runner` extension point the caller may currently reach:
@@ -218,6 +226,7 @@ async fn list_code_block_runners(
                 runners.push(CodeBlockRunnerDto {
                     module_id: module.id.clone(),
                     command: command.clone(),
+                    language: ep.language.clone(),
                 });
             }
         }

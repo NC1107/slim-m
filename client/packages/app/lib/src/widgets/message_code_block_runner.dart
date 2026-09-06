@@ -3,11 +3,13 @@
 /// output rendered inline below - notebook-style, monospace, clearly
 /// delimited from the code above it.
 ///
-/// The affordance itself is driven entirely by [codeBlockRunnerProvider]:
-/// this file has no notion of what running code means, only of "POST this
-/// text to whatever (module_id, command) discovery handed back" - see
-/// docs/decisions/0021-modules-and-the-dock.md's module-agnostic principle.
-/// No Run affordance shows at all when the provider resolves to null.
+/// The affordance itself is driven entirely by [codeBlockRunnerProvider] and
+/// [matchCodeBlockRunner]: this file has no notion of what running code
+/// means, only of "match this block's own language tag to a discovered
+/// runner, then POST its text to whatever (module_id, command) that runner
+/// named" - see docs/decisions/0021-modules-and-the-dock.md's
+/// module-agnostic principle. No Run affordance shows at all when no runner
+/// matches this block's language.
 ///
 /// The output is ephemeral and per-viewer: it lives only in this widget's own
 /// state, is never persisted or broadcast, and a second run replaces it
@@ -22,6 +24,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/code_block_runner.dart';
 import '../providers/providers.dart';
 import 'message_code_lexer.dart';
+import 'module_command_output.dart';
 import 'run_guarded.dart';
 
 class MessageCodeBlockRunner extends ConsumerStatefulWidget {
@@ -71,7 +74,8 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
 
   @override
   Widget build(BuildContext context) {
-    final runner = ref.watch(codeBlockRunnerProvider).valueOrNull;
+    final runners = ref.watch(codeBlockRunnerProvider).valueOrNull ?? const [];
+    final runner = matchCodeBlockRunner(runners, widget.language);
     final result = _result;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,7 +93,7 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         ],
         if (result != null) ...[
           const SizedBox(height: AppSpacing.s4),
-          _CodeBlockOutput(result: result),
+          ModuleCommandOutput(result: result),
         ],
       ],
     );
@@ -118,56 +122,4 @@ class _RunAction extends StatelessWidget {
           size: AppIconButtonSize.sm,
           onPressed: onPressed,
         );
-}
-
-/// One run's result, notebook-style: its own bordered panel below the code
-/// it came from, monospace, tinted for an error rather than only labelled.
-class _CodeBlockOutput extends StatelessWidget {
-  const _CodeBlockOutput({required this.result});
-
-  final api.RunModuleCommandResult result;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final isError = !result.ok;
-    final text = (isError ? result.error : result.output) ?? '';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s8,
-        vertical: AppSpacing.s8,
-      ),
-      decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
-        border: Border.all(
-          color: isError ? tokens.dangerBorder : tokens.borderSubtle,
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.control),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isError ? 'Error' : 'Output',
-            style: AppText.micro.copyWith(
-              fontFamily: AppFonts.mono,
-              color: isError ? tokens.dangerText : tokens.textSecondary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s4),
-          SelectableText(
-            text,
-            // 13/1.6 match AppCodeBlock's own fenced-block body exactly, so output reads as a continuation of the code above it, not a mismatched font.
-            style: TextStyle(
-              fontFamily: AppFonts.mono,
-              fontSize: 13,
-              height: 1.6,
-              color: isError ? tokens.dangerText : tokens.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

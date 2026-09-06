@@ -120,6 +120,7 @@ class DockExtensionPoint {
     this.description,
     this.permission,
     this.command,
+    this.language,
   });
 
   final String kind;
@@ -134,6 +135,10 @@ class DockExtensionPoint {
   /// name it invokes.
   final String? command;
 
+  /// For a `code-block-runner` only: the fenced-block language it matches,
+  /// or null for a wildcard that matches any block.
+  final String? language;
+
   factory DockExtensionPoint.fromJson(Map<String, dynamic> json) =>
       DockExtensionPoint(
         kind: json['kind'] as String,
@@ -141,6 +146,7 @@ class DockExtensionPoint {
         description: json['description'] as String?,
         permission: json['permission'] as String?,
         command: json['command'] as String?,
+        language: json['language'] as String?,
       );
 }
 
@@ -208,6 +214,7 @@ class InstalledDockModule {
     required this.version,
     required this.artifactSha256,
     required this.approvedCapabilities,
+    required this.extensionPoints,
     required this.enabled,
     required this.installedAt,
   });
@@ -217,6 +224,12 @@ class InstalledDockModule {
   final String version;
   final String artifactSha256;
   final List<String> approvedCapabilities;
+
+  /// Which commands this installed module offers, and the permission each
+  /// needs, as recorded at its last install - not re-fetched from the
+  /// registry, so this stays accurate even if the upstream manifest has
+  /// since changed.
+  final List<DockExtensionPoint> extensionPoints;
 
   /// Off by default: installing never runs a module, a separate enable call
   /// does.
@@ -233,6 +246,9 @@ class InstalledDockModule {
         artifactSha256: json['artifact_sha256'] as String,
         approvedCapabilities: (json['approved_capabilities'] as List<dynamic>)
             .map((c) => c as String)
+            .toList(growable: false),
+        extensionPoints: (json['extension_points'] as List<dynamic>)
+            .map((e) => DockExtensionPoint.fromJson(e as Map<String, dynamic>))
             .toList(growable: false),
         enabled: json['enabled'] as bool,
         installedAt: json['installed_at'] as int,

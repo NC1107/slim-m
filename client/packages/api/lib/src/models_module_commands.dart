@@ -10,15 +10,26 @@ library;
 /// One `(module_id, command)` pair this caller may POST to via
 /// `runModuleCommand`, from `GET /modules/code-block-runners`.
 class CodeBlockRunner {
-  const CodeBlockRunner({required this.moduleId, required this.command});
+  const CodeBlockRunner({
+    required this.moduleId,
+    required this.command,
+    this.language,
+  });
 
   final String moduleId;
   final String command;
+
+  /// The fenced-block language this runner matches, or null for a wildcard
+  /// that matches any block. The app layer normalizes case and applies its
+  /// own alias map before comparing this against a block's own fence tag -
+  /// this package stays a plain mirror of the wire shape.
+  final String? language;
 
   factory CodeBlockRunner.fromJson(Map<String, dynamic> json) =>
       CodeBlockRunner(
         moduleId: json['module_id'] as String,
         command: json['command'] as String,
+        language: json['language'] as String?,
       );
 }
 

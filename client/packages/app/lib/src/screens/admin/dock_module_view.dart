@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
+import 'dock_command_panel.dart';
 
 /// A module's manifest, plus the lifecycle action appropriate to
 /// [installed]'s state: install when null, otherwise an enable/disable
@@ -89,8 +90,25 @@ class DockManifestView extends StatelessWidget {
           const SizedBox(height: AppSpacing.s8),
           AppErrorState(message: error!, onDismiss: onErrorDismiss),
         ],
+        for (final ep in _runnableCommands(installed)) ...[
+          const SizedBox(height: AppSpacing.s16),
+          DockCommandPanel(moduleId: installed!.id, extensionPoint: ep),
+        ],
       ],
     );
+  }
+
+  /// Every `command` extension point [installed] declares, or none at all
+  /// while the module is not installed or is disabled - a command only
+  /// reaches the host under those two conditions (`http::module_commands`),
+  /// so this panel offers nothing a Run could not possibly answer.
+  static List<api.DockExtensionPoint> _runnableCommands(
+    api.InstalledDockModule? installed,
+  ) {
+    if (installed == null || !installed.enabled) return const [];
+    return installed.extensionPoints
+        .where((ep) => ep.kind == 'command')
+        .toList(growable: false);
   }
 }
 

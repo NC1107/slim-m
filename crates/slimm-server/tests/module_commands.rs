@@ -82,6 +82,7 @@ async fn install(s: &Store, wasm: Vec<u8>, enabled: bool, fuel: Option<u64>) {
         description: Some("runs it"),
         permission: Some("run"),
         command: None,
+        language: None,
     }];
     s.install_module(InstallModuleRequest {
         id: "code-exec",
