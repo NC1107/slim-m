@@ -195,9 +195,8 @@ pub(super) async fn authorize(
     let channel_id = match super::canvas_frames::channel_id(&event) {
         Some(channel_id) => channel_id,
         None => match &event {
-            Event::MessageCreated { message, .. } | Event::MessageEdited { message, .. } => {
-                message.channel_id
-            }
+            Event::MessageCreated { message, .. } => message.channel_id,
+            Event::MessageEdited { message, .. } => message.channel_id,
             Event::MessageDeleted { channel_id, .. } => *channel_id,
             Event::ReactionsChanged { channel_id, .. } => *channel_id,
             Event::ThreadUpdated { channel_id, .. } => *channel_id,
@@ -303,9 +302,10 @@ pub(super) async fn authorize(
         } => match super::message_frames::created(
             store,
             ctx.user_id,
-            message,
-            attachments,
-            forwarded,
+            // Cloned only here, past every filter above; see `Event::MessageCreated`'s own doc.
+            (*message).clone(),
+            (*attachments).clone(),
+            forwarded.map(|f| (*f).clone()),
         )
         .await
         {
@@ -427,11 +427,12 @@ pub(super) async fn authorize(
             channel_id: channel_id.to_string(),
             user_id: user_id.to_string(),
         },
+        // Cloned only here, past every filter above; see `MessageCreated`'s own note.
         Event::ChannelCreated(channel) => ServerFrame::ChannelCreated {
-            channel: ChannelDto::from(channel),
+            channel: ChannelDto::from((*channel).clone()),
         },
         Event::ChannelUpdated(channel) => ServerFrame::ChannelUpdated {
-            channel: ChannelDto::from(channel),
+            channel: ChannelDto::from((*channel).clone()),
         },
         Event::OverwriteChanged { channel_id, .. } => ServerFrame::OverwriteChanged {
             channel_id: channel_id.to_string(),

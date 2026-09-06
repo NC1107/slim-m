@@ -9,6 +9,8 @@
 //! target channel before touching the store: view to read, view plus send to
 //! post, and authorship or manage-messages to edit or delete.
 
+use std::sync::Arc;
+
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
@@ -208,9 +210,9 @@ async fn send(
         .await?;
 
         state.hub.publish(Event::MessageCreated {
-            message: sent.message.clone(),
-            attachments: attachments.clone(),
-            forwarded: forwarded.clone(),
+            message: Arc::new(sent.message.clone()),
+            attachments: Arc::new(attachments.clone()),
+            forwarded: forwarded.clone().map(Arc::new),
         });
 
         // Cheap in-memory decision only, real work detached; see the note on
