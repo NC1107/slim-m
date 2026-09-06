@@ -97,6 +97,11 @@ final roleChangeWatcherProvider = Provider.autoDispose<void>((ref) {
       ref.invalidate(meProvider);
       ref.invalidate(channelPermissionsProvider);
       refreshVisibleChannels();
+      // A module-permission grant/revoke publishes RoleChanged too.
+      if (event is api.RoleChanged &&
+          ref.exists(roleModulePermissionsProvider(event.roleId))) {
+        ref.invalidate(roleModulePermissionsProvider(event.roleId));
+      }
     } else if (event is api.MemberTimeoutChanged && event.userId == selfId) {
       ref.invalidate(meProvider);
       ref.invalidate(channelPermissionsProvider);
@@ -157,3 +162,49 @@ final spaceScreenShareCeilingProvider = FutureProvider.autoDispose<int>(
 final spaceStorageProvider = FutureProvider.autoDispose<api.SpaceStorage>(
   (ref) => ref.watch(apiProvider).fetchSpaceStorage(),
 );
+
+/// The module marketplace's index, plus which of those modules (if any) this
+/// space has already installed - fetched together so a browse list can show
+/// each entry's install state in one round trip. See
+/// `docs/decisions/0021-modules-and-the-dock.md` and
+/// `screens/admin/dock_screen.dart`.
+class DockCatalog {
+  const DockCatalog({required this.entries, required this.installed});
+
+  final List<api.DockIndexEntry> entries;
+  final List<api.InstalledDockModule> installed;
+
+  /// The install record for [moduleId], or null when it is not installed.
+  api.InstalledDockModule? installedFor(String moduleId) =>
+      installed.where((m) => m.id == moduleId).firstOrNull;
+}
+
+final dockCatalogProvider = FutureProvider.autoDispose<DockCatalog>((
+  ref,
+) async {
+  final api = ref.watch(apiProvider);
+  final entries = await api.listDockModules();
+  final installed = await api.listInstalledDockModules();
+  return DockCatalog(entries: entries, installed: installed);
+});
+
+/// One module's full manifest, fetched only once its row is opened - see
+/// `screens/admin/dock_module_sheet.dart`.
+final dockManifestProvider = FutureProvider.autoDispose
+    .family<api.DockManifest, String>(
+      (ref, moduleId) => ref.watch(apiProvider).getDockModule(moduleId),
+    );
+
+/// Every module-scoped permission any installed module currently declares -
+/// the catalog a role editor lists alongside the fixed permission bitmask.
+/// See `docs/decisions/0021-modules-and-the-dock.md`.
+final modulePermissionsProvider =
+    FutureProvider.autoDispose<List<api.ModulePermission>>(
+      (ref) => ref.watch(apiProvider).listModulePermissions(),
+    );
+
+/// The module permissions one role currently holds.
+final roleModulePermissionsProvider = FutureProvider.autoDispose
+    .family<List<api.GrantedModulePermission>, String>(
+      (ref, roleId) => ref.watch(apiProvider).listRoleModulePermissions(roleId),
+    );

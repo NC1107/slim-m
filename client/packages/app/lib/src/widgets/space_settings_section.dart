@@ -23,6 +23,7 @@ import '../routing/routes.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/categories_screen.dart';
 import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/dock_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
 import '../screens/admin/performance_screen.dart';
@@ -176,6 +177,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.storage,
             compactRoute: Routes.adminStorage,
             builder: (_) => const StoragePane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'dock',
+            label: 'Dock',
+            icon: AppIcons.dock,
+            compactRoute: Routes.adminDock,
+            builder: (_) => const DockPane(),
           ),
       ],
     ),

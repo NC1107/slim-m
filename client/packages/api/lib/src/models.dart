@@ -14,6 +14,7 @@ library;
 export 'models_admin.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
+export 'models_dock.dart';
 export 'models_emoji.dart';
 export 'models_forwards.dart';
 export 'models_gifs.dart';
