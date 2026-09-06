@@ -112,23 +112,35 @@ class DockPermission {
 }
 
 /// One seam a module attaches to - a command, a message action, a scheduled
-/// job. The first release defines `command` only.
+/// job, or a code-block runner.
 class DockExtensionPoint {
   const DockExtensionPoint({
     required this.kind,
     required this.name,
     this.description,
+    this.permission,
+    this.command,
   });
 
   final String kind;
   final String name;
   final String? description;
 
+  /// The declared permission key a caller must hold to reach this extension
+  /// point. Always present for a `command` or a `code-block-runner`.
+  final String? permission;
+
+  /// For a `code-block-runner` only: the `command` extension point's own
+  /// name it invokes.
+  final String? command;
+
   factory DockExtensionPoint.fromJson(Map<String, dynamic> json) =>
       DockExtensionPoint(
         kind: json['kind'] as String,
         name: json['name'] as String,
         description: json['description'] as String?,
+        permission: json['permission'] as String?,
+        command: json['command'] as String?,
       );
 }
 

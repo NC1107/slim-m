@@ -60,6 +60,14 @@ pub(super) struct ExtensionPointDto {
     name: String,
     description: Option<String>,
     permission: Option<String>,
+    /// Omitted rather than sent as a literal `null` when absent (a `command`
+    /// extension point never has one): `tests/response_contract` validates
+    /// with a real JSON Schema, which has no `nullable` keyword of its own -
+    /// an emitted `null` on an `Option` field the schema types as `string`
+    /// fails validation outright, where an absent field on a non-`required`
+    /// property does not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<String>,
 }
 
 /// A module's full manifest, as the Dock shows an admin before install: every
@@ -117,6 +125,7 @@ impl From<Manifest> for ManifestDto {
                     name: e.name,
                     description: e.description,
                     permission: e.permission,
+                    command: e.command,
                 })
                 .collect(),
         }
@@ -156,6 +165,7 @@ impl From<InstalledModule> for InstalledModuleDto {
                     name: e.name,
                     description: e.description,
                     permission: e.permission,
+                    command: e.command,
                 })
                 .collect(),
             enabled: m.enabled,

@@ -109,7 +109,7 @@ A backend is provided by slim; a module declares which one it needs.
 
 - **WASM first (`wasmtime`).** Runs in slim's process but strongly isolated: no syscalls, memory-bounded, CPU and time metered by fuel, network default-deny.
   It fits slim's single-process, self-hostable identity and needs no extra service.
-  A module that must run a *language* (the code-exec module running user snippets) does so by carrying a language runtime compiled to WASM (for example QuickJS for JavaScript); that choice is the module's, not slim's.
+  A module that must run a *language* (the code-exec module running user snippets) does so by carrying a language runtime compiled to WASM (the code-exec module uses the pure-Rust `boa` JS engine, which compiles import-free; QuickJS would need WASI imports the ABI forbids); that choice is the module's, not slim's.
 - **A container backend is a possible later host capability, not a module.**
   It would give OS-level isolation and native language support at the cost of a second service and real ops.
   Deferred; recorded here because the shape of the manifest (`runtime.backend`) already allows a module to request it without any change to the module model.
@@ -151,7 +151,7 @@ slim contains none of this; it only routes the command to the module and enforce
 ## Decisions (owner, 2026-09-06)
 
 - **Repository:** `NC1107/slim-addons`, public, default branch `main`. The Dock fetches `https://raw.githubusercontent.com/NC1107/slim-addons/main/index.json` and per-module manifests under it. Created with the code-exec manifest already present.
-- **First language:** JavaScript, via a QuickJS build compiled to WASM that the code-exec module carries. slim itself stays language-agnostic.
+- **First language:** JavaScript, via the pure-Rust `boa` engine compiled to import-free WASM that the code-exec module carries (chosen over QuickJS/javy, which require WASI imports the ABI forbids; both are JS). slim itself stays language-agnostic.
 - **Permissions:** space-wide for the first pass; channel-scoped overwrites for module permissions are a later extension.
 - **Integrity:** sha256 pin only for now; an artifact signature is a later hardening (Phase 5).
 - **WASM engine:** `wasmi` (pure-Rust interpreter, small binary footprint, supports fuel metering) rather than `wasmtime`, to protect the 20 MiB release-binary budget the brief treats as first-class. `wasmtime` is the upgrade path if execution speed becomes the bottleneck; the `runtime.backend` field already lets a module stay indifferent to which the host uses.
@@ -210,3 +210,23 @@ reach it. `http::module_commands` checks
 `Store::user_has_module_permission` before ever calling the host - the route
 is gating, the host is execution, and slim still has no notion of what any
 command actually does.
+
+## The code-block-runner extension point
+
+The client's "Run" affordance on a fenced code block is driven by a second
+extension-point kind, `code-block-runner`: `{ "kind": "code-block-runner",
+"name": "...", "permission": "<permKey>", "command": "<cmd>" }`. `permission`
+works exactly as it does for `command`; `command` names one of the
+manifest's own `command` extension points, checked at manifest-validation
+time the same way `permission` is checked against `permissions`.
+
+`GET /modules/code-block-runners` (any authenticated caller, not
+`MANAGE_SERVER`) answers every `(module_id, command)` pair from an installed,
+enabled module whose `code-block-runner` permission the caller holds. This
+is the entire mechanism: the client offers Run when the list is non-empty
+and POSTs to `/modules/{moduleId}/commands/{command}` exactly as
+`runModuleCommand` already does. slim has no hardcoded notion of
+"code-exec" anywhere in this path - a deployment with no such module
+installed gets an empty list and no Run affordance at all, and a module
+declaring `code-block-runner` is free to be anything a manifest author
+wants to expose on a code block, not only a language sandbox.

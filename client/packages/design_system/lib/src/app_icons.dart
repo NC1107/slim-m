@@ -93,6 +93,12 @@ abstract final class AppIcons {
   /// Overlaid on a held gif or a not-yet-loaded media preview: tap to reveal.
   static const IconData play = LucideIcons.play300;
 
+  /// Running a fenced code block through an installed module's
+  /// `code-block-runner` extension point (docs/decisions/0021). Shares
+  /// [play]'s glyph but named separately: the two are different actions and
+  /// must be free to diverge later.
+  static const IconData runCode = LucideIcons.play300;
+
   /// A playing attachment video's own transport control, distinct from
   /// [play]'s poster-overlay role.
   static const IconData pause = LucideIcons.pause300;

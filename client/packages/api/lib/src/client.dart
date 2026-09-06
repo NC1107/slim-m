@@ -24,6 +24,7 @@ part 'client_gifs.dart';
 part 'client_link_preview.dart';
 part 'client_messages.dart';
 part 'client_moderation.dart';
+part 'client_module_commands.dart';
 part 'client_module_permissions.dart';
 part 'client_presence.dart';
 part 'client_push.dart';

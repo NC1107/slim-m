@@ -141,12 +141,20 @@ struct RawExtensionPoint {
     #[serde(default)]
     description: Option<String>,
     /// The declared permission key (see `permissions` above) a caller must
-    /// hold to reach this extension point. Required for `kind: "command"`,
-    /// per the module runtime's own permission gate
-    /// (`http::module_commands`); optional for any future kind that adds no
-    /// permission of its own.
+    /// hold to reach this extension point. Required for `kind: "command"`
+    /// and `kind: "code-block-runner"`, per the module runtime's own
+    /// permission gate (`http::module_commands`); optional for any future
+    /// kind that adds no permission of its own.
     #[serde(default)]
     permission: Option<String>,
+    /// For `kind: "code-block-runner"` only: the `command` extension
+    /// point's own `name` this runner invokes - the module must declare
+    /// both, so the client's discovery call
+    /// (`GET /modules/code-block-runners`) can hand back a `(module_id,
+    /// command)` pair that `POST /modules/{moduleId}/commands/{command}`
+    /// is guaranteed to accept.
+    #[serde(default)]
+    command: Option<String>,
 }
 
 /// A module's declared permission, validated: `key` is a safe slug, `name`
@@ -184,6 +192,7 @@ pub(super) struct ManifestExtensionPoint {
     pub(super) name: String,
     pub(super) description: Option<String>,
     pub(super) permission: Option<String>,
+    pub(super) command: Option<String>,
 }
 
 /// A fully parsed and validated module manifest.
@@ -250,10 +259,17 @@ fn validate_manifest(raw: RawManifest) -> Result<Manifest, ManifestError> {
     if raw.extension_points.len() > MAX_LIST_ITEMS {
         return Err(malformed("manifest declares too many extension points"));
     }
+    // Collected before validation consumes the list, so a `code-block-runner` can be checked against its sibling `command` names, the same way `seen_keys` checks against `permissions`.
+    let command_names: std::collections::HashSet<String> = raw
+        .extension_points
+        .iter()
+        .filter(|ep| ep.kind == "command")
+        .map(|ep| ep.name.trim().to_owned())
+        .collect();
     let extension_points = raw
         .extension_points
         .into_iter()
-        .map(|ep| validate_extension_point(ep, &seen_keys))
+        .map(|ep| validate_extension_point(ep, &seen_keys, &command_names))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Manifest {
@@ -328,10 +344,13 @@ fn validate_permission(raw: RawPermission) -> Result<ManifestPermission, Manifes
 /// (`permissions[].key`, already validated), checked against here so a
 /// command cannot name a permission the manifest never declares - the
 /// module runtime otherwise has no way to tell an admin's `MANAGE_ROLES`
-/// grant surface apart from a typo.
+/// grant surface apart from a typo. `command_names` is likewise the
+/// manifest's own `command` extension point names, checked against a
+/// `code-block-runner`'s own `command` field for the same reason.
 fn validate_extension_point(
     raw: RawExtensionPoint,
     permission_keys: &std::collections::HashSet<String>,
+    command_names: &std::collections::HashSet<String>,
 ) -> Result<ManifestExtensionPoint, ManifestError> {
     let kind = bounded(&raw.kind, MAX_SLUG, "extension_points[].kind")?;
     let name = bounded(&raw.name, MAX_SHORT_FIELD, "extension_points[].name")?;
@@ -342,6 +361,10 @@ fn validate_extension_point(
     let permission = raw
         .permission
         .map(|p| bounded(&p, MAX_SLUG, "extension_points[].permission"))
+        .transpose()?;
+    let command = raw
+        .command
+        .map(|c| bounded(&c, MAX_SHORT_FIELD, "extension_points[].command"))
         .transpose()?;
     if kind == "command" {
         match &permission {
@@ -357,12 +380,40 @@ fn validate_extension_point(
                 ));
             }
         }
+    } else if kind == "code-block-runner" {
+        match &permission {
+            Some(key) if permission_keys.contains(key) => {}
+            Some(_) => {
+                return Err(malformed(
+                    "a code-block-runner extension point's permission must name a permission this manifest declares",
+                ));
+            }
+            None => {
+                return Err(malformed(
+                    "a code-block-runner extension point must declare which permission it requires",
+                ));
+            }
+        }
+        match &command {
+            Some(cmd) if command_names.contains(cmd) => {}
+            Some(_) => {
+                return Err(malformed(
+                    "a code-block-runner extension point's command must name a command this manifest declares",
+                ));
+            }
+            None => {
+                return Err(malformed(
+                    "a code-block-runner extension point must declare which command it runs",
+                ));
+            }
+        }
     }
     Ok(ManifestExtensionPoint {
         kind,
         name,
         description,
         permission,
+        command,
     })
 }
 

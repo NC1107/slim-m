@@ -16,6 +16,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/code_block_runner.dart';
 import '../../providers/providers.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
@@ -68,7 +69,10 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (ok) ref.invalidate(dockCatalogProvider);
+    if (ok) {
+      ref.invalidate(dockCatalogProvider);
+      ref.invalidate(codeBlockRunnerProvider);
+    }
   }
 
   Future<void> _uninstall(String name) async {
@@ -92,6 +96,7 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
     if (ok) {
       ref.invalidate(dockCatalogProvider);
       ref.invalidate(modulePermissionsProvider);
+      ref.invalidate(codeBlockRunnerProvider);
       if (mounted) Navigator.of(context).pop();
     }
   }

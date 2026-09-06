@@ -6,13 +6,22 @@ library;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/code_block_runner.dart';
 import 'package:slimm_app/src/widgets/message_text.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-Widget _harness(Widget child) => MaterialApp(
-  theme: buildTheme(Brightness.light, AppTokens.light),
-  home: Scaffold(body: child),
+/// No installed runner by default: a plain-text override rather than a real
+/// network round trip, since none of these tests are about the Run
+/// affordance. `message_code_block_runner_test.dart` overrides it the other
+/// way, with a runner present.
+Widget _harness(Widget child) => ProviderScope(
+  overrides: [codeBlockRunnerProvider.overrideWith((ref) async => null)],
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(body: child),
+  ),
 );
 
 void main() {

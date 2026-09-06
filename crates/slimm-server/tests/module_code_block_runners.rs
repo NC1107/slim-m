@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! `POST /modules/{moduleId}/commands/{command}`: gating (not installed, not
-//! enabled, no such command, missing permission) and the wasm sandbox itself
-//! answering cleanly, including when it hits a resource limit. See
-//! docs/decisions/0021-modules-and-the-dock.md's Phase 3.
+//! `GET /modules/code-block-runners`: the general discovery mechanism a
+//! client uses to decide whether to offer "Run" on a fenced code block, per
+//! docs/decisions/0021-modules-and-the-dock.md's module-agnostic principle -
+//! slim has no notion of "code execution" anywhere in this route, only of an
+//! installed, enabled module that declared a `code-block-runner` extension
+//! point the caller holds the permission for.
 //!
-//! `tests/dock.rs` and `crates/slimm-server/src/module_runtime/tests.rs`
-//! already cover the artifact fetch/verify path and the host's own ABI
-//! mechanics (import refusal, fuel, memory) in isolation; this file is about
-//! the route that ties installed-module state, the permission grant, and the
-//! host together.
+//! `tests/module_commands.rs` covers running a command once discovered; this
+//! file is only about which `(module_id, command)` pairs a caller is shown.
 
 use axum::Router;
 use axum::body::Body;
@@ -31,7 +30,7 @@ use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
 
 mod support;
-use support::wasm_fixtures::{canned_ok_wasm, fuel_burner_wasm, sha256_hex};
+use support::wasm_fixtures::{canned_ok_wasm, sha256_hex};
 
 async fn store(name: &str) -> (Store, support::TestDbGuard) {
     let (path, guard) = support::TestDbGuard::new(name);
@@ -66,33 +65,39 @@ async fn deployment(s: &Store) -> User {
     s.create_user("nia", "Nia").await.unwrap()
 }
 
-/// Installs `code-exec` with one `run` command requiring the `run`
-/// permission, and stores `wasm` as its verified artifact. `fuel` lets the
-/// fuel-exhaustion test configure a tight budget.
-async fn install(s: &Store, wasm: Vec<u8>, enabled: bool, fuel: Option<u64>) {
+/// Installs `code-exec` with both a `run` command and a `code-block-runner`
+/// extension point that invokes it, both gated on the `run` permission.
+async fn install(s: &Store, enabled: bool) {
+    let wasm = canned_ok_wasm("done");
     let sha256 = sha256_hex(&wasm);
     let permissions = vec![ModulePermissionSpec {
         key: "run",
         name: "Execute code blocks",
         description: "run a snippet",
     }];
-    let extension_points = vec![ModuleExtensionPointSpec {
-        kind: "command",
-        name: "run",
-        description: Some("runs it"),
-        permission: Some("run"),
-        command: None,
-    }];
+    let extension_points = vec![
+        ModuleExtensionPointSpec {
+            kind: "command",
+            name: "run",
+            description: Some("runs it"),
+            permission: Some("run"),
+            command: None,
+        },
+        ModuleExtensionPointSpec {
+            kind: "code-block-runner",
+            name: "Run in chat",
+            description: Some("offers Run on a fenced code block"),
+            permission: Some("run"),
+            command: Some("run"),
+        },
+    ];
     s.install_module(InstallModuleRequest {
         id: "code-exec",
         name: "Code Blocks",
         version: "0.1.0",
         artifact_sha256: &sha256,
         approved_capabilities: &[],
-        runtime_limits: &ModuleRuntimeLimits {
-            fuel,
-            ..ModuleRuntimeLimits::default()
-        },
+        runtime_limits: &ModuleRuntimeLimits::default(),
         permissions: &permissions,
         extension_points: &extension_points,
     })
@@ -118,13 +123,12 @@ async fn grant_run_permission(s: &Store, user: &User) {
         .unwrap();
 }
 
-fn req_json(method: &str, uri: &str, token: &str, body: Value) -> Request<Body> {
+fn req(uri: &str, token: &str) -> Request<Body> {
     Request::builder()
-        .method(method)
+        .method("GET")
         .uri(uri)
         .header("authorization", format!("Bearer {token}"))
-        .header("content-type", "application/json")
-        .body(Body::from(body.to_string()))
+        .body(Body::empty())
         .unwrap()
 }
 
@@ -136,135 +140,129 @@ async fn json_body(response: axum::response::Response) -> Value {
 }
 
 #[tokio::test]
-async fn a_module_that_is_not_installed_404s() {
-    let (s, _guard) = store("slimm-module-cmd-not-installed").await;
+async fn no_installed_module_answers_an_empty_list() {
+    let (s, _guard) = store("slimm-runners-none").await;
     let member = deployment(&s).await;
     let token = s.open_session(member.id, "phone").await.unwrap();
     let router = app(s);
 
     let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/run",
+        .oneshot(req(
+            "/modules/code-block-runners",
             token.access_token.as_str(),
-            json!({ "input": "hi" }),
         ))
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(json_body(response).await, json!([]));
 }
 
 #[tokio::test]
-async fn a_disabled_module_409s() {
-    let (s, _guard) = store("slimm-module-cmd-disabled").await;
+async fn an_installed_but_disabled_module_is_never_offered() {
+    let (s, _guard) = store("slimm-runners-disabled").await;
     let member = deployment(&s).await;
-    install(&s, canned_ok_wasm("done"), false, None).await;
+    install(&s, false).await;
     grant_run_permission(&s, &member).await;
     let token = s.open_session(member.id, "phone").await.unwrap();
     let router = app(s);
 
     let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/run",
+        .oneshot(req(
+            "/modules/code-block-runners",
             token.access_token.as_str(),
-            json!({ "input": "hi" }),
         ))
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(json_body(response).await, json!([]));
 }
 
 #[tokio::test]
-async fn an_unknown_command_404s() {
-    let (s, _guard) = store("slimm-module-cmd-unknown-command").await;
+async fn an_enabled_module_is_hidden_from_a_caller_without_the_permission() {
+    let (s, _guard) = store("slimm-runners-no-perm").await;
     let member = deployment(&s).await;
-    install(&s, canned_ok_wasm("done"), true, None).await;
-    grant_run_permission(&s, &member).await;
-    let token = s.open_session(member.id, "phone").await.unwrap();
-    let router = app(s);
-
-    let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/does-not-exist",
-            token.access_token.as_str(),
-            json!({ "input": "hi" }),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
-}
-
-#[tokio::test]
-async fn a_caller_without_the_permission_is_forbidden() {
-    let (s, _guard) = store("slimm-module-cmd-forbidden").await;
-    let member = deployment(&s).await;
-    install(&s, canned_ok_wasm("done"), true, None).await;
+    install(&s, true).await;
     // Deliberately never granted.
     let token = s.open_session(member.id, "phone").await.unwrap();
     let router = app(s);
 
     let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/run",
+        .oneshot(req(
+            "/modules/code-block-runners",
             token.access_token.as_str(),
-            json!({ "input": "hi" }),
         ))
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(json_body(response).await, json!([]));
 }
 
 #[tokio::test]
-async fn a_permission_holder_gets_the_modules_own_output() {
-    let (s, _guard) = store("slimm-module-cmd-success").await;
+async fn a_permission_holder_is_offered_the_installed_runner() {
+    let (s, _guard) = store("slimm-runners-ok").await;
     let member = deployment(&s).await;
-    install(&s, canned_ok_wasm("done"), true, None).await;
+    install(&s, true).await;
     grant_run_permission(&s, &member).await;
     let token = s.open_session(member.id, "phone").await.unwrap();
     let router = app(s);
 
     let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/run",
+        .oneshot(req(
+            "/modules/code-block-runners",
             token.access_token.as_str(),
-            json!({ "input": "hi" }),
         ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    assert_eq!(body["ok"], json!(true));
-    assert_eq!(body["output"], json!("done"));
+    assert_eq!(
+        json_body(response).await,
+        json!([{ "module_id": "code-exec", "command": "run" }])
+    );
 }
 
-/// The core promise of the sandbox: a module that never returns still
-/// answers promptly with a clean `ok: false`, never a 500 and never a hang.
+/// A plain `command` extension point with no `code-block-runner` of its own
+/// must never be offered as a Run affordance - the two are separate kinds,
+/// and only the latter means "show Run on a fenced code block".
 #[tokio::test]
-async fn a_fuel_exhausting_module_answers_cleanly_instead_of_hanging() {
-    let (s, _guard) = store("slimm-module-cmd-fuel").await;
+async fn a_module_with_only_a_command_extension_point_is_never_offered() {
+    let (s, _guard) = store("slimm-runners-command-only").await;
     let member = deployment(&s).await;
-    install(&s, fuel_burner_wasm(), true, Some(10_000)).await;
+    let wasm = canned_ok_wasm("done");
+    let sha256 = sha256_hex(&wasm);
+    s.install_module(InstallModuleRequest {
+        id: "code-exec",
+        name: "Code Blocks",
+        version: "0.1.0",
+        artifact_sha256: &sha256,
+        approved_capabilities: &[],
+        runtime_limits: &ModuleRuntimeLimits::default(),
+        permissions: &[ModulePermissionSpec {
+            key: "run",
+            name: "Execute code blocks",
+            description: "run a snippet",
+        }],
+        extension_points: &[ModuleExtensionPointSpec {
+            kind: "command",
+            name: "run",
+            description: Some("runs it"),
+            permission: Some("run"),
+            command: None,
+        }],
+    })
+    .await
+    .unwrap();
+    s.store_module_artifact("code-exec", &sha256, &wasm)
+        .await
+        .unwrap();
+    s.set_module_enabled("code-exec", true).await.unwrap();
     grant_run_permission(&s, &member).await;
     let token = s.open_session(member.id, "phone").await.unwrap();
     let router = app(s);
 
-    let started = std::time::Instant::now();
     let response = router
-        .oneshot(req_json(
-            "POST",
-            "/modules/code-exec/commands/run",
+        .oneshot(req(
+            "/modules/code-block-runners",
             token.access_token.as_str(),
-            json!({ "input": "hi" }),
         ))
         .await
         .unwrap();
-    assert!(started.elapsed() < std::time::Duration::from_secs(5));
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = json_body(response).await;
-    assert_eq!(body["ok"], json!(false));
-    assert!(body["error"].as_str().unwrap().contains("limit"));
+    assert_eq!(json_body(response).await, json!([]));
 }

@@ -68,6 +68,85 @@ fn rejects_a_command_extension_point_naming_an_undeclared_permission() {
     ));
 }
 
+const GOOD_MANIFEST_WITH_RUNNER: &str = r#"{
+    "schema": 1,
+    "id": "code-exec",
+    "name": "Code Blocks",
+    "version": "0.1.0",
+    "summary": "runs code",
+    "author": "slim-m",
+    "artifact": {
+        "kind": "wasm",
+        "path": "modules/code-exec/0.1.0/module.wasm",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "runtime": {"backend": "wasm", "limits": {"memory_mb": 64, "wall_ms": 2000, "fuel": 500000000}},
+    "permissions": [
+        {"key": "run", "name": "Execute code blocks", "description": "run a snippet"}
+    ],
+    "capabilities": ["command.register", "message.post"],
+    "extension_points": [
+        {"kind": "command", "name": "run", "description": "runs it", "permission": "run"},
+        {"kind": "code-block-runner", "name": "Run in chat", "permission": "run", "command": "run"}
+    ]
+}"#;
+
+#[test]
+fn parses_a_code_block_runner_extension_point() {
+    let manifest = parse_manifest(GOOD_MANIFEST_WITH_RUNNER.as_bytes()).unwrap();
+    let runner = manifest
+        .extension_points
+        .iter()
+        .find(|e| e.kind == "code-block-runner")
+        .unwrap();
+    assert_eq!(runner.command.as_deref(), Some("run"));
+    assert_eq!(runner.permission.as_deref(), Some("run"));
+}
+
+#[test]
+fn rejects_a_code_block_runner_with_no_permission() {
+    let bad = GOOD_MANIFEST_WITH_RUNNER.replace(r#", "permission": "run", "command": "run""#, "");
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
+fn rejects_a_code_block_runner_naming_an_undeclared_permission() {
+    let bad = GOOD_MANIFEST_WITH_RUNNER.replacen(
+        r#""permission": "run", "command": "run""#,
+        r#""permission": "ghost", "command": "run""#,
+        1,
+    );
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
+fn rejects_a_code_block_runner_with_no_command() {
+    let bad = GOOD_MANIFEST_WITH_RUNNER.replace(r#", "command": "run""#, "");
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
+fn rejects_a_code_block_runner_naming_an_undeclared_command() {
+    let bad = GOOD_MANIFEST_WITH_RUNNER.replacen(
+        r#""command": "run""#,
+        r#""command": "does-not-exist""#,
+        1,
+    );
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
 #[test]
 fn rejects_malformed_json() {
     assert!(matches!(
