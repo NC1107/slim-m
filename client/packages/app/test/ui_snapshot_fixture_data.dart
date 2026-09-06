@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rows the UI snapshot matrix's fake server answers with: real members,
-/// real roles, real invites, real reports, and a channel with a real topic.
+/// real presence, real roles, real invites, real reports, and a channel with
+/// a real topic.
 ///
 /// Split out of `ui_snapshot_support.dart` purely to stay under this repo's
 /// line budget; see that file for the container and router this data feeds.
@@ -67,6 +68,16 @@ const _fixtureRoleMaps = [
     'is_everyone': false,
     'created_at': 0,
   },
+];
+
+/// Presence for the fixture roster: only the signed-in user online. Ada and
+/// the long-name member are left unseeded (offline), which is what
+/// `shell_semantics_test.dart` already asserts by name, and is enough on its
+/// own to put a real screenshot's own Online and Offline groups both on
+/// screen instead of leaving every member - self included - unseeded and
+/// therefore Offline.
+const _fixturePresenceMaps = [
+  {'user_id': 'user-nick', 'status': 'online'},
 ];
 
 /// A spent code (used up, not revoked, never expiring), a live one that
@@ -239,6 +250,8 @@ Future<http.Response> fixtureResponse(http.Request request) async {
     '/users' => _fixtureMemberMaps,
     _ when path.endsWith('/members') => _fixtureMemberMaps,
     '/members/removed' => _fixtureRemovalMaps,
+    _ when path == '/presence' && request.method == 'GET' =>
+      _fixturePresenceMaps,
     '/roles' => _fixtureRoleMaps,
     '/invites' => _fixtureInviteMaps,
     '/reports' => _fixtureReportMaps,
