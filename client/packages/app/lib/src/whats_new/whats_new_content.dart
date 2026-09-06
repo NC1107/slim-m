@@ -329,6 +329,38 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.70.0',
+    headline: 'Install modules, run code, and search across the whole space',
+    points: [
+      WhatsNewPoint(
+        'A space can now install modules from the Dock in space settings. '
+        'The first one turns a code block into something you can run, with '
+        'its output shown inline like a notebook cell. Modules run sandboxed '
+        'and are off until an admin installs one and grants the permission, '
+        'so a space gains only what its admin chooses.',
+      ),
+      WhatsNewPoint(
+        'Search now looks across every channel you can see, not only the one '
+        'open in front of you.',
+      ),
+      WhatsNewPoint(
+        'A channel where you were mentioned reads differently from one with '
+        'only ordinary unread messages, so a question meant for you is not '
+        'lost in the rest.',
+      ),
+      WhatsNewPoint(
+        'A channel can be given a slow mode - a minimum gap between messages '
+        '- as a lighter step than timing anyone out. Roles that manage the '
+        'channel are exempt, and the composer shows the wait rather than '
+        'refusing a message after you have typed it.',
+      ),
+      WhatsNewPoint(
+        'A YouTube link shows its thumbnail with a play button, and nothing '
+        'from YouTube loads until you choose to play it.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
