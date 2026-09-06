@@ -63,6 +63,12 @@ pub(crate) enum ApiError {
     /// full", and the two have different fixes: one is the sender's, the other
     /// is the operator's.
     InsufficientStorage,
+    /// A trusted upstream (the Dock's module registry) was reached but
+    /// returned data this server refuses to trust: malformed, oversized, or
+    /// otherwise not what the wire contract promises. Distinct from
+    /// [`ApiError::BadRequest`], which is the caller's own doing, and from
+    /// [`ApiError::Internal`], which is this server's own bug.
+    UpstreamInvalid(String),
     Internal,
 }
 
@@ -112,6 +118,7 @@ impl IntoResponse for ApiError {
                 StatusCode::INSUFFICIENT_STORAGE,
                 "this deployment has no storage left for new uploads".into(),
             ),
+            ApiError::UpstreamInvalid(message) => (StatusCode::BAD_GATEWAY, message.into()),
             ApiError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 INTERNAL_ERROR_MESSAGE.into(),

@@ -15,6 +15,7 @@ pub mod identity;
 pub mod ids;
 pub mod media;
 pub mod mentions;
+mod net_guard;
 pub mod notifications;
 pub mod permissions;
 pub mod presence;
@@ -62,6 +63,7 @@ pub async fn run() -> anyhow::Result<()> {
     sweeps::spawn_message_retention_sweep(store.clone(), media.clone(), hub.clone());
     let gifs = http::gifs::GifSearch::new(&config)?;
     let link_previews = http::link_preview::LinkPreviews::new(&config);
+    let dock = http::dock::Dock::new(&config);
     let app = cors.apply(http::router(http::AppState {
         store,
         auth,
@@ -72,6 +74,7 @@ pub async fn run() -> anyhow::Result<()> {
         media,
         gifs,
         link_previews,
+        dock,
     }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;

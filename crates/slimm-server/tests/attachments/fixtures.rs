@@ -49,6 +49,7 @@ pub fn app(store: Store) -> Router {
         media: media_for_test(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
+        dock: slimm_server::http::dock::Dock::disabled(),
     })
 }
 

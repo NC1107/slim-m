@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT mp.module_id AS \"module_id!\", im.name AS \"module_name!\",\n                      mp.perm_key AS \"perm_key!\", mp.name AS \"name!\",\n                      mp.description AS \"description!\"\n               FROM module_permissions mp\n               JOIN installed_modules im ON im.id = mp.module_id\n               ORDER BY im.name, mp.perm_key",
+  "describe": {
+    "columns": [
+      {
+        "name": "module_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "module_name!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "perm_key!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "name!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "description!",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1a7b8f62048d4d85e1f2a4ce223b3d6ac33717ed9bd80cb4d617b9cffbb98f68"
+}

@@ -47,6 +47,7 @@ async fn world() -> (Store, axum::Router, support::TestDbGuard) {
         media: Media::for_tests(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
+        dock: slimm_server::http::dock::Dock::disabled(),
     });
     (store, app, guard)
 }

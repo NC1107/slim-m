@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM module_permissions WHERE module_id = ? AND perm_key = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ab7a9c679f4c4fa9b727d31631c916a7004f6ac02e266b8840a99d71e955831a"
+}
