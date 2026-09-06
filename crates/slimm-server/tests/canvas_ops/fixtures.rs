@@ -15,7 +15,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
-use slimm_server::ids::{CanvasObjectId, ChannelId, UserId};
+use slimm_server::ids::{CanvasObjectId, CanvasOpId, ChannelId, UserId};
 use slimm_server::media::Media;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
@@ -200,7 +200,66 @@ pub(crate) async fn get_ops(
     )
 }
 
-/// Places directly through the store, bypassing the HTTP rate limiter.
+/// Seeds `count` placed objects in one transaction: the same rows `place`
+/// writes per call - a `canvas_objects` row and its `canvas_ops` place row
+/// under a shared canvas seq, plus a single counter bump - but without a
+/// transaction per object, which is the difference between a budget test that
+/// needs tens of thousands of objects finishing in a second and in a minute.
+/// The R-Tree stays in sync through its own `AFTER INSERT` trigger, exactly as
+/// a real place relies on; `channel_key` is inlined from its `pub(crate)`
+/// formula since a test binary cannot reach it. A caller's own `affected` and
+/// feed assertions are what prove this reproduced the real placed state.
+pub(crate) async fn place_many(
+    pool: &sqlx::SqlitePool,
+    channel: ChannelId,
+    author: UserId,
+    count: i64,
+) {
+    let bytes = channel.0.as_bytes();
+    let key = (i64::from(bytes[13]) << 16) | (i64::from(bytes[14]) << 8) | i64::from(bytes[15]);
+    let mut tx = pool.begin().await.unwrap();
+    let next: i64 = sqlx::query_scalar(
+        "UPDATE channel_seq_counters SET next_seq = next_seq + ? \
+         WHERE channel_id = ? AND stream = 'canvas' RETURNING next_seq",
+    )
+    .bind(count)
+    .bind(channel)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    let base = next - count;
+    for i in 0..count {
+        let seq = base + i;
+        sqlx::query(
+            "INSERT INTO canvas_objects \
+             (id, channel_id, channel_key, kind, z_index, x, y, w, h, props, author_id, seq, created_at) \
+             VALUES (?, ?, ?, 'stroke', ?, 0.0, 0.0, 1.0, 1.0, '{}', ?, ?, 0)",
+        )
+        .bind(CanvasObjectId::generate())
+        .bind(channel)
+        .bind(key)
+        .bind(seq)
+        .bind(author)
+        .bind(seq)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO canvas_ops (channel_id, seq, id, kind, actor_id, created_at) \
+             VALUES (?, ?, ?, 'place', ?, 0)",
+        )
+        .bind(channel)
+        .bind(seq)
+        .bind(CanvasOpId::generate())
+        .bind(author)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+}
+
+/// Places one object directly through the store, bypassing the HTTP rate limiter.
 pub(crate) async fn place(
     store: &Store,
     channel: ChannelId,
