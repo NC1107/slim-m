@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Installed-module persistence: install (metadata plus the permissions it
-//! declares), enable/disable, list, and uninstall. No runtime lives here;
-//! see docs/decisions/0021-modules-and-the-dock.md for the phasing this is
-//! the Phase 2 half of.
+//! declares), enable/disable, list, and uninstall. See `module_artifacts`
+//! for the module's own wasm bytes and `crate::module_runtime` for the Phase
+//! 3 host that runs them; see
+//! docs/decisions/0021-modules-and-the-dock.md for the phasing this belongs
+//! to.
 //!
-//! Artifact bytes are never fetched or stored by this module: `Dock::install`
-//! records only the manifest's own metadata, `artifact_sha256` included, as a
-//! placeholder a later phase compares real downloaded bytes against. See
-//! `http::dock`'s install handler for why that is deliberate at this phase.
+//! `runtime_limits` and `extension_points` are recorded here, at install
+//! time, from the manifest the Dock just fetched and validated: the runtime
+//! never re-fetches a manifest on every command call, so anything it needs
+//! (a command's required permission key, the resource caps to run under) has
+//! to be persisted alongside the rest of the install row.
 
 use super::{Store, now_ms};
 
@@ -19,8 +22,35 @@ pub struct InstalledModule {
     pub version: String,
     pub artifact_sha256: String,
     pub approved_capabilities: Vec<String>,
+    pub runtime_limits: ModuleRuntimeLimits,
+    pub extension_points: Vec<ModuleExtensionPoint>,
     pub enabled: bool,
     pub installed_at: i64,
+}
+
+/// The manifest's `runtime.limits`, persisted verbatim so the module host can
+/// enforce them without a network round trip. Any field left unset by the
+/// manifest falls back to the host's own default, applied where the limits
+/// are read rather than here, so an installed row always reflects exactly
+/// what the manifest declared.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ModuleRuntimeLimits {
+    pub memory_mb: Option<u64>,
+    pub wall_ms: Option<u64>,
+    pub fuel: Option<u64>,
+}
+
+/// One of the module's declared extension points, as recorded at install.
+/// `permission` is the declared permission key (namespaced by this module's
+/// id once granted, see `store::module_permissions`) a caller must hold to
+/// reach it; a `command` extension point always carries one, checked by
+/// `http::dock::manifest`'s own validation before this ever gets here.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ModuleExtensionPoint {
+    pub kind: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub permission: Option<String>,
 }
 
 /// One permission a module's manifest declares, as install registers it into
@@ -31,6 +61,15 @@ pub struct ModulePermissionSpec<'a> {
     pub description: &'a str,
 }
 
+/// One extension point a module's manifest declares, as install records it
+/// onto the `installed_modules` row.
+pub struct ModuleExtensionPointSpec<'a> {
+    pub kind: &'a str,
+    pub name: &'a str,
+    pub description: Option<&'a str>,
+    pub permission: Option<&'a str>,
+}
+
 /// Everything an install call needs, bundled so `Store::install_module` stays
 /// under the project's 7-positional-parameter limit.
 pub struct InstallModuleRequest<'a> {
@@ -39,7 +78,9 @@ pub struct InstallModuleRequest<'a> {
     pub version: &'a str,
     pub artifact_sha256: &'a str,
     pub approved_capabilities: &'a [String],
+    pub runtime_limits: &'a ModuleRuntimeLimits,
     pub permissions: &'a [ModulePermissionSpec<'a>],
+    pub extension_points: &'a [ModuleExtensionPointSpec<'a>],
 }
 
 struct ModuleRow {
@@ -48,6 +89,8 @@ struct ModuleRow {
     version: String,
     artifact_sha256: String,
     approved_capabilities: String,
+    runtime_limits: String,
+    extension_points: String,
     enabled: bool,
     installed_at: i64,
 }
@@ -57,12 +100,16 @@ impl From<ModuleRow> for InstalledModule {
         // A parse failure means the row was corrupted elsewhere; fall back to empty rather than erroring a read.
         let approved_capabilities =
             serde_json::from_str(&row.approved_capabilities).unwrap_or_default();
+        let runtime_limits = serde_json::from_str(&row.runtime_limits).unwrap_or_default();
+        let extension_points = serde_json::from_str(&row.extension_points).unwrap_or_default();
         Self {
             id: row.id,
             name: row.name,
             version: row.version,
             artifact_sha256: row.artifact_sha256,
             approved_capabilities,
+            runtime_limits,
+            extension_points,
             enabled: row.enabled,
             installed_at: row.installed_at,
         }
@@ -89,21 +136,38 @@ impl Store {
         let mut tx = self.begin_write().await?;
         let now = now_ms();
         let caps_json = serde_json::to_string(req.approved_capabilities)?;
+        let limits_json = serde_json::to_string(req.runtime_limits)?;
+        let extension_points: Vec<ModuleExtensionPoint> = req
+            .extension_points
+            .iter()
+            .map(|e| ModuleExtensionPoint {
+                kind: e.kind.to_owned(),
+                name: e.name.to_owned(),
+                description: e.description.map(str::to_owned),
+                permission: e.permission.map(str::to_owned),
+            })
+            .collect();
+        let extension_points_json = serde_json::to_string(&extension_points)?;
 
         sqlx::query!(
             "INSERT INTO installed_modules
-                 (id, name, version, artifact_sha256, approved_capabilities, enabled, installed_at)
-             VALUES (?, ?, ?, ?, ?, 0, ?)
+                 (id, name, version, artifact_sha256, approved_capabilities,
+                  runtime_limits, extension_points, enabled, installed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
                  version = excluded.version,
                  artifact_sha256 = excluded.artifact_sha256,
-                 approved_capabilities = excluded.approved_capabilities",
+                 approved_capabilities = excluded.approved_capabilities,
+                 runtime_limits = excluded.runtime_limits,
+                 extension_points = excluded.extension_points",
             req.id,
             req.name,
             req.version,
             req.artifact_sha256,
             caps_json,
+            limits_json,
+            extension_points_json,
             now
         )
         .execute(&mut *tx)
@@ -154,6 +218,8 @@ impl Store {
             r#"SELECT id AS "id!", name AS "name!", version AS "version!",
                       artifact_sha256 AS "artifact_sha256!",
                       approved_capabilities AS "approved_capabilities!",
+                      runtime_limits AS "runtime_limits!",
+                      extension_points AS "extension_points!",
                       enabled AS "enabled!: bool", installed_at AS "installed_at!"
                FROM installed_modules WHERE id = ?"#,
             id
@@ -170,6 +236,8 @@ impl Store {
             r#"SELECT id AS "id!", name AS "name!", version AS "version!",
                       artifact_sha256 AS "artifact_sha256!",
                       approved_capabilities AS "approved_capabilities!",
+                      runtime_limits AS "runtime_limits!",
+                      extension_points AS "extension_points!",
                       enabled AS "enabled!: bool", installed_at AS "installed_at!"
                FROM installed_modules ORDER BY installed_at DESC"#
         )
@@ -194,9 +262,9 @@ impl Store {
     }
 
     /// Uninstalls a module. `Ok(false)` if it was not installed. The
-    /// `module_permissions` and `role_module_permissions` rows cascade away
-    /// on the `installed_modules` foreign key, so nothing dangles: see the
-    /// migration's own comment.
+    /// `module_permissions`, `role_module_permissions` and `module_artifacts`
+    /// rows all cascade away on the `installed_modules` foreign key, so
+    /// nothing dangles: see the migrations' own comments.
     pub async fn uninstall_module(&self, id: &str) -> anyhow::Result<bool> {
         let affected = sqlx::query!("DELETE FROM installed_modules WHERE id = ?", id)
             .execute(&self.pool)

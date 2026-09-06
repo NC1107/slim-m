@@ -27,6 +27,7 @@ use tower::ServiceExt;
 
 use super::openapi::Api;
 use super::verdict::{self, Answer};
+use crate::support::wasm_fixtures;
 
 pub enum Payload {
     None,
@@ -265,6 +266,7 @@ async fn spawn_fake_dock_registry() -> String {
         }))
     }
     async fn manifest() -> axum::Json<Value> {
+        let sha256 = wasm_fixtures::sha256_hex(&wasm_fixtures::canned_ok_wasm("done"));
         axum::Json(json!({
             "schema": 1,
             "id": "code-exec",
@@ -275,7 +277,7 @@ async fn spawn_fake_dock_registry() -> String {
             "artifact": {
                 "kind": "wasm",
                 "path": "modules/code-exec/0.1.0/module.wasm",
-                "sha256": "0".repeat(64)
+                "sha256": sha256
             },
             "runtime": {
                 "backend": "wasm",
@@ -286,9 +288,12 @@ async fn spawn_fake_dock_registry() -> String {
             ],
             "capabilities": ["command.register", "message.post"],
             "extension_points": [
-                {"kind": "command", "name": "run", "description": "runs it"}
+                {"kind": "command", "name": "run", "description": "runs it", "permission": "run"}
             ]
         }))
+    }
+    async fn artifact() -> Vec<u8> {
+        wasm_fixtures::canned_ok_wasm("done")
     }
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -296,7 +301,8 @@ async fn spawn_fake_dock_registry() -> String {
     let base = format!("http://{addr}/");
     let router = Router::new()
         .route("/index.json", get(index))
-        .route("/modules/code-exec/manifest.json", get(manifest));
+        .route("/modules/code-exec/manifest.json", get(manifest))
+        .route("/modules/code-exec/0.1.0/module.wasm", get(artifact));
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });

@@ -13,6 +13,13 @@ use super::ssrf::{UrlError, validate};
 pub(super) const MAX_INDEX_BYTES: usize = 256 * 1024;
 /// Largest `manifest.json` this server will read.
 pub(super) const MAX_MANIFEST_BYTES: usize = 64 * 1024;
+/// Largest module artifact this server will fetch and store. A module is
+/// pure compute with no wasm imports (see `crate::module_runtime`'s ABI doc),
+/// so even a bundled language runtime compiled to wasm is expected to fit
+/// well inside this; sized generously above that rather than tightly, since
+/// the real ceiling on what a module can do at run time is its own
+/// `runtime.limits`, not this fetch cap.
+pub(super) const MAX_ARTIFACT_BYTES: usize = 16 * 1024 * 1024;
 
 /// What went wrong fetching from the Dock's one allowed host.
 #[derive(Debug, PartialEq, Eq)]

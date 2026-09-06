@@ -26,6 +26,13 @@ use tower::ServiceExt;
 
 mod support;
 
+/// The bytes served at `/modules/code-exec/0.1.0/module.wasm` by
+/// [`fake_registry`]. Not a real wasm module - these lifecycle tests never
+/// run it, only install/uninstall it - so any bytes work as long as
+/// `ARTIFACT_SHA256` below is really their sha256.
+const ARTIFACT_BYTES: &[u8] = b"fake wasm bytes for lifecycle test";
+const ARTIFACT_SHA256: &str = "f2699cd279b6629b45bd9ff149868dad60f6e4d236eafed4063421286c712f9c";
+
 const GOOD_MANIFEST: &str = r#"{
     "schema": 1,
     "id": "code-exec",
@@ -35,7 +42,7 @@ const GOOD_MANIFEST: &str = r#"{
     "artifact": {
         "kind": "wasm",
         "path": "modules/code-exec/0.1.0/module.wasm",
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        "sha256": "f2699cd279b6629b45bd9ff149868dad60f6e4d236eafed4063421286c712f9c"
     },
     "runtime": {"backend": "wasm", "limits": {"memory_mb": 64, "wall_ms": 2000, "fuel": 500000000}},
     "permissions": [
@@ -43,7 +50,7 @@ const GOOD_MANIFEST: &str = r#"{
     ],
     "capabilities": ["command.register", "message.post"],
     "extension_points": [
-        {"kind": "command", "name": "run", "description": "runs it"}
+        {"kind": "command", "name": "run", "description": "runs it", "permission": "run"}
     ]
 }"#;
 
@@ -130,12 +137,16 @@ async fn fake_registry() -> String {
     async fn manifest() -> axum::Json<Value> {
         axum::Json(serde_json::from_str(GOOD_MANIFEST).unwrap())
     }
+    async fn artifact() -> Vec<u8> {
+        ARTIFACT_BYTES.to_vec()
+    }
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let base = format!("http://{addr}/");
     let router = Router::new()
         .route("/index.json", get(index))
-        .route("/modules/code-exec/manifest.json", get(manifest));
+        .route("/modules/code-exec/manifest.json", get(manifest))
+        .route("/modules/code-exec/0.1.0/module.wasm", get(artifact));
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });
@@ -231,6 +242,14 @@ async fn install_registers_permissions_and_uninstall_removes_them() {
     assert_eq!(perms[0].module_id, "code-exec");
     assert_eq!(perms[0].perm_key, "run");
 
+    let (stored_sha256, stored_bytes) = s
+        .module_artifact("code-exec")
+        .await
+        .unwrap()
+        .expect("install should have fetched and stored the artifact bytes");
+    assert_eq!(stored_sha256, ARTIFACT_SHA256);
+    assert_eq!(stored_bytes, ARTIFACT_BYTES);
+
     let enable_response = router
         .clone()
         .oneshot(req("POST", "/space/dock/modules/code-exec/enable", token))
@@ -252,6 +271,7 @@ async fn install_registers_permissions_and_uninstall_removes_them() {
 
     assert!(s.installed_module("code-exec").await.unwrap().is_none());
     assert!(s.list_module_permissions().await.unwrap().is_empty());
+    assert!(s.module_artifact("code-exec").await.unwrap().is_none());
 
     // Idempotent-in-shape: a second uninstall 404s rather than succeeding twice.
     let second_uninstall = router

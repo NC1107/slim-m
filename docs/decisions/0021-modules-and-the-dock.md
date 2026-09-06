@@ -155,3 +155,58 @@ slim contains none of this; it only routes the command to the module and enforce
 - **Permissions:** space-wide for the first pass; channel-scoped overwrites for module permissions are a later extension.
 - **Integrity:** sha256 pin only for now; an artifact signature is a later hardening (Phase 5).
 - **WASM engine:** `wasmi` (pure-Rust interpreter, small binary footprint, supports fuel metering) rather than `wasmtime`, to protect the 20 MiB release-binary budget the brief treats as first-class. `wasmtime` is the upgrade path if execution speed becomes the bottleneck; the `runtime.backend` field already lets a module stay indifferent to which the host uses.
+
+## Module ABI v1
+
+Phase 3's host (`crate::module_runtime::ModuleHost`) runs a module under a
+deliberately minimal ABI, kept import-free for maximal isolation: a module is
+pure compute in v1, nothing more.
+
+A module exports exactly two functions and one memory, and imports nothing:
+
+- `memory` (exported linear memory).
+- `alloc(len: i32) -> i32`: reserves `len` bytes inside the module's own
+  memory and returns a pointer. Called once by the host, before `run`, to get
+  somewhere to write the request.
+- `run(in_ptr: i32, in_len: i32) -> i64`: given the request the host just
+  wrote at `in_ptr`/`in_len`, returns a packed `(out_ptr << 32) | out_len`
+  pointing at the response, wherever the module put it.
+
+The host writes a UTF-8 JSON request into the memory `alloc` returned, calls
+`run`, and reads `out_len` bytes at `out_ptr` back as a UTF-8 JSON response.
+Request: `{ "command": "<name>", "input": "<string>" }`. Response:
+`{ "ok": true, "output": "<string>" }` or `{ "ok": false, "error": "<string>" }`.
+That JSON shape is a contract between `http::module_commands` and the
+module; the host itself only moves bytes and has no opinion about what is
+inside them.
+
+The host refuses to instantiate a module that declares any wasm import at
+all, and refuses one whose artifact sha256 does not match what was recorded
+at install. No imports means a module can only compute - it cannot touch the
+network, the filesystem, or anything else in the host process. Every other
+capability a module might eventually want (posting a message, reading a
+key-value store) has to arrive later as an explicit, mediated host function
+per the "no ambient authority" principle above, never as ambient access.
+
+Each call runs under the manifest's own `runtime.limits`: a memory cap
+(enforced via wasmi's `ResourceLimiter`), a fuel cap (CPU, via wasmi's fuel
+metering), and a wall-clock cap (the call runs on a blocking task under a
+timeout, abandoned rather than awaited past the deadline). Any of the three
+being hit answers with a clean `{ "ok": false, "error": ... }`, never a 500
+and never a hang.
+
+The install flow now also fetches the module's own artifact bytes (over the
+same host-allowlisted client the manifest itself came from), verifies them
+against the manifest's `sha256`, and stores them - Phase 2 had deferred this;
+Phase 3 needs the bytes to actually run something. They are kept as a
+database row rather than a media-style file: unlike attachments, a module
+artifact is one of a handful installed deployment-wide, bounded in size at
+fetch time, and versioned with the install row it belongs to, so there is no
+attachment-shaped growth argument for keeping it off the database file.
+
+A `command` extension point now also carries `permission`: the declared
+permission key (from the manifest's own `permissions`) a caller must hold to
+reach it. `http::module_commands` checks
+`Store::user_has_module_permission` before ever calling the host - the route
+is gating, the host is execution, and slim still has no notion of what any
+command actually does.

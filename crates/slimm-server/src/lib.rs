@@ -15,6 +15,7 @@ pub mod identity;
 pub mod ids;
 pub mod media;
 pub mod mentions;
+pub mod module_runtime;
 mod net_guard;
 pub mod notifications;
 pub mod permissions;

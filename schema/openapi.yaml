@@ -5315,6 +5315,56 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /modules/{moduleId}/commands/{command}:
+    parameters:
+      - name: moduleId
+        in: path
+        required: true
+        description: The installed module's slug id.
+        schema:
+          type: string
+      - name: command
+        in: path
+        required: true
+        description: The `command` extension point's own name from its manifest.
+        schema:
+          type: string
+    post:
+      operationId: runModuleCommand
+      tags: [space]
+      summary: Runs an installed module's command in the wasm sandbox.
+      description: >
+        Requires the module to be installed and enabled, and the caller to
+        hold the permission its manifest declared for this command (see
+        DockExtensionPoint). Runs the module's own wasm artifact under its
+        declared resource limits (docs/decisions/0021's "Module ABI v1"
+        section); a fuel, memory, or wall-clock limit hit still answers 200
+        with `ok: false`, never a 500 and never a hang.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunModuleCommandRequest"
+      responses:
+        "200":
+          description: The module ran; see `ok` for whether it succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunModuleCommandResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -6377,6 +6427,15 @@ components:
         description:
           type: string
           nullable: true
+        permission:
+          type: string
+          nullable: true
+          description: >
+            The declared permission key (see DockPermission) a caller must
+            hold to reach this extension point. Always present for a
+            `command`; the module host checks it via
+            Store::user_has_module_permission before ever running the
+            module. See docs/decisions/0021's "Module ABI v1" section.
     DockManifest:
       type: object
       required:
@@ -6437,6 +6496,7 @@ components:
           version,
           artifact_sha256,
           approved_capabilities,
+          extension_points,
           enabled,
           installed_at,
         ]
@@ -6453,10 +6513,45 @@ components:
           type: array
           items:
             type: string
+        extension_points:
+          type: array
+          description: >
+            Every extension point the module's manifest declared at install,
+            so a client can discover which commands it offers - and which
+            permission each needs - without re-browsing the Dock.
+          items:
+            $ref: "#/components/schemas/DockExtensionPoint"
         enabled:
           type: boolean
         installed_at:
           type: integer
+    RunModuleCommandRequest:
+      type: object
+      required: [input]
+      properties:
+        input:
+          type: string
+          description: >
+            The module ABI's own request `input` field, passed through
+            verbatim. What it means is entirely up to the module.
+    RunModuleCommandResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        output:
+          type: string
+          nullable: true
+          description: Present when `ok` is true.
+        error:
+          type: string
+          nullable: true
+          description: >
+            Present when `ok` is false: either the module's own declared
+            failure, or a clean description of a host-level refusal (a
+            resource limit, a malformed module response). Never a 500 and
+            never a hang; see docs/decisions/0021's "Module ABI v1" section.
     PresenceStatus:
       type: object
       required: [user_id, status]

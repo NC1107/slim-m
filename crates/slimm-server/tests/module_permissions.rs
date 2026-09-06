@@ -17,7 +17,9 @@ use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::{InstallModuleRequest, ModulePermissionSpec, Store, User};
+use slimm_server::store::{
+    InstallModuleRequest, ModulePermissionSpec, ModuleRuntimeLimits, Store, User,
+};
 use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
 
@@ -75,7 +77,9 @@ async fn install_code_exec(s: &Store) {
         version: "0.1.0",
         artifact_sha256: &"0".repeat(64),
         approved_capabilities: &["command.register".to_owned()],
+        runtime_limits: &ModuleRuntimeLimits::default(),
         permissions: &permissions,
+        extension_points: &[],
     })
     .await
     .unwrap();
