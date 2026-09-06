@@ -17,6 +17,16 @@ extension SlimmApiModuleCommands on SlimmApi {
         .toList(growable: false);
   }
 
+  /// Every slash command this caller may currently use in the composer,
+  /// possibly empty - an empty list means no installed and enabled module
+  /// declares a `slash-command` the caller holds the permission for.
+  Future<List<SlashCommand>> listSlashCommands() async {
+    final json = await _send('GET', '/modules/slash-commands');
+    return (json as List<dynamic>)
+        .map((c) => SlashCommand.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Runs [moduleId]'s [command] with [input], returning the module ABI's
   /// own outcome. Requires the module to be installed, enabled, and the
   /// caller to hold the permission the command declared.

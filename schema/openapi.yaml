@@ -5393,6 +5393,33 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /modules/slash-commands:
+    get:
+      operationId: listSlashCommands
+      tags: [space]
+      summary: Discover which slash commands this caller may use in the composer.
+      description: >
+        One entry per installed and enabled module that declares a
+        `slash-command` extension point and whose declared permission the
+        caller holds (Store::user_has_module_permission). Each entry's `name`
+        is the keyword the composer offers as `/name` and `command` is the
+        `command` extension point to POST to via
+        /modules/{moduleId}/commands/{command}. An empty list means the
+        composer offers no module slash commands. slim has no notion of what
+        any command does - see docs/decisions/0021's module-agnostic principle.
+      responses:
+        "200":
+          description: The slash commands this caller may use, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlashCommand"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -6616,6 +6643,26 @@ components:
             wildcard that matches any block. The client normalizes case and
             applies a small alias map before comparing this against a
             block's own fence tag.
+    SlashCommand:
+      type: object
+      required: [module_id, command, name]
+      properties:
+        module_id:
+          type: string
+        command:
+          type: string
+          description: >
+            The `command` extension point's own name to POST to via
+            /modules/{moduleId}/commands/{command}.
+        name:
+          type: string
+          description: >
+            The keyword the composer offers as `/name`; what the caller types
+            before any arguments.
+        description:
+          type: string
+          nullable: true
+          description: A short human summary of what the command does.
     PresenceStatus:
       type: object
       required: [user_id, status]

@@ -18,6 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
 import '../../providers/code_block_runner.dart';
+import '../../providers/slash_command.dart';
 import '../../providers/providers.dart';
 import '../../widgets/run_guarded.dart';
 
@@ -64,6 +65,7 @@ class _ModulePermissionsSectionState
     if (ok) {
       ref.invalidate(roleModulePermissionsProvider(widget.roleId));
       ref.invalidate(codeBlockRunnerProvider);
+      ref.invalidate(slashCommandProvider);
     }
   }
 

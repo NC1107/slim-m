@@ -19,6 +19,7 @@ import '../providers/composer_attachment_drop.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
+import '../providers/slash_command.dart';
 import '../providers/slow_mode_controller.dart';
 import '../providers/typing_controller.dart';
 import 'attachment_picker.dart';
@@ -31,6 +32,7 @@ import 'composer_autocomplete_query.dart';
 import 'composer_clipboard_image.dart';
 import 'composer_clipboard_paste.dart';
 import 'composer_extras.dart';
+import 'composer_slash.dart';
 import 'emoji_picker.dart';
 import 'gif_picker.dart';
 import 'poll_composer_sheet.dart';
@@ -126,6 +128,8 @@ class _ComposerState extends ConsumerState<Composer> {
   /// accepting rewrites its value.
   AutocompleteQuery? _query;
   List<AutocompleteSuggestion> _suggestions = const [];
+  List<SlashCommand> _slashCommands = const [];
+  String? _commandError;
   int _selected = 0;
 
   /// A staged file is sendable on its own: a photo needs no caption, and the
@@ -287,6 +291,7 @@ class _ComposerState extends ConsumerState<Composer> {
       canMentionEveryone: ref
           .watch(myChannelPermissionsProvider(widget.channelId))
           .hasPermission(Perm.mentionEveryone),
+      slashCommands: _slashCommands,
     );
   }
 
@@ -484,7 +489,24 @@ class _ComposerState extends ConsumerState<Composer> {
       .read(typingControllerProvider(widget.channelId).notifier)
       .notifyTyping();
 
+  /// A `/command` for a module runs it and posts its output; anything else is
+  /// an ordinary send. See `composer_slash.dart` for the run itself.
   Future<void> _send() async {
+    final match = matchSlashCommand(_slashCommands, widget.controller.text);
+    if (match != null) {
+      setState(() => _commandError = null);
+      await sendSlashCommand(
+        api: ref.read(apiProvider),
+        command: match.$1,
+        args: match.$2,
+        controller: widget.controller,
+        post: () => widget.onSend(const []),
+        fail: (m) {
+          if (mounted) setState(() => _commandError = m);
+        },
+      );
+      return;
+    }
     final ids = _attachments.readyIds;
     await widget.onSend(ids);
     if (mounted) _attachments.clear();
@@ -494,6 +516,7 @@ class _ComposerState extends ConsumerState<Composer> {
   Widget build(BuildContext context) {
     final touch = AppTouchTargets.of(context);
     // In build because both sources are watched and can arrive late.
+    _slashCommands = ref.watch(slashCommandProvider).valueOrNull ?? const [];
     _suggestions = _buildSuggestions();
     _gifSearchEnabled =
         ref.watch(serverInfoProvider).valueOrNull?.gifSearchEnabled ?? false;
@@ -521,6 +544,8 @@ class _ComposerState extends ConsumerState<Composer> {
               attachmentError: _attachmentError,
               onDismissAttachmentError: () =>
                   setState(() => _attachmentError = null),
+              commandError: _commandError,
+              onDismissCommandError: () => setState(() => _commandError = null),
               overLimitBy: _overBy,
               slowModeRemainingSeconds: _slowModeRemaining,
               stagedAttachments: _attachments.items,

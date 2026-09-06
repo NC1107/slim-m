@@ -355,6 +355,42 @@ fn validate_permission(raw: RawPermission) -> Result<ManifestPermission, Manifes
 /// grant surface apart from a typo. `command_names` is likewise the
 /// manifest's own `command` extension point names, checked against a
 /// `code-block-runner`'s own `command` field for the same reason.
+/// The extension point must declare a `permission` naming one of this
+/// manifest's own permission keys; [kind] names it in the error.
+fn require_declared_permission(
+    kind: &str,
+    permission: &Option<String>,
+    permission_keys: &std::collections::HashSet<String>,
+) -> Result<(), ManifestError> {
+    match permission {
+        Some(key) if permission_keys.contains(key) => Ok(()),
+        Some(_) => Err(malformed(&format!(
+            "a {kind} extension point's permission must name a permission this manifest declares"
+        ))),
+        None => Err(malformed(&format!(
+            "a {kind} extension point must declare which permission it requires"
+        ))),
+    }
+}
+
+/// The extension point must declare a `command` naming one of this manifest's
+/// own `command` extension points; [kind] names it in the error.
+fn require_declared_command(
+    kind: &str,
+    command: &Option<String>,
+    command_names: &std::collections::HashSet<String>,
+) -> Result<(), ManifestError> {
+    match command {
+        Some(cmd) if command_names.contains(cmd) => Ok(()),
+        Some(_) => Err(malformed(&format!(
+            "a {kind} extension point's command must name a command this manifest declares"
+        ))),
+        None => Err(malformed(&format!(
+            "a {kind} extension point must declare which command it runs"
+        ))),
+    }
+}
+
 fn validate_extension_point(
     raw: RawExtensionPoint,
     permission_keys: &std::collections::HashSet<String>,
@@ -382,47 +418,14 @@ fn validate_extension_point(
                 .map_err(|_| malformed("extension_points[].language must be a safe slug"))
         })
         .transpose()?;
-    if kind == "command" {
-        match &permission {
-            Some(key) if permission_keys.contains(key) => {}
-            Some(_) => {
-                return Err(malformed(
-                    "a command extension point's permission must name a permission this manifest declares",
-                ));
-            }
-            None => {
-                return Err(malformed(
-                    "a command extension point must declare which permission it requires",
-                ));
-            }
+    // All three kinds gate on a declared permission; the two runner-like kinds also name a command they invoke.
+    match kind.as_str() {
+        "command" => require_declared_permission(&kind, &permission, permission_keys)?,
+        "code-block-runner" | "slash-command" => {
+            require_declared_permission(&kind, &permission, permission_keys)?;
+            require_declared_command(&kind, &command, command_names)?;
         }
-    } else if kind == "code-block-runner" {
-        match &permission {
-            Some(key) if permission_keys.contains(key) => {}
-            Some(_) => {
-                return Err(malformed(
-                    "a code-block-runner extension point's permission must name a permission this manifest declares",
-                ));
-            }
-            None => {
-                return Err(malformed(
-                    "a code-block-runner extension point must declare which permission it requires",
-                ));
-            }
-        }
-        match &command {
-            Some(cmd) if command_names.contains(cmd) => {}
-            Some(_) => {
-                return Err(malformed(
-                    "a code-block-runner extension point's command must name a command this manifest declares",
-                ));
-            }
-            None => {
-                return Err(malformed(
-                    "a code-block-runner extension point must declare which command it runs",
-                ));
-            }
-        }
+        _ => {}
     }
     Ok(ManifestExtensionPoint {
         kind,

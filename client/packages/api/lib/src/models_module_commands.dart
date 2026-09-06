@@ -9,6 +9,32 @@ library;
 
 /// One `(module_id, command)` pair this caller may POST to via
 /// `runModuleCommand`, from `GET /modules/code-block-runners`.
+/// A module `slash-command` extension point the caller may invoke from the
+/// composer as `/name`. A plain mirror of the wire shape; the app layer
+/// decides how to offer and run it.
+class SlashCommand {
+  const SlashCommand({
+    required this.moduleId,
+    required this.command,
+    required this.name,
+    this.description,
+  });
+
+  final String moduleId;
+  final String command;
+
+  /// The keyword the composer offers as `/name`.
+  final String name;
+  final String? description;
+
+  factory SlashCommand.fromJson(Map<String, dynamic> json) => SlashCommand(
+        moduleId: json['module_id'] as String,
+        command: json['command'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String?,
+      );
+}
+
 class CodeBlockRunner {
   const CodeBlockRunner({
     required this.moduleId,

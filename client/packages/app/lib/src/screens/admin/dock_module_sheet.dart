@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
 import '../../providers/code_block_runner.dart';
+import '../../providers/slash_command.dart';
 import '../../providers/providers.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
@@ -72,6 +73,7 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
     if (ok) {
       ref.invalidate(dockCatalogProvider);
       ref.invalidate(codeBlockRunnerProvider);
+      ref.invalidate(slashCommandProvider);
     }
   }
 
@@ -97,6 +99,7 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
       ref.invalidate(dockCatalogProvider);
       ref.invalidate(modulePermissionsProvider);
       ref.invalidate(codeBlockRunnerProvider);
+      ref.invalidate(slashCommandProvider);
       if (mounted) Navigator.of(context).pop();
     }
   }
