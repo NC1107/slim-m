@@ -230,3 +230,32 @@ and POSTs to `/modules/{moduleId}/commands/{command}` exactly as
 installed gets an empty list and no Run affordance at all, and a module
 declaring `code-block-runner` is free to be anything a manifest author
 wants to expose on a code block, not only a language sandbox.
+
+A `code-block-runner` also carries an optional `language` (a short slug,
+validated the same way a permission key is): which fenced-block language it
+matches. Discovery hands it straight through, unvalidated any further,
+alongside `module_id` and `command`. This is what lets two runner modules
+coexist - v1 offered the first discovery result unconditionally, so a
+second installed runner could never be reached. The client, not slim,
+normalizes case and resolves a small alias table (`js`/`node` ->
+`javascript`, `py` -> `python`, `sh`/`bash` -> `shell`, `md` ->
+`markdown`) before comparing a block's own fence tag against a runner's
+declared language; a runner with no `language` is a wildcard, matching any
+block, which is what keeps a deployment with a single older runner working
+unmatched. Several matching runners resolve to whichever discovery listed
+first - slim has no notion of which runner is "better" for a language, only
+of match or no match.
+
+A bare `command` extension point (no `code-block-runner` alongside it) gets
+a UI path too: the Dock's own module view renders a small panel per
+`command` an installed and enabled module declares, whose permission the
+viewer holds - a text input and Run button against the same
+`POST /modules/{moduleId}/commands/{command}` route, rendering the same
+`{ok, output}` / `{ok: false, error}` shape the code-block runner already
+does. The client has no way to learn client-side whether the viewer holds
+an arbitrary module permission without re-deriving the role editor's own
+per-role grants, so the panel is shown unconditionally to whoever reaches
+the Dock (already `MANAGE_SERVER`-gated) and a caller lacking the module's
+own permission simply sees the 403 surface inline, the same as any other
+transport failure - never a second, weaker permission model bolted onto the
+client to avoid that one round trip.

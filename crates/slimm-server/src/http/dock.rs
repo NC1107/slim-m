@@ -263,6 +263,7 @@ async fn install(
             description: e.description.as_deref(),
             permission: e.permission.as_deref(),
             command: e.command.as_deref(),
+            language: e.language.as_deref(),
         })
         .collect();
     let runtime_limits = ModuleRuntimeLimits {

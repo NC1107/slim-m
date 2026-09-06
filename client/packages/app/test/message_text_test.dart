@@ -17,7 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 /// affordance. `message_code_block_runner_test.dart` overrides it the other
 /// way, with a runner present.
 Widget _harness(Widget child) => ProviderScope(
-  overrides: [codeBlockRunnerProvider.overrideWith((ref) async => null)],
+  overrides: [codeBlockRunnerProvider.overrideWith((ref) async => const [])],
   child: MaterialApp(
     theme: buildTheme(Brightness.light, AppTokens.light),
     home: Scaffold(body: child),

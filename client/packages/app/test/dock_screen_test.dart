@@ -59,12 +59,16 @@ Map<String, dynamic> _manifest() => {
   ],
 };
 
-Map<String, dynamic> _installedRow({required bool enabled}) => {
+Map<String, dynamic> _installedRow({
+  required bool enabled,
+  List<Map<String, dynamic>> extensionPoints = const [],
+}) => {
   'id': 'code-exec',
   'name': 'Code Blocks',
   'version': '1.2.0',
   'artifact_sha256': _fakeSha256,
   'approved_capabilities': ['command.register', 'message.post'],
+  'extension_points': extensionPoints,
   'enabled': enabled,
   'installed_at': 1000,
 };
@@ -184,6 +188,164 @@ void main() {
     expect(find.text('Enabled'), findsOneWidget);
     expect(find.text('Uninstall'), findsOneWidget);
   });
+
+  testWidgets(
+    'an installed and enabled module with a command extension point shows '
+    'a run panel that posts input and renders output',
+    (tester) async {
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/space/dock/modules') {
+          return _json([_indexEntry]);
+        }
+        if (path == '/space/dock/installed') {
+          return _json([
+            _installedRow(
+              enabled: true,
+              extensionPoints: [
+                {
+                  'kind': 'command',
+                  'name': 'run',
+                  'description': 'Runs a snippet.',
+                  'permission': 'run',
+                },
+              ],
+            ),
+          ]);
+        }
+        if (path == '/space/dock/modules/code-exec') {
+          return _json(_manifest());
+        }
+        if (path == '/modules/code-exec/commands/run' &&
+            request.method == 'POST') {
+          expect(jsonDecode(request.body)['input'], 'console.log(1)');
+          return _json({'ok': true, 'output': '1'});
+        }
+        throw StateError(
+          'unexpected request: ${request.method} ${request.url}',
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(AppIcons.chevronRight));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Runs a snippet.'), findsOneWidget);
+
+      await tester.ensureVisible(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'console.log(1)');
+      await tester.ensureVisible(find.text('Run'));
+      await tester.tap(find.text('Run'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Output'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a 403 from running a command surfaces via AppErrorState, never a '
+    'SnackBar',
+    (tester) async {
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/space/dock/modules') {
+          return _json([_indexEntry]);
+        }
+        if (path == '/space/dock/installed') {
+          return _json([
+            _installedRow(
+              enabled: true,
+              extensionPoints: [
+                {
+                  'kind': 'command',
+                  'name': 'run',
+                  'description': 'Runs a snippet.',
+                  'permission': 'run',
+                },
+              ],
+            ),
+          ]);
+        }
+        if (path == '/space/dock/modules/code-exec') {
+          return _json(_manifest());
+        }
+        if (path == '/modules/code-exec/commands/run' &&
+            request.method == 'POST') {
+          return _json({'error': 'forbidden'}, 403);
+        }
+        throw StateError(
+          'unexpected request: ${request.method} ${request.url}',
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(AppIcons.chevronRight));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'console.log(1)');
+      await tester.ensureVisible(find.text('Run'));
+      await tester.tap(find.text('Run'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppErrorState), findsOneWidget);
+      expect(find.textContaining('not allowed'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a disabled module never shows a command panel even if it declares one',
+    (tester) async {
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/space/dock/modules') {
+          return _json([_indexEntry]);
+        }
+        if (path == '/space/dock/installed') {
+          return _json([
+            _installedRow(
+              enabled: false,
+              extensionPoints: [
+                {
+                  'kind': 'command',
+                  'name': 'run',
+                  'description': 'Runs a snippet.',
+                  'permission': 'run',
+                },
+              ],
+            ),
+          ]);
+        }
+        if (path == '/space/dock/modules/code-exec') {
+          return _json(_manifest());
+        }
+        throw StateError(
+          'unexpected request: ${request.method} ${request.url}',
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(AppIcons.chevronRight));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Runs a snippet.'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+    },
+  );
 
   testWidgets(
     'a failed fetch surfaces through the persistent error state, never a '

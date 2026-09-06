@@ -30,14 +30,14 @@ const _fenced = '```js\nconsole.log(1)\n```';
 
 Future<void> _pump(
   WidgetTester tester, {
-  required api.CodeBlockRunner? runner,
+  required List<api.CodeBlockRunner> runners,
   http.Response Function(http.Request)? onRunRequest,
 }) async {
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
-      codeBlockRunnerProvider.overrideWith((ref) async => runner),
+      codeBlockRunnerProvider.overrideWith((ref) async => runners),
       apiProvider.overrideWith((ref) {
         final built = api.SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
@@ -79,7 +79,7 @@ void main() {
   testWidgets('no runner available means no Run affordance at all', (
     tester,
   ) async {
-    await _pump(tester, runner: null);
+    await _pump(tester, runners: const []);
 
     expect(find.bySemanticsLabel('Run code'), findsNothing);
   });
@@ -89,7 +89,9 @@ void main() {
   ) async {
     await _pump(
       tester,
-      runner: const api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+      runners: const [
+        api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+      ],
     );
 
     expect(find.bySemanticsLabel('Run code'), findsOneWidget);
@@ -101,10 +103,9 @@ void main() {
       String? sentBody;
       await _pump(
         tester,
-        runner: const api.CodeBlockRunner(
-          moduleId: 'code-exec',
-          command: 'run',
-        ),
+        runners: const [
+          api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+        ],
         onRunRequest: (request) {
           expect(request.method, 'POST');
           expect(request.url.path, '/modules/code-exec/commands/run');
@@ -127,10 +128,9 @@ void main() {
     (tester) async {
       await _pump(
         tester,
-        runner: const api.CodeBlockRunner(
-          moduleId: 'code-exec',
-          command: 'run',
-        ),
+        runners: const [
+          api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+        ],
         onRunRequest: (_) =>
             _jsonResponse({'ok': false, 'error': 'syntax error'}),
       );
@@ -150,10 +150,9 @@ void main() {
     (tester) async {
       await _pump(
         tester,
-        runner: const api.CodeBlockRunner(
-          moduleId: 'code-exec',
-          command: 'run',
-        ),
+        runners: const [
+          api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+        ],
         onRunRequest: (_) =>
             _jsonResponse({'error': 'module is not enabled'}, 409),
       );
@@ -174,7 +173,9 @@ void main() {
     var call = 0;
     await _pump(
       tester,
-      runner: const api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+      runners: const [
+        api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+      ],
       onRunRequest: (_) {
         call += 1;
         return _jsonResponse({'ok': true, 'output': 'run $call'});
@@ -189,5 +190,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('run 1'), findsNothing);
     expect(find.text('run 2'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a runner declared for a different language is never offered on this '
+    'block',
+    (tester) async {
+      await _pump(
+        tester,
+        runners: const [
+          api.CodeBlockRunner(
+            moduleId: 'code-exec',
+            command: 'run',
+            language: 'python',
+          ),
+        ],
+      );
+
+      expect(find.bySemanticsLabel('Run code'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    "a runner declared 'javascript' matches this block's 'js' fence tag "
+    'through the alias map',
+    (tester) async {
+      await _pump(
+        tester,
+        runners: const [
+          api.CodeBlockRunner(
+            moduleId: 'code-exec',
+            command: 'run',
+            language: 'javascript',
+          ),
+        ],
+      );
+
+      expect(find.bySemanticsLabel('Run code'), findsOneWidget);
+    },
+  );
+
+  testWidgets('the first matching runner wins when several are discovered', (
+    tester,
+  ) async {
+    String? postedModuleId;
+    await _pump(
+      tester,
+      runners: const [
+        api.CodeBlockRunner(
+          moduleId: 'first',
+          command: 'run',
+          language: 'javascript',
+        ),
+        api.CodeBlockRunner(
+          moduleId: 'second',
+          command: 'run',
+          language: 'javascript',
+        ),
+      ],
+      onRunRequest: (request) {
+        postedModuleId = request.url.pathSegments[1];
+        return _jsonResponse({'ok': true, 'output': 'done'});
+      },
+    );
+
+    await tester.tap(find.bySemanticsLabel('Run code'));
+    await tester.pumpAndSettle();
+
+    expect(postedModuleId, 'first');
   });
 }

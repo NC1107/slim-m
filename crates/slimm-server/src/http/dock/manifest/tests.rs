@@ -135,6 +135,44 @@ fn rejects_a_code_block_runner_with_no_command() {
 }
 
 #[test]
+fn parses_a_code_block_runner_language() {
+    let with_language = GOOD_MANIFEST_WITH_RUNNER.replace(
+        r#""permission": "run", "command": "run""#,
+        r#""permission": "run", "command": "run", "language": "javascript""#,
+    );
+    let manifest = parse_manifest(with_language.as_bytes()).unwrap();
+    let runner = manifest
+        .extension_points
+        .iter()
+        .find(|e| e.kind == "code-block-runner")
+        .unwrap();
+    assert_eq!(runner.language.as_deref(), Some("javascript"));
+}
+
+#[test]
+fn a_code_block_runner_with_no_language_is_a_wildcard() {
+    let manifest = parse_manifest(GOOD_MANIFEST_WITH_RUNNER.as_bytes()).unwrap();
+    let runner = manifest
+        .extension_points
+        .iter()
+        .find(|e| e.kind == "code-block-runner")
+        .unwrap();
+    assert_eq!(runner.language, None);
+}
+
+#[test]
+fn rejects_an_unsafe_extension_point_language() {
+    let bad = GOOD_MANIFEST_WITH_RUNNER.replace(
+        r#""permission": "run", "command": "run""#,
+        r#""permission": "run", "command": "run", "language": "Java_Script!""#,
+    );
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
 fn rejects_a_code_block_runner_naming_an_undeclared_command() {
     let bad = GOOD_MANIFEST_WITH_RUNNER.replacen(
         r#""command": "run""#,

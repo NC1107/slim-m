@@ -155,6 +155,13 @@ struct RawExtensionPoint {
     /// is guaranteed to accept.
     #[serde(default)]
     command: Option<String>,
+    /// For `kind: "code-block-runner"` only: the fenced-block language this
+    /// runner matches (a short slug such as `javascript`). Absent means a
+    /// wildcard - the client offers it for any block - so a deployment with
+    /// a single, older runner keeps working unmatched. Never meaningful for
+    /// any other kind.
+    #[serde(default)]
+    language: Option<String>,
 }
 
 /// A module's declared permission, validated: `key` is a safe slug, `name`
@@ -193,6 +200,7 @@ pub(super) struct ManifestExtensionPoint {
     pub(super) description: Option<String>,
     pub(super) permission: Option<String>,
     pub(super) command: Option<String>,
+    pub(super) language: Option<String>,
 }
 
 /// A fully parsed and validated module manifest.
@@ -366,6 +374,14 @@ fn validate_extension_point(
         .command
         .map(|c| bounded(&c, MAX_SHORT_FIELD, "extension_points[].command"))
         .transpose()?;
+    let language = raw
+        .language
+        .map(|l| {
+            validate_slug(&l, MAX_SLUG)
+                .map(|()| l)
+                .map_err(|_| malformed("extension_points[].language must be a safe slug"))
+        })
+        .transpose()?;
     if kind == "command" {
         match &permission {
             Some(key) if permission_keys.contains(key) => {}
@@ -414,6 +430,7 @@ fn validate_extension_point(
         description,
         permission,
         command,
+        language,
     })
 }
 

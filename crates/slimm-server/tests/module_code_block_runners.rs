@@ -82,6 +82,7 @@ async fn install(s: &Store, enabled: bool) {
             description: Some("runs it"),
             permission: Some("run"),
             command: None,
+            language: None,
         },
         ModuleExtensionPointSpec {
             kind: "code-block-runner",
@@ -89,6 +90,7 @@ async fn install(s: &Store, enabled: bool) {
             description: Some("offers Run on a fenced code block"),
             permission: Some("run"),
             command: Some("run"),
+            language: Some("javascript"),
         },
     ];
     s.install_module(InstallModuleRequest {
@@ -214,6 +216,71 @@ async fn a_permission_holder_is_offered_the_installed_runner() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         json_body(response).await,
+        json!([{ "module_id": "code-exec", "command": "run", "language": "javascript" }])
+    );
+}
+
+/// A `code-block-runner` with no declared `language` is a wildcard, matching
+/// any fenced block on the client side - the discovery response omits the
+/// field entirely rather than sending it as `null`, so an older client's
+/// deserializer (which already treats the field as optional) sees exactly
+/// what it always has.
+#[tokio::test]
+async fn a_runner_with_no_language_is_offered_as_a_wildcard() {
+    let (s, _guard) = store("slimm-runners-wildcard").await;
+    let member = deployment(&s).await;
+    let wasm = canned_ok_wasm("done");
+    let sha256 = sha256_hex(&wasm);
+    s.install_module(InstallModuleRequest {
+        id: "code-exec",
+        name: "Code Blocks",
+        version: "0.1.0",
+        artifact_sha256: &sha256,
+        approved_capabilities: &[],
+        runtime_limits: &ModuleRuntimeLimits::default(),
+        permissions: &[ModulePermissionSpec {
+            key: "run",
+            name: "Execute code blocks",
+            description: "run a snippet",
+        }],
+        extension_points: &[
+            ModuleExtensionPointSpec {
+                kind: "command",
+                name: "run",
+                description: Some("runs it"),
+                permission: Some("run"),
+                command: None,
+                language: None,
+            },
+            ModuleExtensionPointSpec {
+                kind: "code-block-runner",
+                name: "Run in chat",
+                description: Some("offers Run on a fenced code block"),
+                permission: Some("run"),
+                command: Some("run"),
+                language: None,
+            },
+        ],
+    })
+    .await
+    .unwrap();
+    s.store_module_artifact("code-exec", &sha256, &wasm)
+        .await
+        .unwrap();
+    s.set_module_enabled("code-exec", true).await.unwrap();
+    grant_run_permission(&s, &member).await;
+    let token = s.open_session(member.id, "phone").await.unwrap();
+    let router = app(s);
+
+    let response = router
+        .oneshot(req(
+            "/modules/code-block-runners",
+            token.access_token.as_str(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        json_body(response).await,
         json!([{ "module_id": "code-exec", "command": "run" }])
     );
 }
@@ -245,6 +312,7 @@ async fn a_module_with_only_a_command_extension_point_is_never_offered() {
             description: Some("runs it"),
             permission: Some("run"),
             command: None,
+            language: None,
         }],
     })
     .await
