@@ -63,12 +63,10 @@ class AutocompleteSuggestion {
   final bool isRoleMention;
 }
 
-/// A slash command: text substitution only.
-///
-/// Deliberately a tiny set of things that need nothing from the server. There
-/// is no command system in this product - no `/me` message flag, no bot
-/// dispatch - so anything beyond substitution would be a promise the wire
-/// protocol cannot keep. When one exists, this list is where it plugs in.
+/// The built-in slash commands: text substitution only, needing nothing from
+/// the server. Module `slash-command` extension points are the other half,
+/// merged in by [_commandRows] - those are not substituted but run on send
+/// (see `slash_command.dart`).
 const _commands = <(String, String, String)>[
   ('shrug', r'¯\_(ツ)_/¯', 'append a shrug'),
   ('tableflip', '(╯°□°)╯︵ ┻━┻', 'flip a table'),
@@ -90,6 +88,7 @@ List<AutocompleteSuggestion> autocompleteSuggestions({
   required List<api.UserProfile> members,
   String? selfId,
   bool canMentionEveryone = false,
+  List<api.SlashCommand> slashCommands = const [],
 }) => switch (query.kind) {
   AutocompleteKind.emoji => _emoji(query.term, custom),
   AutocompleteKind.mention => _mentions(
@@ -98,7 +97,7 @@ List<AutocompleteSuggestion> autocompleteSuggestions({
     selfId,
     canMentionEveryone: canMentionEveryone,
   ),
-  AutocompleteKind.command => _commandRows(query.term),
+  AutocompleteKind.command => _commandRows(query.term, slashCommands),
 };
 
 List<AutocompleteSuggestion> _emoji(
@@ -224,8 +223,22 @@ List<AutocompleteSuggestion> _roleSuggestions(
   ];
 }
 
-List<AutocompleteSuggestion> _commandRows(String term) => [
+/// Built-in text commands first, then module slash commands. A built-in
+/// inserts its substitution text (it is finished on pick); a module command
+/// inserts `/name ` so the caret lands after the keyword ready for arguments,
+/// and running it is the composer's job on send, not this list's.
+List<AutocompleteSuggestion> _commandRows(
+  String term,
+  List<api.SlashCommand> slashCommands,
+) => [
   for (final (name, text, detail) in _commands)
     if (term.isEmpty || name.startsWith(term))
       AutocompleteSuggestion(insert: '$text ', label: '/$name', detail: detail),
-];
+  for (final command in slashCommands)
+    if (term.isEmpty || command.name.toLowerCase().startsWith(term))
+      AutocompleteSuggestion(
+        insert: '/${command.name} ',
+        label: '/${command.name}',
+        detail: command.description,
+      ),
+].take(maxAutocompleteRows).toList(growable: false);

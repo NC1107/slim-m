@@ -85,6 +85,9 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str) {
     // The admin now holds `run`, so this comes back a real pair to validate against CodeBlockRunner, not just the empty-list case.
     c.get("listCodeBlockRunners", "/modules/code-block-runners", root)
         .await;
+    // code-exec declares no slash-command, so this is the empty-list shape; the populated shape is validated in tests/module_slash_commands.rs.
+    c.get("listSlashCommands", "/modules/slash-commands", root)
+        .await;
     c.bare(
         "unassignRole",
         "DELETE",

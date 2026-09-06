@@ -50,6 +50,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/modules/{moduleId}/commands/{command}", post(run_command))
         .route("/modules/code-block-runners", get(list_code_block_runners))
+        .route("/modules/slash-commands", get(list_slash_commands))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -193,6 +194,59 @@ struct CodeBlockRunnerDto {
     /// fence tag.
     #[serde(skip_serializing_if = "Option::is_none")]
     language: Option<String>,
+}
+
+/// One `slash-command` extension point a client may offer in the composer and
+/// `POST` to `/modules/{moduleId}/commands/{command}`. Unlike a code-block
+/// runner it carries its own `name` (the slash keyword the composer offers,
+/// e.g. `roll`) and `description`, since a slash command is chosen by name
+/// from a list rather than matched to a block's language.
+#[derive(Serialize)]
+struct SlashCommandDto {
+    module_id: String,
+    command: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+}
+
+/// Every `slash-command` extension point the caller may currently reach:
+/// installed, enabled, and the caller holds the permission it declared. This
+/// is how a client learns which `/name` commands to offer in the composer -
+/// never a hardcoded module id, per docs/decisions/0021's module-agnostic
+/// principle. Possibly empty.
+async fn list_slash_commands(
+    AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<SlashCommandDto>>, ApiError> {
+    let modules = state.store.list_installed_modules().await?;
+    let mut commands = Vec::new();
+    for module in modules {
+        if !module.enabled {
+            continue;
+        }
+        for ep in &module.extension_points {
+            if ep.kind != "slash-command" {
+                continue;
+            }
+            let (Some(command), Some(permission)) = (&ep.command, &ep.permission) else {
+                continue;
+            };
+            if state
+                .store
+                .user_has_module_permission(ctx.user_id, &module.id, permission)
+                .await?
+            {
+                commands.push(SlashCommandDto {
+                    module_id: module.id.clone(),
+                    command: command.clone(),
+                    name: ep.name.clone(),
+                    description: ep.description.clone(),
+                });
+            }
+        }
+    }
+    Ok(Json(commands))
 }
 
 /// Every `code-block-runner` extension point the caller may currently reach:

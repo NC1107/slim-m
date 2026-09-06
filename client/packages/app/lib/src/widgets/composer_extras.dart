@@ -313,10 +313,18 @@ class ComposerBanners extends StatelessWidget {
     required this.stagedAttachments,
     required this.onRemoveAttachment,
     required this.onRetryAttachment,
+    this.commandError,
+    this.onDismissCommandError,
   });
 
   final String? attachmentError;
   final VoidCallback onDismissAttachmentError;
+
+  /// A slash command that would not run (a 403, or the module's own error).
+  /// Transient like [attachmentError]: the `/command` text stays in the field
+  /// so it can be retried, and the band clears itself after a beat.
+  final String? commandError;
+  final VoidCallback? onDismissCommandError;
 
   /// How many characters over [kMessageMaxChars] the composed text sits, or
   /// null when it is within the limit. Non-null both disables the send
@@ -336,6 +344,7 @@ class ComposerBanners extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final error = attachmentError;
+    final command = commandError;
     final overBy = overLimitBy;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -347,6 +356,15 @@ class ComposerBanners extends StatelessWidget {
                   message: error,
                   onDismiss: onDismissAttachmentError,
                   // A gif/attachment action failure is transient and self-correcting - clear it after a beat, unlike the over-limit band below which is a live state.
+                  autoDismissAfter: const Duration(seconds: 6),
+                ),
+        ),
+        AppRevealBand(
+          child: command == null
+              ? null
+              : ComposerInlineError(
+                  message: command,
+                  onDismiss: onDismissCommandError,
                   autoDismissAfter: const Duration(seconds: 6),
                 ),
         ),
