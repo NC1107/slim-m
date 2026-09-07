@@ -892,13 +892,10 @@ paths:
             format: int64
         - name: limit
           in: query
-          description: Page size; the server clamps it to this range.
+          description: Page size, 50 when omitted; the server clamps it into 1..200 rather than rejecting it.
           schema:
             type: integer
             format: int32
-            minimum: 1
-            maximum: 200
-            default: 50
       responses:
         "200":
           description: One page of open reports.
@@ -1000,13 +997,10 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Page size; the server clamps it to this range.
+          description: Page size, 50 when omitted; the server clamps it into 1..200 rather than rejecting it.
           schema:
             type: integer
             format: int32
-            minimum: 1
-            maximum: 200
-            default: 50
       responses:
         "200":
           description: One page of the merged moderation-history feed.
@@ -3456,12 +3450,10 @@ paths:
       parameters:
         - name: limit
           in: query
-          description: At most this many pins, newest first; the server clamps it to this range. Omitted means every pin in the channel (itself capped at 200).
+          description: At most this many pins, newest first; the server clamps it into 1..200 rather than rejecting it. Omitted means every pin in the channel (itself capped at 200).
           schema:
             type: integer
             format: int32
-            minimum: 1
-            maximum: 200
       responses:
         "200":
           description: The channel's pinned messages, newest pin first.
