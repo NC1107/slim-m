@@ -286,6 +286,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       }
       unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
+      if (!mounted) return;
       // Say what actually happened. "Something went wrong" tells the user
       // nothing about whether to fix their password or wait.
       setState(

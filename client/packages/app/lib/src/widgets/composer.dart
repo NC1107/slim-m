@@ -425,9 +425,7 @@ class _ComposerState extends ConsumerState<Composer> {
                 context,
                 ref,
                 widget.channelId,
-                onError: (m) {
-                  if (mounted) setState(() => _commandError = m);
-                },
+                onError: _reportCommandError,
               ),
             ),
     ),
@@ -506,6 +504,10 @@ class _ComposerState extends ConsumerState<Composer> {
       .read(typingControllerProvider(widget.channelId).notifier)
       .notifyTyping();
 
+  void _reportCommandError(String message) {
+    if (mounted) setState(() => _commandError = message);
+  }
+
   /// A `/command` for a module runs it and posts its output; anything else is
   /// an ordinary send. See `composer_slash.dart` for the run itself.
   Future<void> _send() async {
@@ -517,11 +519,9 @@ class _ComposerState extends ConsumerState<Composer> {
         ref: ref,
         channelId: widget.channelId,
         app: app,
-        onError: (m) {
-          if (mounted) setState(() => _commandError = m);
-        },
+        onError: _reportCommandError,
       );
-      if (launched) widget.controller.clear();
+      if (launched && mounted) widget.controller.clear();
       return;
     }
     final match = matchSlashCommand(_slashCommands, widget.controller.text);
@@ -532,10 +532,9 @@ class _ComposerState extends ConsumerState<Composer> {
         command: match.$1,
         args: match.$2,
         controller: widget.controller,
+        isMounted: () => mounted,
         post: () => widget.onSend(const []),
-        fail: (m) {
-          if (mounted) setState(() => _commandError = m);
-        },
+        fail: _reportCommandError,
       );
       return;
     }

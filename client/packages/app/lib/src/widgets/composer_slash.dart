@@ -18,11 +18,17 @@ import '../api_failure.dart';
 /// Runs [command] with [args] and applies the outcome: on a non-empty result,
 /// replaces the field text with it and [post]s; on an empty-but-ok result,
 /// clears the field; on any failure, calls [fail] with a human message.
+///
+/// [controller] belongs to the composer's parent and is disposed with it, so
+/// the round trip can outlive it: once [isMounted] is false nothing here
+/// touches the field, the same guard every other post-await write in the
+/// composer already carries.
 Future<void> sendSlashCommand({
   required SlimmApi api,
   required SlashCommand command,
   required String args,
   required TextEditingController controller,
+  required bool Function() isMounted,
   required Future<void> Function() post,
   required void Function(String message) fail,
 }) async {
@@ -32,6 +38,7 @@ Future<void> sendSlashCommand({
       command: command.command,
       input: args,
     );
+    if (!isMounted()) return;
     final output = result.output;
     if (result.ok && output != null && output.trim().isNotEmpty) {
       controller.text = output;
