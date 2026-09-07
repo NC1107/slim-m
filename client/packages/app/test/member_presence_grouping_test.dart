@@ -64,4 +64,28 @@ void main() {
       ], reason: 'apple sorts before Banana only when case is folded');
     });
   });
+
+  group('rosterEntries', () {
+    test('each non-empty group is its counted heading then its members', () {
+      final entries = rosterEntries((
+        online: [_m('a', 'Ada')],
+        offline: [_m('b', 'Bo'), _m('c', 'Cy')],
+      ));
+      expect(entries, hasLength(5));
+      expect((entries[0] as RosterGroupLabel).text, 'Online \u00b7 1');
+      expect((entries[1] as RosterMember).profile.id, 'a');
+      expect((entries[2] as RosterGroupLabel).text, 'Offline \u00b7 2');
+      expect((entries[3] as RosterMember).profile.id, 'b');
+      expect((entries[4] as RosterMember).profile.id, 'c');
+    });
+
+    test('an empty group contributes no heading', () {
+      final entries = rosterEntries((
+        online: const [],
+        offline: [_m('b', 'Bo')],
+      ));
+      expect(entries, hasLength(2));
+      expect((entries[0] as RosterGroupLabel).text, startsWith('Offline'));
+    });
+  });
 }

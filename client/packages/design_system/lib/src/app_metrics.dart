@@ -82,6 +82,11 @@ abstract final class AppSizes {
   /// unnamed literal for `AppIconButtonSize.md`'s diameter.
   static const double icon28 = 28;
   static const double icon32 = 32;
+
+  /// The height of every pane's header bar - the conversation header, the
+  /// rail's own, the member pane's, a DM call's - so the bars across the shell
+  /// meet on one line. Five files each carried the literal before this existed.
+  static const double headerBar = 52;
 }
 
 /// The shadows, for the few things that genuinely float.

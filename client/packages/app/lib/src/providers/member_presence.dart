@@ -173,6 +173,38 @@ groupMembersByPresence(
   return (online: online, offline: offline);
 }
 
+/// One row of the member pane's roster: a group heading or a member.
+sealed class RosterEntry {
+  const RosterEntry();
+}
+
+final class RosterGroupLabel extends RosterEntry {
+  const RosterGroupLabel(this.text);
+  final String text;
+}
+
+final class RosterMember extends RosterEntry {
+  const RosterMember(this.profile);
+  final api.UserProfile profile;
+}
+
+/// [groupMembersByPresence]'s result flattened into the rows the pane lays
+/// out, each non-empty group as its heading followed by its members, so a
+/// lazy list can build only the rows on screen rather than a widget per
+/// member of a possibly large roster.
+List<RosterEntry> rosterEntries(
+  ({List<api.UserProfile> online, List<api.UserProfile> offline}) grouped,
+) => [
+  if (grouped.online.isNotEmpty) ...[
+    RosterGroupLabel('Online · ${grouped.online.length}'),
+    for (final m in grouped.online) RosterMember(m),
+  ],
+  if (grouped.offline.isNotEmpty) ...[
+    RosterGroupLabel('Offline · ${grouped.offline.length}'),
+    for (final m in grouped.offline) RosterMember(m),
+  ],
+];
+
 /// Live per-member profile edits [membersProvider]'s roster snapshot does not
 /// pick up on its own: that provider only refetches on an inferred join or a
 /// moderation event, never on a plain `PATCH /me` (a display name or status

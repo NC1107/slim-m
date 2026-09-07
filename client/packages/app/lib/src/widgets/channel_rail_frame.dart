@@ -67,7 +67,7 @@ class RailHeader extends ConsumerWidget {
         right: !_railHasNeighbour(context),
         // minHeight, not height: the two text lines grow under a larger OS text scale.
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 52),
+          constraints: const BoxConstraints(minHeight: AppSizes.headerBar),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
             child: Row(

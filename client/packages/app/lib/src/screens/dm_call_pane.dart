@@ -67,7 +67,7 @@ class _DmCallBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Container(
-      height: 52,
+      height: AppSizes.headerBar,
       padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),

@@ -71,7 +71,7 @@ class ChannelHeader extends ConsumerWidget {
         ).fitsMemberPane(MediaQuery.sizeOf(context).width);
 
     return Container(
-      height: 52,
+      height: AppSizes.headerBar,
       // Matches the message rows and composer below it.
       padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
       decoration: BoxDecoration(
