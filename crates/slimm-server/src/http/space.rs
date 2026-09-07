@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
+use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
-use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::JoinPolicy;
 
@@ -42,7 +42,7 @@ async fn read(
 ) -> Result<Json<SpaceSettingsDto>, ApiError> {
     // AuthedRead, not Write: this reads one config value, same as `update` writes one.
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     Ok(Json(SpaceSettingsDto {
         join_policy: state.store.join_policy().await?.as_str().to_owned(),
     }))
@@ -57,7 +57,7 @@ async fn update(
     Json(body): Json<SpaceSettingsDto>,
 ) -> Result<Json<SpaceSettingsDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
 
     let policy = match body.join_policy.as_str() {
         "invite" => JoinPolicy::Invite,
@@ -68,15 +68,4 @@ async fn update(
     Ok(Json(SpaceSettingsDto {
         join_policy: policy.as_str().to_owned(),
     }))
-}
-
-async fn require_manage_server(
-    state: &AppState,
-    ctx: &crate::store::SessionContext,
-) -> Result<(), ApiError> {
-    let permissions = state.store.base_permissions(ctx.user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_SERVER) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
 }

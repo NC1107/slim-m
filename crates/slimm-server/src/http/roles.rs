@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::error::ApiError;
 use super::escalation::escalation_guard;
+use super::extract::require_manage_roles;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
@@ -322,14 +323,6 @@ async fn unassign(
 /// did.
 async fn caller_granted(state: &AppState, user_id: UserId) -> Result<Permissions, ApiError> {
     Ok(state.store.granted_base_permissions(user_id).await?)
-}
-
-async fn require_manage_roles(state: &AppState, user_id: UserId) -> Result<Permissions, ApiError> {
-    let permissions = state.store.base_permissions(user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_ROLES) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(permissions)
 }
 
 /// Validates that `bits` names only defined permissions and that every one of

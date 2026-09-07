@@ -27,6 +27,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::{MessageDto, parse_uuid};
+use super::module_commands::reachable_extension_points;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId, UserId};
 use crate::permissions::Permissions;
@@ -239,33 +240,16 @@ async fn list_apps(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AppDto>>, ApiError> {
-    let modules = state.store.list_installed_modules().await?;
-    let mut apps = Vec::new();
-    for module in modules {
-        if !module.enabled {
-            continue;
-        }
-        for ep in &module.extension_points {
-            if ep.kind != "app" {
-                continue;
-            }
-            let (Some(command), Some(permission)) = (&ep.command, &ep.permission) else {
-                continue;
-            };
-            if state
-                .store
-                .user_has_module_permission(ctx.user_id, &module.id, permission)
-                .await?
-            {
-                apps.push(AppDto {
-                    module_id: module.id.clone(),
-                    command: command.clone(),
-                    name: ep.name.clone(),
-                    description: ep.description.clone(),
-                });
-            }
-        }
-    }
+    let apps = reachable_extension_points(&state, ctx.user_id, "app")
+        .await?
+        .into_iter()
+        .map(|r| AppDto {
+            module_id: r.module_id,
+            command: r.command,
+            name: r.point.name,
+            description: r.point.description,
+        })
+        .collect();
     Ok(Json(apps))
 }
 

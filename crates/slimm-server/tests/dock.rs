@@ -131,14 +131,17 @@ async fn json_body(response: axum::response::Response) -> Value {
 /// fixture the response-contract pass and `http::dock::manifest`'s own tests
 /// use.
 async fn fake_registry() -> String {
+    fake_registry_serving(ARTIFACT_BYTES).await
+}
+
+/// [`fake_registry`] with the artifact route serving `artifact` instead, so a
+/// test can hand out bytes the manifest's `sha256` does not describe.
+async fn fake_registry_serving(artifact: &'static [u8]) -> String {
     async fn index() -> axum::Json<Value> {
         axum::Json(serde_json::from_str(GOOD_INDEX).unwrap())
     }
     async fn manifest() -> axum::Json<Value> {
         axum::Json(serde_json::from_str(GOOD_MANIFEST).unwrap())
-    }
-    async fn artifact() -> Vec<u8> {
-        ARTIFACT_BYTES.to_vec()
     }
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -146,7 +149,10 @@ async fn fake_registry() -> String {
     let router = Router::new()
         .route("/index.json", get(index))
         .route("/modules/code-exec/manifest.json", get(manifest))
-        .route("/modules/code-exec/0.1.0/module.wasm", get(artifact));
+        .route(
+            "/modules/code-exec/0.1.0/module.wasm",
+            get(move || async move { artifact.to_vec() }),
+        );
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });
@@ -304,6 +310,34 @@ async fn install_refuses_a_version_that_no_longer_matches_the_registry() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::CONFLICT);
+}
+
+/// The install-time half of artifact integrity (the run-time half is
+/// `module_runtime`'s own hash check): bytes that do not hash to the
+/// manifest's `sha256` are refused as a bad upstream - the registry, not the
+/// caller, served something wrong - and nothing about the module is stored.
+#[tokio::test]
+async fn install_refuses_an_artifact_whose_bytes_do_not_match_the_manifest() {
+    let (s, _guard) = store("slimm-dock-tampered").await;
+    let (admin, _member) = deployment(&s).await;
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let token = session.access_token.as_str();
+    let dock =
+        Dock::for_test(&fake_registry_serving(b"not the bytes the manifest describes").await);
+    let router = app(s.clone(), dock);
+
+    let response = router
+        .oneshot(req_json(
+            "POST",
+            "/space/dock/modules/code-exec/install",
+            token,
+            json!({ "version": "0.1.0" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert!(s.installed_module("code-exec").await.unwrap().is_none());
+    assert!(s.module_artifact("code-exec").await.unwrap().is_none());
 }
 
 #[tokio::test]

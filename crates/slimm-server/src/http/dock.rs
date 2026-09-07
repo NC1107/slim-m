@@ -29,14 +29,13 @@ use url::Url;
 
 use super::AppState;
 use super::error::ApiError;
+use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
 use crate::config::Config;
 use crate::media::to_hex;
-use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{
     InstallModuleRequest, ModuleExtensionPointSpec, ModulePermissionSpec, ModuleRuntimeLimits,
-    SessionContext,
 };
 
 use fetch::{FetchError, fetch_capped};
@@ -187,7 +186,7 @@ async fn list_modules(
     Authed(ctx): Authed,
 ) -> Result<Json<Vec<IndexEntryDto>>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     let dock = state.dock.enabled()?;
     let url = dock
         .base_url
@@ -211,7 +210,7 @@ async fn get_module(
     Path(id): Path<String>,
 ) -> Result<Json<ManifestDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     validate_module_id(&id)?;
     let dock = state.dock.enabled()?;
     let manifest = fetch_manifest(dock, &id).await?;
@@ -234,7 +233,7 @@ async fn install(
     Json(req): Json<InstallRequest>,
 ) -> Result<Json<InstalledModuleDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     validate_module_id(&id)?;
     let dock = state.dock.enabled()?;
     let manifest = fetch_manifest(dock, &id).await?;
@@ -324,7 +323,7 @@ async fn uninstall(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     if state.store.uninstall_module(&id).await? {
         Ok(StatusCode::NO_CONTENT)
     } else {
@@ -339,7 +338,7 @@ async fn enable(
     Path(id): Path<String>,
 ) -> Result<Json<InstalledModuleDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     apply_enabled(&state, &id, true).await
 }
 
@@ -350,7 +349,7 @@ async fn disable(
     Path(id): Path<String>,
 ) -> Result<Json<InstalledModuleDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     apply_enabled(&state, &id, false).await
 }
 
@@ -380,17 +379,9 @@ async fn list_installed(
     Authed(ctx): Authed,
 ) -> Result<Json<Vec<InstalledModuleDto>>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     let modules = state.store.list_installed_modules().await?;
     Ok(Json(
         modules.into_iter().map(InstalledModuleDto::from).collect(),
     ))
-}
-
-async fn require_manage_server(state: &AppState, ctx: &SessionContext) -> Result<(), ApiError> {
-    let permissions = state.store.base_permissions(ctx.user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_SERVER) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
 }

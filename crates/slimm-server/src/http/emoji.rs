@@ -31,12 +31,12 @@ use super::attachments::serve;
 use super::error::ApiError;
 use super::extract::Authed;
 use super::extract::enforce;
+use super::extract::require_manage_server;
 use super::extract::{ASSET, AUTHED_READ, AuthedLimited, Bytes, Json, Query};
 use crate::emoji::bulk::{self, BulkAddError};
 use crate::emoji::{self, AddError};
 use crate::ids::EmojiId;
 use crate::media;
-use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 
 /// The JSON body of a [`bulk_upload`] request base64-encodes every image, so
@@ -115,7 +115,7 @@ async fn upload(
     Bytes(body): Bytes,
 ) -> Result<(StatusCode, Json<CustomEmojiDto>), ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
 
     super::attachments::room_for(&state, body.len() as i64).await?;
     let created = emoji::add_emoji(
@@ -156,7 +156,7 @@ async fn bulk_upload(
     Json(req): Json<BulkUploadRequest>,
 ) -> Result<(StatusCode, Json<Vec<CustomEmojiDto>>), ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Upload)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
 
     if req.images.is_empty() {
         return Err(ApiError::BadRequest("no images given"));
@@ -243,7 +243,7 @@ async fn remove(
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
 
     let id = parse_id(&emoji_id)?;
     state.store.delete_custom_emoji(id).await?;
@@ -279,17 +279,6 @@ async fn image(
 }
 
 // --- Helpers ---
-
-async fn require_manage_server(
-    state: &AppState,
-    ctx: &crate::store::SessionContext,
-) -> Result<(), ApiError> {
-    let permissions = state.store.base_permissions(ctx.user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_SERVER) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
-}
 
 fn parse_id(raw: &str) -> Result<EmojiId, ApiError> {
     raw.parse::<uuid::Uuid>()
