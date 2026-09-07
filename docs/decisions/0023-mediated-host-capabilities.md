@@ -100,6 +100,30 @@ The first capability to build, because it is the safest: it touches nothing but 
 `kv.store` deliberately has no way to observe or affect anything outside the module, which is what makes it the right first proof of the whole surface.
 `message.post` is the obvious second capability and is a larger review - it acts in a channel as a user, so it needs the permission gate, rate limiting, and a careful answer to "posts as whom" - and is not part of this record's build.
 
+### Persistence and the sync/async boundary
+
+The scaffolded `kv.store` splits into two halves along a deliberate seam.
+The capability's *shape* - its four operations, its per-request and per-store bounds, and its isolation between modules - is implemented against a `KvBackend` trait and proven end to end in memory, because that is the part a security review actually needs to judge, and it is judgeable without deciding how the bytes persist.
+*Where the bytes live* is the durable `KvBackend` an owner decides on, and it is left open on purpose, because it is a real architectural fork rather than a detail:
+
+- `slim.host_call` is a **synchronous** wasm host function (wasmi has no async), running on a `spawn_blocking` thread, while slim's store is **async** sqlx. A durable backend must bridge that. The two candidates are (a) a backend that `block_on`s the async store from the blocking thread - simple, but it holds a database round trip inside the module run, per call; or (b) an **effects model** - load the module's `kv` snapshot before the run, serve reads and buffer writes in memory during it, and apply the buffered writes after `run` returns - which keeps the run itself free of database I/O and makes every effect reviewable in one place, at the cost of a snapshot per run.
+- Either way the schema is small: `module_kv(module_id, key, value)` (a `space_id` column is trivial to add when slim gains more than one space; today it has one), with the entry and byte caps enforced on write.
+- The `KvBackend` trait is exactly the seam that keeps this open: `module_runtime` depends on the trait, not on the store, so choosing (a) or (b) - or changing it later - never touches the gate or the capability logic.
+
+This split is the reviewable decision this phase hands the owner: the gate and the capability are built and tested; the persistence backend is one trait implementation, and which one is a call to make deliberately, not one an autonomous change should have made.
+
+### Threat model (kv.store)
+
+What a hostile or buggy module could try, and why each fails closed:
+
+- **Read or clobber another module's data.** Every operation is keyed by the host-established `module_id`, which the module cannot set or spoof; there is no operation that takes another module's id.
+- **Exhaust host memory or disk.** Per-store caps (entries, total bytes) and per-request caps (key length, value size) bound the total; a per-run call budget bounds how much one run can attempt even within its fuel. Over any cap is a clean refusal, never a partial write.
+- **Escape the sandbox through the response.** The host writes the response only through the module's own `alloc`, into the module's own memory; it never hands back a host pointer, and a failure to write is an empty response, not a host error.
+- **Turn a bad request into a crash.** Every field is validated host-side; a malformed request, an unknown op, or a missing argument is a refusal, never a panic or a trap.
+- **Do anything at all when it should not.** The capability runs only when the surface is on (owner flag), the module declared `kv.store`, and the space approved it; any gate failing is default-deny.
+
+The one thing this threat model does not yet cover is the durable backend's own surface (a `block_on` starving the blocking pool, or a snapshot's size), which is part of that backend's separate review.
+
 ## Phasing
 
 - **Phase A - this record.** The contract.
@@ -118,7 +142,8 @@ They change the sandbox boundary, so they are reviewed and merged by the owner d
 - **One bounded contract at a time.** Each capability is added deliberately, with its own review and its own bounds, never by widening a generic hole. `host_call` is a dispatcher over a fixed, reviewed set of capabilities, not an escape hatch.
 - **No new trust in the module.** Every value in a request is validated host-side; the context (space, user, channel) is host-established and unspoofable; a module error can never become a host error.
 
-## What this record does not do
+## What is built, and what is not
 
-It does not implement `host_call`, any capability, or reactive execution.
-It fixes the ABI, the gating, the reference capability's shape, and the phasing, so each build phase is a bounded, separately reviewable change against a contract that already exists - which is the whole point of writing it before building.
+Phases B and C are now scaffolded, off by default, as owner-reviewed pull requests: the gated `slim.host_call` surface, and `kv.store`'s shape (operations, bounds, isolation) against a `KvBackend` trait with an in-memory reference, both proven end to end but reached by no live path.
+
+Not built: reactive execution (Phase E), `message.post` (Phase D), and `kv.store`'s durable backend (see the persistence section - the deliberate fork left to the owner). The owner flag that would ever turn the surface on is also not built; until it is, `slim.host_call` is refused exactly like any other import.
