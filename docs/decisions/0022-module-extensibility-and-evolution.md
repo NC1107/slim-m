@@ -68,6 +68,7 @@ That model is deliberate (maximum isolation) and is enough for commands, code ru
 The classes that go beyond drawing-from-input - a module that posts a message, stores state, or reacts to an event (the streamer's corner) - need **mediated host capabilities and host-to-module events**: specific, capability-gated calls the host allows a module to make, and events the host pushes to a module that runs reactively rather than only on a user's request.
 The slots for this are already pre-wired: capabilities are declared in the manifest and stored on install (`message.post`, `kv.store`, ... today declared but not enforced), and the permission-and-capability checks exist.
 Wiring them is a future phase (a host import surface behind the capability gate, plus a reactive execution model), not a redesign - the contracts point at it.
+That phase is now designed in decision 0023, which fixes the host-import ABI, the capability gating, and the phasing without building the surface.
 Real-time or high-framerate rendering is a separate frontier again (a client-side wasm runtime), tracked in the backlog.
 
 ## Guardrails
