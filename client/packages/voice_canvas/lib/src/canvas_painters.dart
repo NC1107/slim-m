@@ -215,9 +215,12 @@ class StrokePainter extends CustomPainter {
       bitmap.width.toDouble(),
       bitmap.height.toDouble(),
     );
-    canvas.drawImageRect(
-        bitmap, src, dst, Paint()..filterQuality = FilterQuality.medium);
+    canvas.drawImageRect(bitmap, src, dst, _imagePaint);
   }
+
+  /// Shared across images and repaints; nothing about it varies per image.
+  static final Paint _imagePaint = Paint()
+    ..filterQuality = FilterQuality.medium;
 
   /// Drawn first, since a shadow always sits behind whatever casts it -
   /// before the bitmap or the placeholder, both of which paint over it.
