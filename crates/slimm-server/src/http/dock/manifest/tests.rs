@@ -50,6 +50,38 @@ fn parses_the_live_registry_shapes() {
     );
 }
 
+/// Forward-compatibility invariant: a manifest carrying an extension-point
+/// kind and a capability this server has never heard of still parses. It
+/// keeps what it does not understand and ignores it, so a future module class
+/// (a theme, a panel, a channel-surface, an event handler) is an additive
+/// change that installs on today's server rather than one needing the server
+/// bumped in lockstep. This is the invariant the "modules extend slim through
+/// bounded contracts, they never patch it" model rests on; see decision 0022.
+#[test]
+fn accepts_an_unknown_extension_point_kind_and_capability() {
+    let forward = GOOD_MANIFEST
+        .replace(
+            r#""capabilities": ["command.register", "message.post"]"#,
+            r#""capabilities": ["command.register", "surface.render"]"#,
+        )
+        .replace(
+            r#"{"kind": "command", "name": "run", "description": "runs it", "permission": "run"}"#,
+            r#"{"kind": "command", "name": "run", "description": "runs it", "permission": "run"}, {"kind": "channel-surface", "name": "podcast", "description": "a kind from the future"}"#,
+        );
+    let manifest = parse_manifest(forward.as_bytes()).expect("a future kind parses");
+    assert!(
+        manifest.capabilities.iter().any(|c| c == "surface.render"),
+        "an unknown capability is retained, not rejected"
+    );
+    assert!(
+        manifest
+            .extension_points
+            .iter()
+            .any(|e| e.kind == "channel-surface"),
+        "an unknown extension-point kind is retained, not rejected"
+    );
+}
+
 #[test]
 fn rejects_a_command_extension_point_with_no_permission() {
     let bad = GOOD_MANIFEST.replace(r#", "permission": "run""#, "");

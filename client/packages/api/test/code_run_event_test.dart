@@ -80,4 +80,12 @@ void main() {
   test('Message.fromJson defaults code_runs to empty when absent', () {
     expect(Message.fromJson(_message(const {})).codeRuns, isEmpty);
   });
+
+  // Forward-compat: a frame kind from a future server is ignored, not thrown on, so a new module class does not break an older client. See decision 0022.
+  test('an unknown frame type is ignored, not thrown', () {
+    expect(
+      ServerEvent.parse(jsonEncode({'type': 'surface.rendered', 'foo': 1})),
+      isNull,
+    );
+  });
 }
