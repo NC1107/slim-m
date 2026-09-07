@@ -13,6 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
 import 'dock_command_panel.dart';
+import 'dock_what_it_adds.dart';
 
 /// A module's manifest, plus the lifecycle action appropriate to
 /// [installed]'s state: install when null, otherwise an enable/disable
@@ -81,6 +82,10 @@ class DockManifestView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s16),
         _PermissionsCard(permissions: manifest.permissions),
+        if (manifest.extensionPoints.any((ep) => ep.kind != 'command')) ...[
+          const SizedBox(height: AppSpacing.s16),
+          DockWhatItAddsCard(extensionPoints: manifest.extensionPoints),
+        ],
         const SizedBox(height: AppSpacing.s16),
         _CapabilitiesCard(manifest: manifest),
         const SizedBox(height: AppSpacing.s16),
