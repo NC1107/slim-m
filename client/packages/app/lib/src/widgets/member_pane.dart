@@ -136,24 +136,23 @@ class AppMemberPane extends ConsumerWidget {
                   for (final entry in presence.entries)
                     entry.key: presenceOf(entry.value),
                 };
-                final grouped = groupMembersByPresence(members, statusOf);
-                return ListView(
+                final entries = rosterEntries(
+                  groupMembersByPresence(members, statusOf),
+                );
+                // Lazy, so a large roster builds only the rows on screen.
+                return ListView.builder(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s8,
                     vertical: AppSpacing.s8,
                   ),
-                  children: [
-                    if (grouped.online.isNotEmpty) ...[
-                      MemberGroupLabel('Online · ${grouped.online.length}'),
-                      for (final m in grouped.online)
-                        MemberRow(profile: m, isSelf: m.id == myId),
-                    ],
-                    if (grouped.offline.isNotEmpty) ...[
-                      MemberGroupLabel('Offline · ${grouped.offline.length}'),
-                      for (final m in grouped.offline)
-                        MemberRow(profile: m, isSelf: m.id == myId),
-                    ],
-                  ],
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) => switch (entries[index]) {
+                    RosterGroupLabel(:final text) => MemberGroupLabel(text),
+                    RosterMember(:final profile) => MemberRow(
+                      profile: profile,
+                      isSelf: profile.id == myId,
+                    ),
+                  },
                 );
               },
             ),
@@ -192,8 +191,8 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: AppSizes.headerBar,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),

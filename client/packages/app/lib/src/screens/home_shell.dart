@@ -383,7 +383,7 @@ class _VoiceConversationHeader extends ConsumerWidget {
     ).fitsThreadPane(MediaQuery.sizeOf(context).width);
     final chatOpen = ref.watch(voiceChatPaneVisibleProvider);
     return Container(
-      height: 52,
+      height: AppSizes.headerBar,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
