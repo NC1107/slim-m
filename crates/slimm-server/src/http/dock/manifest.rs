@@ -12,6 +12,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::module_runtime::{MAX_FUEL, MAX_MEMORY_MB, MAX_WALL_MS};
+
 /// The one schema version this server understands. A registry that bumps it
 /// is a breaking change to the wire contract, not something to guess at.
 const SUPPORTED_SCHEMA: i64 = 1;
@@ -314,14 +316,19 @@ fn validate_artifact(raw: RawArtifact) -> Result<ManifestArtifact, ManifestError
 
 fn validate_runtime(raw: RawRuntime) -> Result<ManifestRuntime, ManifestError> {
     let backend = bounded(&raw.backend, MAX_SLUG, "runtime.backend")?;
-    for (value, field) in [
-        (raw.limits.memory_mb, "memory_mb"),
-        (raw.limits.wall_ms, "wall_ms"),
-        (raw.limits.fuel, "fuel"),
+    for (value, field, max) in [
+        (raw.limits.memory_mb, "memory_mb", MAX_MEMORY_MB),
+        (raw.limits.wall_ms, "wall_ms", MAX_WALL_MS),
+        (raw.limits.fuel, "fuel", MAX_FUEL),
     ] {
         if value == Some(0) {
             return Err(malformed(&format!(
                 "runtime.limits.{field} must be positive"
+            )));
+        }
+        if value.is_some_and(|v| v > max) {
+            return Err(malformed(&format!(
+                "runtime.limits.{field} may not exceed {max}"
             )));
         }
     }

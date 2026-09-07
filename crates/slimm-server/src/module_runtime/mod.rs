@@ -48,6 +48,7 @@
 //! for the reference capability and its bounds.
 
 mod capabilities;
+mod compiled;
 mod host;
 mod kv;
 mod limits;
@@ -55,7 +56,7 @@ mod limits;
 pub use capabilities::CapabilitySurface;
 pub use host::{ModuleHost, RunError};
 pub use kv::{InMemoryKv, KvBackend};
-pub use limits::RunLimits;
+pub use limits::{MAX_FUEL, MAX_MEMORY_MB, MAX_WALL_MS, RunLimits};
 
 #[cfg(test)]
 mod tests;
