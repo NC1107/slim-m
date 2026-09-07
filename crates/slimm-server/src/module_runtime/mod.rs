@@ -34,10 +34,23 @@
 //! eventually want (posting a message, reading a key-value store) has to
 //! come later as an explicit, mediated host function rather than ambient
 //! access - see decision 0021's "no ambient authority" principle.
+//!
+//! # The mediated-capability surface (decision 0023, scaffolded, off by default)
+//!
+//! [`ModuleHost::run_with_capabilities`] is the seam for that "later": with a
+//! [`CapabilitySurface`] enabled, a module may import the single gated
+//! `slim.host_call` function (and nothing else), whose requests the surface
+//! gates and answers. This is Phase B of decision 0023 - the gate is real but
+//! no capability is implemented, and every live path passes
+//! [`CapabilitySurface::Disabled`], so the surface ships dark and a stock
+//! deployment behaves exactly as the import-free model above. See
+//! [`capabilities`] for the gate and the fail-closed guarantees.
 
+mod capabilities;
 mod host;
 mod limits;
 
+pub use capabilities::CapabilitySurface;
 pub use host::{ModuleHost, RunError};
 pub use limits::RunLimits;
 

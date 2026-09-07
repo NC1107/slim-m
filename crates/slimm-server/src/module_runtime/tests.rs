@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use super::{ModuleHost, RunError, RunLimits};
+use super::{CapabilitySurface, ModuleHost, RunError, RunLimits};
 
 const GENEROUS: RunLimits = RunLimits {
     memory_bytes: 4 * 1024 * 1024,
@@ -89,9 +89,108 @@ fn memory_hog_wasm() -> Vec<u8> {
     "#)
 }
 
+/// ABI-conformant and declares the single `slim.host_call` import (the only
+/// import a capability-using module may have): a bump allocator so the host can
+/// write the response back, the `request` staged at offset 1024, and a `run`
+/// that calls `host_call` on it and returns its packed result verbatim - so the
+/// host's response comes straight back out as the module's output.
+fn host_call_wasm(request: &str) -> Vec<u8> {
+    let escaped: String = request
+        .chars()
+        .flat_map(|c| match c {
+            '"' => vec!['\\', '"'],
+            '\\' => vec!['\\', '\\'],
+            other => vec![other],
+        })
+        .collect();
+    wat(&format!(
+        r#"
+        (module
+            (import "slim" "host_call" (func $host_call (param i32 i32) (result i64)))
+            (memory (export "memory") 1)
+            (global $bump (mut i32) (i32.const 8192))
+            (data (i32.const 1024) "{escaped}")
+            (func (export "alloc") (param $len i32) (result i32)
+                (local $ptr i32)
+                (local.set $ptr (global.get $bump))
+                (global.set $bump (i32.add (global.get $bump) (local.get $len)))
+                (local.get $ptr))
+            (func (export "run") (param $in_ptr i32) (param $in_len i32) (result i64)
+                (call $host_call (i32.const 1024) (i32.const {len}))))
+        "#,
+        len = request.len()
+    ))
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     crate::media::to_hex(&Sha256::digest(bytes))
+}
+
+/// The surface is off on every live path, so a module importing `host_call` is
+/// refused exactly like any other import - a stock deployment is unchanged.
+#[tokio::test]
+async fn a_host_call_module_is_refused_when_the_surface_is_off() {
+    let wasm = host_call_wasm(r#"{"capability":"kv.store"}"#);
+    let sha256 = sha256_hex(&wasm);
+
+    let err = ModuleHost::run(wasm, sha256, GENEROUS, b"hi".to_vec())
+        .await
+        .expect_err("host_call must be refused while the surface is off");
+
+    assert!(matches!(err, RunError::ImportsNotAllowed));
+}
+
+/// With the surface on and a capability approved, the `host_call` import links
+/// (the module instantiates and runs), but the call itself is gated: Phase B
+/// implements no capability, so an approved one comes back a clean refusal.
+#[tokio::test]
+async fn an_enabled_host_call_instantiates_and_the_call_is_refused_cleanly() {
+    let wasm = host_call_wasm(r#"{"capability":"kv.store","op":"get"}"#);
+    let sha256 = sha256_hex(&wasm);
+    let surface = CapabilitySurface::Enabled {
+        approved: vec!["kv.store".to_owned()],
+    };
+
+    let output = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
+        .await
+        .expect("the module should instantiate and its host_call should answer");
+
+    let text = String::from_utf8(output).expect("the response is UTF-8 JSON");
+    assert!(text.contains(r#""ok":false"#), "{text}");
+    assert!(text.contains("not available: kv.store"), "{text}");
+}
+
+/// The surface being on is not enough: with no capability approved for the
+/// module, even the `host_call` import is refused.
+#[tokio::test]
+async fn an_enabled_surface_with_no_approved_capability_refuses_the_import() {
+    let wasm = host_call_wasm(r#"{"capability":"kv.store"}"#);
+    let sha256 = sha256_hex(&wasm);
+    let surface = CapabilitySurface::Enabled { approved: vec![] };
+
+    let err = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
+        .await
+        .expect_err("no approved capability means no host_call import");
+
+    assert!(matches!(err, RunError::ImportsNotAllowed));
+}
+
+/// Only `slim.host_call` is ever allowed: any other import is refused even with
+/// the surface on and a capability approved.
+#[tokio::test]
+async fn any_other_import_is_refused_even_with_the_surface_on() {
+    let wasm = importing_wasm(); // imports env.log
+    let sha256 = sha256_hex(&wasm);
+    let surface = CapabilitySurface::Enabled {
+        approved: vec!["kv.store".to_owned()],
+    };
+
+    let err = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
+        .await
+        .expect_err("only slim.host_call may be imported");
+
+    assert!(matches!(err, RunError::ImportsNotAllowed));
 }
 
 #[tokio::test]
