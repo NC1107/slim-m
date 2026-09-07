@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE code_runs SET ran_by = NULL WHERE ran_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "306c2fde65111aa434366d354b1c19bbc9561cdc37680bbbbec0751703313a89"
+}
