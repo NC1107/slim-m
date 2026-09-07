@@ -7,8 +7,12 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 use wasmi::core::TrapCode;
-use wasmi::{Config, Engine, Instance, Module, Store as WasmiStore, StoreLimitsBuilder};
+use wasmi::{
+    Caller, Config, Engine, Extern, Instance, Linker, Module, Store as WasmiStore, StoreLimits,
+    StoreLimitsBuilder,
+};
 
+use super::capabilities::CapabilitySurface;
 use super::limits::RunLimits;
 use crate::media::to_hex;
 
@@ -74,13 +78,40 @@ impl ModuleHost {
         limits: RunLimits,
         input: Vec<u8>,
     ) -> Result<Vec<u8>, RunError> {
+        Self::run_with_capabilities(
+            wasm,
+            expected_sha256,
+            limits,
+            input,
+            CapabilitySurface::Disabled,
+        )
+        .await
+    }
+
+    /// As [`run`](Self::run), but with a mediated-capability surface available
+    /// to the module (decision 0023). With [`CapabilitySurface::Disabled`] this
+    /// is exactly [`run`](Self::run) - a module may import nothing. With it
+    /// enabled and at least one capability approved, the module may import the
+    /// single `slim.host_call` function (and nothing else), whose requests are
+    /// gated by the surface; every other import is still refused.
+    ///
+    /// The surface ships dark: the live paths pass `Disabled`, so this path is
+    /// only reached once an owner turns capabilities on (a future step) - see
+    /// the [`super::capabilities`] module doc and decision 0023's Phase B.
+    pub async fn run_with_capabilities(
+        wasm: Vec<u8>,
+        expected_sha256: String,
+        limits: RunLimits,
+        input: Vec<u8>,
+        surface: CapabilitySurface,
+    ) -> Result<Vec<u8>, RunError> {
         let digest = to_hex(&Sha256::digest(&wasm));
         if digest != expected_sha256 {
             return Err(RunError::HashMismatch);
         }
 
         let wall = limits.wall;
-        let task = tokio::task::spawn_blocking(move || run_sync(&wasm, limits, &input));
+        let task = tokio::task::spawn_blocking(move || run_sync(&wasm, limits, &input, surface));
         match tokio::time::timeout(wall, task).await {
             Ok(Ok(result)) => result,
             Ok(Err(_join_error)) => Err(RunError::Trap("module task did not complete".to_owned())),
@@ -89,28 +120,64 @@ impl ModuleHost {
     }
 }
 
-fn run_sync(wasm: &[u8], limits: RunLimits, input: &[u8]) -> Result<Vec<u8>, RunError> {
+/// A module run's store data: the memory/fuel limiter as before, plus the
+/// capability surface a `slim.host_call` host function reads to gate a request.
+struct HostState {
+    limits: StoreLimits,
+    surface: CapabilitySurface,
+}
+
+fn run_sync(
+    wasm: &[u8],
+    limits: RunLimits,
+    input: &[u8],
+    surface: CapabilitySurface,
+) -> Result<Vec<u8>, RunError> {
     let mut config = Config::default();
     config.consume_fuel(true);
     let engine = Engine::new(&config);
 
     let module = Module::new(&engine, wasm)
         .map_err(|e| RunError::Instantiate(format!("invalid wasm module: {e}")))?;
-    if module.imports().next().is_some() {
-        return Err(RunError::ImportsNotAllowed);
+    // The only import a module may declare is the single gated `slim.host_call`, and only with the surface on and a capability approved; every other case (any import while off, any other import ever, a second import) is refused, the same no-ambient-authority rule v1 has always had (decisions 0021, 0023).
+    let allows_host_call = surface.allows_host_call();
+    let mut imports_host_call = false;
+    for import in module.imports() {
+        if allows_host_call && import.module() == "slim" && import.name() == "host_call" {
+            imports_host_call = true;
+        } else {
+            return Err(RunError::ImportsNotAllowed);
+        }
     }
 
     let store_limits = StoreLimitsBuilder::new()
         .memory_size(limits.memory_bytes)
         .build();
-    let mut store = WasmiStore::new(&engine, store_limits);
-    store.limiter(|limits| limits);
+    let mut store = WasmiStore::new(
+        &engine,
+        HostState {
+            limits: store_limits,
+            surface,
+        },
+    );
+    store.limiter(|state| &mut state.limits);
     store
         .set_fuel(limits.fuel)
         .map_err(|e| RunError::Instantiate(format!("failed to configure fuel: {e}")))?;
 
-    let instance = Instance::new(&mut store, &module, &[])
-        .map_err(|e| RunError::Instantiate(format!("module failed to instantiate: {e}")))?;
+    let instance = if imports_host_call {
+        let mut linker = Linker::<HostState>::new(&engine);
+        linker
+            .func_wrap("slim", "host_call", host_call)
+            .map_err(|e| RunError::Instantiate(format!("failed to define host_call: {e}")))?;
+        // A slim module has no wasm start function, so instantiate-and-start is just instantiation; the response comes from `run`, called below.
+        linker
+            .instantiate_and_start(&mut store, &module)
+            .map_err(|e| RunError::Instantiate(format!("module failed to instantiate: {e}")))?
+    } else {
+        Instance::new(&mut store, &module, &[])
+            .map_err(|e| RunError::Instantiate(format!("module failed to instantiate: {e}")))?
+    };
 
     let memory = instance.get_memory(&store, "memory").ok_or_else(|| {
         RunError::Instantiate("module does not export a memory named \"memory\"".to_owned())
@@ -140,6 +207,56 @@ fn run_sync(wasm: &[u8], limits: RunLimits, input: &[u8]) -> Result<Vec<u8>, Run
         .read(&store, out_ptr, &mut output)
         .map_err(|e| RunError::Instantiate(format!("module's run returned bad memory: {e}")))?;
     Ok(output)
+}
+
+/// The single host function a capability-using module may import. It reads the
+/// UTF-8 JSON request from the module's memory, hands it to the surface to gate
+/// and answer (see [`super::capabilities`]), then writes the response back into
+/// the module's own memory using the module's own `alloc` export - so the
+/// response lives in the module's address space, never the host's - and returns
+/// the packed `(out_ptr << 32) | out_len`, the same convention `run` uses.
+///
+/// Every failure path returns `0` (an empty response), which the module reads
+/// as "no bytes" and treats as an error; a misbehaving module can make this
+/// return nothing but can never make it read or write outside its own memory,
+/// nor turn a bad request into a host error.
+fn host_call(mut caller: Caller<'_, HostState>, req_ptr: i32, req_len: i32) -> i64 {
+    let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
+        return 0;
+    };
+    let Ok(req_len) = usize::try_from(req_len) else {
+        return 0;
+    };
+    let Ok(req_ptr) = usize::try_from(req_ptr) else {
+        return 0;
+    };
+    let mut request = vec![0u8; req_len];
+    if memory.read(&caller, req_ptr, &mut request).is_err() {
+        return 0;
+    }
+
+    // The borrow of `caller` ends when `dispatch` returns its owned bytes, so the alloc/write below can take `caller` mutably.
+    let response = caller.data().surface.dispatch(&request);
+
+    let Some(Extern::Func(alloc)) = caller.get_export("alloc") else {
+        return 0;
+    };
+    let Ok(alloc) = alloc.typed::<i32, i32>(&caller) else {
+        return 0;
+    };
+    let Ok(out_len) = i32::try_from(response.len()) else {
+        return 0;
+    };
+    let Ok(out_ptr) = alloc.call(&mut caller, out_len) else {
+        return 0;
+    };
+    if memory
+        .write(&mut caller, out_ptr as usize, &response)
+        .is_err()
+    {
+        return 0;
+    }
+    ((out_ptr as i64) << 32) | (out_len as i64 & 0xffff_ffff)
 }
 
 /// Fuel exhaustion and a limiter-denied memory growth both surface as a
