@@ -66,18 +66,44 @@ Color _roleColor(AppCodeRole role, AppCodeColors code, Color plain) =>
 ///
 /// The body does not wrap: the source is a `<pre>` with `overflow: auto`, so
 /// a long line scrolls horizontally instead of reflowing.
-class AppCodeBlock extends StatelessWidget {
-  const AppCodeBlock(
-      {super.key, required this.lines, this.language, this.action});
+class AppCodeBlock extends StatefulWidget {
+  const AppCodeBlock({
+    super.key,
+    required this.lines,
+    this.language,
+    this.action,
+    this.collapseAfterLines,
+  });
 
   final List<AppCodeLine> lines;
   final String? language;
   final Widget? action;
 
+  /// When set and the block has more than this many lines, it renders
+  /// collapsed to this many with a "show more"/"show less" toggle, the way a
+  /// long paste is folded rather than eating the transcript. Null (the
+  /// default) never collapses, so every existing caller renders as before.
+  /// The header - language label and [action] (typically Run) - always shows,
+  /// so a long block can be run without expanding it.
+  final int? collapseAfterLines;
+
+  @override
+  State<AppCodeBlock> createState() => _AppCodeBlockState();
+}
+
+class _AppCodeBlockState extends State<AppCodeBlock> {
+  bool _expanded = false;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final code = tokens.code;
+    final threshold = widget.collapseAfterLines;
+    final collapsible = threshold != null && widget.lines.length > threshold;
+    final visible = collapsible && !_expanded
+        ? widget.lines.take(threshold).toList(growable: false)
+        : widget.lines;
+    final hidden = collapsible ? widget.lines.length - threshold : 0;
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -99,7 +125,7 @@ class AppCodeBlock extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    language ?? '',
+                    widget.language ?? '',
                     style: AppText.micro.copyWith(
                       fontFamily: AppFonts.mono,
                       color: tokens.textSecondary,
@@ -107,7 +133,7 @@ class AppCodeBlock extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (action != null) action!,
+                if (widget.action != null) widget.action!,
               ],
             ),
           ),
@@ -118,9 +144,9 @@ class AppCodeBlock extends StatelessWidget {
             child: Text.rich(
               TextSpan(
                 children: [
-                  for (var i = 0; i < lines.length; i++) ...[
+                  for (var i = 0; i < visible.length; i++) ...[
                     if (i > 0) const TextSpan(text: '\n'),
-                    for (final span in lines[i].spans)
+                    for (final span in visible[i].spans)
                       TextSpan(
                         text: span.text,
                         style: TextStyle(
@@ -137,7 +163,52 @@ class AppCodeBlock extends StatelessWidget {
                   fontFamily: AppFonts.mono, fontSize: 13, height: 1.6),
             ),
           ),
+          if (collapsible)
+            _CodeBlockToggle(
+              expanded: _expanded,
+              hidden: hidden,
+              onTap: () => setState(() => _expanded = !_expanded),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// The fold control below a collapsed block: a full-width hairline-topped bar
+/// naming how many lines are hidden, so a long paste is scannable at a glance
+/// and expandable in one tap.
+class _CodeBlockToggle extends StatelessWidget {
+  const _CodeBlockToggle({
+    required this.expanded,
+    required this.hidden,
+    required this.onTap,
+  });
+
+  final bool expanded;
+  final int hidden;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: tokens.borderSubtle)),
+        ),
+        child: Text(
+          expanded
+              ? 'Show less'
+              : 'Show $hidden more ${hidden == 1 ? 'line' : 'lines'}',
+          style: AppText.micro.copyWith(
+            fontFamily: AppFonts.mono,
+            color: tokens.textSecondary,
+          ),
+        ),
       ),
     );
   }

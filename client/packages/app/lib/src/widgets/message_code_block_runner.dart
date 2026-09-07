@@ -51,6 +51,11 @@ class MessageCodeBlockRunner extends ConsumerStatefulWidget {
       _MessageCodeBlockRunnerState();
 }
 
+/// Blocks longer than this fold by default - long enough that an ordinary
+/// snippet is never touched, short enough that a file-sized paste does not
+/// take over the transcript.
+const _collapseAfterLines = 12;
+
 class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
     with GuardedActionState<MessageCodeBlockRunner> {
   bool _running = false;
@@ -126,6 +131,8 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         AppCodeBlock(
           language: widget.language,
           lines: lexCodeBlock(widget.code, widget.language),
+          // A long paste folds so it does not eat the transcript; the header (and its Run) stays, so it can be run without expanding.
+          collapseAfterLines: _collapseAfterLines,
           action: runner == null
               ? null
               : _RunAction(running: _running, onPressed: () => _run(runner)),
