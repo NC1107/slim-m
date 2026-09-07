@@ -163,7 +163,8 @@ async fn the_widened_action_is_accepted_and_the_old_ones_still_constrained() {
 
 /// The rebuild drops the old table's indexes with it. Both have to come back,
 /// or account deletion's own actor cleanup silently starts scanning every act
-/// ever recorded.
+/// ever recorded. Later migrations may add indexes of their own (0068 does),
+/// so this checks the two 0049 promises are present, not that they are alone.
 #[tokio::test]
 async fn the_rebuild_restores_both_indexes() {
     let (pool, _guard) = pool_at_0048().await;
@@ -176,11 +177,10 @@ async fn the_rebuild_restores_both_indexes() {
     .fetch_all(&pool)
     .await
     .unwrap();
-    assert_eq!(
-        names,
-        vec![
-            "moderation_audit_log_actor".to_owned(),
-            "moderation_audit_log_subject".to_owned()
-        ]
-    );
+    for rebuilt in ["moderation_audit_log_actor", "moderation_audit_log_subject"] {
+        assert!(
+            names.iter().any(|n| n == rebuilt),
+            "{rebuilt} must survive the rebuild; the indexes are {names:?}"
+        );
+    }
 }
