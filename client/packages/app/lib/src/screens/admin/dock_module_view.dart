@@ -59,6 +59,12 @@ class DockManifestView extends StatelessWidget {
                 ),
               ),
             ),
+            // An explicit way out: the sheet's drag handle is easy to miss on a tall, scrolling module view.
+            IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: Icon(AppIcons.dismiss, color: tokens.textSecondary),
+              tooltip: 'Close',
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.s4),
