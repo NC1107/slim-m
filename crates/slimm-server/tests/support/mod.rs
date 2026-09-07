@@ -106,9 +106,7 @@ fn build_or_find_template() -> Option<PathBuf> {
     if is_nonempty(&final_path) {
         return Some(final_path);
     }
-    // Build to a private path, then publish by rename. A rename is atomic, and a
-    // concurrent copier of the old file keeps reading it through its open handle,
-    // so parallel builders racing to publish an identical template is harmless.
+    // Build to a private path, then publish by an atomic rename; a concurrent copier of the old file keeps reading it through its open handle, so builders racing to publish an identical template is harmless.
     let building = std::env::temp_dir().join(format!(
         "slimm-test-tpl-{}.{}.building",
         migrations_hash(),
