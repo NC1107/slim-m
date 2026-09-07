@@ -61,7 +61,7 @@ Server (`crates/slimm-server/src/`):
 - `lib.rs::run` wires `AppState` (store, auth, hub, limiter, push, voice, media, gifs) and spawns the background sweeps: expired tokens, orphaned attachments, canvas ops, stale calls, message retention.
 - `http/` and `store/` are both split one module per feature and mirror each other; a new feature usually means a matching pair plus a route in `http.rs` and an entry in `schema/openapi.yaml`.
 - `store.rs` keeps methods inherent on `Store` rather than behind a repository trait; that trait arrives when Postgres actually needs it.
-- `hub.rs` is one broadcast channel, not a per-scope router. Fan-out order across concurrent writers is best-effort, so clients apply events strictly by per-scope `seq`. A subscriber that lags past `CHANNEL_CAPACITY` is dropped, and the client resyncs over REST.
+- `hub.rs` is two class-based broadcast channels (durable and ephemeral), not a per-scope router. Fan-out order across concurrent writers is best-effort, so clients apply events strictly by per-scope `seq`. A subscriber that lags past `CHANNEL_CAPACITY` is dropped, and the client resyncs over REST.
 
 Client (`client/packages/`), layered bottom-up:
 

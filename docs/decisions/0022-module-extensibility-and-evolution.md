@@ -55,6 +55,7 @@ None of these is built here; each is named so its shape as a bounded addition is
 - **A richer in-chat game or tool (a slot machine)**: already expressible today via the scene contract's interactive path (a scene plus controls plus opaque state, the Game of Life shape) - no new contract needed, at most richer scene ops.
 - **A theme**: a `theme` extension-point kind whose module emits a design-token set the client applies through its existing token system - a bounded token override, never arbitrary styling.
 - **An app-like panel**: a `panel` extension-point kind the client hosts as a full surface, rendered through the scene contract (or a richer UI contract) rather than inline in a message.
+  The inline half of this shape already exists as the `app` kind (decision 0021, "The slash-command and app extension points"); `panel` would be the same command hosted as a full surface.
 - **A channel with its own UI (a podcast channel)**: a `channel-surface` extension-point kind that supplies a channel body the client renders, with the server carrying a module-defined channel kind.
 - **A surface that reacts to an event (a streamer's corner)**: the ambitious one, and the reason for the deferred foundation below - it needs a module to receive host events and manage a surface, not just answer a request.
 

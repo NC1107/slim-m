@@ -260,6 +260,21 @@ own permission simply sees the 403 surface inline, the same as any other
 transport failure - never a second, weaker permission model bolted onto the
 client to avoid that one round trip.
 
+## The slash-command and app extension points
+
+Two further kinds reuse the `code-block-runner` shape exactly - `permission` and `command` are required and validated the same way - and differ only in where the client surfaces them.
+
+`slash-command` (`{ "kind": "slash-command", "name": "<keyword>", "permission": "<permKey>", "command": "<cmd>" }`) puts a module's command behind `/<name>` in the composer.
+`GET /modules/slash-commands` lists every reachable one (installed, enabled, permission held), and the client runs the matched command through `runModuleCommand` and posts its output as an ordinary message from the person who typed it.
+There is no bot identity: a module is a pure function, so its output goes out under the caller's own name or not at all.
+
+`app` (`{ "kind": "app", "name": "<label>", "permission": "<permKey>", "command": "<cmd>" }`) is a command whose output is a shared, interactive surface rather than text - a game, a tool.
+`GET /modules/apps` lists the reachable ones; launching one is `launchAppMessage`, a durable, idempotent message that records only `(module_id, command)` in the `app_surfaces` side table.
+The surface's live state is the module's own output, run and broadcast through the shared code-run route at block 0 exactly like a run fenced code block, so everyone viewing the message sees the same state and any viewer holding the permission can act on it.
+Rendering is the scene contract below, including its interactive path.
+
+Both kinds shipped after decision 0022 and were added here afterwards; they are the additive, bounded contracts that record describes, and `app` is the inline half of the `panel` shape it lists as future work.
+
 ## Rendering: the scene contract (scene/1)
 
 A module returns one opaque `output` string; ABI v1 carries no content type, and deliberately gains none.
