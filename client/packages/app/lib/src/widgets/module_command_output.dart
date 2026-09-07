@@ -9,6 +9,12 @@
 /// [moduleId] and [command] are what a scene needs to run its own follow-up
 /// actions (step, tap, ...) back against the same module; without them a scene
 /// still renders, just as a static first frame with no controls.
+///
+/// When [messageId] and [blockIndex] are given (a code block in a real
+/// message), those follow-up actions go through the message-scoped, shared run
+/// route, so every step/tap/play tick is stored and broadcast - everyone
+/// viewing sees the same evolving scene, not a private copy. Without them (the
+/// Dock command panel), the actions are the ephemeral per-caller run.
 library;
 
 import 'package:flutter/material.dart';
@@ -26,11 +32,19 @@ class ModuleCommandOutput extends ConsumerWidget {
     required this.result,
     this.moduleId,
     this.command,
+    this.messageId,
+    this.blockIndex,
   });
 
   final api.RunModuleCommandResult result;
   final String? moduleId;
   final String? command;
+
+  /// The message and fenced-block this output belongs to, so a scene's
+  /// follow-up actions run through the shared, message-scoped route rather
+  /// than the ephemeral one - see the class doc. Null for the Dock panel.
+  final String? messageId;
+  final int? blockIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,15 +55,28 @@ class ModuleCommandOutput extends ConsumerWidget {
     if (result.ok && output != null && moduleId != null && command != null) {
       final scene = parseModuleScene(output);
       if (scene != null) {
+        final messageId = this.messageId;
+        final blockIndex = this.blockIndex;
         return ModuleSceneView(
           initial: scene,
-          runCommand: (input) => ref
-              .read(apiProvider)
-              .runModuleCommand(
-                moduleId: moduleId,
-                command: command,
-                input: input,
-              ),
+          // Shared when this scene belongs to a message: each action stores and broadcasts, so everyone watching sees the same evolving scene.
+          runCommand: messageId != null && blockIndex != null
+              ? (input) => ref
+                    .read(apiProvider)
+                    .runCodeBlock(
+                      messageId: messageId,
+                      blockIndex: blockIndex,
+                      moduleId: moduleId,
+                      command: command,
+                      input: input,
+                    )
+              : (input) => ref
+                    .read(apiProvider)
+                    .runModuleCommand(
+                      moduleId: moduleId,
+                      command: command,
+                      input: input,
+                    ),
         );
       }
     }

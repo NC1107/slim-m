@@ -147,6 +147,8 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
             result: result,
             moduleId: runner?.moduleId,
             command: runner?.command,
+            messageId: widget.messageId,
+            blockIndex: widget.blockIndex,
           ),
         ],
       ],
