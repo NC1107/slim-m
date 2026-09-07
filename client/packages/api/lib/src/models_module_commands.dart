@@ -35,6 +35,33 @@ class SlashCommand {
       );
 }
 
+/// A module `app` extension point the caller may launch into a channel from
+/// the composer's apps menu (or as a `/name` alias), from `GET /modules/apps`.
+/// Launching one posts a message that renders as the module's interactive,
+/// shared surface. A plain mirror of the wire shape.
+class App {
+  const App({
+    required this.moduleId,
+    required this.command,
+    required this.name,
+    this.description,
+  });
+
+  final String moduleId;
+  final String command;
+
+  /// What the composer's apps menu shows, and the `/name` keyword.
+  final String name;
+  final String? description;
+
+  factory App.fromJson(Map<String, dynamic> json) => App(
+        moduleId: json['module_id'] as String,
+        command: json['command'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String?,
+      );
+}
+
 class CodeBlockRunner {
   const CodeBlockRunner({
     required this.moduleId,

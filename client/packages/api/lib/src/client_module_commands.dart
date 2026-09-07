@@ -27,6 +27,16 @@ extension SlimmApiModuleCommands on SlimmApi {
         .toList(growable: false);
   }
 
+  /// Every app this caller may currently launch into a channel, possibly
+  /// empty - an empty list means no installed and enabled module declares an
+  /// `app` extension point the caller holds the permission for.
+  Future<List<App>> listApps() async {
+    final json = await _send('GET', '/modules/apps');
+    return (json as List<dynamic>)
+        .map((a) => App.fromJson(a as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Runs [moduleId]'s [command] with [input], returning the module ABI's
   /// own outcome. Requires the module to be installed, enabled, and the
   /// caller to hold the permission the command declared.

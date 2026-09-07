@@ -3187,6 +3187,48 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/messages/apps:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      operationId: launchAppMessage
+      tags: [messages]
+      summary: Launch an installed module's app as a message.
+      description: >
+        An app surface is not its own resource: it is a message, so this is
+        idempotent by the client-supplied `id` exactly like `sendMessage`, and
+        gated on the same VIEW_CHANNEL plus SEND_MESSAGES permissions, evaluated
+        in this channel. The caller must also currently be able to reach the
+        named app (installed, enabled, and holding its declared permission),
+        the same three checks `listApps` filters on. The message carries only
+        which module and command to launch; the surface's live, shared state is
+        the module's own output, run and seen by everyone through the shared
+        code-run route at block 0, exactly like a fenced code block. slim has no
+        notion of what any app does - see docs/decisions/0021.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LaunchAppRequest"
+      responses:
+        "200":
+          description: The stored message, with its app surface attached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /messages/{messageId}/save:
     parameters:
       - name: messageId
@@ -5474,6 +5516,32 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /modules/apps:
+    get:
+      operationId: listApps
+      tags: [space]
+      summary: Discover which apps this caller may launch into a channel.
+      description: >
+        One entry per installed and enabled module that declares an `app`
+        extension point and whose declared permission the caller holds
+        (Store::user_has_module_permission). Each entry's `name` is what the
+        composer's apps menu shows and `command` is the `command` extension
+        point that `launchAppMessage` posts. An empty list means no launchable
+        apps. slim has no notion of what any app does - see docs/decisions/0021's
+        module-agnostic principle.
+      responses:
+        "200":
+          description: The apps this caller may launch, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/App"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /sync:
     post:
       operationId: sync
@@ -6730,6 +6798,35 @@ components:
           type: string
           nullable: true
           description: A short human summary of what the command does.
+    App:
+      type: object
+      required: [module_id, command, name]
+      properties:
+        module_id:
+          type: string
+        command:
+          type: string
+          description: >
+            The `command` extension point's own name the launch posts, and that
+            the surface then runs and re-runs through the shared code-run route.
+        name:
+          type: string
+          description: What the composer's apps menu shows for this app.
+        description:
+          type: string
+          nullable: true
+          description: A short human summary of what the app is.
+    AppSurface:
+      type: object
+      required: [module_id, command]
+      properties:
+        module_id:
+          type: string
+        command:
+          type: string
+          description: >
+            The module command this message launched. The surface's live state
+            is the code-run at block 0 of this message, not carried here.
     PresenceStatus:
       type: object
       required: [user_id, status]
@@ -7918,6 +8015,15 @@ components:
             The poll this message carries, if any. Always present as a key:
             null means this message is not a poll, the same convention
             `reactions` follows for "genuinely none" versus omitted.
+        app_surface:
+          oneOf:
+            - $ref: "#/components/schemas/AppSurface"
+            - type: "null"
+          description: >-
+            The app this message launches, if any. Always present as a key:
+            null means this message launches no app, the same "genuinely none"
+            convention `poll` follows. The surface's live, shared state is the
+            code-run at block 0, not carried here.
         attachments:
           type: array
           description: >-
@@ -8301,6 +8407,30 @@ components:
           format: int64
           description: >-
             Unix milliseconds. Omitted or null means the poll never closes.
+
+    LaunchAppRequest:
+      type: object
+      required: [id, module_id, command]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            Client-generated UUIDv7. Retrying with the same id returns the
+            stored message instead of launching twice.
+        content:
+          type: string
+          maxLength: 4000
+          description: >-
+            An optional caption riding alongside the app. May be empty or
+            omitted: the app itself is what the message is for.
+        module_id:
+          type: string
+          description: The installed module whose app to launch.
+        command:
+          type: string
+          description: >-
+            The module command this app's `app` extension point names.
 
     VotePollRequest:
       type: object

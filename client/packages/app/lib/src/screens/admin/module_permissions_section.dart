@@ -17,6 +17,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/app_launch.dart';
 import '../../providers/code_block_runner.dart';
 import '../../providers/slash_command.dart';
 import '../../providers/providers.dart';
@@ -66,6 +67,7 @@ class _ModulePermissionsSectionState
       ref.invalidate(roleModulePermissionsProvider(widget.roleId));
       ref.invalidate(codeBlockRunnerProvider);
       ref.invalidate(slashCommandProvider);
+      ref.invalidate(appLaunchProvider);
     }
   }
 

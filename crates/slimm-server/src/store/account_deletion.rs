@@ -188,6 +188,13 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // A launched app surface stays visible to everyone in the channel; who launched it goes the way a poll's creator does, and for the same tombstone-UPDATE reason the FK never fires.
+        sqlx::query!(
+            "UPDATE app_surfaces SET created_by = NULL WHERE created_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // schema/openapi.yaml promises both of these read null once the account is gone.
         sqlx::query!(
             "UPDATE pinned_messages SET pinned_by = NULL WHERE pinned_by = ?",

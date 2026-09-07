@@ -16,6 +16,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
+import '../../providers/app_launch.dart';
 import '../../providers/code_block_runner.dart';
 import '../../providers/slash_command.dart';
 import '../../providers/providers.dart';
@@ -74,6 +75,7 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
       ref.invalidate(dockCatalogProvider);
       ref.invalidate(codeBlockRunnerProvider);
       ref.invalidate(slashCommandProvider);
+      ref.invalidate(appLaunchProvider);
     }
   }
 
@@ -100,6 +102,7 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
       ref.invalidate(modulePermissionsProvider);
       ref.invalidate(codeBlockRunnerProvider);
       ref.invalidate(slashCommandProvider);
+      ref.invalidate(appLaunchProvider);
       if (mounted) Navigator.of(context).pop();
     }
   }

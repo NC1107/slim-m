@@ -54,6 +54,7 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
         "user_id",
         OnDelete::CascadesFrom("devices"),
     ),
+    ("app_surfaces", "created_by", OnDelete::Anonymize),
     ("attachment_uploaders", "uploaded_by", OnDelete::Purge),
     ("canvas_audit_log", "actor_id", OnDelete::Anonymize),
     ("canvas_media_slots", "user_id", OnDelete::Purge),

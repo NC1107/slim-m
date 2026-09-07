@@ -289,7 +289,8 @@ async fn spawn_fake_dock_registry() -> String {
             "capabilities": ["command.register", "message.post"],
             "extension_points": [
                 {"kind": "command", "name": "run", "description": "runs it", "permission": "run"},
-                {"kind": "code-block-runner", "name": "Run in chat", "description": "offers Run on a fenced code block", "permission": "run", "command": "run", "language": "javascript"}
+                {"kind": "code-block-runner", "name": "Run in chat", "description": "offers Run on a fenced code block", "permission": "run", "command": "run", "language": "javascript"},
+                {"kind": "app", "name": "Code App", "description": "launch it as a surface", "permission": "run", "command": "run"}
             ]
         }))
     }

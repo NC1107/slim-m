@@ -141,18 +141,17 @@ struct RawExtensionPoint {
     #[serde(default)]
     description: Option<String>,
     /// The declared permission key (see `permissions` above) a caller must
-    /// hold to reach this extension point. Required for `kind: "command"`
-    /// and `kind: "code-block-runner"`, per the module runtime's own
-    /// permission gate (`http::module_commands`); optional for any future
-    /// kind that adds no permission of its own.
+    /// hold to reach this extension point. Required for `kind: "command"`,
+    /// `"code-block-runner"`, `"slash-command"` and `"app"`, per the module
+    /// runtime's own permission gate (`http::module_commands`); optional for
+    /// any future kind that adds no permission of its own.
     #[serde(default)]
     permission: Option<String>,
-    /// For `kind: "code-block-runner"` only: the `command` extension
-    /// point's own `name` this runner invokes - the module must declare
-    /// both, so the client's discovery call
-    /// (`GET /modules/code-block-runners`) can hand back a `(module_id,
-    /// command)` pair that `POST /modules/{moduleId}/commands/{command}`
-    /// is guaranteed to accept.
+    /// For the runner-like kinds (`code-block-runner`, `slash-command`,
+    /// `app`): the `command` extension point's own `name` this one invokes -
+    /// the module must declare both, so a discovery call can hand back a
+    /// `(module_id, command)` pair that
+    /// `POST /modules/{moduleId}/commands/{command}` is guaranteed to accept.
     #[serde(default)]
     command: Option<String>,
     /// For `kind: "code-block-runner"` only: the fenced-block language this
@@ -418,10 +417,10 @@ fn validate_extension_point(
                 .map_err(|_| malformed("extension_points[].language must be a safe slug"))
         })
         .transpose()?;
-    // All three kinds gate on a declared permission; the two runner-like kinds also name a command they invoke.
+    // Every known kind gates on a declared permission; the runner-like kinds (all but bare `command`) also name a command they invoke.
     match kind.as_str() {
         "command" => require_declared_permission(&kind, &permission, permission_keys)?,
-        "code-block-runner" | "slash-command" => {
+        "code-block-runner" | "slash-command" | "app" => {
             require_declared_permission(&kind, &permission, permission_keys)?;
             require_declared_command(&kind, &command, command_names)?;
         }

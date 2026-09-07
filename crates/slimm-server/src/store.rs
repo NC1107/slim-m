@@ -18,6 +18,7 @@ use crate::ids::{ChannelCategoryId, ChannelId, MessageId, Seq, UserId};
 
 mod account_deletion;
 mod analytics;
+mod app_surfaces;
 mod attachments;
 mod bootstrap;
 mod canvas;
@@ -85,6 +86,7 @@ pub use account_deletion::DeleteAccountError;
 pub use analytics::{
     ANALYTICS_WINDOW_DAYS, AnalyticsStats, DayCount, MemberAttachmentUsage, MetricSample,
 };
+pub use app_surfaces::{AppSurface, CreateAppSurfaceError};
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
 pub use canvas::{

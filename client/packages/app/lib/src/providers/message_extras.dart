@@ -66,6 +66,7 @@ class MessageExtras {
     this.attachments = const [],
     this.codeRuns = const [],
     this.poll,
+    this.appSurface,
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
@@ -81,6 +82,11 @@ class MessageExtras {
   /// it, and a `code_run.changed` broadcast replaces the one block's entry.
   final List<api.CodeRun> codeRuns;
   final api.Poll? poll;
+
+  /// The app this message launches, or null when it launches none. Fixed once
+  /// the message exists, like [poll]; its live surface state rides [codeRuns]
+  /// at block 0.
+  final api.AppSurface? appSurface;
 
   /// The thread opened from this message, or null if none is known yet -
   /// same four fields, same merge rule, as [api.Message] carries them.
@@ -100,11 +106,13 @@ class MessageExtras {
     List<api.Attachment>? attachments,
     List<api.CodeRun>? codeRuns,
     api.Poll? poll,
+    api.AppSurface? appSurface,
   }) => MessageExtras(
     reactions: reactions ?? this.reactions,
     attachments: attachments ?? this.attachments,
     codeRuns: codeRuns ?? this.codeRuns,
     poll: poll ?? this.poll,
+    appSurface: appSurface ?? this.appSurface,
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
@@ -217,6 +225,7 @@ class MessageExtrasController
         ? message.codeRuns
         : existing?.codeRuns ?? const [],
     poll: message.poll ?? existing?.poll,
+    appSurface: message.appSurface ?? existing?.appSurface,
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
     threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,

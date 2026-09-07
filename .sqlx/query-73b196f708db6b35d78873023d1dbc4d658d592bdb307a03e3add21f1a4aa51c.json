@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO app_surfaces (message_id, channel_id, module_id, command, created_by, created_at)\n               VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "73b196f708db6b35d78873023d1dbc4d658d592bdb307a03e3add21f1a4aa51c"
+}

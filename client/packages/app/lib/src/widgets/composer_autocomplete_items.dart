@@ -89,6 +89,7 @@ List<AutocompleteSuggestion> autocompleteSuggestions({
   String? selfId,
   bool canMentionEveryone = false,
   List<api.SlashCommand> slashCommands = const [],
+  List<api.App> apps = const [],
 }) => switch (query.kind) {
   AutocompleteKind.emoji => _emoji(query.term, custom),
   AutocompleteKind.mention => _mentions(
@@ -97,7 +98,7 @@ List<AutocompleteSuggestion> autocompleteSuggestions({
     selfId,
     canMentionEveryone: canMentionEveryone,
   ),
-  AutocompleteKind.command => _commandRows(query.term, slashCommands),
+  AutocompleteKind.command => _commandRows(query.term, slashCommands, apps),
 };
 
 List<AutocompleteSuggestion> _emoji(
@@ -230,6 +231,7 @@ List<AutocompleteSuggestion> _roleSuggestions(
 List<AutocompleteSuggestion> _commandRows(
   String term,
   List<api.SlashCommand> slashCommands,
+  List<api.App> apps,
 ) => [
   for (final (name, text, detail) in _commands)
     if (term.isEmpty || name.startsWith(term))
@@ -240,5 +242,13 @@ List<AutocompleteSuggestion> _commandRows(
         insert: '/${command.name} ',
         label: '/${command.name}',
         detail: command.description,
+      ),
+  // An app launches on its keyword alone (no arguments), so its row inserts the complete `/module-id` ready to send.
+  for (final app in apps)
+    if (term.isEmpty || app.moduleId.toLowerCase().startsWith(term))
+      AutocompleteSuggestion(
+        insert: '/${app.moduleId}',
+        label: '/${app.moduleId}',
+        detail: app.name,
       ),
 ].take(maxAutocompleteRows).toList(growable: false);
