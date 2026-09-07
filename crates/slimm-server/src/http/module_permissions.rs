@@ -21,11 +21,11 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
+use super::extract::require_manage_roles;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
-use crate::ids::{RoleId, UserId};
-use crate::permissions::Permissions;
+use crate::ids::RoleId;
 use crate::ratelimit::Class;
 use crate::store::{GrantModulePermissionError, GrantedModulePermission, ModulePermission};
 
@@ -155,12 +155,4 @@ async fn revoke(
         .await?;
     state.hub.publish(Event::RoleChanged { role_id });
     Ok(StatusCode::NO_CONTENT)
-}
-
-async fn require_manage_roles(state: &AppState, user_id: UserId) -> Result<(), ApiError> {
-    let permissions = state.store.base_permissions(user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_ROLES) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
 }

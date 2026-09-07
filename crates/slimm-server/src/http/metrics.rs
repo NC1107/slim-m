@@ -43,8 +43,7 @@ use axum::routing::get;
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{Authed, enforce};
-use crate::permissions::Permissions;
+use super::extract::{Authed, enforce, require_manage_server};
 use crate::process_metrics::current_rss_bytes;
 use crate::ratelimit::Class;
 
@@ -60,10 +59,7 @@ async fn metrics(
 ) -> Result<Response, ApiError> {
     // Write, not AuthedRead: write_voice probes the SFU live on every call.
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    let permissions = state.store.base_permissions(ctx.user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_SERVER) {
-        return Err(ApiError::Forbidden);
-    }
+    require_manage_server(&state, ctx.user_id).await?;
 
     let mut body = String::new();
     write_memory(&mut body);

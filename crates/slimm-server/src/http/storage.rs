@@ -18,8 +18,8 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
+use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
-use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{ChannelStorage, DatabaseBytes, MAX_STORAGE_CHANNEL_ROWS, SweepStatus};
 
@@ -78,7 +78,7 @@ async fn read(
 ) -> Result<Json<StorageDto>, ApiError> {
     // Write, not AuthedRead: attachment_bytes_by_channel does real cross-table aggregation.
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
 
     let DatabaseBytes {
         database_bytes,
@@ -98,15 +98,4 @@ async fn read(
         top_channels: top_channels.into_iter().map(Into::into).collect(),
         sweeps: sweeps.into_iter().map(Into::into).collect(),
     }))
-}
-
-async fn require_manage_server(
-    state: &AppState,
-    ctx: &crate::store::SessionContext,
-) -> Result<(), ApiError> {
-    let permissions = state.store.base_permissions(ctx.user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_SERVER) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
 }

@@ -34,7 +34,7 @@ use super::error::ApiError;
 use super::extract::{AUTHED_READ, AuthedLimited, Json, WRITE};
 use crate::ids::UserId;
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
-use crate::store::InstalledModule;
+use crate::store::{InstalledModule, ModuleExtensionPoint};
 
 /// A command name is compared verbatim against a module's own persisted
 /// extension points, never used as a path or SQL fragment, so this bounds
@@ -246,6 +246,54 @@ struct SlashCommandDto {
     description: Option<String>,
 }
 
+/// One extension point the caller may currently reach, with the module it
+/// belongs to and the `command` it invokes already pulled out, since every
+/// discovery list hands exactly that pair to a client.
+pub(super) struct Reachable {
+    pub(super) module_id: String,
+    pub(super) command: String,
+    pub(super) point: ModuleExtensionPoint,
+}
+
+/// Every extension point of `kind` the caller may currently reach: declared by
+/// an installed, enabled module, naming both a `command` and a `permission`,
+/// and the caller holds that permission. The one discovery loop behind the
+/// slash-command, code-block-runner and app lists (decision 0021's
+/// module-agnostic principle: a client learns what to offer from here, never
+/// from a hardcoded module id), so a new kind reuses it rather than copying it.
+pub(super) async fn reachable_extension_points(
+    state: &AppState,
+    user_id: UserId,
+    kind: &str,
+) -> Result<Vec<Reachable>, ApiError> {
+    let mut reachable = Vec::new();
+    for module in state.store.list_installed_modules().await? {
+        if !module.enabled {
+            continue;
+        }
+        for point in module.extension_points {
+            if point.kind != kind {
+                continue;
+            }
+            let (Some(command), Some(permission)) = (&point.command, &point.permission) else {
+                continue;
+            };
+            if state
+                .store
+                .user_has_module_permission(user_id, &module.id, permission)
+                .await?
+            {
+                reachable.push(Reachable {
+                    module_id: module.id.clone(),
+                    command: command.clone(),
+                    point,
+                });
+            }
+        }
+    }
+    Ok(reachable)
+}
+
 /// Every `slash-command` extension point the caller may currently reach:
 /// installed, enabled, and the caller holds the permission it declared. This
 /// is how a client learns which `/name` commands to offer in the composer -
@@ -255,33 +303,16 @@ async fn list_slash_commands(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<SlashCommandDto>>, ApiError> {
-    let modules = state.store.list_installed_modules().await?;
-    let mut commands = Vec::new();
-    for module in modules {
-        if !module.enabled {
-            continue;
-        }
-        for ep in &module.extension_points {
-            if ep.kind != "slash-command" {
-                continue;
-            }
-            let (Some(command), Some(permission)) = (&ep.command, &ep.permission) else {
-                continue;
-            };
-            if state
-                .store
-                .user_has_module_permission(ctx.user_id, &module.id, permission)
-                .await?
-            {
-                commands.push(SlashCommandDto {
-                    module_id: module.id.clone(),
-                    command: command.clone(),
-                    name: ep.name.clone(),
-                    description: ep.description.clone(),
-                });
-            }
-        }
-    }
+    let commands = reachable_extension_points(&state, ctx.user_id, "slash-command")
+        .await?
+        .into_iter()
+        .map(|r| SlashCommandDto {
+            module_id: r.module_id,
+            command: r.command,
+            name: r.point.name,
+            description: r.point.description,
+        })
+        .collect();
     Ok(Json(commands))
 }
 
@@ -295,31 +326,14 @@ async fn list_code_block_runners(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CodeBlockRunnerDto>>, ApiError> {
-    let modules = state.store.list_installed_modules().await?;
-    let mut runners = Vec::new();
-    for module in modules {
-        if !module.enabled {
-            continue;
-        }
-        for ep in &module.extension_points {
-            if ep.kind != "code-block-runner" {
-                continue;
-            }
-            let (Some(command), Some(permission)) = (&ep.command, &ep.permission) else {
-                continue;
-            };
-            if state
-                .store
-                .user_has_module_permission(ctx.user_id, &module.id, permission)
-                .await?
-            {
-                runners.push(CodeBlockRunnerDto {
-                    module_id: module.id.clone(),
-                    command: command.clone(),
-                    language: ep.language.clone(),
-                });
-            }
-        }
-    }
+    let runners = reachable_extension_points(&state, ctx.user_id, "code-block-runner")
+        .await?
+        .into_iter()
+        .map(|r| CodeBlockRunnerDto {
+            module_id: r.module_id,
+            command: r.command,
+            language: r.point.language,
+        })
+        .collect();
     Ok(Json(runners))
 }

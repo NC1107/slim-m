@@ -16,6 +16,8 @@ use serde::de::DeserializeOwned;
 
 use super::AppState;
 use super::error::ApiError;
+use crate::ids::UserId;
+use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::SessionContext;
 
@@ -254,6 +256,40 @@ impl FromRequest<AppState> for Bytes {
         let bytes = axum::body::Bytes::from_request(req, state).await?;
         Ok(Bytes(bytes))
     }
+}
+
+/// Refuses a caller without the deployment-wide `MANAGE_SERVER` bit: the one
+/// gate the Dock, analytics, retention, storage, emoji and metrics routes
+/// share (decision 0021 names them as one settings surface). Called from each
+/// handler rather than layered as middleware, so `tests/openapi_429_coverage.rs`'s
+/// static per-handler scan still sees the rate-limit charge beside it.
+pub(crate) async fn require_manage_server(
+    state: &AppState,
+    user_id: UserId,
+) -> Result<(), ApiError> {
+    require_base_permission(state, user_id, Permissions::MANAGE_SERVER).await?;
+    Ok(())
+}
+
+/// Refuses a caller without `MANAGE_ROLES`, handing back the caller's own base
+/// permissions so a role edit can also check it grants no bit the caller lacks.
+pub(crate) async fn require_manage_roles(
+    state: &AppState,
+    user_id: UserId,
+) -> Result<Permissions, ApiError> {
+    require_base_permission(state, user_id, Permissions::MANAGE_ROLES).await
+}
+
+async fn require_base_permission(
+    state: &AppState,
+    user_id: UserId,
+    bit: Permissions,
+) -> Result<Permissions, ApiError> {
+    let permissions = state.store.base_permissions(user_id).await?;
+    if !permissions.contains(bit) {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(permissions)
 }
 
 #[cfg(test)]

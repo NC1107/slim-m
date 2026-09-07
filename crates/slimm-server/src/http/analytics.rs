@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
+use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
-use crate::permissions::Permissions;
 use crate::process_metrics::current_rss_bytes;
 use crate::ratelimit::Class;
 use crate::store::{
@@ -152,7 +152,7 @@ async fn read(
 ) -> Result<Json<AnalyticsDto>, ApiError> {
     // Write, not AuthedRead: current_analytics does real cross-table aggregation.
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     Ok(Json(current_analytics(&state).await?))
 }
 
@@ -163,7 +163,7 @@ async fn update(
     Json(body): Json<UpdateAnalyticsDto>,
 ) -> Result<Json<AnalyticsDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     state.store.set_analytics_enabled(body.enabled).await?;
     Ok(Json(current_analytics(&state).await?))
 }
@@ -204,7 +204,7 @@ async fn read_retention(
     Authed(ctx): Authed,
 ) -> Result<Json<RetentionDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     Ok(Json(RetentionDto {
         retention_days: state.store.message_retention_days().await?,
     }))
@@ -219,7 +219,7 @@ async fn update_retention(
     Json(body): Json<RetentionDto>,
 ) -> Result<Json<RetentionDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     if !(0..=MAX_MESSAGE_RETENTION_DAYS).contains(&body.retention_days) {
         return Err(ApiError::BadRequest("retention_days out of range"));
     }
@@ -246,7 +246,7 @@ async fn read_canvas_cap(
     Authed(ctx): Authed,
 ) -> Result<Json<CanvasCapDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     Ok(Json(CanvasCapDto {
         object_cap: state.store.canvas_object_cap().await?,
     }))
@@ -262,7 +262,7 @@ async fn update_canvas_cap(
     Json(body): Json<CanvasCapDto>,
 ) -> Result<Json<CanvasCapDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     if !(MIN_CANVAS_OBJECT_CAP..=MAX_CANVAS_OBJECT_CAP).contains(&body.object_cap) {
         return Err(ApiError::BadRequest("object_cap out of range"));
     }
@@ -287,7 +287,7 @@ async fn read_screen_share_cap(
     Authed(ctx): Authed,
 ) -> Result<Json<ScreenShareCapDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     Ok(Json(ScreenShareCapDto {
         max_height: state.store.screen_share_max_height().await?,
     }))
@@ -303,7 +303,7 @@ async fn update_screen_share_cap(
     Json(body): Json<ScreenShareCapDto>,
 ) -> Result<Json<ScreenShareCapDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, &ctx).await?;
+    require_manage_server(&state, ctx.user_id).await?;
     if !(MIN_SCREEN_SHARE_MAX_HEIGHT..=MAX_SCREEN_SHARE_MAX_HEIGHT).contains(&body.max_height) {
         return Err(ApiError::BadRequest("max_height out of range"));
     }
@@ -314,15 +314,4 @@ async fn update_screen_share_cap(
     Ok(Json(ScreenShareCapDto {
         max_height: body.max_height,
     }))
-}
-
-async fn require_manage_server(
-    state: &AppState,
-    ctx: &crate::store::SessionContext,
-) -> Result<(), ApiError> {
-    let permissions = state.store.base_permissions(ctx.user_id).await?;
-    if !permissions.contains(Permissions::MANAGE_SERVER) {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
 }
