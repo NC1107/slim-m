@@ -60,7 +60,8 @@ void main() {
     expect(
       established,
       wasEnabled,
-      reason: 'the rejoined call carries the preference the stalled mute '
+      reason:
+          'the rejoined call carries the preference the stalled mute '
           'had not yet changed, so a late write would visibly flip it',
     );
   });
