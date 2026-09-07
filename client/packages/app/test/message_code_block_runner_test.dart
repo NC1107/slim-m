@@ -118,7 +118,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(jsonDecode(sentBody!)['input'], 'console.log(1)');
-      expect(find.text('Output'), findsOneWidget);
+      expect(find.text('Result'), findsOneWidget);
       expect(find.text('1'), findsOneWidget);
     },
   );
@@ -163,7 +163,7 @@ void main() {
       expect(find.byType(AppErrorState), findsOneWidget);
       expect(find.textContaining('Module is not enabled'), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
-      expect(find.text('Output'), findsNothing);
+      expect(find.text('Result'), findsNothing);
       expect(find.text('Error'), findsNothing);
     },
   );

@@ -143,7 +143,6 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         ],
         if (result != null) ...[
           const SizedBox(height: AppSpacing.s4),
-          if (sharedRun != null) const _SharedRunLabel(),
           ModuleCommandOutput(
             result: result,
             moduleId: runner?.moduleId,
@@ -162,27 +161,6 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         output: run.ok ? run.output : null,
         error: run.ok ? null : run.output,
       );
-}
-
-/// A muted line above a shared result, so a viewer who did not run it sees
-/// that this output is shared rather than their own private run.
-class _SharedRunLabel extends StatelessWidget {
-  const _SharedRunLabel();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s4),
-      child: Text(
-        'Shared result',
-        style: AppText.micro.copyWith(
-          fontFamily: AppFonts.mono,
-          color: tokens.textSecondary,
-        ),
-      ),
-    );
-  }
 }
 
 /// The header's action slot while idle, or a spinner while a run is in
