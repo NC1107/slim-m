@@ -24,7 +24,7 @@ async fn migrator() -> Migrator {
 }
 
 async fn pool_at_0025() -> (SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-canvas-ops-rebuild");
+    let (path, guard) = support::TestDbGuard::empty("slimm-canvas-ops-rebuild");
     let options = SqliteConnectOptions::new()
         .filename(&path)
         .create_if_missing(true)

@@ -37,7 +37,7 @@ async fn migrator() -> Migrator {
 }
 
 async fn pool_at_0023() -> (SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-rowid-alias");
+    let (path, guard) = support::TestDbGuard::empty("slimm-rowid-alias");
     let options = SqliteConnectOptions::new()
         .filename(&path)
         .create_if_missing(true)

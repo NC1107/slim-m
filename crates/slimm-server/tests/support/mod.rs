@@ -5,7 +5,9 @@
 //! `#[path = "../support/mod.rs"] mod support;`.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
+use slimm_server::config::Config;
 use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::presence::PresenceTracker;
 use slimm_server::store::Store;
@@ -53,11 +55,131 @@ pub struct TestDbGuard(PathBuf);
 impl TestDbGuard {
     /// A fresh unique path under `prefix` in the system temp dir, paired with
     /// a guard that removes it (and its `-wal`/`-shm` siblings) on drop.
+    ///
+    /// The path is seeded from a pre-migrated template so the `db::connect` that
+    /// follows finds every migration already applied - a fast no-op - instead of
+    /// running all of them from scratch. Measured on this suite: ~58 ms/connect
+    /// migrating vs ~7 ms copy-then-connect, ~50 ms saved across ~1000 test DBs.
+    /// If the template cannot be built the copy is skipped and `connect` migrates
+    /// from scratch exactly as before, so this can only ever lose the speedup,
+    /// never correctness.
+    #[allow(dead_code)]
     pub fn new(prefix: &str) -> (String, Self) {
+        let path = std::env::temp_dir().join(format!("{prefix}-{}.db", uuid::Uuid::now_v7()));
+        if let Some(template) = template_db() {
+            let _ = std::fs::copy(&template, &path);
+        }
+        let display = path.to_string_lossy().into_owned();
+        (display, Self(path))
+    }
+
+    /// Like [`new`](Self::new) but seeds nothing: the path names a file that
+    /// does not exist yet. For the migration-state tests that open the path
+    /// themselves and run migrations to a specific version (a backfill or a
+    /// rebuild under test) - a pre-migrated template would defeat exactly what
+    /// they exercise.
+    #[allow(dead_code)]
+    pub fn empty(prefix: &str) -> (String, Self) {
         let path = std::env::temp_dir().join(format!("{prefix}-{}.db", uuid::Uuid::now_v7()));
         let display = path.to_string_lossy().into_owned();
         (display, Self(path))
     }
+}
+
+/// A migrated SQLite database file all test DBs are copied from, so migrations
+/// run once per test session rather than once per test. `None` if it could not
+/// be built, which drops callers back to migrating from scratch.
+///
+/// Keyed by a hash of the migration files so a changed migration set builds a
+/// fresh template rather than reusing a stale one. Shared across processes on
+/// disk because `cargo nextest` runs each test in its own process: the first to
+/// need it builds it, the rest copy it.
+#[allow(dead_code)]
+fn template_db() -> Option<PathBuf> {
+    static TEMPLATE: OnceLock<Option<PathBuf>> = OnceLock::new();
+    TEMPLATE.get_or_init(build_or_find_template).clone()
+}
+
+#[allow(dead_code)]
+fn build_or_find_template() -> Option<PathBuf> {
+    let final_path = std::env::temp_dir().join(format!("slimm-test-tpl-{}.db", migrations_hash()));
+    if is_nonempty(&final_path) {
+        return Some(final_path);
+    }
+    // Build to a private path, then publish by an atomic rename; a concurrent copier of the old file keeps reading it through its open handle, so builders racing to publish an identical template is harmless.
+    let building = std::env::temp_dir().join(format!(
+        "slimm-test-tpl-{}.{}.building",
+        migrations_hash(),
+        uuid::Uuid::now_v7()
+    ));
+    if migrate_fresh(&building).is_err() {
+        remove(&building);
+        return None;
+    }
+    let _ = std::fs::rename(&building, &final_path);
+    remove(&building);
+    is_nonempty(&final_path).then_some(final_path)
+}
+
+/// Runs `db::connect` (which migrates) against `dest`, on a dedicated thread
+/// with its own runtime: [`TestDbGuard::new`] is called from inside the test's
+/// tokio runtime, and a nested runtime would panic.
+#[allow(dead_code)]
+fn migrate_fresh(dest: &Path) -> anyhow::Result<()> {
+    let database_path = dest.to_string_lossy().into_owned();
+    std::thread::spawn(move || -> anyhow::Result<()> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        runtime.block_on(async move {
+            let config = Config {
+                port: 0,
+                database_path,
+                hash_concurrency: 2,
+                ..Config::default()
+            };
+            let pool = slimm_server::db::connect(&config).await?;
+            // Fold the WAL into the main file so a plain copy of it is complete.
+            let _ = sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+                .execute(&pool)
+                .await;
+            pool.close().await;
+            Ok(())
+        })
+    })
+    .join()
+    .map_err(|_| anyhow::anyhow!("template build thread panicked"))?
+}
+
+/// A stable hash of the migration set (name and contents), so the template is
+/// rebuilt whenever a migration is added or edited rather than going stale.
+#[allow(dead_code)]
+fn migrations_hash() -> u64 {
+    use std::hash::{Hash, Hasher};
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "sql"))
+        .collect();
+    entries.sort();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for path in entries {
+        path.file_name().hash(&mut hasher);
+        if let Ok(bytes) = std::fs::read(&path) {
+            bytes.hash(&mut hasher);
+        }
+    }
+    hasher.finish()
+}
+
+#[allow(dead_code)]
+fn is_nonempty(path: &Path) -> bool {
+    std::fs::metadata(path)
+        .map(|m| m.len() > 0)
+        .unwrap_or(false)
 }
 
 impl Drop for TestDbGuard {

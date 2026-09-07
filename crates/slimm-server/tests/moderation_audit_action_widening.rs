@@ -37,7 +37,7 @@ async fn migrator() -> Migrator {
 }
 
 async fn pool_at_0048() -> (SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-audit-widening");
+    let (path, guard) = support::TestDbGuard::empty("slimm-audit-widening");
     let options = SqliteConnectOptions::new()
         .filename(&path)
         .create_if_missing(true)

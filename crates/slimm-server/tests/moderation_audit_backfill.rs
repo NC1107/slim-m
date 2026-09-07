@@ -34,7 +34,7 @@ async fn migrator() -> Migrator {
 }
 
 async fn pool_at_0047() -> (SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-moderation-backfill");
+    let (path, guard) = support::TestDbGuard::empty("slimm-moderation-backfill");
     let options = SqliteConnectOptions::new()
         .filename(&path)
         .create_if_missing(true)
