@@ -49,6 +49,7 @@ pub fn clamp_output(output: &str) -> String {
 
 impl Store {
     /// Records a block's run, replacing any previous result for that block.
+    #[allow(clippy::too_many_arguments)]
     pub async fn record_code_run(
         &self,
         message_id: MessageId,
