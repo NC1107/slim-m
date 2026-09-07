@@ -6,9 +6,9 @@
 //! they get there); which role holds one lives in `role_module_permissions`,
 //! the module-scoped parallel to `roles.permissions`'s bitmask.
 //!
-//! Nothing calls [`Store::user_has_module_permission`] yet - it is the
-//! runtime's (Phase 3) read path, designed now so the grant surface below
-//! has somewhere real to resolve against later.
+//! [`Store::user_has_module_permission`] is the runtime's live gate: every
+//! route that runs or lists a module's extension points (`http::module_commands`,
+//! `http::apps`) resolves the caller's grant through it before anything runs.
 
 use uuid::Uuid;
 

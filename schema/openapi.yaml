@@ -892,7 +892,7 @@ paths:
             format: int64
         - name: limit
           in: query
-          description: Page size; the server clamps it.
+          description: Page size, 50 when omitted; the server clamps it into 1..200 rather than rejecting it.
           schema:
             type: integer
             format: int32
@@ -997,7 +997,7 @@ paths:
             type: string
         - name: limit
           in: query
-          description: Page size; the server clamps it.
+          description: Page size, 50 when omitted; the server clamps it into 1..200 rather than rejecting it.
           schema:
             type: integer
             format: int32
@@ -2386,8 +2386,10 @@ paths:
       summary: Send a message.
       description: >
         Idempotent by the client-supplied `id` within its channel and author, so
-        a retry after an uncertain failure never duplicates. Reusing an id from
-        a different channel or author is a conflict.
+        a retry after an uncertain failure never duplicates. A retry replays
+        the message first stored under that id verbatim, whatever body the
+        retry carried, so never vary the body between attempts. Reusing an id
+        from a different channel or author is a conflict.
       requestBody:
         required: true
         content:
@@ -3448,7 +3450,7 @@ paths:
       parameters:
         - name: limit
           in: query
-          description: Page size; the server clamps it.
+          description: At most this many pins, newest first; the server clamps it into 1..200 rather than rejecting it. Omitted means every pin in the channel (itself capped at 200).
           schema:
             type: integer
             format: int32
@@ -6109,6 +6111,9 @@ components:
           minLength: 1
           maxLength: 32
           pattern: "^[A-Za-z0-9_.-]+$"
+          description: >
+            `everyone` and `here` (in any letter case) are reserved for the
+            `@everyone` / `@here` mentions and refused with 400.
         display_name:
           type: string
           minLength: 1
