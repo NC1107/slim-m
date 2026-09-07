@@ -242,7 +242,7 @@ void main() {
       await tester.tap(find.text('Run'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Output'), findsOneWidget);
+      expect(find.text('Result'), findsOneWidget);
       expect(find.text('1'), findsOneWidget);
     },
   );

@@ -56,6 +56,7 @@ class ModuleCommandOutput extends ConsumerWidget {
 
     final isError = !result.ok;
     final text = (isError ? result.error : result.output) ?? '';
+    // Recessed (sunken), not raised like the code block above it, so the result reads as the answer that came out of the code, not more code.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -63,7 +64,7 @@ class ModuleCommandOutput extends ConsumerWidget {
         vertical: AppSpacing.s8,
       ),
       decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
+        color: isError ? tokens.surfaceRaised : tokens.surfaceSunken,
         border: Border.all(
           color: isError ? tokens.dangerBorder : tokens.borderSubtle,
         ),
@@ -72,12 +73,22 @@ class ModuleCommandOutput extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            isError ? 'Error' : 'Output',
-            style: AppText.micro.copyWith(
-              fontFamily: AppFonts.mono,
-              color: isError ? tokens.dangerText : tokens.textSecondary,
-            ),
+          Row(
+            children: [
+              Icon(
+                AppIcons.forward,
+                size: AppSizes.icon16,
+                color: isError ? tokens.dangerText : tokens.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.s4),
+              Text(
+                isError ? 'Error' : 'Result',
+                style: AppText.micro.copyWith(
+                  fontFamily: AppFonts.mono,
+                  color: isError ? tokens.dangerText : tokens.textSecondary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.s4),
           SelectableText(
