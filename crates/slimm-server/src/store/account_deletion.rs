@@ -181,6 +181,13 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // A shared code-block run stays visible to everyone who can see the message; its runner id goes the way a message author's does. The FK's ON DELETE SET NULL never fires on a tombstone UPDATE, so this clears it by hand.
+        sqlx::query!(
+            "UPDATE code_runs SET ran_by = NULL WHERE ran_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // schema/openapi.yaml promises both of these read null once the account is gone.
         sqlx::query!(
             "UPDATE pinned_messages SET pinned_by = NULL WHERE pinned_by = ?",
