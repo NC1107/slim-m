@@ -29,7 +29,7 @@ async fn migrator() -> Migrator {
 }
 
 async fn pool_at_0024() -> (SqlitePool, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-dm-channels-rebuild");
+    let (path, guard) = support::TestDbGuard::empty("slimm-dm-channels-rebuild");
     let options = SqliteConnectOptions::new()
         .filename(&path)
         .create_if_missing(true)
