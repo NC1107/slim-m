@@ -125,6 +125,10 @@ class FakeSession implements VoiceSession {
   /// real `room.disconnect()` round trip lets a person race it by hand.
   Completer<void>? leaveGate;
 
+  /// Holds [setMicrophoneEnabled] open the same way, so a mute whose SFU round
+  /// trip is still in flight can be raced against a hang-up and a fresh join.
+  Completer<void>? microphoneGate;
+
   /// The real session's own supersession counter, modelled here so a gated
   /// [leave] behaves the way the thing it stands in for does.
   int _generation = 0;
@@ -257,7 +261,11 @@ class FakeSession implements VoiceSession {
   }
 
   @override
-  Future<bool> setMicrophoneEnabled(bool enabled) async => microphoneGranted;
+  Future<bool> setMicrophoneEnabled(bool enabled) async {
+    final gate = microphoneGate;
+    if (gate != null) await gate.future;
+    return microphoneGranted;
+  }
 
   /// Records a cause on refusal, `setScreenShareEnabled`'s own reasoning
   /// below: a fake that drops it cannot catch a controller that does too.

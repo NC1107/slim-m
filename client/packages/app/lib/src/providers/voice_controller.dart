@@ -301,9 +301,14 @@ class VoiceController extends StateNotifier<VoiceState>
     );
   }
 
+  /// Guarded by the call generation like [join] and [leave]: the SFU round
+  /// trip can outlive the call it was asked in, and its answer belongs to
+  /// that call, not to whichever one is connected by the time it lands.
   Future<void> toggleMicrophone() async {
+    final generation = _callGeneration;
     final want = !state.microphoneEnabled;
     final got = await _session.setMicrophoneEnabled(want);
+    if (generation != _callGeneration) return;
     // Reflects what happened rather than what was asked for, so the button
     // never claims a microphone is open when the SFU refused the track.
     state = state.copyWith(
@@ -326,8 +331,10 @@ class VoiceController extends StateNotifier<VoiceState>
   /// where the platform actually distinguished it, and the raw cause
   /// otherwise, rather than inventing a distinction it did not give us.
   Future<void> toggleCamera() async {
+    final generation = _callGeneration;
     final want = !state.cameraEnabled;
     final got = await _session.setCameraEnabled(want);
+    if (generation != _callGeneration) return;
     final cause = got ? null : _session.lastError;
     if (cause != null) {
       _log('Camera ${want ? 'on' : 'off'} failed', detail: cause);
@@ -376,8 +383,10 @@ class VoiceController extends StateNotifier<VoiceState>
   /// session's own microphone: deafening and muting are independent, exactly
   /// as they are for every other voice product this design is drawn from.
   Future<void> toggleDeafen() async {
+    final generation = _callGeneration;
     final want = !state.deafened;
     final got = await _session.setDeafened(want);
+    if (generation != _callGeneration) return;
     state = state.copyWith(
       deafened: got ? want : state.deafened,
       error: got ? null : 'Could not ${want ? 'deafen' : 'undeafen'}.',

@@ -521,7 +521,7 @@ class _ComposerState extends ConsumerState<Composer> {
           if (mounted) setState(() => _commandError = m);
         },
       );
-      if (launched) widget.controller.clear();
+      if (launched && mounted) widget.controller.clear();
       return;
     }
     final match = matchSlashCommand(_slashCommands, widget.controller.text);
@@ -532,6 +532,7 @@ class _ComposerState extends ConsumerState<Composer> {
         command: match.$1,
         args: match.$2,
         controller: widget.controller,
+        isMounted: () => mounted,
         post: () => widget.onSend(const []),
         fail: (m) {
           if (mounted) setState(() => _commandError = m);
