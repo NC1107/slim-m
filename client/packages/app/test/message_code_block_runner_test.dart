@@ -5,6 +5,7 @@
 /// `codeBlockRunnerProvider` hands back.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/code_block_runner.dart';
+import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/message_text.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -32,11 +34,14 @@ Future<void> _pump(
   WidgetTester tester, {
   required List<api.CodeBlockRunner> runners,
   http.Response Function(http.Request)? onRunRequest,
+  String? messageId,
+  Stream<api.ServerEvent>? events,
 }) async {
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
+      if (events != null) liveEventsProvider.overrideWithValue(events),
       codeBlockRunnerProvider.overrideWith((ref) async => runners),
       apiProvider.overrideWith((ref) {
         final built = api.SlimmApi(
@@ -59,8 +64,12 @@ Future<void> _pump(
       container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(
-          body: MessageBody(content: _fenced, knownUsernames: {}),
+        home: Scaffold(
+          body: MessageBody(
+            content: _fenced,
+            knownUsernames: const {},
+            messageId: messageId,
+          ),
         ),
       ),
     ),
@@ -259,4 +268,65 @@ void main() {
 
     expect(postedModuleId, 'first');
   });
+
+  testWidgets(
+    'a scene step in a message goes through the shared message-scoped route, '
+    'not the ephemeral one, so every viewer sees it',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      String scene(String state) =>
+          '{"\$slim":"scene/1","width":3,"height":3,'
+          '"ops":[{"op":"cells","cols":3,"rows":3,"data":"000010000",'
+          '"palette":["sunken","accent"],"tap":"toggle"}],'
+          '"controls":["step"],"state":"$state","live":true}';
+      final events = StreamController<api.ServerEvent>.broadcast();
+      addTearDown(events.close);
+      final paths = <String>[];
+      await _pump(
+        tester,
+        messageId: 'm1',
+        events: events.stream,
+        runners: const [
+          api.CodeBlockRunner(moduleId: 'game-of-life', command: 'life'),
+        ],
+        onRunRequest: (request) {
+          paths.add(request.url.path);
+          // The shared render comes from the broadcast (extras), so feed one.
+          events.add(
+            api.CodeRunChanged(
+              channelId: 'c1',
+              messageId: 'm1',
+              run: api.CodeRun(
+                blockIndex: 0,
+                moduleId: 'game-of-life',
+                command: 'life',
+                ok: true,
+                output: scene('s${paths.length}'),
+                ranBy: 'u1',
+                ranAt: 1700000000000 + paths.length,
+              ),
+            ),
+          );
+          return _jsonResponse({'ok': true, 'output': scene('s${paths.length}')});
+        },
+      );
+
+      await tester.tap(find.bySemanticsLabel('Run code'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Step'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Step'));
+      await tester.pumpAndSettle();
+
+      expect(paths, isNotEmpty);
+      expect(paths, everyElement('/messages/m1/blocks/0/run'));
+      expect(
+        paths.any((p) => p.contains('/commands/')),
+        isFalse,
+        reason: 'a step must not hit the ephemeral per-caller run endpoint',
+      );
+    },
+  );
 }
