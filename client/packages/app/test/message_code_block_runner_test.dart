@@ -309,7 +309,10 @@ void main() {
               ),
             ),
           );
-          return _jsonResponse({'ok': true, 'output': scene('s${paths.length}')});
+          return _jsonResponse({
+            'ok': true,
+            'output': scene('s${paths.length}'),
+          });
         },
       );
 
