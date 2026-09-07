@@ -4,9 +4,10 @@
 //! oversized memory - is readable right here rather than shipped as an
 //! opaque checked-in binary.
 
+use std::sync::Arc;
 use std::time::Duration;
 
-use super::{CapabilitySurface, ModuleHost, RunError, RunLimits};
+use super::{CapabilitySurface, InMemoryKv, ModuleHost, RunError, RunLimits};
 
 const GENEROUS: RunLimits = RunLimits {
     memory_bytes: 4 * 1024 * 1024,
@@ -142,15 +143,17 @@ async fn a_host_call_module_is_refused_when_the_surface_is_off() {
 }
 
 /// With the surface on and a capability approved, the `host_call` import links
-/// (the module instantiates and runs), but the call itself is gated: Phase B
-/// implements no capability, so an approved one comes back a clean refusal.
+/// (the module instantiates and runs), and an approved capability the host does
+/// not implement comes back a clean refusal rather than a trap.
 #[tokio::test]
-async fn an_enabled_host_call_instantiates_and_the_call_is_refused_cleanly() {
-    let wasm = host_call_wasm(r#"{"capability":"kv.store","op":"get"}"#);
+async fn an_enabled_host_call_instantiates_and_an_unimplemented_capability_is_refused() {
+    let wasm = host_call_wasm(r#"{"capability":"message.post","text":"hi"}"#);
     let sha256 = sha256_hex(&wasm);
-    let surface = CapabilitySurface::Enabled {
-        approved: vec!["kv.store".to_owned()],
-    };
+    let surface = CapabilitySurface::enabled(
+        vec!["message.post".to_owned()],
+        "test-module",
+        Arc::new(InMemoryKv::default()),
+    );
 
     let output = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
         .await
@@ -158,7 +161,40 @@ async fn an_enabled_host_call_instantiates_and_the_call_is_refused_cleanly() {
 
     let text = String::from_utf8(output).expect("the response is UTF-8 JSON");
     assert!(text.contains(r#""ok":false"#), "{text}");
-    assert!(text.contains("not available: kv.store"), "{text}");
+    assert!(text.contains("not available: message.post"), "{text}");
+}
+
+/// The `kv.store` capability, end to end through the real wasm `host_call`: a
+/// `set` in one run is readable by a `get` in a later run sharing the same
+/// backend - the whole path (import, memory read, gate, kv, alloc-and-write
+/// back) works, and the capability persists across runs.
+#[tokio::test]
+async fn kv_store_round_trips_across_runs_through_host_call() {
+    let kv = Arc::new(InMemoryKv::default());
+
+    let set = host_call_wasm(r#"{"capability":"kv.store","op":"set","key":"score","value":"42"}"#);
+    let out = ModuleHost::run_with_capabilities(
+        set.clone(),
+        sha256_hex(&set),
+        GENEROUS,
+        b"hi".to_vec(),
+        CapabilitySurface::enabled(vec!["kv.store".to_owned()], "game", kv.clone()),
+    )
+    .await
+    .expect("set should run");
+    assert!(String::from_utf8(out).unwrap().contains(r#""ok":true"#));
+
+    let get = host_call_wasm(r#"{"capability":"kv.store","op":"get","key":"score"}"#);
+    let out = ModuleHost::run_with_capabilities(
+        get.clone(),
+        sha256_hex(&get),
+        GENEROUS,
+        b"hi".to_vec(),
+        CapabilitySurface::enabled(vec!["kv.store".to_owned()], "game", kv.clone()),
+    )
+    .await
+    .expect("get should run");
+    assert!(String::from_utf8(out).unwrap().contains(r#""value":"42""#));
 }
 
 /// The surface being on is not enough: with no capability approved for the
@@ -167,7 +203,7 @@ async fn an_enabled_host_call_instantiates_and_the_call_is_refused_cleanly() {
 async fn an_enabled_surface_with_no_approved_capability_refuses_the_import() {
     let wasm = host_call_wasm(r#"{"capability":"kv.store"}"#);
     let sha256 = sha256_hex(&wasm);
-    let surface = CapabilitySurface::Enabled { approved: vec![] };
+    let surface = CapabilitySurface::enabled(vec![], "m", Arc::new(InMemoryKv::default()));
 
     let err = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
         .await
@@ -182,9 +218,11 @@ async fn an_enabled_surface_with_no_approved_capability_refuses_the_import() {
 async fn any_other_import_is_refused_even_with_the_surface_on() {
     let wasm = importing_wasm(); // imports env.log
     let sha256 = sha256_hex(&wasm);
-    let surface = CapabilitySurface::Enabled {
-        approved: vec!["kv.store".to_owned()],
-    };
+    let surface = CapabilitySurface::enabled(
+        vec!["kv.store".to_owned()],
+        "m",
+        Arc::new(InMemoryKv::default()),
+    );
 
     let err = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
         .await

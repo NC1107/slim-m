@@ -236,7 +236,7 @@ fn host_call(mut caller: Caller<'_, HostState>, req_ptr: i32, req_len: i32) -> i
     }
 
     // The borrow of `caller` ends when `dispatch` returns its owned bytes, so the alloc/write below can take `caller` mutably.
-    let response = caller.data().surface.dispatch(&request);
+    let response = caller.data_mut().surface.dispatch(&request);
 
     let Some(Extern::Func(alloc)) = caller.get_export("alloc") else {
         return 0;
