@@ -257,25 +257,33 @@ class CursorPainter extends CustomPainter {
   /// the second pass directly over the first, so the white never actually
   /// shows - a cursor in a hue close to whatever sits behind it (another
   /// participant's ink, a similarly-toned object) had no contrast edge at all.
+  ///
+  /// The glyph is one path built once at the origin and translated into
+  /// place, and the two paints are reused across cursors and frames: this
+  /// runs per visible cursor on every repaint, which a drawer's cursor can
+  /// trigger many times a second.
   void _paintGlyph(Canvas canvas, Offset at, Color color) {
-    final path = Path()
-      ..moveTo(at.dx, at.dy)
-      ..lineTo(at.dx, at.dy + 15)
-      ..lineTo(at.dx + 4.5, at.dy + 11.5)
-      ..lineTo(at.dx + 7, at.dy + 17)
-      ..lineTo(at.dx + 9.5, at.dy + 16)
-      ..lineTo(at.dx + 7, at.dy + 10.5)
-      ..lineTo(at.dx + 11.5, at.dy + 10.5)
-      ..close();
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = const Color(0xFFFFFFFF)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    canvas.drawPath(path, Paint()..color = color);
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    canvas.drawPath(_glyphPath, _glyphRim);
+    canvas.drawPath(_glyphPath, _glyphFill..color = color);
+    canvas.restore();
   }
+
+  static final Path _glyphPath = Path()
+    ..moveTo(0, 0)
+    ..lineTo(0, 15)
+    ..lineTo(4.5, 11.5)
+    ..lineTo(7, 17)
+    ..lineTo(9.5, 16)
+    ..lineTo(7, 10.5)
+    ..lineTo(11.5, 10.5)
+    ..close();
+  static final Paint _glyphRim = Paint()
+    ..color = const Color(0xFFFFFFFF)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2;
+  static final Paint _glyphFill = Paint();
 
   void _paintLabel(
     Canvas canvas,

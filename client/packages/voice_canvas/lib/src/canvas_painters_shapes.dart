@@ -6,6 +6,19 @@ part of 'canvas_painters.dart';
 /// private fields (`textInk`, `textFontFamily`) and are called from its
 /// `paint` method's own switch.
 extension _StrokePainterShapes on StrokePainter {
+  /// Reused across objects and repaints, recoloured per object: `paint()`
+  /// visits every note and shape on each repaint, including every frame of a
+  /// pan or zoom, so a fresh Paint per object was a steady per-frame churn
+  /// the ink branch in `paint()` already avoids by hoisting its own.
+  static final Paint _noteFill = Paint();
+  static final Paint _noteStroke = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
+  static final Paint _shapeStroke = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2
+    ..isAntiAlias = true;
+
   /// A tinted box with a text body, painted in screen space the same way
   /// `_paintImage` already projects its own box - simpler than the
   /// world-scale `save`/`translate`/`scale` the ink branch uses, and correct
@@ -30,14 +43,11 @@ extension _StrokePainterShapes on StrokePainter {
     );
     if (elevated) _paintElevation(canvas, box);
     final rounded = RRect.fromRectAndRadius(box, const Radius.circular(6));
-    canvas.drawRRect(rounded, Paint()..color = color.withValues(alpha: 0.18));
     canvas.drawRRect(
-      rounded.deflate(0.75),
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+      rounded,
+      _noteFill..color = color.withValues(alpha: 0.18),
     );
+    canvas.drawRRect(rounded.deflate(0.75), _noteStroke..color = color);
     final text = stroke.text;
     const pad = 8.0;
     if (text == null ||
@@ -116,11 +126,7 @@ extension _StrokePainterShapes on StrokePainter {
     );
     canvas.scale(camera.zoom);
     final local = Rect.fromLTWH(0, 0, stroke.w, stroke.h);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..isAntiAlias = true;
+    final paint = _shapeStroke..color = color;
     switch (stroke.shapeKind) {
       case CanvasShapeKind.ellipse:
         canvas.drawOval(local, paint);
