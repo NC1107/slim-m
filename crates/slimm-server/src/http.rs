@@ -24,6 +24,7 @@ use error::ApiError;
 use extract::{Json, READ, RateLimited};
 
 mod analytics;
+mod apps;
 mod attachment_ids;
 mod attachment_range;
 mod attachments;
@@ -143,6 +144,7 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
         .route("/version", get(version))
         .merge(analytics::routes())
+        .merge(apps::routes())
         .merge(auth::routes())
         .merge(canvas::routes())
         .merge(canvas_media_slots::routes())

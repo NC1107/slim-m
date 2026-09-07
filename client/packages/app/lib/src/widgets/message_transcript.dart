@@ -393,13 +393,12 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                   reactions: extras.reactions,
                   attachments: extras.attachments,
                   poll: extras.poll,
+                  appSurface: extras.appSurface,
                   threadReplyCount: extras.threadReplyCount,
                   threadLastReplyAt: extras.threadLastReplyAt,
                   threadUnreadCount: extras.threadUnreadCount,
-                  replyTo: switch (message.replyToId) {
-                    final String id => byId[id],
-                    null => null,
-                  },
+                  // A null replyToId is a null map key here, which is a null lookup - the same "no parent" the row renders as nothing.
+                  replyTo: byId[message.replyToId],
                   onReplyTap: switch (message.replyToId) {
                     final String id => () => widget.onJumpToReply(id),
                     null => null,

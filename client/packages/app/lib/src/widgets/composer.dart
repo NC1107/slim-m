@@ -18,10 +18,12 @@ import '../providers/channel_permissions.dart';
 import '../providers/composer_attachment_drop.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
+import '../providers/app_launch.dart';
 import '../providers/providers.dart';
 import '../providers/slash_command.dart';
 import '../providers/slow_mode_controller.dart';
 import '../providers/typing_controller.dart';
+import 'app_launcher_sheet.dart';
 import 'attachment_picker.dart';
 import 'channel_rail_frame.dart' show serverInfoProvider;
 import 'composer_action_bar.dart';
@@ -129,6 +131,7 @@ class _ComposerState extends ConsumerState<Composer> {
   AutocompleteQuery? _query;
   List<AutocompleteSuggestion> _suggestions = const [];
   List<SlashCommand> _slashCommands = const [];
+  List<App> _apps = const [];
   String? _commandError;
   int _selected = 0;
 
@@ -292,6 +295,7 @@ class _ComposerState extends ConsumerState<Composer> {
           .watch(myChannelPermissionsProvider(widget.channelId))
           .hasPermission(Perm.mentionEveryone),
       slashCommands: _slashCommands,
+      apps: _apps,
     );
   }
 
@@ -413,6 +417,19 @@ class _ComposerState extends ConsumerState<Composer> {
       onPoll: () => showPollComposerSheet(context, widget.channelId),
       onCode: _insertCodeFence,
       onGif: _gifSearchEnabled ? _pickGif : null,
+      // Only when there is something to launch; an empty menu entry would dead-end.
+      onApps: _apps.isEmpty
+          ? null
+          : () => unawaited(
+              showAppLauncherSheet(
+                context,
+                ref,
+                widget.channelId,
+                onError: (m) {
+                  if (mounted) setState(() => _commandError = m);
+                },
+              ),
+            ),
     ),
   );
 
@@ -492,6 +509,21 @@ class _ComposerState extends ConsumerState<Composer> {
   /// A `/command` for a module runs it and posts its output; anything else is
   /// an ordinary send. See `composer_slash.dart` for the run itself.
   Future<void> _send() async {
+    // A `/name` matching an app launches it (a shared, interactive surface) instead of posting text; checked before the slash-command run so an app wins its own keyword.
+    final app = matchApp(_apps, widget.controller.text);
+    if (app != null) {
+      setState(() => _commandError = null);
+      final launched = await launchApp(
+        ref: ref,
+        channelId: widget.channelId,
+        app: app,
+        onError: (m) {
+          if (mounted) setState(() => _commandError = m);
+        },
+      );
+      if (launched) widget.controller.clear();
+      return;
+    }
     final match = matchSlashCommand(_slashCommands, widget.controller.text);
     if (match != null) {
       setState(() => _commandError = null);
@@ -517,6 +549,7 @@ class _ComposerState extends ConsumerState<Composer> {
     final touch = AppTouchTargets.of(context);
     // In build because both sources are watched and can arrive late.
     _slashCommands = ref.watch(slashCommandProvider).valueOrNull ?? const [];
+    _apps = ref.watch(appLaunchProvider).valueOrNull ?? const [];
     _suggestions = _buildSuggestions();
     _gifSearchEnabled =
         ref.watch(serverInfoProvider).valueOrNull?.gifSearchEnabled ?? false;

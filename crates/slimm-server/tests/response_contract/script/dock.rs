@@ -109,6 +109,17 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str, cha
     // code-exec declares no slash-command, so this is the empty-list shape; the populated shape is validated in tests/module_slash_commands.rs.
     c.get("listSlashCommands", "/modules/slash-commands", root)
         .await;
+    // code-exec declares an `app` extension point and the admin holds `run`, so this is a real populated App list.
+    c.get("listApps", "/modules/apps", root).await;
+    // Launching an app is a message send; the admin holds `run` and can view, so a real 200 carrying the Message with its app_surface.
+    c.json(
+        "launchAppMessage",
+        "POST",
+        &format!("/channels/{channel}/messages/apps"),
+        root,
+        json!({ "id": Uuid::now_v7().to_string(), "module_id": id, "command": "run" }),
+    )
+    .await;
     c.bare(
         "unassignRole",
         "DELETE",

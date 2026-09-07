@@ -217,6 +217,72 @@ fn rejects_a_code_block_runner_naming_an_undeclared_command() {
     ));
 }
 
+const GOOD_MANIFEST_WITH_APP: &str = r#"{
+    "schema": 1,
+    "id": "game-of-life",
+    "name": "Game of Life",
+    "version": "0.1.0",
+    "summary": "an in-chat game",
+    "author": "slim-m",
+    "artifact": {
+        "kind": "wasm",
+        "path": "modules/game-of-life/0.1.0/module.wasm",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "runtime": {"backend": "wasm", "limits": {"memory_mb": 64, "wall_ms": 2000, "fuel": 500000000}},
+    "permissions": [
+        {"key": "play", "name": "Play the game", "description": "run it"}
+    ],
+    "capabilities": ["command.register"],
+    "extension_points": [
+        {"kind": "command", "name": "life", "description": "steps it", "permission": "play"},
+        {"kind": "app", "name": "Game of Life", "description": "launch it in chat", "permission": "play", "command": "life"}
+    ]
+}"#;
+
+#[test]
+fn parses_an_app_extension_point() {
+    let manifest = parse_manifest(GOOD_MANIFEST_WITH_APP.as_bytes()).unwrap();
+    let app = manifest
+        .extension_points
+        .iter()
+        .find(|e| e.kind == "app")
+        .unwrap();
+    assert_eq!(app.command.as_deref(), Some("life"));
+    assert_eq!(app.permission.as_deref(), Some("play"));
+}
+
+#[test]
+fn rejects_an_app_with_no_permission() {
+    let bad = GOOD_MANIFEST_WITH_APP.replace(r#", "permission": "play", "command": "life""#, "");
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
+fn rejects_an_app_with_no_command() {
+    let bad = GOOD_MANIFEST_WITH_APP.replace(r#", "command": "life""#, "");
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
+#[test]
+fn rejects_an_app_naming_an_undeclared_command() {
+    let bad = GOOD_MANIFEST_WITH_APP.replacen(
+        r#""command": "life""#,
+        r#""command": "does-not-exist""#,
+        1,
+    );
+    assert!(matches!(
+        parse_manifest(bad.as_bytes()),
+        Err(ManifestError::Malformed(_))
+    ));
+}
+
 #[test]
 fn rejects_malformed_json() {
     assert!(matches!(

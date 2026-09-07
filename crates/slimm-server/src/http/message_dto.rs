@@ -7,6 +7,7 @@
 
 use serde::Serialize;
 
+use super::apps::AppSurfaceDto;
 use super::message_forwards::ForwardedDto;
 use super::polls::PollDto;
 use crate::store::{AttachmentSummary, Message, MessageRevision};
@@ -79,6 +80,13 @@ pub(crate) struct MessageDto {
     /// already follows. Set by [`super::polls::attach_polls`], not by this
     /// conversion, since a bare `Message` has nowhere to read poll data from.
     pub(crate) poll: Option<PollDto>,
+    /// The app this message launches, if any. Always present as a key: `null`
+    /// means this message launches no app - the same "always there, null means
+    /// genuinely none" convention `poll` follows. Set by
+    /// [`super::apps::attach_app_surfaces`], not by this conversion, since a
+    /// bare `Message` has nowhere to read it from. The surface's live, shared
+    /// state is not here: it rides `code_runs` at block 0, like a run block.
+    pub(crate) app_surface: Option<AppSurfaceDto>,
     /// Always present, empty when there are none - same convention as
     /// `reactions`. Unlike reactions and polls, a fresh send can carry these
     /// immediately (they are uploaded before the send, then referenced in
@@ -181,6 +189,7 @@ impl From<Message> for MessageDto {
             forwarded: None,
             reactions: Vec::new(),
             poll: None,
+            app_surface: None,
             attachments: Vec::new(),
             code_runs: Vec::new(),
             mentions_me: false,

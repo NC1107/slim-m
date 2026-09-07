@@ -23,6 +23,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/breakpoints.dart';
 
+import 'app_surface_view.dart';
 import 'attachment_view.dart';
 import 'emoji_picker.dart';
 import 'forwarded_message_card.dart';
@@ -69,6 +70,7 @@ class MessageRow extends StatelessWidget {
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
+    this.appSurface,
     this.threadReplyCount,
     this.threadLastReplyAt,
     this.threadUnreadCount,
@@ -158,6 +160,10 @@ class MessageRow extends StatelessWidget {
 
   /// The poll this message carries, if it is a poll message.
   final api.Poll? poll;
+
+  /// The app this message launches, if it is an app message. Rendered as an
+  /// interactive, shared surface in place of the message body.
+  final api.AppSurface? appSurface;
 
   /// Undeleted replies in this message's thread, from
   /// `MessageExtras.threadReplyCount` - null (not zero) hides the row
@@ -340,6 +346,17 @@ class MessageRow extends StatelessWidget {
                                         child: PollView(
                                           poll: poll!,
                                           onVote: onVote,
+                                        ),
+                                      ),
+                                    if (appSurface != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: AppSurfaceView(
+                                          messageId: message.id,
+                                          surface: appSurface!,
+                                          title: appSurface!.moduleId,
                                         ),
                                       ),
                                     // A forward's attachments are part of what was forwarded, and are drawn inside its card instead.

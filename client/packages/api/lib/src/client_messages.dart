@@ -377,6 +377,31 @@ extension SlimmApiMessages on SlimmApi {
     return Message.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Launches an installed module's app into [channelId] as a message.
+  /// Idempotent by [id] exactly like [SlimmApi.sendMessage], and gated the same
+  /// way (view plus send in this channel), plus the caller must currently be
+  /// able to reach the app. The returned message carries an `appSurface`; its
+  /// interactive state is then the shared code run at block 0.
+  Future<Message> launchAppMessage({
+    required String channelId,
+    required String id,
+    required String moduleId,
+    required String command,
+    String? content,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/channels/$channelId/messages/apps',
+      body: {
+        'id': id,
+        'module_id': moduleId,
+        'command': command,
+        if (content != null) 'content': content,
+      },
+    );
+    return Message.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Casts or changes the caller's vote on a message's poll: one vote per
   /// user, so a second call replaces the first rather than adding to it.
   /// Requires viewing the channel plus SEND_MESSAGES there, and is refused

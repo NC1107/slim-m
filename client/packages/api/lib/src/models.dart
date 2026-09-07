@@ -12,6 +12,7 @@ library;
 // Split for the line budget; each is exported here so importing this one file
 // still surfaces every model, as if they had all been written in one place.
 export 'models_admin.dart';
+export 'models_app_surface.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_dock.dart';
@@ -43,6 +44,7 @@ export 'models_version.dart';
 
 // Message needs these in scope here, which only `import` grants; the exports
 // above are what re-surface them to callers of this file.
+import 'models_app_surface.dart';
 import 'models_attachments.dart';
 import 'models_code_runs.dart';
 import 'models_forwards.dart';
@@ -127,6 +129,7 @@ class Message {
     this.attachments = const [],
     this.codeRuns = const [],
     this.poll,
+    this.appSurface,
     this.forwarded,
     this.mentionsMe = false,
   });
@@ -185,6 +188,12 @@ class Message {
   /// here.
   final Poll? poll;
 
+  /// The app this message launches, or null when it launches none. Null both
+  /// for an ordinary message and for a key an older server omitted, so it
+  /// parses identically either way. Fixed once the message exists, like [poll];
+  /// the surface's live state rides [codeRuns] at block 0.
+  final AppSurface? appSurface;
+
   /// Attachments riding on this message, in display order. Always present:
   /// an empty list means none, never that the server omitted them. Unlike
   /// [reactions] and [poll], a freshly sent message can carry these
@@ -238,6 +247,9 @@ class Message {
         poll: json['poll'] == null
             ? null
             : Poll.fromJson(json['poll'] as Map<String, dynamic>),
+        appSurface: json['app_surface'] == null
+            ? null
+            : AppSurface.fromJson(json['app_surface'] as Map<String, dynamic>),
         attachments: (json['attachments'] as List<dynamic>?)
                 ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
                 .toList(growable: false) ??
