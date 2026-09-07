@@ -58,8 +58,9 @@ services:
       - "8080"
 
   caddy:
-    # Pin to an exact release; check hub.docker.com/_/caddy/tags for newer patches.
-    image: caddy:2.11.4-alpine
+    # Pinned to an exact release and its digest, so a repointed tag cannot
+    # change what a fresh pull runs; check hub.docker.com/_/caddy/tags for newer patches.
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
     depends_on:
       server:
@@ -88,8 +89,8 @@ services:
       start_period: 10s
 
   livekit:
-    # Pin to an exact release; check github.com/livekit/livekit/releases for newer patches.
-    image: livekit/livekit-server:v1.10.1
+    # Pinned to an exact release and its digest; check github.com/livekit/livekit/releases for newer patches.
+    image: livekit/livekit-server:v1.10.1@sha256:698a13999b4b2285866a32903724884b1e10c03259526391d9b3a72d9b73bbb4
     restart: unless-stopped
     healthcheck:
       # Alpine's busybox wget against LiveKit's own unauthenticated "OK" liveness route; see deploy/README.md.
@@ -147,7 +148,7 @@ services:
   litestream:
     # Held on 0.3.x deliberately: 0.5 replaced the replica format (WAL segments
     # became LTX), so moving is a migration. See deploy/README.md.
-    image: litestream/litestream:0.3.14
+    image: litestream/litestream:0.3.14@sha256:c5a1e1b01916b3a110f6600820ef176d048d9b9c2411ef0a680de0caa68934a5
     # Disabled by default - this whole service only starts when the
     # "litestream" profile is enabled (see deploy/.env.example).
     profiles:
