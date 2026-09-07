@@ -20,6 +20,21 @@ const DEFAULT_WALL_MS: u64 = 1_000;
 /// running forever.
 const DEFAULT_FUEL: u64 = 50_000_000;
 
+/// The most memory a manifest may ask for. A manifest's `runtime.limits` is
+/// the module's declared ceiling, but the host is the one paying for it, so
+/// each limit also has a host-side maximum a manifest cannot exceed - without
+/// one, a manifest claiming gigabytes or hours would be honoured verbatim.
+/// 256 MiB is far above any pure-compute module's needs while still small
+/// against a self-host's total memory.
+pub const MAX_MEMORY_MB: u64 = 256;
+/// The longest wall-clock cap a manifest may declare. A command is a
+/// request-response call the caller waits on, so ten seconds is already long.
+pub const MAX_WALL_MS: u64 = 10_000;
+/// The largest fuel budget a manifest may declare, forty times the default:
+/// the blocking task is not killed at the wall-clock deadline, only abandoned,
+/// so fuel is what actually ends a runaway run and must stay bounded too.
+pub const MAX_FUEL: u64 = 2_000_000_000;
+
 /// The concrete caps one `run` call is held to, resolved from a manifest's
 /// (possibly partial) `runtime.limits` against the defaults above.
 #[derive(Debug, Clone, Copy)]

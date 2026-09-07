@@ -325,6 +325,38 @@ fn rejects_a_short_sha256() {
     ));
 }
 
+/// A manifest's limits are its own ceiling, but the host has a ceiling too:
+/// a manifest asking for more memory, time, or fuel than the host is willing
+/// to pay for is refused at parse, before it can be installed at all.
+#[test]
+fn rejects_runtime_limits_above_the_host_maximum() {
+    for (field, over) in [
+        (
+            "\"memory_mb\": 64",
+            format!("\"memory_mb\": {}", MAX_MEMORY_MB + 1),
+        ),
+        (
+            "\"wall_ms\": 2000",
+            format!("\"wall_ms\": {}", MAX_WALL_MS + 1),
+        ),
+        ("\"fuel\": 500000000", format!("\"fuel\": {}", MAX_FUEL + 1)),
+    ] {
+        let bad = GOOD_MANIFEST.replace(field, &over);
+        assert!(
+            matches!(
+                parse_manifest(bad.as_bytes()),
+                Err(ManifestError::Malformed(_))
+            ),
+            "{over} should be refused"
+        );
+    }
+    let at_max = GOOD_MANIFEST.replace(
+        "\"memory_mb\": 64",
+        &format!("\"memory_mb\": {MAX_MEMORY_MB}"),
+    );
+    assert!(parse_manifest(at_max.as_bytes()).is_ok());
+}
+
 #[test]
 fn rejects_an_unsupported_schema_version() {
     let bad = GOOD_MANIFEST.replacen("\"schema\": 1,", "\"schema\": 99,", 1);

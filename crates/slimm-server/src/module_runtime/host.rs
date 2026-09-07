@@ -8,11 +8,12 @@ use std::fmt;
 use sha2::{Digest, Sha256};
 use wasmi::core::TrapCode;
 use wasmi::{
-    Caller, Config, Engine, Extern, Instance, Linker, Module, Store as WasmiStore, StoreLimits,
-    StoreLimitsBuilder,
+    Caller, Extern, Instance, Linker, Memory, Module, Store as WasmiStore, StoreContext,
+    StoreLimits, StoreLimitsBuilder,
 };
 
 use super::capabilities::CapabilitySurface;
+use super::compiled::{compiled_module, shared_engine};
 use super::limits::RunLimits;
 use crate::media::to_hex;
 
@@ -111,7 +112,10 @@ impl ModuleHost {
         }
 
         let wall = limits.wall;
-        let task = tokio::task::spawn_blocking(move || run_sync(&wasm, limits, &input, surface));
+        let task = tokio::task::spawn_blocking(move || {
+            let module = compiled_module(&digest, &wasm)?;
+            run_sync(&module, limits, &input, surface)
+        });
         match tokio::time::timeout(wall, task).await {
             Ok(Ok(result)) => result,
             Ok(Err(_join_error)) => Err(RunError::Trap("module task did not complete".to_owned())),
@@ -128,17 +132,12 @@ struct HostState {
 }
 
 fn run_sync(
-    wasm: &[u8],
+    module: &Module,
     limits: RunLimits,
     input: &[u8],
     surface: CapabilitySurface,
 ) -> Result<Vec<u8>, RunError> {
-    let mut config = Config::default();
-    config.consume_fuel(true);
-    let engine = Engine::new(&config);
-
-    let module = Module::new(&engine, wasm)
-        .map_err(|e| RunError::Instantiate(format!("invalid wasm module: {e}")))?;
+    let engine = shared_engine();
     // The only import a module may declare is the single gated `slim.host_call`, and only with the surface on and a capability approved; every other case (any import while off, any other import ever, a second import) is refused, the same no-ambient-authority rule v1 has always had (decisions 0021, 0023).
     let allows_host_call = surface.allows_host_call();
     let mut imports_host_call = false;
@@ -154,7 +153,7 @@ fn run_sync(
         .memory_size(limits.memory_bytes)
         .build();
     let mut store = WasmiStore::new(
-        &engine,
+        engine,
         HostState {
             limits: store_limits,
             surface,
@@ -166,16 +165,16 @@ fn run_sync(
         .map_err(|e| RunError::Instantiate(format!("failed to configure fuel: {e}")))?;
 
     let instance = if imports_host_call {
-        let mut linker = Linker::<HostState>::new(&engine);
+        let mut linker = Linker::<HostState>::new(engine);
         linker
             .func_wrap("slim", "host_call", host_call)
             .map_err(|e| RunError::Instantiate(format!("failed to define host_call: {e}")))?;
         // A slim module has no wasm start function, so instantiate-and-start is just instantiation; the response comes from `run`, called below.
         linker
-            .instantiate_and_start(&mut store, &module)
+            .instantiate_and_start(&mut store, module)
             .map_err(|e| RunError::Instantiate(format!("module failed to instantiate: {e}")))?
     } else {
-        Instance::new(&mut store, &module, &[])
+        Instance::new(&mut store, module, &[])
             .map_err(|e| RunError::Instantiate(format!("module failed to instantiate: {e}")))?
     };
 
@@ -201,12 +200,24 @@ fn run_sync(
         .map_err(classify_trap)?;
     let out_ptr = (packed >> 32) as u32 as usize;
     let out_len = (packed & 0xffff_ffff) as u32 as usize;
+    read_guest(&memory, &store, out_ptr, out_len).ok_or_else(|| {
+        RunError::Trap("run returned a response region outside the module's memory".to_owned())
+    })
+}
 
-    let mut output = vec![0u8; out_len];
-    memory
-        .read(&store, out_ptr, &mut output)
-        .map_err(|e| RunError::Instantiate(format!("module's run returned bad memory: {e}")))?;
-    Ok(output)
+/// A bounds-checked copy of `len` bytes at `ptr` in the module's memory, or
+/// `None` when the region does not lie entirely inside it. The pointer and
+/// length both come from the module, so they are checked against the memory's
+/// real size before any host-side buffer is allocated: a module claiming a
+/// 4 GiB response gets a refusal, not a 4 GiB allocation.
+fn read_guest<'a, T: 'a>(
+    memory: &Memory,
+    ctx: impl Into<StoreContext<'a, T>>,
+    ptr: usize,
+    len: usize,
+) -> Option<Vec<u8>> {
+    let end = ptr.checked_add(len)?;
+    memory.data(ctx).get(ptr..end).map(<[u8]>::to_vec)
 }
 
 /// The single host function a capability-using module may import. It reads the
@@ -230,10 +241,9 @@ fn host_call(mut caller: Caller<'_, HostState>, req_ptr: i32, req_len: i32) -> i
     let Ok(req_ptr) = usize::try_from(req_ptr) else {
         return 0;
     };
-    let mut request = vec![0u8; req_len];
-    if memory.read(&caller, req_ptr, &mut request).is_err() {
+    let Some(request) = read_guest(&memory, &caller, req_ptr, req_len) else {
         return 0;
-    }
+    };
 
     // The borrow of `caller` ends when `dispatch` returns its owned bytes, so the alloc/write below can take `caller` mutably.
     let response = caller.data_mut().surface.dispatch(&request);

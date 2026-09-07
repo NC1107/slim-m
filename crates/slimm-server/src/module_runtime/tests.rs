@@ -123,6 +123,32 @@ fn host_call_wasm(request: &str) -> Vec<u8> {
     ))
 }
 
+/// ABI-conformant, but `run` claims its response is 4 GiB long at offset 0 -
+/// far beyond the single 64 KiB page it actually has. The host must refuse
+/// that region, not allocate it.
+fn oversized_output_wasm() -> Vec<u8> {
+    wat(r#"
+        (module
+            (memory (export "memory") 1)
+            (func (export "alloc") (param $len i32) (result i32) (i32.const 0))
+            (func (export "run") (param $in_ptr i32) (param $in_len i32) (result i64)
+                (i64.const 0xFFFFFFFF)))
+    "#)
+}
+
+/// Declares `slim.host_call` and asks the host to read a 2 GiB request from
+/// offset 0 of its single page, returning `host_call`'s result verbatim.
+fn oversized_host_call_wasm() -> Vec<u8> {
+    wat(r#"
+        (module
+            (import "slim" "host_call" (func $host_call (param i32 i32) (result i64)))
+            (memory (export "memory") 1)
+            (func (export "alloc") (param $len i32) (result i32) (i32.const 0))
+            (func (export "run") (param $in_ptr i32) (param $in_len i32) (result i64)
+                (call $host_call (i32.const 0) (i32.const 0x7FFFFFFF))))
+    "#)
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     crate::media::to_hex(&Sha256::digest(bytes))
@@ -241,6 +267,58 @@ async fn run_returns_the_modules_own_output() {
         .expect("a conforming module should run");
 
     assert_eq!(output, b"HELLO THERE");
+}
+
+/// The response region `run` hands back is the module's claim, not the host's
+/// fact: one that does not fit inside the module's memory is refused as the
+/// module's own bug, and never turned into a host-side allocation of that
+/// claimed size.
+#[tokio::test]
+async fn a_response_region_outside_the_modules_memory_is_refused_not_allocated() {
+    let wasm = oversized_output_wasm();
+    let sha256 = sha256_hex(&wasm);
+
+    let err = ModuleHost::run(wasm, sha256, GENEROUS, b"hi".to_vec())
+        .await
+        .expect_err("a 4 GiB response claim from a 64 KiB module must be refused");
+
+    assert!(matches!(err, RunError::Trap(_)), "{err}");
+}
+
+/// The same rule for the request a module hands `host_call`: a length that
+/// does not fit its memory yields the empty (`0`) response, not an allocation.
+#[tokio::test]
+async fn an_oversized_host_call_request_yields_the_empty_response() {
+    let wasm = oversized_host_call_wasm();
+    let sha256 = sha256_hex(&wasm);
+    let surface = CapabilitySurface::enabled(
+        vec!["kv.store".to_owned()],
+        "m",
+        Arc::new(InMemoryKv::default()),
+    );
+
+    let output = ModuleHost::run_with_capabilities(wasm, sha256, GENEROUS, b"hi".to_vec(), surface)
+        .await
+        .expect("the module itself runs to completion");
+
+    assert!(output.is_empty());
+}
+
+/// Compilation is cached by the verified digest, so a second run of the same
+/// artifact skips it; each run still gets its own instance, so the module's
+/// bump allocator starts fresh and the output is identical.
+#[tokio::test]
+async fn a_repeated_run_reuses_the_compiled_module_with_a_fresh_instance() {
+    let wasm = echo_upper_wasm();
+    let sha256 = sha256_hex(&wasm);
+
+    for _ in 0..2 {
+        let output = ModuleHost::run(wasm.clone(), sha256.clone(), GENEROUS, b"again".to_vec())
+            .await
+            .expect("a conforming module should run");
+        assert_eq!(output, b"AGAIN");
+        assert!(super::compiled::is_cached(&sha256));
+    }
 }
 
 #[tokio::test]
