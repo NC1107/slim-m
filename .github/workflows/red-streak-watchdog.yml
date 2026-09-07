@@ -56,6 +56,9 @@ jobs:
   main-builds:
     name: main-builds has not been red for several runs in a row
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 

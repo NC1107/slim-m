@@ -71,9 +71,3 @@ jobs:
       - name: windows compiles
         working-directory: client/packages/app
         run: flutter build windows --debug
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: windows-desktop-debug-bundle
-          path: client/packages/app/build/windows/x64/runner/Debug
-          if-no-files-found: error

@@ -14,7 +14,7 @@
 # environment. The three timing constants are now overridable so a test can
 # run the real loop without a real 4200-second deadline.
 
-set -o pipefail
+set -euo pipefail
 
 : "${GH_TOKEN:?}"
 : "${GITHUB_REPOSITORY:?}"

@@ -64,6 +64,7 @@ jobs:
   analyze-format:
     name: analyze, format check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -101,6 +102,7 @@ jobs:
   test-shards:
     name: client tests (${{ matrix.label }})
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -183,6 +185,7 @@ jobs:
     name: test and web build
     needs: [test-shards]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -215,6 +218,7 @@ jobs:
   linux-compiles:
     name: linux desktop compiles
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -253,6 +257,7 @@ jobs:
     name: linux desktop shell smoke (Xvfb)
     needs: [linux-compiles]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -291,6 +296,7 @@ jobs:
     name: generate golden references (manual)
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
