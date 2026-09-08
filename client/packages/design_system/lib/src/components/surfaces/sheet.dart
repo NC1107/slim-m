@@ -48,6 +48,16 @@ const double kSheetMaxWidth = 460;
 /// out of a dozen remembered to. A caller that already wraps its own content
 /// in one nests harmlessly, since the inner `SafeArea` then has nothing left
 /// to reserve.
+///
+/// The dialog branch wraps the content in `Semantics(container: true,
+/// explicitChildNodes: true)`, as `AlertDialog` wraps its own. A dialog route
+/// names itself from every descendant that forms no semantics node of its
+/// own; content inside a scroll region is safe, since the scrollable is a
+/// boundary, but a heading or action button pinned beside it (the layout
+/// [scrolls] exists for) was merged into the route's label and lost its tap
+/// action - unreachable by a screen reader, and by the e2e harness that drives
+/// the app through the same tree. `explicitChildNodes` keeps every child a
+/// node.
 Future<T?> showAppSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
@@ -110,13 +120,18 @@ class _SheetDialog extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadii.card),
               side: BorderSide(color: tokens.borderSubtle),
             ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: ceiling),
-        child: scrolls
-            ? child
-            : SingleChildScrollView(
-                child: child,
-              ),
+      // explicitChildNodes: see the route-naming paragraph in showAppSheet's doc.
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: ceiling),
+          child: scrolls
+              ? child
+              : SingleChildScrollView(
+                  child: child,
+                ),
+        ),
       ),
     );
   }
