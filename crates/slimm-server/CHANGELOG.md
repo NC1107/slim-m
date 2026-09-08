@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.57.0](https://github.com/NC1107/slim-m/compare/server-v0.56.0...server-v0.57.0) (2026-09-08)
+
+
+### Features
+
+* apps launcher - launch a module as a shared, interactive surface ([#1109](https://github.com/NC1107/slim-m/issues/1109)) ([8c83a68](https://github.com/NC1107/slim-m/commit/8c83a680099a9be4f7a8474d1584baeb6da0b26b))
+* language-matched code-block runners and a command panel ([#1096](https://github.com/NC1107/slim-m/issues/1096)) ([20cc16e](https://github.com/NC1107/slim-m/commit/20cc16e181f137b0ee6d92ec6b90a533b92d0715))
+* **link-preview:** click-to-play for YouTube video links ([#1084](https://github.com/NC1107/slim-m/issues/1084)) ([c091db8](https://github.com/NC1107/slim-m/commit/c091db83fa938d2639a6b53b1e7df4af71d2e98b))
+* module slash commands in the composer ([#1100](https://github.com/NC1107/slim-m/issues/1100)) ([73f50aa](https://github.com/NC1107/slim-m/commit/73f50aaa7d1727f4525202a43b874e8ad4941394))
+* **module-runtime:** kv.store reference capability (off by default) ([#1115](https://github.com/NC1107/slim-m/issues/1115)) ([e667fa8](https://github.com/NC1107/slim-m/commit/e667fa88b4d892c6ee02f818d7866cd8e2d8407d))
+* **module-runtime:** scaffold the host-import surface, off by default ([#1114](https://github.com/NC1107/slim-m/issues/1114)) ([78812f8](https://github.com/NC1107/slim-m/commit/78812f84c87f17c7d608afadf749e14781b550e9))
+* per-channel slow mode ([#1085](https://github.com/NC1107/slim-m/issues/1085)) ([5da23c3](https://github.com/NC1107/slim-m/commit/5da23c30f89aa6931eeb7c8d92b109a7bd94f981))
+* read a channel's permission overwrites before editing them ([#1071](https://github.com/NC1107/slim-m/issues/1071)) ([94f9dcd](https://github.com/NC1107/slim-m/commit/94f9dcd229d49bb909bbe915cbe000491052b1ff))
+* run a code block and see its output ([#1092](https://github.com/NC1107/slim-m/issues/1092)) ([1355afa](https://github.com/NC1107/slim-m/commit/1355afad31ce1cc616158514d39717df443ab551))
+* **server,client:** operator-visible storage view ([#1077](https://github.com/NC1107/slim-m/issues/1077)) ([57bed6b](https://github.com/NC1107/slim-m/commit/57bed6bd8a7bb325f38f2dd1bd30ae21a778dce0))
+* **server:** cross-channel message search (GET /search/messages) ([#1074](https://github.com/NC1107/slim-m/issues/1074)) ([1f7b8bd](https://github.com/NC1107/slim-m/commit/1f7b8bdff99ee4d8b182e134b816b98b47e779a7))
+* **server:** module runtime host running installed modules in a wasmi sandbox ([#1091](https://github.com/NC1107/slim-m/issues/1091)) ([4d1004b](https://github.com/NC1107/slim-m/commit/4d1004b9d53697afce1890620450cd3800cfcb97))
+* **server:** module system foundation - the Dock (Phase 1+2) ([#1089](https://github.com/NC1107/slim-m/issues/1089)) ([415d0ec](https://github.com/NC1107/slim-m/commit/415d0ec092dc57818442b1b28f4643106e7b61a2))
+* shared code-block output ([#1101](https://github.com/NC1107/slim-m/issues/1101)) ([f4876e8](https://github.com/NC1107/slim-m/commit/f4876e8702f3b63db5666c18885def85f50e32f2))
+* unread mention badge on the channel rail ([#1075](https://github.com/NC1107/slim-m/issues/1075)) ([2eb27cf](https://github.com/NC1107/slim-m/commit/2eb27cf5691dfcf000b44f98b6cd6df3b3dd5140))
+
+
+### Bug Fixes
+
+* **link-preview:** build YouTube previews from the URL, not a scrape ([#1102](https://github.com/NC1107/slim-m/issues/1102)) ([29ebdcb](https://github.com/NC1107/slim-m/commit/29ebdcbfae9b1285068d3960ce24227bf0639103))
+* **server:** bound module response regions and cache compiled wasm ([#1117](https://github.com/NC1107/slim-m/issues/1117)) ([74cea80](https://github.com/NC1107/slim-m/commit/74cea80b139e6675e4f7fc04245dcb6b6d48d2fa))
+* **server:** code_runs delete trigger and moderation-history indexes ([#1118](https://github.com/NC1107/slim-m/issues/1118)) ([d04b277](https://github.com/NC1107/slim-m/commit/d04b2775c7c4bae6d5b3e66a06d567747c3ccef0))
+* **server:** unbreak main - too-many-arguments on record_code_run ([#1107](https://github.com/NC1107/slim-m/issues/1107)) ([6b1b33f](https://github.com/NC1107/slim-m/commit/6b1b33f79c59a619aacb460c9dc19a33de7598ee))
+
+
+### Performance Improvements
+
+* **server:** Arc-share heavy broadcast payloads ([#1079](https://github.com/NC1107/slim-m/issues/1079)) ([54fb0d4](https://github.com/NC1107/slim-m/commit/54fb0d4b53411a63a0fa85211538ff3507dca500))
+* **server:** cache presence visibility per connection ([#1073](https://github.com/NC1107/slim-m/issues/1073)) ([046a20c](https://github.com/NC1107/slim-m/commit/046a20cb01152ec8c5786ef17ce472d668ec9e78))
+* **server:** split ephemeral canvas events onto their own broadcast channel ([#1082](https://github.com/NC1107/slim-m/issues/1082)) ([9c6d7eb](https://github.com/NC1107/slim-m/commit/9c6d7eb72c895bc0c3adf1db4d6d4b4416ef80f2))
+* **test:** seed test DBs from a migrated template ([#1116](https://github.com/NC1107/slim-m/issues/1116)) ([5d5d8cc](https://github.com/NC1107/slim-m/commit/5d5d8ccd7229e655e0538f5b53508f56d62d13f1))
+* **test:** seed the feed-budget canvas objects in one transaction ([#1086](https://github.com/NC1107/slim-m/issues/1086)) ([642e1e3](https://github.com/NC1107/slim-m/commit/642e1e31b13672b9ee0919ab4d5ea14264f475a2))
+
 ## [0.56.0](https://github.com/NC1107/slim-m/compare/server-v0.55.0...server-v0.56.0) (2026-09-04)
 
 
