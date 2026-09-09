@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.72.0](https://github.com/NC1107/slim-m/compare/client-v0.71.0...client-v0.72.0) (2026-09-09)
+
+
+### Features
+
+* **server:** make fileReport idempotent by a client-minted id ([#1128](https://github.com/NC1107/slim-m/issues/1128)) ([8005672](https://github.com/NC1107/slim-m/commit/8005672f3be395116a33464a0fdfdcb1744a0ab4))
+
+
+### Bug Fixes
+
+* **client:** reach the compact layout's connection banner, and gate every screen's semantics ([#1132](https://github.com/NC1107/slim-m/issues/1132)) ([4bcf400](https://github.com/NC1107/slim-m/commit/4bcf40079f21aea26f77f7a1fe0909778fb1fc39))
+
 ## [0.71.0](https://github.com/NC1107/slim-m/compare/client-v0.70.0...client-v0.71.0) (2026-09-08)
 
 
