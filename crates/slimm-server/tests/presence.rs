@@ -118,6 +118,17 @@ async fn next_presence_for(ws: &mut Client, user_id: &str) -> Value {
     outcome.unwrap_or_else(|_| panic!("no presence.changed for {user_id} arrived in time"))
 }
 
+/// A `tokio::time::interval` fires its first tick immediately, and on the
+/// test's current-thread runtime that tick can land after the test has already
+/// wound the clock back, announcing the idle transition without the poll ever
+/// having repeated. Waiting out that first tick while the user is still active
+/// means the transition below can only be seen by a later tick - which is the
+/// periodic poll these tests exist to cover, and why a long interval fails
+/// them instead of passing by accident.
+async fn let_the_first_tick_pass() {
+    tokio::time::sleep(Duration::from_millis(60)).await;
+}
+
 fn get_request(uri: &str, token: &str) -> Request<Body> {
     Request::builder()
         .method("GET")
@@ -416,6 +427,7 @@ async fn an_idle_transition_is_announced_to_another_viewer() {
     let _alice_ws = connect(addr, &alice_ticket).await;
     let online = next_presence_for(&mut bob_ws, &alice_id_str).await;
     assert_eq!(online["status"], "online");
+    let_the_first_tick_pass().await;
 
     let long_ago = Instant::now() - presence::IDLE_TIMEOUT - Duration::from_secs(1);
     hub.presence().touch_at(alice_id, long_ago);
@@ -458,6 +470,7 @@ async fn a_hidden_users_idle_transition_is_never_published() {
     let _alice_ws = connect(addr, &alice_ticket).await;
     // Her connect still publishes, which predates the idle watcher and is its own question.
     let _ = next_presence_for(&mut bob_ws, &alice_id_str).await;
+    let_the_first_tick_pass().await;
 
     let long_ago = Instant::now() - presence::IDLE_TIMEOUT - Duration::from_secs(1);
     hub.presence().touch_at(alice_id, long_ago);
