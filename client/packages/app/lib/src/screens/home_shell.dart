@@ -158,7 +158,8 @@ class HomeShell extends ConsumerWidget {
         final compactBody = Column(
           children: [
             const RailConnectionBar(),
-            Expanded(child: child),
+            // Its own semantics node for the same reason the wide layout gives the pane one: the modal barrier inside this pane's navigator drops everything painted before it, which here is the connection bar.
+            Expanded(child: Semantics(container: true, child: child)),
             if (showVoiceStrip) const VoiceStripIndicator(),
           ],
         );
