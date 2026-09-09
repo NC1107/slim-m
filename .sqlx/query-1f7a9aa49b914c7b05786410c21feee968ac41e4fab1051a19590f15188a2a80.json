@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT reporter_id AS \"reporter_id?: UserId\", subject_kind,\n                      subject_id AS \"subject_id: Uuid\"\n               FROM reports WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "reporter_id?: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "subject_kind",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "subject_id: Uuid",
+        "ordinal": 2,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "1f7a9aa49b914c7b05786410c21feee968ac41e4fab1051a19590f15188a2a80"
+}

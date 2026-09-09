@@ -89,6 +89,11 @@ impl From<Device> for DeviceDto {
 
 #[derive(Deserialize)]
 struct ReportRequest {
+    /// A client-minted UUIDv7 that makes the filing idempotent, like every
+    /// other durable write. Optional for older clients, which get a
+    /// server-minted id and the pre-existing 409-on-retry behaviour.
+    #[serde(default)]
+    id: Option<String>,
     /// "message" or "user".
     subject_kind: String,
     subject_id: String,
@@ -221,6 +226,7 @@ async fn file_report(
 
     let reason = validate_reason(Some(&req.reason), true)?
         .expect("a required reason is Some or the call above returned");
+    let report_id = req.id.as_deref().map(parse_uuid).transpose()?;
 
     let id = parse_uuid(&req.subject_id)?;
     let subject = match req.subject_kind.as_str() {
@@ -259,13 +265,29 @@ async fn file_report(
         }
     }
 
-    match state.store.file_report(ctx.user_id, subject, &reason).await {
-        Ok(id) => {
-            // No content rides along; see `Event::ReportsChanged`'s own doc.
-            state.hub.publish(Event::ReportsChanged);
-            Ok(Json(ReportFiled { id: id.to_string() }))
+    let filed = state
+        .store
+        .file_report_with_id(
+            report_id.unwrap_or_else(uuid::Uuid::now_v7),
+            ctx.user_id,
+            subject,
+            &reason,
+        )
+        .await;
+    match filed {
+        Ok(filed) => {
+            // A replay changed nothing, so nothing is announced; see `Event::ReportsChanged`'s own doc.
+            if filed.fresh {
+                state.hub.publish(Event::ReportsChanged);
+            }
+            Ok(Json(ReportFiled {
+                id: filed.id.to_string(),
+            }))
         }
         Err(ReportError::AlreadyOpen) => Err(ApiError::Conflict("you already reported that")),
+        Err(ReportError::IdConflict) => Err(ApiError::Conflict(
+            "that report id already names a different report",
+        )),
         Err(ReportError::NotFound) => Err(ApiError::NotFound("that was not found")),
         Err(ReportError::Internal(e)) => Err(e.into()),
     }
