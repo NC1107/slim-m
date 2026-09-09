@@ -183,8 +183,10 @@ class SlimmApi {
   }
 
   /// Advances the read marker. Monotonic: a lower seq is ignored by the server.
-  Future<ReadState> markRead(
-      {required String channelId, required int seq}) async {
+  Future<ReadState> markRead({
+    required String channelId,
+    required int seq,
+  }) async {
     final json = await _send(
       'PUT',
       '/channels/$channelId/read',
@@ -273,16 +275,19 @@ class SlimmApi {
   Future<void> redeemInvite(String code) =>
       _send('POST', '/invites/$code/redeem', expectNoContent: true);
 
-  /// Files a report for a human to review.
+  /// Files a report for a human to review. [id] is the client-minted UUIDv7
+  /// that lets a retry replay the same report instead of colliding with it.
   Future<String> report({
     required ReportSubject subject,
     required String subjectId,
     required String reason,
+    String? id,
   }) async {
     final json = await _send(
       'POST',
       '/reports',
       body: {
+        if (id != null) 'id': id,
         'subject_kind': subject.wire,
         'subject_id': subjectId,
         'reason': reason,

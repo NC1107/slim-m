@@ -11,6 +11,12 @@ import 'dart:math';
 /// need a client-generated id before the server has ever seen the message.
 String newMessageId() => _uuidV7();
 
+/// The same generator for a report, which is idempotent by id the same way
+/// a message is: the id is minted once per filing so a retry after an
+/// uncertain failure replays the report rather than being refused as a
+/// duplicate.
+String newReportId() => _uuidV7();
+
 /// The same generator for a canvas object, which is idempotent by id the same
 /// way a message send is. Named separately so a call site says which stream it
 /// belongs to.

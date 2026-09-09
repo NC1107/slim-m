@@ -919,6 +919,11 @@ paths:
         Nothing here inspects content automatically; a person decides.
         Reporting a message requires being able to see it, so this cannot be
         used to confirm a message exists in a channel the caller cannot read.
+        Idempotent by the optional client-supplied `id`: a retry with the same
+        id from the same reporter about the same subject returns the report
+        already filed. The same id naming a different reporter or subject is a
+        conflict, as is a second open report about the same subject under any
+        id.
       requestBody:
         required: true
         content:
@@ -6895,6 +6900,13 @@ components:
       type: object
       required: [subject_kind, subject_id, reason]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: >
+            A client-minted UUIDv7 that makes the filing idempotent, like
+            every other durable write. Omitted, the server mints one and a
+            retry cannot be told apart from a second report.
         subject_kind:
           type: string
           enum: [message, user]

@@ -39,6 +39,9 @@ impl ReportSubject {
 pub enum ReportError {
     /// This reporter already has an open report about this subject.
     AlreadyOpen,
+    /// The client-supplied id already names a report by someone else or about
+    /// something else, so replaying it would hand back a foreign report.
+    IdConflict,
     /// The subject does not exist, or is not visible to the reporter.
     NotFound,
     Internal(anyhow::Error),
@@ -92,18 +95,44 @@ pub struct ReporterOwnReport {
     pub resolved: bool,
 }
 
+/// What filing a report produced: its id, and whether this call created it
+/// (`fresh`) or replayed an earlier filing under the same client id.
+#[derive(Debug, Clone, Copy)]
+pub struct FiledReport {
+    pub id: Uuid,
+    pub fresh: bool,
+}
+
 impl Store {
-    /// Files a report for a human to review.
-    ///
-    /// A snapshot of the reported content is stored, because the author can edit
-    /// or delete it afterwards and a report about something that no longer
-    /// exists tells a moderator nothing.
+    /// Files a report for a human to review, under an id the server mints.
+    /// See [`Store::file_report_with_id`] for the idempotent form.
     pub async fn file_report(
         &self,
         reporter: UserId,
         subject: ReportSubject,
         reason: &str,
     ) -> Result<Uuid, ReportError> {
+        self.file_report_with_id(Uuid::now_v7(), reporter, subject, reason)
+            .await
+            .map(|filed| filed.id)
+    }
+
+    /// Files a report for a human to review, idempotent by the client-minted
+    /// `id` the way every other durable write is: a retry with the same id from
+    /// the same reporter about the same subject replays the report already
+    /// stored rather than answering 409 for a filing the client cannot find.
+    /// The same id naming a different reporter or subject is a conflict.
+    ///
+    /// A snapshot of the reported content is stored, because the author can edit
+    /// or delete it afterwards and a report about something that no longer
+    /// exists tells a moderator nothing.
+    pub async fn file_report_with_id(
+        &self,
+        id: Uuid,
+        reporter: UserId,
+        subject: ReportSubject,
+        reason: &str,
+    ) -> Result<FiledReport, ReportError> {
         let (channel_id, snapshot) = match subject {
             ReportSubject::Message(message_id) => {
                 let message = self
@@ -116,11 +145,32 @@ impl Store {
             ReportSubject::User(_) => (None, None),
         };
 
-        let id = Uuid::now_v7();
         let now = now_ms();
         let kind = subject.kind();
         let subject_id = subject.id();
         let channel: Option<ChannelId> = channel_id;
+
+        // Reads the id before deciding what to write; see Store::begin_write.
+        let mut tx = self.begin_write().await?;
+        let existing = sqlx::query!(
+            r#"SELECT reporter_id AS "reporter_id?: UserId", subject_kind,
+                      subject_id AS "subject_id: Uuid"
+               FROM reports WHERE id = ?"#,
+            id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(row) = existing {
+            tx.commit().await?;
+            let same = row.reporter_id == Some(reporter)
+                && row.subject_kind == kind
+                && row.subject_id == subject_id;
+            return if same {
+                Ok(FiledReport { id, fresh: false })
+            } else {
+                Err(ReportError::IdConflict)
+            };
+        }
 
         let result = sqlx::query!(
             "INSERT INTO reports
@@ -136,11 +186,14 @@ impl Store {
             snapshot,
             now
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await;
 
         match result {
-            Ok(_) => Ok(id),
+            Ok(_) => {
+                tx.commit().await?;
+                Ok(FiledReport { id, fresh: true })
+            }
             // One open report per subject per reporter, so this cannot flood the queue.
             Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
                 Err(ReportError::AlreadyOpen)

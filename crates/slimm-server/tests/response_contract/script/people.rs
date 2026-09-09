@@ -88,15 +88,21 @@ pub(super) async fn safety_calls(c: &mut Contract, root: &str, bob_token: &str, 
 }
 
 pub(super) async fn moderation_calls(c: &mut Contract, root: &str, bob_token: &str, message: &str) {
+    let report_id = uuid::Uuid::now_v7().to_string();
+    let body = json!({
+        "id": report_id,
+        "subject_kind": "message",
+        "subject_id": message,
+        "reason": "spam"
+    });
     let filed = c
-        .json(
-            "fileReport",
-            "POST",
-            "/reports",
-            bob_token,
-            json!({ "subject_kind": "message", "subject_id": message, "reason": "spam" }),
-        )
+        .json("fileReport", "POST", "/reports", bob_token, body.clone())
         .await;
+    // The replay half of the contract: the same id answers with the same report.
+    let replayed = c
+        .json("fileReport", "POST", "/reports", bob_token, body)
+        .await;
+    assert_eq!(text(&replayed, "id"), text(&filed, "id"));
     c.get("listOpenReports", "/reports", root).await;
     c.get(
         "myReportStatus",

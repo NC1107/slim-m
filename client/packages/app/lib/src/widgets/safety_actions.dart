@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import '../ids.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/filed_reports.dart';
 import '../providers/providers.dart';
@@ -56,6 +57,7 @@ Future<void> fileReport(
 }) async {
   final reason = await promptReportReason(context, subjectLabel: subjectLabel);
   if (reason == null || !context.mounted) return;
+  final id = newReportId();
   await _tell(
     context,
     'file the report',
@@ -63,7 +65,12 @@ Future<void> fileReport(
     () async {
       final reportId = await container
           .read(apiProvider)
-          .report(subject: subject, subjectId: subjectId, reason: reason);
+          .report(
+            subject: subject,
+            subjectId: subjectId,
+            reason: reason,
+            id: id,
+          );
       await container.read(filedReportsProvider.notifier).record(reportId);
     },
   );
