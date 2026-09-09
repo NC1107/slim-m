@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.71.0](https://github.com/NC1107/slim-m/compare/client-v0.70.0...client-v0.71.0) (2026-09-08)
+
+
+### Features
+
+* apps launcher - launch a module as a shared, interactive surface ([#1109](https://github.com/NC1107/slim-m/issues/1109)) ([8c83a68](https://github.com/NC1107/slim-m/commit/8c83a680099a9be4f7a8474d1584baeb6da0b26b))
+* **client:** a scene renderer for module output, and interactive Game of Life ([#1098](https://github.com/NC1107/slim-m/issues/1098)) ([32dd4cd](https://github.com/NC1107/slim-m/commit/32dd4cda2e2ad712b79fa30292c4996c5b0db7f5))
+* **client:** collapse long code blocks, and a close button on the module sheet ([#1103](https://github.com/NC1107/slim-m/issues/1103)) ([0979dd0](https://github.com/NC1107/slim-m/commit/0979dd05c4b5eec5271491a31e6c148ddd79d062))
+* **dock:** show what a module adds on its Dock page ([#1112](https://github.com/NC1107/slim-m/issues/1112)) ([fa87ab4](https://github.com/NC1107/slim-m/commit/fa87ab4eee8f2766b1d3c60fdf461482962bf7ef))
+* language-matched code-block runners and a command panel ([#1096](https://github.com/NC1107/slim-m/issues/1096)) ([20cc16e](https://github.com/NC1107/slim-m/commit/20cc16e181f137b0ee6d92ec6b90a533b92d0715))
+* module slash commands in the composer ([#1100](https://github.com/NC1107/slim-m/issues/1100)) ([73f50aa](https://github.com/NC1107/slim-m/commit/73f50aaa7d1727f4525202a43b874e8ad4941394))
+* shared code-block output ([#1101](https://github.com/NC1107/slim-m/issues/1101)) ([f4876e8](https://github.com/NC1107/slim-m/commit/f4876e8702f3b63db5666c18885def85f50e32f2))
+
+
+### Bug Fixes
+
+* **client:** add the 0.70.0 whats-new entry ([#1097](https://github.com/NC1107/slim-m/issues/1097)) ([04512cd](https://github.com/NC1107/slim-m/commit/04512cd92a5095059744a1e33eb4286f04910399))
+* **client:** compress a comment run in role_editor_sheet ([#1094](https://github.com/NC1107/slim-m/issues/1094)) ([27e295b](https://github.com/NC1107/slim-m/commit/27e295b9533bdee2fa2b8627745eaa3b1e97c79a))
+* **client:** guard post-await writes in the composer, sign-in and voice toggles ([#1125](https://github.com/NC1107/slim-m/issues/1125)) ([2fc121e](https://github.com/NC1107/slim-m/commit/2fc121e11ed5d2caa39563abd775d0b2ba74dc83))
+* **client:** keep a sheet's pinned heading and action reachable by semantics ([#1126](https://github.com/NC1107/slim-m/issues/1126)) ([0bc05e1](https://github.com/NC1107/slim-m/commit/0bc05e14b4301dd26f44a140efaf4e5dfdc1af58))
+* **client:** make a run's result read as output, not more code ([#1105](https://github.com/NC1107/slim-m/issues/1105)) ([b71a3e5](https://github.com/NC1107/slim-m/commit/b71a3e505d05a9cd34462b79a9b5bf6b4a26efd1))
+* **client:** name the header-bar height, align the member header, virtualize the roster ([#1122](https://github.com/NC1107/slim-m/issues/1122)) ([aaaf8f7](https://github.com/NC1107/slim-m/commit/aaaf8f7072a1cd4a74001f84a5b3023f6849d7f2))
+* **client:** reachable exit + generalized runtime metrics in the module UI ([#1093](https://github.com/NC1107/slim-m/issues/1093)) ([92f9653](https://github.com/NC1107/slim-m/commit/92f9653ee551c2fdf496260ec9e6b6796d3baa67))
+* **client:** share every step of an interactive scene, not just the first run ([#1106](https://github.com/NC1107/slim-m/issues/1106)) ([958a64a](https://github.com/NC1107/slim-m/commit/958a64a803cd0fbd34fb6ccd670f99bb2a8f3d46))
+* **client:** unbreak main - three pre-existing client-ci reds ([#1108](https://github.com/NC1107/slim-m/issues/1108)) ([d596141](https://github.com/NC1107/slim-m/commit/d5961411d1666ebff869619632feb58797ff19e1))
+
+
+### Performance Improvements
+
+* **client:** reuse the canvas cursor glyph path and object paints ([#1123](https://github.com/NC1107/slim-m/issues/1123)) ([f2eb015](https://github.com/NC1107/slim-m/commit/f2eb0154e90ff72d21532c54f4b57aabcb01649d))
+
 ## [0.70.0](https://github.com/NC1107/slim-m/compare/client-v0.69.0...client-v0.70.0) (2026-09-06)
 
 
