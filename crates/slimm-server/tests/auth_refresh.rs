@@ -194,3 +194,69 @@ async fn concurrent_refresh_of_same_token_never_errors() {
             .is_some()
     );
 }
+
+/// The grace window is a duration, not a ratio: a replay landing just past a
+/// real (non-zero) window is reuse. The zero-window test above cannot tell
+/// `now - used_at <= grace` from an arithmetic slip that compares a ratio of
+/// timestamps to the window, because with a zero window both deny.
+#[tokio::test]
+async fn a_replay_just_past_a_real_grace_window_is_reuse() {
+    let (path, _guard) = support::TestDbGuard::new("slimm-auth-refresh-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    let store = Store::with_reuse_grace_ms(pool, 40);
+    let auth = Auth::new(2).expect("auth service");
+    let hash = auth.hash_password(PASSWORD.to_owned()).await.expect("hash");
+    let account = store
+        .create_account("alice", "Alice", &hash)
+        .await
+        .expect("register");
+
+    let original = store.open_session(account.id, "laptop").await.unwrap();
+    assert!(matches!(
+        store.rotate_refresh(&original.refresh_token).await.unwrap(),
+        RefreshOutcome::Rotated(_)
+    ));
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    assert!(
+        matches!(
+            store.rotate_refresh(&original.refresh_token).await.unwrap(),
+            RefreshOutcome::Reused
+        ),
+        "150 ms after spending is outside a 40 ms window, whatever the clock reads"
+    );
+}
+
+/// A rotation issues a pair that expires a TTL from now, the same distance the
+/// sign-in pair did; a slip in that arithmetic would hand out tokens with an
+/// absurd expiry that nothing else checks.
+#[tokio::test]
+async fn a_rotation_issues_tokens_with_the_same_lifetime_as_sign_in() {
+    let (store, _auth, user_id, _guard) = with_alice().await;
+    let original = store.open_session(user_id, "laptop").await.unwrap();
+    let rotated = match store.rotate_refresh(&original.refresh_token).await.unwrap() {
+        RefreshOutcome::Rotated(tokens) => tokens,
+        _ => panic!("first refresh should rotate"),
+    };
+
+    let slack = Duration::from_secs(5).as_millis() as i64;
+    assert!(
+        (rotated.access_expires_at - original.access_expires_at).abs() < slack,
+        "access expiry drifted: {} vs {}",
+        rotated.access_expires_at,
+        original.access_expires_at
+    );
+    assert!(
+        (rotated.refresh_expires_at - original.refresh_expires_at).abs() < slack,
+        "refresh expiry drifted: {} vs {}",
+        rotated.refresh_expires_at,
+        original.refresh_expires_at
+    );
+    assert!(rotated.access_expires_at < rotated.refresh_expires_at);
+}
