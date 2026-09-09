@@ -285,6 +285,68 @@ mod tests {
         );
     }
 
+    /// The bounds are inclusive: a key or value exactly at its cap is fine, one
+    /// byte over is not.
+    #[test]
+    fn a_key_or_value_exactly_at_its_bound_is_accepted() {
+        let kv = InMemoryKv::default();
+        let mut calls = budget();
+        let key = format!(
+            r#"{{"op":"set","key":"{}","value":"x"}}"#,
+            "k".repeat(MAX_KEY_BYTES)
+        );
+        assert!(text(handle(&kv, "m", &mut calls, key.as_bytes())).contains(r#""ok":true"#));
+        let value = format!(
+            r#"{{"op":"set","key":"v","value":"{}"}}"#,
+            "v".repeat(MAX_VALUE_BYTES)
+        );
+        assert!(text(handle(&kv, "m", &mut calls, value.as_bytes())).contains(r#""ok":true"#));
+    }
+
+    /// Bytes are counted as key plus value, filled to exactly the cap, and a
+    /// replacement is charged only for its difference: overwriting at the cap
+    /// with the same size fits, with one more byte does not, and deleting frees
+    /// the room a new key then takes.
+    #[test]
+    fn the_store_fills_at_the_byte_cap_and_a_replacement_costs_only_its_difference() {
+        let kv = InMemoryKv::default();
+        let per_entry = MAX_VALUE_BYTES;
+        let value = "v".repeat(per_entry - 1);
+        let entries = MAX_TOTAL_BYTES / per_entry;
+        assert_eq!(
+            entries * per_entry,
+            MAX_TOTAL_BYTES,
+            "the fixture fills the cap exactly"
+        );
+        let keys: Vec<String> = (0..entries)
+            .map(|i| char::from(b'a' + i as u8).to_string())
+            .collect();
+        for key in &keys {
+            kv.set("m", key, &value)
+                .expect("fits until exactly the cap");
+        }
+
+        assert!(
+            matches!(kv.set("m", "z", ""), Err(KvError::Full)),
+            "one byte over the cap"
+        );
+        let last = keys.last().unwrap();
+        assert!(
+            kv.set("m", last, &value).is_ok(),
+            "same size in place costs nothing"
+        );
+        assert!(
+            matches!(kv.set("m", last, &format!("{value}+")), Err(KvError::Full)),
+            "one byte larger in place is charged the difference"
+        );
+
+        kv.delete("m", last);
+        assert!(kv.set("m", "z", &value).is_ok(), "a delete frees its bytes");
+        let listed = kv.list("m");
+        assert_eq!(listed.len(), entries);
+        assert!(listed.contains(&"z".to_owned()) && !listed.contains(last));
+    }
+
     #[test]
     fn the_per_run_call_budget_is_enforced() {
         let kv = InMemoryKv::default();

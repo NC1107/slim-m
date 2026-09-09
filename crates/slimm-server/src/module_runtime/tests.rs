@@ -23,7 +23,10 @@ fn wat(text: &str) -> Vec<u8> {
 /// returns the same region back - proves the alloc/write/call/read plumbing
 /// end to end without any JSON logic in the fixture itself.
 fn echo_upper_wasm() -> Vec<u8> {
-    wat(r#"
+    wat(ECHO_UPPER_WAT)
+}
+
+const ECHO_UPPER_WAT: &str = r#"
         (module
             (memory (export "memory") 1)
             (global $bump (mut i32) (i32.const 1024))
@@ -49,8 +52,7 @@ fn echo_upper_wasm() -> Vec<u8> {
                 (i64.or
                     (i64.shl (i64.extend_i32_u (local.get $in_ptr)) (i64.const 32))
                     (i64.extend_i32_u (local.get $in_len)))))
-    "#)
-}
+    "#;
 
 /// Otherwise ABI-conformant, but declares a wasm import - the one shape the
 /// host must refuse outright, per the module ABI's "no ambient authority"
@@ -147,6 +149,17 @@ fn oversized_host_call_wasm() -> Vec<u8> {
             (func (export "run") (param $in_ptr i32) (param $in_len i32) (result i64)
                 (call $host_call (i32.const 0) (i32.const 0x7FFFFFFF))))
     "#)
+}
+
+/// [`echo_upper_wasm`] with a distinct global, so each `n` compiles to different
+/// bytes and therefore a different cache entry.
+fn distinct_wasm(n: u32) -> Vec<u8> {
+    let base = String::from_utf8(echo_upper_wasm_source()).unwrap();
+    wat(&base.replace("(module", &format!("(module (global i32 (i32.const {n}))")))
+}
+
+fn echo_upper_wasm_source() -> Vec<u8> {
+    ECHO_UPPER_WAT.as_bytes().to_vec()
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -319,6 +332,35 @@ async fn a_repeated_run_reuses_the_compiled_module_with_a_fresh_instance() {
         assert_eq!(output, b"AGAIN");
         assert!(super::compiled::is_cached(&sha256));
     }
+}
+
+/// The cache is bounded: past [`super::compiled::MAX_CACHED_MODULES`] distinct
+/// artifacts it is dropped and refilled, so the first one compiled is gone
+/// and the cache never holds more than the bound. Only eviction is asserted,
+/// never that the latest survived: other tests in the same process share the
+/// cache and may clear it too, which only makes eviction more certain.
+#[tokio::test]
+async fn the_compiled_module_cache_evicts_past_its_bound() {
+    let first = distinct_wasm(1_000);
+    let first_sha = sha256_hex(&first);
+    ModuleHost::run(first.clone(), first_sha.clone(), GENEROUS, b"a".to_vec())
+        .await
+        .expect("a conforming module should run");
+    assert!(super::compiled::is_cached(&first_sha));
+
+    for n in 1_001..=1_000 + super::compiled::MAX_CACHED_MODULES as u32 {
+        let wasm = distinct_wasm(n);
+        let sha = sha256_hex(&wasm);
+        ModuleHost::run(wasm, sha, GENEROUS, b"a".to_vec())
+            .await
+            .expect("a conforming module should run");
+        assert!(super::compiled::cached_count() <= super::compiled::MAX_CACHED_MODULES);
+    }
+
+    assert!(
+        !super::compiled::is_cached(&first_sha),
+        "the first artifact must have been evicted once the bound was passed"
+    );
 }
 
 #[tokio::test]
