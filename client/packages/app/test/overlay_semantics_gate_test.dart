@@ -75,8 +75,7 @@ List<String> _audit(WidgetTester tester) {
 
   for (final element in find.byType(Text).evaluate()) {
     final widget = element.widget as Text;
-    // A Text announcing something other than what it shows (a counter's
-    // "0/2000" reads as "2000 characters remaining") is judged by that.
+    // Judged by what it announces, not what it shows: a counter's "0/2000" reads as "2000 characters remaining".
     final text = (widget.semanticsLabel ?? widget.data)?.trim();
     if (text == null || text.isEmpty || text == overlayOpenerLabel) continue;
     if (_excluded(element)) continue;
