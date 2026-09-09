@@ -28,142 +28,11 @@ import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
 import 'package:slimm_app/src/widgets/channel_rail.dart'
     show channelRailVisibleProvider;
 
+import 'support/surface_registry.dart';
 import 'ui_snapshot_support.dart';
 import 'voice_snapshot_fixtures.dart'
-    show
-        SnapshotVoiceController,
-        connectedCallState,
-        connectingState,
-        dmChannelId;
+    show SnapshotVoiceController, connectedCallState, connectingState;
 import 'voice_snapshot_scenarios.dart';
-
-/// The surfaces worth a picture: the route, and which viewports to render.
-///
-/// `channel` straddles every breakpoint it owns because width changes its
-/// structure. A voice channel needs the identical breakpoint treatment - it
-/// is the same shell, just a different `kind` - but it also needs its
-/// controller pinned, or the body shows a real, unmocked auto-join that
-/// settles into a blank frame long before this matrix pumps far enough to
-/// see it fail; see `_shellStateSurfaces`'s own `voice` entry for that.
-/// Each standalone screen adds the pair that brackets its *own* breakpoint
-/// to a phone and a desktop render, rather than every screen sampling every
-/// boundary: a screen with no 800px floor of its own gains nothing from
-/// being rendered at 799 and 800.
-const _surfaces = <String, ({String route, List<String> viewports})>{
-  'channel': (
-    route: '/channels/c-general',
-    viewports: [
-      'phone-portrait',
-      'phone-landscape',
-      'tablet-portrait',
-      'desktop-narrow',
-      'desktop',
-      ...compactBracket,
-      'expanded-999',
-      'expanded-1000',
-    ],
-  ),
-  // The default landing state right after sign-in, absent from this matrix until now.
-  'no-channel-selected': (
-    route: '/channels',
-    viewports: [
-      ...phoneAndDesktop,
-      ...compactBracket,
-      'expanded-999',
-      'expanded-1000',
-    ],
-  ),
-  // c-empty has no messages, which #general never does, so only it can show the transcript's offline-empty copy.
-  'channel-offline-empty': (
-    route: '/channels/c-empty',
-    viewports: phoneAndDesktop,
-  ),
-  // An ordinary DM, distinct from the self-DM personal space: renders the rail's DM section and a real transcript.
-  'dm-normal-transcript': (
-    route: '/channels/c-dm-ada',
-    viewports: phoneAndDesktop,
-  ),
-  'onboarding': (
-    route: '/join',
-    viewports: [
-      ...phoneAndDesktop,
-      'stepper-467',
-      'stepper-468',
-      'onboarding-899',
-      'onboarding-900',
-    ],
-  ),
-  'sign-in': (
-    route: '/sign-in',
-    viewports: [...phoneAndDesktop, 'onboarding-899', 'onboarding-900'],
-  ),
-  'settings': (
-    route: '/settings',
-    viewports: [
-      ...phoneAndDesktop,
-      ...compactBracket,
-      'settings-799',
-      'settings-800',
-    ],
-  ),
-  'space-settings': (
-    route: '/settings/space',
-    viewports: [
-      ...phoneAndDesktop,
-      ...compactBracket,
-      'settings-799',
-      'settings-800',
-    ],
-  ),
-  'admin-roles': (
-    route: '/settings/roles',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-invites': (
-    route: '/settings/invites',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-reports': (
-    route: '/settings/reports',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-overwrites': (
-    route: '/settings/permissions',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-emoji': (
-    route: '/settings/emoji',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-categories': (
-    route: '/settings/categories',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-removed-members': (
-    route: '/settings/removed-members',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'admin-analytics': (
-    route: '/settings/analytics',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  'debug-log': (
-    route: '/settings/debug-log',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
-  // The stacked-header bug only ever showed past kCompactWidth; the compact bracket proves it stays clean there too.
-  'thread': (
-    route: '/thread/c-thread',
-    viewports: [
-      ...phoneAndDesktop,
-      ...compactBracket,
-      'expanded-999',
-      'expanded-1000',
-    ],
-  ),
-  // No call open: dm-call-button-idle; -active-lit needs dmCallActivityProvider reporting a ring, which nothing here drives.
-  'dm': (route: '/channels/$dmChannelId', viewports: phoneAndDesktop),
-};
 
 /// `ReportCard`'s own nested resolve needs `renderSurface`'s
 /// `settleNestedResolve` pump, or `expectSettled` catches it as a
@@ -209,7 +78,7 @@ final _analyticsFixture = api.SpaceAnalytics(
   ),
 );
 
-/// Shell states reachable only by overriding a provider the plain [_surfaces]
+/// Shell states reachable only by overriding a provider the plain [snapshotSurfaces]
 /// table has no way to reach: a collapsed rail, a day divider forced to show,
 /// the transcript's connecting/genuinely-empty states (which the default
 /// fixture's offline `SyncController` can never produce on its own), and a
@@ -298,7 +167,7 @@ final _shellStateSurfaces =
 /// The canvas replaces the whole conversation body, header included, at
 /// every width. That is only reachable by forcing `canvasOpenProvider`
 /// open, which the shared render below has no way to do for a plain
-/// [_surfaces] entry, so these get their own small table and loop.
+/// [snapshotSurfaces] entry, so these get their own small table and loop.
 ///
 /// The compact bracket is what a stacked-header regression needs: the outer
 /// app bar there is a second widget entirely (`HomeShell`'s own `Scaffold`,
@@ -360,7 +229,7 @@ void main() {
   setUpAll(loadRealFonts);
 
   for (final theme in const ['dark', 'light']) {
-    for (final surface in _surfaces.entries) {
+    for (final surface in snapshotSurfaces.entries) {
       for (final viewportName in surface.value.viewports) {
         testWidgets(
           '${surface.key} at $viewportName ($theme) fits its viewport',
