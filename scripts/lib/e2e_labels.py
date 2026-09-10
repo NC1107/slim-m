@@ -20,13 +20,19 @@ SPACE_SETTINGS = "Space settings"
 PERSONAL_SETTINGS = "Personal settings"
 
 # Personal settings. Nav entries first: a control needs its own pane selected.
-ACCOUNT_PANE = "Account & presence"
+ACCOUNT_PANE = "Account & profile"
 APPEARANCE_PANE = "Appearance"
 CHANGE_AVATAR = "Change profile picture"
 CROP_TITLE = "Crop your picture"
 USE_PICTURE = "Use picture"
 THEME = "Theme"
-STATUS = "Status"
+
+BACK_TO_CHANNELS = "Back to channels"
+
+# Presence lives on the rail footer, not in settings: it is the one choice with
+# a privacy consequence, so it is one tap from anywhere rather than four.
+CHANGE_STATUS = "Change your status"
+DND = "Do not disturb"
 
 # Space settings
 WHO_CAN_JOIN = "Who can join"

@@ -13,14 +13,17 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import e2e_labels as L  # noqa: E402
 import e2e_settings  # noqa: E402
 
 
 class _FakeClient:
     """Answers just enough of the Client surface these two functions use."""
 
-    def __init__(self, stored_theme):
+    def __init__(self, stored_theme, visible=()):
         self._stored_theme = stored_theme
+        self._visible = set(visible)
+        self.clicks = []
 
     def ev(self, expr):
         if 'location.href' in expr:
@@ -30,10 +33,10 @@ class _FakeClient:
         return None
 
     def find(self, label, field=None):
-        return None
+        return {'t': label} if label in self._visible else None
 
     def click(self, label, settle=1.5):
-        pass
+        self.clicks.append(label)
 
     def wait_for(self, label, timeout=None, field=None):
         return {'t': label}
@@ -68,6 +71,25 @@ class ChangeStatusTest(unittest.TestCase):
     def test_passes_when_the_server_agrees(self):
         e2e_settings.change_status(
             _FakeClient(stored_theme=None), _FakeApi(status='dnd'))
+
+    def test_it_drives_the_rail_footer_and_not_a_settings_pane(self):
+        """Presence left personal settings; this is what keeps the path honest.
+
+        Clicking a settings pane that no longer carries the control fails at
+        "never saw 'Status'" - a name that reads as plausible until it runs.
+        """
+        client = _FakeClient(stored_theme=None)
+        e2e_settings.change_status(client, _FakeApi(status='dnd'))
+        self.assertEqual(
+            client.clicks,
+            [L.BACK_TO_CHANNELS, L.CHANGE_STATUS, L.DND],
+            'presence is chosen on the rail footer, from the channel list')
+
+    def test_it_stays_put_when_the_footer_is_already_in_reach(self):
+        client = _FakeClient(
+            stored_theme=None, visible={L.CHANGE_STATUS})
+        e2e_settings.change_status(client, _FakeApi(status='dnd'))
+        self.assertEqual(client.clicks, [L.CHANGE_STATUS, L.DND])
 
     def test_fails_when_the_server_never_saw_the_change(self):
         # time.time is stubbed so the 20-second poll below is not real time.
