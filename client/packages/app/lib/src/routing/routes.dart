@@ -25,6 +25,9 @@ abstract final class Routes {
   static const adminDock = '/settings/dock';
   static const debugLog = '/settings/debug-log';
 
+  /// One module's manifest and lifecycle, drilled into from the Dock.
+  static String adminDockModule(String moduleId) => '$adminDock/$moduleId';
+
   /// The messages of one channel.
   static String channel(String id) => '/channels/$id';
 

@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// A module's full manifest, opened from [DockPane]: `GET
+/// A module's full manifest, drilled into from [DockPane]: `GET
 /// /space/dock/modules/{id}`, plus the install/enable/disable/uninstall
-/// actions - `docs/decisions/0021-modules-and-the-dock.md`'s lifecycle in one
-/// sheet.
+/// actions - `docs/decisions/0021-modules-and-the-dock.md`'s lifecycle on one
+/// screen.
 ///
 /// Everything a module will add is shown before an admin ever installs it:
 /// the permissions it registers into the role editor and the host
 /// capabilities it asks for, so approval happens with the whole picture in
 /// view rather than after the fact.
+///
+/// A routed screen rather than a sheet: the Dock is itself a modal, and a
+/// sheet opened from it stacked a second scrim and a second panel over the
+/// first. This is the same drill-down every other settings screen uses, so
+/// the way back is the app bar's own back arrow.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -21,28 +27,22 @@ import '../../providers/code_block_runner.dart';
 import '../../providers/slash_command.dart';
 import '../../providers/providers.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
+import '../settings_screen_scaffold.dart';
 import 'dock_module_view.dart';
 
-Future<void> showDockModuleSheet(BuildContext context, String moduleId) {
-  return showAppSheet<void>(
-    context,
-    scrolls: true,
-    builder: (context) => _DockModuleSheet(moduleId: moduleId),
-  );
-}
-
-class _DockModuleSheet extends ConsumerStatefulWidget {
-  const _DockModuleSheet({required this.moduleId});
+class DockModuleScreen extends ConsumerStatefulWidget {
+  const DockModuleScreen({super.key, required this.moduleId});
 
   final String moduleId;
 
   @override
-  ConsumerState<_DockModuleSheet> createState() => _DockModuleSheetState();
+  ConsumerState<DockModuleScreen> createState() => _DockModuleScreenState();
 }
 
-class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
-    with GuardedActionState<_DockModuleSheet> {
+class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
+    with GuardedActionState<DockModuleScreen> {
   bool _busy = false;
 
   Future<void> _install(api.DockManifest manifest) async {
@@ -103,7 +103,8 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
       ref.invalidate(codeBlockRunnerProvider);
       ref.invalidate(slashCommandProvider);
       ref.invalidate(appLaunchProvider);
-      if (mounted) Navigator.of(context).pop();
+      // Back to the list: this module's own screen no longer describes anything installed.
+      if (mounted) closeToDock(context);
     }
   }
 
@@ -115,34 +116,37 @@ class _DockModuleSheetState extends ConsumerState<_DockModuleSheet>
         .valueOrNull
         ?.installedFor(widget.moduleId);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        AppSpacing.s16,
-        AppSpacing.s16,
-        MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
-      ),
-      child: SingleChildScrollView(
-        child: AppAsyncView<api.DockManifest>(
-          value: AppAsyncState(
-            data: manifest.valueOrNull,
-            error: manifest.error,
-          ),
-          center: false,
-          errorMessage: 'Could not load this module.',
-          onRetry: () => ref.invalidate(dockManifestProvider(widget.moduleId)),
-          data: (context, m) => DockManifestView(
-            manifest: m,
-            installed: installed,
-            busy: _busy,
-            error: actionError,
-            onErrorDismiss: clearActionError,
-            onInstall: () => _install(m),
-            onSetEnabled: (v) => _setEnabled(m.name, v),
-            onUninstall: () => _uninstall(m.name),
-          ),
+    return SettingsScreenScaffold(
+      title: manifest.valueOrNull?.name ?? 'Module',
+      backTooltip: 'Back to the Dock',
+      backFallback: Routes.adminDock,
+      child: AppAsyncView<api.DockManifest>(
+        value: AppAsyncState(data: manifest.valueOrNull, error: manifest.error),
+        center: false,
+        errorMessage: 'Could not load this module.',
+        onRetry: () => ref.invalidate(dockManifestProvider(widget.moduleId)),
+        data: (context, m) => DockManifestView(
+          manifest: m,
+          installed: installed,
+          busy: _busy,
+          error: actionError,
+          onErrorDismiss: clearActionError,
+          onInstall: () => _install(m),
+          onSetEnabled: (v) => _setEnabled(m.name, v),
+          onUninstall: () => _uninstall(m.name),
         ),
       ),
     );
+  }
+}
+
+/// Leaves a module's screen for the list it was opened from, falling back to
+/// the Dock's own route when there is nothing to pop (a cold deep link).
+void closeToDock(BuildContext context) {
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) {
+    navigator.pop();
+  } else {
+    GoRouter.of(context).go(Routes.adminDock);
   }
 }
