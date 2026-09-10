@@ -18,6 +18,11 @@ import 'dock_what_it_adds.dart';
 /// A module's manifest, plus the lifecycle action appropriate to
 /// [installed]'s state: install when null, otherwise an enable/disable
 /// toggle and an uninstall button.
+///
+/// No title row of its own. This was a sheet once and carried a header with
+/// the module's name and a Close button; as a routed screen the app bar
+/// already names the module and already has a back arrow, so the header was
+/// the module's name printed twice under two ways out.
 class DockManifestView extends StatelessWidget {
   const DockManifestView({
     super.key,
@@ -29,6 +34,7 @@ class DockManifestView extends StatelessWidget {
     required this.onInstall,
     required this.onSetEnabled,
     required this.onUninstall,
+    required this.onChooseAccess,
   });
 
   final api.DockManifest manifest;
@@ -40,6 +46,10 @@ class DockManifestView extends StatelessWidget {
   final ValueChanged<bool> onSetEnabled;
   final VoidCallback onUninstall;
 
+  /// Opens the who-can-use-this sheet. Present whether or not the module is
+  /// installed; the action card only offers it once it is.
+  final VoidCallback onChooseAccess;
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -47,28 +57,7 @@ class DockManifestView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(AppIcons.dock, color: tokens.textSecondary),
-            const SizedBox(width: AppSpacing.s8),
-            Expanded(
-              child: Text(
-                manifest.name,
-                style: AppText.heading.copyWith(
-                  color: tokens.textPrimary,
-                  fontWeight: AppWeights.semi,
-                ),
-              ),
-            ),
-            // An explicit way out: the sheet's drag handle is easy to miss on a tall, scrolling module view.
-            IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: Icon(AppIcons.dismiss, color: tokens.textSecondary),
-              tooltip: 'Close',
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.s4),
+        // No title row: the app bar already names the module; see this class's doc.
         Text(
           manifest.author == null
               ? 'v${manifest.version}'
@@ -96,6 +85,7 @@ class DockManifestView extends StatelessWidget {
           onInstall: onInstall,
           onSetEnabled: onSetEnabled,
           onUninstall: onUninstall,
+          onChooseAccess: onChooseAccess,
         ),
         if (error != null) ...[
           const SizedBox(height: AppSpacing.s8),
@@ -240,6 +230,7 @@ class _ActionsCard extends StatelessWidget {
     required this.onInstall,
     required this.onSetEnabled,
     required this.onUninstall,
+    required this.onChooseAccess,
   });
 
   final api.DockManifest manifest;
@@ -248,6 +239,10 @@ class _ActionsCard extends StatelessWidget {
   final VoidCallback onInstall;
   final ValueChanged<bool> onSetEnabled;
   final VoidCallback onUninstall;
+
+  /// Opens the who-can-use-this sheet. Present whether or not the module is
+  /// installed; the action card only offers it once it is.
+  final VoidCallback onChooseAccess;
 
   @override
   Widget build(BuildContext context) {
@@ -279,6 +274,17 @@ class _ActionsCard extends StatelessWidget {
             ),
           ],
         ),
+        if (manifest.permissions.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s12),
+          // Installed grants nothing, so this is the step to it appearing at all.
+          AppButton(
+            label: 'Choose who can use this',
+            variant: AppButtonVariant.secondary,
+            full: true,
+            disabled: busy,
+            onPressed: onChooseAccess,
+          ),
+        ],
         const SizedBox(height: AppSpacing.s12),
         AppButton(
           label: 'Uninstall',
