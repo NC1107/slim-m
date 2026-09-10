@@ -18,6 +18,7 @@ import '../screens/admin/categories_screen.dart';
 import 'package:slimm_data/data.dart' show Channel;
 
 import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/dock_module_screen.dart';
 import '../screens/admin/dock_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
@@ -176,6 +177,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.adminDock,
         pageBuilder: (context, state) => modalPage(context, const DockScreen()),
+      ),
+      GoRoute(
+        path: '${Routes.adminDock}/:moduleId',
+        pageBuilder: (context, state) => modalPage(
+          context,
+          DockModuleScreen(moduleId: state.pathParameters['moduleId']!),
+        ),
       ),
       GoRoute(
         path: Routes.debugLog,

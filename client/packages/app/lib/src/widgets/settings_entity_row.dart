@@ -33,8 +33,8 @@ import 'package:slimm_design_system/design_system.dart';
 /// line and a role grant - four pieces over three lines - so it needs a row
 /// that grows. The two are siblings rather than variants.
 ///
-/// The row carries [AppListRow]'s hover tint even though the row itself takes
-/// no tap: its actions do, and a pointer sweeping a list of these otherwise
+/// The row carries [AppListRow]'s hover tint whether or not it takes a tap of
+/// its own: its actions do, and a pointer sweeping a list of these otherwise
 /// reads the whole card as one inert slab. `surfaceSunken`, not
 /// `surfaceRaised`, because these rows sit inside a card already painted
 /// raised - the same choice [AppMenuItem] makes inside a floating menu.
@@ -47,10 +47,22 @@ class SettingsEntityRow extends StatefulWidget {
     this.leading,
     this.details = const [],
     this.actions = const [],
+    this.onTap,
+    this.onTapSemanticLabel,
     this.error,
     this.onErrorRetry,
     this.onErrorDismiss,
   });
+
+  /// Opens whatever the row is about, from anywhere on the row rather than
+  /// from one small control at its right edge. A row whose only way in was a
+  /// chevron gave a pointer a 30px target and a finger no hint that the rest
+  /// of the row was inert.
+  final VoidCallback? onTap;
+
+  /// What activating the row does, for a screen reader. Defaults to the
+  /// headline, which is what the row is about.
+  final String? onTapSemanticLabel;
 
   /// The one thing this row is about: a role's name, an invite's code.
   final String headline;
@@ -163,7 +175,9 @@ class _SettingsEntityRowState extends State<SettingsEntityRow> {
       ),
     );
 
+    final onTap = widget.onTap;
     return MouseRegion(
+      cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
@@ -173,7 +187,17 @@ class _SettingsEntityRowState extends State<SettingsEntityRow> {
           color: _hovered ? tokens.surfaceSunken : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
-        child: body,
+        child: onTap == null
+            ? body
+            : Semantics(
+                button: true,
+                label: widget.onTapSemanticLabel ?? widget.headline,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTap,
+                  child: body,
+                ),
+              ),
       ),
     );
   }

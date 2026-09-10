@@ -10,11 +10,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/screens/admin/dock_module_screen.dart';
 import 'package:slimm_app/src/screens/admin/dock_screen.dart';
+import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
@@ -98,13 +101,35 @@ ProviderContainer _containerFor(MockClient client) {
   return container;
 }
 
+/// The Dock and one module's screen on a real router, since opening a module
+/// is a drill-down now rather than a sheet: the row navigates, and the way
+/// back is the screen's own app bar.
 Widget _app(ProviderContainer container) => UncontrolledProviderScope(
   container: container,
-  child: MaterialApp(
+  child: MaterialApp.router(
     theme: buildTheme(Brightness.dark, AppTokens.dark),
-    home: const Scaffold(body: DockScreen()),
+    routerConfig: GoRouter(
+      initialLocation: Routes.adminDock,
+      routes: [
+        GoRoute(
+          path: Routes.adminDock,
+          builder: (context, state) => const DockScreen(),
+        ),
+        GoRoute(
+          path: '${Routes.adminDock}/:moduleId',
+          builder: (context, state) =>
+              DockModuleScreen(moduleId: state.pathParameters['moduleId']!),
+        ),
+      ],
+    ),
   ),
 );
+
+/// Opens the only module on screen the way a person does: anywhere on its row.
+Future<void> _openModule(WidgetTester tester, String name) async {
+  await tester.tap(find.text(name));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets('browsing lists a module with its version, summary and state', (
@@ -166,9 +191,7 @@ void main() {
     await tester.pumpWidget(_app(container));
     await tester.pumpAndSettle();
 
-    // The only row on screen, so its "view" action is the only chevron.
-    await tester.tap(find.byIcon(AppIcons.chevronRight));
-    await tester.pumpAndSettle();
+    await _openModule(tester, 'Code Blocks');
 
     // Before install, its manifest shows the permission it adds and the capability it asks for.
     expect(find.text('Execute code blocks'), findsOneWidget);
@@ -231,8 +254,7 @@ void main() {
       await tester.pumpWidget(_app(container));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(AppIcons.chevronRight));
-      await tester.pumpAndSettle();
+      await _openModule(tester, 'Code Blocks');
 
       expect(find.text('Runs a snippet.'), findsOneWidget);
 
@@ -288,8 +310,7 @@ void main() {
       await tester.pumpWidget(_app(container));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(AppIcons.chevronRight));
-      await tester.pumpAndSettle();
+      await _openModule(tester, 'Code Blocks');
 
       await tester.ensureVisible(find.byType(TextField));
       await tester.enterText(find.byType(TextField), 'console.log(1)');
@@ -339,8 +360,7 @@ void main() {
       await tester.pumpWidget(_app(container));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(AppIcons.chevronRight));
-      await tester.pumpAndSettle();
+      await _openModule(tester, 'Code Blocks');
 
       expect(find.text('Runs a snippet.'), findsNothing);
       expect(find.byType(TextField), findsNothing);
