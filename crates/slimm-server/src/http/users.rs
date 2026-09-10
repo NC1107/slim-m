@@ -413,6 +413,8 @@ async fn upload_avatar(
         .set_avatar_updated(ctx.user_id)
         .await?
         .ok_or(ApiError::Unauthorized)?;
+    // Announced like a rename: a client's avatar cache is keyed by `avatar_updated_at`, so with no event every other client draws the old picture until it restarts.
+    state.hub.publish(Event::ProfileChanged(ctx.user_id));
     Ok(Json(to_dto(&state.store, user).await?))
 }
 
@@ -427,6 +429,8 @@ async fn delete_avatar(
     if let Err(err) = state.media.delete_avatar(&ctx.user_id.to_string()).await {
         tracing::warn!(error = %err, "failed to delete a cleared avatar file");
     }
+    // Announced like an upload: removing a picture is as much a profile change as setting one.
+    state.hub.publish(Event::ProfileChanged(ctx.user_id));
     Ok(StatusCode::NO_CONTENT)
 }
 
