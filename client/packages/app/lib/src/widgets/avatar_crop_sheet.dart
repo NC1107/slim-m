@@ -67,6 +67,14 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
   /// detail a box filter keeps. `avatar_crop_sharpness_test.dart` measures both
   /// paths against an ideal resample of the same source: capturing small landed
   /// at 86% of it, capturing large and minifying lands on it.
+  ///
+  /// Both buttons are disabled while this runs, so a throw anywhere in the
+  /// raster-and-encode path used to leave the sheet on "Working..." with no way
+  /// out and an unhandled async error behind it. It pops with nothing instead,
+  /// which reads to the caller exactly like a cancel - the picture is still on
+  /// disk and the whole step is repeatable. A reduction that fails separately
+  /// falls back to the captured bytes, which are a correct picture, just the
+  /// softer one this change exists to improve on.
   Future<void> _confirm() async {
     setState(() => _busy = true);
     final object = _boundary.currentContext?.findRenderObject();
@@ -74,18 +82,33 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
       if (mounted) Navigator.of(context).pop();
       return;
     }
+    Uint8List? out;
+    try {
+      out = await _capture(object);
+    } catch (_) {
+      // Raster and encode are the one unrecoverable step here; see the doc.
+      out = null;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop(out);
+  }
+
+  /// Rasters [object] at [_captureEdge] and reduces it to the output size.
+  Future<Uint8List?> _capture(RenderRepaintBoundary object) async {
     final captureEdge = await _captureEdge();
     final image = await object.toImage(
       pixelRatio: captureEdge / object.size.width,
     );
-    final captured = await image.toByteData(format: ui.ImageByteFormat.png);
-    image.dispose();
+    final ByteData? captured;
+    try {
+      captured = await image.toByteData(format: ui.ImageByteFormat.png);
+    } finally {
+      image.dispose();
+    }
     final bytes = captured?.buffer.asUint8List();
-    final out = bytes == null || captureEdge == _outputEdge
-        ? bytes
-        : await _minified(bytes);
-    if (!mounted) return;
-    Navigator.of(context).pop(out);
+    if (bytes == null || captureEdge == _outputEdge) return bytes;
+    // A failed reduction still has a correct, merely softer picture in hand.
+    return await _minified(bytes) ?? bytes;
   }
 
   /// The edge to raster the viewport at: the source's own shorter side, which
