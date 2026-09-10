@@ -216,6 +216,13 @@ abstract final class AppIcons {
   static const IconData appearance = LucideIcons.palette300;
   static const IconData devices = LucideIcons.monitorSmartphone300;
 
+  /// One signed-in device, drawn as the kind of thing it is. A list of
+  /// sessions is read to spot the one you do not recognise, and three
+  /// identical glyphs make every row look the same at a glance.
+  static const IconData devicePhone = LucideIcons.smartphone300;
+  static const IconData deviceLaptop = LucideIcons.laptop300;
+  static const IconData deviceDesktop = LucideIcons.monitor300;
+
   /// The settings avatar's "tap to change" badge. Distinct from [camera]
   /// above, which is a video camera for call controls; this is a still one.
   static const IconData avatarCamera = LucideIcons.camera300;
