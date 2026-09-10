@@ -44,6 +44,23 @@ on:
       - "packaging/**"
       - "!client/CHANGELOG.md"
       - "!client/pubspec.yaml"
+  # By hand, for the one thing a push cannot recover from: a run cancelled by a
+  # later push, where that later push changed nothing this side builds. See
+  # docs/ci.md's concurrency section for the day that happened.
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Build and publish the server image"
+        type: boolean
+        default: true
+      client:
+        description: "Build the client (TestFlight, COPR, Android artifact)"
+        type: boolean
+        default: false
+      packaging:
+        description: "Rebuild the rpm and its tarball"
+        type: boolean
+        default: false
 
 # Minimal default; each job widens to exactly what it needs.
 permissions:
@@ -59,9 +76,9 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      client: ${{ steps.filter.outputs.client }}
-      server: ${{ steps.filter.outputs.server }}
-      packaging: ${{ steps.filter.outputs.packaging }}
+      client: ${{ steps.filter.outputs.client == 'true' || inputs.client }}
+      server: ${{ steps.filter.outputs.server == 'true' || inputs.server }}
+      packaging: ${{ steps.filter.outputs.packaging == 'true' || inputs.packaging }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Include patterns only. This action defaults to predicate-quantifier
@@ -82,8 +99,12 @@ jobs:
       # alone, so the run did nothing at all - confirmed against the real
       # run for #964, which touched only the flatpak manifest and skipped
       # every job. See docs/ci.md.
+      # Push only: a manual run has no push range to diff, and its three inputs
+      # say what to build outright. An unset output is an empty string, which
+      # the `== 'true' ||` above folds into the input cleanly.
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
+        if: github.event_name == 'push'
         with:
           filters: |
             client:
