@@ -196,7 +196,8 @@ Your copy is in the server's own log, printed once at every start:
 docker compose logs server | grep "server identity"
 ```
 
-It reads `fingerprint="dead beef cafe babe feed face 1337 d00d"`, the same eight groups in the same order the joiner sees.
+The line reads `server identity; a joining client shows this code, so confirm it matches fingerprint=dead beef cafe babe feed face 1337 d00d` - the same eight groups in the same order the joiner sees, unquoted.
+Grep for `server identity` rather than for `fingerprint`: the field name and its `=` are separated by terminal colour codes, so a grep for `fingerprint=` matches nothing even though the line is right there.
 Read it back to them over something neither of you is worried about: in person, or a call you placed.
 Not the connection they are asking about, and not a message that arrived through it - an attacker sitting in the middle of that connection can rewrite both halves of the conversation.
 
