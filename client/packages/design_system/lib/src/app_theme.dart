@@ -97,6 +97,15 @@ WidgetStateProperty<BorderSide?> _focusRingSide(AppTokens tokens) =>
 /// were measurably two different accents. Pinning both makes any raw
 /// `colorScheme.primary` or `.error` correct by construction rather than by
 /// every call site remembering.
+///
+/// `bottomSheetTheme` is pinned for the same reason, found the same way. A
+/// sheet is a raised surface like every other panel here, but left to Material
+/// it painted its own generated `surfaceContainerLow` instead of the palette's
+/// `surfaceRaised`. `showAppSheet` renders a dialog on a desktop and a bottom
+/// sheet on a phone, and only the dialog passed a colour, so the same sheet
+/// with the same content was a different colour on the two shapes, and the
+/// strip a bottom sheet reserves for the home indicator read as a seam under
+/// its last row. `sheet_surface_test.dart` is the regression guard.
 ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
   // Overridden, never left to fromSeed; see this function's own doc comment.
   final scheme = ColorScheme.fromSeed(
@@ -126,6 +135,14 @@ ThemeData buildTheme(Brightness brightness, AppTokens tokens) {
     fontFamilyFallback: AppFonts.emoji,
     extensions: [tokens],
     dividerTheme: DividerThemeData(color: tokens.borderSubtle, space: 1),
+    // A sheet is a raised surface like every other panel; see this function's doc.
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: tokens.surfaceRaised,
+      surfaceTintColor: Colors.transparent,
+      dragHandleColor: tokens.borderStrong,
+      elevation: 0,
+      modalElevation: 0,
+    ),
     textTheme: TextTheme(
       headlineSmall: AppText.title.copyWith(color: tokens.textPrimary),
       titleLarge: AppText.heading.copyWith(
