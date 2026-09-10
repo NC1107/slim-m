@@ -30,7 +30,7 @@ Each section below is named for its workflow file.
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
-| `main-builds` | changes under `client/`, `crates/` or `packaging/` on every push to `main`, excluding a release commit's own files | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
+| `main-builds` | changes under `client/`, `crates/` or `packaging/` on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | continuous TestFlight, a Fedora COPR snapshot, an Android artifact, and `latest` on the live server image; never a version bump, changelog or GitHub Release |
 | `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
 
 ## Keeping this table honest
@@ -746,7 +746,21 @@ It is still the right default for this workflow rather than an oversight: an own
 ### Concurrency, and why it is the opposite of `release.yml`
 
 `release.yml` sets `cancel-in-progress: false`, because a half-published release is worse than a queued one.
-This workflow sets it `true`, because a continuous build carries no such asymmetry: a newer commit's build simply supersedes an older one's, so cancelling the older run in favour of the newer one loses nothing worth keeping.
+This workflow sets it `true`, on the reasoning that a continuous build carries no such asymmetry: a newer commit's build supersedes an older one's, so cancelling the older run in favour of the newer one loses nothing worth keeping.
+
+**That reasoning has one hole, and it cost a day's worth of undeployed server fixes on 2026-09-10.**
+A newer run only supersedes an older one for the sides its own `changes` filter turns on.
+If the cancelled run was the only one whose filter said `server: true`, and the push that cancelled it touched `client/**` alone, then `server-image` is cancelled in the first run and *skipped* in the second, and no image is ever published.
+Nothing reports this: both runs end green, because a skipped job is a successful run.
+
+Measured, not reasoned: `fad3339d` (a server fix to the avatar change event) had `server-image` cancelled by the next merge, and every main-builds run after it that day - `483d5fa`, `be39c5e`, `57f2e5e`, `92dd49a`, `cf109c1`, `baf2b58` - reported `server-image: skipped`.
+GHCR's `latest` still pointed at `sha-f6dab94a` from 03:15Z, and the live instance was running a 16-hour-old container with two merged server changes missing from it.
+Re-running the cancelled job alone does not recover it either: `server-image` needs `changes`, and in a cancelled run that dependency has no output, so the rerun skips as well.
+
+`workflow_dispatch` above is the recovery path: three booleans, one per side, ORed into the filter's own outputs so a manual run builds exactly what is asked for and a push behaves exactly as before.
+It is a lever, not a fix - the silent loss can still happen, and the next push of any kind still will not pick it up.
+The structural fix is to stop deciding the server side from the push's own diff: compare against the commit the registry's `latest` actually holds, so the question becomes "has the server changed since what is deployed", which is the question this job exists to answer.
+That is queued rather than done here, because it trades a registry lookup on every run and wants the owner's call on cost.
 
 ## flatpak-ci
 
