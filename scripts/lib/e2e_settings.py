@@ -62,13 +62,18 @@ def change_status(client, api):
     their stored preference, so this also depends on the browser client's own
     WebSocket staying up; the poll below only absorbs a reconnect, not an
     account that dropped its last connection.
+
+    Driven from the rail footer, which is where this choice is made. Personal
+    settings carried a duplicate of it until 2026-09-10 and no longer does, so
+    this leaves settings first - the scenario before it ends up inside them.
     """
-    _open_personal(client)
-    client.click(L.ACCOUNT_PANE, settle=2)
-    client.click(L.STATUS, settle=2)
-    client.wait_for('Do not disturb')
-    client.click('Do not disturb', settle=3)
-    client.wait_for('Status, currently Do not disturb')
+    if not client.find(L.CHANGE_STATUS):
+        client.click(L.BACK_TO_CHANNELS, settle=3)
+    client.click(L.CHANGE_STATUS, settle=2)
+    client.wait_for(L.DND)
+    client.click(L.DND, settle=3)
+    # The footer's own line, lowercased; see presenceDisplayOf.
+    client.wait_for('do not disturb')
 
     me_id = api.me()['id']
     deadline = time.time() + 20

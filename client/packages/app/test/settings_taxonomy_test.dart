@@ -21,7 +21,7 @@ import 'settings_harness.dart';
 
 /// Every nav entry the personal screen offers, and the group it sits under.
 const List<(String?, String)> _panes = [
-  ('You', 'Account & presence'),
+  ('You', 'Account & profile'),
   ('You', 'Appearance'),
   ('You', 'Notifications'),
   ('You', 'Voice & screen share'),
@@ -121,7 +121,7 @@ void main() {
   testWidgets('the delete warning survives, above the action', (tester) async {
     useTallViewport(tester);
     await pumpPersonalSettings(tester, 0, scrollToBottom: false);
-    await tester.tap(find.text('Account & presence'));
+    await tester.tap(find.text('Account & profile'));
     await tester.pumpAndSettle();
 
     expect(

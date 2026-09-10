@@ -28,7 +28,7 @@
 /// `settings_taxonomy_test.dart` holds as a rule rather than a habit.
 ///
 /// `Delete account` moved with it, out of the pane labelled `About slim-m`
-/// and into `Account & presence`. It is permanent and irreversible, and it
+/// and into `Account & profile`. It is permanent and irreversible, and it
 /// was reached by opening a pane whose name promises a version number. About
 /// is the app's own build information now and nothing else.
 ///
@@ -71,14 +71,11 @@ class PersonalSettingsScreen extends StatelessWidget {
           panes: [
             SettingsPane(
               id: 'account',
-              label: 'Account & presence',
+              label: 'Account & profile',
               icon: AppIcons.account,
+              // No presence rows: the rail footer's own status menu already sets both the state and the status text.
               builder: (context) => const Column(
-                children: [
-                  AvatarSettingsSection(),
-                  PresenceSection(),
-                  AccountSection(),
-                ],
+                children: [AvatarSettingsSection(), AccountSection()],
               ),
             ),
             SettingsPane(

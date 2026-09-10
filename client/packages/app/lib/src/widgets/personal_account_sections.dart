@@ -72,6 +72,35 @@ class DevicesSection extends ConsumerWidget {
 
 /// One signed-in device, with its own "sign out" failure: a revoke that
 /// cannot reach the server must say so on the row it was for, not vanish.
+/// The kind of thing a device is, guessed from the name it registered with
+/// ("iOS (localhost)", "Linux (fedora)", "desktop").
+///
+/// A guess, deliberately: the name is a free string the client picks at
+/// sign-in, and the server stores no platform of its own. Getting it wrong
+/// costs a slightly wrong glyph, and getting it right is what makes a list of
+/// sessions scannable for the one you do not recognise.
+IconData deviceIcon(String name) {
+  final lower = name.toLowerCase();
+  const phones = ['ios', 'iphone', 'ipad', 'android', 'phone', 'mobile'];
+  const laptops = ['macbook', 'laptop', 'linux', 'fedora', 'ubuntu', 'debian'];
+  if (phones.any(lower.contains)) return AppIcons.devicePhone;
+  if (laptops.any(lower.contains)) return AppIcons.deviceLaptop;
+  return AppIcons.deviceDesktop;
+}
+
+/// When a device was last seen, as a phrase rather than "Signed in" - which
+/// every row said, about every device, and so told a reader nothing.
+String lastUsed(int? lastSeenAt) {
+  if (lastSeenAt == null) return 'Signed in';
+  final delta = DateTime.now().millisecondsSinceEpoch - lastSeenAt;
+  if (delta < 60 * 1000) return 'Active now';
+  if (delta < 60 * 60 * 1000) return 'Last used ${delta ~/ (60 * 1000)}m ago';
+  if (delta < 24 * 60 * 60 * 1000) {
+    return 'Last used ${delta ~/ (60 * 60 * 1000)}h ago';
+  }
+  return 'Last used ${delta ~/ (24 * 60 * 60 * 1000)}d ago';
+}
+
 class _DeviceRow extends ConsumerStatefulWidget {
   const _DeviceRow({super.key, required this.device});
 
@@ -104,9 +133,9 @@ class _DeviceRowState extends ConsumerState<_DeviceRow>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppListRow(
-          leading: const Icon(AppIcons.account),
+          leading: Icon(deviceIcon(device.name)),
           label: device.name,
-          meta: device.isCurrent ? 'This device' : 'Signed in',
+          meta: device.isCurrent ? 'This device' : lastUsed(device.lastSeenAt),
           trailing: device.isCurrent
               ? null
               : AppButton(

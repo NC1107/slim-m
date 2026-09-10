@@ -22,6 +22,11 @@ void closeScreen(BuildContext context, String fallback) {
 /// Eight screens carried the identical five-line `IconButton` around this
 /// call; naming it once means a change to the back affordance is one edit,
 /// and no screen can drift into a different glyph or a missing tooltip.
+///
+/// [AppIconButton] rather than Material's own: a raw `IconButton` in an app
+/// bar draws Material's circular hover overlay, which is far larger than the
+/// glyph and than every other control in this app, and read as a grey disc
+/// swallowing the arrow on desktop.
 class BackToButton extends StatelessWidget {
   const BackToButton({
     super.key,
@@ -37,9 +42,13 @@ class BackToButton extends StatelessWidget {
   final String fallback;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    icon: const Icon(AppIcons.back),
-    tooltip: tooltip,
-    onPressed: () => closeScreen(context, fallback),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+    child: AppIconButton(
+      icon: AppIcons.back,
+      semanticLabel: tooltip,
+      tooltip: tooltip,
+      onPressed: () => closeScreen(context, fallback),
+    ),
   );
 }
