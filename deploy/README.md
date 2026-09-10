@@ -185,6 +185,28 @@ It answers Prometheus text exposition format with:
 - `slimm_livekit_configured` - whether this deployment has an SFU configured at all.
 - `slimm_livekit_reachable` - whether the configured SFU answered the server's own last reachability probe. Present only when `slimm_livekit_configured` is `1`; a text-only deployment has nothing to be unreachable, so this line is absent rather than a misleading `0`. This is the same class of gap the `livekit` `HEALTHCHECK` above closes, from the server's point of view rather than Docker's - useful when the server and the SFU are not on the same host, or the SFU is not something this compose file runs at all.
 
+## Your server's identity code, and the question a joiner will ask you
+
+The first time someone connects to an address this app has never seen, the client shows them eight groups of hex and asks them to confirm it with whoever runs the server.
+That is you, and the code they are reading is yours.
+
+Your copy is in the server's own log, printed once at every start:
+
+```bash
+docker compose logs server | grep "server identity"
+```
+
+It reads `fingerprint="dead beef cafe babe feed face 1337 d00d"`, the same eight groups in the same order the joiner sees.
+Read it back to them over something neither of you is worried about: in person, or a call you placed.
+Not the connection they are asking about, and not a message that arrived through it - an attacker sitting in the middle of that connection can rewrite both halves of the conversation.
+
+It is public information by construction.
+Every client that connects is handed the key this is derived from, so there is nothing to protect here: the only thing that matters is that the copy reaching the joiner did not travel through the connection they are checking.
+
+The code is stable for the life of the deployment, and it changes only if the identity row in the database is lost or replaced - restoring an older backup that predates it, say, or starting over with a fresh database on the same address.
+When that happens every client that already pinned the old one refuses to continue until a human acknowledges the change, which is the alarm working, not a bug.
+Tell your members before you do anything that would cause it.
+
 ## Custom emoji, and importing them in bulk
 
 **slim-m ships no emoji of its own.**

@@ -11,7 +11,6 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
-import '../api_failure.dart';
 import '../default_server.dart';
 import '../providers/providers.dart';
 import '../providers/push_controller.dart';
@@ -21,6 +20,7 @@ import '../server_scheme_policy.dart';
 import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 import '../widgets/server_notice.dart';
+import 'sign_in_error.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -33,6 +33,13 @@ import '../widgets/server_notice.dart';
 /// password, nothing else. It also opens straight on creating an account,
 /// for the same reason an invite does: that button means there is no
 /// account here yet.
+///
+/// Collapsed is not silent about the destination. The identity chip used to
+/// sit inside the branch that draws the address field, so the official-server
+/// path - the commonest way in, and the one that deliberately hides that
+/// field - named no server anywhere on screen. It is outside that branch now,
+/// with a quieter line standing in until the probe answers, so every state of
+/// this screen says where it is about to connect.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -60,12 +67,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _creatingAccount = false;
   bool _busy = false;
 
-  /// The current failure and the field it belongs to (error grammar 03: an
-  /// error lands on the thing that failed, with its content preserved).
-  /// [_ErrorField.form] is the fallback for failures no one field owns.
-  (_ErrorField, String)? _error;
+  /// The current failure and the field it belongs to; see [signInErrorFor].
+  (SignInErrorField, String)? _error;
 
-  String? _errorFor(_ErrorField field) =>
+  String? _errorFor(SignInErrorField field) =>
       _error?.$1 == field ? _error!.$2 : null;
 
   /// What the server in the field said about itself, or null while nothing is
@@ -188,14 +193,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  /// The host in the field, for naming the destination on screen. Falls back
+  /// to the raw text so a half-typed address still shows what it is rather
+  /// than going blank mid-keystroke.
+  String _host() {
+    final host = Uri.tryParse(_server.text.trim())?.host ?? '';
+    return host.isEmpty ? _server.text.trim() : host;
+  }
+
   void _onServerEdited(String _) {
-    // The old answer is about the old address the moment the field changes.
-    if (_probed != null) {
-      setState(() {
-        _probed = null;
-        _identityStatus = null;
-      });
-    }
+    // The old answer is about the old address the moment the field changes,
+    // and the line naming the destination is read off the field itself.
+    setState(() {
+      _probed = null;
+      _identityStatus = null;
+    });
     _probeDebounce?.cancel();
     _probeDebounce = Timer(const Duration(milliseconds: 600), _probeServer);
   }
@@ -221,12 +233,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   /// [confirmServerIdentity] means it, and binding the check here (rather
   /// than to the field being typed) is what makes a returning sign-in - not
   /// only the manual onboarding dialog - a place TOFU's comparison runs.
+  ///
+  /// A first connect to the compiled-in official address pins silently, for
+  /// the reason onboarding's own official button documents: there is no
+  /// separate operator to read a fingerprint to, so the question has no answer.
+  /// This door onto that address used to ask anyway. A key that later changes
+  /// is never silent either way, which is the case the check exists for.
   Future<void> _submit() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
       setState(
         () => _error = (
-          _ErrorField.server,
+          SignInErrorField.server,
           'That does not look like a server address.',
         ),
       );
@@ -234,7 +252,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
 
     if (requireSecureScheme(address) case final schemeError?) {
-      setState(() => _error = (_ErrorField.server, schemeError));
+      setState(() => _error = (SignInErrorField.server, schemeError));
       return;
     }
 
@@ -244,7 +262,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     });
 
     final reduced = reduceServerAddress(address);
-    if (!await confirmServerIdentity(context, ref, reduced)) {
+    // Silent for the compiled-in address; see this method's own doc.
+    if (!await confirmServerIdentity(
+      context,
+      ref,
+      reduced,
+      silentFirstConnect: isOfficialServer(reduced),
+    )) {
       if (mounted) setState(() => _busy = false);
       return;
     }
@@ -287,41 +311,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       unawaited(ref.read(pushControllerProvider.notifier).register());
     } on ApiException catch (e) {
       if (!mounted) return;
-      // Say what actually happened. "Something went wrong" tells the user
-      // nothing about whether to fix their password or wait.
-      setState(
-        () => _error = switch (e) {
-          UnauthorizedException() => (
-            _ErrorField.password,
-            'Wrong username or password.',
-          ),
-          ConflictException() => (
-            _ErrorField.username,
-            'That username is already taken.',
-          ),
-          BadRequestException(:final message) => (
-            _ErrorField.form,
-            sentenceCase(message),
-          ),
-          RateLimitedException() => (
-            _ErrorField.form,
-            'Too many attempts just now. Wait a moment and try again.',
-          ),
-          UnavailableException() => (
-            _ErrorField.form,
-            'The server is busy. Try again shortly.',
-          ),
-          TransportException() => (
-            _ErrorField.server,
-            "This Space didn't answer. It may be restarting, or the "
-                'address may be wrong. Nothing was sent.',
-          ),
-          _ => (
-            _ErrorField.form,
-            'The server refused that. ${sentenceCase(e.message)}',
-          ),
-        },
-      );
+      setState(() => _error = signInErrorFor(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -347,21 +337,28 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.s8),
-          if (_addressExpanded) ...[
-            // Only once it has answered; a typed address says nothing yet.
-            if (_probed case final version?)
-              ServerIdentityChip(
-                spaceName: version.name,
-                host: Uri.tryParse(_server.text)?.host ?? _server.text,
-                status: _identityStatus ?? ServerIdentityStatus.unknown,
+          // Where this is about to connect, on both branches; see the class doc.
+          if (_probed case final version?)
+            ServerIdentityChip(
+              spaceName: version.name,
+              host: _host(),
+              status: _identityStatus ?? ServerIdentityStatus.unknown,
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s16),
+              child: Text(
+                'Connecting to ${_host()}',
+                style: AppText.code.copyWith(color: tokens.textSecondary),
               ),
-            const SizedBox(height: AppSpacing.s8),
+            ),
+          if (_addressExpanded) ...[
             TextField(
               controller: _server,
               decoration: InputDecoration(
                 labelText: 'Server',
                 helperText: "The Space you're joining - its server address.",
-                errorText: _errorFor(_ErrorField.server),
+                errorText: _errorFor(SignInErrorField.server),
                 errorMaxLines: 3,
               ),
               keyboardType: TextInputType.url,
@@ -369,14 +366,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               onChanged: _onServerEdited,
             ),
             const SizedBox(height: AppSpacing.s8),
-          ] else
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => setState(() => _addressExpanded = true),
-                child: const Text('Use a different server'),
-              ),
-            ),
+          ],
           // First of the three: the other two are about convenience,
           // this one is about whether you have any recourse here.
           if (_probed case final version?) ServerSafetyNotice(version: version),
@@ -404,7 +394,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             controller: _username,
             decoration: InputDecoration(
               labelText: 'Username',
-              errorText: _errorFor(_ErrorField.username),
+              errorText: _errorFor(SignInErrorField.username),
             ),
             autocorrect: false,
             autofillHints: const [AutofillHints.username],
@@ -424,13 +414,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             controller: _password,
             decoration: InputDecoration(
               labelText: 'Password',
-              errorText: _errorFor(_ErrorField.password),
+              errorText: _errorFor(SignInErrorField.password),
             ),
             obscureText: true,
             autofillHints: const [AutofillHints.password],
             onSubmitted: (_) => _busy ? null : _submit(),
           ),
-          if (_errorFor(_ErrorField.form) case final formError?) ...[
+          if (_errorFor(SignInErrorField.form) case final formError?) ...[
             const SizedBox(height: AppSpacing.s16),
             Semantics(
               liveRegion: true,
@@ -473,6 +463,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   : 'Create an account instead',
             ),
           ),
+          // Grouped with the other way out: both change which server this is.
+          if (!_addressExpanded)
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() => _addressExpanded = true),
+              child: const Text('Use a different server'),
+            ),
           // Once a Space is remembered, sign-in is where a signed-out
           // user lands, so this is the only way back to invite redemption.
           TextButton(
@@ -484,6 +482,3 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     );
   }
 }
-
-/// Which part of the form a failure belongs to.
-enum _ErrorField { server, username, password, form }
