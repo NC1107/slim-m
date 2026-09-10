@@ -11,7 +11,7 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use slimm_server::hub::{Event, Hub};
 use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
@@ -90,6 +90,68 @@ fn png(padding: usize) -> Vec<u8> {
     let mut bytes = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     bytes.extend(std::iter::repeat_n(0u8, padding));
     bytes
+}
+
+/// Setting or clearing an avatar is announced, the same way a rename is.
+///
+/// A client caches avatar bytes under `(user_id, avatar_updated_at)`, so a
+/// picture that changes with no event leaves every other client holding the
+/// old key - and therefore the old face - until it restarts and refetches
+/// profiles from scratch. That is exactly what happened: `update_me`
+/// published `ProfileChanged` and the two avatar routes published nothing.
+#[tokio::test]
+async fn changing_an_avatar_announces_the_profile_change() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role("everyone", Permissions::VIEW_CHANNEL, true)
+        .await
+        .unwrap();
+    let (root, _media_guard) = support::TestDirGuard::new("slimm-avatars-event");
+    let media = Media::new(&root, 10 * 1024 * 1024).expect("create temp media directories");
+    let hub = Hub::new();
+    let mut events = hub.subscribe();
+    let app = http::router(AppState {
+        store: store.clone(),
+        auth: Auth::new(2).unwrap(),
+        hub: hub.clone(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media,
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
+        dock: slimm_server::http::dock::Dock::disabled(),
+    });
+    let token = register(&store, "alice").await;
+    let me = json_body(
+        app.clone()
+            .oneshot(request_plain("GET", "/me", &token))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let user_id = me["id"].as_str().unwrap().to_owned();
+
+    let uploaded = app
+        .clone()
+        .oneshot(request_bytes("POST", "/me/avatar", &token, png(8)))
+        .await
+        .unwrap();
+    assert_eq!(uploaded.status(), StatusCode::OK);
+    assert!(
+        matches!(events.try_recv(), Ok(Event::ProfileChanged(id)) if id.to_string() == user_id),
+        "an upload must announce the profile change"
+    );
+
+    let deleted = app
+        .oneshot(request_plain("DELETE", "/me/avatar", &token))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+    assert!(
+        matches!(events.try_recv(), Ok(Event::ProfileChanged(id)) if id.to_string() == user_id),
+        "clearing a picture is a profile change too"
+    );
 }
 
 #[tokio::test]
