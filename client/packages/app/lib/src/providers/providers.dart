@@ -18,6 +18,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'live_events.dart';
+
 /// The server the user picked, with null meaning one has never been picked on
 /// this install.
 ///
@@ -244,7 +246,15 @@ final meProvider = FutureProvider.autoDispose<Me>(
 );
 
 /// [meProvider]'s answer, holding the last one that actually resolved while
-/// the connection is down.
+/// the connection is down, and refetched when the caller edits their profile
+/// somewhere else.
+///
+/// [meProvider] is fetched once per session. Other people's profiles are kept
+/// current by `BatchProfilesController` and `MemberProfileOverridesController`,
+/// both watching `ProfileChanged`; nothing watched it for the caller, so a
+/// picture or name set on a phone left every other device drawing the old one
+/// until it restarted - an avatar is cached under `avatarUpdatedAt`, which
+/// only a refetch moves.
 ///
 /// Losing the network made this read as null, and a null `Me` is
 /// indistinguishable from a member holding no permissions at all - so the
@@ -279,6 +289,14 @@ class EffectiveMe extends Notifier<Me?> {
       _forUser = userId;
       _last = null;
     }
+    // Own-profile edits from another device; the two controllers that do this for other people's profiles never covered the caller's own. See this provider's doc.
+    final sub = ref.read(liveEventsProvider).listen((event) {
+      if (event is ProfileChanged && event.userId == userId) {
+        ref.invalidate(meProvider);
+      }
+    });
+    ref.onDispose(() => unawaited(sub.cancel()));
+
     final resolved = ref.watch(meProvider).valueOrNull;
     if (resolved != null && resolved.id == userId) _last = resolved;
     return _last;
