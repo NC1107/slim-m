@@ -127,6 +127,24 @@ Future<void> _settle(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('a picture smaller than the output still crops to 512', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // Under the output edge, so the reduction is skipped entirely.
+    late Uint8List source;
+    await tester.runAsync(() async => source = await _ringsPng(256));
+
+    final out = await _cropped(tester, source);
+    expect(out, isNotNull);
+    late ({double detail, int edge}) result;
+    await tester.runAsync(() async => result = await _measure(out!));
+    expect(result.edge, 512);
+  });
+
   // 2x, 4x and 8x the output edge: the range a picked photo actually spans.
   for (final sourceEdge in const [1024, 2048, 4096]) {
     testWidgets('a $sourceEdge source crops to all the detail 512px holds', (
