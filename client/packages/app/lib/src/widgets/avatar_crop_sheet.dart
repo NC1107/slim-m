@@ -18,6 +18,14 @@ import 'package:slimm_design_system/design_system.dart';
 /// cap as a side effect of doing the crop the user asked for.
 const int _outputEdge = 512;
 
+/// Ceiling on the intermediate capture, in pixels.
+///
+/// The capture is held in memory as raw pixels, so this is 64 MB at 4 bytes a
+/// pixel and the reason the source's own size does not set it. 4096 is already
+/// 8x the output edge, past which the minification below has nothing left to
+/// recover.
+const int _maxCaptureEdge = 4096;
+
 /// Shows [bytes] in a square viewport the user can pan and zoom, and returns
 /// the cropped PNG, or null if they backed out.
 Future<Uint8List?> showAvatarCropSheet(BuildContext context, Uint8List bytes) {
@@ -51,6 +59,14 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
   /// Captures the viewport rather than reading the pan and zoom back out of
   /// the transform: what is inside the square is exactly what was shown, with
   /// no second implementation of the same geometry to disagree with it.
+  ///
+  /// Captured at the source picture's own resolution and minified afterwards,
+  /// rather than rastered straight to [_outputEdge]. Rastering the viewport at
+  /// the output size samples the decoded photo bilinearly at whatever ratio the
+  /// crop happens to need - 6x for an ordinary phone picture - and throws away
+  /// detail a box filter keeps. `avatar_crop_sharpness_test.dart` measures both
+  /// paths against an ideal resample of the same source: capturing small landed
+  /// at 86% of it, capturing large and minifying lands on it.
   Future<void> _confirm() async {
     setState(() => _busy = true);
     final object = _boundary.currentContext?.findRenderObject();
@@ -58,12 +74,53 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
       if (mounted) Navigator.of(context).pop();
       return;
     }
-    final ratio = _outputEdge / object.size.width;
-    final image = await object.toImage(pixelRatio: ratio);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    final captureEdge = await _captureEdge();
+    final image = await object.toImage(
+      pixelRatio: captureEdge / object.size.width,
+    );
+    final captured = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
+    final bytes = captured?.buffer.asUint8List();
+    final out = bytes == null || captureEdge == _outputEdge
+        ? bytes
+        : await _minified(bytes);
     if (!mounted) return;
-    Navigator.of(context).pop(data?.buffer.asUint8List());
+    Navigator.of(context).pop(out);
+  }
+
+  /// The edge to raster the viewport at: the source's own shorter side, which
+  /// is what one viewport-width of it is worth at zoom 1, bounded below by the
+  /// output and above by [_maxCaptureEdge].
+  ///
+  /// Read from the encoded header rather than a decode, so a picture already
+  /// smaller than the output costs nothing to ask about.
+  Future<int> _captureEdge() async {
+    try {
+      final buffer = await ui.ImmutableBuffer.fromUint8List(widget.bytes);
+      final descriptor = await ui.ImageDescriptor.encoded(buffer);
+      final shorter = math.min(descriptor.width, descriptor.height);
+      descriptor.dispose();
+      return shorter.clamp(_outputEdge, _maxCaptureEdge);
+    } catch (_) {
+      // An unreadable header is the decoder's problem; the crop still happens.
+      return _outputEdge;
+    }
+  }
+
+  /// [png] resampled down to [_outputEdge] square by the image decoder, whose
+  /// own downscale is area-averaging rather than the bilinear tap a canvas
+  /// minification gets.
+  static Future<Uint8List?> _minified(Uint8List png) async {
+    final codec = await ui.instantiateImageCodec(
+      png,
+      targetWidth: _outputEdge,
+      targetHeight: _outputEdge,
+    );
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    return data?.buffer.asUint8List();
   }
 
   @override
