@@ -110,6 +110,96 @@ Future<void> _dragThrough(
 }
 
 void main() {
+  testWidgets('play survives the shared path echoing each step back', (
+    tester,
+  ) async {
+    // The shape a message-owned scene has: every action stores and broadcasts.
+    var gen = 0;
+    var latest = _scene(0);
+    final actions = <String>[];
+    late StateSetter rebuildHost;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setHostState) {
+              rebuildHost = setHostState;
+              return ModuleSceneView(
+                initial: parseModuleScene(latest)!,
+                runCommand: (input) async {
+                  actions.add(jsonDecode(input)['action'] as String);
+                  latest = _scene(++gen);
+                  // The broadcast lands on the row that owns this widget.
+                  rebuildHost(() {});
+                  return api.RunModuleCommandResult(ok: true, output: latest);
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Play'));
+    await tester.pump();
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 140));
+    }
+
+    expect(
+      actions.length,
+      greaterThan(3),
+      reason:
+          'the widget stopped its own timer when its own step came back: '
+          'played $actions',
+    );
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+  });
+
+  testWidgets('a run somebody else started still resets and stops', (
+    tester,
+  ) async {
+    // The other half of the guard: a state this view never produced is new.
+    var latest = _scene(0);
+    late StateSetter rebuildHost;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setHostState) {
+              rebuildHost = setHostState;
+              return ModuleSceneView(
+                initial: parseModuleScene(latest)!,
+                runCommand: (_) async =>
+                    api.RunModuleCommandResult(ok: true, output: latest),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Play'));
+    await tester.pump();
+    expect(find.bySemanticsLabel('Pause'), findsOneWidget);
+
+    // Nothing in flight, and a state this view has never seen.
+    latest = _scene(999);
+    rebuildHost(() {});
+    await tester.pump();
+
+    expect(
+      find.bySemanticsLabel('Play'),
+      findsOneWidget,
+      reason: 'a foreign run must stop the animation, not inherit it',
+    );
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+  });
+
   testWidgets('a drag paints every cell it crosses, in order', (tester) async {
     // Roughly 100px a cell, so the row-0 centres sit near 50, 150, 250, 350.
     final actions = await _actionsFrom(tester, (tester, origin) async {

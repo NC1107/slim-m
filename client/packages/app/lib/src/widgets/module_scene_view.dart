@@ -75,17 +75,60 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
   /// not toggle it back off. Cleared when the drag starts.
   final _paintedThisDrag = <String>{};
 
-  /// A genuinely new run (a re-Run of the block) carries a different seed
-  /// state; an unrelated rebuild carries the same one and must not reset an
-  /// animation already in progress, so the seed state is what decides.
+  /// The last few scene states this view produced itself.
+  ///
+  /// A scene that belongs to a message is shared: every action stores the new
+  /// output on the message and broadcasts it, so this widget's own step comes
+  /// straight back as a new [widget.initial]. Without this it read as somebody
+  /// starting a new run and stopped the very timer that had just produced it -
+  /// press play, watch exactly one generation, then nothing.
+  final _ownStates = <String>{};
+  static const _ownStateMemory = 8;
+
+  @override
+  void initState() {
+    super.initState();
+    _rememberOwn(widget.initial.state);
+  }
+
+  /// A genuinely new run - somebody re-Ran the block, or another viewer acted
+  /// on a shared scene - resets this view and stops any animation. This
+  /// widget's own work does not, even though on the shared path it arrives by
+  /// exactly the same route: see [_ownStates].
   @override
   void didUpdateWidget(ModuleSceneView old) {
     super.didUpdateWidget(old);
-    if (old.initial.state != widget.initial.state) {
-      _stop();
-      _queue.clear();
-      _paintedThisDrag.clear();
-      setState(() => _scene = widget.initial);
+    if (old.initial.state == widget.initial.state) return;
+    if (_isOwnWork(widget.initial.state)) {
+      _rememberOwn(widget.initial.state);
+      if (_scene.state != widget.initial.state) {
+        setState(() => _scene = widget.initial);
+      }
+      return;
+    }
+    _stop();
+    _queue.clear();
+    _paintedThisDrag.clear();
+    _rememberOwn(widget.initial.state);
+    setState(() => _scene = widget.initial);
+  }
+
+  /// Whether a scene arriving from above is this view's own, rather than a new
+  /// run to reset for.
+  ///
+  /// A call in flight or a queue still draining is the answer on its own: the
+  /// broadcast can beat this view's own response back, so the state would not
+  /// be in [_ownStates] yet even though it is ours.
+  bool _isOwnWork(String? state) =>
+      _busy ||
+      _queue.isNotEmpty ||
+      (state != null && _ownStates.contains(state));
+
+  void _rememberOwn(String? state) {
+    if (state == null) return;
+    _ownStates.add(state);
+    if (_ownStates.length > _ownStateMemory) {
+      _ownStates.remove(_ownStates.first);
     }
   }
 
@@ -109,6 +152,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       final next = result.ok && result.output != null
           ? parseModuleScene(result.output!)
           : null;
+      if (next != null) _rememberOwn(next.state);
       setState(() {
         _busy = false;
         if (next != null) {
