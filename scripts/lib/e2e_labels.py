@@ -29,8 +29,7 @@ THEME = "Theme"
 
 BACK_TO_CHANNELS = "Back to channels"
 
-# Presence lives on the rail footer, not in settings: it is the one choice with
-# a privacy consequence, so it is one tap from anywhere rather than four.
+# Presence lives on the rail footer now, not in settings.
 CHANGE_STATUS = "Change your status"
 DND = "Do not disturb"
 
