@@ -30,7 +30,6 @@ import '../../widgets/confirm_dialog.dart';
 import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
 import '../settings_screen_scaffold.dart';
-import 'dock_module_access_sheet.dart';
 import 'dock_module_view.dart';
 
 class DockModuleScreen extends ConsumerStatefulWidget {
@@ -59,9 +58,9 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     if (ok) {
       ref.invalidate(dockCatalogProvider);
       ref.invalidate(modulePermissionsProvider);
-      // Installed is not usable until somebody is granted it; see the sheet's doc.
+      // Installed is not usable until somebody is granted it; see that screen's doc.
       if (mounted && manifest.permissions.isNotEmpty) {
-        await showModuleAccessSheet(context, manifest);
+        context.go(Routes.adminDockModuleAccess(manifest.id));
       }
     }
   }
@@ -139,7 +138,7 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
           onInstall: () => _install(m),
           onSetEnabled: (v) => _setEnabled(m.name, v),
           onUninstall: () => _uninstall(m.name),
-          onChooseAccess: () => showModuleAccessSheet(context, m),
+          onChooseAccess: () => context.go(Routes.adminDockModuleAccess(m.id)),
         ),
       ),
     );

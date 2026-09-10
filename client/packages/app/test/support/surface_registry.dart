@@ -122,6 +122,19 @@ const snapshotSurfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/debug-log',
     viewports: [...phoneAndDesktop, ...compactBracket],
   ),
+  // The Dock's three levels; the third was a sheet over a modal until #1148.
+  'admin-dock': (
+    route: '/settings/dock',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
+  'admin-dock-module': (
+    route: '/settings/dock/code-exec',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
+  'admin-dock-module-access': (
+    route: '/settings/dock/code-exec/access',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
   // The stacked-header bug only ever showed past kCompactWidth; the compact bracket proves it stays clean there too.
   'thread': (
     route: '/thread/c-thread',
