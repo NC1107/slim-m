@@ -38,6 +38,26 @@ use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
+/// Prints this deployment's identity fingerprint where its operator can read
+/// it, in the same eight groups a joining client shows them.
+///
+/// Trust-on-first-use asks a joiner to confirm that code with whoever runs the
+/// server. Until this log line existed that was an unanswerable request: the
+/// fingerprint was derived inside `/version` and shown only to clients, so the
+/// one person being asked to vouch for it had no copy to compare. It is public
+/// information by construction - every client that connects is handed it - so
+/// logging it discloses nothing. Generating the keypair on the first call is
+/// also why this runs here: the line doubles as the record of when a
+/// deployment's identity was established.
+async fn log_server_identity(store: &store::Store) -> anyhow::Result<()> {
+    let identity = store.server_identity().await?;
+    tracing::info!(
+        fingerprint = %identity.fingerprint_groups().join(" "),
+        "server identity; a joining client shows this code, so confirm it matches"
+    );
+    Ok(())
+}
+
 /// Loads configuration, opens the embedded database (running migrations), and
 /// serves the HTTP surface until a shutdown signal.
 pub async fn run() -> anyhow::Result<()> {
@@ -49,6 +69,7 @@ pub async fn run() -> anyhow::Result<()> {
     let pool = db::connect(&config).await?;
 
     let store = store::Store::new(pool);
+    log_server_identity(&store).await?;
     sweeps::spawn_token_sweep(store.clone());
     let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?
         .with_total_ceiling(config.max_total_attachment_bytes);

@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -97,7 +98,14 @@ class FingerprintDisplay extends StatelessWidget {
 /// point an out-of-band check (the admin reading the code aloud) can catch an
 /// attacker already sitting on the connection. Pins the key and pops `true`
 /// once the caller confirms; pops `false` on cancel.
-class ServerFingerprintStep extends StatelessWidget {
+///
+/// Never shown for the compiled-in official server, where the app and the
+/// server come from one source and there is no separate operator to ask; both
+/// doors onto that address pin silently instead. A code this screen asks about
+/// is therefore always a server somebody else runs, which is what makes the
+/// instruction below a question that has an answer: that operator's own server
+/// prints the same eight groups when it starts.
+class ServerFingerprintStep extends StatefulWidget {
   const ServerFingerprintStep({
     super.key,
     required this.address,
@@ -108,8 +116,28 @@ class ServerFingerprintStep extends StatelessWidget {
   final api.ServerIdentity identity;
 
   @override
+  State<ServerFingerprintStep> createState() => _ServerFingerprintStepState();
+}
+
+class _ServerFingerprintStepState extends State<ServerFingerprintStep> {
+  bool _copied = false;
+
+  /// Copies the code as the same eight space-separated groups on screen, so
+  /// whoever receives it can compare it against their log line character for
+  /// character rather than reformatting it first.
+  Future<void> _copy() async {
+    await Clipboard.setData(
+      ClipboardData(text: widget.identity.fingerprintGroups.join(' ')),
+    );
+    if (!mounted) return;
+    setState(() => _copied = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final identity = widget.identity;
+    final address = widget.address;
 
     return Scaffold(
       body: Center(
@@ -140,15 +168,30 @@ class ServerFingerprintStep extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.s24),
                 FingerprintDisplay(identity: identity),
+                const SizedBox(height: AppSpacing.s16),
+                AppButton(
+                  label: _copied ? 'Copied' : 'Copy this code',
+                  variant: AppButtonVariant.secondary,
+                  full: true,
+                  icon: _copied ? AppIcons.check : AppIcons.copy,
+                  onPressed: _copy,
+                ),
                 const SizedBox(height: AppSpacing.s24),
+                Text(
+                  'Whoever runs ${address.host} sees the same eight groups in '
+                  'their server log when it starts. Ask them to read it back '
+                  'over something you already trust: in person, or a call you '
+                  'placed yourself. Not this connection, and not a message '
+                  'that arrived through it.',
+                  style: AppText.body.copyWith(color: tokens.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.s16),
                 const AppCallout(
                   tone: AppCalloutTone.warn,
                   child: Text(
                     'This only protects connections after this one: someone '
                     'already sitting on this connection could show you their '
-                    'own key just as convincingly. Read this code to '
-                    'whoever runs the server, or have them read it to you, '
-                    'and confirm it matches before continuing.',
+                    'own key just as convincingly.',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.s24),
