@@ -57,6 +57,24 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
   bool _playing = false;
   String? _error;
 
+  /// Actions waiting on the one in flight, oldest first.
+  ///
+  /// A module call is a round trip and only one runs at a time, so a drag
+  /// across a grid produces actions faster than they can be sent. Dropping the
+  /// ones that arrive while busy - which is what the [_busy] guard in [_send]
+  /// does on its own - would leave holes in a drawn line, so they queue here
+  /// and drain in order instead.
+  final _queue = <String>[];
+
+  /// Capped so a long drag on a fine grid cannot build a backlog the board
+  /// spends a minute catching up on. A dropped tail is better than a board
+  /// that keeps moving after the finger stops.
+  static const _maxQueue = 64;
+
+  /// Cells already sent during the current drag, so crossing one twice does
+  /// not toggle it back off. Cleared when the drag starts.
+  final _paintedThisDrag = <String>{};
+
   /// A genuinely new run (a re-Run of the block) carries a different seed
   /// state; an unrelated rebuild carries the same one and must not reset an
   /// animation already in progress, so the seed state is what decides.
@@ -65,6 +83,8 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     super.didUpdateWidget(old);
     if (old.initial.state != widget.initial.state) {
       _stop();
+      _queue.clear();
+      _paintedThisDrag.clear();
       setState(() => _scene = widget.initial);
     }
   }
@@ -111,7 +131,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
 
   void _togglePlay() {
     if (_playing) {
-      _stop();
+      _stopAndRepaint();
       return;
     }
     setState(() => _playing = true);
@@ -119,20 +139,89 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       if (!_busy && _scene.live) {
         _send('step');
       } else if (!_scene.live) {
-        _stop();
+        _stopAndRepaint();
       }
     });
   }
 
+  /// Cancels the timer and clears the flag, with no rebuild of its own: two of
+  /// the three callers are already inside a `setState`, and nesting one is an
+  /// error. [_stopAndRepaint] is the version for the callers that are not.
   void _stop() {
     _timer?.cancel();
     _timer = null;
-    if (_playing) _playing = false;
+    _playing = false;
+  }
+
+  /// Stops, and repaints the control that says so.
+  ///
+  /// Pressing pause used to call [_stop] directly, which left `_playing` false
+  /// while the button still drew a pause glyph and its active highlight. The
+  /// animation really had stopped, so the only feedback was the board going
+  /// still, and pressing the button again started it while the icon still said
+  /// pause - a control whose state was the opposite of what it showed.
+  void _stopAndRepaint() {
+    if (!mounted) {
+      _stop();
+      return;
+    }
+    setState(_stop);
+  }
+
+  /// Where the current gesture began, remembered because `onPanStart` reports
+  /// the point at which the drag was *recognised* rather than the point the
+  /// finger came down on. Those are a cell or two apart, so a line drawn by
+  /// dragging was missing the cell it started in until this was recorded here.
+  Offset? _downAt;
+
+  /// The raw pointer-down, not `onTapDown`: the tap recogniser is rejected
+  /// before its own deadline when a drag is quick, so `onTapDown` never fires
+  /// for exactly the gestures this needs to know the origin of.
+  void _handlePointerDown(PointerDownEvent event) {
+    _downAt = event.localPosition;
+    _paintedThisDrag.clear();
   }
 
   void _handleTapUp(TapUpDetails details, Size size) {
     final action = sceneTapAction(_scene, details.localPosition, size);
-    if (action != null) _send(action);
+    if (action != null) _enqueue(action);
+  }
+
+  /// Paints the cell the finger actually landed on, then the one the drag was
+  /// recognised in. The dedupe set makes the common case, where they are the
+  /// same cell, a single paint.
+  void _handlePanStart(DragStartDetails details, Size size) {
+    final down = _downAt;
+    if (down != null) _paintCell(down, size);
+    _paintCell(details.localPosition, size);
+  }
+
+  void _handlePanUpdate(DragUpdateDetails details, Size size) =>
+      _paintCell(details.localPosition, size);
+
+  /// Sends the cell under [local] once per drag. Ops that answer a bare action
+  /// rather than a cell (a button drawn into the scene) are ignored here: a
+  /// drag across one is not a press of it.
+  void _paintCell(Offset local, Size size) {
+    final action = sceneTapAction(_scene, local, size);
+    if (action == null || !action.contains(':')) return;
+    if (!_paintedThisDrag.add(action)) return;
+    _enqueue(action);
+  }
+
+  void _enqueue(String action) {
+    if (_queue.length >= _maxQueue) return;
+    _queue.add(action);
+    unawaited(_drain());
+  }
+
+  /// Sends queued actions one at a time. Re-entrant calls return immediately,
+  /// so the drain already running is the only one.
+  Future<void> _drain() async {
+    if (_busy || _queue.isEmpty) return;
+    while (_queue.isNotEmpty && mounted) {
+      await _send(_queue.removeAt(0));
+    }
   }
 
   @override
@@ -155,14 +244,19 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final size = constraints.biggest;
-                  return GestureDetector(
-                    onTapUp: (d) => _handleTapUp(d, size),
-                    child: CustomPaint(
-                      painter: ModuleScenePainter(
-                        scene: _scene,
-                        tokens: tokens,
+                  return Listener(
+                    onPointerDown: _handlePointerDown,
+                    child: GestureDetector(
+                      onTapUp: (d) => _handleTapUp(d, size),
+                      onPanStart: (d) => _handlePanStart(d, size),
+                      onPanUpdate: (d) => _handlePanUpdate(d, size),
+                      child: CustomPaint(
+                        painter: ModuleScenePainter(
+                          scene: _scene,
+                          tokens: tokens,
+                        ),
+                        size: size,
                       ),
-                      size: size,
                     ),
                   );
                 },
