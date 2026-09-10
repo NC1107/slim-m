@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.58.0](https://github.com/NC1107/slim-m/compare/server-v0.57.0...server-v0.58.0) (2026-09-09)
+
+
+### Features
+
+* **server:** make fileReport idempotent by a client-minted id ([#1128](https://github.com/NC1107/slim-m/issues/1128)) ([8005672](https://github.com/NC1107/slim-m/commit/8005672f3be395116a33464a0fdfdcb1744a0ab4))
+
 ## [0.57.0](https://github.com/NC1107/slim-m/compare/server-v0.56.0...server-v0.57.0) (2026-09-08)
 
 
