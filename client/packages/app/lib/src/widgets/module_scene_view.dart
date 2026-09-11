@@ -259,13 +259,33 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     unawaited(_drain());
   }
 
-  /// Sends queued actions one at a time. Re-entrant calls return immediately,
-  /// so the drain already running is the only one.
+  /// Sends queued actions, coalescing what the module said it can read in one
+  /// go. Re-entrant calls return immediately, so the drain already running is
+  /// the only one.
   Future<void> _drain() async {
     if (_busy || _queue.isEmpty) return;
     while (_queue.isNotEmpty && mounted) {
-      await _send(_queue.removeAt(0));
+      await _send(_takeNext());
     }
+  }
+
+  /// The next call to make: one queued action, or every leading action sharing
+  /// a prefix the module reads as a list, joined into one.
+  ///
+  /// A whole drag becomes a single round trip that way. Without it the queue
+  /// still drains in order and nothing is lost - it just costs a call per cell,
+  /// which over a real network is what made drawing feel like work.
+  String _takeNext() {
+    final first = _queue.removeAt(0);
+    final prefix = first.split(':').first;
+    if (!first.contains(':') || !sceneAllowsTapBatch(_scene, first)) {
+      return first;
+    }
+    final cells = <String>[first.substring(prefix.length + 1)];
+    while (_queue.isNotEmpty && _queue.first.startsWith('$prefix:')) {
+      cells.add(_queue.removeAt(0).substring(prefix.length + 1));
+    }
+    return '$prefix:${cells.join(';')}';
   }
 
   @override

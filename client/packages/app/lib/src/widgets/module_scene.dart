@@ -37,6 +37,7 @@ class CellsOp extends SceneOp {
     required this.palette,
     this.gap = 0,
     this.tap,
+    this.tapBatch = false,
   });
 
   final int cols;
@@ -45,6 +46,17 @@ class CellsOp extends SceneOp {
   final List<String> palette;
   final double gap;
   final String? tap;
+
+  /// Whether this module reads several cells from one [tap] action, as a
+  /// `;`-separated list.
+  ///
+  /// A module call is a round trip and only one runs at a time, so a drag
+  /// across a grid costs a call per cell without this. Defaults false because
+  /// an older module would answer "bad cell" to a list, so a client may only
+  /// send one to a module that has said it can read one. Additive both ways:
+  /// a module that declares it still accepts a list of one, which is what a
+  /// client that never looks at this field keeps sending.
+  final bool tapBatch;
 }
 
 class RectOp extends SceneOp {
@@ -202,6 +214,7 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         palette: _stringList(op['palette']),
         gap: _double(op['gap'], 0),
         tap: _string(op['tap']),
+        tapBatch: op['tap_batch'] == true,
       );
     case 'rect':
       return RectOp(

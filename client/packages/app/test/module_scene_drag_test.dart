@@ -22,29 +22,35 @@ import 'package:slimm_app/src/widgets/module_scene_view.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 /// A 4x4 board whose cells answer `toggle`, the shape game-of-life sends.
-String _scene(int gen, {bool live = true}) => jsonEncode({
-  r'$slim': 'scene/1',
-  'width': 4,
-  'height': 4,
-  'ops': [
-    {
-      'op': 'cells',
-      'cols': 4,
-      'rows': 4,
-      'data': '................',
-      'tap': 'toggle',
-    },
-  ],
-  'state': 'g$gen',
-  'controls': ['play', 'step'],
-  'live': live,
-});
+///
+/// [tapBatch] mirrors the module's own `tap_batch`: game-of-life 0.3.0 reads a
+/// `;`-separated list of cells, 0.2.0 does not and answers "bad cell" to one.
+String _scene(int gen, {bool live = true, bool tapBatch = false}) =>
+    jsonEncode({
+      r'$slim': 'scene/1',
+      'width': 4,
+      'height': 4,
+      'ops': [
+        {
+          'op': 'cells',
+          'cols': 4,
+          'rows': 4,
+          'data': '................',
+          'tap': 'toggle',
+          'tap_batch': tapBatch,
+        },
+      ],
+      'state': 'g$gen',
+      'controls': ['play', 'step'],
+      'live': live,
+    });
 
 /// Mounts the view at a known size and records every action it sends.
 Future<List<String>> _actionsFrom(
   WidgetTester tester,
   Future<void> Function(WidgetTester tester, Offset topLeft) drive, {
   Duration latency = Duration.zero,
+  bool tapBatch = false,
 }) async {
   final actions = <String>[];
   var gen = 0;
@@ -56,7 +62,7 @@ Future<List<String>> _actionsFrom(
           child: SizedBox(
             width: 400,
             child: ModuleSceneView(
-              initial: parseModuleScene(_scene(0))!,
+              initial: parseModuleScene(_scene(0, tapBatch: tapBatch))!,
               runCommand: (input) async {
                 actions.add(jsonDecode(input)['action'] as String);
                 if (latency > Duration.zero) {
@@ -64,7 +70,7 @@ Future<List<String>> _actionsFrom(
                 }
                 return api.RunModuleCommandResult(
                   ok: true,
-                  output: _scene(++gen),
+                  output: _scene(++gen, tapBatch: tapBatch),
                 );
               },
             ),
@@ -245,6 +251,69 @@ void main() {
       4,
       reason: 'the queue drains, it does not drop: $actions',
     );
+  });
+
+  testWidgets('a module that reads a list gets the drag in far fewer calls', (
+    tester,
+  ) async {
+    // Latency is the point: cells only pile up behind a call already in flight.
+    late List<String> actions;
+    await tester.runAsync(() async {
+      actions = await _actionsFrom(
+        tester,
+        (tester, origin) async {
+          final gesture = await tester.startGesture(
+            origin + const Offset(50, 50),
+          );
+          for (final dx in [150.0, 250.0, 350.0]) {
+            await gesture.moveTo(origin + Offset(dx, 50));
+            await tester.pump();
+          }
+          await gesture.up();
+          for (var i = 0; i < 30; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+        },
+        latency: const Duration(milliseconds: 40),
+        tapBatch: true,
+      );
+    });
+
+    // The first cell goes alone; the rest ride together in the next call.
+    expect(actions.length, lessThan(4), reason: 'sent $actions');
+    expect(
+      actions.last.split(';').length,
+      greaterThan(1),
+      reason: 'the tail should have been coalesced: $actions',
+    );
+    expect(actions.expand((a) => a.split(':').last.split(';')).toSet(), {
+      '0,0',
+      '0,1',
+      '0,2',
+      '0,3',
+    }, reason: 'every cell still arrives, whatever the grouping');
+  });
+
+  testWidgets('a module that never said it reads a list still gets singles', (
+    tester,
+  ) async {
+    // game-of-life 0.2.0's shape: a list would come back "bad cell".
+    final actions = await _actionsFrom(tester, (tester, origin) async {
+      final gesture = await tester.startGesture(origin + const Offset(50, 50));
+      for (final dx in [150.0, 250.0, 350.0]) {
+        await gesture.moveTo(origin + Offset(dx, 50));
+        await tester.pump();
+      }
+      await gesture.up();
+    });
+
+    expect(actions, [
+      'toggle:0,0',
+      'toggle:0,1',
+      'toggle:0,2',
+      'toggle:0,3',
+    ], reason: 'batching is opt-in, and an older module never opted in');
   });
 
   testWidgets('crossing a cell twice in one drag paints it once', (
