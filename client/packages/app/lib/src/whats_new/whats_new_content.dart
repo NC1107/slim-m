@@ -361,6 +361,50 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.73.0',
+    headline: 'Launch a module as an app, and a Dock that keeps up',
+    points: [
+      WhatsNewPoint(
+        'A module can now be an app rather than only a code block. Launch one '
+        'from the composer and it opens as a surface everyone in the channel '
+        'shares, so a board you step through moves for all of you at once.',
+      ),
+      WhatsNewPoint(
+        'Draw on one of those boards by dragging across it, instead of '
+        'tapping each cell.',
+      ),
+      WhatsNewPoint(
+        'Installing a module now asks which roles may use it, right then. It '
+        'grants nothing to anybody on its own, so a module installed and left '
+        'alone used to appear nowhere at all, including for the admin who '
+        'installed it.',
+      ),
+      WhatsNewPoint(
+        'The Dock says when a module you have installed has a newer version, '
+        'and updates it in place. Updating keeps who can use it and whether '
+        'it is switched on; the only way forward before was to uninstall and '
+        'start again, which lost both. You can also search the Dock, and open '
+        'a module by tapping anywhere on its row.',
+      ),
+      WhatsNewPoint(
+        'A new profile picture reaches your other devices straight away. It '
+        'used to sit there looking unchanged until you quit and reopened the '
+        'app, and pictures come out sharper than they did.',
+      ),
+      WhatsNewPoint(
+        'Signing in says which server you are connecting to, on every screen '
+        'that asks. When a server is one this app has not seen before, the '
+        'code you are asked to confirm can now be checked: whoever runs it '
+        'sees the same code in their own server log.',
+      ),
+      WhatsNewPoint(
+        'Your status is set from the footer of the channel list and nowhere '
+        'else now, rather than living in two places that could disagree. The '
+        'device list names each device and says when it was last used.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
