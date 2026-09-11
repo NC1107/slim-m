@@ -26,17 +26,19 @@ import '../desktop/window_resize_frame.dart';
 /// How wide the left edge zone is: the band where a horizontal drag means
 /// "open the drawer" and never anything else.
 ///
-/// One shared number rather than a private one, because [SwipeToReply] has to
-/// refuse exactly this band. Before it did, the two gestures split the row and
-/// left the drawer about four usable pixels: Flutter's `DrawerController`
-/// claimed the leftmost 20 whether or not it would act on them, so this strip
-/// only won from 20 to 24, and every drag past 24 replied to a message
-/// instead. `home_shell` now turns that claim off, so the whole band works.
+/// It was once shared with a swipe-to-reply gesture on the message row, which
+/// had to refuse exactly this band, and the two split the row between them.
+/// Flutter's own `DrawerController` claimed the leftmost 20 pixels whether or
+/// not it would act on them, so this strip only won from 20 to 24 and every
+/// drag past 24 replied to a message instead; `home_shell` turns that claim
+/// off, which is why the whole band works. The reply gesture is gone as of
+/// 2026-09-11, so nothing competes for the rest of the row any more, but the
+/// `DrawerController` half of that story still holds and is why this is not
+/// simply left to the framework.
 ///
-/// Deliberately not widened past 24 while fixing that. A compact row puts its
-/// avatar at x=10 through 46 (`paneGutterCompact` plus `_avatarSize`), so a
-/// zone of 40 would swallow most of the avatar and take a reply swipe started
-/// there for the drawer's - the same class of bug, moved inside the row.
+/// Deliberately not widened past 24. A compact row puts its avatar at x=10
+/// through 46 (`paneGutterCompact` plus `_avatarSize`), so a zone of 40 would
+/// swallow most of the avatar.
 const double kDrawerEdgeZoneWidth = 24;
 
 /// Wraps [child] with the edge-drag strip; [child] still fills the space.
