@@ -184,6 +184,17 @@ Color? _parseHex(String value) {
 /// it hit nothing interactive. Ops are tested topmost-first. A tap on a
 /// [CellsOp] reports the specific cell as `"$tap:row,col"`; a tap on a [RectOp]
 /// or [CircleOp] reports its bare `tap`.
+/// Whether [action] came from a cells op that reads a `;`-separated list, so
+/// several of them may be sent as one call. False for anything else, including
+/// a scene from a module that has never heard of batching.
+bool sceneAllowsTapBatch(ModuleScene scene, String action) {
+  final prefix = action.split(':').first;
+  for (final op in scene.ops) {
+    if (op is CellsOp && op.tap == prefix) return op.tapBatch;
+  }
+  return false;
+}
+
 String? sceneTapAction(ModuleScene scene, Offset local, Size size) {
   final sx = scene.width == 0 ? 1.0 : size.width / scene.width;
   final sy = scene.height == 0 ? 1.0 : size.height / scene.height;
