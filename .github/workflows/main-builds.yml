@@ -75,30 +75,20 @@ jobs:
   # Narrows "client/** or crates/** changed" into the two booleans every job below gates on.
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     outputs:
       client: ${{ steps.filter.outputs.client == 'true' || inputs.client }}
-      server: ${{ steps.filter.outputs.server == 'true' || inputs.server }}
+      server: ${{ steps.filter.outputs.server == 'true' || steps.undeployed.outputs.server == 'true' || inputs.server }}
       packaging: ${{ steps.filter.outputs.packaging == 'true' || inputs.packaging }}
     steps:
+      # Full history, so the diff below can reach the last published commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # Include patterns only. This action defaults to predicate-quantifier
-      # `some`, which ORs the patterns, so a negated entry like
-      # `!client/CHANGELOG.md` is true of nearly every file in the repo and
-      # makes the whole filter match unconditionally - which is exactly what
-      # it did, running the Android, iOS and Linux client jobs on every
-      # server-only merge and uploading a TestFlight build with no client
-      # change in it. The version-bump exclusion belongs in `on.push.paths`
-      # above, where GitHub's own path semantics apply negation correctly.
-      #
-      # `packaging` is its own output rather than folded into `client`: a
-      # packaging-only change (the rpm spec, the flatpak manifest) has
-      # nothing to do with Android or iOS, so it should wake the Linux job
-      # below without also uploading a TestFlight build. Before this output
-      # existed, `on.push.paths` triggered the workflow on a packaging-only
-      # commit but every downstream job still gated on `client`/`server`
-      # alone, so the run did nothing at all - confirmed against the real
-      # run for #964, which touched only the flatpak manifest and skipped
-      # every job. See docs/ci.md.
+        with:
+          fetch-depth: 0
+      # Include patterns only, and `packaging` deliberately its own output.
+      # docs/ci.md's main-builds section has why both of those are load-bearing.
       # Push only: a manual run has no push range to diff, and its three inputs
       # say what to build outright. An unset output is an empty string, which
       # the `== 'true' ||` above folds into the input cleanly.
@@ -113,6 +103,15 @@ jobs:
               - 'crates/**'
             packaging:
               - 'packaging/**'
+
+      # The filter above asks what this push touched; this asks what is still
+      # undeployed, which is a different and more useful question. See the
+      # script's own header, and docs/ci.md's concurrency section.
+      - id: undeployed
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/server-image-needed.sh "${{ github.sha }}"
 
   # The Linux build and its portable tarball, which both the rpm below and the copr job downstream are built from.
   # Gated on `packaging` as well as `client`: a change to the rpm spec or the

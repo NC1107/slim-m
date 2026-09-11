@@ -696,6 +696,11 @@ A tagged release still supersedes all of this: it wins over any COPR snapshot of
 A single `on.push.paths` list cannot tell a client-only merge from a server-only one, so the trigger is deliberately wide (`client/**`, `crates/**` or `packaging/**`, minus a release commit's own `client/CHANGELOG.md` and `client/pubspec.yaml`) and a `changes` job built on `dorny/paths-filter` narrows that into the three booleans (`client`, `server`, `packaging`) every downstream job gates on.
 The brief allowed splitting this into two workflows with their own top-level `paths` instead; one workflow with one filter step was chosen because it keeps the concurrency group, the header, and this section in one place, and because the filter step is one checkout rather than two.
 
+The filter's own patterns are include-only, and that is load-bearing rather than tidy.
+`dorny/paths-filter` defaults to predicate-quantifier `some`, which ORs the patterns, so a negated entry like `!client/CHANGELOG.md` is true of nearly every file in the repository and makes the whole filter match unconditionally.
+That is exactly what it did: the Android, iOS and Linux client jobs ran on every server-only merge, uploading a TestFlight build with no client change in it.
+The version-bump exclusion belongs in `on.push.paths` above, where GitHub's own path semantics apply negation correctly, and it lives there now.
+
 `packaging` used to not exist, and every job below gated on `client`/`server` alone even though `on.push.paths` already listed `packaging/**`.
 The trigger fired on a packaging-only commit, and then every downstream job's own `if:` read `client`/`server` as both false and skipped, so the run did nothing at all; confirmed directly against the real run for the commit that merged #964, which touched only `packaging/flatpak/top.npcserver.slimm.yaml`.
 `linux-client` (the rpm build) and `copr` now also gate on `packaging`, so a packaging-only change reaches them; `android-client` and `ios-testflight` deliberately do not, since a packaging change has nothing to do with either.
@@ -757,10 +762,20 @@ Measured, not reasoned: `fad3339d` (a server fix to the avatar change event) had
 GHCR's `latest` still pointed at `sha-f6dab94a` from 03:15Z, and the live instance was running a 16-hour-old container with two merged server changes missing from it.
 Re-running the cancelled job alone does not recover it either: `server-image` needs `changes`, and in a cancelled run that dependency has no output, so the rerun skips as well.
 
-`workflow_dispatch` above is the recovery path: three booleans, one per side, ORed into the filter's own outputs so a manual run builds exactly what is asked for and a push behaves exactly as before.
-It is a lever, not a fix - the silent loss can still happen, and the next push of any kind still will not pick it up.
-The structural fix is to stop deciding the server side from the push's own diff: compare against the commit the registry's `latest` actually holds, so the question becomes "has the server changed since what is deployed", which is the question this job exists to answer.
-That is queued rather than done here, because it trades a registry lookup on every run and wants the owner's call on cost.
+`workflow_dispatch` is the manual recovery path: three booleans, one per side, ORed into the filter's own outputs so a manual run builds exactly what is asked for and a push behaves exactly as before.
+
+**The structural fix is the `undeployed` step**, which stops deciding the server side from the push's own diff.
+`scripts/server-image-needed.sh` finds the newest `main-builds` run whose `server-image` job really succeeded, and reports `server: true` when anything under `crates/**` has moved since that commit.
+The question becomes "has the server changed since the image that is actually out there", which is the question this job exists to answer, so a cancelled build is picked up by the next push of any kind rather than lost.
+Checked against the incident above: `git diff 92dd49a2..ab598657 -- crates/` names `crates/slimm-server/src/lib.rs`, so the missed identity-log image would have been rebuilt by the very next client-only merge; the same diff from `6d437bd1`, which `latest` did hold, is empty, so a settled server side still costs no build.
+
+It reports `server: true` and never `server: false` - the paths filter beside it owns that answer.
+Every way of failing to resolve a base commit (a short history, a GitHub hiccup, an unreachable SHA) prints a line and stays quiet, leaving the filter as the only voice.
+That is the old behaviour, and it is the safe direction: an extra image costs minutes of runner time, a missed one costs a deploy nobody notices.
+`scripts/lib/test_server_image_base.py` pins the decision itself, including the cancelled-then-skipped shape this was built for, and that malformed API output degrades rather than fails.
+
+`client` and `packaging` still decide from the push diff alone and keep the same hole.
+That is deliberate for now: a missed TestFlight or COPR build is visible to whoever goes looking for it on their phone or in `dnf upgrade`, where a missed server image is invisible until somebody notices a fix is not live.
 
 ## flatpak-ci
 
