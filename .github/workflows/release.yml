@@ -193,11 +193,11 @@ jobs:
         id: manifest
         run: |
           version="${{ steps.ver.outputs.version }}"
-          refs=""
-          for f in /tmp/digests/*; do refs="${refs} ${IMAGE}@$(cat "$f")"; done
+          refs=()
+          for f in /tmp/digests/*; do refs+=("${IMAGE}@$(cat "$f")"); done
           tags=(-t "${IMAGE}:${version}" -t "${IMAGE}:sha-${GITHUB_SHA}")
           if [ "${{ steps.latest.outputs.move }}" = "true" ]; then tags+=(-t "${IMAGE}:latest"); fi
-          docker buildx imagetools create "${tags[@]}" ${refs}
+          docker buildx imagetools create "${tags[@]}" "${refs[@]}"
           digest="$(docker buildx imagetools inspect "${IMAGE}:${version}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
@@ -825,7 +825,8 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         working-directory: client/packages/app
         run: |
+          ipa=(build/ios/ipa/*.ipa)
           xcrun altool --upload-app --type ios \
-            --file "$(ls build/ios/ipa/*.ipa | head -n1)" \
+            --file "${ipa[0]}" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"

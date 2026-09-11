@@ -212,7 +212,7 @@ jobs:
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -only-testing:RunnerTests \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || exit ${PIPESTATUS[0]}
+            | xcpretty || exit "${PIPESTATUS[0]}"
 
       # PR #292's actual failure: a link error only `build ipa` (Release,
       # device) hit, never the Debug simulator build above. This is that

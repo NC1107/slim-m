@@ -385,3 +385,32 @@ jobs:
       # wrong-looking. See the script header.
       - name: every workflow is in the docs/ci.md table
         run: python3 scripts/check-ci-docs.py
+
+      # The shell was the one layer nothing checked: 22 workflows, ~84 inline
+      # `run:` blocks and 14 scripts orchestrating every build and deploy, with
+      # no linter over any of it. A bad `${{ }}` expression, a `needs:` naming
+      # a job that does not exist, or an invalid key only shows at runtime on
+      # main, which is exactly where a workflow bug is most expensive.
+      # actionlint runs shellcheck over the inline blocks as well, so this and
+      # the step below cover the same language from both ends.
+      - name: workflows lint
+        run: |
+          docker run --rm -v "$PWD":/repo -w /repo \
+            rhysd/actionlint@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
+            -color
+
+      # Pinned by digest rather than using the runner's preinstalled shellcheck,
+      # which is how this gate failed on the pull request that added it: the
+      # runner ships 0.10.0, the image tagged `stable` is 0.11.0, and 0.11.0 no
+      # longer reports the SC2015 that 0.10.0 does. Verifying locally against
+      # one and gating on the other is a gate that disagrees with itself. Every
+      # tracked *.sh is clean under both versions, so this arrives with no
+      # backlog behind it and is a pure ratchet from here.
+      - name: shell scripts lint
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files '*.sh')
+          printf 'checking %d scripts\n' "${#scripts[@]}"
+          docker run --rm -v "$PWD":/repo -w /repo \
+            koalaman/shellcheck@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+            "${scripts[@]}"

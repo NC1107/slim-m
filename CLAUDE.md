@@ -138,6 +138,7 @@ Never use `:memory:` for tests that depend on the multi-connection SQLite pool.
   All three run in the `scripts/lib` unittest suite, not as their own steps.
 - `scripts/commit-lint` (`npm ci && node check-parses.mjs`) - the PR title parses, and no commit body crashes release-please's parser. A body that crashes it is dropped from the changelog silently.
 - `scripts/check-ci-docs.py` - every workflow has a row in `docs/ci.md`'s table. It checks the row exists, never what the row says.
+- `actionlint` over every workflow, which also shellchecks the inline `run:` blocks, and `shellcheck` over every tracked `*.sh`. Both are pinned by image digest, because the runner's preinstalled shellcheck and the `stable` image are different versions that disagree; verify locally with the pinned digest, not with whatever `shellcheck` is on PATH. Both were green when they landed, so either failing means the change under review introduced it.
 - Inline in the workflow: no emoji in `client/` Dart/YAML/ARB sources, an SPDX header on the first line of every `crates/**/*.rs` file, orientation locked on phones only, the iOS Info.plist/broadcast-extension/notification-extension wiring checks, and unit tests for the e2e harness's own scenario logic.
 
 ## Local environment

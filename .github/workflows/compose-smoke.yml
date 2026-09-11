@@ -80,7 +80,7 @@ jobs:
       - name: the server becomes healthy and answers
         run: |
           set -euo pipefail
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             state=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q server)" 2>/dev/null || echo starting)
             [ "$state" = "healthy" ] && break
             sleep 2
@@ -114,7 +114,7 @@ jobs:
           set -euo pipefail
           # "voice enabled" above is only the server's opinion of its own config,
           # and a real deployment crashlooped behind it; see docs/ci.md.
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             docker compose logs livekit 2>/dev/null | grep -q "starting LiveKit server" && break
             sleep 2
           done
