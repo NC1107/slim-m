@@ -52,6 +52,16 @@ Path-gated so a client-only change never triggers a server build.
 `schema/openapi.yaml` is in the path filter even though it is not Rust.
 `crates/slimm-server/tests/openapi_contract.rs` gates the schema against the router, so a schema-only edit that documents a path nothing serves, without touching `crates/`, must still run that test.
 
+### Unused dependencies
+
+`cargo machete` runs beside clippy, because a dependency nobody imports is invisible to every other check here: the build is green, the tests pass and the binary works, so it accrues quietly until somebody goes looking.
+It found one on the day it was added - `jiff`, declared in the workspace and never used by any crate, its only mention a doc comment in `http/search.rs` explaining why that call site had *not* used it - and removing it took ten crates out of the build: `jiff` and its four siblings, plus `bitflags`, three `defmt` crates and two `portable-atomic` ones.
+
+It is source-text based, so it can be wrong, and a flag is a question rather than a verdict.
+Anything it raises that is genuinely needed belongs in `[package.metadata.cargo-machete] ignored` with a reason, not deleted on its say-so.
+The same audit run against the client's pubspecs is the cautionary half: three flags, three false positives, all of them native side-effect packages with no Dart API to import - `sqlite3_flutter_libs` bundling SQLite for drift, `media_kit_libs_video` whose own pubspec comment already says it is a no-op marker on Linux, and `firebase_core` behind `firebase_messaging`'s plugin registration.
+There is no equivalent gate on the Dart side for that reason: it would be three false positives and nothing else.
+
 `SQLX_OFFLINE: "true"` is set workflow-wide: the crate compiles against the committed `.sqlx` query cache and needs no database in CI.
 
 The binary size budget step exists because the brief treats binary size as a first-class budget rather than something to notice after the fact.
