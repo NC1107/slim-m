@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.59.0](https://github.com/NC1107/slim-m/compare/server-v0.58.0...server-v0.59.0) (2026-09-11)
+
+
+### Bug Fixes
+
+* an avatar change reaches other devices without a restart ([#1138](https://github.com/NC1107/slim-m/issues/1138)) ([fad3339](https://github.com/NC1107/slim-m/commit/fad3339d6a0d85f2267b2bebb2a18c088617450d))
+* say which server sign-in connects to, and make its code checkable ([#1144](https://github.com/NC1107/slim-m/issues/1144)) ([cf109c1](https://github.com/NC1107/slim-m/commit/cf109c1d2d66a592478e83daae195c54f439dc32))
+
 ## [0.58.0](https://github.com/NC1107/slim-m/compare/server-v0.57.0...server-v0.58.0) (2026-09-09)
 
 
