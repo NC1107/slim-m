@@ -122,6 +122,27 @@ class _ModuleRow extends StatelessWidget {
   /// been docked here.
   final api.InstalledDockModule? installed;
 
+  /// What this space has, against what the marketplace now offers.
+  ///
+  /// A version that differs is the whole update affordance on this screen:
+  /// the row used to show the registry's version and the word "Installed"
+  /// side by side, which reads as agreement even when they disagree.
+  static AppBadge _stateBadge(
+    api.DockIndexEntry entry,
+    api.InstalledDockModule installed,
+  ) {
+    if (installed.version != entry.version) {
+      return AppBadge(
+        variant: AppBadgeVariant.warn,
+        label: 'v${installed.version} · update',
+      );
+    }
+    return AppBadge(
+      variant: AppBadgeVariant.role,
+      label: installed.enabled ? 'Installed' : 'Installed · Off',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -133,12 +154,7 @@ class _ModuleRow extends StatelessWidget {
         color: installed == null ? null : tokens.accent,
       ),
       headline: entry.name,
-      badge: installed == null
-          ? null
-          : AppBadge(
-              variant: AppBadgeVariant.role,
-              label: installed.enabled ? 'Installed' : 'Installed · Off',
-            ),
+      badge: installed == null ? null : _stateBadge(entry, installed),
       details: [
         SettingsEntityDetail('v${entry.version}'),
         SettingsEntityDetail(entry.summary, wrap: true),
