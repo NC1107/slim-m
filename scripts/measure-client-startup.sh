@@ -42,7 +42,7 @@ WEB_DIR="$ROOT/client/packages/app/build/web"
 
 cleanup() {
   local code=$?
-  [[ -n "${WEB_PID:-}" ]] && kill "$WEB_PID" 2>/dev/null || true
+  if [[ -n "${WEB_PID:-}" ]]; then kill "$WEB_PID" 2>/dev/null || true; fi
   rm -rf "$WORK"
   exit $code
 }

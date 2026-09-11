@@ -50,8 +50,8 @@ cleanup() {
     return
   fi
   echo "== teardown =="
-  [[ -n "${WEB_PID:-}" ]] && kill "$WEB_PID" 2>/dev/null || true
-  [[ -n "${API_PID:-}" ]] && kill "$API_PID" 2>/dev/null || true
+  if [[ -n "${WEB_PID:-}" ]]; then kill "$WEB_PID" 2>/dev/null || true; fi
+  if [[ -n "${API_PID:-}" ]]; then kill "$API_PID" 2>/dev/null || true; fi
   pkill -f "remote-debugging-port=980[12]" 2>/dev/null || true
   docker rm -f "$LK_CONTAINER" >/dev/null 2>&1 || true
   rm -rf "$WORK/chrome-alice" "$WORK/chrome-bob" "$WORK/slimm.db"*

@@ -399,11 +399,18 @@ jobs:
             rhysd/actionlint@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
             -color
 
-      # Preinstalled on the runner. Every tracked *.sh, which was already clean
-      # when this landed, so it ratchets rather than arriving with a backlog.
+      # Pinned by digest rather than using the runner's preinstalled shellcheck,
+      # which is how this gate failed on the pull request that added it: the
+      # runner ships 0.10.0, the image tagged `stable` is 0.11.0, and 0.11.0 no
+      # longer reports the SC2015 that 0.10.0 does. Verifying locally against
+      # one and gating on the other is a gate that disagrees with itself. Every
+      # tracked *.sh is clean under both versions, so this arrives with no
+      # backlog behind it and is a pure ratchet from here.
       - name: shell scripts lint
         run: |
           set -euo pipefail
           mapfile -t scripts < <(git ls-files '*.sh')
           printf 'checking %d scripts\n' "${#scripts[@]}"
-          shellcheck "${scripts[@]}"
+          docker run --rm -v "$PWD":/repo -w /repo \
+            koalaman/shellcheck@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+            "${scripts[@]}"
