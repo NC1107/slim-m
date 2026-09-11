@@ -45,23 +45,42 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     with GuardedActionState<DockModuleScreen> {
   bool _busy = false;
 
-  Future<void> _install(api.DockManifest manifest) async {
+  /// Installs, or updates: the same call either way.
+  ///
+  /// Re-installing at a new version is what an update is here. The server
+  /// upserts the row, leaves `enabled` alone, and only drops permission rows
+  /// the new manifest no longer declares, so grants for surviving keys survive
+  /// with it (`store/modules.rs`). There is deliberately no separate route.
+  ///
+  /// [wasInstalled] is why this takes an argument rather than reading the
+  /// catalog again: only a first install should ask who may use the module.
+  /// An update already has its answer, and throwing the admin at a screen full
+  /// of switches they set last month would read as though it had been lost.
+  Future<void> _install(
+    api.DockManifest manifest, {
+    bool wasInstalled = false,
+  }) async {
     setState(() => _busy = true);
     final ok = await guard(
-      whatFailed: 'install ${manifest.name}',
+      whatFailed: wasInstalled
+          ? 'update ${manifest.name}'
+          : 'install ${manifest.name}',
       action: () => ref
           .read(apiProvider)
           .installDockModule(moduleId: manifest.id, version: manifest.version),
     );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (ok) {
-      ref.invalidate(dockCatalogProvider);
-      ref.invalidate(modulePermissionsProvider);
-      // Installed is not usable until somebody is granted it; see that screen's doc.
-      if (mounted && manifest.permissions.isNotEmpty) {
-        context.go(Routes.adminDockModuleAccess(manifest.id));
-      }
+    if (!ok) return;
+    ref.invalidate(dockCatalogProvider);
+    ref.invalidate(modulePermissionsProvider);
+    // A new version can declare different extension points; see this doc.
+    ref.invalidate(codeBlockRunnerProvider);
+    ref.invalidate(slashCommandProvider);
+    ref.invalidate(appLaunchProvider);
+    // Installed is not usable until somebody is granted it; see that screen's doc.
+    if (!wasInstalled && mounted && manifest.permissions.isNotEmpty) {
+      context.go(Routes.adminDockModuleAccess(manifest.id));
     }
   }
 
@@ -135,7 +154,7 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
           busy: _busy,
           error: actionError,
           onErrorDismiss: clearActionError,
-          onInstall: () => _install(m),
+          onInstall: () => _install(m, wasInstalled: installed != null),
           onSetEnabled: (v) => _setEnabled(m.name, v),
           onUninstall: () => _uninstall(m.name),
           onChooseAccess: () => context.go(Routes.adminDockModuleAccess(m.id)),

@@ -17,7 +17,13 @@ import 'dock_what_it_adds.dart';
 
 /// A module's manifest, plus the lifecycle action appropriate to
 /// [installed]'s state: install when null, otherwise an enable/disable
-/// toggle and an uninstall button.
+/// toggle and an uninstall button, with an update above them when this space
+/// is on an older version than the marketplace now offers.
+///
+/// An update is a re-install at the new version, with no separate route. The
+/// server upserts the row, leaves `enabled` alone, and only drops permission
+/// rows the new manifest stops declaring, so grants for surviving keys and the
+/// enabled state both come through untouched. See `store/modules.rs`.
 ///
 /// No title row of its own. This was a sheet once and carried a header with
 /// the module's name and a Close button; as a routed screen the app bar
@@ -246,6 +252,7 @@ class _ActionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     final installed = this.installed;
     if (installed == null) {
       return AppButton(
@@ -256,9 +263,27 @@ class _ActionsCard extends StatelessWidget {
         onPressed: onInstall,
       );
     }
+    final outdated = installed.version != manifest.version;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (outdated) ...[
+          // Re-installing at the new version is the update; see the class doc.
+          AppButton(
+            label: busy ? 'Updating...' : 'Update to v${manifest.version}',
+            variant: AppButtonVariant.primary,
+            full: true,
+            disabled: busy,
+            onPressed: onInstall,
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            'This space is on v${installed.version}. Updating keeps who can '
+            'use it, and whether it is on.',
+            style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.s16),
+        ],
         SettingsSectionCard(
           children: [
             SettingsToggleRow(
