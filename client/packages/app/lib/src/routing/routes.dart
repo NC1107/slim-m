@@ -28,6 +28,12 @@ abstract final class Routes {
   /// One module's manifest and lifecycle, drilled into from the Dock.
   static String adminDockModule(String moduleId) => '$adminDock/$moduleId';
 
+  /// The third level of the Dock drill-down: who may use one module. A screen
+  /// rather than a sheet, so it does not scrim a Space settings modal that is
+  /// already scrimming the shell.
+  static String adminDockModuleAccess(String moduleId) =>
+      '${adminDockModule(moduleId)}/access';
+
   /// The messages of one channel.
   static String channel(String id) => '/channels/$id';
 

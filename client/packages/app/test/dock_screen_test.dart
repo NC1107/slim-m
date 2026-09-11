@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/screens/admin/dock_module_access_screen.dart';
 import 'package:slimm_app/src/screens/admin/dock_module_screen.dart';
 import 'package:slimm_app/src/screens/admin/dock_screen.dart';
 import 'package:slimm_app/src/routing/routes.dart';
@@ -120,6 +121,12 @@ Widget _app(ProviderContainer container) => UncontrolledProviderScope(
           builder: (context, state) =>
               DockModuleScreen(moduleId: state.pathParameters['moduleId']!),
         ),
+        GoRoute(
+          path: '${Routes.adminDock}/:moduleId/access',
+          builder: (context, state) => DockModuleAccessScreen(
+            moduleId: state.pathParameters['moduleId']!,
+          ),
+        ),
       ],
     ),
   ),
@@ -206,7 +213,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(installedPath, '/space/dock/modules/code-exec/install');
-    // Installed (disabled by default): the sheet now offers enable/disable and uninstall, not "Install".
+    // A module declaring a permission lands on the access screen; see its doc.
+    expect(find.text('Who can use this'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Back to the module'));
+    await tester.pumpAndSettle();
+    // Installed (disabled by default): the screen now offers enable/disable and uninstall, not "Install".
     expect(find.text('Install v1.2.0'), findsNothing);
     expect(find.text('Enabled'), findsOneWidget);
     expect(find.text('Uninstall'), findsOneWidget);

@@ -3,9 +3,13 @@
 ///
 /// A module's permissions are granted to nobody at install, and ADMINISTRATOR
 /// does not bypass them, so an admin who installs one and walks away has a
-/// module that appears nowhere - for them least of all. The sheet that opens
-/// on install, and the button that reopens it, is the step between installed
+/// module that appears nowhere - for them least of all. The screen the install
+/// lands on, and the button that returns to it, is the step between installed
 /// and usable.
+///
+/// It is a third routing level rather than a sheet: Space settings is already
+/// a modal and the module screen is already a drill-down inside it, so a sheet
+/// here put a second scrim over a screen that was dimming the shell.
 library;
 
 import 'dart:convert';
@@ -19,6 +23,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/screens/admin/dock_module_access_screen.dart';
 import 'package:slimm_app/src/screens/admin/dock_module_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -162,6 +167,12 @@ void main() {
                   moduleId: state.pathParameters['moduleId']!,
                 ),
               ),
+              GoRoute(
+                path: '${Routes.adminDock}/:moduleId/access',
+                builder: (context, state) => DockModuleAccessScreen(
+                  moduleId: state.pathParameters['moduleId']!,
+                ),
+              ),
             ],
           ),
         ),
@@ -172,8 +183,13 @@ void main() {
     await tester.tap(find.text('Install v0.2.0'));
     await tester.pumpAndSettle();
 
-    // The install alone grants nothing, so the question is asked immediately.
-    expect(find.text('Who can use Game of Life?'), findsOneWidget);
+    // Installed grants nothing, so the question is asked at once, by navigating.
+    expect(find.text('Who can use this'), findsOneWidget);
+    expect(
+      find.byType(Dialog),
+      findsNothing,
+      reason: 'a sheet here scrims a settings modal that already scrims',
+    );
     expect(find.textContaining('Play cellular automata'), findsWidgets);
     expect(find.text('everyone'), findsOneWidget);
     expect(find.text('mods'), findsOneWidget);
@@ -186,13 +202,14 @@ void main() {
       reason: 'the toggle must grant this module every key it declares',
     );
 
-    await tester.tap(find.text('Done'));
+    // Back to the module, the way every other settings drill-down leaves.
+    await tester.tap(find.bySemanticsLabel('Back to the module'));
     await tester.pumpAndSettle();
-    expect(find.text('Who can use Game of Life?'), findsNothing);
+    expect(find.text('Who can use this'), findsNothing);
 
     // And it stays reachable afterwards, for a module installed long ago.
     await tester.tap(find.text('Choose who can use this'));
     await tester.pumpAndSettle();
-    expect(find.text('Who can use Game of Life?'), findsOneWidget);
+    expect(find.text('Who can use this'), findsOneWidget);
   });
 }

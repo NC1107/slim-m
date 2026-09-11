@@ -331,6 +331,25 @@ class _MemberLocalAudioSectionState extends State<MemberLocalAudioSection> {
 /// A dialog for "5 minutes" would be a confirmation step for something that
 /// undoes itself, and the undo lives on the resulting badge rather than in a
 /// toast that floats away.
+///
+/// Two separate defects made this unreadable in the member pane, which at
+/// 236px is the narrowest surface it appears on. Both showed in one
+/// screenshot, as two of the four durations rendering as empty boxes.
+///
+/// The buttons were four [Expanded] in a [Row]. Expanded makes each child's
+/// width the row's decision rather than the label's, so at that width every
+/// button was narrower than its own padding plus text and every label was
+/// clipped to a fixed 16px - measured, and identical for `5m` and `24h` alike.
+/// No overflow was reported for this, because Expanded forces the fit. A
+/// [Wrap] lets each take the width it needs and fall to a second line when
+/// there isn't any; a wider profile sheet still fits them on one.
+///
+/// Separately, the header's [Text] sat in a [Row] with no [Flexible], so that
+/// row wanted 46px more than the pane had and reported a real overflow. That
+/// one is independent of the buttons and shows at this width alone.
+///
+/// `timeout_chips_width_test.dart` pins both: nothing overflows, and a
+/// three-character label stays wider than a two-character one.
 class TimeoutDurationChips extends StatelessWidget {
   const TimeoutDurationChips({super.key, required this.onChosen});
 
@@ -360,26 +379,27 @@ class TimeoutDurationChips extends StatelessWidget {
                 color: tokens.textSecondary,
               ),
               const SizedBox(width: AppSpacing.s8),
-              Text(
-                'Time out for...',
-                style: AppText.ui.copyWith(color: tokens.textPrimary),
+              // Flexible, or this runs 46px past the member pane; see the class doc.
+              Flexible(
+                child: Text(
+                  'Time out for...',
+                  style: AppText.ui.copyWith(color: tokens.textPrimary),
+                ),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.s8),
-          Row(
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
             children: [
               for (final (label, duration) in _options)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: AppButton(
-                      label: label,
-                      variant: AppButtonVariant.secondary,
-                      size: AppButtonSize.sm,
-                      onPressed: () => onChosen(duration),
-                    ),
-                  ),
+                AppButton(
+                  label: label,
+                  variant: AppButtonVariant.secondary,
+                  size: AppButtonSize.sm,
+                  semanticLabel: 'Time out for $label',
+                  onPressed: () => onChosen(duration),
                 ),
             ],
           ),

@@ -13,7 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
-import 'package:slimm_app/src/screens/admin/dock_module_access_sheet.dart';
 import 'package:slimm_app/src/screens/admin/overwrite_target_picker_sheets.dart';
 import 'package:slimm_app/src/screens/admin/role_editor_sheet.dart';
 import 'package:slimm_app/src/whats_new/whats_new_content.dart';
@@ -84,37 +83,6 @@ const _screenSources = [
   ScreenShareSource(id: 'screen-1', name: 'Screen 2'),
 ];
 
-/// A one-permission module, the shape the access sheet is for: the sheet lists
-/// a switch per role and grants every key the module declares.
-final _lifeManifest = api.DockManifest.fromJson(const {
-  'id': 'game-of-life',
-  'name': 'Game of Life',
-  'version': '0.2.0',
-  'summary': 'Conway cellular automata on a channel-sized board.',
-  'author': 'slim-m',
-  'artifact': {
-    'kind': 'wasm',
-    'path': 'modules/game-of-life/0.2.0/module.wasm',
-    'sha256':
-        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  },
-  'runtime': {
-    'backend': 'wasm',
-    'limits': {'memory_mb': 32, 'wall_ms': 1000, 'fuel': 100000000},
-  },
-  'permissions': [
-    {
-      'key': 'play',
-      'name': 'Play cellular automata',
-      'description': 'Seed and step a board.',
-    },
-  ],
-  'capabilities': <String>[],
-  'extension_points': [
-    {'kind': 'app', 'name': 'Game of Life', 'permission': 'play'},
-  ],
-});
-
 /// Every overlay under review, keyed by name; each opens itself given a
 /// mounted [BuildContext] and [WidgetRef].
 final overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
@@ -138,8 +106,6 @@ final overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
   'member-roles-sheet': (context, ref) =>
       showMemberRolesSheet(context, 'user-long-name'),
   'role-editor-sheet': (context, ref) => showRoleEditorSheet(context),
-  'module-access-sheet': (context, ref) =>
-      showModuleAccessSheet(context, _lifeManifest),
   'avatar-crop-sheet': (context, ref) => showAvatarCropSheet(context, _png),
   'whats-new-sheet': (context, ref) =>
       showWhatsNewSheet(context, whatsNewEntries),

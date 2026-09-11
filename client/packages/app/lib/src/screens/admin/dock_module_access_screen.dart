@@ -9,6 +9,13 @@
 /// not bypass a module's own permission. So the question is asked here, right
 /// after the install, and stays reachable from the module afterwards.
 ///
+/// A routed screen, not a sheet, for the reason `dock_module_screen.dart`
+/// already gives for itself: Space settings is a modal, the Dock and the
+/// module screen are drill-downs inside it, and a sheet opened from the third
+/// of those stacked a second scrim over a screen that was already dimming the
+/// shell. Three levels deep is what the settings drill-down is for, so this is
+/// the third level rather than an overlay on top of it.
+///
 /// One switch per role, covering every permission the module declares: a
 /// module usually declares exactly one, and a role holding some but not all
 /// of a multi-permission module's keys reads as off until it holds them all.
@@ -25,32 +32,50 @@ import '../../providers/app_launch.dart';
 import '../../providers/code_block_runner.dart';
 import '../../providers/providers.dart';
 import '../../providers/slash_command.dart';
+import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
+import '../settings_screen_scaffold.dart';
 
-Future<void> showModuleAccessSheet(
-  BuildContext context,
-  api.DockManifest manifest,
-) {
-  return showAppSheet<void>(
-    context,
-    scrolls: true,
-    builder: (context) => _ModuleAccessSheet(manifest: manifest),
-  );
+/// Resolves the manifest for [moduleId] so this screen can be deep-linked and
+/// popped back to like any other, rather than needing its subject handed in.
+class DockModuleAccessScreen extends ConsumerWidget {
+  const DockModuleAccessScreen({super.key, required this.moduleId});
+
+  final String moduleId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final manifest = ref.watch(dockManifestProvider(moduleId));
+    return SettingsScreenScaffold(
+      title: 'Who can use this',
+      backTooltip: 'Back to the module',
+      backFallback: Routes.adminDockModule(moduleId),
+      child: AppAsyncView<api.DockManifest>(
+        value: AppAsyncState(data: manifest.valueOrNull, error: manifest.error),
+        center: false,
+        errorMessage: 'Could not load this module.',
+        onRetry: () => ref.invalidate(dockManifestProvider(moduleId)),
+        data: (context, m) => ModuleAccessPane(manifest: m),
+      ),
+    );
+  }
 }
 
-class _ModuleAccessSheet extends ConsumerStatefulWidget {
-  const _ModuleAccessSheet({required this.manifest});
+/// The switches themselves, separate from the scaffold so the screen above
+/// stays a routing shell and this stays testable on its own.
+class ModuleAccessPane extends ConsumerStatefulWidget {
+  const ModuleAccessPane({super.key, required this.manifest});
 
   final api.DockManifest manifest;
 
   @override
-  ConsumerState<_ModuleAccessSheet> createState() => _ModuleAccessSheetState();
+  ConsumerState<ModuleAccessPane> createState() => _ModuleAccessPaneState();
 }
 
-class _ModuleAccessSheetState extends ConsumerState<_ModuleAccessSheet>
-    with GuardedActionState<_ModuleAccessSheet> {
+class _ModuleAccessPaneState extends ConsumerState<ModuleAccessPane>
+    with GuardedActionState<ModuleAccessPane> {
   final Set<String> _pending = {};
 
   List<String> get _permKeys => [
@@ -117,63 +142,37 @@ class _ModuleAccessSheetState extends ConsumerState<_ModuleAccessSheet>
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final roles = ref.watch(rolesProvider);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.s16,
-        AppSpacing.s16,
-        AppSpacing.s16,
-        MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Who can use ${widget.manifest.name}?',
-              style: AppText.heading.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: AppWeights.semi,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              _summary(),
-              style: AppText.caption.copyWith(color: tokens.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.s16),
-            AppAsyncView<List<api.Role>>(
-              value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
-              center: false,
-              errorMessage: 'Could not load the roles.',
-              onRetry: () => ref.invalidate(rolesProvider),
-              data: (context, list) => SettingsSectionCard(
-                children: [
-                  for (final role in list)
-                    _RoleSwitch(
-                      role: role,
-                      busy: _pending.contains(role.id),
-                      keysDeclared: _permKeys.isNotEmpty,
-                      holdsAll: _holdsAll,
-                      onChanged: (value) => _set(role, value),
-                    ),
-                ],
-              ),
-            ),
-            if (actionError != null) ...[
-              const SizedBox(height: AppSpacing.s8),
-              AppErrorState(message: actionError!, onDismiss: clearActionError),
-            ],
-            const SizedBox(height: AppSpacing.s12),
-            AppButton(
-              label: 'Done',
-              variant: AppButtonVariant.primary,
-              full: true,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _summary(),
+          style: AppText.body.copyWith(color: tokens.textSecondary),
         ),
-      ),
+        const SizedBox(height: AppSpacing.s16),
+        AppAsyncView<List<api.Role>>(
+          value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
+          center: false,
+          errorMessage: 'Could not load the roles.',
+          onRetry: () => ref.invalidate(rolesProvider),
+          data: (context, list) => SettingsSectionCard(
+            children: [
+              for (final role in list)
+                _RoleSwitch(
+                  role: role,
+                  busy: _pending.contains(role.id),
+                  keysDeclared: _permKeys.isNotEmpty,
+                  holdsAll: _holdsAll,
+                  onChanged: (value) => _set(role, value),
+                ),
+            ],
+          ),
+        ),
+        if (actionError != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppErrorState(message: actionError!, onDismiss: clearActionError),
+        ],
+      ],
     );
   }
 }
