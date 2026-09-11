@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.73.0](https://github.com/NC1107/slim-m/compare/client-v0.72.0...client-v0.73.0) (2026-09-11)
+
+
+### Features
+
+* **client:** say when a module has an update, and offer it ([#1152](https://github.com/NC1107/slim-m/issues/1152)) ([31d1a9a](https://github.com/NC1107/slim-m/commit/31d1a9a238772dd2a4c86f5d3a88738e51e4b372))
+* **client:** search the Dock, open a module from anywhere on its row ([#1139](https://github.com/NC1107/slim-m/issues/1139)) ([483d5fa](https://github.com/NC1107/slim-m/commit/483d5fafbd233efa5b8eef9c3b07d7506b4783c6))
+
+
+### Bug Fixes
+
+* an avatar change reaches other devices without a restart ([#1138](https://github.com/NC1107/slim-m/issues/1138)) ([fad3339](https://github.com/NC1107/slim-m/commit/fad3339d6a0d85f2267b2bebb2a18c088617450d))
+* **client:** crop an avatar at the source's resolution, then minify ([#1143](https://github.com/NC1107/slim-m/issues/1143)) ([57f2e5e](https://github.com/NC1107/slim-m/commit/57f2e5e13ded733dccd749eb29e9cffa4c38bd0c))
+* **client:** drop the duplicate presence rows, name each device, tame the back button ([#1140](https://github.com/NC1107/slim-m/issues/1140)) ([92dd49a](https://github.com/NC1107/slim-m/commit/92dd49a24694d6b08006a875b2af3be2c21d1f49))
+* **client:** never leave the crop sheet stuck on "Working..." ([#1145](https://github.com/NC1107/slim-m/issues/1145)) ([baf2b58](https://github.com/NC1107/slim-m/commit/baf2b582e5415d8f30ba6e1d34721c12a931af5b))
+* **client:** pin the sheet surface, and offer role access after a module install ([#1142](https://github.com/NC1107/slim-m/issues/1142)) ([be39c5e](https://github.com/NC1107/slim-m/commit/be39c5eb979f5b474554d5a5059525e967390ddf))
+* **client:** the timeout chips, the module access modal, and drawing by drag ([#1148](https://github.com/NC1107/slim-m/issues/1148)) ([ab59865](https://github.com/NC1107/slim-m/commit/ab598657fb2ffdcf8472c5b4286e5b75e67e57a2))
+* say which server sign-in connects to, and make its code checkable ([#1144](https://github.com/NC1107/slim-m/issues/1144)) ([cf109c1](https://github.com/NC1107/slim-m/commit/cf109c1d2d66a592478e83daae195c54f439dc32))
+
 ## [0.72.0](https://github.com/NC1107/slim-m/compare/client-v0.71.0...client-v0.72.0) (2026-09-09)
 
 
