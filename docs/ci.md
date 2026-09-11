@@ -135,6 +135,19 @@ It is a request property, so nothing is testable either way: the field is option
 
 ## hygiene
 
+### The shell, which nothing checked until 2026-09-11
+
+22 workflow files, roughly 84 inline `run:` blocks and 17 shell scripts orchestrate every build, release and deploy this project has, and no linter looked at any of it.
+That is the layer a mistake is most expensive in: a bad `${{ }}` expression, a `needs:` naming a job that does not exist, or an invalid key is a runtime failure on `main`, after the merge, rather than a red check on the pull request.
+
+`actionlint` is the workflow half, pinned by image digest.
+It also runs `shellcheck` over the inline `run:` blocks, so the two steps here cover the same language from both ends.
+It found eight things when it was first run, all minor - unquoted `${PIPESTATUS[0]}`, unused `i` in four retry loops, two `ls | head` pipelines and one deliberately word-split variable - and all eight were fixed in the change that added it, so it lands green.
+The word-split one is worth naming since it was in `release.yml`: `refs` became an array, which produces an argv identical to the old unquoted expansion for digest strings and cannot break on one containing a space.
+
+`shellcheck` is the standalone-script half, preinstalled on the runner and run over every tracked `*.sh`.
+It reported nothing at all on first run, so that gate arrives with no backlog behind it and is a pure ratchet from here.
+
 ### The e2e harness's own unit tests
 
 `scripts/lib/test_*.py` covers the harness's scenario logic (the read-state and sync assertions, the settings assertions) against stubs, with no server and no browser.

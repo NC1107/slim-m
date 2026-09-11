@@ -385,3 +385,25 @@ jobs:
       # wrong-looking. See the script header.
       - name: every workflow is in the docs/ci.md table
         run: python3 scripts/check-ci-docs.py
+
+      # The shell was the one layer nothing checked: 22 workflows, ~84 inline
+      # `run:` blocks and 14 scripts orchestrating every build and deploy, with
+      # no linter over any of it. A bad `${{ }}` expression, a `needs:` naming
+      # a job that does not exist, or an invalid key only shows at runtime on
+      # main, which is exactly where a workflow bug is most expensive.
+      # actionlint runs shellcheck over the inline blocks as well, so this and
+      # the step below cover the same language from both ends.
+      - name: workflows lint
+        run: |
+          docker run --rm -v "$PWD":/repo -w /repo \
+            rhysd/actionlint@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9 \
+            -color
+
+      # Preinstalled on the runner. Every tracked *.sh, which was already clean
+      # when this landed, so it ratchets rather than arriving with a backlog.
+      - name: shell scripts lint
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files '*.sh')
+          printf 'checking %d scripts\n' "${#scripts[@]}"
+          shellcheck "${scripts[@]}"

@@ -87,7 +87,7 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         # Retried because a tag-push run can start before release-please's release object exists.
         run: |
-          for i in 1 2 3 4 5; do
+          for _ in 1 2 3 4 5; do
             gh release upload "$TAG" slim-m-client-*-windows-x64.zip --clobber && exit 0
             sleep 60
           done
@@ -134,7 +134,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          for i in 1 2 3 4 5; do
+          for _ in 1 2 3 4 5; do
             gh release upload "$TAG" slim-m-client-*-macos.zip --clobber && exit 0
             sleep 60
           done
