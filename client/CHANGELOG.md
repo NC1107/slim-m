@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.74.0](https://github.com/NC1107/slim-m/compare/client-v0.73.0...client-v0.74.0) (2026-09-12)
+
+
+### Features
+
+* **client:** remove swipe-to-reply from the message row ([#1155](https://github.com/NC1107/slim-m/issues/1155)) ([c009435](https://github.com/NC1107/slim-m/commit/c009435f7b37447f02b5dc1d9c18e3e83b7894f4))
+* **client:** send a whole drag as one module call where the module allows it ([#1157](https://github.com/NC1107/slim-m/issues/1157)) ([298c357](https://github.com/NC1107/slim-m/commit/298c357ec87ecee502a624efa5e6522ff8d527a4))
+* **client:** who is speaking reaches the accessible name ([#1161](https://github.com/NC1107/slim-m/issues/1161)) ([fa3b72b](https://github.com/NC1107/slim-m/commit/fa3b72b28767fa485d8df9b212bef9b992f4a8df))
+
+
+### Bug Fixes
+
+* **client:** let the channel topic use the header width the name leaves ([#1164](https://github.com/NC1107/slim-m/issues/1164)) ([9299923](https://github.com/NC1107/slim-m/commit/929992396b63b44fcd855ccb4ec09c79879c8720))
+* **client:** pace a playing scene against the rate limit, and stop the controls flashing ([#1158](https://github.com/NC1107/slim-m/issues/1158)) ([4f50763](https://github.com/NC1107/slim-m/commit/4f507634180de60a8ecfea4b8b41d26644bf1265))
+
 ## [0.73.0](https://github.com/NC1107/slim-m/compare/client-v0.72.0...client-v0.73.0) (2026-09-11)
 
 
