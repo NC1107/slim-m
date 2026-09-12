@@ -151,6 +151,9 @@ def scenarios(a, b, admin, member, room_id, server):
          "it rather than placing a second one",
          lambda: e2e_canvas_shapes.place_then_move_without_switching_tools(
              a, admin, admin.channel_named(L.VOICE_CHANNEL)["id"])),
+        ("canvas: two clients editing at once converge, and stay live",
+         lambda: e2e_canvas.concurrent_edits_converge(
+             a, b, admin, admin.channel_named(L.VOICE_CHANNEL)["id"])),
         ("canvas: a reload proves it actually persisted",
          lambda: e2e_canvas.reload_persists(
              b, L.VOICE_CHANNEL, admin,
@@ -164,6 +167,10 @@ def scenarios(a, b, admin, member, room_id, server):
             a, b, room_id)),
         ("voice: mute reaches the server", lambda: e2e_voice.mute_propagates(
             a, b, room_id)),
+        ("voice: muting actually silences it",
+         lambda: e2e_voice.mute_actually_silences(a, b)),
+        ("voice: audio survives losing the network",
+         lambda: e2e_voice.audio_survives_a_reconnect(a, b)),
         ("voice: the canvas dock keeps mute and hang-up reachable",
          lambda: e2e_voice.canvas_keeps_call_controls(a, room_id)),
         ("voice: a shared camera tile converges and persists",

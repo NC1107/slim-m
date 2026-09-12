@@ -107,6 +107,21 @@ def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
         print(f'  {p["identity"][:13]} ACTIVE, mic published unmuted')
 
 
+def _wait_until_gone(client, label, timeout=30):
+    """Waits for a label to leave the tree, which `wait_for` cannot express.
+
+    Returns nothing and raises on timeout, so a caller reads the same way
+    round as `wait_for` does.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if client.find(label) is None:
+            return
+        time.sleep(1)
+    client.shot(f"still-there-{label[:20].replace(' ', '-')}")
+    raise AssertionError(f"{client.name}: {label!r} never went away")
+
+
 def audio_actually_arrives(a, b):
     """Sound crossing the SFU, rather than tracks merely being present.
 
@@ -140,6 +155,40 @@ def audio_actually_arrives(a, b):
     b.wait_for(f"Alice{L.SPEAKING}", timeout=45)
     a.shot("audio-arrives")
     print("  each client hears the other: the speaking ring lit on both")
+
+
+def audio_survives_a_reconnect(a, b):
+    """A call that loses its network and gets it back is still a call.
+
+    This is where real calls break, and nothing here covered it. The rejoin
+    scenario is a *deliberate* leave and re-click, which is a different path
+    entirely: the client chose to go, tore the session down cleanly and built
+    a new one. What a train tunnel does is take the transport away under a
+    page that never moved, and hand it back a few seconds later expecting the
+    session to have healed itself.
+
+    Cutting it with `Network.emulateNetworkConditions` rather than a reload is
+    the whole point - a reload leaves the call, so it would prove the rejoin
+    path again and nothing new.
+
+    The assertion is audio, not presence, and that matters here more than
+    anywhere: a reconnect that restores the signalling socket while leaving
+    the media path dead is exactly the failure that looks completely healthy
+    on a roster. Both directions are checked, because a one-way recovery -
+    the returning client hearing the room while the room hears nothing from
+    it - is a real and unpleasant way for this to half-work.
+    """
+    b.go_offline()
+    print("  bob's network is gone")
+    _wait_until_gone(a, f"Bob{L.SPEAKING}", timeout=60)
+    a.shot("peer-dropped")
+
+    b.go_online()
+    print("  and back; waiting for the call to heal itself")
+    a.wait_for(f"Bob{L.SPEAKING}", timeout=120)
+    b.wait_for(f"Alice{L.SPEAKING}", timeout=120)
+    a.shot("peer-reconnected")
+    print("  audio flows both ways again after the drop")
 
 
 def share_screen(client, other, room_id):
@@ -213,6 +262,37 @@ def mute_propagates(a, b, room_id):
     assert unmuted, f"nobody is publishing a mic track: {sfu_participants(room_id)}"
     assert not any(unmuted.values()), f"still reads as muted: {unmuted}"
     print("  and unmuting clears it, so the next call this client joins starts unmuted")
+
+
+def mute_actually_silences(a, b):
+    """Muting stops the sound, not just the flag.
+
+    `mute_propagates` asserts the SFU's own muted bit flips, which is the
+    client having said so. It is not the same claim as no audio arriving: a
+    track marked muted that still carries frames, or a second capture path
+    left publishing, would satisfy every assertion there and be audible to
+    everyone in the room. Nothing checked the difference until the speaking
+    indicator became something a test could read.
+
+    So this mutes and waits for the other client to stop hearing it, then
+    unmutes and waits for it to come back. Each half matters: the first
+    catches audio that outlives the flag, and the second catches a mute that
+    never releases - a microphone that stays dead after unmuting is the worse
+    bug of the two, and one a test that only muted would miss entirely.
+
+    Leaves the client unmuted, as `mute_propagates` does and for the reason
+    its own doc gives: a mute left standing carries into the next call.
+    """
+    a.wait_for(f"Bob{L.SPEAKING}", timeout=45)
+
+    b.click(L.MUTE)
+    _wait_until_gone(a, f"Bob{L.SPEAKING}", timeout=30)
+    a.shot("peer-muted-and-silent")
+    print("  muting stops the sound, not just the flag")
+
+    b.click(L.UNMUTE)
+    a.wait_for(f"Bob{L.SPEAKING}", timeout=45)
+    print("  and unmuting brings it back, so the mute released the microphone")
 
 
 def canvas_keeps_call_controls(client, room_id, channel=L.VOICE_CHANNEL):

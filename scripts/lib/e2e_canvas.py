@@ -68,6 +68,7 @@ produces is what draw_stroke_and_see_it_live already checks on both
 clients.
 """
 import json
+import threading
 import time
 
 import e2e_labels as L
@@ -327,3 +328,70 @@ def close_on_both(a, b):
         c.wait_for(L.IN_CALL)
     for c in (a, b):
         c.click(L.LEAVE_CALL, settle=6)
+
+
+def concurrent_edits_converge(a, b, admin_api, channel_id):
+    """Both clients drag the same object at once, and everything settles.
+
+    Every canvas scenario before this one is sequential: one client acts, the
+    other watches it arrive. That proves the sync path carries a change, and
+    says nothing about what happens when two changes race - which is the case
+    a shared canvas exists to handle and the one where convergence bugs live.
+
+    Genuinely simultaneous, on two threads, rather than one drag quickly
+    followed by another: interleaving them by hand would let the first finish
+    its round trip before the second starts, which is the sequential case
+    again wearing a different hat.
+
+    What is asserted is convergence, deliberately not a winner. Last write
+    wins is a perfectly good answer here; a *blend* of the two drags is not,
+    and neither is a value still moving after everyone stopped. So this checks
+    the server settles on one of the two outcomes and stays there across two
+    reads a second apart.
+
+    The last assertion is the one worth having. A conflict that wedges the
+    sync loop leaves the object exactly where it should be and the canvas
+    dead, which every positional check here would call a pass - so afterwards
+    `a` draws a fresh stroke and `b` has to see it.
+    """
+    image_id = object_of_kind(admin_api, channel_id, "image")["id"]
+    before = admin_api.canvas_object(channel_id, image_id)
+    org_a = origin(a)
+
+    def drag(client, dx, dy):
+        sx, sy = before["x"], before["y"]
+        client.gestures(True)
+        client.drag([(sx, sy), (sx + dx // 2, sy + dy // 2), (sx + dx, sy + dy)])
+        client.gestures(False)
+
+    threads = [
+        threading.Thread(target=drag, args=(a, 120, 0)),
+        threading.Thread(target=drag, args=(b, 0, 120)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    time.sleep(3)
+
+    settled = admin_api.canvas_object(channel_id, image_id)
+    time.sleep(1.5)
+    again = admin_api.canvas_object(channel_id, image_id)
+    assert (settled["x"], settled["y"]) == (again["x"], again["y"]), \
+        f"the object is still moving after both drags stopped: {settled} then {again}"
+
+    moved_x = abs(settled["x"] - (before["x"] + 120)) < 12
+    moved_y = abs(settled["y"] - (before["y"] + 120)) < 12
+    assert moved_x or moved_y, (
+        "the object landed on neither drag's result, which is a blend of the "
+        f"two rather than one of them winning: {before} -> {settled}")
+    print(f"  both dragged at once; settled at "
+          f"({settled['x']:.0f}, {settled['y']:.0f}) and stayed there")
+
+    # A wedged sync loop looks identical to a healthy one until something moves.
+    a.gestures(True)
+    a.drag([at(org_a, STROKE_START), at(org_a, STROKE_MID),
+            at(org_a, STROKE_END)])
+    a.gestures(False)
+    wait_for_summary(b, "2 strokes", timeout=45)
+    print("  and the canvas is still live: a new stroke still reaches b")
