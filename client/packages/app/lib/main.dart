@@ -147,7 +147,8 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
 ///
 /// "Get update" opens the release (or its package-manager hint); it does not
 /// self-apply yet, which is Phase 2 and needs signed artifacts. "Not now"
-/// loads the current client immediately.
+/// loads the current client immediately and is remembered, so that version is
+/// not offered again on the next launch - see [updateWasDismissed].
 Future<void> _maybePromptForUpdate(ProviderContainer container) async {
   if (!isDesktopHost || updateChecksDisabled()) return;
   try {
@@ -156,6 +157,15 @@ Future<void> _maybePromptForUpdate(ProviderContainer container) async {
     final version = (await PackageInfo.fromPlatform()).version;
     final update = await checkForClientUpdate(currentVersion: version);
     if (update == null) return;
+
+    // The same cached future every other preference reads.
+    final prefs = await container.read(preferencesProvider.future);
+    if (updateWasDismissed(
+      dismissed: prefs.getString(dismissedUpdateVersionKey),
+      candidate: update.version,
+    )) {
+      return;
+    }
 
     final choice = Completer<bool>();
     void respond(bool accepted) {
@@ -170,6 +180,10 @@ Future<void> _maybePromptForUpdate(ProviderContainer container) async {
     );
     final accepted = await choice.future;
     container.read(startupUpdateProvider.notifier).state = null;
+    // Only "Not now" suppresses; see [updateWasDismissed].
+    if (!accepted) {
+      await prefs.setString(dismissedUpdateVersionKey, update.version);
+    }
     if (accepted) {
       final uri = Uri.tryParse(update.releaseUrl);
       if (uri != null) {

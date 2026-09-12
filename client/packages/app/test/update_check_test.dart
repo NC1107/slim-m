@@ -39,6 +39,39 @@ void main() {
       expect(isNewer('0.69.0', '0.69.0'), isFalse);
       expect(isNewer('0.68.0', '0.69.0'), isFalse);
     });
+
+    /// A version that will not parse means "cannot tell", and the only safe
+    /// reading of that is "not newer". The right-hand side used to answer
+    /// true, which is what made a build with an unreadable version.json offer
+    /// an update on every launch forever.
+    test('an unreadable version on either side is not newer', () {
+      expect(isNewer('0.70.0', ''), isFalse);
+      expect(isNewer('0.70.0', 'unknown'), isFalse);
+      expect(isNewer('', '0.70.0'), isFalse);
+    });
+  });
+
+  group('a dismissed offer', () {
+    test('stays dismissed until something newer exists', () {
+      expect(
+        updateWasDismissed(dismissed: '0.73.0', candidate: '0.73.0'),
+        isTrue,
+        reason: 'the same version must not be offered again next launch',
+      );
+      expect(
+        updateWasDismissed(dismissed: '0.73.0', candidate: '0.74.0'),
+        isFalse,
+        reason: 'a genuinely newer release is worth asking about again',
+      );
+      expect(
+        updateWasDismissed(dismissed: '0.73.0', candidate: '0.72.0'),
+        isTrue,
+      );
+    });
+
+    test('nothing dismissed suppresses nothing', () {
+      expect(updateWasDismissed(dismissed: null, candidate: '0.73.0'), isFalse);
+    });
   });
 
   group('checkForClientUpdate', () {
@@ -107,6 +140,27 @@ void main() {
             currentVersion: '0.69.0',
             client: junk,
             format: InstallFormat.tarball,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    /// The reported bug: on Linux `PackageInfo` answers with an empty string
+    /// when it cannot find `version.json` beside the executable, and the check
+    /// then treated every published release as newer than the running build.
+    test(
+      'a build that cannot read its own version is never offered one',
+      () async {
+        final client = releasing([
+          rel('client-v0.73.0'),
+          rel('client-v0.72.0'),
+        ]);
+        expect(
+          await checkForClientUpdate(
+            currentVersion: '',
+            client: client,
+            format: InstallFormat.rpm,
           ),
           isNull,
         );
