@@ -107,6 +107,41 @@ def join_call(a, b, room_id, channel=L.VOICE_CHANNEL):
         print(f'  {p["identity"][:13]} ACTIVE, mic published unmuted')
 
 
+def audio_actually_arrives(a, b):
+    """Sound crossing the SFU, rather than tracks merely being present.
+
+    `join_call` already proves both participants are ACTIVE with an unmuted
+    microphone track published. That is presence and plumbing, and it is what
+    every voice check here was until this one: two people can satisfy all of
+    it with no audio getting through at all - an ICE path that failed over to
+    nothing, a codec both ends refused, a capture device producing silence.
+
+    Chrome runs with `--use-fake-device-for-media-stream`, which generates a
+    real tone rather than silence, so asserting the speaking indicator lights
+    exercises the whole chain: capture, encode, the SFU, decode, LiveKit's own
+    voice-activity detection, and that state reaching the roster.
+
+    Each client is asked about the *other* one, which is the load-bearing part.
+    A participant's own speaking state is computed from its own local audio
+    level and would light with the network unplugged; only the remote one
+    proves media crossed the room. A generous timeout because voice-activity
+    detection needs a moment of audio before it reports anything.
+
+    Reading a failure here: `join_call` runs immediately before and has already
+    asserted both participants are ACTIVE at the SFU with unmuted microphone
+    tracks. So a failure at this step is not "the call broke" - it is tracks
+    present and no audio detected across them, which is either media genuinely
+    not flowing or LiveKit's voice-activity detection never firing on Chrome's
+    synthetic tone. The client half is not a suspect: the speaking threshold
+    passes any level at the default sensitivity, so this reduces to whatever
+    the SFU reports.
+    """
+    a.wait_for(f"Bob{L.SPEAKING}", timeout=45)
+    b.wait_for(f"Alice{L.SPEAKING}", timeout=45)
+    a.shot("audio-arrives")
+    print("  each client hears the other: the speaking ring lit on both")
+
+
 def share_screen(client, other, room_id):
     """Publish a screen track, and see the other side told about it.
 

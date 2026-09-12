@@ -29,6 +29,9 @@ THEME = "Theme"
 
 BACK_TO_CHANNELS = "Back to channels"
 
+# AppAvatar's suffix while a speaking ring is lit; composed with a name.
+SPEAKING = ", speaking"
+
 # Presence lives on the rail footer now, not in settings.
 CHANGE_STATUS = "Change your status"
 DND = "Do not disturb"

@@ -9,6 +9,11 @@ that reads as plausible right up until something actually runs it. This test
 catches that class of drift in seconds, at unit-test speed, rather than
 after the 60-minute stack in scripts/e2e.sh boots.
 
+Every package's `lib` is searched, not just the app's. It was `app/lib` alone,
+which quietly narrowed what this could see: a label produced by a design-system
+widget - `AppAvatar` composing "<name>, speaking" - lives outside that
+directory, so a constant naming it read as stale while being perfectly real.
+
 It reads code only, never comments, and that is load-bearing rather than
 tidy. `COMPOSER = "Message #"` went stale on 2026-08-09 when PR #495
 correctly stopped a thread's composer rendering a dangling hint, and this
@@ -26,7 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import e2e_labels as L  # noqa: E402
 
-CLIENT_LIB = Path(__file__).resolve().parents[2] / "client" / "packages" / "app" / "lib"
+_PACKAGES = Path(__file__).resolve().parents[2] / "client" / "packages"
+
+CLIENT_LIBS = sorted(p / "lib" for p in _PACKAGES.iterdir() if (p / "lib").is_dir())
 
 # Fixture content the seed script writes (a channel name, a message body), never a widget's own label.
 NOT_A_LABEL = {"TEXT_CHANNEL", "VOICE_CHANNEL", "FIRST_MESSAGE", "REPLY_MESSAGE"}
@@ -59,8 +66,8 @@ class LabelsStillExistTest(unittest.TestCase):
     """Every accessible-name constant must appear somewhere in the client."""
 
     def test_every_label_appears_in_client_source(self):
-        sources = list(CLIENT_LIB.rglob("*.dart"))
-        self.assertTrue(sources, f"no .dart files found under {CLIENT_LIB}")
+        sources = [f for lib in CLIENT_LIBS for f in lib.rglob("*.dart")]
+        self.assertTrue(sources, f"no .dart files found under {CLIENT_LIBS}")
         contents = [
             code_only(p.read_text(encoding="utf-8", errors="ignore"))
             for p in sources
@@ -69,8 +76,8 @@ class LabelsStillExistTest(unittest.TestCase):
                  if not any(value in text for text in contents)]
         self.assertEqual(
             stale, [],
-            f"e2e_labels.py still names {stale}, but no .dart file under "
-            f"{CLIENT_LIB} carries that string any more - the widget was "
+            f"e2e_labels.py still names {stale}, but no .dart file in "
+            f"any package's lib carries that string any more - the widget was "
             "renamed or removed and the harness needs updating to match")
 
 
