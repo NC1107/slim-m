@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.60.0](https://github.com/NC1107/slim-m/compare/server-v0.59.0...server-v0.60.0) (2026-09-12)
+
+
+### Bug Fixes
+
+* **server:** give module runs their own rate-limit class ([#1159](https://github.com/NC1107/slim-m/issues/1159)) ([2f6b0ee](https://github.com/NC1107/slim-m/commit/2f6b0ee4345ecc97c150003920ab908238a9d94c))
+
 ## [0.59.0](https://github.com/NC1107/slim-m/compare/server-v0.58.0...server-v0.59.0) (2026-09-11)
 
 
