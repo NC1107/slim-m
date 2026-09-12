@@ -2,10 +2,16 @@
 /// The centre column's channel header: name, topic, pin pill, and the two
 /// toggles that live beside it.
 ///
-/// The name outweighs the topic when both compete for space (`Flexible`
-/// flex 2 against the topic's implicit 1): the name carries this pane's own
-/// identity and the topic is secondary, which flex alone did not enforce
-/// while the topic outweighed the name.
+/// The name carries this pane's identity and the topic is secondary, so the
+/// name wins when the two compete for space - but only then. Weighted flex
+/// expressed that as 2:1 and got the sharing wrong: a `Flexible` that asks
+/// for less than its share leaves the rest unused rather than passing it on,
+/// so a short name like `#general` handed the topic a third of the header and
+/// ellipsised it with most of the row still empty. Measured at an 800px
+/// header, the topic was capped at 250px with 467px of dead air beside it.
+///
+/// So the name is sized to its content under a cap and the topic takes
+/// everything left, which is the same priority without the dead space.
 library;
 
 import 'package:flutter/material.dart';
@@ -18,6 +24,11 @@ import '../routing/breakpoints.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
+
+/// How much of the header a channel name may take before it has to elide, so
+/// a long one cannot crowd the topic out entirely. Only applies when there is
+/// a topic to protect; without one the name gets the whole row.
+const double _nameMaxShare = 0.6;
 
 class ChannelHeader extends ConsumerWidget {
   const ChannelHeader({
@@ -70,6 +81,9 @@ class ChannelHeader extends ConsumerWidget {
           context,
         ).fitsMemberPane(MediaQuery.sizeOf(context).width);
 
+    final topic = this.topic;
+    final hasTopic = topic != null && topic.isNotEmpty;
+
     return Container(
       height: AppSizes.headerBar,
       // Matches the message rows and composer below it.
@@ -83,56 +97,69 @@ class ChannelHeader extends ConsumerWidget {
           // beside a Spacer: two flex children split the free space evenly,
           // which left the actions mid-pane with dead air to their right.
           Expanded(
-            child: Row(
-              children: [
-                // A DM is a person: show their avatar like every other member-naming surface. The personal space keeps its notebook, and a text or voice channel its own icon.
-                if (isPersonalSpace)
-                  Icon(
-                    AppIcons.notebook,
-                    size: AppSizes.icon16,
-                    color: tokens.textSecondary,
-                  )
-                else if (isDm)
-                  AppAvatar(name: name, tintKey: dmParticipantId, size: 24)
-                else
-                  Icon(
-                    isVoice ? AppIcons.voice : AppIcons.hash,
-                    size: AppSizes.icon16,
-                    color: tokens.textSecondary,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // The design's 17px header left the scale
+                // (app_typography.dart): it differed from body only in
+                // weight, so weight alone carries it.
+                final nameText = Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body.copyWith(
+                    color: tokens.textPrimary,
+                    fontWeight: AppWeights.medium,
                   ),
-                const SizedBox(width: AppSpacing.s8),
-                // See the library doc comment above for why flex is 2 here.
-                Flexible(
-                  flex: 2,
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    // The design's 17px header left the scale
-                    // (app_typography.dart): it differed from body only in
-                    // weight, so weight alone carries it.
-                    style: AppText.body.copyWith(
-                      color: tokens.textPrimary,
-                      fontWeight: AppWeights.medium,
-                    ),
-                  ),
-                ),
-                if (topic != null && topic!.isNotEmpty) ...[
-                  const SizedBox(width: AppSpacing.s12),
-                  Container(width: 1, height: 20, color: tokens.borderSubtle),
-                  const SizedBox(width: AppSpacing.s12),
-                  Flexible(
-                    child: Text(
-                      topic!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.caption.copyWith(
+                );
+                return Row(
+                  children: [
+                    // A DM is a person: show their avatar like every other member-naming surface. The personal space keeps its notebook, and a text or voice channel its own icon.
+                    if (isPersonalSpace)
+                      Icon(
+                        AppIcons.notebook,
+                        size: AppSizes.icon16,
+                        color: tokens.textSecondary,
+                      )
+                    else if (isDm)
+                      AppAvatar(name: name, tintKey: dmParticipantId, size: 24)
+                    else
+                      Icon(
+                        isVoice ? AppIcons.voice : AppIcons.hash,
+                        size: AppSizes.icon16,
                         color: tokens.textSecondary,
                       ),
-                    ),
-                  ),
-                ],
-              ],
+                    const SizedBox(width: AppSpacing.s8),
+                    if (!hasTopic)
+                      Expanded(child: nameText)
+                    else ...[
+                      // Not flexible; see the library comment above.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth * _nameMaxShare,
+                        ),
+                        child: nameText,
+                      ),
+                      const SizedBox(width: AppSpacing.s12),
+                      Container(
+                        width: 1,
+                        height: 20,
+                        color: tokens.borderSubtle,
+                      ),
+                      const SizedBox(width: AppSpacing.s12),
+                      Expanded(
+                        child: Text(
+                          topic,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption.copyWith(
+                            color: tokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
           AppIconButton(
