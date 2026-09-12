@@ -405,6 +405,29 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.74.0',
+    headline: 'Swipe-to-reply is gone, and a playing board keeps playing',
+    points: [
+      WhatsNewPoint(
+        'Swiping a message sideways no longer starts a reply. It ran the '
+        'opposite way round from other apps, and it took every sideways drag '
+        'on a message - including one meant to draw on a module board. Reply '
+        'is still on the message menu, where it always was.',
+      ),
+      WhatsNewPoint(
+        'A board left playing no longer stops with "too many requests". It '
+        'notices it is asking faster than the server will answer and slows '
+        'down instead, and its buttons stop flickering once a generation '
+        'while it runs.',
+      ),
+      WhatsNewPoint(
+        'Drawing on a board by dragging across it now takes one round trip '
+        'for the whole line rather than one per square, on modules that say '
+        'they can read it that way. Game of Life 0.3.0 can.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
