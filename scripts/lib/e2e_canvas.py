@@ -351,6 +351,11 @@ def concurrent_edits_converge(a, b, admin_api, channel_id):
     server rather than assuming it, so nothing downstream inherits whatever
     this leaves behind - the first draft hard-coded "2 strokes" and would have
     broken the moment an earlier scenario drew one more.
+
+    Every tool it needs is selected explicitly. Two drafts failed on the tool
+    left over from the step before: the drags found empty canvas with the pen
+    still active, and then the closing stroke moved something with the select
+    tool still active. A drag here means nothing without the tool it runs in.
     """
     image_id = object_of_kind(admin_api, channel_id, "image")["id"]
     before = admin_api.canvas_object(channel_id, image_id)
@@ -397,6 +402,7 @@ def concurrent_edits_converge(a, b, admin_api, channel_id):
           f"({settled['x']:.0f}, {settled['y']:.0f}) and stayed there")
 
     # A wedged sync loop looks identical to a healthy one until something moves.
+    a.click(L.PEN_TOOL)
     a.gestures(True)
     a.drag([at(org_a, STROKE_START), at(org_a, STROKE_MID),
             at(org_a, STROKE_END)])
