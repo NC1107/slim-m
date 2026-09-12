@@ -280,14 +280,20 @@ void main() {
     expect(find.byType(AppAvatar), findsNothing);
   });
 
-  /// shell.md: at the one width where the name and the topic compete for
-  /// space with a member pane also on screen, the topic used to outweigh
-  /// the name and take the room first.
-  testWidgets('the channel name outweighs the topic when both are truncating', (
-    tester,
-  ) async {
-    final container = _containerWithPins([]);
-    addTearDown(container.dispose);
+  /// Both of these are about how the header divides its width, so both
+  /// measure what was rendered rather than the widget that arranged it. An
+  /// earlier version asserted the two `Flexible` weights directly and so
+  /// passed happily while the layout it was describing stranded a third of
+  /// the header - the weights were right and the sharing was not.
+  Future<void> pumpHeader(
+    WidgetTester tester,
+    ProviderContainer container, {
+    required String name,
+    required String topic,
+  }) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -297,8 +303,8 @@ void main() {
           home: Scaffold(
             body: ChannelHeader(
               channelId: 'c1',
-              name: 'general',
-              topic: 'Anything and everything about the project',
+              name: name,
+              topic: topic,
               isVoice: false,
               searchOpen: false,
               onToggleSearch: () {},
@@ -308,23 +314,57 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
 
-    final nameFlexible = tester.widget<Flexible>(
-      find
-          .ancestor(of: find.text('general'), matching: find.byType(Flexible))
-          .first,
-    );
-    final topicFlexible = tester.widget<Flexible>(
-      find
-          .ancestor(
-            of: find.textContaining('Anything'),
-            matching: find.byType(Flexible),
-          )
-          .first,
-    );
+  const longTopic =
+      'General chat for the whole Space - keep it friendly, and keep call '
+      'logistics in #main instead of here.';
+
+  testWidgets('a short name leaves the topic the rest of the header', (
+    tester,
+  ) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+    await pumpHeader(tester, container, name: 'general', topic: longTopic);
+
+    final topicRight = tester
+        .getBottomRight(find.textContaining('General chat'))
+        .dx;
+    final actionsLeft = tester.getTopLeft(find.byIcon(AppIcons.pin)).dx;
     expect(
-      nameFlexible.flex,
-      greaterThan(topicFlexible.flex),
+      actionsLeft - topicRight,
+      lessThan(24),
+      reason:
+          'the topic elided with the header still empty beside it: it ran to '
+          '${topicRight.round()} with the actions not starting until '
+          '${actionsLeft.round()}',
+    );
+  });
+
+  /// shell.md: at the one width where the name and the topic compete for
+  /// space with a member pane also on screen, the topic used to outweigh
+  /// the name and take the room first.
+  testWidgets('the channel name outweighs the topic when both are truncating', (
+    tester,
+  ) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+    await pumpHeader(
+      tester,
+      container,
+      name: 'a-channel-name-long-enough-to-need-eliding-all-on-its-own',
+      topic: longTopic,
+    );
+
+    final nameWidth = tester
+        .getSize(find.textContaining('a-channel-name'))
+        .width;
+    final topicWidth = tester
+        .getSize(find.textContaining('General chat'))
+        .width;
+    expect(
+      nameWidth,
+      greaterThan(topicWidth),
       reason: 'the name must give up space last, not the topic',
     );
   });
