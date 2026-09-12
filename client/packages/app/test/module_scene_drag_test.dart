@@ -12,6 +12,7 @@
 /// pause. The board going still was the only feedback either way.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -116,6 +117,120 @@ Future<void> _dragThrough(
 }
 
 void main() {
+  testWidgets('a rate limit while playing paces it instead of stopping it', (
+    tester,
+  ) async {
+    // Playing outruns the write budget; a long run used to fail outright.
+    var calls = 0;
+    var gen = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: ModuleSceneView(
+            initial: parseModuleScene(_scene(0))!,
+            runCommand: (_) async {
+              calls++;
+              if (calls == 2) {
+                throw const api.RateLimitedException('too many requests');
+              }
+              return api.RunModuleCommandResult(
+                ok: true,
+                output: _scene(++gen),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Play'));
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 140));
+    }
+
+    expect(
+      find.bySemanticsLabel('Pause'),
+      findsOneWidget,
+      reason: 'a refusal for asking too fast must not stop the animation',
+    );
+    expect(
+      find.byType(AppErrorState),
+      findsNothing,
+      reason: 'nor put an error in front of somebody watching a board play',
+    );
+    expect(calls, greaterThan(2), reason: 'it kept going after the refusal');
+
+    await tester.tap(find.bySemanticsLabel('Pause'));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+  });
+
+  testWidgets('a rate limit on a manual step still surfaces', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: ModuleSceneView(
+            initial: parseModuleScene(_scene(0))!,
+            runCommand: (_) async =>
+                throw const api.RateLimitedException('too many requests'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Step'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(AppErrorState),
+      findsOneWidget,
+      reason: 'a press that did nothing has to say why; only play paces',
+    );
+  });
+
+  testWidgets('the controls do not disable themselves mid-call', (
+    tester,
+  ) async {
+    // Disabling on every in-flight call is what made them flash while playing.
+    final completer = Completer<api.RunModuleCommandResult>();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: ModuleSceneView(
+            initial: parseModuleScene(_scene(0))!,
+            runCommand: (_) => completer.future,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Step'));
+    await tester.pump();
+
+    final step = tester.widget<AppIconButton>(
+      find
+          .ancestor(
+            of: find.bySemanticsLabel('Step'),
+            matching: find.byType(AppIconButton),
+          )
+          .first,
+    );
+    expect(
+      step.onPressed,
+      isNotNull,
+      reason: 'greying out for the length of every generation is the flicker',
+    );
+
+    completer.complete(api.RunModuleCommandResult(ok: true, output: _scene(1)));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('play survives the shared path echoing each step back', (
     tester,
   ) async {
