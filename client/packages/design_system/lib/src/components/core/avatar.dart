@@ -123,6 +123,13 @@ class AppAvatar extends StatelessWidget {
 
   /// A live-speaking ring. Takes priority over [ringColor], matching the
   /// source design's own precedence.
+  ///
+  /// It also reaches the accessible name, as `<name>, speaking`. The ring was
+  /// the only thing carrying that, so who is talking in a call was information
+  /// a sighted viewer got and a screen reader user did not. A caller that
+  /// passes its own [semanticLabel] owns the whole name and gets no suffix -
+  /// which is the way out for a surface borrowing this ring to mean something
+  /// other than speech.
   final bool speaking;
 
   /// A caller-supplied ring (a fingerprint-confirmation colour strip, for
@@ -227,7 +234,7 @@ class AppAvatar extends StatelessWidget {
     // placeholder icon) from merging its own auto-label into this one.
     return Semantics(
       image: true,
-      label: semanticLabel ?? name,
+      label: semanticLabel ?? (speaking ? '$name, speaking' : name),
       child: ExcludeSemantics(child: content),
     );
   }
