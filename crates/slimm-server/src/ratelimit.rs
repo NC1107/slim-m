@@ -230,6 +230,69 @@ mod tests {
         );
     }
 
+    /// A playing module scene must not be able to spend the allowance a
+    /// person needs to send a message.
+    ///
+    /// Both module routes charged [`Class::Write`] until 2026-09-12, which is
+    /// exactly what this asserts is no longer true: a Game of Life left
+    /// running exhausted the write bucket, so it failed itself and would have
+    /// taken message sends down with it. Separate buckets, separate fates.
+    #[test]
+    fn exhausting_the_module_budget_leaves_writes_alone() {
+        let limiter = RateLimiter::new();
+        let now = Instant::now();
+        let (module_burst, _) = Class::Module.budget();
+
+        // Spend every module token this account has, and then some.
+        for _ in 0..(module_burst as usize * 2) {
+            limiter.check_at(Class::Module, "1.2.3.4", now);
+        }
+        assert!(
+            !limiter.check_at(Class::Module, "1.2.3.4", now),
+            "the module bucket should be empty by now"
+        );
+
+        assert!(
+            limiter.check_at(Class::Write, "1.2.3.4", now),
+            "sending a message must not be refused because a board was playing"
+        );
+    }
+
+    /// The other direction, so the separation is not a one-way accident: a
+    /// person writing hard does not stop a board mid-frame either.
+    #[test]
+    fn exhausting_the_write_budget_leaves_modules_alone() {
+        let limiter = RateLimiter::new();
+        let now = Instant::now();
+        let (write_burst, _) = Class::Write.budget();
+        for _ in 0..(write_burst as usize * 2) {
+            limiter.check_at(Class::Write, "1.2.3.4", now);
+        }
+        assert!(!limiter.check_at(Class::Write, "1.2.3.4", now));
+        assert!(
+            limiter.check_at(Class::Module, "1.2.3.4", now),
+            "a playing board should survive somebody typing fast"
+        );
+    }
+
+    /// Sized for an animating scene rather than inherited. Play asks roughly
+    /// every 130ms, so a refill below about 7.7/s means it spends its life
+    /// backing off; a ceiling above Canvas would be charging less for a
+    /// sandboxed execution than for a row write.
+    #[test]
+    fn the_module_budget_suits_a_playing_scene() {
+        let (burst, refill) = Class::Module.budget();
+        assert!(
+            refill >= 7.7,
+            "a playing scene ticks faster than {refill}/s"
+        );
+        assert!(
+            refill <= Class::Canvas.budget().1,
+            "a wasm execution should not be cheaper than a canvas write"
+        );
+        assert!(burst >= refill, "a burst below the refill is not a burst");
+    }
+
     /// The `/metrics` counters: admitted and refused are counted separately,
     /// not the same event read twice. Mutation-tested: always incrementing
     /// `admitted` regardless of outcome leaves every other test in this

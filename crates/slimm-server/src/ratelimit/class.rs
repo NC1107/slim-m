@@ -187,6 +187,22 @@ pub enum Class {
     /// fast as it can open connections. Sized for a person pasting a handful
     /// of links, not a per-keystroke re-fetch; the client caches per URL.
     LinkPreview,
+    /// Running a module command, both the direct route and the shared
+    /// code-block one.
+    ///
+    /// Both routes charged [`Class::Write`] before this existed, and a playing
+    /// scene asks for the next frame every 130ms. A Game of Life left running
+    /// sailed through that burst and then failed outright - found by running
+    /// one - and, worse, a board playing was spending the same allowance a
+    /// person needs to send a message. Those are different workloads and
+    /// should not share a bucket.
+    ///
+    /// Sized just above an animating scene's own tick so play does not spend
+    /// its life being refused, and below [`Class::Canvas`] because a frame
+    /// here costs a sandboxed execution rather than a row write. What bounds
+    /// the *cost* of each call is the module's own `runtime.limits` - its fuel
+    /// and wall-clock ceilings - not this, which bounds only the rate.
+    Module,
 }
 
 impl Class {
@@ -214,6 +230,8 @@ impl Class {
             Class::Ring => (5.0, 1.0 / 5.0),
             // See this variant's own doc comment for the roster and reconnect math.
             Class::AuthedRead => (40.0, 8.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::Module => (40.0, 8.0),
         }
     }
 
@@ -222,7 +240,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 16] = [
+    pub const ALL: [Class; 17] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -239,6 +257,7 @@ impl Class {
         Class::AuthedRead,
         Class::Ring,
         Class::LinkPreview,
+        Class::Module,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -261,6 +280,7 @@ impl Class {
             Class::LinkPreview => "link_preview",
             Class::Ring => "ring",
             Class::AuthedRead => "authed_read",
+            Class::Module => "module",
         }
     }
 }
