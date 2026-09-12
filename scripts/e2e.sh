@@ -135,6 +135,12 @@ for asset in main.dart.js flutter_bootstrap.js sqlite3.wasm drift_worker.js; do
 done
 
 echo "== two browsers =="
+# Chrome's own fake tone is too quiet for LiveKit to call it speech - a real
+# run reached the call with both tiles named and neither ever flagged speaking
+# - so it captures this instead. See scripts/lib/make_fake_voice.py.
+VOICE_WAV="$WORK/fake-voice.wav"
+python3 "$(dirname "$0")/lib/make_fake_voice.py" "$VOICE_WAV"
+
 for pair in "9801:alice" "9802:bob"; do
   port="${pair%%:*}"; who="${pair##*:}"
   profile="$WORK/chrome-$who"; rm -rf "$profile"; mkdir -p "$profile"
@@ -144,6 +150,7 @@ for pair in "9801:alice" "9802:bob"; do
     --user-data-dir='$profile' --remote-debugging-port=$port \
     --window-size=1280,900 --no-first-run --no-default-browser-check \
     --use-fake-device-for-media-stream --use-fake-ui-for-media-stream \
+    --use-file-for-fake-audio-capture='$VOICE_WAV' \
     --autoplay-policy=no-user-gesture-required --enable-unsafe-swiftshader \
     --mute-audio \
     --auto-select-desktop-capture-source='Entire screen' \
