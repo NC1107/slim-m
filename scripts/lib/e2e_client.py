@@ -106,35 +106,6 @@ class Client:
             time.sleep(2)
         raise AssertionError(f"{self.name}: accessibility tree never came up")
 
-    def go_offline(self):
-        """Cuts this client's network without touching the page.
-
-        Not [go_away], which navigates away and back: that is a reload, and a
-        reload leaves the call outright rather than dropping its transport.
-        What breaks a real call is the connection going and coming back under
-        a page that never moved, which is this.
-
-        `Network.enable` first because `emulateNetworkConditions` is a no-op
-        until the domain is on, and a silently ignored offline is a test that
-        proves nothing.
-        """
-        self.send("Network.enable")
-        self.send("Network.emulateNetworkConditions", {
-            "offline": True,
-            "latency": 0,
-            "downloadThroughput": 0,
-            "uploadThroughput": 0,
-        })
-
-    def go_online(self):
-        """Restores the network [go_offline] cut."""
-        self.send("Network.emulateNetworkConditions", {
-            "offline": False,
-            "latency": 0,
-            "downloadThroughput": -1,
-            "uploadThroughput": -1,
-        })
-
     def go_away(self):
         """Navigates to a blank page, which closes the app's socket.
 

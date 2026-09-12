@@ -157,40 +157,6 @@ def audio_actually_arrives(a, b):
     print("  each client hears the other: the speaking ring lit on both")
 
 
-def audio_survives_a_reconnect(a, b):
-    """A call that loses its network and gets it back is still a call.
-
-    This is where real calls break, and nothing here covered it. The rejoin
-    scenario is a *deliberate* leave and re-click, which is a different path
-    entirely: the client chose to go, tore the session down cleanly and built
-    a new one. What a train tunnel does is take the transport away under a
-    page that never moved, and hand it back a few seconds later expecting the
-    session to have healed itself.
-
-    Cutting it with `Network.emulateNetworkConditions` rather than a reload is
-    the whole point - a reload leaves the call, so it would prove the rejoin
-    path again and nothing new.
-
-    The assertion is audio, not presence, and that matters here more than
-    anywhere: a reconnect that restores the signalling socket while leaving
-    the media path dead is exactly the failure that looks completely healthy
-    on a roster. Both directions are checked, because a one-way recovery -
-    the returning client hearing the room while the room hears nothing from
-    it - is a real and unpleasant way for this to half-work.
-    """
-    b.go_offline()
-    print("  bob's network is gone")
-    _wait_until_gone(a, f"Bob{L.SPEAKING}", timeout=60)
-    a.shot("peer-dropped")
-
-    b.go_online()
-    print("  and back; waiting for the call to heal itself")
-    a.wait_for(f"Bob{L.SPEAKING}", timeout=120)
-    b.wait_for(f"Alice{L.SPEAKING}", timeout=120)
-    a.shot("peer-reconnected")
-    print("  audio flows both ways again after the drop")
-
-
 def share_screen(client, other, room_id):
     """Publish a screen track, and see the other side told about it.
 

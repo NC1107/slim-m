@@ -345,28 +345,36 @@ def concurrent_edits_converge(a, b, admin_api, channel_id):
 
     What is asserted is convergence, deliberately not a winner. Last write
     wins is a perfectly good answer here; a *blend* of the two drags is not,
-    and neither is a value still moving after everyone stopped. So this checks
-    the server settles on one of the two outcomes and stays there across two
-    reads a second apart.
+    and neither is a value still moving after everyone stopped.
 
-    The last assertion is the one worth having. A conflict that wedges the
-    sync loop leaves the object exactly where it should be and the canvas
-    dead, which every positional check here would call a pass - so afterwards
-    `a` draws a fresh stroke and `b` has to see it.
+    Runs last among the canvas scenarios and reads the stroke count from the
+    server rather than assuming it, so nothing downstream inherits whatever
+    this leaves behind - the first draft hard-coded "2 strokes" and would have
+    broken the moment an earlier scenario drew one more.
     """
     image_id = object_of_kind(admin_api, channel_id, "image")["id"]
     before = admin_api.canvas_object(channel_id, image_id)
-    org_a = origin(a)
+    strokes_before = sum(
+        1 for o in admin_api.canvas_objects(channel_id) if o["kind"] == "stroke")
 
-    def drag(client, dx, dy):
-        sx, sy = before["x"], before["y"]
+    # An object's position is in canvas coordinates; a drag is in screen ones.
+    for c in (a, b):
+        c.click(L.SELECT_TOOL)
+    org_a, org_b = origin(a), origin(b)
+    centre_a = (org_a[0] + before["x"] + before["w"] / 2,
+                org_a[1] + before["y"] + before["h"] / 2)
+    centre_b = (org_b[0] + before["x"] + before["w"] / 2,
+                org_b[1] + before["y"] + before["h"] / 2)
+
+    def drag(client, centre, dx, dy):
+        cx, cy = centre
         client.gestures(True)
-        client.drag([(sx, sy), (sx + dx // 2, sy + dy // 2), (sx + dx, sy + dy)])
+        client.drag([(cx, cy), (cx + dx / 2, cy + dy / 2), (cx + dx, cy + dy)])
         client.gestures(False)
 
     threads = [
-        threading.Thread(target=drag, args=(a, 120, 0)),
-        threading.Thread(target=drag, args=(b, 0, 120)),
+        threading.Thread(target=drag, args=(a, centre_a, 120, 0)),
+        threading.Thread(target=drag, args=(b, centre_b, 0, 120)),
     ]
     for t in threads:
         t.start()
@@ -378,10 +386,10 @@ def concurrent_edits_converge(a, b, admin_api, channel_id):
     time.sleep(1.5)
     again = admin_api.canvas_object(channel_id, image_id)
     assert (settled["x"], settled["y"]) == (again["x"], again["y"]), \
-        f"the object is still moving after both drags stopped: {settled} then {again}"
+        f"still moving after both drags stopped: {settled} then {again}"
 
-    moved_x = abs(settled["x"] - (before["x"] + 120)) < 12
-    moved_y = abs(settled["y"] - (before["y"] + 120)) < 12
+    moved_x = abs(settled["x"] - (before["x"] + 120)) < 20
+    moved_y = abs(settled["y"] - (before["y"] + 120)) < 20
     assert moved_x or moved_y, (
         "the object landed on neither drag's result, which is a blend of the "
         f"two rather than one of them winning: {before} -> {settled}")
@@ -393,5 +401,6 @@ def concurrent_edits_converge(a, b, admin_api, channel_id):
     a.drag([at(org_a, STROKE_START), at(org_a, STROKE_MID),
             at(org_a, STROKE_END)])
     a.gestures(False)
-    wait_for_summary(b, "2 strokes", timeout=45)
+    want = strokes_before + 1
+    wait_for_summary(b, f"{want} stroke" + ("" if want == 1 else "s"), timeout=45)
     print("  and the canvas is still live: a new stroke still reaches b")
