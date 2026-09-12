@@ -147,6 +147,9 @@ pub(crate) const AUTHED_READ: u8 = 9;
 /// Unfurling a pasted link; see [`Class::LinkPreview`].
 pub(crate) const LINK_PREVIEW: u8 = 10;
 
+/// Running a module command, direct or shared; see [`Class::Module`].
+pub(crate) const MODULE: u8 = 11;
+
 /// Panics on an unknown code rather than falling back.
 ///
 /// It used to end `_ => Class::Refresh`, which meant a new code compiled clean
@@ -156,6 +159,7 @@ pub(crate) const LINK_PREVIEW: u8 = 10;
 /// unreachable for any code this module defines.
 fn class_of(code: u8) -> Class {
     match code {
+        MODULE => Class::Module,
         PASSWORD => Class::Password,
         REFRESH => Class::Refresh,
         INVITE_CHECK => Class::InviteCheck,

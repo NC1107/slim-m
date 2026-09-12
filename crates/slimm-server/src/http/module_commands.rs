@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::dock::validate_module_id;
 use super::error::ApiError;
-use super::extract::{AUTHED_READ, AuthedLimited, Json, WRITE};
+use super::extract::{AUTHED_READ, AuthedLimited, Json, MODULE};
 use crate::ids::UserId;
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
 use crate::store::{InstalledModule, ModuleExtensionPoint};
@@ -191,7 +191,7 @@ pub(crate) async fn execute_command(
 }
 
 async fn run_command(
-    AuthedLimited(ctx): AuthedLimited<WRITE>,
+    AuthedLimited(ctx): AuthedLimited<MODULE>,
     State(state): State<AppState>,
     Path((module_id, command)): Path<(String, String)>,
     Json(req): Json<RunCommandRequest>,

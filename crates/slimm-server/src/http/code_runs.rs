@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::error::ApiError;
-use super::extract::{AuthedLimited, Json, WRITE};
+use super::extract::{AuthedLimited, Json, MODULE};
 use super::messages::parse_uuid;
 use super::module_commands::execute_command;
 use crate::hub::Event;
@@ -59,7 +59,7 @@ struct RunResponse {
 }
 
 async fn run(
-    AuthedLimited(ctx): AuthedLimited<WRITE>,
+    AuthedLimited(ctx): AuthedLimited<MODULE>,
     State(state): State<AppState>,
     Path((message_id, block_index)): Path<(String, i64)>,
     Json(req): Json<RunRequest>,
