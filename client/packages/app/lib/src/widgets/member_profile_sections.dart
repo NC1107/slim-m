@@ -90,7 +90,11 @@ class MemberProfileHeader extends StatelessWidget {
               avatarUpdatedAt: profile.avatarUpdatedAt,
               name: profile.displayName,
               size: 44,
+              // The ring here means "in a call with you", so the name says that.
               speaking: inCallTogether,
+              semanticLabel: inCallTogether
+                  ? '${profile.displayName}, in a call with you'
+                  : null,
             ),
           ),
           const SizedBox(width: AppSpacing.s12),
