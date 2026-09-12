@@ -68,6 +68,7 @@ produces is what draw_stroke_and_see_it_live already checks on both
 clients.
 """
 import json
+import threading
 import time
 
 import e2e_labels as L
@@ -327,3 +328,85 @@ def close_on_both(a, b):
         c.wait_for(L.IN_CALL)
     for c in (a, b):
         c.click(L.LEAVE_CALL, settle=6)
+
+
+def concurrent_edits_converge(a, b, admin_api, channel_id):
+    """Both clients drag the same object at once, and everything settles.
+
+    Every canvas scenario before this one is sequential: one client acts, the
+    other watches it arrive. That proves the sync path carries a change, and
+    says nothing about what happens when two changes race - which is the case
+    a shared canvas exists to handle and the one where convergence bugs live.
+
+    Genuinely simultaneous, on two threads, rather than one drag quickly
+    followed by another: interleaving them by hand would let the first finish
+    its round trip before the second starts, which is the sequential case
+    again wearing a different hat.
+
+    What is asserted is convergence, deliberately not a winner. Last write
+    wins is a perfectly good answer here; a *blend* of the two drags is not,
+    and neither is a value still moving after everyone stopped.
+
+    Runs last among the canvas scenarios and reads the stroke count from the
+    server rather than assuming it, so nothing downstream inherits whatever
+    this leaves behind - the first draft hard-coded "2 strokes" and would have
+    broken the moment an earlier scenario drew one more.
+
+    Every tool it needs is selected explicitly. Two drafts failed on the tool
+    left over from the step before: the drags found empty canvas with the pen
+    still active, and then the closing stroke moved something with the select
+    tool still active. A drag here means nothing without the tool it runs in.
+    """
+    image_id = object_of_kind(admin_api, channel_id, "image")["id"]
+    before = admin_api.canvas_object(channel_id, image_id)
+    strokes_before = sum(
+        1 for o in admin_api.canvas_objects(channel_id) if o["kind"] == "stroke")
+
+    # An object's position is in canvas coordinates; a drag is in screen ones.
+    for c in (a, b):
+        c.click(L.SELECT_TOOL)
+    org_a, org_b = origin(a), origin(b)
+    centre_a = (org_a[0] + before["x"] + before["w"] / 2,
+                org_a[1] + before["y"] + before["h"] / 2)
+    centre_b = (org_b[0] + before["x"] + before["w"] / 2,
+                org_b[1] + before["y"] + before["h"] / 2)
+
+    def drag(client, centre, dx, dy):
+        cx, cy = centre
+        client.gestures(True)
+        client.drag([(cx, cy), (cx + dx / 2, cy + dy / 2), (cx + dx, cy + dy)])
+        client.gestures(False)
+
+    threads = [
+        threading.Thread(target=drag, args=(a, centre_a, 120, 0)),
+        threading.Thread(target=drag, args=(b, centre_b, 0, 120)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    time.sleep(3)
+
+    settled = admin_api.canvas_object(channel_id, image_id)
+    time.sleep(1.5)
+    again = admin_api.canvas_object(channel_id, image_id)
+    assert (settled["x"], settled["y"]) == (again["x"], again["y"]), \
+        f"still moving after both drags stopped: {settled} then {again}"
+
+    moved_x = abs(settled["x"] - (before["x"] + 120)) < 20
+    moved_y = abs(settled["y"] - (before["y"] + 120)) < 20
+    assert moved_x or moved_y, (
+        "the object landed on neither drag's result, which is a blend of the "
+        f"two rather than one of them winning: {before} -> {settled}")
+    print(f"  both dragged at once; settled at "
+          f"({settled['x']:.0f}, {settled['y']:.0f}) and stayed there")
+
+    # A wedged sync loop looks identical to a healthy one until something moves.
+    a.click(L.PEN_TOOL)
+    a.gestures(True)
+    a.drag([at(org_a, STROKE_START), at(org_a, STROKE_MID),
+            at(org_a, STROKE_END)])
+    a.gestures(False)
+    want = strokes_before + 1
+    wait_for_summary(b, f"{want} stroke" + ("" if want == 1 else "s"), timeout=45)
+    print("  and the canvas is still live: a new stroke still reaches b")

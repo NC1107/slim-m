@@ -155,6 +155,9 @@ def scenarios(a, b, admin, member, room_id, server):
          lambda: e2e_canvas.reload_persists(
              b, L.VOICE_CHANNEL, admin,
              admin.channel_named(L.VOICE_CHANNEL)["id"])),
+        ("canvas: two clients editing at once converge, and stay live",
+         lambda: e2e_canvas.concurrent_edits_converge(
+             a, b, admin, admin.channel_named(L.VOICE_CHANNEL)["id"])),
         ("canvas: closing it", lambda: e2e_canvas.close_on_both(a, b)),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
@@ -164,6 +167,8 @@ def scenarios(a, b, admin, member, room_id, server):
             a, b, room_id)),
         ("voice: mute reaches the server", lambda: e2e_voice.mute_propagates(
             a, b, room_id)),
+        ("voice: muting actually silences it",
+         lambda: e2e_voice.mute_actually_silences(a, b)),
         ("voice: the canvas dock keeps mute and hang-up reachable",
          lambda: e2e_voice.canvas_keeps_call_controls(a, room_id)),
         ("voice: a shared camera tile converges and persists",
