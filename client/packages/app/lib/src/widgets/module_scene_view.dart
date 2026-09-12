@@ -49,7 +49,25 @@ class ModuleSceneView extends StatefulWidget {
 }
 
 class _ModuleSceneViewState extends State<ModuleSceneView> {
+  /// How often play asks for the next generation, at its fastest.
+  ///
+  /// Not the rate it settles at. The shared code-block route is rate limited
+  /// as an ordinary write (30 burst, 5 a second refilling), and playing at
+  /// this tick outruns that: a long run used to sail through the burst and
+  /// then fail outright with "too many requests", which is a rate limit doing
+  /// its job and an animation handling it badly. [_backoff] is what turns that
+  /// into pacing rather than a stop.
   static const _tick = Duration(milliseconds: 130);
+
+  /// The ceiling [_interval] backs off to. Beyond a couple of seconds a board
+  /// is not really playing any more, and something is wrong that waiting
+  /// longer will not fix.
+  static const _maxTick = Duration(seconds: 2);
+
+  /// The interval play is currently running at, between [_tick] and
+  /// [_maxTick]. Doubles on a refused call and eases back on a run of good
+  /// ones, so a deployment's own limit is found rather than assumed.
+  Duration _interval = _tick;
 
   late ModuleScene _scene = widget.initial;
   Timer? _timer;
@@ -163,6 +181,19 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
           _error = result.error ?? 'The module returned nothing to draw.';
         }
       });
+    } on api.RateLimitedException catch (e) {
+      if (!mounted) return;
+      // Only play can outrun the budget; see _backOff.
+      if (_playing) {
+        setState(() => _busy = false);
+        _backOff(e.retryAfter);
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _stop();
+        _error = describeApiFailure('run this', e);
+      });
     } on api.ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -178,14 +209,38 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       _stopAndRepaint();
       return;
     }
+    // A fresh press starts at full speed again; see _backOff.
+    _interval = _tick;
     setState(() => _playing = true);
-    _timer = Timer.periodic(_tick, (_) {
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(_interval, (_) {
       if (!_busy && _scene.live) {
         _send('step');
       } else if (!_scene.live) {
         _stopAndRepaint();
       }
     });
+  }
+
+  /// Slows play after the server refused a call for asking too fast.
+  ///
+  /// Doubles, or waits whatever `Retry-After` asked for if that is longer,
+  /// capped at [_maxTick]. It does not speed back up inside a run: creeping
+  /// back toward [_tick] would find the limit again, and a board that keeps
+  /// stuttering into refusals is worse than one that settled slightly slow.
+  /// Pressing play again is how you ask for full speed.
+  void _backOff(Duration? retryAfter) {
+    final doubled = _interval * 2;
+    var next = retryAfter != null && retryAfter > doubled
+        ? retryAfter
+        : doubled;
+    if (next > _maxTick) next = _maxTick;
+    _interval = next;
+    if (_playing) _startTimer();
   }
 
   /// Cancels the timer and clears the flag, with no rebuild of its own: two of
@@ -369,6 +424,14 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     return widgets;
   }
 
+  /// One control, or null for a name this client does not offer.
+  ///
+  /// Deliberately never disabled on [_busy]. It used to be, and while playing
+  /// that meant every control greyed out and came back on each generation -
+  /// a visible flicker at eight times a second, reported as the buttons
+  /// flashing. A press landing mid-call is already a no-op, because [_send]
+  /// refuses a second call while one is in flight, so disabling them bought
+  /// nothing the guard did not already do and cost that.
   Widget? _controlButton(String control) {
     switch (control) {
       case 'play':
@@ -382,25 +445,25 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
         return AppIconButton(
           icon: AppIcons.forward,
           semanticLabel: 'Step',
-          onPressed: _busy ? null : () => _send('step'),
+          onPressed: () => _send('step'),
         );
       case 'random':
         return AppIconButton(
           icon: AppIcons.highlight,
           semanticLabel: 'Random',
-          onPressed: _busy ? null : () => _send('random'),
+          onPressed: () => _send('random'),
         );
       case 'clear':
         return AppIconButton(
           icon: AppIcons.eraser,
           semanticLabel: 'Clear',
-          onPressed: _busy ? null : () => _send('clear'),
+          onPressed: () => _send('clear'),
         );
       case 'reset':
         return AppIconButton(
           icon: AppIcons.retry,
           semanticLabel: 'Reset',
-          onPressed: _busy ? null : () => _send('reset'),
+          onPressed: () => _send('reset'),
         );
       default:
         return null;
