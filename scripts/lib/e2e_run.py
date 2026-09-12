@@ -158,6 +158,8 @@ def scenarios(a, b, admin, member, room_id, server):
         ("canvas: closing it", lambda: e2e_canvas.close_on_both(a, b)),
         ("voice: two clients in one call", lambda: e2e_voice.join_call(
             a, b, room_id)),
+        ("voice: audio actually arrives",
+         lambda: e2e_voice.audio_actually_arrives(a, b)),
         ("voice: sharing a screen", lambda: e2e_voice.share_screen(
             a, b, room_id)),
         ("voice: mute reaches the server", lambda: e2e_voice.mute_propagates(
