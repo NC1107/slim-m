@@ -325,6 +325,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       // Creating an account is the last of the join steps; signing back in to
       // a server you already trust is one act and gets no stepper.
       step: _creatingAccount ? OnboardingStep.identity : null,
+      version: ref.watch(appInfoProvider).valueOrNull?.version,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -41,6 +41,7 @@ class OnboardingScreen extends ConsumerWidget {
 
     return OnboardingShell(
       step: OnboardingStep.invite,
+      version: ref.watch(appInfoProvider).valueOrNull?.version,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,7 +84,10 @@ class OnboardingScreen extends ConsumerWidget {
             child: _Entry(
               icon: AppIcons.members,
               title: 'Join the official Space',
-              description: officialServer,
+              // The host, not the whole address: a scheme is not something a
+              // person reads, and mono is how every other host here is set.
+              description: Uri.parse(officialServer).host,
+              mono: true,
               onTap: () => _officialFlow(context, ref),
             ),
           ),
@@ -157,12 +161,16 @@ class _Entry extends StatelessWidget {
     required this.title,
     required this.description,
     required this.onTap,
+    this.mono = false,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final VoidCallback onTap;
+
+  /// True when [description] is a host rather than a sentence.
+  final bool mono;
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +184,7 @@ class _Entry extends StatelessWidget {
           onTap: onTap,
           // AppFocusRing replaces this overlay; see its own doc comment.
           focusColor: Colors.transparent,
+          hoverColor: tokens.surfaceRaised,
           onFocusChange: onFocusChange,
           borderRadius: BorderRadius.circular(AppRadii.card),
           child: Container(
@@ -188,7 +197,23 @@ class _Entry extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(icon, color: tokens.accent),
+                // The accent's soft tint is where it does most of its work
+                // (decision 0004); a bare glyph on the surface read as an icon
+                // in a list rather than the face of a choice.
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tokens.accentSoft,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: AppSizes.icon20,
+                    color: tokens.accent,
+                  ),
+                ),
                 const SizedBox(width: AppSpacing.s16),
                 Expanded(
                   child: Column(
@@ -196,7 +221,7 @@ class _Entry extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: TextStyle(
+                        style: AppText.body.copyWith(
                           color: tokens.textPrimary,
                           fontWeight: AppWeights.semi,
                         ),
@@ -204,12 +229,18 @@ class _Entry extends StatelessWidget {
                       const SizedBox(height: AppSpacing.s4),
                       Text(
                         description,
-                        style: AppText.caption.copyWith(
+                        style: (mono ? AppText.code : AppText.caption).copyWith(
                           color: tokens.textSecondary,
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Icon(
+                  AppIcons.chevronRight,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
                 ),
               ],
             ),
