@@ -61,6 +61,9 @@ START_DM = "Message"
 DM_CALL = "Call"
 DM_CALL_BACK = "Back to messages"
 
+# What the person who was called sees; see call_record_view.dart.
+MISSED_CALL = "Missed call"
+
 # Replies: only the rendered quote is reachable here, never "Reply" itself (see e2e_replies.py).
 REPLY_UNAVAILABLE = "Message unavailable"
 REPLY_UNAVAILABLE_QUOTE = "Reply to a message that is not available"

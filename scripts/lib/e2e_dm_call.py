@@ -101,3 +101,67 @@ def start_dm_and_call(a, b, admin_api, member_api):
     b.wait_for('1 in call')
     b.shot('dm-peer-left')
     print("  leaving dropped the other side to 1 in call")
+
+
+def a_missed_call_shows_up_in_the_dm(a, b, admin_api, member_api):
+    """Alice rings, nobody answers, and the DM tells Bob he missed it.
+
+    The case the whole call record exists for. Every part of ringing used to
+    be ephemeral - the ring lives in the server's memory and the sweep tears
+    it down after `RING_TIMEOUT` - so a call nobody answered left no trace
+    anywhere, and the person who missed it never found out.
+
+    Drives the *timeout* rather than a decline. Declining is a click and
+    proves the record and its rendering in two seconds; letting the ring lapse
+    is the only thing that exercises `sweep_stale_call_rings`, the write site
+    with no request behind it and the one a person actually hits. That is what
+    the long wait below buys.
+
+    Alice rings through the API rather than by clicking her own call button.
+    Two earlier drafts failed on her UI state rather than on the product:
+    leaving a call leaves you on that call's recap pane, and a second click on
+    the call button while that pane is open closes the pane instead of ringing
+    (`dm_call_button.dart`'s `_toggle`). Her ringing is setup here; what is
+    under test is what Bob's transcript says afterwards, so the setup should
+    be the part that cannot wobble.
+
+    Bob is asserted in the UI because Bob is the one who missed the call.
+    Alice's own "No answer" wording is `call_record_view_test.dart`'s job,
+    which can ask directly instead of steering her out of a call pane.
+    """
+    conversation = next(
+        (c for c in member_api.call('GET', '/dms')
+         if c['user']['display_name'] == 'Alice'), None)
+    assert conversation, "the DM the earlier scenario opened is gone"
+    channel_id = conversation['channel_id']
+
+    def call_records():
+        return [m for m in member_api.call(
+            'GET', f'/channels/{channel_id}/messages') if m.get('call')]
+
+    # Leaving lands on the call's recap pane, not on the transcript.
+    b.click(L.LEAVE_CALL, settle=4)
+    b.click(L.DM_CALL_BACK, settle=2)
+    b.wait_for(L.COMPOSER)
+    print('  bob is out of the call and back on the transcript')
+    before = len(call_records())
+
+    ring = admin_api.call('POST', f'/channels/{channel_id}/voice/ring')
+    assert ring and ring.get('ring_id'), f'alice never got a ring started: {ring}'
+    print(f"  alice is ringing bob, who is not going to answer "
+          f"({ring['timeout_ms']}ms to go)")
+
+    # RING_TIMEOUT is 30s and the sweep ticks every 2s; the rest is slack.
+    b.wait_for(L.MISSED_CALL, timeout=75)
+    b.shot('dm-missed-call')
+    print("  bob's transcript shows the missed call")
+
+    after = call_records()
+    assert len(after) == before + 1, (
+        f'expected one new call record, went from {before} to {len(after)}')
+    # By seq: /messages answers newest-first, so [-1] is the oldest.
+    record = max(after, key=lambda m: m['seq'])['call']
+    assert record['outcome'] == 'timed_out', record
+    assert record['duration_ms'] is None, (
+        f'nothing lasted any time when nobody picked up: {record}')
+    print(f"  and the server stored it as {record['outcome']}, past a reload")
