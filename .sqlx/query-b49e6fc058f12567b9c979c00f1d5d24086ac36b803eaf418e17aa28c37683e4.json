@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO call_records\n                   (message_id, channel_id, caller_id, outcome, duration_ms, created_at)\n               VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "b49e6fc058f12567b9c979c00f1d5d24086ac36b803eaf418e17aa28c37683e4"
+}

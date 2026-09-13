@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// The three wire types a voice call needs: the token that admits you to the
+/// SFU room, one participant of a channel's live roster, and the ring that
+/// tells the other side of a DM you are calling.
+///
+/// Split out of models.dart to stay under this repo's line budget, and they
+/// are what came out because they are the one group in there that belongs to
+/// a single feature rather than to messaging in general.
+library;
+
+/// A short-lived credential for a channel's voice room.
+///
+/// [canPublish] mirrors the SPEAK grant inside the token, so the UI can show a
+/// listen-only state up front rather than after the SFU refuses a track.
+class VoiceToken {
+  const VoiceToken({
+    required this.url,
+    required this.room,
+    required this.token,
+    required this.expiresAt,
+    required this.canPublish,
+  });
+
+  final String url;
+  final String room;
+  final String token;
+  final int expiresAt;
+  final bool canPublish;
+
+  factory VoiceToken.fromJson(Map<String, dynamic> json) => VoiceToken(
+        url: json['url'] as String,
+        room: json['room'] as String,
+        token: json['token'] as String,
+        expiresAt: json['expires_at'] as int,
+        canPublish: json['can_publish'] as bool,
+      );
+}
+
+/// One participant the server reports as currently connected to a channel's
+/// voice room, from `GET /channels/{id}/voice/roster`.
+///
+/// [displayName] is as it was when this participant joined, not necessarily
+/// their current profile name; a participant who chose to appear offline is
+/// never sent to any viewer but themselves, so absence from the list is not
+/// distinguishable from never having joined.
+class VoiceRosterParticipant {
+  const VoiceRosterParticipant(
+      {required this.userId, required this.displayName});
+
+  final String userId;
+  final String displayName;
+
+  factory VoiceRosterParticipant.fromJson(Map<String, dynamic> json) =>
+      VoiceRosterParticipant(
+        userId: json['user_id'] as String,
+        displayName: json['display_name'] as String,
+      );
+}
+
+/// A DM call ring the caller just started, from `POST
+/// /channels/{id}/voice/ring`.
+class RingStarted {
+  const RingStarted({required this.ringId, required this.timeoutMs});
+
+  final String ringId;
+
+  /// How long the server itself waits for an answer before giving up on this
+  /// ring; a client renders its own countdown from this rather than a
+  /// hard-coded duration that could drift from the server's.
+  final int timeoutMs;
+
+  factory RingStarted.fromJson(Map<String, dynamic> json) => RingStarted(
+        ringId: json['ring_id'] as String,
+        timeoutMs: json['timeout_ms'] as int,
+      );
+}

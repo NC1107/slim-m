@@ -21,6 +21,7 @@ mod analytics;
 mod app_surfaces;
 mod attachments;
 mod bootstrap;
+mod calls;
 mod canvas;
 mod canvas_audit;
 mod canvas_geometry;
@@ -89,6 +90,7 @@ pub use analytics::{
 pub use app_surfaces::{AppSurface, CreateAppSurfaceError};
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
+pub use calls::CallRecord;
 pub use canvas::{
     CanvasObject, MAX_CANVAS_OBJECT_CAP, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL,
     MIN_CANVAS_OBJECT_CAP, PlaceError, PlaceRequest, Placement, Rect, ViewportQuery, WORLD_LIMIT,

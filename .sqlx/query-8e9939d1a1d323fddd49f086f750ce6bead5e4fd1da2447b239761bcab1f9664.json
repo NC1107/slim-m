@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE call_records SET caller_id = NULL WHERE caller_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "8e9939d1a1d323fddd49f086f750ce6bead5e4fd1da2447b239761bcab1f9664"
+}

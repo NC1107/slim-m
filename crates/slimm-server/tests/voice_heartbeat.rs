@@ -159,7 +159,10 @@ async fn a_keepalive_from_someone_already_in_the_call_does_not_answer_a_ring() {
     // His next routine keepalive must leave that ring outstanding.
     assert_eq!(beat().await.unwrap().status(), StatusCode::NO_CONTENT);
     assert_eq!(
-        voice.rings().answer(channel.id, callee_id),
+        voice
+            .rings()
+            .answer(channel.id, callee_id)
+            .map(|(id, _)| id),
         Some(ring_id),
         "the keepalive answered the ring; only a first join may do that"
     );

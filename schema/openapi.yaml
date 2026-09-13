@@ -6826,6 +6826,34 @@ components:
           type: string
           nullable: true
           description: A short human summary of what the app is.
+    CallRecord:
+      type: object
+      required: [outcome]
+      description: >-
+        How a DM call ended. Carried by the message that records it, so it
+        orders, paginates and syncs like any other message.
+      properties:
+        caller_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            Who placed the call. Null once that account has been deleted,
+            exactly as a message's own `author_id` is.
+        outcome:
+          type: string
+          enum: [answered, declined, canceled, timed_out]
+          description: >-
+            `timed_out` is the missed call - nobody answered before the ring's
+            own timeout. `canceled` is the caller hanging up first, which the
+            other side also never answered.
+        duration_ms:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            How long the call lasted, or null. Null for every outcome but
+            `answered`, and also null on an answered call until the duration is
+            known: the record is written when the call is answered, and how
+            long it ran is only settled when the last participant leaves.
     AppSurface:
       type: object
       required: [module_id, command]
@@ -8041,6 +8069,16 @@ components:
             null means this message launches no app, the same "genuinely none"
             convention `poll` follows. The surface's live, shared state is the
             code-run at block 0, not carried here.
+        call:
+          oneOf:
+            - $ref: "#/components/schemas/CallRecord"
+            - type: "null"
+          description: >-
+            What happened to the DM call this message records, if any. Always
+            present as a key: null means this message is not a call, the same
+            "genuinely none" convention `poll` follows. A call message's own
+            `content` is always empty - what to say about a call depends on
+            which side is reading it, so the wording is the client's.
         attachments:
           type: array
           description: >-

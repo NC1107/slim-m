@@ -195,6 +195,13 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // A call stays in the transcript the way any other message does; who placed it goes the way a launched app surface's creator does.
+        sqlx::query!(
+            "UPDATE call_records SET caller_id = NULL WHERE caller_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // schema/openapi.yaml promises both of these read null once the account is gone.
         sqlx::query!(
             "UPDATE pinned_messages SET pinned_by = NULL WHERE pinned_by = ?",

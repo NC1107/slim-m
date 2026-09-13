@@ -7,7 +7,7 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/message_row_identity.dart';
-import 'package:slimm_app/src/widgets/message_transcript.dart';
+import 'package:slimm_app/src/widgets/message_transcript_dividers.dart';
 
 import 'message_row_harness.dart';
 

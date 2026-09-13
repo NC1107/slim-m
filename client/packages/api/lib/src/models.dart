@@ -13,6 +13,8 @@ library;
 // still surfaces every model, as if they had all been written in one place.
 export 'models_admin.dart';
 export 'models_app_surface.dart';
+export 'models_call_record.dart';
+export 'models_voice.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_dock.dart';
@@ -45,6 +47,7 @@ export 'models_version.dart';
 // Message needs these in scope here, which only `import` grants; the exports
 // above are what re-surface them to callers of this file.
 import 'models_app_surface.dart';
+import 'models_call_record.dart';
 import 'models_attachments.dart';
 import 'models_code_runs.dart';
 import 'models_forwards.dart';
@@ -130,6 +133,7 @@ class Message {
     this.codeRuns = const [],
     this.poll,
     this.appSurface,
+    this.call,
     this.forwarded,
     this.mentionsMe = false,
   });
@@ -194,6 +198,11 @@ class Message {
   /// the surface's live state rides [codeRuns] at block 0.
   final AppSurface? appSurface;
 
+  /// The call this message records, or null on an ordinary message. A call
+  /// message's own [content] is always empty: what to say about a call
+  /// depends on which side is reading it, so the wording is the client's.
+  final CallRecord? call;
+
   /// Attachments riding on this message, in display order. Always present:
   /// an empty list means none, never that the server omitted them. Unlike
   /// [reactions] and [poll], a freshly sent message can carry these
@@ -250,6 +259,9 @@ class Message {
         appSurface: json['app_surface'] == null
             ? null
             : AppSurface.fromJson(json['app_surface'] as Map<String, dynamic>),
+        call: json['call'] == null
+            ? null
+            : CallRecord.fromJson(json['call'] as Map<String, dynamic>),
         attachments: (json['attachments'] as List<dynamic>?)
                 ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
                 .toList(growable: false) ??
@@ -264,73 +276,6 @@ class Message {
                 json['forwarded'] as Map<String, dynamic>),
         // Not in the schema's `required` list either, the same tolerance `reactions` above already needs.
         mentionsMe: json['mentions_me'] as bool? ?? false,
-      );
-}
-
-/// A short-lived credential for a channel's voice room.
-///
-/// [canPublish] mirrors the SPEAK grant inside the token, so the UI can show a
-/// listen-only state up front rather than after the SFU refuses a track.
-class VoiceToken {
-  const VoiceToken({
-    required this.url,
-    required this.room,
-    required this.token,
-    required this.expiresAt,
-    required this.canPublish,
-  });
-
-  final String url;
-  final String room;
-  final String token;
-  final int expiresAt;
-  final bool canPublish;
-
-  factory VoiceToken.fromJson(Map<String, dynamic> json) => VoiceToken(
-        url: json['url'] as String,
-        room: json['room'] as String,
-        token: json['token'] as String,
-        expiresAt: json['expires_at'] as int,
-        canPublish: json['can_publish'] as bool,
-      );
-}
-
-/// One participant the server reports as currently connected to a channel's
-/// voice room, from `GET /channels/{id}/voice/roster`.
-///
-/// [displayName] is as it was when this participant joined, not necessarily
-/// their current profile name; a participant who chose to appear offline is
-/// never sent to any viewer but themselves, so absence from the list is not
-/// distinguishable from never having joined.
-class VoiceRosterParticipant {
-  const VoiceRosterParticipant(
-      {required this.userId, required this.displayName});
-
-  final String userId;
-  final String displayName;
-
-  factory VoiceRosterParticipant.fromJson(Map<String, dynamic> json) =>
-      VoiceRosterParticipant(
-        userId: json['user_id'] as String,
-        displayName: json['display_name'] as String,
-      );
-}
-
-/// A DM call ring the caller just started, from `POST
-/// /channels/{id}/voice/ring`.
-class RingStarted {
-  const RingStarted({required this.ringId, required this.timeoutMs});
-
-  final String ringId;
-
-  /// How long the server itself waits for an answer before giving up on this
-  /// ring; a client renders its own countdown from this rather than a
-  /// hard-coded duration that could drift from the server's.
-  final int timeoutMs;
-
-  factory RingStarted.fromJson(Map<String, dynamic> json) => RingStarted(
-        ringId: json['ring_id'] as String,
-        timeoutMs: json['timeout_ms'] as int,
       );
 }
 

@@ -225,12 +225,14 @@ async fn heartbeat(
             .hub
             .publish(Event::VoiceActivityChanged { channel_id });
     }
-    if let Some(ring_id) = answered {
+    if let Some((ring_id, caller_id)) = answered {
         state.hub.publish(Event::CallRingEnded {
             channel_id,
             ring_id,
             outcome: CallRingOutcome::Answered,
         });
+        super::voice_ring::record_call(&state, channel_id, caller_id, CallRingOutcome::Answered)
+            .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -278,6 +280,8 @@ async fn forget_heartbeat(
             ring_id,
             outcome: CallRingOutcome::Canceled,
         });
+        super::voice_ring::record_call(&state, channel_id, ctx.user_id, CallRingOutcome::Canceled)
+            .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
