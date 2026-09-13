@@ -182,6 +182,49 @@ void main() {
     await setup.dispose();
   });
 
+  test('after signing in as someone else, "me" is the new account', () async {
+    // The account id used to be captured once at bootstrap and never again.
+    if (!isDesktopHost) return;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    final setup = await _wire();
+    setup.container
+        .read(sessionProvider)
+        .set(
+          const api.TokenPair(
+            userId: 'someone-new',
+            accessToken: 'access2',
+            refreshToken: 'refresh2',
+            accessExpiresAt: 0,
+          ),
+        );
+
+    setup.events.add(
+      api.MessageCreated(
+        _message(id: 'm1', authorId: 'someone-new', channelId: 'group-1'),
+      ),
+    );
+    setup.events.add(
+      api.MessageCreated(
+        _message(
+          id: 'm2',
+          authorId: 'me',
+          authorDisplayName: 'Old Me',
+          channelId: 'group-1',
+        ),
+      ),
+    );
+    await _settle(setup);
+
+    // Not exact: _settle's flush is by the old "me", who may now notify too.
+    expect(setup.notifications.shown, contains('New message from Old Me'));
+    expect(
+      setup.notifications.shown.where((t) => t.contains('someone-new')),
+      isEmpty,
+      reason: 'the account signed in now must never be notified about itself',
+    );
+    await setup.dispose();
+  });
+
   test('a focused window shows nothing', () async {
     if (!isDesktopHost) return;
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

@@ -246,3 +246,97 @@ async fn each_missed_call_is_its_own_record() {
 
     assert_eq!(calls_in(&h.app, &channel_id, &bob_token).await.len(), 2);
 }
+
+/// Answering is the callee's first heartbeat for the channel, not a route of
+/// its own, so the record for a call that happened is written from inside the
+/// heartbeat handler - the one write site with nothing named "ring" in it.
+#[tokio::test]
+async fn an_answered_call_is_recorded_when_the_callee_first_joins() {
+    let h = harness().await;
+    let (alice_token, alice_id) = register(&h.store, "alice").await;
+    let (bob_token, bob_id) = register(&h.store, "bob").await;
+    let channel_id = open_dm(&h.app, &alice_token, &bob_id).await;
+
+    assert_eq!(
+        ring(&h.app, &channel_id, &alice_token).await,
+        StatusCode::OK
+    );
+    let joined = h
+        .app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{channel_id}/voice/heartbeat"),
+            Some(&bob_token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(joined.status(), StatusCode::NO_CONTENT);
+
+    let calls = calls_in(&h.app, &channel_id, &bob_token).await;
+    assert_eq!(
+        calls.len(),
+        1,
+        "bob answering must leave exactly one record"
+    );
+    assert_eq!(calls[0]["call"]["outcome"], "answered");
+    assert_eq!(
+        calls[0]["call"]["caller_id"], alice_id,
+        "an answered call is attributed to whoever placed it, not who answered"
+    );
+    assert!(
+        calls[0]["call"]["duration_ms"].is_null(),
+        "how long it ran is not known at the moment it is answered"
+    );
+
+    // A routine keepalive is not a second answer, so no second record.
+    let beat = h
+        .app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{channel_id}/voice/heartbeat"),
+            Some(&bob_token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(beat.status(), StatusCode::NO_CONTENT);
+    assert_eq!(calls_in(&h.app, &channel_id, &bob_token).await.len(), 1);
+}
+
+/// The caller hanging up before anyone answers goes through the leave route,
+/// which cancels their own outstanding ring. From the other side that is a
+/// missed call too, so it has to be recorded like one.
+#[tokio::test]
+async fn a_caller_hanging_up_first_records_a_canceled_call() {
+    let h = harness().await;
+    let (alice_token, alice_id) = register(&h.store, "alice").await;
+    let (bob_token, bob_id) = register(&h.store, "bob").await;
+    let channel_id = open_dm(&h.app, &alice_token, &bob_id).await;
+
+    assert_eq!(
+        ring(&h.app, &channel_id, &alice_token).await,
+        StatusCode::OK
+    );
+    let left = h
+        .app
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/channels/{channel_id}/voice/heartbeat"),
+            Some(&alice_token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(left.status(), StatusCode::NO_CONTENT);
+
+    let calls = calls_in(&h.app, &channel_id, &bob_token).await;
+    assert_eq!(
+        calls.len(),
+        1,
+        "the cancelled ring must be in bob's transcript"
+    );
+    assert_eq!(calls[0]["call"]["outcome"], "canceled");
+    assert_eq!(calls[0]["call"]["caller_id"], alice_id);
+    assert!(calls[0]["call"]["duration_ms"].is_null());
+}

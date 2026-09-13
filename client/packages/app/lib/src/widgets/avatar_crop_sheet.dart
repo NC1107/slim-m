@@ -134,16 +134,21 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
   /// own downscale is area-averaging rather than the bilinear tap a canvas
   /// minification gets.
   static Future<Uint8List?> _minified(Uint8List png) async {
-    final codec = await ui.instantiateImageCodec(
-      png,
-      targetWidth: _outputEdge,
-      targetHeight: _outputEdge,
-    );
-    final frame = await codec.getNextFrame();
-    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    frame.image.dispose();
-    codec.dispose();
-    return data?.buffer.asUint8List();
+    try {
+      final codec = await ui.instantiateImageCodec(
+        png,
+        targetWidth: _outputEdge,
+        targetHeight: _outputEdge,
+      );
+      final frame = await codec.getNextFrame();
+      final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      frame.image.dispose();
+      codec.dispose();
+      return data?.buffer.asUint8List();
+    } catch (_) {
+      // Null is the documented fallback; a throw must not become a cancel.
+      return null;
+    }
   }
 
   @override

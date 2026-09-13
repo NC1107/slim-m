@@ -32,14 +32,14 @@ final desktopMessageNotifierProvider = Provider<void>((ref) {
   // Android and iOS notify from platform push; only the desktop needs this.
   if (!isDesktopHost) return;
 
-  final selfId = ref.read(sessionProvider).tokens?.userId;
   final notifications = ref.read(localNotificationsProvider);
 
   final sub = ref.read(liveEventsProvider).listen((event) {
     if (event is! api.MessageCreated) return;
     final message = event.message;
 
-    // Not my own message echoed back to me.
+    // Per event, not at bootstrap: signing in as someone else changes "me".
+    final selfId = ref.read(sessionProvider).tokens?.userId;
     if (message.authorId != null && message.authorId == selfId) return;
 
     // Skip while focused: a foreground app already shows unread in the rail.

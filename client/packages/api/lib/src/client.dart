@@ -140,7 +140,7 @@ class SessionStore {
   /// problem, and every 401 retry funnels through that same rotation.
   Future<void> get settled => _pending;
 
-  Future<void> dispose() => _changes.close();
+  Future<void> dispose() => Future.wait([_changes.close(), _endings.close()]);
 }
 
 /// A typed client for one server.

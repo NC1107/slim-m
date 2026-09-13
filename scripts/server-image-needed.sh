@@ -48,7 +48,7 @@ if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
   exit 0
 fi
 
-if git diff --name-only "$base"..HEAD -- crates/ | grep -q .; then
+if git diff --name-only "$base"..HEAD -- crates/ Cargo.toml Cargo.lock rust-toolchain.toml docker/server.Dockerfile .sqlx/ | grep -q .; then
   echo "crates/ moved since $base, which is the commit latest holds"
   echo "server=true" >> "${GITHUB_OUTPUT:-/dev/stdout}"
 else

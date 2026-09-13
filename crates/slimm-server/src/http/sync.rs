@@ -226,14 +226,12 @@ async fn sync(
                     .await?;
                 let has_more = rows.len() as i64 > limit;
                 rows.truncate(limit as usize);
-                budget -= rows.len() as i64;
                 // `with_reactions`, never a bare `MessageDto::from`; see the
                 // note on this function.
-                let dtos = with_reactions(&state, ctx.user_id, rows).await?;
-                for dto in &dtos {
-                    bytes = bytes.saturating_sub(dto.wire_cost());
-                }
-                (dtos, has_more, false)
+                let mut dtos = with_reactions(&state, ctx.user_id, rows).await?;
+                let trimmed = trim_messages_to_budget(&mut dtos, &mut bytes);
+                budget -= dtos.len() as i64;
+                (dtos, has_more || trimmed, false)
             }
         };
 
@@ -249,6 +247,30 @@ async fn sync(
     }
 
     Ok(Json(SyncResponse { scopes }))
+}
+
+/// Drops messages from the back until the page fits the shared byte budget,
+/// answering whether it cut any - the message half of what
+/// `sync_ops::trim_to_budget` does for ops, so the budget binds both halves
+/// rather than only being subtracted after the fact.
+///
+/// The first row is always admitted however little budget is left, for the
+/// same reason the op half admits its first: one message longer than the
+/// whole budget would otherwise stall the cursor forever. A page cut here
+/// reports `has_more`, so the client asks again from the last row it kept.
+fn trim_messages_to_budget(dtos: &mut Vec<MessageDto>, budget: &mut usize) -> bool {
+    let mut kept = 0usize;
+    for (i, dto) in dtos.iter().enumerate() {
+        let cost = dto.wire_cost();
+        if i > 0 && cost > *budget {
+            break;
+        }
+        *budget = budget.saturating_sub(cost);
+        kept = i + 1;
+    }
+    let trimmed = kept < dtos.len();
+    dtos.truncate(kept);
+    trimmed
 }
 
 /// Collapses repeated channels, keeping the cursor that asks for the most (the
@@ -283,7 +305,51 @@ fn dedupe_scopes(scopes: Vec<ScopeCursor>) -> Vec<ScopeCursor> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ScopeCursor, dedupe_scopes};
+    use super::super::message_dto::MessageDto;
+    use super::{ScopeCursor, dedupe_scopes, trim_messages_to_budget};
+    use crate::ids::{ChannelId, MessageId, Seq};
+    use crate::store::Message;
+
+    fn message_of(len: usize) -> MessageDto {
+        MessageDto::from(Message {
+            id: MessageId::generate(),
+            channel_id: ChannelId::generate(),
+            author_id: None,
+            author_display_name: None,
+            seq: Seq(1),
+            content: "x".repeat(len),
+            created_at: 0,
+            edited_at: None,
+            reply_to_id: None,
+        })
+    }
+
+    #[test]
+    fn a_page_of_long_messages_is_cut_to_the_byte_budget_and_reports_more() {
+        // Ten rows of 4000 bytes against a budget that fits three of them.
+        let mut dtos: Vec<MessageDto> = (0..10).map(|_| message_of(4000)).collect();
+        let mut budget = 3 * (4000 + 128) + 10;
+        assert!(trim_messages_to_budget(&mut dtos, &mut budget));
+        assert_eq!(dtos.len(), 3, "exactly the rows the budget paid for");
+    }
+
+    #[test]
+    fn one_message_larger_than_the_whole_budget_is_still_admitted() {
+        // Otherwise a single oversized message would stall the cursor forever.
+        let mut dtos = vec![message_of(10_000), message_of(10)];
+        let mut budget = 100;
+        assert!(trim_messages_to_budget(&mut dtos, &mut budget));
+        assert_eq!(dtos.len(), 1);
+        assert_eq!(budget, 0, "an oversized admit spends the budget to zero");
+    }
+
+    #[test]
+    fn a_page_that_fits_is_untouched_and_reports_nothing_more() {
+        let mut dtos = vec![message_of(10), message_of(10)];
+        let mut budget = 10_000;
+        assert!(!trim_messages_to_budget(&mut dtos, &mut budget));
+        assert_eq!(dtos.len(), 2);
+    }
 
     fn sc(id: &str, after_seq: i64, after_op_seq: Option<i64>) -> ScopeCursor {
         ScopeCursor {

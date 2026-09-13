@@ -201,6 +201,9 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
         _stop();
         _error = describeApiFailure('run this', e);
       });
+    } finally {
+      // A drag queued behind play's own step has nothing else to restart it.
+      if (mounted && !_busy && _queue.isNotEmpty) unawaited(_drain());
     }
   }
 
@@ -318,8 +321,9 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
   /// go. Re-entrant calls return immediately, so the drain already running is
   /// the only one.
   Future<void> _drain() async {
-    if (_busy || _queue.isEmpty) return;
     while (_queue.isNotEmpty && mounted) {
+      // Per iteration: play's step can take _busy between sends.
+      if (_busy) return;
       await _send(_takeNext());
     }
   }

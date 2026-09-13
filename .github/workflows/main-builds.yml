@@ -37,6 +37,13 @@ on:
     paths:
       - "client/**"
       - "crates/**"
+      # The same root files server-ci.yml treats as server-affecting: a lone
+      # dependency, toolchain or base-image bump passed CI and never redeployed.
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "docker/server.Dockerfile"
+      - ".sqlx/**"
       # Its own file, so a change to how these builds work is validated and
       # deployed by them rather than waiting on unrelated work to trigger it.
       - ".github/workflows/main-builds.yml"
