@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.74.0](https://github.com/NC1107/slim-m/compare/client-v0.73.0...client-v0.74.0) (2026-09-13)
+
+
+### Features
+
+* a DM call leaves a record in the transcript ([#1168](https://github.com/NC1107/slim-m/issues/1168)) ([3e8809f](https://github.com/NC1107/slim-m/commit/3e8809fb5d2dffe8dcaa7720c5a057452b3ca8b9))
+* **client:** raise an OS notification for an incoming call on the desktop ([#1166](https://github.com/NC1107/slim-m/issues/1166)) ([6297bb8](https://github.com/NC1107/slim-m/commit/6297bb871cafb879fea1025b2b48e8368b3afc34))
+* **client:** remove swipe-to-reply from the message row ([#1155](https://github.com/NC1107/slim-m/issues/1155)) ([c009435](https://github.com/NC1107/slim-m/commit/c009435f7b37447f02b5dc1d9c18e3e83b7894f4))
+* **client:** send a whole drag as one module call where the module allows it ([#1157](https://github.com/NC1107/slim-m/issues/1157)) ([298c357](https://github.com/NC1107/slim-m/commit/298c357ec87ecee502a624efa5e6522ff8d527a4))
+* **client:** who is speaking reaches the accessible name ([#1161](https://github.com/NC1107/slim-m/issues/1161)) ([fa3b72b](https://github.com/NC1107/slim-m/commit/fa3b72b28767fa485d8df9b212bef9b992f4a8df))
+
+
+### Bug Fixes
+
+* **client:** let the channel topic use the header width the name leaves ([#1164](https://github.com/NC1107/slim-m/issues/1164)) ([9299923](https://github.com/NC1107/slim-m/commit/929992396b63b44fcd855ccb4ec09c79879c8720))
+* **client:** pace a playing scene against the rate limit, and stop the controls flashing ([#1158](https://github.com/NC1107/slim-m/issues/1158)) ([4f50763](https://github.com/NC1107/slim-m/commit/4f507634180de60a8ecfea4b8b41d26644bf1265))
+* **client:** say why a session ended, and log every refresh rejection ([#1167](https://github.com/NC1107/slim-m/issues/1167)) ([0f56716](https://github.com/NC1107/slim-m/commit/0f567162a73e289d4531bf27649163dfe5697d33))
+* **client:** stop the update splash re-offering a version already dismissed ([#1165](https://github.com/NC1107/slim-m/issues/1165)) ([205f72b](https://github.com/NC1107/slim-m/commit/205f72b515e5ac0b9cc4605a3c72aa778f973a98))
+
 ## [0.73.0](https://github.com/NC1107/slim-m/compare/client-v0.72.0...client-v0.73.0) (2026-09-11)
 
 
