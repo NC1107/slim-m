@@ -19,7 +19,7 @@
 /// no right button.
 ///
 /// A right-click also raises [SelectionArea]'s own platform text-selection
-/// menu, independently of `ContextMenuRegion`'s `onSecondaryTapDown` -
+/// menu, independently of `ContextMenuRegion`'s `onSecondaryTapUp` -
 /// reported directly by the owner as two popups at once, our own menu with a
 /// stray "Select all" drawn over it. [_suppressedContextMenu] answers that
 /// menu with nothing, since `MessageContextMenuRegion` (which already carries

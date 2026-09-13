@@ -159,6 +159,10 @@ abstract final class AppIcons {
   /// [leaveCall], which is the control you press to hang up: this one is a
   /// record of something that already happened and is never a button.
   static const IconData missedCall = LucideIcons.phoneMissed300;
+
+  /// Making a new channel category, beside [add] (a new channel) in the rail's
+  /// own menu, so the two "create" items read as different things at a glance.
+  static const IconData addCategory = LucideIcons.folderPlus300;
   static const IconData canvas = LucideIcons.pencilRuler300;
 
   /// The canvas's own draw/erase toggle. Distinct constants from [edit] even
