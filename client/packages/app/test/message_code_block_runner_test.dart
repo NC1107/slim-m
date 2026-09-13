@@ -318,9 +318,9 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Run code'));
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('Step'), findsOneWidget);
+      expect(find.bySemanticsLabel('Step forward'), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel('Step'));
+      await tester.tap(find.bySemanticsLabel('Step forward'));
       await tester.pumpAndSettle();
 
       expect(paths, isNotEmpty);

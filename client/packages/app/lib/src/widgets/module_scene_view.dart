@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import 'module_scene.dart';
+import 'module_scene_frame.dart';
 import 'module_scene_painter.dart';
 
 /// Runs one action against the module and returns its raw result. The action
@@ -354,37 +355,24 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: tokens.borderSubtle),
-              borderRadius: BorderRadius.circular(AppRadii.control),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: AspectRatio(
-              aspectRatio: aspect <= 0 ? 1.0 : aspect,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final size = constraints.biggest;
-                  return Listener(
-                    onPointerDown: _handlePointerDown,
-                    child: GestureDetector(
-                      onTapUp: (d) => _handleTapUp(d, size),
-                      onPanStart: (d) => _handlePanStart(d, size),
-                      onPanUpdate: (d) => _handlePanUpdate(d, size),
-                      child: CustomPaint(
-                        painter: ModuleScenePainter(
-                          scene: _scene,
-                          tokens: tokens,
-                        ),
-                        size: size,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+        ModuleSceneFrame(
+          aspect: aspect,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final size = constraints.biggest;
+              return Listener(
+                onPointerDown: _handlePointerDown,
+                child: GestureDetector(
+                  onTapUp: (d) => _handleTapUp(d, size),
+                  onPanStart: (d) => _handlePanStart(d, size),
+                  onPanUpdate: (d) => _handlePanUpdate(d, size),
+                  child: CustomPaint(
+                    painter: ModuleScenePainter(scene: _scene, tokens: tokens),
+                    size: size,
+                  ),
+                ),
+              );
+            },
           ),
         ),
         if (_scene.status != null) ...[
@@ -442,31 +430,36 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
         return AppIconButton(
           icon: _playing ? AppIcons.pause : AppIcons.play,
           semanticLabel: _playing ? 'Pause' : 'Play',
+          tooltip: _playing ? 'Pause' : 'Play',
           active: _playing,
           onPressed: _togglePlay,
         );
       case 'step':
         return AppIconButton(
           icon: AppIcons.forward,
-          semanticLabel: 'Step',
+          semanticLabel: 'Step forward',
+          tooltip: 'Step forward',
           onPressed: () => _send('step'),
         );
       case 'random':
         return AppIconButton(
           icon: AppIcons.highlight,
-          semanticLabel: 'Random',
+          semanticLabel: 'Randomise',
+          tooltip: 'Randomise',
           onPressed: () => _send('random'),
         );
       case 'clear':
         return AppIconButton(
           icon: AppIcons.eraser,
           semanticLabel: 'Clear',
+          tooltip: 'Clear',
           onPressed: () => _send('clear'),
         );
       case 'reset':
         return AppIconButton(
           icon: AppIcons.retry,
           semanticLabel: 'Reset',
+          tooltip: 'Reset',
           onPressed: () => _send('reset'),
         );
       default:

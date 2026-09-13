@@ -148,7 +148,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Step'));
+    await tester.tap(find.bySemanticsLabel('Step forward'));
     await tester.pumpAndSettle();
 
     expect(
@@ -176,13 +176,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Step'));
+    await tester.tap(find.bySemanticsLabel('Step forward'));
     await tester.pump();
 
     final step = tester.widget<AppIconButton>(
       find
           .ancestor(
-            of: find.bySemanticsLabel('Step'),
+            of: find.bySemanticsLabel('Step forward'),
             matching: find.byType(AppIconButton),
           )
           .first,

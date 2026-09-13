@@ -14,7 +14,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_app/src/widgets/channel_rail_reorder.dart';
+import 'package:slimm_app/src/widgets/rail_drag_lift.dart';
 import 'package:slimm_data/data.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 Channel _channel(String id) => Channel(
   id: id,
@@ -30,6 +32,7 @@ Channel _channel(String id) => Channel(
 );
 
 Widget _harness(Widget child) => MaterialApp(
+  theme: buildTheme(Brightness.light, AppTokens.light),
   home: Scaffold(body: SizedBox(height: 400, child: child)),
 );
 
@@ -98,6 +101,53 @@ void main() {
 
     expect(reported, isNotNull, reason: 'the mouse drag never started');
     expect(reported!.single.channelIds, isNot(['a', 'b', 'c']));
+  });
+
+  testWidgets('a mouse press takes hold of the row and the drag lifts it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        ReorderableChannelRows(
+          sections: [
+            (null, [_channel('a'), _channel('b'), _channel('c')]),
+          ],
+          canManage: true,
+          onReorder: (_) {},
+          rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
+              SizedBox(height: 48, child: Text(channel.id)),
+          headerBuilder: _header,
+        ),
+      ),
+    );
+    double heldScale() => tester
+        .widget<AnimatedScale>(
+          find.ancestor(
+            of: find.text('a'),
+            matching: find.byType(AnimatedScale),
+          ),
+        )
+        .scale;
+    expect(heldScale(), 1);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('a')),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    expect(heldScale(), AppMotion.pressScale, reason: 'pressed reads as held');
+
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(const Offset(0, 20));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(find.byType(RailDragLift), findsOneWidget, reason: 'carried copy');
+
+    await tester.pumpAndSettle();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(RailDragLift), findsNothing, reason: 'set back down');
+    expect(heldScale(), 1);
   });
 
   testWidgets('a mouse click on a row still reaches the row, not a drag', (

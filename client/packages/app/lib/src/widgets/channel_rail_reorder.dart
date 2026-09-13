@@ -80,6 +80,8 @@ import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'rail_drag_lift.dart';
+
 /// One category's ordered channels, `null` for the implicit uncategorised
 /// section, which always renders first.
 typedef ChannelSection = (ChannelCategoryRow? category, List<Channel> channels);
@@ -176,6 +178,8 @@ class ReorderableChannelRows extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       buildDefaultDragHandles: false,
+      proxyDecorator: (child, _, animation) =>
+          RailDragLift(animation: animation, child: child),
       onReorderItem: (oldIndex, newIndex) {
         final moved = items[oldIndex];
         if (moved is! _ChannelItem) return;
@@ -200,7 +204,9 @@ class ReorderableChannelRows extends StatelessWidget {
                   : ReorderableDragStartListener(
                       key: ValueKey(channel.id),
                       index: i,
-                      child: rowBuilder(channel, true, null),
+                      child: RailGrabFeedback(
+                        child: rowBuilder(channel, true, null),
+                      ),
                     ),
           },
       ],
