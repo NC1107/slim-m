@@ -20,6 +20,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/routing/router.dart';
 import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/widgets/labeled_field.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -136,8 +137,9 @@ void main() {
       );
 
       final field = tester.widget<TextField>(
-        find.byWidgetPredicate(
-          (w) => w is TextField && w.decoration?.labelText == 'Server',
+        find.descendant(
+          of: find.widgetWithText(LabeledField, 'Server'),
+          matching: find.byType(TextField),
         ),
       );
       expect(

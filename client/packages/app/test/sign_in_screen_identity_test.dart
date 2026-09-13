@@ -122,7 +122,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Use https'), findsOneWidget);
@@ -176,7 +176,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
 
       final chosen = container.read(chosenServerProvider);
@@ -383,7 +383,7 @@ void main() {
 
         await tester.enterText(find.byType(TextField).at(1), 'alice');
         await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-        await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+        await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
         await tester.pumpAndSettle();
 
         expect(find.text("This server's identity changed"), findsOneWidget);
@@ -459,7 +459,7 @@ void main() {
 
         await tester.enterText(find.byType(TextField).at(1), 'alice');
         await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-        await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+        await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
         await tester.pumpAndSettle();
 
         expect(find.text("This server's identity changed"), findsNothing);

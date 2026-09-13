@@ -17,6 +17,7 @@ import '../providers/push_controller.dart';
 import '../routing/routes.dart';
 import '../server_address_reduction.dart';
 import '../server_scheme_policy.dart';
+import '../widgets/labeled_field.dart';
 import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 import '../widgets/server_notice.dart';
@@ -354,17 +355,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               ),
             ),
           if (_addressExpanded) ...[
-            TextField(
-              controller: _server,
-              decoration: InputDecoration(
-                labelText: 'Server',
-                helperText: "The Space you're joining - its server address.",
+            LabeledField(
+              label: 'Server',
+              helper: "The Space you're joining - its server address.",
+              child: AppInput(
+                controller: _server,
+                mono: true,
                 errorText: _errorFor(SignInErrorField.server),
-                errorMaxLines: 3,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                semanticLabel: 'Server',
+                onChanged: _onServerEdited,
               ),
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              onChanged: _onServerEdited,
             ),
             const SizedBox(height: AppSpacing.s8),
           ],
@@ -391,35 +393,41 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   'new messages while the app is open.',
             ),
           const SizedBox(height: AppSpacing.s16),
-          TextField(
-            controller: _username,
-            decoration: InputDecoration(
-              labelText: 'Username',
+          LabeledField(
+            label: 'Username',
+            child: AppInput(
+              controller: _username,
               errorText: _errorFor(SignInErrorField.username),
+              autocorrect: false,
+              autofillHints: const [AutofillHints.username],
+              textInputAction: TextInputAction.next,
+              semanticLabel: 'Username',
             ),
-            autocorrect: false,
-            autofillHints: const [AutofillHints.username],
           ),
           if (_creatingAccount) ...[
             const SizedBox(height: AppSpacing.s16),
-            TextField(
-              controller: _displayName,
-              decoration: const InputDecoration(
-                labelText: 'Display name',
-                helperText: 'What others see. Defaults to your username.',
+            LabeledField(
+              label: 'Display name',
+              helper: 'What others see. Defaults to your username.',
+              child: AppInput(
+                controller: _displayName,
+                textInputAction: TextInputAction.next,
+                semanticLabel: 'Display name',
               ),
             ),
           ],
           const SizedBox(height: AppSpacing.s16),
-          TextField(
-            controller: _password,
-            decoration: InputDecoration(
-              labelText: 'Password',
+          LabeledField(
+            label: 'Password',
+            child: AppInput(
+              controller: _password,
               errorText: _errorFor(SignInErrorField.password),
+              obscureText: true,
+              autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.done,
+              semanticLabel: 'Password',
+              onSubmitted: (_) => _busy ? null : _submit(),
             ),
-            obscureText: true,
-            autofillHints: const [AutofillHints.password],
-            onSubmitted: (_) => _busy ? null : _submit(),
           ),
           if (_errorFor(SignInErrorField.form) case final formError?) ...[
             const SizedBox(height: AppSpacing.s16),
@@ -427,56 +435,52 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               liveRegion: true,
               child: Text(
                 formError,
-                style: TextStyle(color: tokens.dangerText),
+                style: AppText.caption.copyWith(color: tokens.dangerText),
               ),
             ),
           ],
           const SizedBox(height: AppSpacing.s24),
-          FilledButton(
-            onPressed: _busy ? null : _submit,
-            // Cross-fades to a spinner rather than swapping in one frame.
-            child: AnimatedSwitcher(
-              duration: AppMotion.reduced(context, AppMotion.fast),
-              child: _busy
-                  ? const SizedBox(
-                      key: ValueKey('busy'),
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      _creatingAccount ? 'Create account' : 'Sign in',
-                      key: const ValueKey('label'),
-                    ),
-            ),
+          AppButton(
+            label: _creatingAccount ? 'Create account' : 'Sign in',
+            variant: AppButtonVariant.primary,
+            size: AppButtonSize.lg,
+            full: true,
+            busy: _busy,
+            onPressed: _submit,
           ),
-          const SizedBox(height: AppSpacing.s8),
-          TextButton(
-            onPressed: _busy
-                ? null
-                : () => setState(() {
-                    _creatingAccount = !_creatingAccount;
-                    _error = null;
-                  }),
-            child: Text(
-              _creatingAccount
-                  ? 'I already have an account'
-                  : 'Create an account instead',
-            ),
-          ),
-          // Grouped with the other way out: both change which server this is.
-          if (!_addressExpanded)
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => setState(() => _addressExpanded = true),
-              child: const Text('Use a different server'),
-            ),
-          // Once a Space is remembered, sign-in is where a signed-out
-          // user lands, so this is the only way back to invite redemption.
-          TextButton(
-            onPressed: _busy ? null : () => context.go(Routes.onboarding),
-            child: const Text('Join a different Space'),
+          const SizedBox(height: AppSpacing.s12),
+          // The other ways out, in one row so they read as alternatives to the action above rather than a list under it.
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s4,
+            children: [
+              AppButton(
+                label: _creatingAccount
+                    ? 'I already have an account'
+                    : 'Create an account instead',
+                variant: AppButtonVariant.ghost,
+                disabled: _busy,
+                onPressed: () => setState(() {
+                  _creatingAccount = !_creatingAccount;
+                  _error = null;
+                }),
+              ),
+              if (!_addressExpanded)
+                AppButton(
+                  label: 'Use a different server',
+                  variant: AppButtonVariant.ghost,
+                  disabled: _busy,
+                  onPressed: () => setState(() => _addressExpanded = true),
+                ),
+              // Once a Space is remembered this is the only way back to invite redemption.
+              AppButton(
+                label: 'Join a different Space',
+                variant: AppButtonVariant.ghost,
+                disabled: _busy,
+                onPressed: () => context.go(Routes.onboarding),
+              ),
+            ],
           ),
         ],
       ),

@@ -38,6 +38,8 @@ class AppInput extends StatefulWidget {
     this.keyboardType,
     this.textInputAction,
     this.inputFormatters,
+    this.autofillHints,
+    this.autocorrect = true,
     this.onChanged,
     this.onSubmitted,
     this.semanticLabel,
@@ -75,6 +77,11 @@ class AppInput extends StatefulWidget {
   /// which is the only place a caller can refuse "not a digit" outright
   /// rather than accepting it and parsing the mistake out later.
   final List<TextInputFormatter>? inputFormatters;
+
+  /// Passed straight through to the platform's autofill, so a password
+  /// manager can recognise a credential field drawn in this chrome.
+  final Iterable<String>? autofillHints;
+  final bool autocorrect;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final String? semanticLabel;
@@ -162,6 +169,8 @@ class _AppInputState extends State<AppInput> {
               keyboardType: widget.keyboardType,
               textInputAction: widget.textInputAction,
               inputFormatters: widget.inputFormatters,
+              autofillHints: widget.autofillHints,
+              autocorrect: widget.autocorrect,
               onChanged: widget.onChanged,
               onSubmitted: widget.onSubmitted,
               style: textStyle,

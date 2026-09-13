@@ -65,7 +65,7 @@ Future<void> _pump(
 
   await tester.enterText(find.byType(TextField).at(1), 'alice');
   await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-  await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+  await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
 }
 
 void main() {
@@ -77,7 +77,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 40));
 
-      final button = find.byType(FilledButton);
+      final button = find.byType(AppButton);
       expect(
         find.descendant(
           of: button,
@@ -106,7 +106,7 @@ void main() {
       // Not pumpAndSettle: the spinner's own indeterminate ticker never settles.
       await tester.pump(const Duration(milliseconds: 200));
 
-      final button = find.byType(FilledButton);
+      final button = find.byType(AppButton);
       expect(
         find.descendant(of: button, matching: find.text('Sign in')),
         findsNothing,
@@ -131,7 +131,7 @@ void main() {
       await _pump(tester, gate, reduceMotion: true);
       await tester.pump();
 
-      final button = find.byType(FilledButton);
+      final button = find.byType(AppButton);
       expect(
         find.descendant(
           of: button,
