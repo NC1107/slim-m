@@ -684,17 +684,36 @@ async fn classify_failed_refresh(
     .await?;
 
     let Some(row) = row else {
-        return Ok(RefreshOutcome::Denied); // unknown token
+        // Swept or never issued; the one rejection with no session to name.
+        tracing::info!(reason = "unknown", "refresh rejected");
+        return Ok(RefreshOutcome::Denied);
     };
     if row.revoked_at.is_some() {
-        return Ok(RefreshOutcome::Denied); // family already revoked
+        tracing::info!(
+            session_id = %row.session_id,
+            reason = "family already revoked",
+            "refresh rejected"
+        );
+        return Ok(RefreshOutcome::Denied);
     }
     let Some(used_at) = row.used_at else {
-        return Ok(RefreshOutcome::Denied); // not spent, so the claim failed on expiry
+        // Never spent, so the claim guard failed on expiry instead.
+        tracing::info!(
+            session_id = %row.session_id,
+            reason = "expired",
+            "refresh rejected"
+        );
+        return Ok(RefreshOutcome::Denied);
     };
     if now - used_at <= reuse_grace_ms {
         // The honest client raced itself; the winning request already rotated and
         // handed it a fresh pair, so deny this one softly without revoking.
+        tracing::info!(
+            session_id = %row.session_id,
+            spent_ms_ago = now - used_at,
+            reason = "replayed inside the grace window",
+            "refresh rejected"
+        );
         return Ok(RefreshOutcome::Denied);
     }
 
@@ -704,6 +723,7 @@ async fn classify_failed_refresh(
     tx.commit().await?;
     tracing::warn!(
         session_id = %row.session_id,
+        spent_ms_ago = now - used_at,
         "refresh token reuse detected outside the grace window; family and session revoked"
     );
     Ok(RefreshOutcome::Reused)

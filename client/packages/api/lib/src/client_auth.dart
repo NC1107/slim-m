@@ -97,12 +97,17 @@ extension SlimmApiAuth on SlimmApi {
       final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
       session.set(tokens);
       // Bounded: a wedged key store must cost one slow rotation, never every later request.
-      await session.settled.timeout(_persistDeadline, onTimeout: () {});
+      var persisted = true;
+      await session.settled.timeout(
+        _persistDeadline,
+        onTimeout: () => persisted = false,
+      );
+      session.noteRotation(persisted: persisted);
       return tokens;
     } on UnauthorizedException {
       // The refresh token is spent, revoked, or the session is gone; the only
       // move left is a fresh sign-in.
-      session.clear();
+      session.clear(reason: session.describeRejection());
       rethrow;
     }
   }
