@@ -58,8 +58,9 @@ class ClientUpdate {
 }
 
 /// The latest `client-v*` release newer than [currentVersion], or `null` when
-/// there is none, the check failed, or this is not a self-updatable desktop
-/// build's concern. [client] and [format] are injectable for tests.
+/// there is none, the check failed, [currentVersion] cannot be read, or this
+/// is not a self-updatable desktop build's concern. [client] and [format] are
+/// injectable for tests.
 Future<ClientUpdate?> checkForClientUpdate({
   required String currentVersion,
   http.Client? client,
@@ -109,6 +110,21 @@ Future<ClientUpdate?> checkForClientUpdate({
   }
 }
 
+/// Where the version last dismissed with "Not now" is stored.
+const dismissedUpdateVersionKey = 'slimm.update.dismissed_version';
+
+/// Whether an offer of [candidate] should be withheld because the user already
+/// said "Not now" to [dismissed].
+///
+/// Phase 1 cannot apply an update itself: an rpm or flatpak has to be updated
+/// out-of-band, which can be days later. Re-offering the same version on every
+/// launch until then is the whole of "I keep getting the update screen", so a
+/// dismissal holds until something genuinely newer than it exists.
+bool updateWasDismissed({
+  required String? dismissed,
+  required String candidate,
+}) => dismissed != null && !isNewer(candidate, dismissed);
+
 /// `[major, minor, patch]` from a `X.Y.Z` string, or `null` if it is not that
 /// shape. Any pre-release or build suffix after the patch is ignored.
 List<int>? parseVersion(String raw) {
@@ -124,14 +140,18 @@ List<int>? parseVersion(String raw) {
   return numbers;
 }
 
-/// Whether [candidate] is a strictly higher version than [against]. A version
-/// that will not parse is treated as not-newer, so junk never offers itself
-/// as an update.
+/// Whether [candidate] is a strictly higher version than [against].
+///
+/// Either side failing to parse answers false, because the honest answer is
+/// "cannot tell" and the only safe reading of that here is "do not offer".
+/// [against] used to answer true, which meant an install whose own version
+/// could not be read - `PackageInfo` returns an empty string on Linux when
+/// `version.json` is not where it expects it - was told that every release
+/// ever published was newer than it, on every single launch.
 bool isNewer(String candidate, String against) {
   final a = parseVersion(candidate);
   final b = parseVersion(against);
-  if (a == null) return false;
-  if (b == null) return true;
+  if (a == null || b == null) return false;
   for (var i = 0; i < 3; i++) {
     if (a[i] != b[i]) return a[i] > b[i];
   }
