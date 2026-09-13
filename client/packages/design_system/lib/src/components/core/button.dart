@@ -113,6 +113,7 @@ class AppButton extends StatefulWidget {
     this.icon,
     this.full = false,
     this.disabled = false,
+    this.busy = false,
     this.touch,
     this.semanticLabel,
     this.focusNode,
@@ -133,6 +134,12 @@ class AppButton extends StatefulWidget {
   /// valid, say) rather than having to null it out and reattach it later.
   final bool disabled;
 
+  /// The label cross-fades to a spinner and taps are ignored, without the
+  /// dimming [disabled] gets: a form mid-submit is working, not unavailable.
+  /// The fade takes [AppMotion.fast] and collapses to a swap under reduce
+  /// motion.
+  final bool busy;
+
   /// Null means "whatever this subtree is at", read from [AppTouchTargets].
   final bool? touch;
   final String? semanticLabel;
@@ -152,14 +159,16 @@ class _AppButtonState extends State<AppButton> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final enabled = !widget.disabled && widget.onPressed != null;
+    final enabled =
+        !widget.disabled && !widget.busy && widget.onPressed != null;
     final metrics = _metricsFor(widget.size);
     final look = _lookFor(widget.variant, tokens);
     final touch = widget.touch ?? AppTouchTargets.of(context);
     final hitTarget = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
     final height = metrics.height > hitTarget ? metrics.height : hitTarget;
 
-    final content = Row(
+    final labelRow = Row(
+      key: const ValueKey('label'),
       mainAxisSize: MainAxisSize.min,
       children: [
         if (widget.icon != null) ...[
@@ -178,6 +187,21 @@ class _AppButtonState extends State<AppButton> {
           ),
         ),
       ],
+    );
+
+    final content = AnimatedSwitcher(
+      duration: AppMotion.reduced(context, AppMotion.fast),
+      child: widget.busy
+          ? SizedBox(
+              key: const ValueKey('busy'),
+              width: AppSizes.icon16,
+              height: AppSizes.icon16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: look.foreground,
+              ),
+            )
+          : labelRow,
     );
 
     final button = Container(
@@ -206,7 +230,7 @@ class _AppButtonState extends State<AppButton> {
       button: true,
       enabled: enabled,
       child: Opacity(
-        opacity: enabled ? 1 : 0.45,
+        opacity: enabled || widget.busy ? 1 : 0.45,
         child: FocusableActionDetector(
           enabled: enabled,
           focusNode: widget.focusNode,

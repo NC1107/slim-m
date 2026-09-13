@@ -167,7 +167,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).at(0), 'alice');
       await tester.enterText(find.byType(TextField).at(1), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
 
       expect(loggedInHost, Uri.parse(officialServer).host);

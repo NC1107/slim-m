@@ -22,6 +22,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/default_server.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
+import 'package:slimm_app/src/widgets/labeled_field.dart';
 import 'package:slimm_app/src/widgets/server_identity_confirmation.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -117,12 +118,19 @@ Future<KeyStore> _pump(
   return keyStore;
 }
 
+/// The box under the field named [label]: the name is drawn above the
+/// control, not inside it, so a text-in-field finder never sees it.
+Finder _field(String label) => find.descendant(
+  of: find.widgetWithText(LabeledField, label),
+  matching: find.byType(TextField),
+);
+
 /// Fills the credentials and submits. The address field is absent on the
 /// official path, so the fields are found by their label rather than by index.
 Future<void> _signIn(WidgetTester tester) async {
-  await tester.enterText(find.widgetWithText(TextField, 'Username'), 'alice');
-  await tester.enterText(find.widgetWithText(TextField, 'Password'), 'hunter2');
-  await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+  await tester.enterText(_field('Username'), 'alice');
+  await tester.enterText(_field('Password'), 'hunter2');
+  await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
   await tester.pumpAndSettle();
 }
 
@@ -137,7 +145,7 @@ void main() {
     );
 
     expect(
-      find.widgetWithText(TextField, 'Server'),
+      _field('Server'),
       findsNothing,
       reason: 'the address is not a decision on this path',
     );

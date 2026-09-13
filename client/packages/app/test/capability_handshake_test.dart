@@ -138,8 +138,8 @@ void main() {
   testWidgets('the warning does not block the connection', (tester) async {
     await pumpAgainst(tester, _version(<String>[]));
     expect(_missingNotice, findsOneWidget);
-    final button = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Sign in'),
+    final button = tester.widget<AppButton>(
+      find.widgetWithText(AppButton, 'Sign in'),
     );
     expect(
       button.onPressed,

@@ -311,7 +311,7 @@ void main() {
     Future<void> submitSignIn(WidgetTester tester) async {
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
     }
 
@@ -333,7 +333,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(3), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+      await tester.tap(find.widgetWithText(AppButton, 'Create account'));
       await tester.pumpAndSettle();
       expect(find.text('That username is already taken.'), findsOneWidget);
       await _finish(tester, 'submit-username-taken-desktop');
@@ -411,7 +411,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, 'not a url');
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
       expect(
         find.text('That does not look like a server address.'),
@@ -431,7 +431,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
-      await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+      await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Use https'), findsOneWidget);
       await _finish(tester, 'submit-scheme-refused-desktop');
