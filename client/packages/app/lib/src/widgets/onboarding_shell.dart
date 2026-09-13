@@ -17,6 +17,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+export 'server_identity_chip.dart';
+
 /// Narrowest width that still gets the brand panel. Above this there is room
 /// for a 260px brand rail and a 440px form with gutters; below it, there is not.
 const double _panelFloor = 900;
@@ -54,9 +56,19 @@ enum OnboardingStep {
 }
 
 class OnboardingShell extends StatelessWidget {
-  const OnboardingShell({super.key, required this.child, this.step});
+  const OnboardingShell({
+    super.key,
+    required this.child,
+    this.step,
+    this.version,
+  });
 
   final Widget child;
+
+  /// The running build, shown at the foot of the brand rail, or null while it
+  /// is still being read. A version on the screen a tester first meets is the
+  /// difference between a bug report that can be placed and one that cannot.
+  final String? version;
 
   /// The step being shown, or null for a screen that is not part of the join
   /// flow - signing back in to a server you already trust is one act, and a
@@ -128,7 +140,7 @@ class OnboardingShell extends StatelessWidget {
                 color: tokens.surfaceSunken,
                 border: Border(right: BorderSide(color: tokens.borderSubtle)),
               ),
-              child: const _BrandPanel(),
+              child: _BrandPanel(version: version),
             ),
             Expanded(child: content),
           ],
@@ -168,29 +180,49 @@ class _Wordmark extends StatelessWidget {
   }
 }
 
-/// The left column: the mark, and room kept for whatever goes under it.
+/// The left column: the mark, the mark's own lattice drawn large behind it,
+/// and the build number at the foot.
 ///
-/// Deliberately blank below the wordmark. It carried a headline, a subtitle
-/// and three promises, and most of it was either marketing or not true yet -
-/// it advertised a shared canvas the product does not have. Copy that
-/// overstates what a self-hosted server does is worse here than nowhere,
-/// because this is the screen where somebody decides whether to trust one.
+/// Still no copy below the wordmark, on purpose. It once carried a headline,
+/// a subtitle and three promises, and most of it was either marketing or not
+/// true yet; copy that overstates what a self-hosted server does is worse here
+/// than nowhere, because this is the screen where somebody decides whether to
+/// trust one. What replaced the blank is [AppBrandLattice], which is the
+/// brand's one figure and cannot promise anything - it turned a rail that read
+/// as an unfinished half into one that reads as designed.
 ///
-/// The layout is kept rather than collapsed so there is a place to put real
-/// words when there are some - but the rail is narrow (its container's width),
-/// because at a third of the viewport this emptiness read as an unfinished
-/// half rather than a margin.
+/// The version is the one line of text allowed in, because it is a fact a
+/// tester needs and this is the first screen they see.
 class _BrandPanel extends StatelessWidget {
-  const _BrandPanel();
+  const _BrandPanel({this.version});
+
+  final String? version;
 
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.all(AppSpacing.s32),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [_Wordmark()],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const AppBrandLattice(),
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.s32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _Wordmark(),
+              const Spacer(),
+              if (version case final v?)
+                Text(
+                  'v$v',
+                  style: AppText.code.copyWith(color: tokens.textSecondary),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// `1 invite - 2 who are you`.
@@ -306,173 +338,6 @@ class _Pip extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-/// How a server's identity compares against whatever this app already
-/// pinned for that address. Three states, not a boolean, because "no pin
-/// exists yet" and "the pin does not match" are opposite risk levels and
-/// must never share one rendering.
-enum ServerIdentityStatus {
-  /// The fetched key matches the pin. The tick is about this, and only
-  /// this: reaching a server says who answered, not that it is the one
-  /// trusted last time.
-  confirmed,
-
-  /// Nothing is pinned yet, or the server is too old to report an identity
-  /// at all (`Version.identity == null`). Neither is a safety claim in
-  /// either direction, so this renders as quietly as an unasked question.
-  unknown,
-
-  /// The fetched key does not match the pin. Must read louder than
-  /// [unknown] and never as a neutral absence of information: this is the
-  /// one state trust-on-first-use exists to make visible.
-  mismatch,
-}
-
-/// The Space a form is about: its initials, its name and its host, with a
-/// glyph for how its identity compares against what this app already
-/// pinned.
-///
-/// Shown only once `/version` has answered, because until then the only
-/// honest thing to say about a typed address is nothing.
-class ServerIdentityChip extends StatelessWidget {
-  const ServerIdentityChip({
-    super.key,
-    required this.spaceName,
-    required this.host,
-    this.status = ServerIdentityStatus.unknown,
-  });
-
-  final String spaceName;
-  final String host;
-  final ServerIdentityStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final stripped = initialsFor(spaceName);
-    final initials = stripped.isEmpty ? '?' : stripped;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s16),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: tokens.surfaceSunken,
-              border: Border.all(color: tokens.borderSubtle),
-              borderRadius: BorderRadius.circular(AppRadii.control),
-            ),
-            child: Text(
-              initials,
-              style: AppText.code.copyWith(
-                fontSize: 11,
-                color: tokens.textSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s12),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: spaceName,
-                    style: TextStyle(color: tokens.textPrimary),
-                  ),
-                  TextSpan(
-                    text: '  $host',
-                    style: AppText.code.copyWith(
-                      fontSize: 12,
-                      color: tokens.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              style: AppText.caption,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.s8),
-          _IdentityStatusGlyph(status: status),
-        ],
-      ),
-    );
-  }
-}
-
-/// The tick, its louder mismatch counterpart, or nothing - each with a
-/// visible word beside it, not only a screen-reader label.
-///
-/// This is a security-relevant signal (trust-on-first-use's one visible
-/// cue for whether a server is the one trusted last time), so a sighted,
-/// non-screen-reader user needs on-screen words for it too, not just a
-/// tooltip nobody has a reason to hover a 16px glyph for. The full
-/// semantic sentence stays on the [Semantics] wrapper for a screen reader;
-/// the short visible word is `excludeSemantics`-scoped so nothing is
-/// announced twice.
-class _IdentityStatusGlyph extends StatelessWidget {
-  const _IdentityStatusGlyph({required this.status});
-
-  final ServerIdentityStatus status;
-
-  static const _labels = {
-    ServerIdentityStatus.confirmed:
-        'Identity confirmed: matches the key this app pinned before.',
-    ServerIdentityStatus.unknown: 'Identity not yet confirmed.',
-    ServerIdentityStatus.mismatch:
-        "Identity does not match the key this app pinned before. This "
-        'server may not be the one trusted last time.',
-  };
-
-  /// The short visible word beside the glyph. Unknown renders neither an
-  /// icon nor a word, deliberately: it is not yet a claim in either
-  /// direction, so it stays as quiet as an unasked question.
-  static const _visibleText = {
-    ServerIdentityStatus.confirmed: 'Confirmed',
-    ServerIdentityStatus.mismatch: 'Changed',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final (icon, color) = switch (status) {
-      ServerIdentityStatus.confirmed => (AppIcons.check, tokens.accent),
-      ServerIdentityStatus.unknown => (null, null),
-      ServerIdentityStatus.mismatch => (AppIcons.danger, tokens.dangerText),
-    };
-    final text = _visibleText[status];
-
-    return Semantics(
-      label: _labels[status],
-      excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: AppSizes.icon16,
-            height: AppSizes.icon16,
-            child: icon == null
-                ? null
-                : Icon(icon, size: AppSizes.icon16, color: color),
-          ),
-          if (text != null) ...[
-            const SizedBox(width: AppSpacing.s4),
-            Text(
-              text,
-              style: AppText.caption.copyWith(
-                color: color,
-                fontWeight: AppWeights.semi,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

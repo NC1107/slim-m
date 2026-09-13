@@ -284,4 +284,37 @@ void main() {
       },
     );
   });
+
+  testWidgets('the rail shows the build version once it is known', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: const OnboardingShell(
+          version: '0.74.0',
+          child: SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('v0.74.0'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: const OnboardingShell(child: SizedBox.shrink()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('v0.'),
+      findsNothing,
+      reason: 'nothing to show until the version has been read',
+    );
+  });
 }
