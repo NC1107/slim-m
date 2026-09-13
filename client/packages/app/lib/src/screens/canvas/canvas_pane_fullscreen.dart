@@ -45,4 +45,19 @@ extension _CanvasPaneFullscreen on _CanvasPaneState {
     ref.read(canvasFullscreenProvider.notifier).state = null;
     ref.read(canvasOpenProvider.notifier).state = null;
   }
+
+  /// Hanging up closes the canvas with the call. The owner hung up from the
+  /// fullscreen canvas and was left on an empty grid with one button; closing
+  /// it by hand minutes later remounted `VoiceScreen` past
+  /// `VoiceState.rejoinGuardWindow`, which read as a fresh arrival and joined
+  /// the call straight back. Closing here, in the same motion as the leave,
+  /// lands inside that window, so the voice screen shows the recap instead.
+  /// Only the call *ending* counts - a canvas opened outside any call never
+  /// sees this transition and stays put.
+  void _closeWhenCallEnds(VoiceFlags? previous, VoiceFlags next) {
+    if (previous?.channelId != widget.channelId) return;
+    if (next.channelId != null) return;
+    if (ref.read(canvasOpenProvider) != widget.channelId) return;
+    _closeCanvas();
+  }
 }

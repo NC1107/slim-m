@@ -163,6 +163,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     final fullscreen = _fullscreen;
     // The one ref.watch keeping canvasEngineProvider alive; see its own doc.
     final engineState = ref.watch(canvasEngineProvider(widget.channelId));
+    ref.listen(voiceFlagsProvider, _closeWhenCallEnds);
     return CallbackShortcuts(
       bindings: {
         // Only bound while there is something to escape from, so Escape keeps reaching whatever else would have handled it.
