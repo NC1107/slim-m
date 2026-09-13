@@ -75,7 +75,55 @@ class SessionStore {
     }
   }
 
-  void clear() => set(null);
+  /// Ends the session. [reason] is recorded on [lastEndReason] and announced
+  /// on [endings] so the app can say *why* somebody was signed out - the one
+  /// thing a person who has just been thrown back to the sign-in screen
+  /// cannot otherwise find out.
+  void clear({String reason = 'signed out'}) {
+    _lastEndReason = reason;
+    _endings.add(reason);
+    set(null);
+  }
+
+  String? _lastEndReason;
+  final _endings = StreamController<String>.broadcast();
+
+  DateTime? _lastRotationAt;
+  bool _lastRotationPersisted = false;
+
+  /// Records that a refresh rotation completed, and whether its new pair
+  /// reached storage before [settled]'s deadline. Only [describeRejection]
+  /// reads this.
+  void noteRotation({required bool persisted}) {
+    _lastRotationAt = DateTime.now();
+    _lastRotationPersisted = persisted;
+  }
+
+  /// Why a refresh was just rejected, in the terms that separate the
+  /// candidate causes rather than the terms the server used.
+  ///
+  /// A rejection on a pair this process never rotated means what was loaded
+  /// from storage at launch was already dead: a write that never landed, or
+  /// another instance that spent it. A rejection seconds after a rotation
+  /// means this process raced itself or lost the response. Those want
+  /// different fixes and are indistinguishable from the sign-in screen, which
+  /// is the only thing anybody sees today.
+  String describeRejection() {
+    final at = _lastRotationAt;
+    if (at == null) {
+      return 'credentials rejected; the stored pair was already spent at launch';
+    }
+    final age = DateTime.now().difference(at).inSeconds;
+    final durable = _lastRotationPersisted ? 'persisted' : 'NOT persisted';
+    return 'credentials rejected ${age}s after a rotation that was $durable';
+  }
+
+  /// Why the session last ended, or null if it never has in this process.
+  String? get lastEndReason => _lastEndReason;
+
+  /// Emits the reason each time the session ends. Separate from [changes],
+  /// which reports every token rotation too.
+  Stream<String> get endings => _endings.stream;
 
   /// Resolves once every [_onChange] triggered by [set] so far has settled,
   /// whether it succeeded or failed.
