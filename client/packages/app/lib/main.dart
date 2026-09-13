@@ -5,7 +5,9 @@ library;
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -72,6 +74,8 @@ import 'src/widgets/toast_overlay.dart';
 /// size. Waiting for the real first frame avoids that race entirely.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The browser's own menu otherwise lands on top of every in-app one.
+  if (kIsWeb) unawaited(BrowserContextMenu.disableContextMenu());
   // Registers media_kit's player backend; every inline video attachment goes through it (attachment_video_player.dart).
   MediaKit.ensureInitialized();
   await _initAndroidPush();

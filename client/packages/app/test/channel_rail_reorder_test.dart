@@ -63,6 +63,73 @@ void main() {
     expect(find.text('b'), findsOneWidget);
   });
 
+  testWidgets('a mouse drag starts moving without a held press', (
+    tester,
+  ) async {
+    // A delayed listener never began a drag that moved before its deadline.
+    List<ChannelOrderGroup>? reported;
+    await tester.pumpWidget(
+      _harness(
+        ReorderableChannelRows(
+          sections: [
+            (null, [_channel('a'), _channel('b'), _channel('c')]),
+          ],
+          canManage: true,
+          onReorder: (order) => reported = order,
+          rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
+              SizedBox(height: 48, child: Text(channel.id)),
+          headerBuilder: _header,
+        ),
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('a')),
+      kind: PointerDeviceKind.mouse,
+    );
+    // Straight into the move, the way a mouse drag is actually made.
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(const Offset(0, 20));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.pumpAndSettle();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(reported, isNotNull, reason: 'the mouse drag never started');
+    expect(reported!.single.channelIds, isNot(['a', 'b', 'c']));
+  });
+
+  testWidgets('a mouse click on a row still reaches the row, not a drag', (
+    tester,
+  ) async {
+    var tapped = 0;
+    List<ChannelOrderGroup>? reported;
+    await tester.pumpWidget(
+      _harness(
+        ReorderableChannelRows(
+          sections: [
+            (null, [_channel('a'), _channel('b')]),
+          ],
+          canManage: true,
+          onReorder: (order) => reported = order,
+          rowBuilder: (channel, longPressDrags, dragHandleIndex) =>
+              GestureDetector(
+                onTap: () => tapped++,
+                child: SizedBox(height: 48, child: Text(channel.id)),
+              ),
+          headerBuilder: _header,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('a'), kind: PointerDeviceKind.mouse);
+    await tester.pumpAndSettle();
+
+    expect(tapped, 1, reason: 'the immediate drag listener must not eat taps');
+    expect(reported, isNull);
+  });
+
   testWidgets('a manager can drag a row to a new position within a section', (
     tester,
   ) async {

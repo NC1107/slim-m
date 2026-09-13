@@ -22,6 +22,7 @@ import 'channel_rail_selection_marker.dart';
 import 'channel_rail_sections.dart';
 import 'command_palette.dart';
 import 'context_menu_region.dart';
+import 'create_category_sheet.dart';
 import 'create_channel_sheet.dart';
 
 /// The channel id in [path], or null when [path] is not a channel route.
@@ -223,6 +224,14 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                                 context,
                                 initialKind: 'text',
                               );
+                            },
+                          ),
+                          AppMenuItem(
+                            label: 'Create category...',
+                            leading: AppIcons.addCategory,
+                            onTap: () {
+                              close();
+                              showCreateCategorySheet(context);
                             },
                           ),
                         ],

@@ -40,6 +40,14 @@ const Offset _pointerInset = Offset(4, 4);
 /// Wraps [child] so a right-click or long-press over it opens a menu built by
 /// [itemsBuilder], anchored under the pointer on a wide layout or presented
 /// as a bottom sheet on a compact one.
+///
+/// The right-click is taken on `onSecondaryTapUp`, not `onSecondaryTapDown`.
+/// Regions nest - a DM row inside the rail, which has a menu of its own - and
+/// Flutter fires every nested recognizer's *down* callback once the press
+/// deadline passes, whether or not the gesture arena has picked a winner. So
+/// both menus opened at once, the rail's "Create channel" drawn over the
+/// row's own items. The up callback is only ever delivered to the arena's
+/// winner, which for nested taps is the innermost region.
 class ContextMenuRegion extends StatefulWidget {
   const ContextMenuRegion({
     super.key,
@@ -232,7 +240,8 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
         onOpen: () => _setOpen(true),
         ownsFocusNode: widget.ownsFocusNode,
         child: GestureDetector(
-          onSecondaryTapDown: (details) =>
+          // Up, never down: only the up event belongs to the arena winner.
+          onSecondaryTapUp: (details) =>
               _setOpen(true, pointerGlobal: details.globalPosition),
           // Kept out of the semantics tree once the child owns its own node; see this file's own doc comment for why.
           excludeFromSemantics: !widget.ownsFocusNode,

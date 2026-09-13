@@ -101,14 +101,19 @@ class _ChannelItem extends _RailItem {
 /// Renders [sections] as [rowBuilder]-built rows under [headerBuilder]-built
 /// headers, reorderable across every section by [canManage].
 ///
-/// A held drag on any platform starts the move
-/// ([ReorderableDelayedDragStartListener]) rather than the library's default
-/// (a drag handle glyph on desktop, a long press on mobile with none): the
-/// row already carries a manage kebab in its trailing slot, and a second
-/// glyph beside it would be one control too many for what a drag already
-/// reaches through a held press. Only channel rows carry that listener, so a
-/// header can never itself be picked up, however its slot may still shift as
-/// channels are dropped around it.
+/// No drag handle glyph, unlike the library's desktop default: the row
+/// already carries a manage kebab in its trailing slot, and a second glyph
+/// beside it would be one control too many. Instead the whole row is the
+/// handle. On touch a held press starts the move (the row's own listener,
+/// via `dragIndex`), because an immediate one would fight the list's scroll.
+/// With a mouse the drag starts immediately ([ReorderableDragStartListener]):
+/// there is no scroll gesture to fight, and a mouse press held still for half
+/// a second before moving is not a gesture anyone makes - the earlier
+/// [ReorderableDelayedDragStartListener] here read to the owner as "unable to
+/// drag channels" at all. A plain click still selects, since the immediate
+/// recogniser only claims the pointer once it has actually moved. Only
+/// channel rows carry a listener, so a header can never itself be picked up,
+/// however its slot may still shift as channels are dropped around it.
 class ReorderableChannelRows extends StatelessWidget {
   const ReorderableChannelRows({
     super.key,
@@ -192,7 +197,7 @@ class ReorderableChannelRows extends StatelessWidget {
                       key: ValueKey(channel.id),
                       child: rowBuilder(channel, false, i),
                     )
-                  : ReorderableDelayedDragStartListener(
+                  : ReorderableDragStartListener(
                       key: ValueKey(channel.id),
                       index: i,
                       child: rowBuilder(channel, true, null),
