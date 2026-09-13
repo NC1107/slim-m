@@ -42,6 +42,7 @@ import 'message_row_identity.dart';
 import 'message_row_parts.dart';
 import 'reactions_row.dart';
 import 'message_text.dart';
+import 'call_record_view.dart';
 import 'poll_view.dart';
 import 'reply_quote.dart';
 
@@ -76,6 +77,8 @@ class MessageRow extends StatelessWidget {
     this.attachments = const [],
     this.poll,
     this.appSurface,
+    this.call,
+    this.viewerIsCaller = false,
     this.threadReplyCount,
     this.threadLastReplyAt,
     this.threadUnreadCount,
@@ -169,6 +172,15 @@ class MessageRow extends StatelessWidget {
   /// The app this message launches, if it is an app message. Rendered as an
   /// interactive, shared surface in place of the message body.
   final api.AppSurface? appSurface;
+
+  /// The call this message records, or null on an ordinary message. Rendered
+  /// in place of the body, which a call message stores empty.
+  final api.CallRecord? call;
+
+  /// Whether the reader is the one who placed [call]. The same stored record
+  /// reads as "missed call" to one side and "no answer" to the other, so this
+  /// cannot be derived from the message: its author is always the caller.
+  final bool viewerIsCaller;
 
   /// Undeleted replies in this message's thread, from
   /// `MessageExtras.threadReplyCount` - null (not zero) hides the row
@@ -346,6 +358,16 @@ class MessageRow extends StatelessWidget {
                                       child: PollView(
                                         poll: poll!,
                                         onVote: onVote,
+                                      ),
+                                    ),
+                                  if (call != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: AppSpacing.s4,
+                                      ),
+                                      child: CallRecordView(
+                                        record: call!,
+                                        viewerIsCaller: viewerIsCaller,
                                       ),
                                     ),
                                   if (appSurface != null)

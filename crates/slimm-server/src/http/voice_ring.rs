@@ -143,6 +143,7 @@ async fn decline(
             ring_id,
             outcome: CallRingOutcome::Declined,
         });
+        record_call(&state, channel_id, caller_id, CallRingOutcome::Declined).await;
         match state.voice.remove_participant(channel_id, caller_id).await {
             Ok(()) | Err(VoiceError::Unavailable) => {}
             Err(VoiceError::Internal(err)) => {
@@ -151,4 +152,40 @@ async fn decline(
         }
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Writes the record a finished call leaves in its DM, and fans it out live.
+///
+/// Best-effort on purpose: a call that happened is more important than its
+/// record, and a store error here must not fail the request that ended the
+/// ring. It is logged instead.
+///
+/// Every terminal outcome writes one, including `Answered` - the transcript is
+/// the call history, so a call that did happen belongs in it as much as one
+/// that did not. `duration_ms` is left null for now even on an answered call:
+/// how long it lasted is only known when the last participant leaves, which is
+/// the voice roster's business rather than the ring's, and filling it in is a
+/// follow-up on top of this.
+pub(crate) async fn record_call(
+    state: &AppState,
+    channel_id: ChannelId,
+    caller_id: crate::ids::UserId,
+    outcome: CallRingOutcome,
+) {
+    let sent = match state
+        .store
+        .record_call(channel_id, caller_id, outcome.as_str(), None)
+        .await
+    {
+        Ok(sent) => sent,
+        Err(err) => {
+            tracing::warn!(error = %err, %channel_id, "failed to record a finished call");
+            return;
+        }
+    };
+    state.hub.publish(Event::MessageCreated {
+        message: std::sync::Arc::new(sent.message),
+        attachments: std::sync::Arc::new(Vec::new()),
+        forwarded: None,
+    });
 }

@@ -10,7 +10,7 @@ use serde::Serialize;
 use super::apps::AppSurfaceDto;
 use super::message_forwards::ForwardedDto;
 use super::polls::PollDto;
-use crate::store::{AttachmentSummary, Message, MessageRevision};
+use crate::store::{AttachmentSummary, CallRecord as StoreCallRecord, Message, MessageRevision};
 
 #[derive(Serialize)]
 pub(crate) struct MessageDto {
@@ -103,6 +103,16 @@ pub(crate) struct MessageDto {
     /// a block in it yet, exactly like `reactions`.
     #[serde(default)]
     pub(crate) code_runs: Vec<CodeRunDto>,
+    /// The call this message records, if any. Always present as a key: `null`
+    /// means this message is not a call, the same "always there, null means
+    /// genuinely none" convention `poll` follows. Set by
+    /// [`super::message_enrich::with_reactions`]'s batch lookup, never by this
+    /// conversion, since a bare `Message` has nowhere to read it from.
+    ///
+    /// A call message's `content` is always empty. What to say about a call
+    /// depends on which side is reading it - "missed call" and "you called, no
+    /// answer" are one row - so the wording is the client's.
+    pub(crate) call: Option<CallDto>,
     /// Whether this message mentions the caller - by `@name`, by a
     /// `@[Role]` the caller holds, or by `@everyone`/`@here` when the author
     /// held `MENTION_EVERYONE` - per-viewer exactly like `reacted`, and
@@ -131,6 +141,27 @@ impl From<AttachmentSummary> for AttachmentDto {
             filename: a.filename,
             content_type: a.content_type,
             size: a.size,
+        }
+    }
+}
+
+/// How a DM call ended, as it rides the message that records it.
+///
+/// `duration_ms` is null for every outcome but `answered`, and the outcome
+/// strings are the text form of `voice::CallRingOutcome`.
+#[derive(Serialize, Clone)]
+pub(crate) struct CallDto {
+    pub(crate) caller_id: Option<String>,
+    pub(crate) outcome: String,
+    pub(crate) duration_ms: Option<i64>,
+}
+
+impl From<StoreCallRecord> for CallDto {
+    fn from(record: StoreCallRecord) -> Self {
+        Self {
+            caller_id: record.caller_id.map(|id| id.to_string()),
+            outcome: record.outcome,
+            duration_ms: record.duration_ms,
         }
     }
 }
@@ -190,6 +221,7 @@ impl From<Message> for MessageDto {
             reactions: Vec::new(),
             poll: None,
             app_surface: None,
+            call: None,
             attachments: Vec::new(),
             code_runs: Vec::new(),
             mentions_me: false,

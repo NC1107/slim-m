@@ -154,6 +154,11 @@ abstract final class AppIcons {
   /// Starting or joining a DM call, distinct from [voice] (a voice channel's
   /// own icon) since a DM has no channel kind of its own to draw.
   static const IconData startCall = LucideIcons.phone300;
+
+  /// A call in the transcript that nobody answered. Distinct from
+  /// [leaveCall], which is the control you press to hang up: this one is a
+  /// record of something that already happened and is never a button.
+  static const IconData missedCall = LucideIcons.phoneMissed300;
   static const IconData canvas = LucideIcons.pencilRuler300;
 
   /// The canvas's own draw/erase toggle. Distinct constants from [edit] even

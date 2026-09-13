@@ -68,9 +68,13 @@ impl CallRings {
     /// reports its id, or `None` if nothing was outstanding or it was not
     /// this user's own ring to answer - a stray heartbeat from somebody
     /// else must never cancel a ring that has nothing to do with them.
-    pub fn answer(&self, channel_id: ChannelId, callee_id: UserId) -> Option<CallRingId> {
+    ///
+    /// Reports the caller alongside the ring id for the same reason
+    /// [`Self::decline`] does: the call record this writes is attributed to
+    /// whoever placed the call, and the callee is the only one here.
+    pub fn answer(&self, channel_id: ChannelId, callee_id: UserId) -> Option<(CallRingId, UserId)> {
         self.take_if(channel_id, |ring| ring.callee_id == callee_id)
-            .map(|ring| ring.ring_id)
+            .map(|ring| (ring.ring_id, ring.caller_id))
     }
 
     /// The callee explicitly declined, the same match rule [`Self::answer`]
@@ -186,7 +190,10 @@ mod tests {
         let (channel, caller, callee) = (cid(), uid(), uid());
         let ring_id = rings.start(channel, caller, callee);
 
-        assert_eq!(rings.answer(channel, callee), Some(ring_id));
+        assert_eq!(
+            rings.answer(channel, callee).map(|(id, _)| id),
+            Some(ring_id)
+        );
         // Answered rings do not answer twice.
         assert_eq!(rings.answer(channel, callee), None);
     }
@@ -268,7 +275,10 @@ mod tests {
         let second = rings.start(channel, caller, callee);
 
         assert_ne!(first, second, "each attempt mints a fresh id");
-        assert_eq!(rings.answer(channel, callee), Some(second));
+        assert_eq!(
+            rings.answer(channel, callee).map(|(id, _)| id),
+            Some(second)
+        );
     }
 
     #[test]

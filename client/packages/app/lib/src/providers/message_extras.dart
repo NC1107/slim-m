@@ -67,6 +67,7 @@ class MessageExtras {
     this.codeRuns = const [],
     this.poll,
     this.appSurface,
+    this.call,
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
@@ -88,6 +89,11 @@ class MessageExtras {
   /// at block 0.
   final api.AppSurface? appSurface;
 
+  /// The call this message records, or null on an ordinary message. Fixed
+  /// once the message exists, like [appSurface]: a call reaches a terminal
+  /// state exactly once and nothing edits it afterwards.
+  final api.CallRecord? call;
+
   /// The thread opened from this message, or null if none is known yet -
   /// same four fields, same merge rule, as [api.Message] carries them.
   final String? threadChannelId;
@@ -107,12 +113,14 @@ class MessageExtras {
     List<api.CodeRun>? codeRuns,
     api.Poll? poll,
     api.AppSurface? appSurface,
+    api.CallRecord? call,
   }) => MessageExtras(
     reactions: reactions ?? this.reactions,
     attachments: attachments ?? this.attachments,
     codeRuns: codeRuns ?? this.codeRuns,
     poll: poll ?? this.poll,
     appSurface: appSurface ?? this.appSurface,
+    call: call ?? this.call,
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
@@ -226,6 +234,7 @@ class MessageExtrasController
         : existing?.codeRuns ?? const [],
     poll: message.poll ?? existing?.poll,
     appSurface: message.appSurface ?? existing?.appSurface,
+    call: message.call ?? existing?.call,
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
     threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,

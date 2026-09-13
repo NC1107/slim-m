@@ -8,6 +8,7 @@
 //! discipline `Event::ReactionsChanged` already follows in `authorization.rs`
 //! for its own fresh-per-event store read.
 
+use super::super::message_dto::CallDto;
 use super::{AttachmentDto, MessageDto, frames::ServerFrame};
 use crate::ids::UserId;
 use crate::store::{AttachmentSummary, ForwardSummary, Message, Store};
@@ -33,6 +34,12 @@ pub(super) async fn created(
         .is_mentioned(message_id, viewer)
         .await
         .map_err(|_| ())?;
+    // Without this a call arrives blank until the next cold read.
+    dto.call = store
+        .call_for_message(message_id)
+        .await
+        .map_err(|_| ())?
+        .map(CallDto::from);
     Ok(ServerFrame::MessageCreated {
         channel_id,
         seq,

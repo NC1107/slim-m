@@ -11,6 +11,7 @@
 
 use futures_util::StreamExt;
 
+use crate::store::Store;
 use crate::{hub, media, store, voice};
 
 /// Records that a sweep just ran, for the operator-visible storage view at
@@ -232,13 +233,13 @@ const RING_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(
 /// [`spawn_token_sweep`]. A deployment with no SFU configured, or one that
 /// never rings, never has anything to sweep, so this is safe to spawn
 /// unconditionally.
-pub(crate) fn spawn_ring_sweep(voice: voice::VoiceService, hub: hub::Hub) {
+pub(crate) fn spawn_ring_sweep(voice: voice::VoiceService, hub: hub::Hub, store: Store) {
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(RING_SWEEP_INTERVAL);
         ticker.tick().await;
         loop {
             ticker.tick().await;
-            sweep_stale_call_rings(&voice, &hub).await;
+            sweep_stale_call_rings(&voice, &hub, &store).await;
         }
     });
 }
@@ -255,8 +256,8 @@ pub(crate) fn spawn_ring_sweep(voice: voice::VoiceService, hub: hub::Hub) {
 /// person ever get answered", the condition the owner actually flagged as
 /// wasting resources - a caller sitting alone with a perfectly live
 /// heartbeat is exactly the case [`sweep_stale_voice_calls`] cannot see.
-pub async fn sweep_stale_call_rings(voice: &voice::VoiceService, hub: &hub::Hub) {
-    sweep_stale_call_rings_at(voice, hub, std::time::Instant::now()).await;
+pub async fn sweep_stale_call_rings(voice: &voice::VoiceService, hub: &hub::Hub, store: &Store) {
+    sweep_stale_call_rings_at(voice, hub, store, std::time::Instant::now()).await;
 }
 
 /// [`sweep_stale_call_rings`] with an explicit clock, `pub` for the same
@@ -264,6 +265,7 @@ pub async fn sweep_stale_call_rings(voice: &voice::VoiceService, hub: &hub::Hub)
 pub async fn sweep_stale_call_rings_at(
     voice: &voice::VoiceService,
     hub: &hub::Hub,
+    store: &Store,
     now: std::time::Instant,
 ) {
     for (channel_id, ring_id, caller_id) in voice.rings().sweep_stale_at(now) {
@@ -272,6 +274,8 @@ pub async fn sweep_stale_call_rings_at(
             ring_id,
             outcome: voice::CallRingOutcome::TimedOut,
         });
+        // The missed call: the one outcome that used to leave no trace.
+        record_timed_out_call(store, hub, channel_id, caller_id).await;
         match voice.remove_participant(channel_id, caller_id).await {
             Ok(()) => tracing::info!(
                 %channel_id,
@@ -285,6 +289,41 @@ pub async fn sweep_stale_call_rings_at(
                 "failed to release an unanswered dm call room"
             ),
         }
+    }
+}
+
+/// Writes the call record for a ring nobody answered, and fans it out live.
+///
+/// A near-copy of `http::voice_ring::record_call` rather than a call into it:
+/// that one takes an `AppState`, which a background sweep has no reason to
+/// hold, and the alternative is threading the whole thing through every sweep
+/// for one field. Best-effort for the same reason - a record that fails to
+/// write must not stop the room being released on the next line.
+async fn record_timed_out_call(
+    store: &Store,
+    hub: &hub::Hub,
+    channel_id: crate::ids::ChannelId,
+    caller_id: crate::ids::UserId,
+) {
+    match store
+        .record_call(
+            channel_id,
+            caller_id,
+            voice::CallRingOutcome::TimedOut.as_str(),
+            None,
+        )
+        .await
+    {
+        Ok(sent) => hub.publish(hub::Event::MessageCreated {
+            message: std::sync::Arc::new(sent.message),
+            attachments: std::sync::Arc::new(Vec::new()),
+            forwarded: None,
+        }),
+        Err(err) => tracing::warn!(
+            error = %err,
+            %channel_id,
+            "failed to record a call nobody answered"
+        ),
     }
 }
 
