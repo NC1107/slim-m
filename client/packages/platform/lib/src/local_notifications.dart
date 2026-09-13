@@ -25,6 +25,10 @@ const messagesChannelId = 'messages_v1';
 const messagesChannelName = 'Messages';
 const mentionsChannelId = 'mentions_v1';
 const mentionsChannelName = 'Mentions';
+
+/// Deliberately the same id `IncomingCallNotifier.kt` uses. Android's call
+/// notification is a native `CallStyle` one and that file owns this channel
+/// there, so this side must never create it - see [LocalAlertChannel.calls].
 const callsChannelId = 'calls_v1';
 const callsChannelName = 'Calls';
 
@@ -81,11 +85,19 @@ enum LocalAlertChannel {
   final String name;
   final String description;
 
-  /// Whether this kind may interrupt: urgency critical on Linux, and the
-  /// highest importance Android offers. Only [calls] sets it - a channel that
-  /// interrupts for something the reader could have caught later is the thing
-  /// that makes people turn notifications off.
+  /// Whether this kind may interrupt: urgency critical on Linux. Only
+  /// [calls] sets it - a channel that interrupts for something the reader
+  /// could have caught later is the thing that makes people turn
+  /// notifications off.
   final bool critical;
+
+  /// Whether Android creates this channel itself, in which case this side
+  /// must not. [calls] is Android's native `CallStyle` channel
+  /// (`IncomingCallNotifier.kt`, same id): a channel's importance and sound
+  /// are fixed forever by whoever creates it first, so creating it here would
+  /// race the native one and could leave a call notification stuck with
+  /// settings meant for a desktop alert.
+  bool get androidOwnsThis => this == LocalAlertChannel.calls;
 
   /// A fixed id per channel rather than one shared id: a person can
   /// legitimately have an unread ordinary message and an unread mention at
@@ -189,6 +201,7 @@ class LocalNotifications {
           AndroidFlutterLocalNotificationsPlugin>();
       // Channels are an Android concept; Linux has no per-kind channel here.
       for (final channel in LocalAlertChannel.values) {
+        if (channel.androidOwnsThis) continue;
         await android?.createNotificationChannel(
           AndroidNotificationChannel(
             channel.id,

@@ -128,15 +128,25 @@ void main() {
     expect(notifications.shown, isEmpty);
   });
 
-  test('calls is the only channel allowed to interrupt', () {
-    expect(LocalAlertChannel.calls.critical, isTrue);
-    for (final channel in LocalAlertChannel.values) {
-      if (channel == LocalAlertChannel.calls) continue;
+  test(
+    'calls is the only channel allowed to interrupt, and Android owns it',
+    () {
+      expect(LocalAlertChannel.calls.critical, isTrue);
       expect(
-        channel.critical,
-        isFalse,
-        reason: '${channel.name} must not be able to interrupt',
+        LocalAlertChannel.calls.androidOwnsThis,
+        isTrue,
+        reason:
+            'IncomingCallNotifier.kt creates calls_v1 with CallStyle settings; '
+            'creating it from Dart too would race it and fix the wrong ones',
       );
-    }
-  });
+      for (final channel in LocalAlertChannel.values) {
+        if (channel == LocalAlertChannel.calls) continue;
+        expect(
+          channel.critical,
+          isFalse,
+          reason: '${channel.name} must not be able to interrupt',
+        );
+      }
+    },
+  );
 }
