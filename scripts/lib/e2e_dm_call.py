@@ -101,3 +101,59 @@ def start_dm_and_call(a, b, admin_api, member_api):
     b.wait_for('1 in call')
     b.shot('dm-peer-left')
     print("  leaving dropped the other side to 1 in call")
+
+
+def a_missed_call_shows_up_in_the_dm(a, b, member_api):
+    """Alice rings, Bob never answers, and the DM says so on both sides.
+
+    The case the whole call record exists for. Every part of ringing used to
+    be ephemeral - the ring lives in the server's memory and the sweep tears
+    it down after `RING_TIMEOUT` - so a call nobody answered left no trace
+    anywhere and the person who missed it never found out.
+
+    Deliberately drives the *timeout*, not a decline. Declining is a click and
+    would prove the record and its rendering in two seconds; letting the ring
+    lapse is the only thing that exercises `sweep_stale_call_rings`, which is
+    the write site with no request behind it and the one a person actually
+    hits. That costs the 30-second ring timeout plus a 2-second sweep tick,
+    which is why this waits as long as it does.
+
+    Asserts both ends, because they must not read the same. One stored
+    outcome renders as "Missed call" to whoever was called and "No answer" to
+    whoever called - and telling Alice she missed her own call is exactly the
+    bug that storing the wording server-side would have made unavoidable.
+    """
+    conversation = next(
+        (c for c in member_api.call('GET', '/dms')
+         if c['user']['display_name'] == 'Alice'), None)
+    assert conversation, "the DM the earlier scenario opened is gone"
+    before = len([
+        m for m in member_api.call(
+            'GET', f"/channels/{conversation['channel_id']}/messages")
+        if m.get('call')
+    ])
+
+    a.click(L.DM_CALL, settle=2)
+    a.wait_for(L.IN_CALL)
+    print('  alice is ringing bob, who is not going to answer')
+
+    # RING_TIMEOUT is 30s and the sweep ticks every 2s; the rest is slack.
+    b.wait_for(L.MISSED_CALL, timeout=75)
+    b.shot('dm-missed-call')
+    print('  bob\'s transcript shows the missed call')
+
+    a.wait_for(L.NO_ANSWER, timeout=20)
+    print('  and alice\'s own says no answer, not that she missed it')
+
+    after = [
+        m for m in member_api.call(
+            'GET', f"/channels/{conversation['channel_id']}/messages")
+        if m.get('call')
+    ]
+    assert len(after) == before + 1, (
+        f'expected one new call record, went from {before} to {len(after)}')
+    record = after[-1]['call']
+    assert record['outcome'] == 'timed_out', record
+    assert record['duration_ms'] is None, (
+        f'nothing lasted any time when nobody picked up: {record}')
+    print('  and the server stored it as timed_out, durable past a reload')
