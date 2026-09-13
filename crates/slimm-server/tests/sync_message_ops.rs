@@ -346,3 +346,60 @@ async fn a_caller_without_view_gets_no_scope_at_all() {
         "the scope must be absent, not empty: {body}"
     );
 }
+
+/// The byte budget has to bind the message half, not only the op half.
+///
+/// Three channels of a hundred 4000-byte messages is about 1.2 MB, past the
+/// 1 MiB the module doc promises a `/sync` response stays under. Before this
+/// the budget was subtracted after each page was already fetched whole, so
+/// nothing ever cut a page and the promise held only for ops.
+#[tokio::test]
+async fn the_byte_budget_cuts_the_message_half_and_reports_more() {
+    let (store, app, _guard) = world().await;
+    let (token, user) = register(&store, "root").await;
+    let mut channels = vec![store.list_channels().await.unwrap()[0].id];
+    for name in ["second", "third"] {
+        channels.push(store.create_channel(name, "text").await.unwrap().id);
+    }
+    let body = "x".repeat(4000);
+    for &channel in &channels {
+        for _ in 0..100 {
+            send(&store, channel, user, &body).await;
+        }
+    }
+
+    let scopes: Vec<Value> = channels
+        .iter()
+        .map(|c| json!({ "channel_id": c.to_string(), "after_seq": 0 }))
+        .collect();
+    let (status, response) = sync(&app, &token, Value::Array(scopes)).await;
+    assert_eq!(status, StatusCode::OK, "{response}");
+
+    let returned = response["scopes"].as_array().unwrap();
+    assert_eq!(returned.len(), 3);
+    let total_bytes: usize = returned
+        .iter()
+        .flat_map(|s| s["messages"].as_array().unwrap())
+        .map(|m| m["content"].as_str().unwrap().len())
+        .sum();
+    assert!(
+        total_bytes <= 1024 * 1024,
+        "the response carried {total_bytes} bytes of message content, past the 1 MiB budget"
+    );
+    let cut = returned
+        .iter()
+        .find(|s| s["messages"].as_array().unwrap().len() < 100)
+        .expect("one scope must have been cut short by the budget");
+    assert_eq!(
+        cut["has_more"], true,
+        "a page cut by the budget must tell the client to ask again"
+    );
+    let full: usize = returned
+        .iter()
+        .filter(|s| s["messages"].as_array().unwrap().len() == 100)
+        .count();
+    assert_eq!(
+        full, 2,
+        "the budget admits two whole scopes before it cuts the third"
+    );
+}
