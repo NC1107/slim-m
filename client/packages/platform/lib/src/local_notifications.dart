@@ -25,6 +25,8 @@ const messagesChannelId = 'messages_v1';
 const messagesChannelName = 'Messages';
 const mentionsChannelId = 'mentions_v1';
 const mentionsChannelName = 'Mentions';
+const callsChannelId = 'calls_v1';
+const callsChannelName = 'Calls';
 
 /// The Android channel a plain content-free alert posts through, and the
 /// stable notification id it replaces rather than stacks beside.
@@ -49,6 +51,22 @@ enum LocalAlertChannel {
     name: mentionsChannelName,
     description: 'Messages that mention you.',
     notificationId: 2,
+  ),
+
+  /// An incoming call, which is the one kind that has to interrupt.
+  ///
+  /// [critical] is what makes that possible on Linux. A ring cannot be
+  /// delivered by raising the window: Wayland forbids focus stealing, so the
+  /// app's own `show`/`focus` call reaches nobody who is looking at another
+  /// application - which is exactly when a ring matters. Critical urgency is
+  /// the mechanism the desktop does honour: KDE shows those over a fullscreen
+  /// window and does not time them out.
+  calls(
+    id: callsChannelId,
+    name: callsChannelName,
+    description: 'Someone is calling you.',
+    notificationId: 3,
+    critical: true,
   );
 
   const LocalAlertChannel({
@@ -56,11 +74,18 @@ enum LocalAlertChannel {
     required this.name,
     required this.description,
     required this.notificationId,
+    this.critical = false,
   });
 
   final String id;
   final String name;
   final String description;
+
+  /// Whether this kind may interrupt: urgency critical on Linux, and the
+  /// highest importance Android offers. Only [calls] sets it - a channel that
+  /// interrupts for something the reader could have caught later is the thing
+  /// that makes people turn notifications off.
+  final bool critical;
 
   /// A fixed id per channel rather than one shared id: a person can
   /// legitimately have an unread ordinary message and an unread mention at
@@ -225,8 +250,23 @@ class LocalNotifications {
           priority: Priority.high,
         ),
         // Linux takes no channel; the per-channel notification id still makes a mention replace the last mention rather than stack, matching Android.
-        linux: const LinuxNotificationDetails(),
+        linux: LinuxNotificationDetails(
+          urgency: channel.critical
+              ? LinuxNotificationUrgency.critical
+              : LinuxNotificationUrgency.normal,
+        ),
       ),
     );
+  }
+
+  /// Takes down whatever this app is currently showing on [channel].
+  ///
+  /// [LocalAlertChannel.calls] is why this exists: a critical notification
+  /// does not time out, so a ring that was answered, declined, or swept would
+  /// otherwise sit on screen claiming someone is still calling.
+  Future<void> cancel(LocalAlertChannel channel) async {
+    if (!_supported) return;
+    await _ensureReady();
+    await _plugin.cancel(channel.notificationId);
   }
 }

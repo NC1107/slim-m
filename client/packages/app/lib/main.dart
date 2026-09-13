@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'src/deep_links.dart';
 import 'src/desktop/update_check.dart';
+import 'src/providers/desktop_call_notifier.dart';
 import 'src/providers/desktop_message_notifier.dart';
 import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
@@ -246,6 +247,7 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   container.read(pushControllerProvider);
   container.read(deepLinkControllerProvider);
   container.read(desktopMessageNotifierProvider);
+  container.read(desktopCallNotifierProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
 }
 
