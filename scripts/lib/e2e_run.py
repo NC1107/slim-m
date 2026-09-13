@@ -181,7 +181,8 @@ def scenarios(a, b, admin, member, room_id, server):
         ("voice: calling in a dm", lambda: e2e_dm_call.start_dm_and_call(
             a, b, admin, member)),
         ("voice: a call nobody answers shows up in the dm",
-         lambda: e2e_dm_call.a_missed_call_shows_up_in_the_dm(a, b, member)),
+         lambda: e2e_dm_call.a_missed_call_shows_up_in_the_dm(
+             a, b, admin, member)),
     ]
 
 
