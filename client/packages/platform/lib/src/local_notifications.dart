@@ -26,6 +26,12 @@ const messagesChannelName = 'Messages';
 const mentionsChannelId = 'mentions_v1';
 const mentionsChannelName = 'Mentions';
 
+/// Deliberately the same id `IncomingCallNotifier.kt` uses. Android's call
+/// notification is a native `CallStyle` one and that file owns this channel
+/// there, so this side must never create it - see [LocalAlertChannel.calls].
+const callsChannelId = 'calls_v1';
+const callsChannelName = 'Calls';
+
 /// The Android channel a plain content-free alert posts through, and the
 /// stable notification id it replaces rather than stacks beside.
 ///
@@ -49,6 +55,22 @@ enum LocalAlertChannel {
     name: mentionsChannelName,
     description: 'Messages that mention you.',
     notificationId: 2,
+  ),
+
+  /// An incoming call, which is the one kind that has to interrupt.
+  ///
+  /// [critical] is what makes that possible on Linux. A ring cannot be
+  /// delivered by raising the window: Wayland forbids focus stealing, so the
+  /// app's own `show`/`focus` call reaches nobody who is looking at another
+  /// application - which is exactly when a ring matters. Critical urgency is
+  /// the mechanism the desktop does honour: KDE shows those over a fullscreen
+  /// window and does not time them out.
+  calls(
+    id: callsChannelId,
+    name: callsChannelName,
+    description: 'Someone is calling you.',
+    notificationId: 3,
+    critical: true,
   );
 
   const LocalAlertChannel({
@@ -56,11 +78,26 @@ enum LocalAlertChannel {
     required this.name,
     required this.description,
     required this.notificationId,
+    this.critical = false,
   });
 
   final String id;
   final String name;
   final String description;
+
+  /// Whether this kind may interrupt: urgency critical on Linux. Only
+  /// [calls] sets it - a channel that interrupts for something the reader
+  /// could have caught later is the thing that makes people turn
+  /// notifications off.
+  final bool critical;
+
+  /// Whether Android creates this channel itself, in which case this side
+  /// must not. [calls] is Android's native `CallStyle` channel
+  /// (`IncomingCallNotifier.kt`, same id): a channel's importance and sound
+  /// are fixed forever by whoever creates it first, so creating it here would
+  /// race the native one and could leave a call notification stuck with
+  /// settings meant for a desktop alert.
+  bool get androidOwnsThis => this == LocalAlertChannel.calls;
 
   /// A fixed id per channel rather than one shared id: a person can
   /// legitimately have an unread ordinary message and an unread mention at
@@ -164,6 +201,7 @@ class LocalNotifications {
           AndroidFlutterLocalNotificationsPlugin>();
       // Channels are an Android concept; Linux has no per-kind channel here.
       for (final channel in LocalAlertChannel.values) {
+        if (channel.androidOwnsThis) continue;
         await android?.createNotificationChannel(
           AndroidNotificationChannel(
             channel.id,
@@ -225,8 +263,23 @@ class LocalNotifications {
           priority: Priority.high,
         ),
         // Linux takes no channel; the per-channel notification id still makes a mention replace the last mention rather than stack, matching Android.
-        linux: const LinuxNotificationDetails(),
+        linux: LinuxNotificationDetails(
+          urgency: channel.critical
+              ? LinuxNotificationUrgency.critical
+              : LinuxNotificationUrgency.normal,
+        ),
       ),
     );
+  }
+
+  /// Takes down whatever this app is currently showing on [channel].
+  ///
+  /// [LocalAlertChannel.calls] is why this exists: a critical notification
+  /// does not time out, so a ring that was answered, declined, or swept would
+  /// otherwise sit on screen claiming someone is still calling.
+  Future<void> cancel(LocalAlertChannel channel) async {
+    if (!_supported) return;
+    await _ensureReady();
+    await _plugin.cancel(channel.notificationId);
   }
 }
