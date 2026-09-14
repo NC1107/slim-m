@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.76.1](https://github.com/NC1107/slim-m/compare/client-v0.76.0...client-v0.76.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **client:** the desktop app no longer boots into the phone layout ([#1187](https://github.com/NC1107/slim-m/issues/1187)) ([75c3c69](https://github.com/NC1107/slim-m/commit/75c3c69fa96a596d2aae28fdd81af9962f6e01be))
+
 ## [0.76.0](https://github.com/NC1107/slim-m/compare/client-v0.75.0...client-v0.76.0) (2026-09-14)
 
 
