@@ -57,6 +57,15 @@ class ClientUpdate {
   final InstallFormat format;
 }
 
+/// [checkForClientUpdate]'s own shape, so a caller can inject a fake without
+/// reaching for a fake HTTP client to express "there is nothing newer".
+typedef CheckForClientUpdate =
+    Future<ClientUpdate?> Function({
+      required String currentVersion,
+      http.Client? client,
+      InstallFormat? format,
+    });
+
 /// The latest `client-v*` release newer than [currentVersion], or `null` when
 /// there is none, the check failed, [currentVersion] cannot be read, or this
 /// is not a self-updatable desktop build's concern. [client] and [format] are

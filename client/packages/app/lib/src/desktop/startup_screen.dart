@@ -44,18 +44,29 @@ const defaultStartupStatus = 'Starting slim-m';
 /// A newer version offered in the splash, and the two things the user can do
 /// about it. Phase 1 of decision 0020: [onGet] opens the release rather than
 /// self-applying, and [onDismiss] launches the current client unchanged.
-class StartupUpdate {
-  const StartupUpdate({
-    required this.version,
-    required this.format,
-    required this.onGet,
-    required this.onDismiss,
+/// A question the splash puts to the user, holding startup until it is
+/// answered. Two buttons, because every one of these is a choice between
+/// doing the thing now and going on without it: enable automatic updates or
+/// not, restart into an installed update or not, open a release or not.
+class StartupPrompt {
+  const StartupPrompt({
+    required this.title,
+    required this.primaryLabel,
+    required this.onPrimary,
+    required this.secondaryLabel,
+    required this.onSecondary,
+    this.detail,
   });
 
-  final String version;
-  final InstallFormat format;
-  final VoidCallback onGet;
-  final VoidCallback onDismiss;
+  final String title;
+
+  /// One line under [title], typically what this install's own update
+  /// mechanism is - see `startup_updates.dart`.
+  final String? detail;
+  final String primaryLabel;
+  final VoidCallback onPrimary;
+  final String secondaryLabel;
+  final VoidCallback onSecondary;
 }
 
 /// How this install actually gets the update, in one line - because the app
@@ -73,18 +84,18 @@ class StartupApp extends StatelessWidget {
   const StartupApp({
     super.key,
     this.status = defaultStartupStatus,
-    this.update,
+    this.prompt,
   });
 
   final String status;
-  final StartupUpdate? update;
+  final StartupPrompt? prompt;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'slim-m',
     debugShowCheckedModeBanner: false,
     theme: buildTheme(Brightness.dark, AppTokens.dark),
-    home: StartupScreen(status: status, update: update),
+    home: StartupScreen(status: status, prompt: prompt),
   );
 }
 
@@ -92,14 +103,14 @@ class StartupScreen extends StatelessWidget {
   const StartupScreen({
     super.key,
     this.status = defaultStartupStatus,
-    this.update,
+    this.prompt,
   });
 
   final String status;
 
-  /// When set, the splash shows an update offer instead of the plain status
-  /// line, and waits on the user rather than proceeding on its own.
-  final StartupUpdate? update;
+  /// When set, the splash shows a question instead of the plain status line,
+  /// and waits on the user rather than proceeding on its own.
+  final StartupPrompt? prompt;
 
   @override
   Widget build(BuildContext context) {
@@ -124,8 +135,8 @@ class StartupScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.s24),
-              if (update case final offer?)
-                _UpdateOffer(offer: offer, tokens: tokens)
+              if (prompt case final question?)
+                _Prompt(prompt: question, tokens: tokens)
               else
                 Text(
                   status,
@@ -139,10 +150,10 @@ class StartupScreen extends StatelessWidget {
   }
 }
 
-class _UpdateOffer extends StatelessWidget {
-  const _UpdateOffer({required this.offer, required this.tokens});
+class _Prompt extends StatelessWidget {
+  const _Prompt({required this.prompt, required this.tokens});
 
-  final StartupUpdate offer;
+  final StartupPrompt prompt;
   final AppTokens tokens;
 
   @override
@@ -153,30 +164,32 @@ class _UpdateOffer extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Version ${offer.version} is available',
+            prompt.title,
             textAlign: TextAlign.center,
             style: AppText.body.copyWith(color: tokens.textPrimary),
           ),
-          const SizedBox(height: AppSpacing.s4),
-          Text(
-            updateActionHint(offer.format),
-            textAlign: TextAlign.center,
-            style: AppText.caption.copyWith(color: tokens.textSecondary),
-          ),
+          if (prompt.detail case final detail?) ...[
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              detail,
+              textAlign: TextAlign.center,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ],
           const SizedBox(height: AppSpacing.s16),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               AppButton(
-                label: 'Not now',
+                label: prompt.secondaryLabel,
                 variant: AppButtonVariant.ghost,
-                onPressed: offer.onDismiss,
+                onPressed: prompt.onSecondary,
               ),
               const SizedBox(width: AppSpacing.s8),
               AppButton(
-                label: 'Get update',
+                label: prompt.primaryLabel,
                 variant: AppButtonVariant.primary,
-                onPressed: offer.onGet,
+                onPressed: prompt.onPrimary,
               ),
             ],
           ),

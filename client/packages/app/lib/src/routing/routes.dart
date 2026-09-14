@@ -8,6 +8,10 @@ library;
 abstract final class Routes {
   static const onboarding = '/join';
   static const signIn = '/sign-in';
+
+  /// The desktop install's own question after an account is created, asked
+  /// once; see `updates_choice_screen.dart`.
+  static const updatesChoice = '/join/updates';
   static const channels = '/channels';
   static const personalSettings = '/settings';
   static const spaceSettings = '/settings/space';
