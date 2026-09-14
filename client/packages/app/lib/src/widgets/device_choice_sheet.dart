@@ -22,6 +22,7 @@ class DeviceChoiceSheet<T> extends StatelessWidget {
     required this.icon,
     required this.items,
     required this.labelOf,
+    this.isSelected,
   });
 
   final String title;
@@ -29,6 +30,11 @@ class DeviceChoiceSheet<T> extends StatelessWidget {
   final IconData icon;
   final List<T> items;
   final String Function(T item) labelOf;
+
+  /// Marks one row as the one already in effect - a screen already being
+  /// shared, reopened to switch to another. Null (every existing caller)
+  /// marks nothing, the same shape [caption] already uses for "no opinion".
+  final bool Function(T item)? isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +74,7 @@ class DeviceChoiceSheet<T> extends StatelessWidget {
                 size: AppSizes.icon16,
                 color: tokens.textSecondary,
               ),
+              selected: isSelected?.call(item) ?? false,
               onTap: () => Navigator.of(context).pop(item),
             ),
           const SizedBox(height: AppSpacing.s8),
