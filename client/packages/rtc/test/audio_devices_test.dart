@@ -34,6 +34,18 @@ class _FakeAudioDevices implements AudioDevices {
 }
 
 void main() {
+  group('withoutPseudoDefaults', () {
+    test('drops the browser stand-ins and keeps every real device', () {
+      const real = AudioDevice(id: 'abc', label: 'Headset');
+      final kept = withoutPseudoDefaults(const [
+        AudioDevice(id: 'default', label: 'Default'),
+        AudioDevice(id: 'communications', label: 'Communications'),
+        real,
+      ]);
+      expect(kept, [real]);
+    });
+  });
+
   group('resolveAudioDevice', () {
     const devices = [
       AudioDevice(id: 'mic-1', label: 'Built-in microphone'),

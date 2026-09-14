@@ -22,12 +22,14 @@ class HardwareAudioDevices implements AudioDevices {
   const HardwareAudioDevices();
 
   @override
-  Future<List<AudioDevice>> inputs() async =>
-      _toAudioDevices(await lk.Hardware.instance.audioInputs());
+  Future<List<AudioDevice>> inputs() async => withoutPseudoDefaults(
+        _toAudioDevices(await lk.Hardware.instance.audioInputs()),
+      );
 
   @override
-  Future<List<AudioDevice>> outputs() async =>
-      _toAudioDevices(await lk.Hardware.instance.audioOutputs());
+  Future<List<AudioDevice>> outputs() async => withoutPseudoDefaults(
+        _toAudioDevices(await lk.Hardware.instance.audioOutputs()),
+      );
 
   @override
   Stream<void> get onChange =>
@@ -60,3 +62,15 @@ AudioDevice? resolveAudioDevice(
   }
   return null;
 }
+
+/// Drops the browser's own stand-ins for "whatever the system default is".
+///
+/// Chrome lists a `default` (and on Windows a `communications`) entry ahead
+/// of the real devices; seen live, that put "Default" and this app's own
+/// "System default" in the same picker meaning the same thing. Null already
+/// means the system default here, so the pseudo entries add a duplicate and
+/// nothing else.
+List<AudioDevice> withoutPseudoDefaults(List<AudioDevice> devices) => [
+      for (final device in devices)
+        if (device.id != 'default' && device.id != 'communications') device,
+    ];
