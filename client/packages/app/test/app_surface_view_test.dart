@@ -115,9 +115,9 @@ void main() {
         isNotEmpty,
         reason: 'it should launch itself on mount without a tap',
       );
-      expect(find.bySemanticsLabel('Step'), findsOneWidget);
+      expect(find.bySemanticsLabel('Step forward'), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel('Step'));
+      await tester.tap(find.bySemanticsLabel('Step forward'));
       await tester.pumpAndSettle();
 
       expect(paths.length, greaterThanOrEqualTo(2));
