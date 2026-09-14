@@ -4,9 +4,11 @@
 /// speaking or not), and screen share quality and join/leave sounds are
 /// preferences that survive a relaunch rather than a session-only echo.
 ///
-/// The camera-on-join preference has its own suite,
-/// `voice_settings_camera_test.dart`, split out once it pushed this file over
-/// the 500-line hard ceiling; both share `voice_settings_screen_harness.dart`.
+/// The camera-on-join preference and the microphone/speaker pickers have
+/// their own suites, `voice_settings_camera_test.dart` and
+/// `voice_settings_audio_devices_test.dart`, split out once this file
+/// pushed past the 500-line hard ceiling; all three share
+/// `voice_settings_screen_harness.dart`.
 library;
 
 import 'package:flutter/material.dart';
@@ -45,18 +47,6 @@ void main() {
       expect(tween.end, 6.0);
     },
   );
-
-  testWidgets('device selection is reported as unavailable, not faked', (
-    tester,
-  ) async {
-    await tester.pumpWidget(wrap(const VoiceSettingsBody()));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining('Device selection is not available'),
-      findsOneWidget,
-    );
-  });
 
   testWidgets('speaking in a live call raises the meter target', (
     tester,

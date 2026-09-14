@@ -244,6 +244,7 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
     voice.restoreCameraPreference(),
     voice.restoreVoiceActivitySensitivity(),
     voice.restorePushToTalkPreference(),
+    voice.restoreAudioDevicePreferences(),
   ]);
 
   container.read(startupStatusProvider.notifier).state = 'Connecting';

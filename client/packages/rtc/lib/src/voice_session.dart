@@ -22,6 +22,8 @@ import 'audio_gain.dart' as rtc_gain;
 import 'local_audio.dart';
 import 'screen_share_audio.dart' as rtc_share_audio;
 
+import 'audio_device_switching.dart';
+import 'audio_devices.dart';
 import 'broadcast_bridge.dart';
 import 'camera_devices.dart';
 import 'camera_switching.dart';
@@ -36,6 +38,7 @@ import 'video_subscription_culler.dart';
 import 'voice_models.dart';
 import 'voice_roster_snapshot.dart';
 
+part 'voice_session_audio_devices.dart';
 part 'voice_session_tracks.dart';
 part 'voice_session_video.dart';
 
@@ -48,37 +51,39 @@ typedef RoomFactory = lk.Room Function();
 /// its lifetime. [dispose] must be called, and leaving is not the same as
 /// disposing, because a user can leave and rejoin without the surrounding
 /// screen being torn down.
-class VoiceSession {
+class VoiceSession with VoiceSessionAudioDevices {
   VoiceSession({
     RoomFactory? roomFactory,
     BroadcastBridge? broadcast,
     DesktopSources? desktopSources,
     CameraDevices? cameraDevices,
-  })  : _roomFactory = roomFactory ?? _defaultRoomFactory,
-        _broadcast = broadcast ?? const MethodChannelBroadcastBridge(),
+  })  : _broadcast = broadcast ?? const MethodChannelBroadcastBridge(),
         _desktopSources = desktopSources ?? const WebrtcDesktopSources(),
         _cameraSwitching =
             CameraSwitching(cameraDevices ?? const HardwareCameraDevices()) {
+    _roomFactory = roomFactory ?? _buildRoom;
     _screenShare = ScreenShareControl(_broadcast);
     _videoCuller = VideoSubscriptionCuller(onDue: _applyVideoInterest);
   }
 
-  static lk.Room _defaultRoomFactory() => lk.Room(
-        roomOptions: const lk.RoomOptions(
-          // Only what is on screen is subscribed, at the size shown, so
-          // several video tiles do not cost the same as all at full size.
-          adaptiveStream: true,
-          dynacast: true,
+  /// The room a fresh call publishes into: only what is on screen is
+  /// subscribed, at the size shown, so several video tiles do not cost the
+  /// same as all at full size, plus whatever microphone/speaker Voice
+  /// Settings has chosen; see [VoiceSessionAudioDevices].
+  lk.Room _buildRoom() => lk.Room(
+        roomOptions: _audioSwitching.roomOptions(
+          const lk.RoomOptions(adaptiveStream: true, dynacast: true),
         ),
       );
 
-  final RoomFactory _roomFactory;
+  late final RoomFactory _roomFactory;
   final BroadcastBridge _broadcast;
   final DesktopSources _desktopSources;
   final CameraSwitching _cameraSwitching;
   late final ScreenShareControl _screenShare;
   late final VideoSubscriptionCuller _videoCuller;
 
+  @override
   lk.Room? _room;
   // room.events.listen returns a cancel function rather than a
   // StreamSubscription, so this holds the canceller itself.
@@ -456,35 +461,6 @@ class VoiceSession {
     _audio.deafened = deafened;
     await _applyLocalAudioState(room);
     return true;
-  }
-
-  void _refreshParticipants() {
-    final room = _room;
-    if (room == null || _disposed) return;
-
-    // Reapplied on every refresh, not only on toggle, so a participant or
-    // track appearing after deafening starts is silenced too.
-    unawaited(_applyLocalAudioState(room));
-    // Ahead of the unchanged-roster early return below: a subscription can change with no visible roster change at all.
-    _applyVideoInterest();
-
-    final next = snapshotParticipants(
-      room,
-      speakingSensitivity: _speakingSensitivity,
-    );
-    // Only emit on a real change: the events stream is chatty (audio levels
-    // arrive constantly) and rebuilding the roster each time is how it janks.
-    if (listEquals(next, _participants)) return;
-    _participants = List.unmodifiable(next);
-    if (!_participantsController.isClosed) {
-      _participantsController.add(_participants);
-    }
-  }
-
-  void _setState(VoiceSessionState next) {
-    if (_state == next || _disposed) return;
-    _state = next;
-    if (!_stateController.isClosed) _stateController.add(next);
   }
 
   Future<void> dispose() async {
