@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.75.0](https://github.com/NC1107/slim-m/compare/client-v0.74.0...client-v0.75.0) (2026-09-14)
+
+
+### Features
+
+* **client:** choose the microphone and speaker a call uses ([#1181](https://github.com/NC1107/slim-m/issues/1181)) ([e489eec](https://github.com/NC1107/slim-m/commit/e489eecd5ad8ed131aa2699222d0c2e95261506f))
+* **client:** devices live with the account, signed out from a hover glyph ([#1178](https://github.com/NC1107/slim-m/issues/1178)) ([71a0113](https://github.com/NC1107/slim-m/commit/71a01136ab9b43e161849a1144eb3cf9b6596262))
+* **client:** draw the brand lattice in the onboarding rail ([#1174](https://github.com/NC1107/slim-m/issues/1174)) ([6a31b5b](https://github.com/NC1107/slim-m/commit/6a31b5b7dafaa68e6f4fb685e60633ae1834b934))
+* **client:** sign in on design-system inputs and buttons ([#1175](https://github.com/NC1107/slim-m/issues/1175)) ([e39b71b](https://github.com/NC1107/slim-m/commit/e39b71bd71210615d8074408e86959b04bd69bb6))
+
+
+### Bug Fixes
+
+* address the audit's confirmed findings across sync, ci and the client ([#1171](https://github.com/NC1107/slim-m/issues/1171)) ([67316a3](https://github.com/NC1107/slim-m/commit/67316a3be2af6fd9c0a3e0a292edf7293f98266c))
+* **client:** decode the source edge on web instead of guessing it ([#1179](https://github.com/NC1107/slim-m/issues/1179)) ([b26dac7](https://github.com/NC1107/slim-m/commit/b26dac76714b7bf64339ab5bff6f366d0fd43613))
+* **client:** drawing over tiles, live shape sizing, and a way to change share source ([#1180](https://github.com/NC1107/slim-m/issues/1180)) ([e859fc7](https://github.com/NC1107/slim-m/commit/e859fc76f11c1f06656b2085e76c5f8f02aca63e))
+* **client:** hanging up inside the canvas closes the canvas too ([#1176](https://github.com/NC1107/slim-m/issues/1176)) ([885007c](https://github.com/NC1107/slim-m/commit/885007c36a1d6d0b6f04a90e0f8ebad706d81448))
+* **client:** right-click menus that stack, a rail with no category option, and drags that never start ([#1172](https://github.com/NC1107/slim-m/issues/1172)) ([3f82e88](https://github.com/NC1107/slim-m/commit/3f82e886694657ec98d8d774b12ae501d97cb621))
+* **client:** scale module scenes to the card and make rail drags feel held ([#1177](https://github.com/NC1107/slim-m/issues/1177)) ([ed1709a](https://github.com/NC1107/slim-m/commit/ed1709a0af7b1b0100f4c20d510039474ab6b75d))
+
 ## [0.74.0](https://github.com/NC1107/slim-m/compare/client-v0.73.0...client-v0.74.0) (2026-09-13)
 
 
