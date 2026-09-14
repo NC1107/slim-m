@@ -20,6 +20,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/widgets.dart' show Size;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -176,5 +177,39 @@ void main() {
     final saved = store.read();
     expect(saved, isNotNull);
     expect(saved!.windowedSize, const WindowSize(width: 1280, height: 720));
+  });
+
+  /// The owner's report, twice: a desktop window opening on the phone
+  /// layout. Measured on their KDE Wayland session, one launch in three
+  /// built the real UI at the splash's own 380 logical pixels, because the
+  /// ready flip raced the compositor's metrics. `main.dart` now reveals
+  /// first and flips second, and this is the comparison that decides when
+  /// the view has caught up.
+  test('the view has caught up only when it reports the applied size', () {
+    const target = WindowSize(width: 1280, height: 720);
+
+    expect(viewMatchesSize(const Size(1280, 720), target), isTrue);
+    expect(
+      viewMatchesSize(const Size(380, 508), target),
+      isFalse,
+      reason: 'the splash size is exactly the case this exists to catch',
+    );
+  });
+
+  /// A compositor converts through physical pixels and a fractional device
+  /// pixel ratio, so a window that is exactly right can still report
+  /// 1279.9998; an exact match would wait out the whole timeout there.
+  test('a sub-pixel rounding difference still counts as caught up', () {
+    const target = WindowSize(width: 1280, height: 720);
+
+    expect(viewMatchesSize(const Size(1279.9998, 720.0002), target), isTrue);
+    expect(viewMatchesSize(const Size(1277, 720), target), isFalse);
+  });
+
+  test('no view at all is not a match, so the wait keeps asking', () {
+    expect(
+      viewMatchesSize(null, const WindowSize(width: 1280, height: 720)),
+      isFalse,
+    );
   });
 }

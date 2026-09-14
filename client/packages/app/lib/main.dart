@@ -143,8 +143,9 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   // After the session restore: having an account decides whether the splash asks about updates at all.
   await runStartupUpdates(container);
   await DesktopWindowShell.prepareHandoff(container);
-  container.read(appReadyProvider.notifier).state = true;
+  // Revealed before the flip: a window reports its real size only once shown, and the real UI must not build at the splash's 380px.
   await DesktopWindowShell.revealAfterHandoff();
+  container.read(appReadyProvider.notifier).state = true;
 }
 
 /// Restores the splash on/off and duration preferences and turns them into

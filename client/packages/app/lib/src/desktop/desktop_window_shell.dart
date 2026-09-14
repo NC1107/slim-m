@@ -17,6 +17,7 @@ library;
 
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
+import 'package:flutter/widgets.dart' show Size, WidgetsBinding;
 import 'package:flutter/services.dart' show MethodCall, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -77,6 +78,12 @@ class DesktopWindowShell {
   static DesktopTrayController? _trayController;
   static bool _active = false;
   static bool _framelessApplied = false;
+
+  /// The windowed size [_applyFinalGeometry] asked for, so
+  /// [revealAfterHandoff] knows what the view is supposed to settle at.
+  /// Null when the run state is maximized or fullscreen, where the final
+  /// size is the compositor's to decide and there is nothing to compare.
+  static WindowSize? _handoffTargetSize;
 
   /// Test-only seam: a real desktop-shell test still runs on real Linux
   /// (`dart:io`'s `Platform` cannot tell a CI runner from a launch), so
@@ -264,11 +271,13 @@ class DesktopWindowShell {
 
     switch (geometry.runState) {
       case WindowRunState.maximized:
+        _handoffTargetSize = null;
         await _port.maximize();
       case WindowRunState.fullscreen:
+        _handoffTargetSize = null;
         await _port.setFullScreen(true);
       case WindowRunState.windowed:
-        break;
+        _handoffTargetSize = geometry.windowedSize;
     }
   }
 
@@ -319,6 +328,54 @@ class DesktopWindowShell {
     } catch (error) {
       debugPrint('desktop: post-reveal frame wait failed: $error');
     }
+    await _awaitMetricsAtHandoffSize();
+  }
+
+  /// Waits, bounded, for the view to actually report the size
+  /// [_applyFinalGeometry] asked for.
+  ///
+  /// This is what keeps the real UI from ever laying out at the splash's
+  /// 380px. `main.dart` flips `appReadyProvider` only after this returns, so
+  /// the first frame of the real app is built against the window it is
+  /// really in. Without it the flip races the compositor's own metrics, and
+  /// on a launch that loses the race the whole app builds at
+  /// [LayoutClass.compact] - a desktop window rendering the phone layout,
+  /// which the owner reported twice. Measured on their KDE Wayland session:
+  /// one launch in three built the real UI at 380 logical pixels.
+  ///
+  /// Only a windowed run state is waited on; maximized and fullscreen have
+  /// no size of ours to match. Fails open on the timeout, because a window
+  /// whose metrics never arrive must still get its app: a wrong layout is
+  /// recoverable by resizing, a splash that never leaves is not.
+  static Future<void> _awaitMetricsAtHandoffSize() async {
+    final target = _handoffTargetSize;
+    if (target == null) return;
+    final deadline = DateTime.now().add(_setupTimeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (viewMatchesSize(_currentViewSize(), target)) return;
+      try {
+        await SchedulerBinding.instance.endOfFrame.timeout(_metricsPollStep);
+      } catch (_) {
+        // A frame that never came is not a reason to stop asking.
+      }
+    }
+    debugPrint(
+      'desktop: view never reported the handoff size $target; '
+      'last seen ${_currentViewSize()}',
+    );
+  }
+
+  /// How long one poll waits for a frame before re-reading the view size: a
+  /// hidden or idle window can go a while without painting, and the size may
+  /// change without one.
+  static const _metricsPollStep = Duration(milliseconds: 100);
+
+  static Size? _currentViewSize() {
+    final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+    if (view == null) return null;
+    final ratio = view.devicePixelRatio;
+    if (ratio <= 0) return null;
+    return view.physicalSize / ratio;
   }
 
   /// Registers the Linux-only receiving end of
@@ -421,4 +478,17 @@ class DesktopWindowShell {
     container.read(firstRunTrayNoticeCloseActionProvider.notifier).state =
         action;
   }
+}
+
+/// Whether [size] is the window [target] asked for, to within a logical
+/// pixel either way.
+///
+/// Rounded rather than exact: a compositor converts through physical pixels
+/// and a fractional device pixel ratio, so a window that is exactly right
+/// can still report 1279.9998. An exact comparison would wait out the whole
+/// timeout on every fractional-scale display.
+bool viewMatchesSize(Size? size, WindowSize target) {
+  if (size == null) return false;
+  return (size.width - target.width).abs() <= 1 &&
+      (size.height - target.height).abs() <= 1;
 }
