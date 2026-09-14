@@ -25,10 +25,9 @@ const List<(String?, String)> _panes = [
   ('You', 'Appearance'),
   ('You', 'Notifications'),
   ('You', 'Voice & screen share'),
-  ('Safety', 'Devices'),
   ('Safety', 'Blocked'),
   ('Safety', 'Report status'),
-  (null, 'About slim-m'),
+  ('App', 'About slim-m'),
 ];
 
 const _spaceRows = [
@@ -57,31 +56,31 @@ void main() {
     }
   });
 
-  /// The guard for the regrouping: `Calls` and `About` used to hold one pane
-  /// each, so the nav alternated heading and row down its whole length. A
-  /// heading is worth its space only when it marks more than one thing.
-  testWidgets('every group heading marks more than one pane', (tester) async {
+  /// Every group is named, the trailing one included. `About slim-m` used to
+  /// sit under a bare gap on the theory that a heading over one row is
+  /// decoration; the owner read that gap as a section missing its header,
+  /// so the rule is now the simpler one: a divider always comes with a name.
+  testWidgets('every group has a heading, the last one included', (
+    tester,
+  ) async {
     useTallViewport(tester);
     await pumpPersonalSettings(tester, 0, scrollToBottom: false);
 
-    final counts = <String, int>{};
-    for (final (group, _) in _panes) {
-      if (group == null) continue;
-      counts[group] = (counts[group] ?? 0) + 1;
+    for (final (group, pane) in _panes) {
+      expect(group, isNotNull, reason: '$pane sits under an unnamed group');
+      expect(find.text(group!.toUpperCase()), findsWidgets, reason: group);
     }
-    final singletons = counts.entries
-        .where((e) => e.value < 2)
-        .map((e) => e.key)
-        .toList();
-    expect(
-      singletons,
-      isEmpty,
-      reason: 'a heading over one row is decoration, not grouping',
-    );
+  });
 
-    for (final heading in counts.keys) {
-      expect(find.text(heading.toUpperCase()), findsWidgets, reason: heading);
-    }
+  testWidgets('devices live with the account, not in a pane of their own', (
+    tester,
+  ) async {
+    useTallViewport(tester);
+    await pumpPersonalSettings(tester, 0, scrollToBottom: false);
+    expect(find.text('Devices'), findsNothing, reason: 'no nav row');
+    await tester.tap(find.text('Account & profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Devices'), findsOneWidget, reason: 'a section header');
   });
 
   /// A pane whose whole body is one card must not title that card with the
@@ -100,12 +99,7 @@ void main() {
     addTearDown(tester.view.reset);
     await pumpPersonalSettings(tester, 0, scrollToBottom: false);
 
-    for (final label in [
-      'Appearance',
-      'Notifications',
-      'Devices',
-      'About slim-m',
-    ]) {
+    for (final label in ['Appearance', 'Notifications', 'About slim-m']) {
       await tester.tap(find.text(label));
       await tester.pumpAndSettle();
       expect(
