@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.61.0](https://github.com/NC1107/slim-m/compare/server-v0.60.0...server-v0.61.0) (2026-09-14)
+
+
+### Bug Fixes
+
+* address the audit's confirmed findings across sync, ci and the client ([#1171](https://github.com/NC1107/slim-m/issues/1171)) ([67316a3](https://github.com/NC1107/slim-m/commit/67316a3be2af6fd9c0a3e0a292edf7293f98266c))
+
 ## [0.60.0](https://github.com/NC1107/slim-m/compare/server-v0.59.0...server-v0.60.0) (2026-09-13)
 
 
