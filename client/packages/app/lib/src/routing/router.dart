@@ -35,6 +35,7 @@ import '../screens/personal_settings_screen.dart';
 import '../screens/space_settings_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/sign_in_screen.dart';
+import '../screens/updates_choice_screen.dart';
 import '../screens/thread_screen.dart';
 import '../widgets/mobile_boot_gate.dart';
 import 'breakpoints.dart';
@@ -77,6 +78,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Anywhere in the join flow is left alone, so a signed-out user can walk
       // back to onboarding to pick a different server or redeem an invite.
       if (!signedIn) return onJoinFlow ? null : signedOutHome();
+      // Asked once, right after the account exists, so a signed-in user belongs here.
+      if (location == Routes.updatesChoice) return null;
       if (onJoinFlow) return Routes.channels;
       return null;
     },
@@ -102,6 +105,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           context,
           const SignInScreen(),
           key: const ValueKey('sign-in'),
+        ),
+      ),
+      GoRoute(
+        path: Routes.updatesChoice,
+        pageBuilder: (context, state) => fadeThroughPage(
+          context,
+          const UpdatesChoiceScreen(),
+          key: const ValueKey('updates-choice'),
         ),
       ),
       GoRoute(

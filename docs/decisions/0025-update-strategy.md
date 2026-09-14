@@ -1,7 +1,7 @@
 # 0025 - How every surface of slim-m gets its updates
 
 Date: 2026-09-14
-Status: proposed
+Status: accepted; amended 2026-09-14 after the owner chose opt-in updates applied during the splash
 
 ## Context
 
@@ -40,10 +40,12 @@ Two things are missing from every row: the client never learns from the server t
    Below it a client shows a blocking update screen and nothing else; at or above it the client is never interrupted.
    The floor is for retiring a client with a real defect (a data-loss bug, a broken protocol reading), not for nudging.
 
-3. **Updates never block a working client.**
-   The check runs after launch, in the background, at most a few times a day.
-   The result is a small badge, not a dialog.
-   Only the server's floor may block, and a check that fails or times out is silent.
+3. **Updating is opt-in, asked once, and then it just happens.**
+   The owner's shape: a new account is asked at signup whether slim-m may keep itself up to date, and an install that already has an account is asked once at the splash.
+   With it on, every launch checks during the mini splash and installs what it finds before the app starts, which is the moment an update is least in the way.
+   With it off, nothing interrupts startup at all.
+   Either answer is an answer, so nothing asks twice; the switch in Settings, under About, is how it changes afterwards.
+   A check that fails or times out is silent, and never delays the app by more than its own timeout.
 
 4. **The user always sees both numbers.**
    "You have 0.74.0, 0.75.0 is available" is diagnosable; "Update available" is not.
@@ -63,20 +65,23 @@ Two things are missing from every row: the client never learns from the server t
 - `/version` already carries `protocol` and `capabilities`; the client keeps reading capabilities per feature (the existing handshake) rather than gating on `protocol` alone.
 - A client version is `X.Y.Z`; build metadata after `+` is ignored for comparison, as `parseVersion` already does.
 
-### Desktop notifier (all formats)
+### The splash pass (all desktop formats)
 
-- The startup check moves off the splash.
-  It runs once after the shell is up, then every six hours with jitter, and on returning from the About pane's "Check for updates".
-- Result surfaces as a badge on the rail footer's settings gear and a row in Settings, About: "0.75.0 is available. You have 0.74.0." with one primary action whose label names the mechanism ("Update with dnf", "Open release page", "Update in Discover").
-- "Skip this version" persists per version, as today; a newer version clears it.
+- The preference is three-state on purpose: absent means nobody has been asked, which is what tells "said no" apart from "never asked".
+  Absent is what makes the signup screen and the splash each ask once, and neither ask again.
+- With it on, the splash checks, and then does whatever this format allows: install it (dnf today), or say a version is there and open the release.
+  The status line carries the progress, so "Checking for updates" and "Installing 0.76.0" replace the plain boilerplate while it works.
+- Installed is not running: the new files are on disk but the process in memory is the old build, so the splash offers "Restart now" and takes "Later" for an answer.
+- A version turned down on the open-the-release path is not offered again until something newer exists, which is the existing dismissal memory.
 - The blocking screen exists only for the server floor.
 
 ### Fedora rpm (the owner's own install)
 
-- "Update with dnf" runs `pkexec dnf upgrade --refresh -y slim-m-client` (dnf5 on Fedora 41+), streams the exit into the row, and offers "Relaunch" on success.
+- The install runs `pkexec dnf upgrade --refresh -y slim-m-client` (dnf5 on Fedora 41+) and keeps dnf's own last lines for the failure case, so a refused polkit prompt or a broken transaction is diagnosable rather than "update failed".
   The polkit prompt is the system's own consent step; the app never escalates silently.
 - Precondition: the COPR repo is enabled.
-  The notifier checks `dnf repolist --enabled` for `copr:copr.fedorainfracloud.org:nc1107:slim-m`; when missing it offers the one-line `dnf copr enable nc1107/slim-m` first, with the same polkit prompt.
+  The pass reads `dnf repolist --enabled` for `copr:copr.fedorainfracloud.org:nc1107:slim-m`; when missing it runs `dnf copr enable -y nc1107/slim-m` first, behind the same prompt.
+- A dnf that fails falls back to the open-the-release path rather than claiming an install that did not happen.
 - The rpm spec should carry the COPR `.repo` file so an install from the GitHub asset also lands on the repo (a packaging change, not an app one).
 
 ### Flatpak
@@ -126,7 +131,7 @@ Two things are missing from every row: the client never learns from the server t
 ## Rollout order
 
 Phase 1, before the beta (client-side, no owner secrets):
-the non-blocking notifier with both versions shown; `min_client_version` on the server and the floor screen in the client; the dnf action for the rpm; the web reload pill; the web image built and deployed by CI; the rollback runbook.
+the opt-in question at signup and at the splash, the splash install pass with the dnf path for the rpm, and the switch in Settings under About - **done**; then `min_client_version` on the server and the floor screen in the client; the web reload pill; the web image built and deployed by CI; the rollback runbook.
 
 Phase 2, owner-gated by certificates:
 Sparkle/WinSparkle through `auto_updater` with an appcast; notarized macOS and signed Windows builds.

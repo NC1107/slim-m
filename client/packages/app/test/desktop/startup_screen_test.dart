@@ -50,30 +50,32 @@ void main() {
     expect(find.text('Get update'), findsNothing);
   });
 
-  testWidgets('an update offer shows the version, a format hint and both '
-      'actions, and the buttons fire their callbacks', (tester) async {
-    var got = false;
-    var dismissed = false;
+  testWidgets('a prompt shows its title, detail and both actions, and the '
+      'buttons fire their callbacks', (tester) async {
+    var primary = false;
+    var secondary = false;
     await tester.pumpWidget(
       StartupApp(
-        status: 'ignored while offering',
-        update: StartupUpdate(
-          version: '0.70.0',
-          format: InstallFormat.rpm,
-          onGet: () => got = true,
-          onDismiss: () => dismissed = true,
+        status: 'ignored while asking',
+        prompt: StartupPrompt(
+          title: 'Version 0.70.0 is available',
+          detail: updateActionHint(InstallFormat.rpm),
+          primaryLabel: 'Get update',
+          onPrimary: () => primary = true,
+          secondaryLabel: 'Not now',
+          onSecondary: () => secondary = true,
         ),
       ),
     );
 
     expect(find.text('Version 0.70.0 is available'), findsOneWidget);
     expect(find.text(updateActionHint(InstallFormat.rpm)), findsOneWidget);
-    expect(find.text('ignored while offering'), findsNothing);
+    expect(find.text('ignored while asking'), findsNothing);
 
     await tester.tap(find.text('Not now'));
-    expect(dismissed, isTrue);
+    expect(secondary, isTrue);
     await tester.tap(find.text('Get update'));
-    expect(got, isTrue);
+    expect(primary, isTrue);
   });
 
   test('the update hint is format-specific', () {

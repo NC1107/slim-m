@@ -10,13 +10,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+export 'src/desktop/startup_state.dart';
 
 import 'src/deep_links.dart';
-import 'src/desktop/update_check.dart';
+import 'src/desktop/startup_updates.dart';
 import 'src/providers/desktop_call_notifier.dart';
 import 'src/providers/desktop_message_notifier.dart';
 import 'src/desktop/desktop_chrome.dart';
@@ -31,6 +31,7 @@ import 'src/providers/message_page_size.dart';
 import 'src/providers/image_cache_preference.dart';
 import 'src/desktop/splash_floor.dart';
 import 'src/desktop/startup_screen.dart';
+import 'src/desktop/startup_state.dart';
 import 'src/diagnostics/debug_log.dart';
 import 'src/providers/display_preferences.dart';
 import 'src/providers/notification_tap_router.dart';
@@ -133,74 +134,16 @@ Future<void> main() async {
 /// native runner before any preference can be read, so even "off" cannot
 /// skip that first small frame, only the added dwell on top of it.
 Future<void> _bootstrapApp(ProviderContainer container) async {
-  await _maybePromptForUpdate(container);
   final floor = await _resolveSplashFloor(container);
   await awaitBootstrapWithSplashFloor(
     () => _runBootstrapSequence(container),
     floor: floor,
   );
+  // After the session restore: having an account decides whether the splash asks about updates at all.
+  await runStartupUpdates(container);
   await DesktopWindowShell.prepareHandoff(container);
   container.read(appReadyProvider.notifier).state = true;
   await DesktopWindowShell.revealAfterHandoff();
-}
-
-/// Phase 1 of the desktop update notifier (decision 0020): during the splash,
-/// check GitHub for a newer client release and, if there is one, offer it and
-/// wait on the user's choice before loading the current client. Never blocks
-/// or fails startup - the check is timeout-bounded and best-effort, only the
-/// desktop reaches here, and any error just falls through to launching.
-///
-/// "Get update" opens the release (or its package-manager hint); it does not
-/// self-apply yet, which is Phase 2 and needs signed artifacts. "Not now"
-/// loads the current client immediately and is remembered, so that version is
-/// not offered again on the next launch - see [updateWasDismissed].
-Future<void> _maybePromptForUpdate(ProviderContainer container) async {
-  if (!isDesktopHost || updateChecksDisabled()) return;
-  try {
-    container.read(startupStatusProvider.notifier).state =
-        'Checking for updates';
-    final version = (await PackageInfo.fromPlatform()).version;
-    final update = await checkForClientUpdate(currentVersion: version);
-    if (update == null) return;
-
-    // The same cached future every other preference reads.
-    final prefs = await container.read(preferencesProvider.future);
-    if (updateWasDismissed(
-      dismissed: prefs.getString(dismissedUpdateVersionKey),
-      candidate: update.version,
-    )) {
-      return;
-    }
-
-    final choice = Completer<bool>();
-    void respond(bool accepted) {
-      if (!choice.isCompleted) choice.complete(accepted);
-    }
-
-    container.read(startupUpdateProvider.notifier).state = StartupUpdate(
-      version: update.version,
-      format: update.format,
-      onGet: () => respond(true),
-      onDismiss: () => respond(false),
-    );
-    final accepted = await choice.future;
-    container.read(startupUpdateProvider.notifier).state = null;
-    // Only "Not now" suppresses; see [updateWasDismissed].
-    if (!accepted) {
-      await prefs.setString(dismissedUpdateVersionKey, update.version);
-    }
-    if (accepted) {
-      final uri = Uri.tryParse(update.releaseUrl);
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
-  } catch (error) {
-    container
-        .read(debugLogProvider.notifier)
-        .record('update', 'update check failed: $error');
-    container.read(startupUpdateProvider.notifier).state = null;
-  }
 }
 
 /// Restores the splash on/off and duration preferences and turns them into
@@ -256,27 +199,6 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   await DesktopWindowShell.registerListenersAndTray(container);
 }
 
-/// Whether [_bootstrapApp] has finished. Defaults to true rather than false:
-/// a test pumping `SlimMApp()` directly, with no call ever made into
-/// [_bootstrapApp], sees the real app immediately, matching every existing
-/// test's assumption - only the real entry point above ever sets it false
-/// first.
-final appReadyProvider = StateProvider<bool>((ref) => true);
-
-/// The startup screen's status line, updated at each phase boundary in
-/// [_runBootstrapSequence]. Deliberately plain text today rather than an enum
-/// of phases: the structure this exists for is the provider itself, so a
-/// later update flow ("Checking for updates", "Downloading update",
-/// "Installing update") is copy at the call sites above, not new plumbing.
-final startupStatusProvider = StateProvider<String>(
-  (ref) => defaultStartupStatus,
-);
-
-/// The update offer shown in the splash while [_maybePromptForUpdate] waits on
-/// the user, or null when there is nothing to offer. The splash renders the
-/// offer's buttons; their callbacks resolve the wait. See decision 0020.
-final startupUpdateProvider = StateProvider<StartupUpdate?>((ref) => null);
-
 /// Wires Firebase and the FCM background message handler Android needs to
 /// ever show a notification while backgrounded or killed - the relay sends
 /// data-only messages, so nothing appears unless this app builds it (see
@@ -319,7 +241,7 @@ class SlimMApp extends ConsumerWidget {
     if (!ref.watch(appReadyProvider)) {
       return StartupApp(
         status: ref.watch(startupStatusProvider),
-        update: ref.watch(startupUpdateProvider),
+        prompt: ref.watch(startupPromptProvider),
       );
     }
 
