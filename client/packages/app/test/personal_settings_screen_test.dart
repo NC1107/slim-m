@@ -234,7 +234,6 @@ void main() {
         AppIcons.appearance,
         AppIcons.notificationsOn,
         AppIcons.voice,
-        AppIcons.devices,
         AppIcons.revoke,
         AppIcons.info,
       ]) {

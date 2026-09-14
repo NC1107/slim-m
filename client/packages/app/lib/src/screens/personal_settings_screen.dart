@@ -75,7 +75,11 @@ class PersonalSettingsScreen extends StatelessWidget {
               icon: AppIcons.account,
               // No presence rows: the rail footer's own status menu already sets both the state and the status text.
               builder: (context) => const Column(
-                children: [AvatarSettingsSection(), AccountSection()],
+                children: [
+                  AvatarSettingsSection(),
+                  DevicesSection(),
+                  AccountSection(),
+                ],
               ),
             ),
             SettingsPane(
@@ -108,12 +112,6 @@ class PersonalSettingsScreen extends StatelessWidget {
           label: 'Safety',
           panes: [
             SettingsPane(
-              id: 'devices',
-              label: 'Devices',
-              icon: AppIcons.devices,
-              builder: (context) => const DevicesSection(),
-            ),
-            SettingsPane(
               id: 'blocked',
               label: 'Blocked',
               icon: AppIcons.revoke,
@@ -128,6 +126,7 @@ class PersonalSettingsScreen extends StatelessWidget {
           ],
         ),
         SettingsPaneGroup(
+          label: 'App',
           panes: [
             SettingsPane(
               id: 'about',

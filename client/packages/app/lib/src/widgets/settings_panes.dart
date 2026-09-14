@@ -76,10 +76,12 @@ class SettingsPane {
 class SettingsPaneGroup {
   const SettingsPaneGroup({required this.panes, this.label});
 
-  /// Null for a trailing run that is not a category - `About slim-m` is one
-  /// pane and naming a group of one is decoration, so it takes a gap instead
-  /// of a heading. A heading here should always mark more than one pane;
-  /// `settings_taxonomy_test.dart` holds that rule.
+  /// Every group carries one. `About slim-m` used to sit under a bare gap on
+  /// the theory that naming a group of one is decoration; the owner read the
+  /// gap as a section "clearly sectioned off but missing its header", which
+  /// is the better reading - the divider already says "new group", and a
+  /// group with no name is a question, not a saving. Nullable only so a
+  /// caller can still build one without, never the shape the nav ships.
   final String? label;
   final List<SettingsPane> panes;
 }
