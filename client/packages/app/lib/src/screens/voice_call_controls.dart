@@ -155,7 +155,10 @@ class _CallControlsState extends ConsumerState<CallControls> {
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
           icon: AppIcons.screenShare,
-          tooltip: _shareTooltip(voice),
+          tooltip: _shareTooltip(
+            voice,
+            canSwitch: widget.controller.screenShareNeedsSource,
+          ),
           active: voice.screenSharing,
           // Pending is its own look, never the active one: the lit
           // button over a share nobody could see was the whole bug.
@@ -185,8 +188,14 @@ class _CallControlsState extends ConsumerState<CallControls> {
     );
   }
 
-  static String _shareTooltip(VoiceFlags voice) {
-    if (voice.screenSharing) return 'Stop sharing';
+  /// [canSwitch] names the long-press route while sharing: a hidden gesture
+  /// nobody is told about is not a way to change source.
+  static String _shareTooltip(VoiceFlags voice, {required bool canSwitch}) {
+    if (voice.screenSharing) {
+      return canSwitch
+          ? 'Stop sharing (hold to change source)'
+          : 'Stop sharing';
+    }
     if (voice.awaitingBroadcast) {
       return 'Waiting for you to start the broadcast. Tap to cancel.';
     }

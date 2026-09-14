@@ -50,7 +50,7 @@ void main() {
         session: session,
       );
 
-      await tester.tap(find.byTooltip('Stop sharing'));
+      await tester.tap(find.byTooltip(RegExp(r'^Stop sharing')));
       await tester.pumpAndSettle();
 
       expect(session.screenShareCalls, hasLength(1));
@@ -75,7 +75,7 @@ void main() {
         session: session,
       );
 
-      await tester.longPress(find.byTooltip('Stop sharing'));
+      await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
       await tester.pumpAndSettle();
 
       expect(
@@ -136,7 +136,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.longPress(find.byTooltip('Stop sharing'));
+    await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
     await tester.pumpAndSettle();
 
     final rows = tester
@@ -165,7 +165,7 @@ void main() {
         session: session,
       );
 
-      await tester.longPress(find.byTooltip('Stop sharing'));
+      await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
       await tester.pumpAndSettle();
 
       expect(
@@ -193,7 +193,7 @@ void main() {
         session: session,
       );
 
-      await tester.longPress(find.byTooltip('Stop sharing'));
+      await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
       await tester.pumpAndSettle();
 
       expect(session.screenShareCalls, isEmpty);
