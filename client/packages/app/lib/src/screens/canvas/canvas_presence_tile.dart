@@ -18,10 +18,10 @@
 /// self-contained gesture handler instead, the same shape the self bubble's
 /// old screen-anchored drag already used before this file replaced it.
 ///
-/// [CanvasPresenceManipulableTile.locked] wraps only the content in
-/// [IgnorePointer]: the resize grip disappears (nothing to resize while
-/// locked) but the lock control itself never does, or a locked tile would be
-/// a dead end with no way back.
+/// Being locked, or [tool] not being [CanvasTool.select], wraps only the
+/// content in [IgnorePointer]: the resize grip disappears too (nothing to
+/// resize while it is not reachable) but the lock control itself never
+/// does, or a locked tile would be a dead end with no way back.
 ///
 /// The resize grip and the lock/depth/hide row are hidden - both visually
 /// and to hit-testing - until this tile is hovered (desktop) or pressed
@@ -65,26 +65,20 @@
 /// exactly where a person last saw them, whichever side of the drawing
 /// surface the tile's own pixels are currently painting on.
 ///
-/// An unlocked tile's opaque hit test also has to answer for three things
-/// it does not otherwise implement, all because `CanvasSurface` beneath it
-/// never receives an event a tile has already absorbed - true regardless of
-/// [sentToBack], since this widget's own interactive shell stays in front
-/// of `CanvasSurface` at every depth. A middle-mouse grab-pan is one -
-/// `canvas_surface_gestures.dart` honours it everywhere else on the canvas,
-/// and Flutter's hit test cannot forward just that button selectively
-/// (opacity is decided once per pointer, before its buttons are read), so
-/// this widget replicates `_updatePan`'s own delta math directly against
-/// [document]. Every pointer this tile absorbs is reported to
-/// [CanvasDocument.externalPointers], or `CanvasSurface`'s own
-/// pinch-cancellation guard would only ever see one finger of a two-finger
-/// touch that happened to land partly on a tile, and place on it as though
-/// no second finger had come down at all. The third was a real bug rather
-/// than an anticipated gap: the outer `Listener` wires `onPointerSignal` to
-/// [cameraAfterWheelScroll] now, the same pure math `CanvasSurface` itself
-/// reads - without it a mouse wheel over any tile did nothing at all, ctrl
-/// held or not, which is indistinguishable in practice from "zoom is
-/// broken" to somebody drawing on a canvas with their own camera bubble on
-/// it, which is most of what this canvas is for.
+/// The outer shell (the [MouseRegion] and the [Listener] both) is opaque,
+/// replicating a middle-mouse grab-pan and a mouse wheel itself against
+/// [document], only while this tile is unlocked with [CanvasTool.select]
+/// active - the one state where a pointer here means "manipulate this
+/// tile". Any other [tool], or [locked] regardless of [tool], turns both
+/// `HitTestBehavior.translucent` and ignores the content: report 2 in the
+/// backlog channel, "unable to start drawing on attachments", is exactly a
+/// pen stroke that would not start over a camera bubble, and report 4 is a
+/// locked, sent-to-back tile still swallowing a click meant for whatever
+/// `CanvasSurface` paints above it. Translucent still delivers every raw
+/// pointer here, so [_revealForTouch] always runs and a locked tile's own
+/// unlock button never becomes a dead end - but the pan/wheel replication
+/// itself stops, since `CanvasSurface` now genuinely receives the same
+/// gesture directly and a second copy here would double it.
 library;
 
 import 'dart:async';
@@ -116,6 +110,7 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
     required this.worldRect,
     required this.camera,
     required this.locked,
+    required this.tool,
     required this.sentToBack,
     required this.onRectChanged,
     required this.onRectCommitted,
@@ -132,6 +127,11 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   final Rect worldRect;
   final Camera camera;
   final bool locked;
+
+  /// The canvas's own active tool - see this file's own library doc for why
+  /// anything but [CanvasTool.select] makes this tile transparent to a
+  /// pointer the same way [locked] already does.
+  final CanvasTool tool;
 
   /// Whether this tile's own content currently paints behind
   /// [CanvasSurface] rather than above it - purely informational here, for
@@ -201,6 +201,11 @@ class _CanvasPresenceManipulableTileState
   Rect? _liveRect;
 
   Rect get _rect => _liveRect ?? widget.worldRect;
+
+  /// See this file's own library doc: true whenever a pointer landing on
+  /// this tile means something to whatever is stacked behind it instead of
+  /// to this tile itself.
+  bool get _passThrough => widget.locked || widget.tool != CanvasTool.select;
 
   /// [_rect], with its size swapped for [CanvasPresenceManipulableTile
   /// .fixedRenderSize] when one is given - the box this widget actually
@@ -291,13 +296,15 @@ class _CanvasPresenceManipulableTileState
   }
 
   void _pointerDown(PointerDownEvent event) {
+    // Unconditional even in pass-through: see this file's own library doc.
+    _revealForTouch();
+    if (_passThrough) return;
     _countedPointers.add(event.pointer);
     widget.document.externalPointers.add();
     if (_panPointer == null && _isPanButton(event.buttons)) {
       _panPointer = event.pointer;
       _panFrom = event.position;
     }
-    _revealForTouch();
   }
 
   void _pointerMove(PointerMoveEvent event) {
@@ -331,11 +338,13 @@ class _CanvasPresenceManipulableTileState
 
   /// A wheel notch landing inside this tile's own opaque bounds - see this
   /// file's own library doc for why `CanvasSurface` never gets a chance to
-  /// answer for it otherwise. [event.localPosition] is relative to this
-  /// tile's own top-left, not the canvas viewport `cameraAfterWheelScroll`
-  /// expects, so it is re-based onto this tile's own on-screen origin
-  /// before being handed to the same pure math `CanvasSurface` reads.
+  /// answer for it otherwise, and never has to while [_passThrough] is
+  /// true, when it does. [event.localPosition] is relative to this tile's
+  /// own top-left, not the canvas viewport `cameraAfterWheelScroll` expects,
+  /// so it is re-based onto this tile's own on-screen origin before being
+  /// handed to the same pure math `CanvasSurface` reads.
   void _onPointerSignal(PointerSignalEvent event) {
+    if (_passThrough) return;
     if (event is! PointerScrollEvent) return;
     final screen = presenceScreenRect(_paintRect, widget.camera);
     final focal = screen.topLeft + event.localPosition;
@@ -412,9 +421,15 @@ class _CanvasPresenceManipulableTileState
       child: MouseRegion(
         onEnter: _onHoverEnter,
         onExit: _onHoverExit,
+        // MouseRegion defaults its own hitTestBehavior to opaque too, which absorbs a pointer before the Listener below ever gets a say - it has to carry the same pass-through choice, or that Listener's own translucent is moot.
+        hitTestBehavior: _passThrough
+            ? HitTestBehavior.translucent
+            : HitTestBehavior.opaque,
         child: Listener(
-          // Default is deferToChild, which would leave this Listener silent for a locked, not-yet-revealed tile: content is IgnorePointer'd and the controls are IgnorePointer'd too until revealed, so nothing below ever hits - a real dead end this fixes.
-          behavior: HitTestBehavior.opaque,
+          // Translucent in pass-through so this Listener's own handlers still fire and whatever CanvasSurface paints beneath still gets the same pointer; opaque otherwise, or a not-yet-revealed tile could never be touched to reveal at all.
+          behavior: _passThrough
+              ? HitTestBehavior.translucent
+              : HitTestBehavior.opaque,
           onPointerDown: _pointerDown,
           onPointerMove: _pointerMove,
           onPointerUp: _pointerUp,
@@ -436,7 +451,7 @@ class _CanvasPresenceManipulableTileState
                   onExpand: widget.onExpand,
                 ),
                 IgnorePointer(
-                  ignoring: widget.locked,
+                  ignoring: _passThrough,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     // Opens this tile's own menu rather than a no-op now, but still HitTestBehavior.opaque - a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption.
@@ -447,7 +462,7 @@ class _CanvasPresenceManipulableTileState
                     child: widget.child,
                   ),
                 ),
-                if (!widget.locked && widget.fixedRenderSize == null)
+                if (!_passThrough && widget.fixedRenderSize == null)
                   Positioned(
                     right: -4,
                     bottom: -4,

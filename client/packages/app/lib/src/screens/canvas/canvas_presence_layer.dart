@@ -116,6 +116,7 @@ class CanvasPresenceLayer extends StatefulWidget {
     this.onVideoInterest,
     this.hideSelfCamera = false,
     this.layout = const CanvasPresenceLayout(),
+    this.tool = CanvasTool.select,
   });
 
   final CanvasDocument document;
@@ -123,6 +124,13 @@ class CanvasPresenceLayer extends StatefulWidget {
   final CameraViewBuilder cameraViewFor;
   final ScreenShareViewBuilder screenShareViewFor;
   final CanvasPresenceTileOverrides overrides;
+
+  /// The canvas's own active tool, forwarded to every tile - see
+  /// `canvas_presence_tile.dart`'s own doc for why anything but
+  /// [CanvasTool.select] makes a tile transparent to a pointer. Defaults to
+  /// [CanvasTool.select] so a caller with no notion of tools (most of this
+  /// file's own test suite) keeps every tile fully interactive, unchanged.
+  final CanvasTool tool;
 
   /// Sends [overrides]' current answer for one tile key onward to the
   /// server - see `CanvasMediaSlotSync.commit` in the app's own canvas
@@ -343,6 +351,7 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       worldRect: rect,
       camera: camera,
       locked: locked,
+      tool: widget.tool,
       sentToBack: sentToBack,
       fixedRenderSize: avatarOnly ? canvasAvatarMarkerSize : null,
       document: widget.document,

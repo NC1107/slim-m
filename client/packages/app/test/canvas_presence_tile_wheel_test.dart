@@ -15,6 +15,12 @@
 /// is what made this read as "sometimes zoom does nothing" rather than a
 /// clean failure - exactly the shape a person on a call, where a tile is
 /// almost always on screen, would describe as "it does not zoom".
+///
+/// A locked tile is now transparent to a pointer (report: "I cannot touch
+/// the rectangle again" once a tile is locked and sent to back), so a
+/// wheel notch over one reaches `CanvasSurface` directly rather than
+/// through this tile's own replicated math - the locked case below mounts
+/// one so there is something underneath to reach.
 library;
 
 import 'package:flutter/gestures.dart';
@@ -54,6 +60,21 @@ Widget _layer(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
       screenShareViewFor: (_) => const SizedBox(),
       overrides: overrides,
       onCommit: (_, __) {},
+    );
+
+/// [_layer] over a real [CanvasSurface], the same stacking
+/// `canvas_pane_body.dart` uses - needed only where a tile is meant to pass
+/// a pointer through to whatever is beneath it.
+Widget _stack(CanvasDocument document, CanvasPresenceTileOverrides overrides) =>
+    Stack(
+      children: [
+        CanvasSurface(
+          document: document,
+          ink: const Color(0xFFE86A5C),
+          onStroke: (_) {},
+        ),
+        _layer(document, overrides),
+      ],
     );
 
 void main() {
@@ -126,7 +147,7 @@ void main() {
         ..setLocked('camera:user-noor', true);
       addTearDown(overrides.dispose);
 
-      await tester.pumpWidget(_wrap(_layer(document, overrides)));
+      await tester.pumpWidget(_wrap(_stack(document, overrides)));
       await tester.pump();
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);

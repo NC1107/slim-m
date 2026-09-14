@@ -446,6 +446,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onCommit: widget.onCommitTile,
           onVideoInterest: widget.onVideoInterest,
           hideSelfCamera: widget.selfBubbleHidden,
+          tool: widget.tool,
         ),
       ],
     ),
