@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.62.0](https://github.com/NC1107/slim-m/compare/server-v0.61.0...server-v0.62.0) (2026-09-14)
+
+
+### Features
+
+* opt-in automatic updates, and a server floor that forces one ([#1184](https://github.com/NC1107/slim-m/issues/1184)) ([f73fd49](https://github.com/NC1107/slim-m/commit/f73fd49247161509124d20e8688b2c7841927837))
+
 ## [0.61.0](https://github.com/NC1107/slim-m/compare/server-v0.60.0...server-v0.61.0) (2026-09-14)
 
 
