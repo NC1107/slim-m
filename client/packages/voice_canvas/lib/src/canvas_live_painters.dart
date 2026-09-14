@@ -10,6 +10,8 @@
 /// `canvas_painters.dart` so nothing importing that file has to change.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
@@ -103,6 +105,116 @@ class DraftPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DraftPainter oldDelegate) => false;
+}
+
+/// The box a shape tool is currently sizing by dragging, in screen
+/// coordinates - [DraftStroke]'s own sibling for report 3 in the backlog
+/// channel: "I don't see it until I let go of click". Screen space for the
+/// same reason [DraftStroke] is: a drag is short enough that a mid-drag
+/// camera change is not worth tracking.
+class DraftShape extends ChangeNotifier {
+  Offset? _anchor;
+  Offset? _current;
+  CanvasShapeKind _kind = CanvasShapeKind.rectangle;
+
+  /// The box the drag has sized so far, or null before one has begun.
+  Rect? get rect {
+    final anchor = _anchor;
+    final current = _current;
+    return anchor == null || current == null
+        ? null
+        : Rect.fromPoints(anchor, current);
+  }
+
+  CanvasShapeKind get kind => _kind;
+
+  void begin(Offset point, CanvasShapeKind kind) {
+    _anchor = point;
+    _current = point;
+    _kind = kind;
+    notifyListeners();
+  }
+
+  void update(Offset point) {
+    if (_anchor == null) return;
+    _current = point;
+    notifyListeners();
+  }
+
+  /// The final box, or null if nothing was ever begun - clears the draft
+  /// either way, the same one-shot shape [DraftStroke.take] already uses.
+  Rect? take() {
+    final result = rect;
+    cancel();
+    return result;
+  }
+
+  void cancel() {
+    if (_anchor == null) return;
+    _anchor = null;
+    _current = null;
+    notifyListeners();
+  }
+}
+
+/// Paints [DraftShape] live, in screen space - [DraftPainter]'s own
+/// treatment for a pen stroke, so a shape drag shows the box being sized
+/// rather than only appearing once the pointer lifts. A fixed screen-space
+/// stroke width, unlike the committed shape's world-scaled one: a
+/// mid-drag preview does not need to track zoom exactly, only to exist.
+class DraftShapePainter extends CustomPainter {
+  DraftShapePainter({required this.draft, required this.color})
+      : super(repaint: draft);
+
+  final DraftShape draft;
+  final Color color;
+
+  static final Paint _stroke = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2
+    ..isAntiAlias = true;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = draft.rect;
+    if (rect == null || rect.width == 0 || rect.height == 0) return;
+    final paint = _stroke..color = color;
+    switch (draft.kind) {
+      case CanvasShapeKind.ellipse:
+        canvas.drawOval(rect, paint);
+      case CanvasShapeKind.line:
+        canvas.drawLine(rect.topLeft, rect.bottomRight, paint);
+      case CanvasShapeKind.arrow:
+        canvas.drawLine(rect.topLeft, rect.bottomRight, paint);
+        _paintArrowhead(canvas, rect.topLeft, rect.bottomRight, paint);
+      case CanvasShapeKind.rectangle:
+        canvas.drawRect(rect, paint);
+    }
+  }
+
+  /// The same two wing segments `canvas_painters_shapes.dart`'s own
+  /// `arrowheadWings` draws for a committed arrow - duplicated rather than
+  /// shared, the same call [RemoteDraftPainter] already makes against
+  /// [DraftPainter] for its own path-building, since a `part of` file's
+  /// private helper is not worth a cross-file import for six lines of math.
+  void _paintArrowhead(Canvas canvas, Offset from, Offset to, Paint paint) {
+    const headLength = 10.0;
+    const headAngle = 0.5;
+    final direction = to - from;
+    if (direction.distance == 0) return;
+    final angle = direction.direction;
+    final left = to -
+        Offset(math.cos(angle - headAngle), math.sin(angle - headAngle)) *
+            headLength;
+    final right = to -
+        Offset(math.cos(angle + headAngle), math.sin(angle + headAngle)) *
+            headLength;
+    canvas.drawLine(to, left, paint);
+    canvas.drawLine(to, right, paint);
+  }
+
+  @override
+  bool shouldRepaint(DraftShapePainter oldDelegate) => false;
 }
 
 /// Other participants' in-flight strokes, in world coordinates.

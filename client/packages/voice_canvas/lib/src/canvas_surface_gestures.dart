@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 part of 'canvas_surface.dart';
 
+/// Below this screen-space distance on both axes, a shape placement reads
+/// as a tap rather than a drag - see [_CanvasSurfaceGestures._resolveShapeDrag].
+const double _shapeDragThreshold = 4.0;
+
 /// Every pointer, scroll and scale handler [_CanvasSurfaceState.build]
 /// wires up, plus the coordinate conversion and cursor choice they share.
 /// A `part of` file rather than a mixin: the eraser and placement tools
@@ -59,6 +63,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       final hadDraft = !_draft.isEmpty;
       _draft.cancel();
       if (hadDraft) widget.onDraftEnded?.call();
+      _shapeDraft.cancel();
       _pendingErasePoint = null;
       _beginPan(event.pointer, event.localPosition);
       return;
@@ -67,6 +72,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       final hadDraft = !_draft.isEmpty;
       _draft.cancel();
       if (hadDraft) widget.onDraftEnded?.call();
+      _shapeDraft.cancel();
       _pendingErasePoint = null;
       return;
     }
@@ -82,6 +88,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       case CanvasTool.shape:
         _pendingPlacementTool = CanvasTool.shape;
         _pendingPlacementWorld = _toWorld(event.localPosition);
+        _shapeDraft.begin(event.localPosition, widget.shapeKind);
       case CanvasTool.pen:
         _draft.begin(event.localPosition);
         widget.onDraftPoint?.call(_toWorld(event.localPosition));
@@ -120,8 +127,9 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       case CanvasTool.select:
         widget.onSelectDrag?.call(_toWorld(event.localPosition));
       case CanvasTool.note:
-      case CanvasTool.shape:
         break;
+      case CanvasTool.shape:
+        _shapeDraft.update(event.localPosition);
       case CanvasTool.pen:
         _draft.extend(event.localPosition);
         widget.onDraftPoint?.call(_toWorld(event.localPosition));
@@ -181,12 +189,34 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       case CanvasTool.note:
         widget.onNotePlace?.call(world);
       case CanvasTool.shape:
-        widget.onShapePlace?.call(world);
+        final (center, size) = _resolveShapeDrag(world);
+        widget.onShapePlace?.call(center, size);
       case CanvasTool.pen:
       case CanvasTool.eraser:
       case CanvasTool.select:
         break;
     }
+  }
+
+  /// [world], unchanged, and a null size for a plain tap (nothing in
+  /// [_shapeDraft] worth calling a drag); otherwise the dragged box's own
+  /// centre and world-space size, clamped to the same
+  /// [minObjectSize]..`maxObjectExtent` a resize handle already respects, so
+  /// a placement drag can never commit a box a resize could not.
+  (Offset, Size?) _resolveShapeDrag(Offset world) {
+    final screen = _shapeDraft.take();
+    if (screen == null ||
+        (screen.width < _shapeDragThreshold &&
+            screen.height < _shapeDragThreshold)) {
+      return (world, null);
+    }
+    final bounds = Rect.fromPoints(
+      _toWorld(screen.topLeft),
+      _toWorld(screen.bottomRight),
+    );
+    final width = bounds.width.clamp(minObjectSize, maxObjectExtent);
+    final height = bounds.height.clamp(minObjectSize, maxObjectExtent);
+    return (bounds.center, Size(width, height));
   }
 
   /// Starts a grab-pan from [screen], the anchor every later [_updatePan]
@@ -229,6 +259,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       case CanvasTool.shape:
         _pendingPlacementTool = CanvasTool.shape;
         _pendingPlacementWorld = _toWorld(screen);
+        _shapeDraft.begin(screen, widget.shapeKind);
       case CanvasTool.pen:
         _draft.begin(screen);
         widget.onDraftPoint?.call(_toWorld(screen));
@@ -262,6 +293,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     final hadDraft = !_draft.isEmpty;
     _draft.cancel();
     if (hadDraft) widget.onDraftEnded?.call();
+    _shapeDraft.cancel();
     switch (widget.tool) {
       case CanvasTool.eraser:
         if (_pendingErasePoint case final pending?) {

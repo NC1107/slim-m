@@ -77,16 +77,19 @@ class CanvasQuickPlacement {
     );
   }
 
-  /// Places a [shapeKind] shape centered at [world].
+  /// Places a [shapeKind] shape centered at [world], sized to [draggedSize]
+  /// when the placement gesture was a drag rather than a tap - null keeps
+  /// the fixed default box a tap has always placed.
   Future<api.CanvasObject?> placeShape(
     Offset world,
     CanvasShapeKind shapeKind, {
+    Size? draggedSize,
     required void Function(String message) onError,
   }) => _place(
     kind: 'shape',
     world: world,
-    w: defaultShapeWidth,
-    h: defaultShapeHeight,
+    w: draggedSize?.width ?? defaultShapeWidth,
+    h: draggedSize?.height ?? defaultShapeHeight,
     props: {'shape': canvasShapeKindToWire(shapeKind)},
     onError: onError,
   );

@@ -148,7 +148,7 @@ void main() {
                   onSelectDrag: (_) {},
                   onSelectEnd: () {},
                   onNotePlace: (_) {},
-                  onShapePlace: (_) {},
+                  onShapePlace: (_, __) {},
                   shapeKind: CanvasShapeKind.rectangle,
                   onShapeKindChanged: (_) {},
                   onBringToFront: (_) {},

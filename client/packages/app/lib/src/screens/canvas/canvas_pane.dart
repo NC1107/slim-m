@@ -210,7 +210,7 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
           onSelectDrag: _onSelectDrag,
           onSelectEnd: () => unawaited(_onSelectEnd()),
           onNotePlace: (world) => unawaited(_onNotePlace(world)),
-          onShapePlace: (world) => unawaited(_onShapePlace(world)),
+          onShapePlace: (world, size) => unawaited(_onShapePlace(world, size)),
           shapeKind: _shapeKind,
           onShapeKindChanged: (kind) => setState(() => _shapeKind = kind),
           onBringToFront: (id) => unawaited(_onBringToFront(id)),

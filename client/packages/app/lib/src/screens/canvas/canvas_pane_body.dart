@@ -126,7 +126,7 @@ class CanvasPaneBody extends StatefulWidget {
   final ValueChanged<Offset> onSelectDrag;
   final VoidCallback onSelectEnd;
   final ValueChanged<Offset> onNotePlace;
-  final ValueChanged<Offset> onShapePlace;
+  final ShapePlaced onShapePlace;
 
   /// The primitive the next tap with the shape tool places, and the bar's
   /// own picker for changing it.
@@ -409,6 +409,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onSelectEnd: widget.onSelectEnd,
           onNotePlace: widget.onNotePlace,
           onShapePlace: widget.onShapePlace,
+          shapeKind: widget.shapeKind,
           cursors: widget.cursors,
           cursorColors: widget.cursorColors,
           cursorLabelFontFamily: AppFonts.sans,
