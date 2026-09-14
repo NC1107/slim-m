@@ -92,12 +92,12 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
 
     The leave-and-rejoin half checks the SFU rather than waiting for
     `L.IN_CALL` or "N in call" on screen: both strings live in
-    `CallStageLayout`, which the canvas dock replaces rather than sits
-    beside while the canvas stays open (`canvas_pane.dart`'s own doc), and
-    the canvas is left open through this on purpose so the dock's own
-    reachability - and PR #469's rejoin fix, exercised by re-clicking the
-    already-open channel - are both proven at once rather than closing the
-    canvas first to dodge the question.
+    `CallStageLayout`, and the moment of the rejoin is the voice screen,
+    not the canvas. Hanging up from the canvas dock closes the canvas with
+    the call now (the owner was left on an empty canvas otherwise, and
+    closing it by hand later rejoined the call), so both sides land on the
+    voice screen, rejoin by re-clicking the channel (PR #469's fix), and
+    reopen the canvas from the voice header before looking for the tile.
     """
     alice_id = admin_api.me()["id"]
 
@@ -138,6 +138,11 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
 
     for c in (a, b):
         c.click(L.LEAVE_CALL, settle=6)
+    for c in (a, b):
+        # The hang-up closes the canvas with the call; its own button is gone.
+        assert not c.find(L.CLOSE_CANVAS), \
+            f"{c.name}: the canvas stayed open after hanging up"
+    print("  hanging up from the canvas dock closed the canvas for both")
     time.sleep(2)
     for c in (a, b):
         c.click(L.VOICE_CHANNEL)
@@ -146,8 +151,10 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
     parts = participants_with_mics(room_id)
     assert len(parts) == 2, \
         f"SFU has {len(parts)} participants after rejoining, expected 2"
-    print("  both rejoined by re-clicking the already-open channel, "
-          "confirmed at the SFU")
+    print("  both rejoined by re-clicking the channel, confirmed at the SFU")
+    for c in (a, b):
+        c.click(L.OPEN_CANVAS)
+        c.wait_for("Canvas,")
     a.wait_for(ALICE_SELF_LABEL, timeout=30)
     b.wait_for(ALICE_REMOTE_LABEL, timeout=30)
     print("  the tile reappeared for both after leaving and rejoining "
