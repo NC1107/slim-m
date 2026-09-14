@@ -26,6 +26,57 @@ const int _outputEdge = 512;
 /// recover.
 const int _maxCaptureEdge = 4096;
 
+/// The shorter side, in pixels, of the image encoded in [bytes].
+///
+/// Tries [ui.ImageDescriptor] first, which reads it from the header without
+/// a decode. That throws `UnsupportedError` unconditionally on the web
+/// engine - not only for a picture with a genuinely unreadable header - so
+/// every web upload used to fall back to a guess instead of the source's
+/// real size, silently rastering straight to the output edge and reintroducing
+/// the soft, bilinear-stretched picture this file otherwise avoids. The
+/// fallback here decodes the picture instead of guessing: extra cost on the
+/// path that would otherwise skip it, but no cost at all against what
+/// `Image.memory` already pays to show the same bytes on screen, and no
+/// guess to be wrong about.
+///
+/// A public top-level function, rather than staying inline in the sheet's
+/// state, exists so a test can call it directly: a test running on the VM
+/// has no way to trigger the real web throw by feeding it a bad picture,
+/// since a header the VM's own decoder cannot parse cannot be displayed by
+/// the sheet either. Exercising this function alone is what lets a VM test
+/// cover the fallback that is every web caller's only path.
+@visibleForTesting
+Future<int?> sourceHeaderEdge(Uint8List bytes) async {
+  try {
+    final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+    final descriptor = await ui.ImageDescriptor.encoded(buffer);
+    final shorter = math.min(descriptor.width, descriptor.height);
+    descriptor.dispose();
+    return shorter;
+  } catch (_) {
+    return decodedSourceEdge(bytes);
+  }
+}
+
+/// [sourceHeaderEdge]'s fallback: the shorter side of an actual decode of
+/// [bytes], or null if the picture cannot be decoded at all. Exposed
+/// separately, and also `@visibleForTesting`, so a test can confirm this
+/// reaches the same real answer [sourceHeaderEdge] would from a readable
+/// header, rather than only confirming that some fallback ran.
+@visibleForTesting
+Future<int?> decodedSourceEdge(Uint8List bytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final shorter = math.min(frame.image.width, frame.image.height);
+    frame.image.dispose();
+    codec.dispose();
+    return shorter;
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Shows [bytes] in a square viewport the user can pan and zoom, and returns
 /// the cropped PNG, or null if they backed out.
 Future<Uint8List?> showAvatarCropSheet(BuildContext context, Uint8List bytes) {
@@ -115,19 +166,16 @@ class _AvatarCropSheetState extends State<_AvatarCropSheet> {
   /// is what one viewport-width of it is worth at zoom 1, bounded below by the
   /// output and above by [_maxCaptureEdge].
   ///
-  /// Read from the encoded header rather than a decode, so a picture already
-  /// smaller than the output costs nothing to ask about.
+  /// [_maxCaptureEdge] only when [sourceHeaderEdge] cannot learn the source's
+  /// real size at all (a picture nothing can decode), rather than a smaller
+  /// guess: capturing bigger than the source costs compute, sending
+  /// [_capture] through an upscale-then-minify round trip it would not
+  /// otherwise need, but capturing smaller than it costs the detail this file
+  /// exists to keep, exactly as [_outputEdge] used to on every web upload.
   Future<int> _captureEdge() async {
-    try {
-      final buffer = await ui.ImmutableBuffer.fromUint8List(widget.bytes);
-      final descriptor = await ui.ImageDescriptor.encoded(buffer);
-      final shorter = math.min(descriptor.width, descriptor.height);
-      descriptor.dispose();
-      return shorter.clamp(_outputEdge, _maxCaptureEdge);
-    } catch (_) {
-      // An unreadable header is the decoder's problem; the crop still happens.
-      return _outputEdge;
-    }
+    final shorter = await sourceHeaderEdge(widget.bytes);
+    if (shorter == null) return _maxCaptureEdge;
+    return shorter.clamp(_outputEdge, _maxCaptureEdge);
   }
 
   /// [png] resampled down to [_outputEdge] square by the image decoder, whose
