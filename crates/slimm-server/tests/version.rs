@@ -125,3 +125,51 @@ async fn version_reports_the_screen_share_ceiling_with_no_auth_required() {
     let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
     assert_eq!(body["screen_share_max_height"], MAX_SCREEN_SHARE_MAX_HEIGHT);
 }
+
+/// No floor is the ordinary case, and it has to be absent rather than null
+/// or empty: a client reads "no field" as "this server does not gate on my
+/// version", and an empty string would parse as a version nothing satisfies.
+#[tokio::test]
+async fn version_declares_no_client_floor_by_default() {
+    unsafe { std::env::remove_var("SLIMM_MIN_CLIENT_VERSION") };
+
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
+
+    assert!(
+        body.get("min_client_version").is_none(),
+        "an unset floor must not appear at all: {body}"
+    );
+}
+
+/// The one lever an operator has when an old client genuinely cannot keep
+/// working against a new server. Set per deployment, beside the build it
+/// qualifies; see decision 0025.
+#[tokio::test]
+async fn version_publishes_the_client_floor_an_operator_set() {
+    unsafe { std::env::set_var("SLIMM_MIN_CLIENT_VERSION", "0.76.0") };
+
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
+
+    assert_eq!(body["min_client_version"], "0.76.0");
+
+    unsafe { std::env::remove_var("SLIMM_MIN_CLIENT_VERSION") };
+}
+
+/// An operator who sets the variable to nothing at all means no floor, not a
+/// floor of "": a blank value is how a compose file spells "leave it off".
+#[tokio::test]
+async fn version_reads_a_blank_floor_as_no_floor() {
+    unsafe { std::env::set_var("SLIMM_MIN_CLIENT_VERSION", "   ") };
+
+    let (store, _guard) = new_store().await;
+    let body = get_version(app(store, PushSender::disabled(), GifSearch::disabled())).await;
+
+    assert!(
+        body.get("min_client_version").is_none(),
+        "blank is not a floor"
+    );
+
+    unsafe { std::env::remove_var("SLIMM_MIN_CLIENT_VERSION") };
+}

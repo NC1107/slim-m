@@ -242,6 +242,18 @@ struct Version {
     /// own capture, the same reason `invite_required` rides on `/version`
     /// rather than staying behind `/space/settings`.
     screen_share_max_height: i64,
+    /// The oldest client this deployment will keep serving, or `None` for no
+    /// floor at all, which is the default and the ordinary case.
+    ///
+    /// The wire is additive, so an old client keeps working across a server
+    /// upgrade; this is the one lever an operator has for the case where it
+    /// genuinely cannot - a client with a data-loss bug, or one that reads a
+    /// shape this server no longer sends. A client below it stops and offers
+    /// to update rather than running against a server it cannot speak to.
+    /// Being a floor rather than a nudge, it is deliberately awkward to set:
+    /// see decision 0025.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min_client_version: Option<String>,
     /// The optional features this build serves, read off the router itself.
     /// See [`capability`] for why it is not a list kept by hand.
     capabilities: Vec<&'static str>,
@@ -324,6 +336,7 @@ async fn version(
         gif_search_enabled: state.gifs.is_enabled(),
         link_previews_enabled: state.link_previews.is_enabled(),
         screen_share_max_height: state.store.screen_share_max_height().await?,
+        min_client_version: min_client_version(),
         capabilities: capabilities(state).await,
         identity: ServerIdentityDto {
             public_key: BASE64.encode(identity.public_key()),
@@ -332,6 +345,21 @@ async fn version(
             color_strip: identity.color_strip(),
         },
     }))
+}
+
+/// `SLIMM_MIN_CLIENT_VERSION`, empty read as unset.
+///
+/// Read here rather than carried on [`AppState`] from [`crate::config::Config`],
+/// unlike every other deployment setting: `AppState` is built literally at 157
+/// sites across the integration tests, and threading one immutable string
+/// through all of them buys nothing this read does not already give. It is
+/// also the one setting whose right value is a property of the build being
+/// deployed rather than of the deployment, so it belongs beside the version
+/// it qualifies.
+fn min_client_version() -> Option<String> {
+    std::env::var("SLIMM_MIN_CLIENT_VERSION")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
 }
 
 /// Minimal error so a failed liveness check returns 503 rather than panicking.

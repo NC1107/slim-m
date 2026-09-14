@@ -59,9 +59,14 @@ Two things are missing from every row: the client never learns from the server t
 
 ### The shared contract
 
-- `/version` gains `min_client_version` (semver string, nullable).
-  Null means no floor.
-  The client compares its own version with `isNewer` and, below the floor, replaces the shell with a "This version can no longer connect" screen that carries the format-aware action from 0020.
+- `/version` carries `min_client_version` (semver string, absent for no floor), set per deployment with `SLIMM_MIN_CLIENT_VERSION`.
+  Absent is the default and the ordinary case; a blank value is read as absent, because blank is how a compose file spells "off".
+  It is read where it is served rather than carried on `AppState` from `Config`, alone among deployment settings: `AppState` is built literally at 157 sites across the integration tests, and the right value for this one is a property of the build being deployed rather than of the deployment, so it belongs beside the version it qualifies.
+- The client compares its own version and, below the floor, replaces the whole app with a "This version can no longer connect" screen carrying the same install action the splash uses - so an rpm user is one polkit prompt from a working client rather than a link to a release page.
+- The comparison fails open at every step.
+  A pending request, an unreachable server, a version on either side that will not parse, and a server too old to declare a floor all render the app untouched.
+  A floor that fails closed is an app nobody can use on a bad network, which is worse than the problem it exists for.
+- Re-read on every reconnect, because that is when a server upgrade actually reaches a client that was already running: the container is replaced, every socket drops, and the reconnect is the first moment the new `/version` is visible.
 - `/version` already carries `protocol` and `capabilities`; the client keeps reading capabilities per feature (the existing handshake) rather than gating on `protocol` alone.
 - A client version is `X.Y.Z`; build metadata after `+` is ignored for comparison, as `parseVersion` already does.
 
@@ -131,7 +136,7 @@ Two things are missing from every row: the client never learns from the server t
 ## Rollout order
 
 Phase 1, before the beta (client-side, no owner secrets):
-the opt-in question at signup and at the splash, the splash install pass with the dnf path for the rpm, and the switch in Settings under About - **done**; then `min_client_version` on the server and the floor screen in the client; the web reload pill; the web image built and deployed by CI; the rollback runbook.
+the opt-in question at signup and at the splash, the splash install pass with the dnf path for the rpm, and the switch in Settings under About - **done**; and `min_client_version` on the server with the floor screen in the client - **done**; then the web reload pill; the web image built and deployed by CI; the rollback runbook.
 
 Phase 2, owner-gated by certificates:
 Sparkle/WinSparkle through `auto_updater` with an appcast; notarized macOS and signed Windows builds.

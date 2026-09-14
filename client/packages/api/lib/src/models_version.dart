@@ -30,6 +30,7 @@ class Version {
     this.screenShareMaxHeight,
     this.capabilities,
     this.identity,
+    this.minClientVersion,
   });
 
   final String name;
@@ -74,6 +75,13 @@ class Version {
   /// report it, the same "unknown" treatment [pushEnabled] gets.
   final ServerIdentity? identity;
 
+  /// The oldest client this deployment still serves, as `X.Y.Z`, or null for
+  /// no floor - which is the default, and what every server older than this
+  /// field reports by saying nothing. A client below it should stop and
+  /// offer to update rather than run against a server it cannot speak to;
+  /// see decision 0025.
+  final String? minClientVersion;
+
   /// Whether this server offers reporting and blocking at all.
   SafetyTools get safetyTools => capabilities == null
       ? SafetyTools.unknown
@@ -112,5 +120,6 @@ class Version {
         identity: json['identity'] == null
             ? null
             : ServerIdentity.fromJson(json['identity'] as Map<String, dynamic>),
+        minClientVersion: json['min_client_version'] as String?,
       );
 }

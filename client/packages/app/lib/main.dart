@@ -41,6 +41,7 @@ import 'src/providers/sync_controller.dart';
 import 'src/providers/voice_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
+import 'src/widgets/client_too_old_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/toast_overlay.dart';
 
@@ -310,7 +311,8 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
         // Above the routed tree and its dialogs and sheets, under the motion override; the call overlay paints last, above the toasts too.
         child: Stack(
           children: [
-            densityWrapped,
+            // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
+            ClientTooOldGate(child: densityWrapped),
             const Positioned.fill(child: ToastOverlay()),
             const Positioned.fill(child: IncomingCallOverlay()),
           ],
