@@ -21,6 +21,8 @@ const _pushToTalkEnabledKey = 'slimm.voice.push_to_talk_enabled';
 const _pushToTalkKeyIdKey = 'slimm.voice.push_to_talk_key_id';
 const _sensitivityKey = 'slimm.voice.activity_sensitivity';
 const _shareAudioKey = 'slimm.voice.screen_share_include_audio';
+const _audioInputDeviceIdKey = 'slimm.voice.audio_input_device_id';
+const _audioOutputDeviceIdKey = 'slimm.voice.audio_output_device_id';
 
 /// The push-to-talk key options offered in Voice settings: plain letters,
 /// so each is reachable while typing - the composer-focus guard is what
@@ -60,6 +62,18 @@ Future<bool> loadPushToTalkEnabled(Ref ref) async {
   return prefs.getBool(_pushToTalkEnabledKey) ?? false;
 }
 
+/// The persisted microphone/speaker choice, [loadCameraOnJoinPreference]'s
+/// own shape: `VoiceControllerAudioDevicesMixin.restoreAudioDevicePreferences`
+/// needs both before the first join. Null means the system default, exactly
+/// as [VoiceSettingsState.audioInputDeviceId] does.
+Future<(String?, String?)> loadAudioDevicePreferences(Ref ref) async {
+  final prefs = await ref.read(preferencesProvider.future);
+  return (
+    prefs.getString(_audioInputDeviceIdKey),
+    prefs.getString(_audioOutputDeviceIdKey),
+  );
+}
+
 /// What the voice settings screen shows and edits. Every field is a pure
 /// local device preference with no server truth, unlike
 /// [presenceVisibilityDisplayProvider]'s session-only echo, so they are
@@ -74,6 +88,8 @@ class VoiceSettingsState {
     this.pushToTalkKey = LogicalKeyboardKey.keyV,
     this.voiceActivitySensitivity = 100.0,
     this.screenShareIncludeAudio = false,
+    this.audioInputDeviceId,
+    this.audioOutputDeviceId,
   });
 
   final bool joinLeaveSoundsEnabled;
@@ -115,6 +131,14 @@ class VoiceSettingsState {
   /// honouring this value.
   final bool screenShareIncludeAudio;
 
+  /// The persisted microphone choice; null is the system default. Applied
+  /// live through `VoiceControllerAudioDevicesMixin.selectAudioInputDevice`
+  /// and, for a future join, through [VoiceSession]'s own room options.
+  final String? audioInputDeviceId;
+
+  /// [audioInputDeviceId]'s own counterpart for the speaker.
+  final String? audioOutputDeviceId;
+
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
     bool? callRingSoundEnabled,
@@ -124,6 +148,10 @@ class VoiceSettingsState {
     LogicalKeyboardKey? pushToTalkKey,
     double? voiceActivitySensitivity,
     bool? screenShareIncludeAudio,
+    String? audioInputDeviceId,
+    bool clearAudioInputDeviceId = false,
+    String? audioOutputDeviceId,
+    bool clearAudioOutputDeviceId = false,
   }) => VoiceSettingsState(
     joinLeaveSoundsEnabled:
         joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
@@ -136,6 +164,12 @@ class VoiceSettingsState {
         voiceActivitySensitivity ?? this.voiceActivitySensitivity,
     screenShareIncludeAudio:
         screenShareIncludeAudio ?? this.screenShareIncludeAudio,
+    audioInputDeviceId: clearAudioInputDeviceId
+        ? null
+        : (audioInputDeviceId ?? this.audioInputDeviceId),
+    audioOutputDeviceId: clearAudioOutputDeviceId
+        ? null
+        : (audioOutputDeviceId ?? this.audioOutputDeviceId),
   );
 }
 
@@ -163,6 +197,8 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
           .firstOrDefault(LogicalKeyboardKey.keyV),
       voiceActivitySensitivity: prefs.getDouble(_sensitivityKey) ?? 100.0,
       screenShareIncludeAudio: prefs.getBool(_shareAudioKey) ?? false,
+      audioInputDeviceId: prefs.getString(_audioInputDeviceIdKey),
+      audioOutputDeviceId: prefs.getString(_audioOutputDeviceIdKey),
     );
   }
 
@@ -188,6 +224,44 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     state = state.copyWith(screenShareIncludeAudio: enabled);
     final prefs = await _ref.read(preferencesProvider.future);
     await prefs.setBool(_shareAudioKey, enabled);
+  }
+
+  /// Persists the microphone choice and applies it live, [setCameraOnJoin]'s
+  /// own reasoning: a call may already be open this session, and the
+  /// persisted copy alone only reaches a *future* launch's
+  /// `VoiceControllerAudioDevicesMixin.restoreAudioDevicePreferences`. Null
+  /// clears back to the system default.
+  Future<void> setAudioInputDevice(AudioDevice? device) async {
+    state = state.copyWith(
+      audioInputDeviceId: device?.id,
+      clearAudioInputDeviceId: device == null,
+    );
+    final prefs = await _ref.read(preferencesProvider.future);
+    if (device == null) {
+      await prefs.remove(_audioInputDeviceIdKey);
+    } else {
+      await prefs.setString(_audioInputDeviceIdKey, device.id);
+    }
+    await _ref
+        .read(voiceControllerProvider.notifier)
+        .selectAudioInputDevice(device);
+  }
+
+  /// [setAudioInputDevice]'s counterpart for the speaker.
+  Future<void> setAudioOutputDevice(AudioDevice? device) async {
+    state = state.copyWith(
+      audioOutputDeviceId: device?.id,
+      clearAudioOutputDeviceId: device == null,
+    );
+    final prefs = await _ref.read(preferencesProvider.future);
+    if (device == null) {
+      await prefs.remove(_audioOutputDeviceIdKey);
+    } else {
+      await prefs.setString(_audioOutputDeviceIdKey, device.id);
+    }
+    await _ref
+        .read(voiceControllerProvider.notifier)
+        .selectAudioOutputDevice(device);
   }
 
   /// Persists the "join with camera on" preference and, since a call may

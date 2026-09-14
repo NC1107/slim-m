@@ -52,13 +52,59 @@ http.Client voiceTokenClient() => MockClient((request) async {
 /// Implemented rather than subclassed so a new member on the real session is
 /// a compile error here, matching `voice_controller_test.dart`'s own fake.
 class FakeSession implements VoiceSession {
-  FakeSession({this.supportsScreenShareAudio = true});
+  FakeSession({
+    this.supportsScreenShareAudio = true,
+    this.supportsAudioInputSelection = true,
+    this.supportsAudioOutputSelection = true,
+    this.audioInputDeviceList = const [],
+    this.audioOutputDeviceList = const [],
+  });
 
   @override
   bool get supportsParticipantVolume => true;
 
   @override
   final bool supportsScreenShareAudio;
+
+  @override
+  final bool supportsAudioInputSelection;
+
+  @override
+  final bool supportsAudioOutputSelection;
+
+  /// What [audioInputDevices] answers with.
+  final List<AudioDevice> audioInputDeviceList;
+
+  /// What [audioOutputDevices] answers with.
+  final List<AudioDevice> audioOutputDeviceList;
+
+  final _audioDeviceChanges = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get audioDeviceChanges => _audioDeviceChanges.stream;
+
+  @override
+  Future<List<AudioDevice>> audioInputDevices() async => audioInputDeviceList;
+
+  @override
+  Future<List<AudioDevice>> audioOutputDevices() async => audioOutputDeviceList;
+
+  /// What the controller actually passed through, so a test can assert the
+  /// chosen device reached the session rather than only the row's own label.
+  AudioDevice? lastSelectedAudioInput;
+  AudioDevice? lastSelectedAudioOutput;
+
+  @override
+  Future<bool> selectAudioInputDevice(AudioDevice? device) async {
+    lastSelectedAudioInput = device;
+    return true;
+  }
+
+  @override
+  Future<bool> selectAudioOutputDevice(AudioDevice? device) async {
+    lastSelectedAudioOutput = device;
+    return true;
+  }
 
   /// Every `includeAudio` a call to [setScreenShareEnabled] received, in
   /// order, so a test can assert the saved preference actually reached the
@@ -201,6 +247,7 @@ class FakeSession implements VoiceSession {
   Future<void> dispose() async {
     await _states.close();
     await _participants.close();
+    await _audioDeviceChanges.close();
   }
 
   void emitParticipants(List<VoiceParticipant> p) => _participants.add(p);

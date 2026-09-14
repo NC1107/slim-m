@@ -27,11 +27,15 @@ import 'voice_state.dart';
 
 export 'voice_state.dart' show VoiceState;
 
+part 'voice_controller_audio_devices.dart';
 part 'voice_controller_input.dart';
 part 'voice_controller_share.dart';
 
 class VoiceController extends StateNotifier<VoiceState>
-    with VoiceControllerInputMixin, VoiceControllerShareMixin {
+    with
+        VoiceControllerInputMixin,
+        VoiceControllerShareMixin,
+        VoiceControllerAudioDevicesMixin {
   VoiceController(
     this._ref, {
     VoiceSession? session,

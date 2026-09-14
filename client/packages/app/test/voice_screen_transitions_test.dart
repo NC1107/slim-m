@@ -110,6 +110,27 @@ class _NoopSession implements VoiceSession {
   Future<bool> selectCameraDevice(CameraDevice device) async => false;
 
   @override
+  bool get supportsAudioInputSelection => false;
+
+  @override
+  bool get supportsAudioOutputSelection => false;
+
+  @override
+  Stream<void> get audioDeviceChanges => const Stream.empty();
+
+  @override
+  Future<List<AudioDevice>> audioInputDevices() async => const [];
+
+  @override
+  Future<List<AudioDevice>> audioOutputDevices() async => const [];
+
+  @override
+  Future<bool> selectAudioInputDevice(AudioDevice? device) async => false;
+
+  @override
+  Future<bool> selectAudioOutputDevice(AudioDevice? device) async => false;
+
+  @override
   Future<void> join({
     required String url,
     required String token,

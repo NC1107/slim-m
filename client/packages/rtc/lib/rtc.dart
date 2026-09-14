@@ -7,6 +7,8 @@
 /// session without a real SFU behind it.
 library;
 
+export 'src/audio_device_switching.dart';
+export 'src/audio_devices.dart';
 export 'src/audio_gain.dart';
 export 'src/broadcast_bridge.dart';
 export 'src/camera_devices.dart';

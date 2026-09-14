@@ -123,6 +123,36 @@ extension VoiceSessionTracks on VoiceSession {
     final failure = await _audio.applyTo(room);
     if (failure != null) _lastError = failure;
   }
+
+  /// Moved here from the main class body for its 500-line hard ceiling:
+  /// private plumbing, so an extension costs it nothing an
+  /// `implements VoiceSession` fake would notice.
+  void _refreshParticipants() {
+    final room = _room;
+    if (room == null || _disposed) return;
+
+    // Reapplied on every refresh, not only on toggle, so deafening reaches a participant or track that appears afterward too.
+    unawaited(_applyLocalAudioState(room));
+    // Ahead of the unchanged-roster early return below: a subscription can change with no visible roster change at all.
+    _applyVideoInterest();
+
+    final next = snapshotParticipants(
+      room,
+      speakingSensitivity: _speakingSensitivity,
+    );
+    // Only emit on a real change: the events stream is chatty, and rebuilding the roster every time is how that janks.
+    if (listEquals(next, _participants)) return;
+    _participants = List.unmodifiable(next);
+    if (!_participantsController.isClosed) {
+      _participantsController.add(_participants);
+    }
+  }
+
+  void _setState(VoiceSessionState next) {
+    if (_state == next || _disposed) return;
+    _state = next;
+    if (!_stateController.isClosed) _stateController.add(next);
+  }
 }
 
 /// Runs one teardown step, absorbing its failure so it cannot abandon the

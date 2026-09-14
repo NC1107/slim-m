@@ -128,3 +128,22 @@ class CameraDevice {
   /// desktop backend included.
   final String? groupId;
 }
+
+/// A microphone or speaker this device offers, for the pickers in Voice
+/// settings. [CameraDevice]'s own shape: nothing outside this package
+/// should hold a `lk.MediaDevice`, audio included.
+class AudioDevice {
+  const AudioDevice({required this.id, required this.label, this.groupId});
+
+  /// Opaque to us, and the only thing a device switch matches on.
+  final String id;
+
+  /// The platform's own device label. Can arrive blank on web before
+  /// microphone permission is granted; the picker is responsible for a
+  /// readable fallback, not this value.
+  final String label;
+
+  /// The platform's own grouping of devices that share one piece of
+  /// hardware, when it reports one at all.
+  final String? groupId;
+}

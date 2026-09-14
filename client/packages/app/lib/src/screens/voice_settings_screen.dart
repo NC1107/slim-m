@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Voice call preferences: microphone level, camera-on-join, screen share
-/// quality, and join/leave sounds.
-///
-/// Input and output device pickers are deliberately absent. `slimm_rtc`'s
-/// public surface ([MediaCapabilities], [VoiceSession]) has no device
-/// enumeration or selection: it only counts microphone tracks and screen
-/// sources to answer "does this work at all", never which named device
-/// answered. Adding one here would mean either reaching past that package
-/// into `flutter_webrtc` directly (breaking the one-package rule
-/// `voice_session.dart` documents) or inventing a device list nothing
-/// backs, so this screen says so instead.
+/// quality, input/output device choice, and join/leave sounds.
 ///
 /// The state these widgets read and write lives in
 /// `providers/voice_settings_controller.dart`, split out once the
@@ -25,6 +16,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import '../providers/voice_controller.dart';
 import '../providers/voice_settings_controller.dart';
+import '../widgets/audio_device_section.dart';
 import '../widgets/camera_on_join_section.dart';
 import '../widgets/media_capability_section.dart';
 import '../widgets/settings_section_header.dart';
@@ -47,7 +39,7 @@ class VoiceSettingsBody extends StatelessWidget {
       _PushToTalkSection(),
       CameraOnJoinSection(),
       MediaCapabilitySection(),
-      _DeviceSection(),
+      AudioDeviceSection(),
       _ScreenShareSection(),
       _SoundsSection(),
     ],
@@ -191,33 +183,6 @@ class _MicrophoneSection extends ConsumerWidget {
             child: Text('Join a voice call to see your live input level here.'),
           ),
         ],
-      ],
-    );
-  }
-}
-
-/// `slimm_rtc` cannot enumerate audio devices today (confirmed by reading
-/// `media_capabilities.dart` and `voice_session.dart`: both only count
-/// tracks and sources, neither lists or selects one), so this states that
-/// plainly rather than showing a picker with nothing behind it.
-class _DeviceSection extends StatelessWidget {
-  const _DeviceSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SettingsSectionCard(
-      title: 'Input and output devices',
-      description: 'Which microphone and speaker a call uses.',
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppCallout(
-          tone: AppCalloutTone.info,
-          icon: AppIcons.headphones,
-          child: Text(
-            'Device selection is not available in this build yet. Calls '
-            "use the operating system's default microphone and speaker.",
-          ),
-        ),
       ],
     );
   }
