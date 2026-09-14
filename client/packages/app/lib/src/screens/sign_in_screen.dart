@@ -311,6 +311,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ref.read(pendingInviteProvider.notifier).state = null;
       }
       unawaited(ref.read(pushControllerProvider.notifier).register());
+      if (!mounted) return;
       await askAboutUpdatesAfterSignUp(context, ref, created: _creatingAccount);
     } on ApiException catch (e) {
       if (!mounted) return;

@@ -71,6 +71,9 @@ class _Dnf implements RpmUpdater {
 
   @override
   Future<bool> repoEnabled() async => true;
+
+  @override
+  Future<String?> installedVersion() async => '1.0.0';
 }
 
 void main() {

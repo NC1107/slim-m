@@ -52,9 +52,38 @@ class RpmUpdater {
     }
   }
 
+  /// The version rpm currently has installed, or null when it cannot say.
+  Future<String?> installedVersion() async {
+    try {
+      final result = await _run('rpm', [
+        '-q',
+        '--queryformat',
+        '%{VERSION}',
+        rpmPackage,
+      ]);
+      if (result.exitCode != 0) return null;
+      final version = '${result.stdout}'.trim();
+      return version.isEmpty ? null : version;
+    } on ProcessException {
+      return null;
+    }
+  }
+
   /// Enables the repo if needed, then upgrades the package. Each privileged
   /// step goes through `pkexec`, so the user sees the system's own prompt
   /// once per step; a refused prompt is a non-zero exit like any other.
+  ///
+  /// `--refresh` is not optional. dnf caches repository metadata, and a
+  /// cache written before the new build was published hides it completely -
+  /// measured on the owner's own box, where `check-upgrade` saw 0.73.0 while
+  /// COPR had 0.75.0 built and waiting.
+  ///
+  /// Success is the installed version actually changing, not dnf's exit
+  /// code. A release whose COPR build has not finished publishing yet is a
+  /// real and ordinary case - GitHub has the tag minutes before the rpm
+  /// exists - and `dnf upgrade -y` exits 0 having done nothing at all for
+  /// it. Reporting that as an installed update would offer a restart into
+  /// the very same build.
   Future<RpmUpdateResult> apply() async {
     if (!await repoEnabled()) {
       final enabled = await _privileged([
@@ -66,7 +95,27 @@ class RpmUpdater {
       ]);
       if (!enabled.ok) return enabled;
     }
-    return _privileged(['dnf', 'upgrade', '--refresh', '-y', rpmPackage]);
+
+    final before = await installedVersion();
+    final upgraded = await _privileged([
+      'dnf',
+      'upgrade',
+      '--refresh',
+      '-y',
+      rpmPackage,
+    ]);
+    if (!upgraded.ok) return upgraded;
+
+    final after = await installedVersion();
+    if (before != null && after != null && before == after) {
+      return RpmUpdateResult(
+        ok: false,
+        detail:
+            'dnf had nothing newer than $after to install; the package for '
+            'this release may still be building.',
+      );
+    }
+    return upgraded;
   }
 
   Future<RpmUpdateResult> _privileged(List<String> command) async {
