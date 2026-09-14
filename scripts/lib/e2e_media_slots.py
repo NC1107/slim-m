@@ -111,9 +111,7 @@ def move_converges_and_persists(a, b, admin_api, channel_id, room_id):
     print("  alice's own tile is already there for both, camera off - "
           "every call participant gets one on the canvas unconditionally")
 
-    # The pen is armed when a canvas opens, and a drag over a tile draws
-    # with it now (the owner asked to draw on attachments); moving the tile
-    # is the Move tool's job, the same as for any other object.
+    # The pen is armed on open and a drag over a tile draws with it now; moving is the Move tool's job.
     a.click(L.SELECT_TOOL)
     _drag_tile(a, ALICE_SELF_LABEL, *_DRAG_ONE)
     slot_1 = _wait_for_slot(admin_api, channel_id, alice_id)
