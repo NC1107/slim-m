@@ -250,7 +250,7 @@ void main() {
           tool: CanvasTool.note,
           onStroke: (_) {},
           onNotePlace: notes.add,
-          onShapePlace: shapes.add,
+          onShapePlace: (world, _) => shapes.add(world),
         ),
       ),
     );
@@ -287,7 +287,7 @@ void main() {
               tool: tool,
               onStroke: (_) {},
               onNotePlace: notes.add,
-              onShapePlace: shapes.add,
+              onShapePlace: (world, _) => shapes.add(world),
             ),
           ),
         );

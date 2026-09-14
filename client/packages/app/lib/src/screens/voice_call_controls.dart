@@ -81,6 +81,14 @@ class _CallControlsState extends ConsumerState<CallControls> {
   /// The same guard as [_shareRequestInFlight], for [_switchCamera].
   bool _cameraSwitchInFlight = false;
 
+  /// Whichever source [_startShare] last resolved a picker's choice to -
+  /// preselected (never silently reused) the next time the picker opens, so
+  /// report 2's "always goes back to whatever was just chosen" reads as a
+  /// highlighted default instead of nothing worth remembering at all. Reset
+  /// by nothing on purpose: it only ever changes what a fresh sheet opens
+  /// pointing at, never whether one opens.
+  String? _lastSourceId;
+
   /// The deduplicated camera count a picker platform found on mount, once
   /// [_loadCameraCount] resolves; unused on a platform that flips instead
   /// (see [_canSwitchCamera]). Null until then, which reads as "cannot
@@ -147,7 +155,10 @@ class _CallControlsState extends ConsumerState<CallControls> {
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
           icon: AppIcons.screenShare,
-          tooltip: _shareTooltip(voice),
+          tooltip: _shareTooltip(
+            voice,
+            canSwitch: widget.controller.screenShareNeedsSource,
+          ),
           active: voice.screenSharing,
           // Pending is its own look, never the active one: the lit
           // button over a share nobody could see was the whole bug.
@@ -156,6 +167,14 @@ class _CallControlsState extends ConsumerState<CallControls> {
             if (_shareRequestInFlight) return;
             unawaited(_share(context));
           },
+          // report 2's own "change source" route: only while sharing, on a platform with a source to switch between.
+          onLongPress:
+              voice.screenSharing && widget.controller.screenShareNeedsSource
+              ? () {
+                  if (_shareRequestInFlight) return;
+                  unawaited(_changeSource(context));
+                }
+              : null,
         ),
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
@@ -169,8 +188,14 @@ class _CallControlsState extends ConsumerState<CallControls> {
     );
   }
 
-  static String _shareTooltip(VoiceFlags voice) {
-    if (voice.screenSharing) return 'Stop sharing';
+  /// [canSwitch] names the long-press route while sharing: a hidden gesture
+  /// nobody is told about is not a way to change source.
+  static String _shareTooltip(VoiceFlags voice, {required bool canSwitch}) {
+    if (voice.screenSharing) {
+      return canSwitch
+          ? 'Stop sharing (hold to change source)'
+          : 'Stop sharing';
+    }
     if (voice.awaitingBroadcast) {
       return 'Waiting for you to start the broadcast. Tap to cancel.';
     }
@@ -178,14 +203,37 @@ class _CallControlsState extends ConsumerState<CallControls> {
   }
 
   Future<void> _share(BuildContext context) async {
-    final controller = widget.controller;
     final voice = widget.voice;
     // Cancelling a request that never became a broadcast goes down the same
     // path as stopping a live one, which is also what ends the recording.
+    // A live share stops here too - [_changeSource] is the long-press route
+    // to switching source instead, so this bare tap never has to guess
+    // which of the two a person meant.
     if (voice.screenSharing || voice.awaitingBroadcast) {
-      await controller.setScreenShare(false);
+      await widget.controller.setScreenShare(false);
       return;
     }
+    await _startShare(context);
+  }
+
+  /// Report 2 in the backlog channel, in the owner's own words: "after
+  /// choosing a screen share screen there is never an option to choose a
+  /// different one while in the same call" - reached by a long press (or a
+  /// right-click) on the share button while it is already active, since a
+  /// bare tap there is already spoken for by stop. Stops the running share
+  /// outright before asking for a new source, rather than trusting
+  /// [VoiceSession.setScreenShareEnabled] to hot-swap a capture already in
+  /// flight - the same two-step "stop, then start" a person switching
+  /// sources by hand would do themselves.
+  Future<void> _changeSource(BuildContext context) async {
+    if (!widget.voice.screenSharing) return;
+    await widget.controller.setScreenShare(false);
+    if (!context.mounted) return;
+    await _startShare(context);
+  }
+
+  Future<void> _startShare(BuildContext context) async {
+    final controller = widget.controller;
     setState(() => _shareRequestInFlight = true);
     try {
       // The saved ceiling and audio choice, applied directly rather than asked again.
@@ -202,11 +250,16 @@ class _CallControlsState extends ConsumerState<CallControls> {
           sourceId = sources.first.id;
         } else {
           if (!context.mounted) return;
-          final chosen = await showScreenSourceSheet(context, sources);
+          final chosen = await showScreenSourceSheet(
+            context,
+            sources,
+            selectedId: _lastSourceId,
+          );
           if (chosen == null) return;
           sourceId = chosen.id;
         }
       }
+      _lastSourceId = sourceId ?? _lastSourceId;
       await controller.setScreenShare(
         true,
         quality: quality,
@@ -274,6 +327,7 @@ class CallDockButton extends StatelessWidget {
     required this.onPressed,
     this.destructive = false,
     this.pending = false,
+    this.onLongPress,
   });
 
   final IconData icon;
@@ -288,6 +342,13 @@ class CallDockButton extends StatelessWidget {
   /// a share nobody can see.
   final bool pending;
   final VoidCallback onPressed;
+
+  /// A secondary action reached by a long press or a right-click, leaving
+  /// [onPressed] itself untouched - the share button's own "change source"
+  /// needs exactly this, without disturbing the tap-to-stop behaviour
+  /// `scripts/lib/e2e_voice.py` already drives by that same tooltip. Null
+  /// (every other caller) offers no secondary action at all.
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -322,6 +383,8 @@ class CallDockButton extends StatelessWidget {
           radius: AppRadii.control,
           builder: (context, onFocusChange) => InkWell(
             onTap: onPressed,
+            onLongPress: onLongPress,
+            onSecondaryTap: onLongPress,
             // AppFocusRing replaces this overlay; see its own doc comment.
             focusColor: Colors.transparent,
             onFocusChange: onFocusChange,

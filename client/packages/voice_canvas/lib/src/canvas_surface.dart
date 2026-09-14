@@ -23,6 +23,7 @@ import 'canvas_camera_wheel.dart';
 import 'canvas_cursors.dart';
 import 'canvas_document.dart';
 import 'canvas_painters.dart';
+import 'canvas_resize.dart' show minObjectSize;
 import 'canvas_stroke_drafts.dart';
 import 'selection_painter.dart';
 
@@ -37,6 +38,12 @@ part 'canvas_surface_gestures.dart';
 
 /// A pen stroke the surface has finished and wants committed.
 typedef StrokeCommitted = void Function(List<Offset> worldPoints);
+
+/// A shape tool's placement: the box's own centre in world coordinates,
+/// and, when the pointer actually dragged rather than merely tapped, the
+/// world-space size that drag sized it to - null for a plain tap, which
+/// keeps the caller's own default size.
+typedef ShapePlaced = void Function(Offset worldCenter, Size? draggedSize);
 
 /// This pointer moved to a world position, on every hover and drag alike.
 /// The caller decides whether and how often to relay it.
@@ -80,6 +87,7 @@ class CanvasSurface extends StatefulWidget {
     this.onSelectEnd,
     this.onNotePlace,
     this.onShapePlace,
+    this.shapeKind = CanvasShapeKind.rectangle,
     this.tool = CanvasTool.pen,
     this.strokeWidth = 3,
     this.enabled = true,
@@ -220,11 +228,19 @@ class CanvasSurface extends StatefulWidget {
   /// starting) can still cancel it - see [_resolvePendingPlacement].
   final ValueChanged<Offset>? onNotePlace;
 
-  /// Fires once for a tap while [tool] is [CanvasTool.shape] - the same
-  /// deferred single-tap placement [onNotePlace] uses, for the same reason.
-  /// Which of [CanvasShapeKind] gets placed is the caller's own state, not
-  /// this widget's: nothing here has a notion of shape kind at all.
-  final ValueChanged<Offset>? onShapePlace;
+  /// Fires once [tool] is [CanvasTool.shape] and every pointer has lifted -
+  /// a tap places at the default size, the same deferred single-tap
+  /// [onNotePlace] uses, for the same reason; a drag sizes the box itself,
+  /// live-previewed by [shapeKind] while it is under way (see
+  /// `DraftShape`'s own doc) and reported back through [ShapePlaced]'s own
+  /// `draggedSize`.
+  final ShapePlaced? onShapePlace;
+
+  /// Which of [CanvasShapeKind] the next shape placement draws and
+  /// previews - the bar's own current pick, forwarded here only so the
+  /// live drag preview draws the right primitive; committing a shape is
+  /// still entirely the caller's own job, over [onShapePlace].
+  final CanvasShapeKind shapeKind;
 
   /// False freezes the pen and leaves pan and zoom alone, which is what a
   /// timed-out member gets: they keep seeing the canvas and cannot add to it.
@@ -291,6 +307,11 @@ class _CanvasSurfaceState extends State<CanvasSurface>
     document: widget.document,
     ink: widget.ink,
     width: widget.strokeWidth,
+  );
+  final DraftShape _shapeDraft = DraftShape();
+  late final DraftShapePainter _shapeDraftPainter = DraftShapePainter(
+    draft: _shapeDraft,
+    color: widget.shapeColor ?? widget.ink,
   );
   late final RemoteDraftPainter? _remoteDraftPainter =
       widget.remoteDrafts == null
@@ -365,6 +386,7 @@ class _CanvasSurfaceState extends State<CanvasSurface>
     _glideTicker.dispose();
     _cursorGlideTick.dispose();
     _draft.dispose();
+    _shapeDraft.dispose();
     _panning.dispose();
     super.dispose();
   }
@@ -405,6 +427,8 @@ class _CanvasSurfaceState extends State<CanvasSurface>
                     RepaintBoundary(
                         child: CustomPaint(painter: remoteDraftPainter)),
                   RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
+                  RepaintBoundary(
+                      child: CustomPaint(painter: _shapeDraftPainter)),
                   if (_selectionPainter case final selectionPainter?)
                     RepaintBoundary(
                         child: CustomPaint(painter: selectionPainter)),

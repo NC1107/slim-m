@@ -48,7 +48,7 @@ Widget _pane(CanvasDocument document, {required String? error}) =>
               onSelectDrag: (_) {},
               onSelectEnd: () {},
               onNotePlace: (_) {},
-              onShapePlace: (_) {},
+              onShapePlace: (_, __) {},
               shapeKind: CanvasShapeKind.rectangle,
               onShapeKindChanged: (_) {},
               onBringToFront: (_) {},

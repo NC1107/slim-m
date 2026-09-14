@@ -44,7 +44,7 @@ Widget _pane(CanvasDocument document, {required bool loading}) => ProviderScope(
           onSelectDrag: (_) {},
           onSelectEnd: () {},
           onNotePlace: (_) {},
-          onShapePlace: (_) {},
+          onShapePlace: (_, __) {},
           shapeKind: CanvasShapeKind.rectangle,
           onShapeKindChanged: (_) {},
           onBringToFront: (_) {},
