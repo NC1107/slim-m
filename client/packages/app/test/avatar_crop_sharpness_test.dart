@@ -13,6 +13,14 @@
 /// area-averaging downscale is the best this size can do. Rastering small
 /// reached 83 to 87 percent of that; rastering at the source's own resolution
 /// and minifying afterwards reaches it.
+///
+/// The `sourceHeaderEdge` group below covers the other way this file used to
+/// end up rastering small: `ImageDescriptor.width`/`.height` throw
+/// `UnsupportedError` unconditionally on the web engine, which every avatar
+/// uploaded from the web client hit, not just a picture with a genuinely
+/// unreadable header - and confirms the fix decodes the real source edge
+/// rather than guessing one, since a guess bigger than the source reopens
+/// this same gap through an unnecessary upscale-then-minify round trip.
 library;
 
 import 'dart:typed_data';
@@ -178,4 +186,28 @@ void main() {
       );
     });
   }
+
+  group('sourceHeaderEdge', () {
+    test('reads the shorter side straight from the header', () async {
+      final png = await _ringsPng(777);
+      expect(await sourceHeaderEdge(png), 777);
+    });
+
+    // The one path every web call takes; see decodedSourceEdge's doc comment.
+    test(
+      'the decode fallback reaches the same real edge a header would',
+      () async {
+        final png = await _ringsPng(777);
+        expect(await decodedSourceEdge(png), 777);
+      },
+    );
+
+    test(
+      'a picture nothing can decode returns null rather than a guess',
+      () async {
+        final garbage = Uint8List.fromList([1, 2, 3, 4]);
+        expect(await sourceHeaderEdge(garbage), isNull);
+      },
+    );
+  });
 }
