@@ -1,0 +1,203 @@
+<!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 -->
+# Deployment sizing
+
+How much processor and memory a slim-m server needs, measured rather than estimated.
+
+Everything here comes from a capacity study run on 2026-09-15 against server 0.63.0.
+The harness is `scripts/loadtest.py`, which holds real sessions open over real websockets and reads the server's own `/metrics` across each run.
+Runs were constrained with systemd resource limits, which is how Docker expresses the same caps, so the numbers transfer to a container deployment.
+
+## The short answer
+
+There are two containers to size and they run out of different things.
+
+| Container | Give it | Carries |
+| --- | --- | --- |
+| slim-m server | 2 cores, 512 MB | up to 1024 connected people, the hard cap |
+| LiveKit | 2 cores, 512 MB | about 60 people in one voice call |
+
+Chat is bound by processor and voice by memory, so the dial to turn when either runs short is a different one.
+
+One core for the server is the single most important finding here, and it is not a matter of degree.
+At one core the server is throttled into second-scale delays while using only three quarters of the core it was given.
+Two cores is the first setting that behaves at all, rather than a capacity figure.
+
+For voice, the processor is never the constraint and raising it buys nothing.
+Memory is what decides how many people fit in a call.
+
+## Hard limits
+
+| Limit | Value | How it fails |
+| --- | --- | --- |
+| Simultaneous websocket connections | 1024 | Refused cleanly. Existing connections are unaffected. |
+| Memory per connection | 144 KB | Linear from 100 to 1024 connections. |
+| Memory at the connection limit | 166 MB | Connections cannot push the server past this, because the count cap stops them first. |
+| Delivery throughput | about 26,000 per second | Latency degrades before the processor saturates. |
+
+A "delivery" is one message arriving at one connection.
+One message sent into a channel a hundred people are watching is a hundred deliveries.
+Deliveries, not messages, are the unit that decides how much processor a deployment needs.
+
+## Processor
+
+Measured at a constant offered load of roughly 26,000 deliveries per second, varying only the quota.
+
+| Quota | Cores actually used | Median delivery | Verdict |
+| --- | --- | --- | --- |
+| 1 core | 0.75 | 1,305 ms | Unusable |
+| 1.5 cores | 0.85 | 541 ms | Poor |
+| 2 cores | 0.95 | 44 ms | Good |
+| 4 cores | 1.30 | 21 ms | Better |
+| 8 cores | 1.48 | 12 ms | Marginal gain |
+
+Two things in that table are worth understanding before choosing a number.
+
+The server never uses more than about 1.5 cores no matter how many it is offered.
+Going from four cores to eight changed throughput by 0.2 percent while halving the median delay, so past two cores you are buying responsiveness rather than capacity.
+
+At one core it used only three quarters of what it had while delivering a 1.3 second median.
+It was not short of work to do, it was being stopped: a quota is enforced by freezing the process for part of every scheduling window, so a tight quota collapses latency while average utilisation still looks comfortable.
+That is why one core is a cliff rather than a slope, and why the first table row says unusable rather than slow.
+
+## Memory
+
+Memory is generous and predictable.
+The floor is about 17 MB, each connection adds 144 KB, and the connection cap means the total can never exceed about 166 MB from connection load.
+
+A server given less than it needs is **killed by the kernel rather than degraded**.
+Holding connections at the cap, a 160 MB ceiling survived and a 144 MB ceiling was killed within a second, having accepted several hundred connections it could not afford.
+The memory admission guard added after this study refuses new connections when headroom runs short, but the reserve it keeps is part of what a deployment must budget for.
+
+| Connections | Recommended memory |
+| --- | --- |
+| 100 | 96 MB |
+| 250 | 128 MB |
+| 500 | 160 MB |
+| 1024 | 256 MB |
+
+Those figures include the 64 MB the admission guard holds back.
+
+## How many people that supports
+
+Two cores sustains about 26,000 deliveries a second.
+Spending that budget on a space of a given size gives the message rate it can carry.
+
+| People in the space | Messages a second it sustains | Which is, per person |
+| --- | --- | --- |
+| 50 | 520 | 624 a minute |
+| 100 | 260 | 156 a minute |
+| 250 | 104 | 25 a minute |
+| 500 | 52 | 6 a minute |
+| 1024 | 25 | 1.5 a minute |
+
+The last row is the one worth reading twice.
+At the connection limit, the sustained budget is about one and a half messages per person per minute, which is a plausible real chat rate rather than a comfortable margin.
+So the 1024-connection cap and the processor capacity run out at roughly the same population, which means the cap sits in about the right place rather than being arbitrary.
+
+Assumptions behind those numbers, all of which make them pessimistic:
+
+- One connection per person. Somebody with a phone and a laptop counts twice.
+- Everyone watching the same busy channel, which is the worst case for fan-out.
+- Sustained activity, not a peak. Real deployments are idle almost all of the time.
+
+Splitting people across channels helps considerably but not completely.
+Measured at the same message rate, sending into a channel only the sender could see cost 2.6 percent of a core where a public channel cost 9.4 percent.
+That is roughly a fourfold difference per connection, and the reason it is not larger is that the hub broadcasts every event to every connection, each of which evaluates whether it may see it.
+A connection that cannot see a channel still pays to work that out.
+
+## Voice
+
+Voice runs entirely through LiveKit, a separate container with its own limits, so nothing above applies to it.
+It is bound by memory where chat is bound by processor, which is why the two need separate rows rather than one combined table.
+
+Measured against LiveKit capped at two cores and 512 MB, the deployment's own configuration.
+
+| People in one call | Processor | Memory | Subscriptions |
+| --- | --- | --- | --- |
+| 5 | 1.8% of a core | 36 MB | 25 |
+| 10 | 3.2% | 59 MB | 100 |
+| 20 | 5.7% | 105 MB | 400 |
+| 40 | 10.5% | 204 MB | 1,600 |
+| 60 | 13.8% | 295 MB | 3,600 |
+| 100 | 23.8% | **511.8 MB, at the cap** | 600 of 10,000 delivered |
+
+About 4.7 MB per participant on a 13 MB floor.
+Processor is nowhere near binding: sixty people in a call used under a seventh of one core, and the two cores LiveKit is given are far more than it needs.
+
+**How it fails is worth knowing.**
+At a hundred people the container sat exactly on its memory ceiling and delivered six percent of the subscriptions: each participant received audio from six of the other ninety-nine.
+Packet loss on what did connect was zero.
+So it does not degrade audio quality, it silently stops subscribing people to each other, and a participant experiences it as joining a call and hearing almost nobody, with nothing reporting an error.
+
+On 512 MB, treat sixty as comfortable and a hundred as past the edge.
+Raising LiveKit's memory limit is the dial for larger calls, not its processor.
+
+Subscriptions grow with the square of the room but processor does not follow.
+Going from five to sixty people multiplied subscriptions by 144 and processor by only 7.5, because LiveKit forwards audio packets rather than mixing them.
+That is good news for call sizes and the reason memory binds first.
+
+### The media port range, which is not measured here
+
+The shipped compose publishes 101 UDP media ports, commented as deliberately sized for a friend group.
+These measurements reached LiveKit over its TCP fallback, so nothing here exercised that range.
+If ports are consumed per participant it binds at about the same hundred-person mark as memory, and a deployment expecting large calls should widen it and re-measure rather than trusting either number alone.
+
+## Compose presets
+
+Set these under the server service in `docker-compose.yml`.
+
+A friend group, up to about fifty people:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '2.0'
+      memory: 256M
+    reservations:
+      memory: 64M
+```
+
+A community up to the connection limit:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '2.0'
+      memory: 512M
+    reservations:
+      memory: 128M
+```
+
+Two cores appears in both because it is the first quota that behaves, not because the smaller deployment needs the capacity.
+Memory is the dial worth turning with size.
+Raising the processor limit above two buys lower latency and no extra capacity.
+
+## What is measured and what is not
+
+Measured directly, and re-measured in a second pass that reproduced every result: the connection limit, memory per connection, the memory ceiling where it is killed, latency against processor quota from a quarter core to eight, delivery throughput, and the difference visibility makes.
+
+Two identical runs differed by 23 percent at the median and 43 percent at the tail.
+Every difference reported here is far larger than that.
+Differences smaller than it are not reported as findings.
+
+Not measured, and not covered by any number above:
+
+- Video and screen share. The voice figures are audio only.
+- LiveKit's media port range, for the reason given in its own section.
+- Reconnect storms, which is how services usually fall over.
+- Sustained multi-hour runs, so slow leaks would not have appeared.
+- Attachment uploads, which have their own limit class and their own disk path.
+- Anything above 1024 connections, which the server refuses.
+
+## Reproducing this
+
+```bash
+cargo build --release --bin slimm-server
+scripts/loadtest.py --base-url http://127.0.0.1:8080 --users 100 --per-account 3 \
+  --senders 25 --messages 10 --workers 8
+```
+
+Watch the server's own processor time in the output before believing a latency number.
+When the two disagree, the harness is the one that is wrong, and during this study it was wrong four times.
