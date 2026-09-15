@@ -4,6 +4,8 @@
 library;
 
 export 'src/apns_token_channel.dart';
+export 'src/app_lock_window_channel.dart';
+export 'src/biometric_auth_channel.dart';
 export 'src/call_lifecycle_channel.dart';
 export 'src/call_notifications.dart';
 export 'src/device_push_keys.dart';

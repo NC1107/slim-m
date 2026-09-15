@@ -61,7 +61,8 @@ jobs:
           # Core Location reference, and dropping the key repeats that.
           for key in NSCameraUsageDescription NSMicrophoneUsageDescription \
                      NSPhotoLibraryUsageDescription \
-                     NSLocationWhenInUseUsageDescription; do
+                     NSLocationWhenInUseUsageDescription \
+                     NSFaceIDUsageDescription; do
             grep -q "<key>$key</key>" "$plist" || missing+=("$key")
           done
           if [ ${#missing[@]} -gt 0 ]; then
