@@ -27,10 +27,12 @@
 //! publisher on either channel.
 //!
 //! The hub also hands out connection slots, capping how many WebSockets can be
-//! open at once so a connection flood cannot exhaust the process.
+//! open at once so a connection flood cannot exhaust the process, and gates
+//! the same admission on memory headroom; see the `memory_guard` submodule's
+//! own doc comment.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
@@ -39,7 +41,10 @@ use crate::presence::PresenceTracker;
 use crate::typing::TypingTracker;
 
 mod event;
+mod memory_guard;
 pub use event::Event;
+use memory_guard::MemoryGuard;
+pub use memory_guard::{MemoryAdmissionSnapshot, MemoryReading};
 
 /// How many events the durable channel buffers per subscriber before the
 /// slowest one starts losing the oldest and receives a `Lagged` error.
@@ -81,6 +86,7 @@ pub struct Hub {
     typing: TypingTracker,
     permissions_epoch: Arc<AtomicU64>,
     idle_poll_interval: Duration,
+    memory_guard: Arc<MemoryGuard>,
 }
 
 /// Default value of [`Hub::idle_poll_interval`]: how often a live connection
@@ -224,6 +230,18 @@ impl Hub {
             typing: TypingTracker::new(),
             permissions_epoch: Arc::new(AtomicU64::new(0)),
             idle_poll_interval: IDLE_POLL_INTERVAL,
+            memory_guard: Arc::new(MemoryGuard::new()),
+        }
+    }
+
+    /// Builds a hub whose memory guard reads a caller-controlled reading
+    /// instead of the real cgroup files, so a test can flip the guard from
+    /// admitting to refusing without restarting anything or touching the
+    /// real filesystem. See `tests/memory_admission.rs`.
+    pub fn with_memory_reading(shared: Arc<Mutex<MemoryReading>>) -> Self {
+        Self {
+            memory_guard: Arc::new(MemoryGuard::with_shared_reading(shared)),
+            ..Self::new()
         }
     }
 
@@ -319,6 +337,19 @@ impl Hub {
     /// second counter, so it cannot drift from what actually gates a connect.
     pub fn connection_count(&self) -> usize {
         MAX_CONNECTIONS - self.slots.available_permits()
+    }
+
+    /// Whether the memory guard admits a new connection right now; see
+    /// `hub::memory_guard`'s own doc comment. Only gates admission - never
+    /// disturbs a connection already open.
+    pub fn admit_memory(&self) -> bool {
+        self.memory_guard.admit()
+    }
+
+    /// The memory guard's own view of the ceiling, current usage, and
+    /// refusal count, for `/metrics`.
+    pub fn memory_admission_snapshot(&self) -> MemoryAdmissionSnapshot {
+        self.memory_guard.snapshot()
     }
 
     /// The shared, cloneable presence tracker (a cheap `Arc` clone).
