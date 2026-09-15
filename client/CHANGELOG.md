@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.77.0](https://github.com/NC1107/slim-m/compare/client-v0.76.1...client-v0.77.0) (2026-09-15)
+
+
+### Features
+
+* **client:** require Face ID or a fingerprint to open slim-m ([#1195](https://github.com/NC1107/slim-m/issues/1195)) ([b4bf0da](https://github.com/NC1107/slim-m/commit/b4bf0da9fe8a04d05a258616b9562101907e4fc1))
+* **client:** three quality-of-life wins from the research sweep ([#1194](https://github.com/NC1107/slim-m/issues/1194)) ([969c716](https://github.com/NC1107/slim-m/commit/969c716ba9992c35b849b0332cd1a2bf661cbe4b))
+* show which channels are private ([#1193](https://github.com/NC1107/slim-m/issues/1193)) ([2307356](https://github.com/NC1107/slim-m/commit/230735668c7b85a83546a165d5bf32dc60aeb8ae))
+
+
+### Bug Fixes
+
+* **client:** five rail and poll defects from the owner's report ([#1190](https://github.com/NC1107/slim-m/issues/1190)) ([c9f86bc](https://github.com/NC1107/slim-m/commit/c9f86bc6f6bd04b3bb8882f9816c8050d6eb6b8b))
+* **client:** the Run button names the module it will use ([#1192](https://github.com/NC1107/slim-m/issues/1192)) ([47ba4f5](https://github.com/NC1107/slim-m/commit/47ba4f51acf0fb7af6e4dc12c222990131d9203e))
+
 ## [0.76.1](https://github.com/NC1107/slim-m/compare/client-v0.76.0...client-v0.76.1) (2026-09-14)
 
 
