@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.63.0](https://github.com/NC1107/slim-m/compare/server-v0.62.0...server-v0.63.0) (2026-09-15)
+
+
+### Features
+
+* show which channels are private ([#1193](https://github.com/NC1107/slim-m/issues/1193)) ([2307356](https://github.com/NC1107/slim-m/commit/230735668c7b85a83546a165d5bf32dc60aeb8ae))
+
 ## [0.62.0](https://github.com/NC1107/slim-m/compare/server-v0.61.0...server-v0.62.0) (2026-09-14)
 
 
