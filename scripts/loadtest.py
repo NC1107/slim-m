@@ -34,7 +34,9 @@ per deployment rather than per run.
 import argparse
 import asyncio
 import json
+import os
 import pathlib
+import subprocess
 import sys
 import time
 import urllib.error
@@ -43,9 +45,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
 
 import e2e_api  # noqa: E402
 import load_report  # noqa: E402
-import load_ws  # noqa: E402
+import load_pool  # noqa: E402
 import load_accounts  # noqa: E402
 
+_SERVER_PID = {}
 DEFAULT_PASSWORD = "loadtest-stable-password-1"
 SETTLE_SECONDS = 5.0
 
@@ -64,7 +67,45 @@ def parse_args(argv=None):
     parser.add_argument("--out", default="loadtest-result.json")
     parser.add_argument("--cache-dir", default=".",
                         help="where cached session tokens live")
+    parser.add_argument("--workers", type=int, default=4,
+                        help="processes to spread listeners across")
+    parser.add_argument("--per-account", type=int, default=1,
+                        help="sockets each account opens, to reach high "
+                             "connection counts without enrolling more")
+    parser.add_argument("--server-pid", type=int, default=None,
+                        help="local server pid, to read its processor time")
     return parser.parse_args(argv)
+
+
+def server_cpu(pid=None):
+    """Processor seconds this server has burned, or None when not local.
+
+    The one number that separates a slow server from a slow harness. A
+    server sitting at a fraction of a core cannot be the reason a delivery
+    took a hundred milliseconds, so when this disagrees with the measured
+    latency, the harness is what is being measured.
+    """
+    target = pid or _SERVER_PID.get("pid")
+    if target is None:
+        return None
+    try:
+        with open(f"/proc/{target}/stat", encoding="utf-8") as handle:
+            fields = handle.read().rsplit(")", 1)[1].split()
+        ticks = float(fields[11]) + float(fields[12])
+        return ticks / os.sysconf("SC_CLK_TCK")
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def find_server_pid():
+    """The local server process, when exactly one is running."""
+    try:
+        out = subprocess.run(["pgrep", "-x", "slimm-server"],
+                             capture_output=True, text=True, check=False)
+        pids = [int(x) for x in out.stdout.split()]
+        return pids[0] if len(pids) == 1 else None
+    except (OSError, ValueError):
+        return None
 
 
 def ws_url_for(base_url):
@@ -146,30 +187,28 @@ async def run(args):
     ws_url = ws_url_for(args.base_url)
 
     before = scrape(admin)
-    subscribers = [load_ws.Subscriber(a["username"], a["api"], ws_url)
-                   for a in accounts]
-    print(f"opening {len(subscribers)} sockets...", flush=True)
-    opened = await load_ws.connect_all(subscribers)
-    live = [s for s, ok in zip(subscribers, opened) if ok]
-    print(f"  {len(live)} of {len(subscribers)} connected", flush=True)
+    pool = load_pool.ListenerPool(accounts, args.base_url, ws_url,
+                                  args.workers, args.per_account)
+    print(f"opening {len(accounts) * args.per_account} sockets across "
+          f"{args.workers} processes...", flush=True)
+    connected, attempted = pool.start()
+    print(f"  {connected} of {attempted} connected", flush=True)
 
-    seen = {}
     sent_at = {}
-    stop = asyncio.Event()
-    listeners = [asyncio.create_task(s.listen(seen, stop)) for s in live]
-
+    cpu_before = server_cpu()
+    wall_before = time.monotonic()
     print(f"sending {args.senders * args.messages} messages into "
           f"{channel['name']!r}...", flush=True)
     send_latencies, notes = await send_phase(
         accounts, channel_id, args, sent_at)
 
     await asyncio.sleep(SETTLE_SECONDS)
-    stop.set()
-    await asyncio.gather(*listeners, return_exceptions=True)
+    cpu_used = (server_cpu() or 0) - (cpu_before or 0)
+    wall = time.monotonic() - wall_before
+    harvest = await asyncio.to_thread(pool.finish)
     after = scrape(admin)
-    await asyncio.gather(*(s.close() for s in subscribers),
-                         return_exceptions=True)
 
+    seen = harvest["seen"]
     delivery = []
     delivered_counts = []
     for message_id, origin in sent_at.items():
@@ -177,15 +216,12 @@ async def run(args):
         delivered_counts.append(len(arrivals))
         delivery.extend((t - origin) * 1000.0 for t in arrivals)
 
-    failures = list(notes)
-    for sub in subscribers:
-        if sub.failure:
-            failures.append(f"{sub.name}: {sub.failure}")
-    resyncs = sum(s.resync for s in subscribers)
+    failures = list(notes) + harvest["failures"]
+    resyncs = harvest["resyncs"]
     if resyncs:
         failures.append(f"{resyncs} subscribers were dropped and told to resync")
 
-    expected = len(live)
+    expected = connected
     fanout = {
         "expected_per_message": expected,
         "messages": len(sent_at),
@@ -202,6 +238,12 @@ async def run(args):
         "rss_end_bytes": (after or {}).get(
             "slimm_process_resident_memory_bytes"),
         "ws_connections_peak": (after or {}).get("slimm_websocket_connections"),
+        "cpu_seconds": round(cpu_used, 3) if cpu_used else None,
+        "wall_seconds": round(wall, 3),
+        "cpu_percent_of_one_core": (round(100 * cpu_used / wall, 1)
+                                    if cpu_used and wall else None),
+        "pool_in_use": (after or {}).get("slimm_db_pool_connections_in_use"),
+        "pool_max": (after or {}).get("slimm_db_pool_connections_max"),
     }
     report = load_report.build(
         "fanout-one-channel",
@@ -220,6 +262,7 @@ def main(argv=None):
     args = parse_args(argv)
     if "npc-server.top" in args.base_url:
         raise SystemExit("refusing to load test the live deployment")
+    _SERVER_PID["pid"] = args.server_pid or find_server_pid()
     asyncio.run(run(args))
     return 0
 

@@ -123,7 +123,9 @@ def render(report):
     server = report.get("server") or {}
     for key in sorted(server.get("delta", {})):
         lines.append(f"  server {key}: +{server['delta'][key]}")
-    for key in ("rss_start_bytes", "rss_end_bytes", "ws_connections_peak"):
+    for key in ("rss_start_bytes", "rss_end_bytes", "ws_connections_peak",
+                "cpu_seconds", "cpu_percent_of_one_core", "pool_in_use",
+                "pool_max"):
         if server.get(key) is not None:
             lines.append(f"  server {key}: {server[key]}")
     return "\n".join(lines)
