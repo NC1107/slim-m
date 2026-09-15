@@ -40,6 +40,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
 
@@ -111,21 +112,32 @@ def find_server_pid():
         return None
 
 
+LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
+WS_SCHEME = {"https": "wss", "http": "ws"}
+
+
 def ws_url_for(base_url):
     """The socket address for `base_url`, encrypted unless it is loopback.
 
-    A plain `ws://` is refused for anything but localhost. This harness is
-    meant to run against a server on the same machine, and an unencrypted
-    socket to anywhere else is either a mistake or a run against something
-    it has no business loading.
+    Parsed rather than string-replaced, so the scheme is derived from what
+    was given instead of assumed, and a malformed address is refused rather
+    than half-rewritten.
+
+    An unencrypted socket is allowed only to this machine. The harness is
+    meant to load a server running beside it, and cleartext to anywhere else
+    is either a mistake or a run against something it has no business
+    loading.
     """
-    if base_url.startswith("https://"):
-        return base_url.replace("https://", "wss://").rstrip("/") + "/ws"
-    host = base_url.split("//", 1)[-1].split("/", 1)[0].split(":", 1)[0]
-    if host not in ("127.0.0.1", "localhost", "::1", "[::1]"):
+    parsed = urllib.parse.urlsplit(base_url)
+    scheme = WS_SCHEME.get(parsed.scheme)
+    if scheme is None or not parsed.hostname:
+        raise SystemExit(f"cannot read {base_url!r} as an http address")
+    if scheme != "wss" and parsed.hostname not in LOOPBACK:
         raise SystemExit(
-            f"refusing an unencrypted socket to {host!r}; use https")
-    return base_url.replace("http://", "ws://").rstrip("/") + "/ws"
+            f"refusing an unencrypted socket to {parsed.hostname!r}; "
+            "use https")
+    path = parsed.path.rstrip("/") + "/ws"
+    return urllib.parse.urlunsplit((scheme, parsed.netloc, path, "", ""))
 
 
 def scrape(api):
