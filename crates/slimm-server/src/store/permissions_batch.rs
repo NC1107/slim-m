@@ -189,22 +189,23 @@ impl Store {
 
     /// [`Self::visible_channels`], paired with each channel's own full
     /// effective bitmask - what `GET /channels`'s `permissions` field is
-    /// populated from. Every row here already carries VIEW_CHANNEL by
-    /// construction (this filters on exactly that bit, and every row came
-    /// from [`Self::list_channels`] in the first place), so unlike the
-    /// dedicated per-channel route and [`Self::permissions_in_channels`]
-    /// below, there is no "channel does not exist" case a raw answer could
-    /// be confused with, and nothing here needs
-    /// [`crate::permissions::mask_unless_viewable`].
+    /// populated from - and whether `@everyone` itself lacks VIEW_CHANNEL
+    /// there, what that response's `restricted` field is populated from.
+    /// Every row here already carries VIEW_CHANNEL by construction (this
+    /// filters on exactly that bit, and every row came from
+    /// [`Self::list_channels`] in the first place), so unlike the dedicated
+    /// per-channel route and [`Self::permissions_in_channels`] below, there
+    /// is no "channel does not exist" case a raw answer could be confused
+    /// with, and nothing here needs [`crate::permissions::mask_unless_viewable`].
     pub async fn visible_channels_with_permissions(
         &self,
         user_id: UserId,
-    ) -> anyhow::Result<Vec<(super::Channel, Permissions)>> {
+    ) -> anyhow::Result<Vec<(super::Channel, Permissions, bool)>> {
         Ok(self
             .channel_permissions_all(user_id)
             .await?
             .into_iter()
-            .filter(|(_, perms)| perms.contains(Permissions::VIEW_CHANNEL))
+            .filter(|(_, perms, _)| perms.contains(Permissions::VIEW_CHANNEL))
             .collect())
     }
 
@@ -228,23 +229,32 @@ impl Store {
             .channel_permissions_all(user_id)
             .await?
             .into_iter()
-            .filter(|(_, perms)| perms.contains(needed))
-            .map(|(channel, _)| channel)
+            .filter(|(_, perms, _)| perms.contains(needed))
+            .map(|(channel, _, _)| channel)
             .collect())
     }
 
     /// The shared load-and-evaluate behind [`Self::channels_where`] and
     /// [`Self::visible_channels_with_permissions`]: every live channel's row
-    /// paired with the caller's full effective bitmask in it, unfiltered.
-    /// Both callers trim this to their own shape, so the query cost - one
-    /// `load_roles` call and one batched overwrite fetch for however many
-    /// channels exist - is paid once regardless of which is asked; this used
-    /// to be `channels_where`'s own body before a second caller needed the
-    /// bitmask itself rather than only a bool.
+    /// paired with the caller's full effective bitmask in it and whether the
+    /// channel is restricted, unfiltered. Both callers trim this to their own
+    /// shape, so the query cost - one `load_roles` call and one batched
+    /// overwrite fetch for however many channels exist - is paid once
+    /// regardless of which is asked; this used to be `channels_where`'s own
+    /// body before a second caller needed the bitmask itself rather than only
+    /// a bool.
+    ///
+    /// "Restricted" is answered from the same per-channel `everyone_overwrite`
+    /// this loop already isolates out of the shared overwrite fetch to build
+    /// the caller's own bitmask, run back through [`evaluate`] with no roles
+    /// and no member overwrite of any kind - `@everyone`'s own view of the
+    /// channel, which is the same for every caller by construction. No new
+    /// query and no new row: it is one extra CPU-only `evaluate` call per
+    /// channel already being evaluated once for the caller's own bitmask.
     async fn channel_permissions_all(
         &self,
         user_id: UserId,
-    ) -> anyhow::Result<Vec<(super::Channel, Permissions)>> {
+    ) -> anyhow::Result<Vec<(super::Channel, Permissions, bool)>> {
         let channels = self.list_channels().await?;
         if channels.is_empty() {
             return Ok(Vec::new());
@@ -317,7 +327,10 @@ impl Store {
                     member_overwrite,
                 )
                 .remove(timeout_deny);
-                (channel, perms)
+                let restricted =
+                    !evaluate(roles.everyone_perms, &[], everyone_overwrite, &[], None)
+                        .contains(Permissions::VIEW_CHANNEL);
+                (channel, perms, restricted)
             })
             .collect())
     }

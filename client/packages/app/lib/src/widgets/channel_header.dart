@@ -21,6 +21,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
 import '../routing/breakpoints.dart';
+import 'channel_kind_icon.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
@@ -40,6 +41,7 @@ class ChannelHeader extends ConsumerWidget {
     this.dmParticipantId,
     this.isPersonalSpace = false,
     this.topic,
+    this.restricted = false,
     required this.searchOpen,
     required this.onToggleSearch,
   });
@@ -66,6 +68,14 @@ class ChannelHeader extends ConsumerWidget {
 
   /// Null for no topic; the server never stores a blank one.
   final String? topic;
+
+  /// Whether `@everyone` lacks VIEW_CHANNEL here, mirroring the wire
+  /// model's own `restricted` field. False (the default) both for an
+  /// ordinary channel and for a server too old to say either way, so this
+  /// never claims a channel is private that it cannot vouch for. Never true
+  /// alongside [isDm] or [isPersonalSpace]: neither carries `@everyone`
+  /// overwrites, so the icon they already show wins.
+  final bool restricted;
   final bool searchOpen;
   final VoidCallback onToggleSearch;
 
@@ -123,9 +133,9 @@ class ChannelHeader extends ConsumerWidget {
                     else if (isDm)
                       AppAvatar(name: name, tintKey: dmParticipantId, size: 24)
                     else
-                      Icon(
-                        isVoice ? AppIcons.voice : AppIcons.hash,
-                        size: AppSizes.icon16,
+                      ChannelKindIcon(
+                        isVoice: isVoice,
+                        restricted: restricted,
                         color: tokens.textSecondary,
                       ),
                     const SizedBox(width: AppSpacing.s8),

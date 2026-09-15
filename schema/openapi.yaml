@@ -7319,6 +7319,16 @@ components:
             `openThread` and the live `channel.created`/`channel.updated`
             frames, none of which have one caller whose bitmask would be
             right to embed.
+        restricted:
+          type: boolean
+          description: >
+            True when @everyone lacks VIEW_CHANNEL here, so the channel is
+            hidden from ordinary members rather than visible to anyone in
+            the deployment. Identical for every caller, unlike
+            `permissions`. Present only on `listChannels`; absent (not
+            `false`) from a server too old to send it or from any other
+            response, which a client must treat as unknown rather than
+            assuming public.
 
     ChannelCategory:
       type: object

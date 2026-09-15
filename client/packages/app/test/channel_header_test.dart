@@ -280,6 +280,69 @@ void main() {
     expect(find.byType(AppAvatar), findsNothing);
   });
 
+  /// The lock replaces the hash exactly when `restricted` is true; a false
+  /// or, per the next case, an entirely absent value must render exactly as
+  /// an ordinary channel always has.
+  testWidgets('a restricted channel shows the lock instead of the hash', (
+    tester,
+  ) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'c1',
+              name: 'staff',
+              isVoice: false,
+              restricted: true,
+              searchOpen: false,
+              onToggleSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(AppIcons.restrictedChannel), findsOneWidget);
+    expect(find.byIcon(AppIcons.hash), findsNothing);
+  });
+
+  testWidgets(
+    'a channel with no restricted value renders exactly as it always has',
+    (tester) async {
+      final container = _containerWithPins([]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(
+              body: ChannelHeader(
+                channelId: 'c1',
+                name: 'general',
+                isVoice: false,
+                searchOpen: false,
+                onToggleSearch: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(AppIcons.hash), findsOneWidget);
+      expect(find.byIcon(AppIcons.restrictedChannel), findsNothing);
+    },
+  );
+
   /// Both of these are about how the header divides its width, so both
   /// measure what was rendered rather than the widget that arranged it. An
   /// earlier version asserted the two `Flexible` weights directly and so

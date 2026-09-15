@@ -16,6 +16,12 @@ abstract final class AppIcons {
   static const IconData settings = LucideIcons.settings300;
   static const IconData members = LucideIcons.users300;
 
+  /// A rail row or header for a channel `@everyone` cannot view, in place of
+  /// [hash]/[voice]. Shares its glyph with [permissions] and [tileLocked] -
+  /// all three read as "restricted" - but is named for this call site so a
+  /// reader never has to guess whether the choice was deliberate.
+  static const IconData restrictedChannel = LucideIcons.lock300;
+
   /// A performance settings pane: personal image cache and preview quality,
   /// or Space retention, canvas and screen-share capacity - the
   /// memory-and-speed dials either way. A gauge, distinct from [settings]'s

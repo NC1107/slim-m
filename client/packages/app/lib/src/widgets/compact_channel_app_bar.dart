@@ -20,6 +20,7 @@ import '../providers/channel_search_controller.dart';
 import '../providers/pins_controller.dart';
 import '../screens/canvas/canvas_open_button.dart';
 import '../screens/dm_call_button.dart';
+import 'channel_kind_icon.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
 
@@ -73,6 +74,7 @@ class CompactChannelAppBar extends ConsumerWidget
         name: channel?.name ?? '',
         topic: channel?.topic,
         isVoice: isVoice,
+        restricted: channel?.restricted ?? false,
       ),
       // A voice channel has neither a message to find nor a message to pin,
       // so those two would be controls that cannot do anything.
@@ -97,11 +99,16 @@ class _Title extends StatelessWidget {
     required this.name,
     required this.topic,
     required this.isVoice,
+    this.restricted = false,
   });
 
   final String name;
   final String? topic;
   final bool isVoice;
+
+  /// See `ChannelHeader.restricted`'s own doc comment; this bar is that
+  /// header's compact-width equivalent for the same channel.
+  final bool restricted;
 
   @override
   Widget build(BuildContext context) {
@@ -114,9 +121,9 @@ class _Title extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isVoice ? AppIcons.voice : AppIcons.hash,
-              size: AppSizes.icon16,
+            ChannelKindIcon(
+              isVoice: isVoice,
+              restricted: restricted,
               color: tokens.textSecondary,
             ),
             const SizedBox(width: AppSpacing.s8),

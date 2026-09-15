@@ -17,6 +17,7 @@ class Channel {
     this.categoryId,
     this.permissions,
     this.slowModeSeconds = 0,
+    this.restricted,
   });
 
   final String id;
@@ -80,6 +81,13 @@ class Channel {
   /// server too old to send this field reads as) means off.
   final int slowModeSeconds;
 
+  /// Whether `@everyone` lacks VIEW_CHANNEL here, so the channel is hidden
+  /// from ordinary members. Identical for every caller, unlike
+  /// [permissions]. Null on a server too old to send it, which reads the
+  /// same as false - a client with nothing to say about a channel's
+  /// visibility must never claim it is public.
+  final bool? restricted;
+
   bool get isVoice => kind == 'voice';
 
   bool get slowModeEnabled => slowModeSeconds > 0;
@@ -99,6 +107,7 @@ class Channel {
         categoryId: json['category_id'] as String?,
         permissions: json['permissions'] as int?,
         slowModeSeconds: json['slow_mode_seconds'] as int? ?? 0,
+        restricted: json['restricted'] as bool?,
       );
 }
 
