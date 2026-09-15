@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.65.0](https://github.com/NC1107/slim-m/compare/server-v0.64.0...server-v0.65.0) (2026-09-15)
+
+
+### Miscellaneous Chores
+
+* **server:** Synchronize server versions
+
 ## [0.64.0](https://github.com/NC1107/slim-m/compare/server-v0.63.0...server-v0.64.0) (2026-09-15)
 
 
