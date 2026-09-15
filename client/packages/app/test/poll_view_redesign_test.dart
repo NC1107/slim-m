@@ -60,30 +60,25 @@ void main() {
       expect(label.style!.fontWeight, AppWeights.semi);
     });
 
-    testWidgets(
-      "carries a fill with more visual weight than an ordinary option's, "
-      'not the identical grey a plain bar gets',
-      (tester) async {
-        await tester.pumpWidget(_app(_poll(votes: const [1, 3])));
+    /// The leading option used to take `textSecondary` as its fill so it
+    /// read heavier than an ordinary bar. Two things were wrong with it.
+    /// The label sits on top of the bar, and at dark #A7AEB6 under
+    /// `textPrimary` #ECEDEF that is about 1.8:1 - the heavier bar cost the
+    /// label its legibility. And there is no neutral both stronger than
+    /// `borderStrong` and still legible under the label, so the weight had
+    /// nowhere to go. The glyph and the semibold label already carry
+    /// "leading" without colour, which is what this asserts instead.
+    testWidgets('is carried by its glyph and weight, not by a heavier bar', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_app(_poll(votes: const [1, 3])));
 
-        final leading = _fillLayers(
-          tester,
-          'Option 1',
-        ).map((c) => c.color).toSet();
-        final ordinary = _fillLayers(
-          tester,
-          'Option 0',
-        ).map((c) => c.color).toSet();
-        expect(
-          leading.difference(ordinary),
-          contains(AppTokens.light.textSecondary),
-          reason:
-              'the leading bar reuses textSecondary as a fill so it reads '
-              'heavier than an ordinary option within the neutral ramp, '
-              'never the accent, which is reserved for "this concerns you"',
-        );
-      },
-    );
+      final leading = _fillLayers(tester, 'Option 1').map((c) => c.color);
+      final ordinary = _fillLayers(tester, 'Option 0').map((c) => c.color);
+
+      expect(leading.toSet(), ordinary.toSet());
+      expect(find.byIcon(AppIcons.pollLeading), findsOneWidget);
+    });
 
     testWidgets('is never marked on a tie for first place', (tester) async {
       await tester.pumpWidget(_app(_poll(votes: const [2, 2])));

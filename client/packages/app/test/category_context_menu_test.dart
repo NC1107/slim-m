@@ -80,7 +80,7 @@ Future<void> _pump(WidgetTester tester, {required bool canManage}) async {
 
 /// Opens the header's context menu the way a desktop right-click does.
 Future<void> _openMenu(WidgetTester tester) async {
-  await tester.tap(find.text('LOUNGE'), buttons: kSecondaryButton);
+  await tester.tap(find.text('Lounge'), buttons: kSecondaryButton);
   await tester.pumpAndSettle();
 }
 

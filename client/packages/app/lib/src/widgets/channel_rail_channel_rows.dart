@@ -38,6 +38,7 @@ class ManagedChannelRow extends StatefulWidget {
     this.dragHandleIndex,
     required this.channel,
     required this.row,
+    this.onRemoveFromCategory,
   });
 
   final bool canManage;
@@ -61,6 +62,11 @@ class ManagedChannelRow extends StatefulWidget {
   /// itself decides where to put it (`AppListRow.trailingExtra`, alongside
   /// whatever [AppListRow.trailing] or the unread dot already occupies).
   final Widget Function(Widget? kebab) row;
+
+  /// Moves this channel out of its category, or null when it is not in one.
+  /// Supplied by the rail, which is what holds the whole arrangement the
+  /// reorder route wants; see `channel_rail_sections.dart`.
+  final VoidCallback? onRemoveFromCategory;
 
   @override
   State<ManagedChannelRow> createState() => _ManagedChannelRowState();
@@ -86,6 +92,7 @@ class _ManagedChannelRowState extends State<ManagedChannelRow> {
         close,
         widget.channel,
         widget.canManage,
+        onRemoveFromCategory: widget.onRemoveFromCategory,
       );
 
   @override

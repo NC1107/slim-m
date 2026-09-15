@@ -142,16 +142,25 @@ String _footerText(api.Poll poll) {
   return '$count vote${count == 1 ? '' : 's'}';
 }
 
-/// The fill under an option's own label. [tokens.textSecondary], reused
-/// here as a fill rather than its usual text role, gives a leading bar more
-/// visual weight within the neutral ramp alone - no new colour, and the
-/// accent still spent nowhere near "winning". Selection wins when both are
-/// true: accentSoft already carries "this is yours" on its own.
-Color _fillColor(AppTokens tokens, bool selected, bool leading) {
-  if (selected) return tokens.accentSoft;
-  if (leading) return tokens.textSecondary;
-  return tokens.borderStrong;
-}
+/// The fill under an option's own label: one colour for every option,
+/// because the bar's job is the share and the share is already the width.
+///
+/// It used to vary - `accentSoft` for your own vote, `textSecondary` for the
+/// leading one - and both readings were wrong against the track they sit on.
+/// The track is [AppTokens.borderSubtle], and `accentSoft` is *darker* than
+/// it in both themes (dark #1D2B33 on #2E333A, light #DAE9F2 on #DCE0E5), so
+/// the option you voted for rendered as a recess while the one you did not
+/// rendered as a bar. The owner reported exactly that, on a 50/50 poll where
+/// two identical shares drew two different colours.
+///
+/// `textSecondary` had its own problem: at dark #A7AEB6 under
+/// [AppTokens.textPrimary] the label on top of a leading bar fell to roughly
+/// 1.8:1.
+///
+/// Neither state loses anything by this. "Yours" is the checkmark beside the
+/// label, "leading" is its own glyph beside the percentage, and both already
+/// carry a semibold label - none of it was ever colour alone.
+Color _fillColor(AppTokens tokens) => tokens.borderStrong;
 
 /// One option: a full-height track, the fill bar over it, and the label and
 /// percentage on top.
@@ -252,9 +261,7 @@ class _PollOptionRowState extends State<_PollOptionRow> {
                   Positioned.fill(child: Container(color: tokens.borderSubtle)),
                   FractionallySizedBox(
                     widthFactor: fraction.clamp(0, 1),
-                    child: Container(
-                      color: _fillColor(tokens, selected, leading),
-                    ),
+                    child: Container(color: _fillColor(tokens)),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(

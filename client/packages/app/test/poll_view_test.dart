@@ -148,19 +148,33 @@ void main() {
       },
     );
 
+    /// This used to assert `accentSoft`, and that was wrong against the
+    /// track it sits on: the track is `borderSubtle`, and `accentSoft` is
+    /// darker than it in both themes (light #DAE9F2 on #DCE0E5, dark
+    /// #1D2B33 on #2E333A). The option you voted for rendered as a recess
+    /// while the one you did not rendered as a bar, which the owner
+    /// reported on a 50/50 poll: two identical shares, two different
+    /// colours, and their own vote the less visible of the two.
     testWidgets(
-      "the voted option's fill is the soft accent tint, one of the seven "
-      'closed accent roles, not the plain neutral an ordinary option gets',
+      'the voted option gets the same fill as any other, because the bar '
+      'is the share and the check is the vote',
       (tester) async {
         await tester.pumpWidget(_app(_poll(votedOption: 1)));
 
-        final layers = _fillLayers(tester, 'Option 1');
+        final voted = _fillLayers(tester, 'Option 1').map((c) => c.color);
+        final ordinary = _fillLayers(tester, 'Option 0').map((c) => c.color);
+
         expect(
-          layers.map((c) => c.color),
+          voted,
           containsAll(<Color>[
             AppTokens.light.borderSubtle,
-            AppTokens.light.accentSoft,
+            AppTokens.light.borderStrong,
           ]),
+        );
+        expect(
+          voted.toSet(),
+          ordinary.toSet(),
+          reason: 'two equal shares must never draw two different colours',
         );
       },
     );

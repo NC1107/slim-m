@@ -6,8 +6,10 @@
 /// `channel_management_harness.dart`.
 library;
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:slimm_api/api.dart' show ChannelOrderGroup;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_app/src/widgets/channel_rail.dart' show channelIdInPath;
 import 'package:slimm_app/src/widgets/channel_rail_sections.dart';
@@ -52,7 +54,7 @@ void main() {
         ),
       );
 
-      expect(find.text('TEXT'), findsOneWidget);
+      expect(find.text('Text'), findsOneWidget);
     });
 
     testWidgets('an empty category is hidden from a member: migration 0031 '
@@ -74,8 +76,200 @@ void main() {
       );
 
       expect(find.text('CHANNELS'), findsOneWidget);
-      expect(find.text('TEXT'), findsNothing);
-      expect(find.text('VOICE'), findsNothing);
+      expect(find.text('Text'), findsNothing);
+      expect(find.text('Voice'), findsNothing);
+    });
+
+    /// The owner: "the default category doesn't need to exist, either allow
+    /// it to be deleted or remove it entirely". It cannot be deleted - it is
+    /// the id-less bucket every uncategorised channel falls into, not a row
+    /// in any table - so it earns its header only while it holds something.
+    testWidgets('the implicit section is gone once every channel is filed, '
+        'for a manager too', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          ChannelCategorySections(
+            channels: [channel('c1', 'general', categoryId: 'cat-1')],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'Text', position: 0),
+            ],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      expect(find.text('CHANNELS'), findsNothing);
+      expect(find.text('Text'), findsOneWidget);
+    });
+
+    /// A name is the user's. They typed "dev" in the categories screen, it
+    /// read back "dev" there, and the rail shouted "DEV" - the owner called
+    /// out the mismatch. The uppercase treatment stays on this app's own
+    /// wording, where it is a style rather than an edit of someone's data.
+    testWidgets('a category keeps the case it was typed in, while the app\'s '
+        'own labels keep the uppercase treatment', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          ChannelCategorySections(
+            channels: [
+              channel('c1', 'general'),
+              channel('c2', 'chat', categoryId: 'cat-1'),
+            ],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'dev', position: 0),
+            ],
+            selectedId: null,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      expect(find.text('dev'), findsOneWidget);
+      expect(find.text('DEV'), findsNothing);
+      expect(find.text('CHANNELS'), findsOneWidget);
+    });
+
+    /// The owner: the channels "look like they are floating and the
+    /// categories are line splits". They shared a left edge with their own
+    /// header, so nothing said which rows belonged to which heading. Every
+    /// channel hangs off its header now, the implicit section included, so
+    /// the rail has one channel indent rather than one per section kind.
+    testWidgets('a channel hangs off its header rather than sharing its left '
+        'edge', (tester) async {
+      // Left-aligned and bounded: the harness centres what it is given, and
+      // a header is only as wide as its own word, so an unconstrained
+      // comparison measures the centring rather than the indent.
+      await tester.pumpWidget(
+        harness(
+          Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 280,
+              child: ChannelCategorySections(
+                channels: [
+                  channel('c1', 'loose'),
+                  channel('c2', 'filed', categoryId: 'cat-1'),
+                ],
+                categories: const [
+                  ChannelCategoryRow(id: 'cat-1', name: 'dev', position: 0),
+                ],
+                selectedId: null,
+                onReorder: (_) {},
+              ),
+            ),
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      final headerLeft = tester.getTopLeft(find.text('dev')).dx;
+      final filedLeft = tester.getTopLeft(find.text('filed')).dx;
+      final looseLeft = tester.getTopLeft(find.text('loose')).dx;
+
+      expect(filedLeft, greaterThan(headerLeft));
+      expect(
+        looseLeft,
+        filedLeft,
+        reason: 'one indent for every channel, whatever section it is in',
+      );
+    });
+
+    /// Found while measuring the indent above. A Column centres by default
+    /// and a header is only as wide as its own word, so without the add
+    /// glyph beside it to stretch the row, every heading sat centred in the
+    /// rail. Only a manager sees that glyph, so only a manager ever saw the
+    /// headings line up with anything.
+    testWidgets('a heading starts at the left edge for a member too, not '
+        'centred in the rail', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 280,
+              child: ChannelCategorySections(
+                channels: [channel('c1', 'chat', categoryId: 'cat-1')],
+                categories: const [
+                  ChannelCategoryRow(id: 'cat-1', name: 'dev', position: 0),
+                ],
+                selectedId: null,
+                onReorder: (_) {},
+              ),
+            ),
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      expect(
+        tester.getTopLeft(find.text('dev')).dx,
+        lessThan(40),
+        reason: 'a centred heading is what made the rail read as adrift',
+      );
+    });
+
+    /// The capability the hidden section would otherwise have taken with it:
+    /// dragging onto "Channels" was the only way out of a category, and that
+    /// section is not drawn once every channel is filed. A menu action is a
+    /// better route than a drag anyway.
+    testWidgets('a manager can take a channel out of its category from the '
+        'row menu', (tester) async {
+      List<ChannelOrderGroup>? reported;
+      await tester.pumpWidget(
+        harness(
+          ChannelCategorySections(
+            channels: [
+              channel('c1', 'chat', categoryId: 'cat-1'),
+              channel('c2', 'notes', categoryId: 'cat-1'),
+            ],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'dev', position: 0),
+            ],
+            selectedId: null,
+            canManage: true,
+            onReorder: (groups) => reported = groups,
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Manage chat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove from category'));
+      await tester.pumpAndSettle();
+
+      expect(reported, isNotNull);
+      expect(reported!.firstWhere((g) => g.categoryId == null).channelIds, [
+        'c1',
+      ]);
+      expect(reported!.firstWhere((g) => g.categoryId == 'cat-1').channelIds, [
+        'c2',
+      ], reason: 'only the one channel moves; the rest of the category stays');
+    });
+
+    testWidgets('a channel already outside every category is offered no such '
+        'action', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          ChannelCategorySections(
+            channels: [channel('c1', 'loose')],
+            categories: const [],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+          handler: (_) => http.Response('{}', 200),
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Manage loose'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remove from category'), findsNothing);
     });
 
     testWidgets('a manager keeps the empty category, as a drop target', (
@@ -96,7 +290,7 @@ void main() {
         ),
       );
 
-      expect(find.text('TEXT'), findsOneWidget);
+      expect(find.text('Text'), findsOneWidget);
     });
   });
 

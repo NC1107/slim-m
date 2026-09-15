@@ -48,8 +48,9 @@ List<Widget> channelRowMenuItems(
   BuildContext context,
   VoidCallback close,
   Channel channel,
-  bool canManage,
-) {
+  bool canManage, {
+  VoidCallback? onRemoveFromCategory,
+}) {
   final container = ProviderScope.containerOf(context, listen: false);
   final current = container
       .read(channelNotificationOverridesProvider)
@@ -99,6 +100,18 @@ List<Widget> channelRowMenuItems(
       selected: current == api.NotificationPreference.mentions,
       onTap: () => toggle(api.NotificationPreference.mentions),
     ),
+    if (canManage && onRemoveFromCategory != null) ...[
+      const AppMenuDivider(),
+      // Dragging onto the implicit "Channels" section was the only way out, and it is not drawn once empty.
+      AppMenuItem(
+        label: 'Remove from category',
+        leading: AppIcons.dismiss,
+        onTap: () {
+          close();
+          onRemoveFromCategory();
+        },
+      ),
+    ],
     if (canManage || canManageRoles) ...[
       const AppMenuDivider(),
       AppMenuItem(

@@ -199,7 +199,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      find.text('ANNOUNCEMENTS'),
+      find.text('Announcements'),
       findsOneWidget,
       reason: 'a manager sees every category, empty or not, while live',
     );
@@ -215,7 +215,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('ANNOUNCEMENTS'),
+      find.text('Announcements'),
       findsOneWidget,
       reason:
           'a failed /me refetch on remount is not evidence this member '
@@ -234,7 +234,7 @@ void main() {
       _harness(setup.container, const _RailCategory(_readMeDirect)),
     );
     await tester.pumpAndSettle();
-    expect(find.text('ANNOUNCEMENTS'), findsOneWidget);
+    expect(find.text('Announcements'), findsOneWidget);
 
     await tester.pumpWidget(_harness(setup.container, const SizedBox()));
     await tester.pumpAndSettle();
@@ -246,7 +246,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('ANNOUNCEMENTS'),
+      find.text('Announcements'),
       findsNothing,
       reason:
           'kept here so the why survives: with nothing permanent watching '
@@ -327,7 +327,7 @@ void main() {
       findsOneWidget,
       reason: 'the dot honestly reporting the drop is correct, not a bug',
     );
-    expect(find.text('ANNOUNCEMENTS'), findsOneWidget);
+    expect(find.text('Announcements'), findsOneWidget);
     expect(find.text('@ada'), findsOneWidget);
   });
 }

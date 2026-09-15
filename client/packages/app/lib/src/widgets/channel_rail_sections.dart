@@ -26,7 +26,7 @@ import 'dm_row.dart';
 import 'personal_space_row.dart';
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text, {this.trailing});
+  const _SectionLabel(this.text, {this.trailing, this.chrome = true});
 
   final String text;
 
@@ -34,6 +34,16 @@ class _SectionLabel extends StatelessWidget {
   /// on the right edge `ChannelRow`'s kebab shares; both are
   /// [AppIconButtonSize.sm].
   final Widget? trailing;
+
+  /// Whether [text] is this app's own wording rather than something someone
+  /// typed. Chrome takes the uppercase treatment; a category name does not.
+  ///
+  /// The owner named the mismatch: they typed "dev" and "General", the
+  /// categories screen showed them back exactly that way, and the rail
+  /// showed "DEV" and "GENERAL". A name is the user's, and showing it in a
+  /// case they did not choose is the app overruling them about their own
+  /// data. The treatment stays where the words are ours.
+  final bool chrome;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +57,8 @@ class _SectionLabel extends StatelessWidget {
       label: text,
       child: ExcludeSemantics(
         child: Text(
-          text.toUpperCase(),
+          chrome ? text.toUpperCase() : text,
+          overflow: TextOverflow.ellipsis,
           style: AppText.label.copyWith(color: tokens.textSecondary),
         ),
       ),
@@ -214,28 +225,41 @@ class ChannelCategorySections extends ConsumerWidget {
         for (final category in categories)
           (category, byCategory[category.id] ?? const []),
       ])
-        if (canManage || section.$2.isNotEmpty) section,
+        // A named category stays visible while empty (rename, delete, drop target); the implicit one is a header over nothing.
+        if (section.$1 == null
+            ? section.$2.isNotEmpty
+            : canManage || section.$2.isNotEmpty)
+          section,
     ];
 
+    // Every channel hangs off its header rather than sharing its left edge, which is what read as floating rows between dividers.
     Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) =>
-        SelectionMarkerTarget(
-          selected: channel.id == selectedId,
-          child: ManagedChannelRow(
-            canManage: canManage,
-            reorderable: longPressDrags,
-            dragHandleIndex: dragHandleIndex,
-            channel: channel,
-            row: (kebab) => channel.kind == 'voice'
-                ? VoiceChannelRow(
-                    channel: channel,
-                    selected: channel.id == selectedId,
-                    trailingExtra: kebab,
-                  )
-                : _TextChannelRow(
-                    channel: channel,
-                    selected: channel.id == selectedId,
-                    trailingExtra: kebab,
-                  ),
+        Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.s8),
+          child: SelectionMarkerTarget(
+            selected: channel.id == selectedId,
+            child: ManagedChannelRow(
+              canManage: canManage,
+              onRemoveFromCategory: channel.categoryId == null
+                  ? null
+                  : () => onReorder(
+                      channelsWithoutCategory(channel, byCategory, categories),
+                    ),
+              reorderable: longPressDrags,
+              dragHandleIndex: dragHandleIndex,
+              channel: channel,
+              row: (kebab) => channel.kind == 'voice'
+                  ? VoiceChannelRow(
+                      channel: channel,
+                      selected: channel.id == selectedId,
+                      trailingExtra: kebab,
+                    )
+                  : _TextChannelRow(
+                      channel: channel,
+                      selected: channel.id == selectedId,
+                      trailingExtra: kebab,
+                    ),
+            ),
           ),
         );
 
@@ -247,7 +271,11 @@ class ChannelCategorySections extends ConsumerWidget {
               categoryId: category?.id,
               categoryName: category?.name ?? 'Channels',
             );
-      final label = _SectionLabel(category?.name ?? 'Channels', trailing: add);
+      final label = _SectionLabel(
+        category?.name ?? 'Channels',
+        trailing: add,
+        chrome: category == null,
+      );
       // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
       if (category == null || !canManage) return label;
       // Both verbs directly: deleting used to be a menu, a sheet, a danger zone and a confirmation.
@@ -325,4 +353,29 @@ class _TextChannelRow extends ConsumerWidget {
       onTap: () => context.go(Routes.channel(channel.id)),
     );
   }
+}
+
+/// The whole rail's arrangement with [moved] taken out of whatever category
+/// it is in and put back among the uncategorised.
+///
+/// The reorder route takes the entire arrangement rather than one move, so a
+/// menu action has to rebuild it the same way a finished drag does.
+@visibleForTesting
+List<ChannelOrderGroup> channelsWithoutCategory(
+  Channel moved,
+  Map<String?, List<Channel>> byCategory,
+  List<ChannelCategoryRow> categories,
+) {
+  List<String> idsIn(String? categoryId) => [
+    for (final channel in byCategory[categoryId] ?? const <Channel>[])
+      if (channel.id != moved.id) channel.id,
+  ];
+  return [
+    ChannelOrderGroup(categoryId: null, channelIds: [...idsIn(null), moved.id]),
+    for (final category in categories)
+      ChannelOrderGroup(
+        categoryId: category.id,
+        channelIds: idsIn(category.id),
+      ),
+  ];
 }
