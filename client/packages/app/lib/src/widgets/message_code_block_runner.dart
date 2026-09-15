@@ -135,7 +135,11 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
           collapseAfterLines: _collapseAfterLines,
           action: runner == null
               ? null
-              : _RunAction(running: _running, onPressed: () => _run(runner)),
+              : _RunAction(
+                  running: _running,
+                  runner: runner,
+                  onPressed: () => _run(runner),
+                ),
         ),
         if (actionError != null) ...[
           const SizedBox(height: AppSpacing.s4),
@@ -168,11 +172,29 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
 /// The header's action slot while idle, or a spinner while a run is in
 /// flight - never both, and never a second tap mid-flight since the icon
 /// button itself is gone until [running] clears.
+///
+/// Names the module it will hand the block to, because a runner that
+/// declares no language is a wildcard and claims *every* fenced block (see
+/// `matchCodeBlockRunner`). The owner fenced a block as `python`, pressed
+/// the Run this app offered, and got `ReferenceError: print is not defined`
+/// back from a JavaScript engine. Nothing before the press said which
+/// runtime was about to see it. Saying so is not the whole answer - a
+/// module that only runs one language should declare it, which is the
+/// module's own manifest rather than this app's business - but it is the
+/// half this app owns.
 class _RunAction extends StatelessWidget {
-  const _RunAction({required this.running, required this.onPressed});
+  const _RunAction({
+    required this.running,
+    required this.runner,
+    required this.onPressed,
+  });
 
   final bool running;
+  final api.CodeBlockRunner runner;
   final VoidCallback onPressed;
+
+  /// "Run with code-exec" rather than a bare "Run code".
+  String get _label => 'Run with ${runner.moduleId}';
 
   @override
   Widget build(BuildContext context) => running
@@ -183,7 +205,8 @@ class _RunAction extends StatelessWidget {
         )
       : AppIconButton(
           icon: AppIcons.runCode,
-          semanticLabel: 'Run code',
+          semanticLabel: _label,
+          tooltip: _label,
           size: AppIconButtonSize.sm,
           onPressed: onPressed,
         );

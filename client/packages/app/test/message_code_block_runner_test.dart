@@ -28,14 +28,13 @@ const _tokens = api.TokenPair(
   accessExpiresAt: 0,
 );
 
-const _fenced = '```js\nconsole.log(1)\n```';
-
 Future<void> _pump(
   WidgetTester tester, {
   required List<api.CodeBlockRunner> runners,
   http.Response Function(http.Request)? onRunRequest,
   String? messageId,
   Stream<api.ServerEvent>? events,
+  String language = 'js',
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -66,7 +65,7 @@ Future<void> _pump(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: Scaffold(
           body: MessageBody(
-            content: _fenced,
+            content: '```$language\nconsole.log(1)\n```',
             knownUsernames: const {},
             messageId: messageId,
           ),
@@ -90,7 +89,7 @@ void main() {
   ) async {
     await _pump(tester, runners: const []);
 
-    expect(find.bySemanticsLabel('Run code'), findsNothing);
+    expect(find.bySemanticsLabel('Run with code-exec'), findsNothing);
   });
 
   testWidgets('a runner being available shows the Run affordance', (
@@ -103,7 +102,7 @@ void main() {
       ],
     );
 
-    expect(find.bySemanticsLabel('Run code'), findsOneWidget);
+    expect(find.bySemanticsLabel('Run with code-exec'), findsOneWidget);
   });
 
   testWidgets(
@@ -123,7 +122,7 @@ void main() {
         },
       );
 
-      await tester.tap(find.bySemanticsLabel('Run code'));
+      await tester.tap(find.bySemanticsLabel('Run with code-exec'));
       await tester.pumpAndSettle();
 
       expect(jsonDecode(sentBody!)['input'], 'console.log(1)');
@@ -144,7 +143,7 @@ void main() {
             _jsonResponse({'ok': false, 'error': 'syntax error'}),
       );
 
-      await tester.tap(find.bySemanticsLabel('Run code'));
+      await tester.tap(find.bySemanticsLabel('Run with code-exec'));
       await tester.pumpAndSettle();
 
       expect(find.text('Error'), findsOneWidget);
@@ -166,7 +165,7 @@ void main() {
             _jsonResponse({'error': 'module is not enabled'}, 409),
       );
 
-      await tester.tap(find.bySemanticsLabel('Run code'));
+      await tester.tap(find.bySemanticsLabel('Run with code-exec'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AppErrorState), findsOneWidget);
@@ -191,11 +190,11 @@ void main() {
       },
     );
 
-    await tester.tap(find.bySemanticsLabel('Run code'));
+    await tester.tap(find.bySemanticsLabel('Run with code-exec'));
     await tester.pumpAndSettle();
     expect(find.text('run 1'), findsOneWidget);
 
-    await tester.tap(find.bySemanticsLabel('Run code'));
+    await tester.tap(find.bySemanticsLabel('Run with code-exec'));
     await tester.pumpAndSettle();
     expect(find.text('run 1'), findsNothing);
     expect(find.text('run 2'), findsOneWidget);
@@ -216,7 +215,7 @@ void main() {
         ],
       );
 
-      expect(find.bySemanticsLabel('Run code'), findsNothing);
+      expect(find.bySemanticsLabel('Run with code-exec'), findsNothing);
     },
   );
 
@@ -235,9 +234,33 @@ void main() {
         ],
       );
 
-      expect(find.bySemanticsLabel('Run code'), findsOneWidget);
+      expect(find.bySemanticsLabel('Run with code-exec'), findsOneWidget);
     },
   );
+
+  /// The owner fenced a block as `python`, pressed Run, and got
+  /// `ReferenceError: print is not defined` back from a JavaScript engine.
+  /// They did nothing wrong: a runner that declares no language is a
+  /// wildcard and claims every block, and nothing before the press said
+  /// which runtime was about to see it.
+  testWidgets('the Run affordance names the module it will hand the block to', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      language: 'python',
+      runners: const [
+        api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+      ],
+    );
+
+    expect(find.bySemanticsLabel('Run with code-exec'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Run code'),
+      findsNothing,
+      reason: 'a bare "Run code" is what let a python fence look runnable',
+    );
+  });
 
   testWidgets('the first matching runner wins when several are discovered', (
     tester,
@@ -263,7 +286,7 @@ void main() {
       },
     );
 
-    await tester.tap(find.bySemanticsLabel('Run code'));
+    await tester.tap(find.bySemanticsLabel('Run with first'));
     await tester.pumpAndSettle();
 
     expect(postedModuleId, 'first');
@@ -316,7 +339,7 @@ void main() {
         },
       );
 
-      await tester.tap(find.bySemanticsLabel('Run code'));
+      await tester.tap(find.bySemanticsLabel('Run with game-of-life'));
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Step forward'), findsOneWidget);
 
