@@ -299,6 +299,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                   isDm: isDm,
                   dmParticipantId: dmPartnerId,
                   isPersonalSpace: isPersonalSpace,
+                  restricted: channel?.restricted ?? false,
                   searchOpen: search.open,
                   onToggleSearch: _toggleSearch,
                 ),

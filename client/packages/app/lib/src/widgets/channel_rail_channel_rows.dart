@@ -20,6 +20,7 @@ import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
+import 'channel_kind_icon.dart';
 import 'channel_row_menu.dart';
 import 'context_menu_region.dart';
 import 'user_avatar.dart';
@@ -221,9 +222,9 @@ class VoiceChannelRow extends ConsumerWidget {
           selected: selected,
           unread: channel.cursor > channel.lastReadSeq,
           mentioned: channel.mentionedSeq > channel.lastReadSeq,
-          leading: Icon(
-            AppIcons.voice,
-            size: AppSizes.icon16,
+          leading: ChannelKindIcon(
+            isVoice: true,
+            restricted: channel.restricted ?? false,
             color: iconColor,
           ),
           trailing: participants.isEmpty

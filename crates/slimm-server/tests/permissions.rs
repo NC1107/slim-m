@@ -293,6 +293,66 @@ async fn visible_channels_matches_the_per_channel_check() {
     }
 }
 
+/// `restricted` - whether `@everyone` itself lacks VIEW_CHANNEL - is a
+/// property of the channel, not the caller: it must read the same for two
+/// callers who see the channel through entirely different grants (a role
+/// overwrite for `modded`, a member overwrite for `member`), and must be
+/// false for a channel `@everyone` can see plainly. Both users hold the mod
+/// role and both get their own member overwrite on `restored`, so every
+/// channel is visible to both and `restricted` can be compared across them
+/// on all three rather than only on the one each would see alone.
+#[tokio::test]
+async fn visible_channels_with_permissions_reports_restricted_independent_of_caller() {
+    let (s, _guard) = store().await;
+    let everyone_id = s.create_role("everyone", VIEW, true).await.unwrap();
+    let mod_role = s.create_role("mod", SEND, false).await.unwrap();
+
+    let member = s.create_user("member", "Member").await.unwrap();
+    let modded = s.create_user("modded", "Modded").await.unwrap();
+    s.assign_role(member.id, mod_role).await.unwrap();
+    s.assign_role(modded.id, mod_role).await.unwrap();
+
+    let open = s.create_channel("open", "text").await.unwrap();
+    let staff = s.create_channel("staff", "text").await.unwrap();
+    let restored = s.create_channel("restored", "text").await.unwrap();
+    // staff: @everyone denied VIEW, mod role regrants it.
+    s.set_role_overwrite(staff.id, everyone_id, NONE, VIEW)
+        .await
+        .unwrap();
+    s.set_role_overwrite(staff.id, mod_role, VIEW, NONE)
+        .await
+        .unwrap();
+    // restored: @everyone denied, each member individually regranted.
+    s.set_role_overwrite(restored.id, everyone_id, NONE, VIEW)
+        .await
+        .unwrap();
+    s.set_member_overwrite(restored.id, member.id, VIEW, NONE)
+        .await
+        .unwrap();
+    s.set_member_overwrite(restored.id, modded.id, VIEW, NONE)
+        .await
+        .unwrap();
+
+    for user in [member.id, modded.id] {
+        let restricted_by_id: std::collections::HashMap<_, _> = s
+            .visible_channels_with_permissions(user)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|(channel, _, restricted)| (channel.id, restricted))
+            .collect();
+        assert!(!restricted_by_id[&open.id], "an ordinary channel");
+        assert!(
+            restricted_by_id[&staff.id],
+            "@everyone is denied VIEW here even though {user:?} sees it via a role"
+        );
+        assert!(
+            restricted_by_id[&restored.id],
+            "@everyone is denied VIEW here even though {user:?} sees it via a member overwrite"
+        );
+    }
+}
+
 /// The report queue's batched lookup must be indistinguishable, id by id,
 /// from calling [`Store::permissions_in_channel`] once per id - including
 /// the two cases `channels_where` structurally cannot reach, a DM and a

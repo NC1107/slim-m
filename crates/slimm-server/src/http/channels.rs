@@ -102,6 +102,14 @@ pub(crate) struct ChannelDto {
     /// caller, so there is no reason to omit it anywhere `ChannelDto`
     /// appears.
     slow_mode_seconds: i64,
+    /// Whether `@everyone` lacks VIEW_CHANNEL here, so the channel is hidden
+    /// from ordinary members rather than visible to anyone in the
+    /// deployment. Identical for every caller, unlike `permissions` - see
+    /// `Store::channel_permissions_all`. Present only on `listChannels`, for
+    /// the same reason `permissions` is: no other response has a channel row
+    /// worth annotating this way.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    restricted: Option<bool>,
 }
 
 impl From<Channel> for ChannelDto {
@@ -117,6 +125,7 @@ impl From<Channel> for ChannelDto {
             created_at: channel.created_at,
             permissions: None,
             slow_mode_seconds: channel.slow_mode_seconds,
+            restricted: None,
         }
     }
 }
@@ -168,10 +177,11 @@ struct UpdateChannelRequest {
 /// live category is at `GET /categories` instead - a new route is additive,
 /// folding the list into this one's body is not.
 ///
-/// Each row's `permissions` rides along free: `visible_channels_with_permissions`
-/// already evaluates the full bitmask to decide VIEW_CHANNEL membership, so
-/// carrying it into the response is a change to what gets kept, not a new
-/// query.
+/// Each row's `permissions` and `restricted` ride along free:
+/// `visible_channels_with_permissions` already evaluates the full bitmask to
+/// decide VIEW_CHANNEL membership and `@everyone`'s own view of the channel
+/// alongside it, so carrying both into the response is a change to what
+/// gets kept, not a new query.
 async fn list(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
@@ -181,8 +191,9 @@ async fn list(
         .visible_channels_with_permissions(ctx.user_id)
         .await?
         .into_iter()
-        .map(|(channel, permissions)| ChannelDto {
+        .map(|(channel, permissions, restricted)| ChannelDto {
             permissions: Some(permissions.bits()),
+            restricted: Some(restricted),
             ..ChannelDto::from(channel)
         })
         .collect();

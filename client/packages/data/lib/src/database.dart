@@ -98,6 +98,12 @@ class Channels extends Table {
   /// fills in the real value.
   IntColumn get slowModeSeconds => integer().withDefault(const Constant(0))();
 
+  /// Whether `@everyone` lacks VIEW_CHANNEL here, mirroring the server's
+  /// `channels.restricted` - null for a server too old to send it, which
+  /// reads the same as false: nothing here claims a channel is public that
+  /// this client cannot actually vouch for.
+  BoolColumn get restricted => boolean().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -220,7 +226,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -307,6 +313,11 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// (off), and the next channel refresh replaces it with the server's real
   /// value, since channels are refetched whole rather than paged by a
   /// cursor.
+  ///
+  /// v16 adds `channels.restricted` in place, the same shape again: every
+  /// existing row reads null (unknown, which renders the same as "not
+  /// restricted") until the next channel refresh fills in the server's real
+  /// value.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -360,6 +371,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 15) {
             await m.addColumn(channels, channels.slowModeSeconds);
+          }
+          if (from < 16) {
+            await m.addColumn(channels, channels.restricted);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

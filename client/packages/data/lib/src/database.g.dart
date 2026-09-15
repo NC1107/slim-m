@@ -107,6 +107,15 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _restrictedMeta =
+      const VerificationMeta('restricted');
+  @override
+  late final GeneratedColumn<bool> restricted = GeneratedColumn<bool>(
+      'restricted', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("restricted" IN (0, 1))'));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -123,7 +132,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
         opCursor,
         parentMessageId,
         categoryId,
-        slowModeSeconds
+        slowModeSeconds,
+        restricted
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -216,6 +226,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           slowModeSeconds.isAcceptableOrUnknown(
               data['slow_mode_seconds']!, _slowModeSecondsMeta));
     }
+    if (data.containsKey('restricted')) {
+      context.handle(
+          _restrictedMeta,
+          restricted.isAcceptableOrUnknown(
+              data['restricted']!, _restrictedMeta));
+    }
     return context;
   }
 
@@ -255,6 +271,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
       slowModeSeconds: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}slow_mode_seconds'])!,
+      restricted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}restricted']),
     );
   }
 
@@ -337,6 +355,12 @@ class Channel extends DataClass implements Insertable<Channel> {
   /// existing row defaults to on upgrade until the next channel refresh
   /// fills in the real value.
   final int slowModeSeconds;
+
+  /// Whether `@everyone` lacks VIEW_CHANNEL here, mirroring the server's
+  /// `channels.restricted` - null for a server too old to send it, which
+  /// reads the same as false: nothing here claims a channel is public that
+  /// this client cannot actually vouch for.
+  final bool? restricted;
   const Channel(
       {required this.id,
       required this.name,
@@ -352,7 +376,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       this.opCursor,
       this.parentMessageId,
       this.categoryId,
-      required this.slowModeSeconds});
+      required this.slowModeSeconds,
+      this.restricted});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -381,6 +406,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       map['category_id'] = Variable<String>(categoryId);
     }
     map['slow_mode_seconds'] = Variable<int>(slowModeSeconds);
+    if (!nullToAbsent || restricted != null) {
+      map['restricted'] = Variable<bool>(restricted);
+    }
     return map;
   }
 
@@ -410,6 +438,9 @@ class Channel extends DataClass implements Insertable<Channel> {
           ? const Value.absent()
           : Value(categoryId),
       slowModeSeconds: Value(slowModeSeconds),
+      restricted: restricted == null && nullToAbsent
+          ? const Value.absent()
+          : Value(restricted),
     );
   }
 
@@ -432,6 +463,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       parentMessageId: serializer.fromJson<String?>(json['parentMessageId']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       slowModeSeconds: serializer.fromJson<int>(json['slowModeSeconds']),
+      restricted: serializer.fromJson<bool?>(json['restricted']),
     );
   }
   @override
@@ -453,6 +485,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'parentMessageId': serializer.toJson<String?>(parentMessageId),
       'categoryId': serializer.toJson<String?>(categoryId),
       'slowModeSeconds': serializer.toJson<int>(slowModeSeconds),
+      'restricted': serializer.toJson<bool?>(restricted),
     };
   }
 
@@ -471,7 +504,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           Value<int?> opCursor = const Value.absent(),
           Value<String?> parentMessageId = const Value.absent(),
           Value<String?> categoryId = const Value.absent(),
-          int? slowModeSeconds}) =>
+          int? slowModeSeconds,
+          Value<bool?> restricted = const Value.absent()}) =>
       Channel(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -492,6 +526,7 @@ class Channel extends DataClass implements Insertable<Channel> {
             : this.parentMessageId,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
         slowModeSeconds: slowModeSeconds ?? this.slowModeSeconds,
+        restricted: restricted.present ? restricted.value : this.restricted,
       );
   Channel copyWithCompanion(ChannelsCompanion data) {
     return Channel(
@@ -522,6 +557,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       slowModeSeconds: data.slowModeSeconds.present
           ? data.slowModeSeconds.value
           : this.slowModeSeconds,
+      restricted:
+          data.restricted.present ? data.restricted.value : this.restricted,
     );
   }
 
@@ -542,7 +579,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('opCursor: $opCursor, ')
           ..write('parentMessageId: $parentMessageId, ')
           ..write('categoryId: $categoryId, ')
-          ..write('slowModeSeconds: $slowModeSeconds')
+          ..write('slowModeSeconds: $slowModeSeconds, ')
+          ..write('restricted: $restricted')
           ..write(')'))
         .toString();
   }
@@ -563,7 +601,8 @@ class Channel extends DataClass implements Insertable<Channel> {
       opCursor,
       parentMessageId,
       categoryId,
-      slowModeSeconds);
+      slowModeSeconds,
+      restricted);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -582,7 +621,8 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.opCursor == this.opCursor &&
           other.parentMessageId == this.parentMessageId &&
           other.categoryId == this.categoryId &&
-          other.slowModeSeconds == this.slowModeSeconds);
+          other.slowModeSeconds == this.slowModeSeconds &&
+          other.restricted == this.restricted);
 }
 
 class ChannelsCompanion extends UpdateCompanion<Channel> {
@@ -601,6 +641,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<String?> parentMessageId;
   final Value<String?> categoryId;
   final Value<int> slowModeSeconds;
+  final Value<bool?> restricted;
   final Value<int> rowid;
   const ChannelsCompanion({
     this.id = const Value.absent(),
@@ -618,6 +659,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.parentMessageId = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.slowModeSeconds = const Value.absent(),
+    this.restricted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChannelsCompanion.insert({
@@ -636,6 +678,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.parentMessageId = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.slowModeSeconds = const Value.absent(),
+    this.restricted = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -657,6 +700,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<String>? parentMessageId,
     Expression<String>? categoryId,
     Expression<int>? slowModeSeconds,
+    Expression<bool>? restricted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -675,6 +719,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (parentMessageId != null) 'parent_message_id': parentMessageId,
       if (categoryId != null) 'category_id': categoryId,
       if (slowModeSeconds != null) 'slow_mode_seconds': slowModeSeconds,
+      if (restricted != null) 'restricted': restricted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -695,6 +740,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<String?>? parentMessageId,
       Value<String?>? categoryId,
       Value<int>? slowModeSeconds,
+      Value<bool?>? restricted,
       Value<int>? rowid}) {
     return ChannelsCompanion(
       id: id ?? this.id,
@@ -712,6 +758,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       parentMessageId: parentMessageId ?? this.parentMessageId,
       categoryId: categoryId ?? this.categoryId,
       slowModeSeconds: slowModeSeconds ?? this.slowModeSeconds,
+      restricted: restricted ?? this.restricted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -764,6 +811,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     if (slowModeSeconds.present) {
       map['slow_mode_seconds'] = Variable<int>(slowModeSeconds.value);
     }
+    if (restricted.present) {
+      map['restricted'] = Variable<bool>(restricted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -788,6 +838,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('parentMessageId: $parentMessageId, ')
           ..write('categoryId: $categoryId, ')
           ..write('slowModeSeconds: $slowModeSeconds, ')
+          ..write('restricted: $restricted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2045,6 +2096,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   Value<String?> parentMessageId,
   Value<String?> categoryId,
   Value<int> slowModeSeconds,
+  Value<bool?> restricted,
   Value<int> rowid,
 });
 typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
@@ -2063,6 +2115,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<String?> parentMessageId,
   Value<String?> categoryId,
   Value<int> slowModeSeconds,
+  Value<bool?> restricted,
   Value<int> rowid,
 });
 
@@ -2123,6 +2176,9 @@ class $$ChannelsTableFilterComposer
   ColumnFilters<int> get slowModeSeconds => $composableBuilder(
       column: $table.slowModeSeconds,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get restricted => $composableBuilder(
+      column: $table.restricted, builder: (column) => ColumnFilters(column));
 }
 
 class $$ChannelsTableOrderingComposer
@@ -2183,6 +2239,9 @@ class $$ChannelsTableOrderingComposer
   ColumnOrderings<int> get slowModeSeconds => $composableBuilder(
       column: $table.slowModeSeconds,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get restricted => $composableBuilder(
+      column: $table.restricted, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ChannelsTableAnnotationComposer
@@ -2238,6 +2297,9 @@ class $$ChannelsTableAnnotationComposer
 
   GeneratedColumn<int> get slowModeSeconds => $composableBuilder(
       column: $table.slowModeSeconds, builder: (column) => column);
+
+  GeneratedColumn<bool> get restricted => $composableBuilder(
+      column: $table.restricted, builder: (column) => column);
 }
 
 class $$ChannelsTableTableManager extends RootTableManager<
@@ -2278,6 +2340,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String?> parentMessageId = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             Value<int> slowModeSeconds = const Value.absent(),
+            Value<bool?> restricted = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion(
@@ -2296,6 +2359,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             parentMessageId: parentMessageId,
             categoryId: categoryId,
             slowModeSeconds: slowModeSeconds,
+            restricted: restricted,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -2314,6 +2378,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String?> parentMessageId = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             Value<int> slowModeSeconds = const Value.absent(),
+            Value<bool?> restricted = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ChannelsCompanion.insert(
@@ -2332,6 +2397,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             parentMessageId: parentMessageId,
             categoryId: categoryId,
             slowModeSeconds: slowModeSeconds,
+            restricted: restricted,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

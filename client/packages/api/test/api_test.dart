@@ -145,6 +145,27 @@ void main() {
       expect(channel.permissions, isNull);
     });
 
+    test('a channel carries restricted when the server sends it', () {
+      final channel = Channel.fromJson({
+        'id': 'chan-1',
+        'name': 'staff',
+        'kind': 'text',
+        'created_at': 1,
+        'restricted': true,
+      });
+      expect(channel.restricted, true);
+    });
+
+    test('a channel omitting restricted reads as unknown, not false', () {
+      final channel = Channel.fromJson({
+        'id': 'chan-1',
+        'name': 'general',
+        'kind': 'text',
+        'created_at': 1,
+      });
+      expect(channel.restricted, isNull);
+    });
+
     test('token and ticket toString never leak the secret', () {
       expect(_tokens(access: 'super-secret').toString(),
           isNot(contains('super-secret')));

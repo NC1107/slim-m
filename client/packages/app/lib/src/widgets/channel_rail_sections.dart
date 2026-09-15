@@ -16,6 +16,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
+import 'channel_kind_icon.dart';
 import 'context_menu_region.dart';
 import 'create_channel_sheet.dart';
 import 'manage_category_sheet.dart';
@@ -337,9 +338,9 @@ class _TextChannelRow extends ConsumerWidget {
       unread: channel.cursor > channel.lastReadSeq,
       mentioned: channel.mentionedSeq > channel.lastReadSeq,
       muted: muted,
-      leading: Icon(
-        AppIcons.hash,
-        size: AppSizes.icon16,
+      leading: ChannelKindIcon(
+        isVoice: false,
+        restricted: channel.restricted ?? false,
         color: selected ? tokens.accent : tokens.textSecondary,
       ),
       trailing: muted
