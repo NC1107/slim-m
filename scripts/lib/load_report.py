@@ -15,6 +15,7 @@ summary: one route produces a dozen cumulative bucket lines, which buries the
 handful of numbers a person reads a run to find.
 """
 import json
+import pathlib
 import statistics
 
 
@@ -93,6 +94,9 @@ def build(scenario, config, timings, delivery, fanout, server, failures):
 
 
 def write(report, path):
+    """Writes the run to `path`, resolved first so a relative argument from
+    the command line cannot land somewhere the caller did not name."""
+    path = pathlib.Path(path).expanduser().resolve()
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(report, handle, indent=2, sort_keys=True)
         handle.write("\n")

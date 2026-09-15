@@ -13,7 +13,7 @@ start expiring while the later connections were still opening.
 """
 import asyncio
 import json
-import random
+import secrets
 import time
 import urllib.error
 
@@ -54,7 +54,7 @@ class Subscriber:
             except urllib.error.HTTPError as exc:
                 if exc.code != 429 or attempt == TICKET_ATTEMPTS - 1:
                     raise
-                await asyncio.sleep(delay + random.random() * 0.5)
+                await asyncio.sleep(delay + secrets.randbelow(500) / 1000.0)
                 delay = min(delay * 1.6, 8.0)
         raise RuntimeError("unreachable")
 

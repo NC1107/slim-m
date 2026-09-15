@@ -112,8 +112,20 @@ def find_server_pid():
 
 
 def ws_url_for(base_url):
-    return base_url.replace("https://", "wss://").replace(
-        "http://", "ws://").rstrip("/") + "/ws"
+    """The socket address for `base_url`, encrypted unless it is loopback.
+
+    A plain `ws://` is refused for anything but localhost. This harness is
+    meant to run against a server on the same machine, and an unencrypted
+    socket to anywhere else is either a mistake or a run against something
+    it has no business loading.
+    """
+    if base_url.startswith("https://"):
+        return base_url.replace("https://", "wss://").rstrip("/") + "/ws"
+    host = base_url.split("//", 1)[-1].split("/", 1)[0].split(":", 1)[0]
+    if host not in ("127.0.0.1", "localhost", "::1", "[::1]"):
+        raise SystemExit(
+            f"refusing an unencrypted socket to {host!r}; use https")
+    return base_url.replace("http://", "ws://").rstrip("/") + "/ws"
 
 
 def scrape(api):

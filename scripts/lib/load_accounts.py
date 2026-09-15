@@ -32,8 +32,15 @@ class AccountSetupError(RuntimeError):
 
 
 def _cache_path(directory, base_url):
+    """The cache file, under a resolved directory and a derived name.
+
+    The directory comes from the command line and the name is built from the
+    deployment address rather than taken from it, so neither half can carry a
+    traversal out of where the caller asked the file to live.
+    """
     safe = "".join(c if c.isalnum() else "-" for c in base_url).strip("-")
-    return pathlib.Path(directory) / f"loadtest-tokens-{safe}.json"
+    root = pathlib.Path(directory).expanduser().resolve()
+    return root / f"loadtest-tokens-{safe}.json"
 
 
 def _load_cache(path):
