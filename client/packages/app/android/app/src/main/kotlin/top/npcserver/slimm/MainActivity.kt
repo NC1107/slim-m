@@ -2,10 +2,18 @@ package top.npcserver.slimm
 
 import android.content.pm.ActivityInfo
 import android.os.Bundle
-import io.flutter.embedding.android.FlutterActivity
+import android.view.WindowManager
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+/**
+ * `FlutterFragmentActivity`, not the template's `FlutterActivity`: the
+ * biometric app lock's `local_auth_android` implementation shows Android's
+ * `BiometricPrompt`, which needs a `FragmentActivity` to attach a
+ * `DialogFragment` to and throws at call time against a plain `Activity`.
+ */
+class MainActivity : FlutterFragmentActivity() {
     /**
      * Locks phones to portrait and leaves tablets alone.
      *
@@ -29,5 +37,35 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         ClipboardImageChannel(applicationContext).attach(flutterEngine.dartExecutor.binaryMessenger)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_LOCK_WINDOW_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setPrivacyShield" -> {
+                        setPrivacyShield(call.arguments as? Boolean ?: false)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    /**
+     * The Android half of the app lock's privacy shield (see
+     * `AppLockWindowChannel` in `packages/platform`, and `SceneDelegate.swift`
+     * for the iOS half). `FLAG_SECURE` blocks a screenshot or a screen
+     * recording of slim-m's content and blanks its thumbnail in the
+     * recent-apps switcher, in one call. Off by default; Dart sets this once
+     * the app-lock preference restores, and again on every toggle.
+     */
+    private fun setPrivacyShield(enabled: Boolean) {
+        if (enabled) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    companion object {
+        private const val APP_LOCK_WINDOW_CHANNEL = "top.npcserver.slimm/app_lock_window"
     }
 }

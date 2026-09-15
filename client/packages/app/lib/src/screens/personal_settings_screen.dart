@@ -45,6 +45,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/routes.dart';
 import '../widgets/app_info_section.dart';
+import '../widgets/app_lock_section.dart';
 import '../widgets/appearance_settings_section.dart';
 import '../widgets/performance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
@@ -78,6 +79,7 @@ class PersonalSettingsScreen extends StatelessWidget {
                 children: [
                   AvatarSettingsSection(),
                   DevicesSection(),
+                  AppLockSection(),
                   AccountSection(),
                 ],
               ),

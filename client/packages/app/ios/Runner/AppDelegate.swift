@@ -25,6 +25,7 @@ import UserNotifications
   private var notificationTapObserver: NotificationTapObserver?
   private var broadcastChannel: FlutterMethodChannel?
   private var clipboardImageChannel: FlutterMethodChannel?
+  private var appLockWindowChannel: FlutterMethodChannel?
   private let voiceCallChannel = VoiceCallChannel()
 
   // The token or a registration failure can each arrive before Dart has asked
@@ -64,6 +65,13 @@ import UserNotifications
       BroadcastChannel.handle(call, result: result)
     }
     broadcastChannel = broadcast
+
+    let appLockWindow = FlutterMethodChannel(
+      name: AppLockWindowChannel.name, binaryMessenger: messenger)
+    appLockWindow.setMethodCallHandler { call, result in
+      AppLockWindowChannel.handle(call, result: result)
+    }
+    appLockWindowChannel = appLockWindow
 
     let clipboardImage = FlutterMethodChannel(
       name: ClipboardImagePlugin.name, binaryMessenger: messenger)

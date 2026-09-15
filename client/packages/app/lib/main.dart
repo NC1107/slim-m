@@ -17,6 +17,8 @@ export 'src/desktop/startup_state.dart';
 
 import 'src/deep_links.dart';
 import 'src/desktop/startup_updates.dart';
+import 'src/providers/app_lock_controller.dart';
+import 'src/providers/app_lock_preference.dart';
 import 'src/providers/desktop_call_notifier.dart';
 import 'src/providers/desktop_message_notifier.dart';
 import 'src/desktop/desktop_chrome.dart';
@@ -41,6 +43,7 @@ import 'src/providers/sync_controller.dart';
 import 'src/providers/voice_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
+import 'src/widgets/app_lock_gate.dart';
 import 'src/widgets/client_too_old_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
 import 'src/widgets/toast_overlay.dart';
@@ -107,7 +110,7 @@ Future<void> main() async {
 
 /// The async sequence [StartupApp] masks: session restore (so the router's
 /// first redirect already knows the answer instead of showing sign-in and
-/// jumping to channels a frame later), the six preference-controller
+/// jumping to channels a frame later), the preference-controller
 /// restores, sync/push bring-up, and the desktop window shell's own
 /// listener/tray registration - a no-op on every platform but a real
 /// desktop build. The sync and push controllers are read here rather than
@@ -186,11 +189,14 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
     container.read(mediaAutoDownloadControllerProvider.notifier).restore(),
     container.read(gifAutoplayControllerProvider.notifier).restore(),
     container.read(messagePageSizeControllerProvider.notifier).restore(),
+    container.read(appLockPreferenceProvider.notifier).restore(),
     voice.restoreCameraPreference(),
     voice.restoreVoiceActivitySensitivity(),
     voice.restorePushToTalkPreference(),
     voice.restoreAudioDevicePreferences(),
   ]);
+  // After the session and app-lock preference both restore, so the first frame past the splash never shows the real app unlocked.
+  container.read(appLockControllerProvider.notifier).armOnLaunch();
 
   container.read(startupStatusProvider.notifier).state = 'Connecting';
   container.read(syncControllerProvider);
@@ -316,6 +322,8 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
             ClientTooOldGate(child: densityWrapped),
             const Positioned.fill(child: ToastOverlay()),
             const Positioned.fill(child: IncomingCallOverlay()),
+            // Last, so a locked screen covers a toast or a ring too, not just the routed app underneath.
+            const Positioned.fill(child: AppLockGate()),
           ],
         ),
       ),

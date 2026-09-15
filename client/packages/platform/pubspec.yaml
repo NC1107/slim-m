@@ -14,6 +14,10 @@ dependencies:
     sdk: flutter
   flutter_local_notifications: ^19.5.0
   flutter_secure_storage: ^10.3.1
+  # Face ID/Touch ID/fingerprint/Windows Hello, with an automatic fallback to
+  # the device passcode; android, ios, macos and windows only - see
+  # docs/dependencies.md and biometric_auth_channel.dart.
+  local_auth: ^3.0.1
   path: ^1.9.0
   path_provider: ^2.1.0
 dev_dependencies:
