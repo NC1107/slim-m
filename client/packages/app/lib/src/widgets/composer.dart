@@ -18,6 +18,8 @@ import '../providers/channel_permissions.dart';
 import '../providers/composer_attachment_drop.dart';
 import '../providers/composer_focus.dart';
 import '../providers/member_presence.dart' show membersProvider;
+import '../providers/message_actions.dart' show lastOwnMessageInChannel;
+import '../providers/message_editing.dart';
 import '../providers/app_launch.dart';
 import '../providers/providers.dart';
 import '../providers/slash_command.dart';
@@ -322,6 +324,33 @@ class _ComposerState extends ConsumerState<Composer> {
     _dismissAutocomplete();
   }
 
+  /// Opens the caller's own most recent message in this channel for inline
+  /// editing - see [_onKey]. `mounted` is checked after each await rather
+  /// than inside [lastOwnMessageInChannel] itself, which takes no `ref` and
+  /// so has no way to know whether this widget is still around by the time
+  /// its snapshot resolves.
+  ///
+  /// [meProvider] is awaited by its own `.future` rather than read
+  /// synchronously: nothing else in the composer keeps it warm, so a cold
+  /// first read here would otherwise catch it mid-`AsyncLoading` and find no
+  /// id at all.
+  Future<void> _editLastOwnMessage() async {
+    final store = await ref.read(storeProvider.future);
+    if (!mounted) return;
+    final myId = await ref
+        .read(meProvider.future)
+        .then<String?>((me) => me.id, onError: (Object _) => null);
+    if (!mounted) return;
+    final message = await lastOwnMessageInChannel(
+      store,
+      widget.channelId,
+      myId,
+    );
+    if (!mounted || message == null) return;
+    ref.read(editingMessageIdProvider(widget.channelId).notifier).state =
+        message.id;
+  }
+
   /// Intercepts the keys the list needs, on the field's own focus node.
   ///
   /// It has to be this node rather than an ancestor: text editing handles the
@@ -336,6 +365,13 @@ class _ComposerState extends ConsumerState<Composer> {
       unawaited(
         pasteClipboardImageFromKeystroke(_stageAttachment, _setAttachmentError),
       );
+    }
+    // Up in an empty composer edits the caller's last message; with text typed it must move the caret as normal instead.
+    if (event is KeyDownEvent &&
+        widget.controller.text.isEmpty &&
+        event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      unawaited(_editLastOwnMessage());
+      return KeyEventResult.handled;
     }
     if (_query == null || _suggestions.isEmpty) return KeyEventResult.ignored;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
