@@ -417,6 +417,12 @@ That package publishes nothing of its own: `skip-github-release` and `skip-chang
 Its one visible artifact is a repo-root `version.txt`, which `release-type: simple` maintains; nothing reads it, and it is auto-maintained so it cannot drift.
 `scripts/lib/test_openapi_version_is_release_managed.py` pins each of those moving parts, since dropping any one silently returns us to hand-editing the release branch, which is how 0.46.0 and 0.47.0 shipped.
 
+That same `skip-github-release` is why the server config carries `commit-search-depth`.
+release-please bounds its walk back through main by the releases it can find, and a package that publishes no release gives it nothing to find: the run logs `looking for tagName: schema-v<version>`, then `could not find release`, and walks to the default depth of 500 merge commits every time.
+That walk grew expensive enough to be refused outright on 2026-09-15, with GitHub answering the paged GraphQL query `Something went wrong while executing your query` at around 120 commits in - which failed the job, which left both standing release PRs frozen several merges behind main while every merge looked green.
+A depth of 100 is far more history than this repo puts between two releases and bounds the query permanently.
+The failure mode if it is ever too small is a commit missing from a changelog rather than a bad release, and it would show up as a release PR that does not mention a merge everyone can see on main.
+
 ### The release PR's own checks
 
 Both `release-please-action` invocations take `token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}`, and which one is in play decides whether a release PR can ever go green.
