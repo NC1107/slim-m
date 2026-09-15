@@ -106,6 +106,32 @@ bool canOpenThreadFor(
 bool canEditMessage(Message message, String? myUserId) =>
     !message.pending && !message.failed && _isAuthor(message, myUserId);
 
+/// The caller's own most recent editable message in [messages] (oldest
+/// first, [MessageStore.watchChannel]'s own order), or null if there isn't
+/// one. Backs "Up in an empty composer edits your last message": scanning
+/// from the end finds the newest match without sorting by `seq` again.
+Message? lastEditableOwnMessage(List<Message> messages, String? myUserId) {
+  for (final message in messages.reversed) {
+    if (canEditMessage(message, myUserId)) return message;
+  }
+  return null;
+}
+
+/// The caller's own most recent editable message in [channelId], or null -
+/// what Up in an empty composer opens for editing. Takes [store] and
+/// [myUserId] already resolved rather than a [WidgetRef], so the one await
+/// in here is the only one: a caller that reads providers before and after
+/// can put its own `mounted` check around them instead of this function
+/// guessing whether its `ref` is still good partway through.
+Future<Message?> lastOwnMessageInChannel(
+  MessageStore store,
+  String channelId,
+  String? myUserId,
+) async {
+  final messages = await store.channelSnapshot(channelId);
+  return lastEditableOwnMessage(messages, myUserId);
+}
+
 /// Own message, or MANAGE_MESSAGES. A pending or failed send was never
 /// stored server-side, so it has nothing here to delete; its own
 /// retry/discard row covers that case instead.

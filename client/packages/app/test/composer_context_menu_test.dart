@@ -190,6 +190,121 @@ void main() {
     });
   });
 
+  group('composerContextMenuBuilder formatting actions', () {
+    Future<EditableTextState> pumpField(
+      WidgetTester tester,
+      TextEditingController controller,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Material(child: TextField(controller: controller)),
+        ),
+      );
+      return tester.state<EditableTextState>(find.byType(EditableText));
+    }
+
+    List<ContextMenuButtonItem> buttonItemsFor(
+      WidgetTester tester,
+      EditableTextState state, {
+      required bool offerFormatting,
+    }) {
+      final widget = composerContextMenuBuilder(
+        tester.element(find.byType(EditableText)),
+        state,
+        clipboardHasImage: false,
+        offerFormatting: offerFormatting,
+      );
+      return (widget as AdaptiveTextSelectionToolbar).buttonItems!;
+    }
+
+    testWidgets(
+      'offers Bold, Italic, Strikethrough and Code over a real selection '
+      'at touch density',
+      (tester) async {
+        final controller = TextEditingController(text: 'hello world');
+        addTearDown(controller.dispose);
+        controller.selection = const TextSelection(
+          baseOffset: 0,
+          extentOffset: 5,
+        );
+        final state = await pumpField(tester, controller);
+
+        final labels = buttonItemsFor(
+          tester,
+          state,
+          offerFormatting: true,
+        ).map((item) => item.label);
+
+        expect(
+          labels,
+          containsAll(['Bold', 'Italic', 'Strikethrough', 'Code']),
+        );
+      },
+    );
+
+    testWidgets(
+      'offers nothing extra when offerFormatting is false (desktop width, '
+      'where the keyboard shortcut already reaches this)',
+      (tester) async {
+        final controller = TextEditingController(text: 'hello world');
+        addTearDown(controller.dispose);
+        controller.selection = const TextSelection(
+          baseOffset: 0,
+          extentOffset: 5,
+        );
+        final state = await pumpField(tester, controller);
+
+        final labels = buttonItemsFor(
+          tester,
+          state,
+          offerFormatting: false,
+        ).map((item) => item.label);
+
+        expect(labels, isNot(contains('Bold')));
+      },
+    );
+
+    testWidgets(
+      'offers nothing extra over a collapsed caret: there is no selection '
+      'to wrap',
+      (tester) async {
+        final controller = TextEditingController(text: 'hello world');
+        addTearDown(controller.dispose);
+        controller.selection = const TextSelection.collapsed(offset: 3);
+        final state = await pumpField(tester, controller);
+
+        final labels = buttonItemsFor(
+          tester,
+          state,
+          offerFormatting: true,
+        ).map((item) => item.label);
+
+        expect(labels, isNot(contains('Bold')));
+      },
+    );
+
+    testWidgets('tapping Bold wraps the selection exactly as Ctrl/Cmd+B does', (
+      tester,
+    ) async {
+      final controller = TextEditingController(text: 'hello world');
+      addTearDown(controller.dispose);
+      controller.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 5,
+      );
+      final state = await pumpField(tester, controller);
+
+      final bold = buttonItemsFor(
+        tester,
+        state,
+        offerFormatting: true,
+      ).firstWhere((item) => item.label == 'Bold');
+      bold.onPressed!();
+
+      expect(controller.text, '**hello** world');
+    });
+  });
+
   group('wired into the composer field', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
     tearDown(() => _mock(null));

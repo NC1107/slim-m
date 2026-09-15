@@ -67,6 +67,29 @@ class MessageStore {
         );
   }
 
+  /// [watchChannel]'s own query and ordering, fetched once rather than
+  /// watched. For a caller that only needs a single snapshot (finding the
+  /// caller's own last message to edit, say) opening a live query would mean
+  /// a subscription to cancel again with nothing ever built to hold it -
+  /// and, in a widget test, a real one left the drift stream machinery's own
+  /// zero-duration cleanup timer pending past the test's end.
+  Future<List<Message>> channelSnapshot(String channelId,
+      {int limit = 200}) async {
+    final query = db.select(db.messages)
+      ..where((m) => m.channelId.equals(channelId))
+      ..orderBy([
+        (m) => OrderingTerm(
+              expression: m.seq.equals(0),
+              mode: OrderingMode.desc,
+            ),
+        (m) => OrderingTerm(expression: m.seq, mode: OrderingMode.desc),
+        (m) => OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc),
+      ])
+      ..limit(limit);
+    final rows = await query.get();
+    return rows.reversed.map((r) => r.toDto()).toList(growable: false);
+  }
+
   /// Position first, then creation order as the tiebreak every DM (whose
   /// position is never set) falls back to - the same ordering the server's
   /// own `list_channels` applies, so a cold-started rail matches a synced one.

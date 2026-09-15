@@ -59,7 +59,8 @@ void main() {
                           'name': 'A phone',
                           'created_at': 0,
                           'last_seen_at': 0,
-                          'is_current': false,
+                          // Current: a lone other device would also draw the new bulk sign-out row, breaking this test's exactly-one-row count.
+                          'is_current': true,
                         },
                       ]),
                       200,
