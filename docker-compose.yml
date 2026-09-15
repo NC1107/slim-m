@@ -56,6 +56,23 @@ services:
     # `--healthcheck` subcommand; no need to redeclare it here.
     expose:
       - "8080"
+    # Measured, not guessed: see docs/sizing.md for the study these come from.
+    # Two cores is the first quota that behaves rather than a capacity figure.
+    # A quota is enforced by freezing the process for part of every scheduling
+    # window, so at one core the server sat at three quarters of it while
+    # delivering a 1.3 second median. Raising this above two buys lower latency
+    # and no extra capacity, because the server never uses past about 1.5.
+    # Memory is the dial worth turning with population: the floor is ~17 MB,
+    # each connection adds ~144 KB, and the 1024-connection cap means
+    # connection load alone cannot exceed ~166 MB. 512M suits a deployment
+    # running up to that cap; 256M is ample for a friend group.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          memory: 128M
 
   caddy:
     # Pinned to an exact release and its digest, so a repointed tag cannot
