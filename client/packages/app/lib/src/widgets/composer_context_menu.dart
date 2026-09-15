@@ -42,6 +42,7 @@ import 'package:slimm_design_system/design_system.dart'
         systemContextMenuItemsWithoutScanText;
 
 import 'composer_clipboard_image.dart';
+import 'composer_markdown_shortcuts.dart';
 
 /// Whether the clipboard holds an image, refreshed only through
 /// [hasClipboardImage]'s metadata check - never the prompting
@@ -99,31 +100,85 @@ List<IOSSystemContextMenuItem> systemContextMenuItemsWithForcedPaste(
   return items;
 }
 
-/// Matches `TextField`'s own default builder except for two changes: see
+/// Bold, italic, strikethrough and code: the composer's own keyboard
+/// shortcuts, offered as selection actions where there is no keyboard to
+/// hold Ctrl/Cmd for. Each marker is applied through [wrapSelectionWithMarker],
+/// the same helper the shortcuts use, so a touch tap and a keystroke wrap a
+/// selection identically.
+const _formattingMarkers = <(String label, String marker)>[
+  ('Bold', '**'),
+  ('Italic', '*'),
+  ('Strikethrough', '~~'),
+  ('Code', '`'),
+];
+
+void _applyFormattingMarker(EditableTextState state, String marker) {
+  state.userUpdateTextEditingValue(
+    wrapSelectionWithMarker(state.textEditingValue, marker),
+    SelectionChangedCause.toolbar,
+  );
+  state.hideToolbar();
+}
+
+/// iOS 16+'s native menu accepts arbitrary custom buttons
+/// ([IOSSystemContextMenuItemCustom]), each running its own Dart callback
+/// rather than a platform-handled action - unlike the forced Paste item
+/// above, which relies on the opposite being true. See this file's own doc
+/// comment for why Paste could not take this same route.
+List<IOSSystemContextMenuItem> _iosFormattingItems(EditableTextState state) => [
+  for (final (label, marker) in _formattingMarkers)
+    IOSSystemContextMenuItemCustom(
+      title: label,
+      onPressed: () => _applyFormattingMarker(state, marker),
+    ),
+];
+
+List<ContextMenuButtonItem> _formattingButtonItems(EditableTextState state) => [
+  for (final (label, marker) in _formattingMarkers)
+    ContextMenuButtonItem(
+      label: label,
+      onPressed: () => _applyFormattingMarker(state, marker),
+    ),
+];
+
+/// Matches `TextField`'s own default builder except for three changes: see
 /// this file's doc comment for why forcing Paste in is enough, and why a
-/// custom item would not be; and backlog #129 for why the Live Text /
+/// custom item would not be; backlog #129 for why the Live Text /
 /// "Scan Text" item is dropped from both the iOS system menu and the
-/// adaptive toolbar it falls back to elsewhere.
+/// adaptive toolbar it falls back to elsewhere; and this file's own note on
+/// [_formattingMarkers] for [offerFormatting], which [ComposerField] passes
+/// as true only at touch density - desktop already has the keyboard
+/// shortcuts, so offering both there would be the same command twice.
 Widget composerContextMenuBuilder(
   BuildContext context,
   EditableTextState editableTextState, {
   required bool clipboardHasImage,
+  required bool offerFormatting,
 }) {
+  final hasSelection =
+      !editableTextState.textEditingValue.selection.isCollapsed;
+  final formatting = offerFormatting && hasSelection;
   if (SystemContextMenu.isSupportedByField(editableTextState)) {
     return SystemContextMenu.editableText(
       editableTextState: editableTextState,
-      items: systemContextMenuItemsWithForcedPaste(
-        systemContextMenuItemsWithoutScanText(
-          SystemContextMenu.getDefaultItems(editableTextState),
+      items: [
+        ...systemContextMenuItemsWithForcedPaste(
+          systemContextMenuItemsWithoutScanText(
+            SystemContextMenu.getDefaultItems(editableTextState),
+          ),
+          clipboardHasImage: clipboardHasImage,
         ),
-        clipboardHasImage: clipboardHasImage,
-      ),
+        if (formatting) ..._iosFormattingItems(editableTextState),
+      ],
     );
   }
   return AdaptiveTextSelectionToolbar.buttonItems(
-    buttonItems: contextMenuButtonItemsWithoutScanText(
-      editableTextState.contextMenuButtonItems,
-    ),
+    buttonItems: [
+      ...contextMenuButtonItemsWithoutScanText(
+        editableTextState.contextMenuButtonItems,
+      ),
+      if (formatting) ..._formattingButtonItems(editableTextState),
+    ],
     anchors: editableTextState.contextMenuAnchors,
   );
 }

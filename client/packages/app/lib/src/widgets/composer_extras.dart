@@ -245,6 +245,7 @@ class _ComposerFieldState extends State<ComposerField> {
                       context,
                       state,
                       clipboardHasImage: _clipboardImageStatus.value,
+                      offerFormatting: AppTouchTargets.of(context),
                     ),
                 decoration: const InputDecoration(
                   isDense: true,
