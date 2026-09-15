@@ -74,6 +74,9 @@ def parse_args(argv=None):
                              "connection counts without enrolling more")
     parser.add_argument("--server-pid", type=int, default=None,
                         help="local server pid, to read its processor time")
+    parser.add_argument("--channel", default=None,
+                        help="name of the channel to send into; defaults to "
+                             "the first text channel the admin can see")
     return parser.parse_args(argv)
 
 
@@ -143,6 +146,11 @@ def setup(args):
     text = [c for c in channels if c.get("kind") == "text"]
     if not text:
         raise SystemExit("no text channel to send into")
+    if args.channel:
+        named = [c for c in text if c.get("name") == args.channel]
+        if not named:
+            raise SystemExit(f"no text channel named {args.channel!r}")
+        return accounts, named[0]
     return accounts, text[0]
 
 
