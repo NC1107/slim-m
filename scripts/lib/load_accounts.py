@@ -44,10 +44,17 @@ def _load_cache(path):
         return None
 
 
+def _entry(account):
+    """One cache row, from either a live account or an existing row."""
+    api = account.get("api")
+    return {"username": account["username"],
+            "display_name": account["display_name"],
+            "token": api.token if api is not None else account.get("token"),
+            "refresh": account.get("refresh")}
+
+
 def _save_cache(path, accounts):
-    payload = [{"username": a["username"], "display_name": a["display_name"],
-                "token": a["api"].token, "refresh": a.get("refresh")}
-               for a in accounts]
+    payload = [_entry(a) for a in accounts]
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
@@ -55,7 +62,16 @@ def _save_cache(path, accounts):
 
 
 def _revive(base_url, entry):
-    """The account's session, refreshed when its access token has aged out."""
+    """The account's session, refreshed when its access token has aged out.
+
+    Access tokens last fifteen minutes and refresh tokens thirty days, so
+    within the window this costs one cheap authenticated probe per account
+    against that account's own generous bucket. Past it, the refresh is
+    charged to an address-keyed bucket allowing ten in a burst and one every
+    two seconds, which is why it needs the same backoff every other
+    rate-limited call here uses. Without it the hundredth account gives up on
+    a 429 and the whole cache is discarded for a fully expired set.
+    """
     api = e2e_api.Api(base_url, token=entry["token"])
     try:
         api.me()
@@ -65,8 +81,11 @@ def _revive(base_url, entry):
     if not entry.get("refresh"):
         return None, None
     try:
-        got = e2e_api.Api(base_url).call(
-            "POST", "/auth/refresh", {"refresh_token": entry["refresh"]})
+        got = seed_backoff.call_with_backoff(
+            lambda: e2e_api.Api(base_url).call(
+                "POST", "/auth/refresh",
+                {"refresh_token": entry["refresh"]}),
+            max_attempts=10, base_delay=2.0, max_delay=30.0)
     except (urllib.error.HTTPError, urllib.error.URLError):
         return None, None
     api.token = got["access_token"]
@@ -105,6 +124,26 @@ def _enrol(base_url, index, password, invite_code):
             "refresh": got.get("refresh_token"), "reused": False}
 
 
+def _login(base_url, index, password):
+    """Signs in to an account known to exist, skipping the doomed register.
+
+    Enrolment attempts a registration first, and on a claimed deployment that
+    always fails while still spending a token from the address-keyed bucket
+    that allows one every six seconds. For an account already in the cache
+    that attempt is pure waste, and skipping it halves the recovery cost.
+    """
+    username, display = seed_content.persona(index, tag="lt")
+    api = e2e_api.Api(base_url)
+    got = seed_backoff.call_with_backoff(
+        lambda: api.call("POST", "/auth/login",
+                         {"username": username, "password": password,
+                          "device_name": f"loadtest-{index}"}),
+        max_attempts=10, base_delay=2.0, max_delay=30.0)
+    api.token = got["access_token"]
+    return {"username": username, "display_name": display, "api": api,
+            "refresh": got.get("refresh_token"), "reused": True}
+
+
 def _mint_invite(api, uses):
     try:
         got = seed_backoff.call_with_backoff(
@@ -135,21 +174,31 @@ def obtain(base_url, count, password, invite_code, cache_dir):
     Returns `(accounts, from_cache)`. A cache that is too small or refuses to
     revive falls back to enrolment and is rewritten, so a wiped server heals
     itself rather than needing the file deleted by hand.
+
+    The cache is rewritten after every account, because refresh rotation is
+    single-use: a token already exchanged is spent, and losing the
+    replacement strands that account behind a full login. One account that
+    cannot revive falls back to a login for itself alone rather than
+    condemning the other ninety-nine to the same.
     """
     path = _cache_path(cache_dir, base_url)
     cached = _load_cache(path)
     if cached and len(cached) >= count:
         revived = []
-        for entry in cached[:count]:
+        for index, entry in enumerate(cached[:count]):
             api, refresh = _revive(base_url, entry)
             if api is None:
-                revived = []
-                break
+                try:
+                    got = _login(base_url, index, password)
+                except urllib.error.HTTPError:
+                    revived = []
+                    break
+                api, refresh = got["api"], got["refresh"]
             revived.append({"username": entry["username"],
                             "display_name": entry["display_name"],
                             "api": api, "refresh": refresh, "reused": True})
-        if revived:
-            _save_cache(path, revived)
+            _save_cache(path, revived + cached[len(revived):count])
+        if len(revived) == count:
             return revived, True
 
     accounts = _enrol_all(base_url, count, password, invite_code)
