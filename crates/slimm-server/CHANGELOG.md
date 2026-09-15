@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.64.0](https://github.com/NC1107/slim-m/compare/server-v0.63.0...server-v0.64.0) (2026-09-15)
+
+
+### Features
+
+* add per-route request timing and an admin metrics screen ([#1200](https://github.com/NC1107/slim-m/issues/1200)) ([91a8891](https://github.com/NC1107/slim-m/commit/91a8891cbbea647f2bfd04c74f24f9dc51e24f13))
+* **server:** refuse new websocket connections when memory is low ([#1201](https://github.com/NC1107/slim-m/issues/1201)) ([d4a7f9b](https://github.com/NC1107/slim-m/commit/d4a7f9b5c983db9f99ddb8e0ec310ce181f4f73d))
+
 ## [0.63.0](https://github.com/NC1107/slim-m/compare/server-v0.62.0...server-v0.63.0) (2026-09-15)
 
 
