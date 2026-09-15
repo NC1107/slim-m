@@ -159,9 +159,12 @@ paths:
         `/version`'s deployment-wide facts are meant to reveal to an
         unauthenticated caller. Resident memory, a requests-admitted and a
         requests-refused counter per rate-limit class since process start,
+        an HTTP request-latency histogram labelled by method and matched
+        route template (never a raw path, to keep the label set bounded),
+        the SQLite pool's configured, open, and in-use connection counts,
         currently open WebSocket connections, the memory-admission guard's
-        own discovered ceiling/usage (both absent when no cgroup limit is
-        found) plus a refusal counter, and whether an SFU is configured.
+        own discovered ceiling and usage (both absent when no cgroup limit
+        is found) plus a refusal counter, and whether an SFU is configured.
         `slimm_livekit_reachable` is present only when one is: the server's
         own live check of whether LiveKit answers, closing the gap where
         `voice enabled` in `/version` only reports this server's own config.

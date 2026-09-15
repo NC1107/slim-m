@@ -27,6 +27,7 @@ import '../screens/admin/performance_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/roles_screen.dart';
+import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
 import '../screens/channel_settings_screen.dart';
 import '../screens/home_shell.dart';
@@ -185,6 +186,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminStorage,
         pageBuilder: (context, state) =>
             modalPage(context, const StorageScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminServerMetrics,
+        pageBuilder: (context, state) =>
+            modalPage(context, const ServerMetricsScreen()),
       ),
       GoRoute(
         path: Routes.adminDock,
