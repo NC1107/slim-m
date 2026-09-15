@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use axum::http::StatusCode;
-use axum::{Router, extract::State, routing::get};
+use axum::{Extension, Router, extract::State, routing::get};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Serialize;
@@ -76,6 +76,7 @@ mod reports;
 mod reports_cursor;
 mod reports_mine;
 mod roles;
+mod route_timing;
 mod safety;
 mod saved_messages;
 mod search;
@@ -140,6 +141,8 @@ pub struct AppState {
 
 /// Builds the router over the shared application state.
 pub fn router(state: AppState) -> Router {
+    // Fresh per call, like `state.limiter`; see `route_timing`'s own doc.
+    let route_timings = route_timing::RouteTimings::new();
     Router::new()
         .route("/healthz", get(healthz))
         .route("/version", get(version))
@@ -190,6 +193,10 @@ pub fn router(state: AppState) -> Router {
         .merge(gifs::routes())
         .merge(link_preview::routes())
         .merge(attachments::routes())
+        // Only applies to a route above, once matched; see `route_timing`.
+        .route_layer(axum::middleware::from_fn(route_timing::record))
+        // Outer to the line above, so its `Extension` is on the request already.
+        .layer(Extension(route_timings))
         // Bounded, and the socket is deliberately outside this: see below.
         .layer(ConcurrencyLimitLayer::new(MAX_INFLIGHT_REQUESTS))
         .layer(TimeoutLayer::with_status_code(

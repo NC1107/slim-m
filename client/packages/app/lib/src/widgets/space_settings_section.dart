@@ -30,6 +30,7 @@ import '../screens/admin/performance_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
+import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
 import 'join_policy_row.dart';
 import 'settings_panes.dart';
@@ -177,6 +178,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.storage,
             compactRoute: Routes.adminStorage,
             builder: (_) => const StoragePane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'server-metrics',
+            label: 'Server metrics',
+            icon: AppIcons.requestLatency,
+            compactRoute: Routes.adminServerMetrics,
+            builder: (_) => const ServerMetricsPane(),
           ),
         if (canManageServer)
           SettingsPane(

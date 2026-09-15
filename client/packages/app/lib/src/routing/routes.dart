@@ -26,6 +26,7 @@ abstract final class Routes {
   static const adminAnalytics = '/settings/analytics';
   static const adminPerformance = '/settings/performance';
   static const adminStorage = '/settings/storage';
+  static const adminServerMetrics = '/settings/server-metrics';
   static const adminDock = '/settings/dock';
   static const debugLog = '/settings/debug-log';
 

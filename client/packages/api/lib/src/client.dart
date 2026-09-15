@@ -23,6 +23,8 @@ part 'client_emoji.dart';
 part 'client_gifs.dart';
 part 'client_link_preview.dart';
 part 'client_messages.dart';
+part 'client_metrics.dart';
+part 'client_metrics_parser.dart';
 part 'client_moderation.dart';
 part 'client_module_commands.dart';
 part 'client_module_permissions.dart';

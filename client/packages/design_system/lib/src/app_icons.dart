@@ -32,6 +32,12 @@ abstract final class AppIcons {
   /// [performance]'s gauge - this is what is on disk, not how fast it runs.
   static const IconData storage = LucideIcons.hardDrive300;
 
+  /// The server metrics screen: request latency and volume over time,
+  /// distinct from [performance]'s static capacity dials and [analytics]'s
+  /// usage counts - a pulse line reads as "traffic happening" rather than a
+  /// fixed setting or a tally.
+  static const IconData requestLatency = LucideIcons.activity300;
+
   /// The collapsible channel rail, drawn as a panel rather than a hamburger:
   /// it toggles one region of a visible layout rather than opening a drawer.
   /// Also the collapsed rail's own edge handle (backlog item 54): a panel

@@ -275,6 +275,15 @@ pub struct Message {
 /// rather than the honest client racing itself. See [`Store::rotate_refresh`].
 const DEFAULT_REUSE_GRACE_MS: i64 = 10 * 1000;
 
+/// A snapshot of [`Store::pool_stats`]: how many of the pool's connections
+/// are open at all, and how many of those are currently checked out.
+#[derive(Debug, Clone, Copy)]
+pub struct PoolStats {
+    pub max: u32,
+    pub size: u32,
+    pub in_use: u32,
+}
+
 /// The persistence layer over one embedded SQLite database.
 #[derive(Clone)]
 pub struct Store {
@@ -312,6 +321,22 @@ impl Store {
     pub async fn ping(&self) -> anyhow::Result<()> {
         sqlx::query("SELECT 1").execute(&self.pool).await?;
         Ok(())
+    }
+
+    /// Live occupancy of the shared SQLite pool, for `/metrics`'s pool
+    /// gauges: every read and every write share the same eight connections,
+    /// so how many are checked out is the most direct signal of contention
+    /// this server has. `max` is read off the pool's own configuration
+    /// rather than duplicated as a constant, so it can never drift from
+    /// what `db::connect` actually set.
+    pub fn pool_stats(&self) -> PoolStats {
+        let size = self.pool.size();
+        let idle = u32::try_from(self.pool.num_idle()).unwrap_or(size);
+        PoolStats {
+            max: self.pool.options().get_max_connections(),
+            size,
+            in_use: size.saturating_sub(idle),
+        }
     }
 
     /// Opens a transaction that takes SQLite's write lock immediately.

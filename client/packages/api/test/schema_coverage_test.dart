@@ -48,9 +48,10 @@ const Map<String, String> _allowlist = {
       'trigger a token refresh',
   'GET /ws': 'an HTTP upgrade opened by web_socket_channel in events.dart, '
       'not a request/response call _send could make',
-  'GET /metrics': 'Prometheus exposition text for a scraper, deliberately '
-      'never fetched by this client: an operator dashboard is the consumer, '
-      'and the app has nothing to render it with',
+  'GET /metrics': 'reads Prometheus text through SlimmApi._fetchBytes, not '
+      '_send, the same shape as the byte-fetching routes below: the admin '
+      'metrics screen fetches and parses it, but a text scrape is never '
+      'JSON, so it needs no JSON-decode attempt to fail on',
   'GET /attachments/{}': 'reads raw bytes through SlimmApi._fetchBytes, not '
       '_send: a response that is never JSON needs no JSON decode attempt to '
       'fail on',

@@ -122,9 +122,9 @@ async fn a_caller_without_manage_server_is_refused() {
 /// The load-bearing shape test: every non-comment, non-blank line is a valid
 /// Prometheus exposition line (`name{labels} value`, or a bare `name value`),
 /// every metric that appears has both a `# HELP` and a `# TYPE` line ahead of
-/// it, and the five series the mission names are all present. Mutation-tested
-/// by hand: dropping any one of the five `write_*` calls in `http/metrics.rs`
-/// fails exactly the matching assertion below and nothing else.
+/// it, and the series the mission names are all present. Mutation-tested by
+/// hand: dropping any one of the `write_*` calls in `http/metrics.rs` fails
+/// exactly the matching assertion below and nothing else.
 #[tokio::test]
 async fn a_manage_server_caller_gets_valid_prometheus_text_with_every_series() {
     let (s, _guard) = store("slimm-metrics-shape").await;
@@ -155,6 +155,68 @@ async fn a_manage_server_caller_gets_valid_prometheus_text_with_every_series() {
     // No SFU here: the configured gauge is 0 and the reachable gauge is absent, not a misleading 0.
     assert!(text.contains("slimm_livekit_configured 0"));
     assert!(!text.contains("slimm_livekit_reachable"));
+
+    // The pool gauges read the pool's own state, so they need no prior request.
+    assert!(text.contains("slimm_db_pool_connections_max "));
+    assert!(text.contains("slimm_db_pool_connections "));
+    assert!(text.contains("slimm_db_pool_connections_in_use "));
+}
+
+/// Per-route latency is recorded *after* a request finishes, so the request
+/// asking for `/metrics` can never report its own duration - only a later
+/// scrape sees it. This drives two, and checks the histogram for
+/// `GET /metrics` shows up on the second with a plausible shape: every
+/// bucket is present, the `+Inf` bucket matches `_count`, and both are at
+/// least 1 since the first call already completed as a `GET /metrics`.
+#[tokio::test]
+async fn a_second_scrape_reports_the_first_scrapes_own_latency() {
+    let (s, _guard) = store("slimm-metrics-latency").await;
+    let (admin, _member) = deployment(&s).await;
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let router = app(s, VoiceService::disabled());
+
+    let first = router
+        .clone()
+        .oneshot(get("/metrics", &session.access_token))
+        .await
+        .unwrap();
+    body_text(first).await;
+
+    let second = router
+        .oneshot(get("/metrics", &session.access_token))
+        .await
+        .unwrap();
+    let text = body_text(second).await;
+    assert_prometheus_format(&text);
+
+    assert!(text.contains("# TYPE slimm_http_request_duration_seconds histogram\n"));
+    assert!(text.contains(
+        "slimm_http_request_duration_seconds_bucket{method=\"GET\",route=\"/metrics\",le=\"+Inf\"} "
+    ));
+    let count = metric_value(
+        &text,
+        "slimm_http_request_duration_seconds_count{method=\"GET\",route=\"/metrics\"} ",
+    );
+    let inf_bucket = metric_value(
+        &text,
+        "slimm_http_request_duration_seconds_bucket{method=\"GET\",route=\"/metrics\",le=\"+Inf\"} ",
+    );
+    assert!(count >= 1, "the first scrape must have been recorded");
+    assert_eq!(
+        inf_bucket, count,
+        "the +Inf bucket always equals the total count"
+    );
+}
+
+/// The exact numeric value on the one line starting with `prefix`, panicking
+/// if that line is missing - a sharper failure than the substring-only
+/// `contains` checks above give when a test actually needs the number.
+fn metric_value(text: &str, prefix: &str) -> u64 {
+    text.lines()
+        .find(|line| line.starts_with(prefix))
+        .and_then(|line| line.rsplit(' ').next())
+        .and_then(|value| value.parse().ok())
+        .unwrap_or_else(|| panic!("no line starting with {prefix:?} in:\n{text}"))
 }
 
 /// A discovered memory ceiling reports both the limit and usage gauges, with
@@ -277,15 +339,17 @@ fn assert_prometheus_format(text: &str) {
     assert!(!text.is_empty(), "the body must not be empty");
     assert!(text.ends_with('\n'), "exposition text ends in a newline");
 
-    let mut typed: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut typed: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     for line in text.lines() {
         if let Some(rest) = line.strip_prefix("# TYPE ") {
-            let name = rest.split_whitespace().next().unwrap_or_default();
+            let mut parts = rest.split_whitespace();
+            let name = parts.next().unwrap_or_default();
+            let kind = parts.next().unwrap_or_default();
             assert!(
                 !name.is_empty(),
                 "a `# TYPE` line must name a metric: {line}"
             );
-            typed.insert(name);
+            typed.insert(name, kind);
             continue;
         }
         if line.starts_with("# HELP ") {
@@ -309,9 +373,15 @@ fn assert_prometheus_format(text: &str) {
                     .is_some_and(|c| c.is_ascii_alphabetic() || c == '_'),
             "metric name is not a legal Prometheus identifier: {line}"
         );
+        // A histogram's _bucket/_sum/_count samples are typed under their shared base name.
+        let recognized = typed.contains_key(name)
+            || ["_bucket", "_sum", "_count"].iter().any(|suffix| {
+                name.strip_suffix(suffix)
+                    .is_some_and(|base| typed.get(base) == Some(&"histogram"))
+            });
         assert!(
-            typed.contains(name),
-            "{name} appears on a sample line with no preceding `# TYPE {name} ...`: {line}"
+            recognized,
+            "{name} appears on a sample line with no preceding `# TYPE` for it or its histogram base: {line}"
         );
     }
 }

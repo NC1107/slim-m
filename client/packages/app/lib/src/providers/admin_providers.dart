@@ -163,6 +163,13 @@ final spaceStorageProvider = FutureProvider.autoDispose<api.SpaceStorage>(
   (ref) => ref.watch(apiProvider).fetchSpaceStorage(),
 );
 
+/// A live `GET /metrics` scrape: request latency by route, request volume by
+/// rate-limit class, SQLite pool occupancy, and resident memory. See
+/// `screens/admin/server_metrics_screen.dart`.
+final serverMetricsProvider = FutureProvider.autoDispose<api.ServerMetrics>(
+  (ref) => ref.watch(apiProvider).fetchServerMetrics(),
+);
+
 /// The module marketplace's index, plus which of those modules (if any) this
 /// space has already installed - fetched together so a browse list can show
 /// each entry's install state in one round trip. See
