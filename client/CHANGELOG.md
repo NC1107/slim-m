@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.78.0](https://github.com/NC1107/slim-m/compare/client-v0.77.0...client-v0.78.0) (2026-09-15)
+
+
+### Features
+
+* add per-route request timing and an admin metrics screen ([#1200](https://github.com/NC1107/slim-m/issues/1200)) ([91a8891](https://github.com/NC1107/slim-m/commit/91a8891cbbea647f2bfd04c74f24f9dc51e24f13))
+
 ## [0.77.0](https://github.com/NC1107/slim-m/compare/client-v0.76.1...client-v0.77.0) (2026-09-15)
 
 
