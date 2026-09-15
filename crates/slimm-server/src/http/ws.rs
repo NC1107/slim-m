@@ -68,6 +68,14 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn connect(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+    // Checked before the connection-count slot: cheaper to refuse here than to claim and release one.
+    if !state.hub.admit_memory() {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "insufficient memory headroom",
+        )
+            .into_response();
+    }
     // Claim a connection slot before upgrading, so a flood cannot open unbounded
     // sockets. The permit is held for the connection's whole life.
     let Some(permit) = state.hub.try_connect() else {

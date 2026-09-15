@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! `GET /metrics`: process resident memory, request counts by rate-limit
-//! class, currently open WebSocket connections, and whether the configured
-//! SFU answers - as Prometheus text exposition format.
+//! class, currently open WebSocket connections, the memory-admission
+//! guard's own view of its ceiling/usage/refusals (`crate::hub::memory_guard`),
+//! and whether the configured SFU answers - as Prometheus text exposition
+//! format.
 //!
 //! Built to close the exact gap CLAUDE.md records: LiveKit crashlooped for
 //! half an hour behind a `voice enabled` line that only ever reports the
@@ -65,6 +67,7 @@ async fn metrics(
     write_memory(&mut body);
     write_requests(&mut body, &state);
     write_connections(&mut body, &state);
+    write_memory_admission(&mut body, &state);
     write_voice(&mut body, &state).await;
 
     let mut response = body.into_response();
@@ -126,6 +129,39 @@ fn write_connections(out: &mut String, state: &AppState) {
     out.push_str(&format!(
         "slimm_websocket_connections {}\n",
         state.hub.connection_count()
+    ));
+}
+
+/// The connection-admission memory guard: the ceiling and usage it
+/// discovered (both absent together when no cgroup limit could be found,
+/// the same "absent, not a misleading zero" shape `write_voice` below uses
+/// for `slimm_livekit_reachable`), and a running count of refusals.
+fn write_memory_admission(out: &mut String, state: &AppState) {
+    let snapshot = state.hub.memory_admission_snapshot();
+
+    if let Some(limit) = snapshot.limit_bytes {
+        out.push_str(
+            "# HELP slimm_memory_limit_bytes Cgroup memory ceiling the connection-admission guard discovered.\n",
+        );
+        out.push_str("# TYPE slimm_memory_limit_bytes gauge\n");
+        out.push_str(&format!("slimm_memory_limit_bytes {limit}\n"));
+    }
+
+    if let Some(usage) = snapshot.usage_bytes {
+        out.push_str(
+            "# HELP slimm_memory_usage_bytes Memory the connection-admission guard counts as in use.\n",
+        );
+        out.push_str("# TYPE slimm_memory_usage_bytes gauge\n");
+        out.push_str(&format!("slimm_memory_usage_bytes {usage}\n"));
+    }
+
+    out.push_str(
+        "# HELP slimm_memory_admission_refused_total New connections refused for low memory headroom since process start.\n",
+    );
+    out.push_str("# TYPE slimm_memory_admission_refused_total counter\n");
+    out.push_str(&format!(
+        "slimm_memory_admission_refused_total {}\n",
+        snapshot.refused_total
     ));
 }
 

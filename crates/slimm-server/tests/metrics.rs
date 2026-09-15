@@ -2,6 +2,8 @@
 //! `GET /metrics`: gating, and the shape of the Prometheus text it answers
 //! with. See `http/metrics.rs`'s own doc comment for the reasoning.
 
+use std::sync::{Arc, Mutex};
+
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -10,7 +12,7 @@ use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use slimm_server::hub::{Hub, MemoryReading};
 use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
@@ -34,10 +36,14 @@ async fn store(name: &str) -> (Store, support::TestDbGuard) {
 }
 
 fn app(store: Store, voice: VoiceService) -> Router {
+    app_with_hub(store, voice, Hub::new())
+}
+
+fn app_with_hub(store: Store, voice: VoiceService, hub: Hub) -> Router {
     http::router(AppState {
         store,
         auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
+        hub,
         limiter: RateLimiter::new(),
         push: PushSender::disabled(),
         voice,
@@ -116,8 +122,8 @@ async fn a_caller_without_manage_server_is_refused() {
 /// The load-bearing shape test: every non-comment, non-blank line is a valid
 /// Prometheus exposition line (`name{labels} value`, or a bare `name value`),
 /// every metric that appears has both a `# HELP` and a `# TYPE` line ahead of
-/// it, and the four series the mission names are all present. Mutation-tested
-/// by hand: dropping any one of the four `write_*` calls in `http/metrics.rs`
+/// it, and the five series the mission names are all present. Mutation-tested
+/// by hand: dropping any one of the five `write_*` calls in `http/metrics.rs`
 /// fails exactly the matching assertion below and nothing else.
 #[tokio::test]
 async fn a_manage_server_caller_gets_valid_prometheus_text_with_every_series() {
@@ -145,9 +151,55 @@ async fn a_manage_server_caller_gets_valid_prometheus_text_with_every_series() {
     assert!(text.contains("slimm_requests_total{class=\"read\"} "));
     assert!(text.contains("slimm_requests_refused_total{class=\"password\"} "));
     assert!(text.contains("slimm_websocket_connections "));
+    assert!(text.contains("slimm_memory_admission_refused_total "));
     // No SFU here: the configured gauge is 0 and the reachable gauge is absent, not a misleading 0.
     assert!(text.contains("slimm_livekit_configured 0"));
     assert!(!text.contains("slimm_livekit_reachable"));
+}
+
+/// A discovered memory ceiling reports both the limit and usage gauges, with
+/// the exact values the guard was given - proving the wiring from
+/// `Hub::memory_admission_snapshot` through to the exposition text, without
+/// depending on whatever cgroup (or lack of one) the test happens to run
+/// under.
+#[tokio::test]
+async fn a_discovered_memory_ceiling_reports_both_gauges() {
+    let (s, _guard) = store("slimm-metrics-mem-known").await;
+    let (admin, _member) = deployment(&s).await;
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let hub = Hub::with_memory_reading(Arc::new(Mutex::new(MemoryReading {
+        limit_bytes: Some(536_870_912),
+        usage_bytes: Some(123_456_789),
+    })));
+    let router = app_with_hub(s, VoiceService::disabled(), hub);
+    let response = router
+        .oneshot(get("/metrics", &session.access_token))
+        .await
+        .unwrap();
+    let text = body_text(response).await;
+    assert!(text.contains("slimm_memory_limit_bytes 536870912"));
+    assert!(text.contains("slimm_memory_usage_bytes 123456789"));
+}
+
+/// No discoverable ceiling omits both gauges, the same "absent, not a
+/// misleading zero" shape `slimm_livekit_reachable` uses when no SFU is
+/// configured, rather than reporting a `0` that would read as "no memory in
+/// use" instead of "unknown".
+#[tokio::test]
+async fn no_discoverable_memory_ceiling_omits_both_gauges() {
+    let (s, _guard) = store("slimm-metrics-mem-unknown").await;
+    let (admin, _member) = deployment(&s).await;
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let hub = Hub::with_memory_reading(Arc::new(Mutex::new(MemoryReading::default())));
+    let router = app_with_hub(s, VoiceService::disabled(), hub);
+    let response = router
+        .oneshot(get("/metrics", &session.access_token))
+        .await
+        .unwrap();
+    let text = body_text(response).await;
+    assert!(!text.contains("slimm_memory_limit_bytes "));
+    assert!(!text.contains("slimm_memory_usage_bytes "));
+    assert!(text.contains("slimm_memory_admission_refused_total 0"));
 }
 
 /// The one gauge that reflects real traffic within the request itself: the
