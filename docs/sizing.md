@@ -9,10 +9,21 @@ Runs were constrained with systemd resource limits, which is how Docker expresse
 
 ## The short answer
 
-Two cores and 256 MB carries any deployment that fits inside the connection limit.
+There are two containers to size and they run out of different things.
 
-One core does not, and that is the single most important finding here.
-It is not a matter of degree: at one core the server is throttled into second-scale delays while using only three quarters of the core it was given.
+| Container | Give it | Carries |
+| --- | --- | --- |
+| slim-m server | 2 cores, 512 MB | up to 1024 connected people, the hard cap |
+| LiveKit | 2 cores, 512 MB | about 60 people in one voice call |
+
+Chat is bound by processor and voice by memory, so the dial to turn when either runs short is a different one.
+
+One core for the server is the single most important finding here, and it is not a matter of degree.
+At one core the server is throttled into second-scale delays while using only three quarters of the core it was given.
+Two cores is the first setting that behaves at all, rather than a capacity figure.
+
+For voice, the processor is never the constraint and raising it buys nothing.
+Memory is what decides how many people fit in a call.
 
 ## Hard limits
 
@@ -68,25 +79,68 @@ Those figures include the 64 MB the admission guard holds back.
 
 ## How many people that supports
 
-The load a deployment generates grows with the square of its population when everybody watches the same channel, because each additional person both sends more and receives more.
-So the answer depends on how chatty people are, and the table below states that assumption rather than hiding it.
+Two cores sustains about 26,000 deliveries a second.
+Spending that budget on a space of a given size gives the message rate it can carry.
 
-| Cores | 1 message per person per minute | 2 per minute | 5 per minute |
-| --- | --- | --- | --- |
-| 1 | 774 | 547 | 346 |
-| 2 | 1024 (connection limit) | 883 | 558 |
-| 4 | 1024 (connection limit) | 883 | 558 |
+| People in the space | Messages a second it sustains | Which is, per person |
+| --- | --- | --- |
+| 50 | 520 | 624 a minute |
+| 100 | 260 | 156 a minute |
+| 250 | 104 | 25 a minute |
+| 500 | 52 | 6 a minute |
+| 1024 | 25 | 1.5 a minute |
+
+The last row is the one worth reading twice.
+At the connection limit, the sustained budget is about one and a half messages per person per minute, which is a plausible real chat rate rather than a comfortable margin.
+So the 1024-connection cap and the processor capacity run out at roughly the same population, which means the cap sits in about the right place rather than being arbitrary.
 
 Assumptions behind those numbers, all of which make them pessimistic:
 
 - One connection per person. Somebody with a phone and a laptop counts twice.
 - Everyone watching the same busy channel, which is the worst case for fan-out.
-- Sustained activity, not a peak. Real deployments are idle most of the time.
+- Sustained activity, not a peak. Real deployments are idle almost all of the time.
 
 Splitting people across channels helps considerably but not completely.
 Measured at the same message rate, sending into a channel only the sender could see cost 2.6 percent of a core where a public channel cost 9.4 percent.
 That is roughly a fourfold difference per connection, and the reason it is not larger is that the hub broadcasts every event to every connection, each of which evaluates whether it may see it.
 A connection that cannot see a channel still pays to work that out.
+
+## Voice
+
+Voice runs entirely through LiveKit, a separate container with its own limits, so nothing above applies to it.
+It is bound by memory where chat is bound by processor, which is why the two need separate rows rather than one combined table.
+
+Measured against LiveKit capped at two cores and 512 MB, the deployment's own configuration.
+
+| People in one call | Processor | Memory | Subscriptions |
+| --- | --- | --- | --- |
+| 5 | 1.8% of a core | 36 MB | 25 |
+| 10 | 3.2% | 59 MB | 100 |
+| 20 | 5.7% | 105 MB | 400 |
+| 40 | 10.5% | 204 MB | 1,600 |
+| 60 | 13.8% | 295 MB | 3,600 |
+| 100 | 23.8% | **511.8 MB, at the cap** | 600 of 10,000 delivered |
+
+About 4.7 MB per participant on a 13 MB floor.
+Processor is nowhere near binding: sixty people in a call used under a seventh of one core, and the two cores LiveKit is given are far more than it needs.
+
+**How it fails is worth knowing.**
+At a hundred people the container sat exactly on its memory ceiling and delivered six percent of the subscriptions: each participant received audio from six of the other ninety-nine.
+Packet loss on what did connect was zero.
+So it does not degrade audio quality, it silently stops subscribing people to each other, and a participant experiences it as joining a call and hearing almost nobody, with nothing reporting an error.
+
+On 512 MB, treat sixty as comfortable and a hundred as past the edge.
+Raising LiveKit's memory limit is the dial for larger calls, not its processor.
+
+Subscriptions grow with the square of the room but processor does not follow.
+Going from five to sixty people multiplied subscriptions by 144 and processor by only 7.5, because LiveKit forwards audio packets rather than mixing them.
+That is good news for call sizes and the reason memory binds first.
+
+### The media port range, which is not measured here
+
+The shipped compose publishes 101 UDP media ports, commented as deliberately sized for a friend group.
+These measurements reached LiveKit over its TCP fallback, so nothing here exercised that range.
+If ports are consumed per participant it binds at about the same hundred-person mark as memory, and a deployment expecting large calls should widen it and re-measure rather than trusting either number alone.
 
 ## Compose presets
 
@@ -130,7 +184,8 @@ Differences smaller than it are not reported as findings.
 
 Not measured, and not covered by any number above:
 
-- Voice and video, which run through a separate media server with its own limits.
+- Video and screen share. The voice figures are audio only.
+- LiveKit's media port range, for the reason given in its own section.
 - Reconnect storms, which is how services usually fall over.
 - Sustained multi-hour runs, so slow leaks would not have appeared.
 - Attachment uploads, which have their own limit class and their own disk path.
