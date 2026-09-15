@@ -7,6 +7,8 @@
 /// toast instead (see `docs/design/desktop-vs-mobile.md` rule 6).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -108,6 +110,9 @@ class _ChannelGeneralSectionState extends ConsumerState<ChannelGeneralSection> {
           controller: _name,
           placeholder: 'Channel name',
           onChanged: (_) => setState(() {}),
+          textInputAction: TextInputAction.done,
+          // Enter saves, the same as the button below: the owner typed a new name, pressed it, and nothing happened.
+          onSubmitted: (_) => _canSave ? unawaited(_save()) : null,
           semanticLabel: 'Channel name',
         ),
         const SizedBox(height: AppSpacing.s8),
@@ -115,6 +120,8 @@ class _ChannelGeneralSectionState extends ConsumerState<ChannelGeneralSection> {
           controller: _topic,
           placeholder: 'Description',
           onChanged: (_) => setState(() {}),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _canSave ? unawaited(_save()) : null,
           semanticLabel: 'Channel description',
         ),
         const SizedBox(height: AppSpacing.s4),

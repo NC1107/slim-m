@@ -164,6 +164,8 @@ class ReorderableChannelRows extends StatelessWidget {
     // See this file's own doc comment for why fewer than two also bails out.
     if (!canManage || channelCount < 2) {
       return Column(
+        // A Column centres by default and a header is only as wide as its word, so without the manager's add glyph every heading sat centred.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final item in items)
             switch (item) {

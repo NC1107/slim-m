@@ -59,6 +59,86 @@ void main() {
       );
     });
 
+    /// The owner: "hitting enter after typing a new channel name doesnt save
+    /// it, it does nothing". Both fields had no onSubmitted at all, so the
+    /// key that every other name field in this app honours did nothing here.
+    testWidgets('Enter saves the name, the same as the button', (tester) async {
+      final requests = <http.Request>[];
+      await tester.pumpWidget(
+        harness(
+          ChannelCategorySections(
+            channels: [channel('c1', 'general')],
+            categories: const [],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+          handler: (request) {
+            requests.add(request);
+            return request.method == 'PATCH'
+                ? http.Response(
+                    jsonEncode({
+                      'id': 'c1',
+                      'name': 'renamed',
+                      'kind': 'text',
+                      'created_at': 0,
+                    }),
+                    200,
+                    headers: {'content-type': 'application/json'},
+                  )
+                : http.Response('{}', 200);
+          },
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Manage general'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Channel settings...'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.bySemanticsLabel('Channel name'), 'renamed');
+      await tester.pumpAndSettle();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(
+        requests.where((r) => r.method == 'PATCH').map((r) => r.url.path),
+        ['/channels/c1'],
+      );
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('Enter on an unchanged name sends nothing at all', (
+      tester,
+    ) async {
+      final requests = <http.Request>[];
+      await tester.pumpWidget(
+        harness(
+          ChannelCategorySections(
+            channels: [channel('c1', 'general')],
+            categories: const [],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+          handler: (request) {
+            requests.add(request);
+            return http.Response('{}', 200);
+          },
+        ),
+      );
+
+      await tester.tap(find.bySemanticsLabel('Manage general'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Channel settings...'));
+      await tester.pumpAndSettle();
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(requests.where((r) => r.method == 'PATCH'), isEmpty);
+    });
+
     testWidgets('saving the name and topic sends a PATCH and stays open, '
         'unlike the old sheet which closed', (tester) async {
       final requests = <http.Request>[];
