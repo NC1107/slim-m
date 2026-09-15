@@ -205,8 +205,8 @@ async def run(args):
     await asyncio.sleep(SETTLE_SECONDS)
     cpu_used = (server_cpu() or 0) - (cpu_before or 0)
     wall = time.monotonic() - wall_before
-    harvest = await asyncio.to_thread(pool.finish)
     after = scrape(admin)
+    harvest = await asyncio.to_thread(pool.finish)
 
     seen = harvest["seen"]
     delivery = []
@@ -247,7 +247,8 @@ async def run(args):
     }
     report = load_report.build(
         "fanout-one-channel",
-        {"users": len(subscribers), "connected": len(live),
+        {"users": attempted, "connected": connected,
+         "per_account": args.per_account, "workers": args.workers,
          "senders": args.senders, "messages": args.senders * args.messages,
          "channel": channel["name"], "gap_seconds": args.gap},
         send_latencies, delivery, fanout, server, failures)

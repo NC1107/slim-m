@@ -85,7 +85,7 @@ class ListenerPool:
         self._stop = self._ctx.Event()
         self._procs = []
 
-    def start(self, timeout=180):
+    def start(self, timeout=900):
         """Spawns the workers and blocks until every one has its sockets up.
 
         Returns how many connections actually opened, which is not always
@@ -110,7 +110,7 @@ class ListenerPool:
             attempted += tried
         return connected, attempted
 
-    def finish(self, timeout=180):
+    def finish(self, timeout=600):
         """Signals stop, drains every worker, and merges what they saw."""
         self._stop.set()
         seen = {}

@@ -13,12 +13,15 @@ start expiring while the later connections were still opening.
 """
 import asyncio
 import json
+import random
 import time
+import urllib.error
 
 import websockets
 
 HELLO_TIMEOUT = 10.0
 PROTOCOL = 1
+TICKET_ATTEMPTS = 12
 
 
 class Subscriber:
@@ -34,9 +37,26 @@ class Subscriber:
         self.resync = 0
 
     async def _ticket(self):
-        got = await asyncio.to_thread(
-            self.api.call, "POST", "/auth/ws-ticket", {})
-        return got["ticket"]
+        """A connect ticket, waiting out the per-account burst limit.
+
+        Tickets allow ten in a burst and then one a second, per account. Any
+        run asking one account for more than ten sockets hits that, and
+        without this it looks exactly like the server refusing connections:
+        a sweep for the connection ceiling stopped at a clean ten per account
+        and reported a ceiling that was really this bucket.
+        """
+        delay = 1.0
+        for attempt in range(TICKET_ATTEMPTS):
+            try:
+                got = await asyncio.to_thread(
+                    self.api.call, "POST", "/auth/ws-ticket", {})
+                return got["ticket"]
+            except urllib.error.HTTPError as exc:
+                if exc.code != 429 or attempt == TICKET_ATTEMPTS - 1:
+                    raise
+                await asyncio.sleep(delay + random.random() * 0.5)
+                delay = min(delay * 1.6, 8.0)
+        raise RuntimeError("unreachable")
 
     async def open(self):
         """Connects and completes the hello handshake.

@@ -9,6 +9,10 @@ Server-side counters are reported as a delta across the run rather than as
 the absolute since-process-start values the endpoint returns, so a run
 against a server that has been up for a while still reads as what this run
 did.
+
+Histogram buckets are kept in the written record but left out of the printed
+summary: one route produces a dozen cumulative bucket lines, which buries the
+handful of numbers a person reads a run to find.
 """
 import json
 import statistics
@@ -122,6 +126,8 @@ def render(report):
             lines.append(f"    {note}")
     server = report.get("server") or {}
     for key in sorted(server.get("delta", {})):
+        if "_bucket{" in key:
+            continue
         lines.append(f"  server {key}: +{server['delta'][key]}")
     for key in ("rss_start_bytes", "rss_end_bytes", "ws_connections_peak",
                 "cpu_seconds", "cpu_percent_of_one_core", "pool_in_use",
