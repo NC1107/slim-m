@@ -318,6 +318,9 @@ async fn record_timed_out_call(
             message: std::sync::Arc::new(sent.message),
             attachments: std::sync::Arc::new(Vec::new()),
             forwarded: None,
+            app_surface: None,
+            code_run: None,
+            poll: None,
         }),
         Err(err) => tracing::warn!(
             error = %err,

@@ -29,7 +29,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{CreatePollError, Poll as StorePoll, VoteError, now_ms};
+use crate::store::{CreatePollError, Poll as StorePoll, Store, VoteError, now_ms};
 
 /// Poll bodies are small: a question, up to four short options, and an
 /// optional close time.
@@ -105,13 +105,15 @@ impl From<StorePoll> for PollDto {
 /// `ids` and `dtos` must be the same length and in the same order, which
 /// holds because both are built from the same source list of messages in
 /// [`super::message_enrich::with_reactions`].
+///
+/// Takes `&Store` rather than `&AppState`: nothing here reads any other field.
 pub(crate) async fn attach_polls(
-    state: &AppState,
+    store: &Store,
     viewer: UserId,
     ids: &[MessageId],
     dtos: &mut [MessageDto],
 ) -> anyhow::Result<()> {
-    let polls = state.store.polls_for_messages(ids, viewer).await?;
+    let polls = store.polls_for_messages(ids, viewer).await?;
     for (message_id, poll) in polls {
         if let Some(pos) = ids.iter().position(|id| *id == message_id) {
             dtos[pos].poll = Some(poll.into());
@@ -199,10 +201,11 @@ async fn create(
         Err(CreatePollError::Internal(e)) => return Err(e.into()),
     };
 
+    let poll = state.store.poll_for_message(id, ctx.user_id).await?;
     let mut dto = MessageDto::from(sent.message.clone());
     // Fresh or a retry, the poll itself already exists by the time this reads
     // it, so both branches attach the same way.
-    if let Some(poll) = state.store.poll_for_message(id, ctx.user_id).await? {
+    if let Some(poll) = poll.clone() {
         dto.poll = Some(poll.into());
     }
 
@@ -217,11 +220,19 @@ async fn create(
         )
         .await?;
 
+        // Nobody can have voted before this, the poll's own creation.
+        let poll_for_event = poll.map(|mut poll| {
+            poll.voted_option = None;
+            poll
+        });
         state.hub.publish(Event::MessageCreated {
             message: Arc::new(sent.message.clone()),
             // A poll message carries no attachment, and forwards nothing.
             attachments: Arc::new(Vec::new()),
             forwarded: None,
+            app_surface: None,
+            code_run: None,
+            poll: poll_for_event.map(Arc::new),
         });
         state.push.notify_message(
             state.store.clone(),

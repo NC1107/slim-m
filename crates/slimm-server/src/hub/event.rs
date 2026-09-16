@@ -12,7 +12,8 @@ use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
 use crate::store::{
-    AttachmentSummary, CanvasObject, Channel, ForwardSummary, MediaSlotKind, Message,
+    AppSurface, AttachmentSummary, CanvasObject, Channel, CodeRunSummary, ForwardSummary,
+    MediaSlotKind, Message, Poll,
 };
 use crate::voice::CallRingOutcome;
 
@@ -36,6 +37,21 @@ pub enum Event {
         /// forward that arrived live without it rendered as a bare note
         /// until the next sync filled the origin in.
         forwarded: Option<Arc<ForwardSummary>>,
+        /// The app this message launches, if any - resolved once here by the
+        /// sender rather than per subscriber, the same reasoning `attachments`
+        /// carries this rather than each connection querying it. See
+        /// `http::ws::message_frames::created`.
+        app_surface: Option<Arc<AppSurface>>,
+        /// The app's block-0 run, if one already landed by the time this
+        /// message was sent - a client can race its first run against the
+        /// send that made the message it targets. `None` here is not "no
+        /// run yet": a run that lands after this event still arrives its
+        /// own `CodeRunChanged`.
+        code_run: Option<Arc<CodeRunSummary>>,
+        /// The poll this message carries, if any. `voted_option` is always
+        /// `None` here: nobody can have voted before this message, which is
+        /// the poll's own creation, exists.
+        poll: Option<Arc<Poll>>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,
     /// a different sequence from the message's own `seq`, which an edit does

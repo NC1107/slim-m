@@ -223,6 +223,10 @@ async fn send(
             message: Arc::new(sent.message.clone()),
             attachments: Arc::new(attachments.clone()),
             forwarded: forwarded.clone().map(Arc::new),
+            // An ordinary send never launches an app or carries a poll.
+            app_surface: None,
+            code_run: None,
+            poll: None,
         });
 
         // Cheap in-memory decision only, real work detached; see the note on
