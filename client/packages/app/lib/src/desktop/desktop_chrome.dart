@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The one wrapper `main.dart`'s `appChromeBuilder` adds for the desktop
-/// window shell: the frameless title bar, once it is actually active, and
-/// the first-run tray notice banner, both mounted above the routed content
-/// rather than deep inside `home_shell.dart`, so every screen gets them with
-/// no change to any of them.
+/// window shell: the frameless title bar, once it is actually active, the
+/// first-run tray notice banner, and the update-available banner, all
+/// mounted above the routed content rather than deep inside
+/// `home_shell.dart`, so every screen gets them with no change to any of
+/// them.
 ///
 /// It carries its own [Material]. This sits in `MaterialApp`'s `builder`,
 /// above the Navigator, so nothing here has a `Scaffold` - and without a
@@ -30,6 +31,7 @@ import 'close_behavior.dart';
 import 'desktop_window_shell.dart';
 import 'first_run_tray_notice_banner.dart';
 import 'title_bar.dart';
+import 'update_available_banner.dart';
 import 'window_resize_frame.dart';
 
 class DesktopChrome extends StatelessWidget {
@@ -61,6 +63,7 @@ class DesktopChrome extends StatelessWidget {
                         onRequestClose: DesktopWindowShell.requestClose,
                       ),
                     const FirstRunTrayNoticeBanner(),
+                    const UpdateAvailableBanner(),
                     Expanded(child: child),
                   ],
                 ),
