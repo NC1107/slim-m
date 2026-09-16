@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.65.0](https://github.com/NC1107/slim-m/compare/server-v0.64.0...server-v0.65.0) (2026-09-16)
+
+
+### Features
+
+* **server:** broker code execution through a self-hosted Piston instance ([#1216](https://github.com/NC1107/slim-m/issues/1216)) ([5deb9c7](https://github.com/NC1107/slim-m/commit/5deb9c7d6a38ebbb40df1170b594bbcd713b2949))
+* **server:** show a YouTube video's channel on its link preview ([#1213](https://github.com/NC1107/slim-m/issues/1213)) ([369cdab](https://github.com/NC1107/slim-m/commit/369cdab8fe9cea2e4b1427f1b017ec954497a361))
+
+
+### Bug Fixes
+
+* double the signup limit, and stop a small board filling the screen ([#1205](https://github.com/NC1107/slim-m/issues/1205)) ([8bfda8c](https://github.com/NC1107/slim-m/commit/8bfda8c904634c0559646212d8ac48429834d135))
+* **server:** carry app surfaces and polls on the live message.created frame ([#1210](https://github.com/NC1107/slim-m/issues/1210)) ([060ff14](https://github.com/NC1107/slim-m/commit/060ff140d3a553f6247369559c26013bfc358f47))
+
 ## [0.64.0](https://github.com/NC1107/slim-m/compare/server-v0.63.0...server-v0.64.0) (2026-09-15)
 
 
