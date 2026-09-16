@@ -1,27 +1,38 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Persistent [KeyStore] backends.
 ///
-/// iOS and Android get the platform keychain (Keychain / Keystore) through
-/// flutter_secure_storage, which is the right place for secrets on a phone:
-/// the OS guarantees a backend is always present. Desktop deliberately does
-/// not use it, even though flutter_secure_storage also ships a Linux
-/// backend: that backend talks to a Secret Service over D-Bus (gnome-keyring,
-/// kwallet plus ksecretsservice), and plenty of real sessions - a fresh
-/// install, a window manager with no keyring agent, a container - do not run
-/// one, so calls would fail unpredictably at runtime even on a machine where
-/// the build itself succeeds.
+/// iOS, Android, macOS and Windows all get the platform keychain (Keychain,
+/// Keystore, Keychain Services, and DPAPI-backed Credential Locker in turn)
+/// through flutter_secure_storage: none of those four backends depends on a
+/// background service that might not be running, so the OS itself guarantees
+/// one is always present, on a laptop exactly as on a phone.
+///
+/// Linux is the exception, even though flutter_secure_storage also ships a
+/// Linux backend: that backend talks to a Secret Service over D-Bus
+/// (gnome-keyring, kwallet plus ksecretsservice), and plenty of real
+/// sessions - a fresh install, a window manager with no keyring agent, a
+/// container - do not run one, so calls would fail unpredictably at runtime
+/// even on a machine where the build itself succeeds.
 ///
 /// Transport-only security is the project's v1 scope (see
-/// docs/decisions/0001-owner-decisions.md); this file is the desktop
+/// docs/decisions/0001-owner-decisions.md); this file is the Linux
 /// key-storage tradeoff that follows from that, not itself a recorded
 /// decision: a session token and a push key are not payment credentials, so a
 /// file only this OS account can open is a proportionate, always-available
-/// choice for desktop rather than one that depends on a keyring agent nobody
+/// choice for Linux rather than one that depends on a keyring agent nobody
 /// promised would be running. It is weaker than a real keychain - no
 /// OS-enforced encryption at rest, and it does not resist another process
 /// already running as this same OS account - but it is not readable by a
-/// different account on a shared machine, which is the threat this desktop
+/// different account on a shared machine, which is the threat this Linux
 /// build actually faces today.
+///
+/// macOS and Windows used to sit on that same file, back when this reasoning
+/// was written for "desktop" as a whole rather than for Linux specifically.
+/// Both ship a real OS-backed keychain with the same always-present guarantee
+/// as the phone platforms, so there is no longer a reason to leave them on
+/// the weaker fallback; [migrateLegacyFileSecretsIfNeeded] is the one-time
+/// move for an install that already has secrets sitting in that file from
+/// before this change.
 ///
 /// The web build does use flutter_secure_storage, because its browser backend
 /// is the only storage a browser has: values are AES-GCM encrypted under a key
@@ -137,11 +148,11 @@ class SecureKeyStore implements KeyStore {
   }
 }
 
-/// The desktop fallback: a single JSON file under the user's
+/// The Linux fallback: a single JSON file under the user's
 /// application-support directory, restricted to this OS account (`chmod
 /// 600`) after every write. See the library doc for why this, not
-/// flutter_secure_storage, is used off mobile, and for what this does and
-/// does not defend against.
+/// flutter_secure_storage, is used there, and for what this does and does
+/// not defend against.
 ///
 /// Every operation is queued behind the last: two calls racing a
 /// read-modify-write of the same file on disk is exactly how a concurrent
@@ -149,6 +160,8 @@ class SecureKeyStore implements KeyStore {
 /// would silently lose one of them.
 class FileKeyStore implements KeyStore {
   FileKeyStore({Directory? directory}) : _directory = directory;
+
+  static const _fileName = 'slimm_secrets.json';
 
   /// Overridden by tests; production always resolves the real
   /// application-support directory.
@@ -176,13 +189,21 @@ class FileKeyStore implements KeyStore {
   }
 
   Future<File> _open() async {
-    final dir = _directory ?? await getApplicationSupportDirectory();
-    final file = File(p.join(dir.path, 'slimm_secrets.json'));
+    final file = await _fileNoCreate();
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
     await _restrict(file);
     return file;
+  }
+
+  /// The file this store reads and writes, without creating it - unlike
+  /// [_open], which every ordinary operation goes through. Used only by the
+  /// migration helpers below, which must not conjure an empty file on a
+  /// platform or install that never had one.
+  Future<File> _fileNoCreate() async {
+    final dir = _directory ?? await getApplicationSupportDirectory();
+    return File(p.join(dir.path, _fileName));
   }
 
   /// Best-effort: a missing `chmod` binary (there is no other platform this
@@ -248,17 +269,123 @@ class FileKeyStore implements KeyStore {
       'signing needs a real key backend; wire one before shipping E2EE',
     );
   }
+
+  /// Every entry currently on disk, for [migrateLegacyFileSecretsIfNeeded].
+  /// Null, rather than an empty map, when the file does not exist at all -
+  /// [_fileNoCreate] is used instead of [_secretsFile] specifically so asking
+  /// never creates one, on a platform or install that never had it.
+  Future<Map<String, String>?> readAllForMigration() async {
+    final file = await _fileNoCreate();
+    if (!await file.exists()) return null;
+    final contents = await file.readAsString();
+    if (contents.trim().isEmpty) return {};
+    final data = jsonDecode(contents) as Map<String, dynamic>;
+    return data.map((key, value) => MapEntry(key, value as String));
+  }
+
+  /// Deletes the file this store reads and writes. Only ever called once
+  /// every entry [readAllForMigration] returned has been written somewhere
+  /// else - see [migrateLegacyFileSecretsIfNeeded].
+  Future<void> deleteLegacyFile() async {
+    final file = await _fileNoCreate();
+    if (await file.exists()) await file.delete();
+  }
 }
 
-/// Picks the right backend for this platform: the OS keychain on iOS and
-/// Android, browser storage on the web (see the library doc for how much
-/// weaker that is), and an owner-only-permissioned file everywhere else,
-/// which today means the Linux desktop build.
-KeyStore createPersistentKeyStore() {
-  // Web is grouped with mobile rather than desktop because a browser has no
-  // filesystem to write an owner-only file to.
-  if (kIsWeb || isIOSHost || isAndroidHost) return SecureKeyStore();
-  return FileKeyStore();
+/// The platform facts [createPersistentKeyStore] switches on, gathered into
+/// one value so a test can supply a fake one: `dart:io`'s `Platform.isX`
+/// getters are the real OS, not something a test running on one CI runner
+/// can flip to pretend to be another.
+@visibleForTesting
+class HostPlatformKind {
+  const HostPlatformKind({
+    required this.isWeb,
+    required this.isIOS,
+    required this.isAndroid,
+    required this.isMacOS,
+    required this.isWindows,
+  });
+
+  /// What this process is actually running on.
+  factory HostPlatformKind.current() => HostPlatformKind(
+        isWeb: kIsWeb,
+        isIOS: isIOSHost,
+        isAndroid: isAndroidHost,
+        isMacOS: isMacOSHost,
+        isWindows: isWindowsHost,
+      );
+
+  final bool isWeb;
+  final bool isIOS;
+  final bool isAndroid;
+  final bool isMacOS;
+  final bool isWindows;
+
+  /// Whether this platform gets [SecureKeyStore] rather than [FileKeyStore].
+  /// A browser has no filesystem to write an owner-only file to, so it is
+  /// grouped with the three OSes whose keychain is always present; Linux is
+  /// the one host left on the file (see the library doc for why).
+  bool get usesSecureBackend =>
+      isWeb || isIOS || isAndroid || isMacOS || isWindows;
+}
+
+/// Picks the right backend for this platform: the OS keychain on iOS,
+/// Android, macOS and Windows, browser storage on the web (see the library
+/// doc for how much weaker that is), and an owner-only-permissioned file on
+/// Linux, the one platform whose flutter_secure_storage backend cannot
+/// promise a running Secret Service (see the library doc).
+KeyStore createPersistentKeyStore({HostPlatformKind? platform}) {
+  final kind = platform ?? HostPlatformKind.current();
+  return kind.usesSecureBackend ? SecureKeyStore() : FileKeyStore();
+}
+
+/// Moves secrets an earlier build left in [FileKeyStore] into
+/// [SecureKeyStore], for the two platforms this version newly routes to the
+/// keychain: macOS and Windows. A no-op everywhere else - Linux still uses
+/// the file (see [createPersistentKeyStore]), and iOS, Android and the web
+/// never wrote one, so there is nothing to move.
+///
+/// Every entry is written to the new store before the old file is deleted,
+/// and the file is left untouched if reading it or writing any entry fails,
+/// so a keychain that refuses a write this one time leaves the user's
+/// session on the file rather than signed out with nothing to fall back to.
+/// The next launch simply tries again.
+///
+/// Call before anything reads [createPersistentKeyStore]'s result for this
+/// install's actual secrets - `restoreSession` in the app package is that
+/// call site today.
+Future<void> migrateLegacyFileSecretsIfNeeded() async {
+  if (!isMacOSHost && !isWindowsHost) return;
+  await migrateLegacyFileSecrets(
+    legacy: FileKeyStore(),
+    destination: SecureKeyStore(),
+  );
+}
+
+/// The platform-independent move [migrateLegacyFileSecretsIfNeeded] performs,
+/// split out so a test can supply an in-memory [destination] instead of a
+/// real keychain and a [legacy] store pointed at a throwaway directory.
+@visibleForTesting
+Future<void> migrateLegacyFileSecrets({
+  required FileKeyStore legacy,
+  required KeyStore destination,
+}) async {
+  final Map<String, String>? entries;
+  try {
+    entries = await legacy.readAllForMigration();
+  } catch (_) {
+    return;
+  }
+  if (entries == null) return;
+
+  try {
+    for (final entry in entries.entries) {
+      await destination.put(entry.key, entry.value);
+    }
+  } catch (_) {
+    return;
+  }
+  await legacy.deleteLegacyFile();
 }
 
 /// Whether the push private key lives somewhere other than where every other
@@ -266,8 +393,8 @@ KeyStore createPersistentKeyStore() {
 ///
 /// The keychain group and the accessibility [SecureKeyStore.forPushKey]
 /// carries are iOS attributes that mean nothing to the Android keystore, the
-/// desktop file, or a browser, and no other platform has a second process
-/// that needs to read this key.
+/// macOS/Windows keychain, the Linux file, or a browser, and no other
+/// platform has a second process that needs to read this key.
 ///
 /// Callers must ask this rather than comparing stores: off iOS the push key
 /// has to use the *same instance* [createPersistentKeyStore] returned, not an

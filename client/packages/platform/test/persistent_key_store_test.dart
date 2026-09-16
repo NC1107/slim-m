@@ -239,4 +239,144 @@ void main() {
       );
     });
   });
+
+  group('createPersistentKeyStore', () {
+    const platforms = {
+      'web': HostPlatformKind(
+        isWeb: true,
+        isIOS: false,
+        isAndroid: false,
+        isMacOS: false,
+        isWindows: false,
+      ),
+      'iOS': HostPlatformKind(
+        isWeb: false,
+        isIOS: true,
+        isAndroid: false,
+        isMacOS: false,
+        isWindows: false,
+      ),
+      'Android': HostPlatformKind(
+        isWeb: false,
+        isIOS: false,
+        isAndroid: true,
+        isMacOS: false,
+        isWindows: false,
+      ),
+      'macOS': HostPlatformKind(
+        isWeb: false,
+        isIOS: false,
+        isAndroid: false,
+        isMacOS: true,
+        isWindows: false,
+      ),
+      'Windows': HostPlatformKind(
+        isWeb: false,
+        isIOS: false,
+        isAndroid: false,
+        isMacOS: false,
+        isWindows: true,
+      ),
+    };
+
+    for (final entry in platforms.entries) {
+      test('${entry.key} gets the keychain backend', () {
+        expect(
+          createPersistentKeyStore(platform: entry.value),
+          isA<SecureKeyStore>(),
+        );
+      });
+    }
+
+    test('Linux gets the file backend', () {
+      const linux = HostPlatformKind(
+        isWeb: false,
+        isIOS: false,
+        isAndroid: false,
+        isMacOS: false,
+        isWindows: false,
+      );
+      expect(createPersistentKeyStore(platform: linux), isA<FileKeyStore>());
+    });
+  });
+
+  group('migrateLegacyFileSecrets', () {
+    late Directory dir;
+
+    setUp(() => dir = Directory.systemTemp.createTempSync('slimm_migrate_'));
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    File legacyFile() => File('${dir.path}/slimm_secrets.json');
+
+    test(
+        'a populated legacy file lands in the new store, and the file is '
+        'gone afterwards', () async {
+      final legacy = FileKeyStore(directory: dir);
+      await legacy.put('session_token_pair', 'token-value');
+      await legacy.put('push_x25519_private_key', 'push-key-value');
+
+      final destination = InMemoryKeyStore();
+      await migrateLegacyFileSecrets(legacy: legacy, destination: destination);
+
+      expect(await destination.read('session_token_pair'), 'token-value');
+      expect(
+        await destination.read('push_x25519_private_key'),
+        'push-key-value',
+      );
+      expect(legacyFile().existsSync(), isFalse);
+    });
+
+    test('nothing to migrate when the legacy file never existed', () async {
+      final legacy = FileKeyStore(directory: dir);
+      final destination = InMemoryKeyStore();
+
+      await migrateLegacyFileSecrets(legacy: legacy, destination: destination);
+
+      expect(legacyFile().existsSync(), isFalse);
+    });
+
+    test(
+        'a write failure on the new store leaves the legacy file in place, '
+        'so a signed-in user is not stranded', () async {
+      final legacy = FileKeyStore(directory: dir);
+      await legacy.put('session_token_pair', 'token-value');
+
+      await migrateLegacyFileSecrets(
+        legacy: legacy,
+        destination: _ThrowingKeyStore(),
+      );
+
+      expect(legacyFile().existsSync(), isTrue);
+      expect(await legacy.read('session_token_pair'), 'token-value');
+    });
+
+    test(
+        'migrateLegacyFileSecretsIfNeeded does nothing on a platform that '
+        'never wrote the file - this suite runs on Linux', () async {
+      await expectLater(migrateLegacyFileSecretsIfNeeded(), completes);
+    }, testOn: 'linux');
+  });
+}
+
+/// A store whose every write fails, standing in for a keychain that refuses
+/// this one write - a locked session, a full disk, whatever the reason.
+class _ThrowingKeyStore implements KeyStore {
+  @override
+  Future<KeyHandle> put(String name, String secret) async =>
+      throw StateError('keychain unavailable');
+
+  @override
+  Future<String?> read(KeyHandle handle) async =>
+      throw StateError('keychain unavailable');
+
+  @override
+  Future<void> delete(KeyHandle handle) async =>
+      throw StateError('keychain unavailable');
+
+  @override
+  Future<void> clear() async => throw StateError('keychain unavailable');
+
+  @override
+  Future<List<int>> sign(KeyHandle handle, List<int> payload) async =>
+      throw StateError('keychain unavailable');
 }

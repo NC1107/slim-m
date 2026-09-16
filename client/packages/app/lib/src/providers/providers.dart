@@ -179,10 +179,16 @@ Future<void> _persistSession(
 /// Everything here, including the very first read, runs inside the guarded
 /// region: main() awaits this before runApp, so any failure of the storage
 /// layer itself must degrade to "no stored session" and let the app reach the
-/// sign-in screen, never crash launch outright.
+/// sign-in screen, never crash launch outright. That guarded region is also
+/// where [migrateLegacyFileSecretsIfNeeded] runs, ahead of the reads below:
+/// on macOS and Windows an upgrading install's session still sits in the old
+/// file until that move lands, and this has to see the moved copy, not miss
+/// it and read as signed out.
 Future<void> restoreSession(ProviderContainer container) async {
   final keyStore = container.read(keyStoreProvider);
   try {
+    await migrateLegacyFileSecretsIfNeeded();
+
     /// The iOS/Android keychain outlives app deletion; this flag does not, so
     /// its absence means this is the first launch since an install (fresh, or
     /// a reinstall over one that was supposedly wiped). Whatever is already in
