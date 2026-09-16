@@ -266,9 +266,11 @@ async fn a_second_client_sees_a_poll_live() {
     let frame = read_frame(&mut watcher_ws).await;
     assert_eq!(frame["type"], "message.created");
     assert_eq!(frame["message"]["poll"]["question"], "cats or dogs");
-    // Nobody, including the author, can have voted before this frame: the
-    // poll's own creation is what this frame announces.
-    assert_eq!(frame["message"]["poll"]["voted_option"], Value::Null);
+    assert_eq!(
+        frame["message"]["poll"]["voted_option"],
+        Value::Null,
+        "nobody can have voted before the frame announcing the poll's creation"
+    );
     assert_eq!(frame["message"]["poll"]["options"][0]["label"], "cats");
 }
 
