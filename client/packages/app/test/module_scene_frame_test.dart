@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The scene board fills the width it is given, until the window's height
-/// says stop. It used to cap at 420px, which on a desktop transcript left a
-/// small square adrift in a card twice its width.
+/// How big a scene is drawn, which two opposite complaints have shaped. A
+/// fixed 420px cap left a small square adrift in a desktop card twice its
+/// width; a share of the window height then made a three-by-three board 650px
+/// tall on a 1080p desktop. The board is now bounded per cell, so a small grid
+/// stays a board while a big one is still limited by the window.
 library;
 
 import 'dart:convert';
@@ -60,18 +62,41 @@ Size _board(WidgetTester tester) => tester.getSize(
 );
 
 void main() {
-  testWidgets('on a desktop the board grows past the old 420px cap', (
+  testWidgets('a small board is past the old 420px cap but not huge', (
     tester,
   ) async {
     await _pump(tester, const Size(1200, 900));
     final board = _board(tester);
-    expect(board.width, greaterThan(420));
     expect(
       board.width,
-      900 * ModuleSceneFrame.viewportShare,
-      reason: 'a square scene is bounded by its share of the window height',
+      greaterThan(420),
+      reason: 'the cap that read as adrift in a desktop card',
+    );
+    expect(
+      board.width,
+      3 * ModuleSceneFrame.maxCellSize,
+      reason: 'three rows, so three cells decide the height',
+    );
+    expect(
+      board.width,
+      lessThan(900 * ModuleSceneFrame.viewportShare),
+      reason: 'a tic-tac-toe grid does not want its share of the window',
     );
     expect(board.height, board.width);
+  });
+
+  testWidgets('a big grid still takes its share of the window', (tester) async {
+    await _pump(
+      tester,
+      const Size(1200, 900),
+      scene: _scene(cols: 40, rows: 40),
+    );
+    final board = _board(tester);
+    expect(
+      board.height,
+      closeTo(900 * ModuleSceneFrame.viewportShare, 1.5),
+      reason: 'forty rows want more than the per-cell bound would give',
+    );
   });
 
   testWidgets('on a phone the board is the full width', (tester) async {
@@ -84,7 +109,7 @@ void main() {
     final board = _board(tester);
     expect(board.width / board.height, closeTo(2, 0.01));
     // Within the hairline: the border rounds the inner box by a pixel.
-    expect(board.height, closeTo(900 * ModuleSceneFrame.viewportShare, 1.5));
+    expect(board.height, closeTo(3 * ModuleSceneFrame.maxCellSize, 1.5));
   });
 
   testWidgets('a short window keeps a usable board', (tester) async {

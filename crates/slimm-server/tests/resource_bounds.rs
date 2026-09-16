@@ -77,6 +77,21 @@ fn login_from(peer: &str, forwarded: Option<&str>) -> Request<Body> {
     request
 }
 
+/// Enough logins to outrun the password bucket's refill on any runner.
+///
+/// Sized rather than tuned. The bucket is ten with one back every three
+/// seconds, so a loop that takes long enough per request never empties it:
+/// at two seconds each, thirty requests would still be admitted. CI proved
+/// that by failing on eleven where a laptop passed. [`any_throttled`] stops
+/// at the first refusal, so the generous ceiling costs nothing in the normal
+/// case and only spends real hashes when the assertion is about to fail.
+const ENOUGH_TO_EXHAUST: usize = 40;
+
+/// Comfortably inside the burst, for asserting that a caller was *not*
+/// throttled. Refill only ever helps this direction, so there is no runner
+/// slow enough to make it flaky.
+const WITHIN_BURST: usize = 8;
+
 /// Fires `count` logins and reports whether any was refused for rate.
 async fn any_throttled(app: &Router, peer: &str, forwarded: Option<&str>, count: usize) -> bool {
     for _ in 0..count {
@@ -102,8 +117,14 @@ async fn without_a_trusted_proxy_every_forwarded_caller_shares_one_bucket() {
 
     // Nothing trusted, so the header is ignored and both key on the proxy.
     assert!(
-        any_throttled(&app, "10.0.0.1:5000", Some("203.0.113.7"), 6).await,
-        "the password budget is a burst of 5, so a run of 6 must be refused"
+        any_throttled(
+            &app,
+            "10.0.0.1:5000",
+            Some("203.0.113.7"),
+            ENOUGH_TO_EXHAUST
+        )
+        .await,
+        "one bucket for every forwarded caller, so a sustained run is refused"
     );
     assert!(
         any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), 1).await,
@@ -118,11 +139,17 @@ async fn a_trusted_proxy_gives_each_real_caller_its_own_bucket() {
     let app = app_with_hops(store, 1);
 
     assert!(
-        any_throttled(&app, "10.0.0.1:5000", Some("203.0.113.7"), 6).await,
+        any_throttled(
+            &app,
+            "10.0.0.1:5000",
+            Some("203.0.113.7"),
+            ENOUGH_TO_EXHAUST
+        )
+        .await,
         "the first client still spends its own budget"
     );
     assert!(
-        !any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), 5).await,
+        !any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), WITHIN_BURST).await,
         "a second real client behind the same proxy has its own budget"
     );
 }
@@ -135,20 +162,21 @@ async fn a_client_supplied_prefix_cannot_reach_the_trusted_slot() {
     let (store, _guard) = new_store("slimm-bounds-spoof").await;
     let app = app_with_hops(store, 1);
 
-    // One real client, varying only the prefix it controls: one bucket.
-    for spoof in ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5"] {
-        app.clone()
+    // One real client varying only the prefix it controls must share a bucket.
+    for spoof in 0..ENOUGH_TO_EXHAUST {
+        let response = app
+            .clone()
             .oneshot(login_from(
                 "10.0.0.1:5000",
-                Some(&format!("{spoof}, 203.0.113.7")),
+                Some(&format!("{spoof}.{spoof}.{spoof}.{spoof}, 203.0.113.7")),
             ))
             .await
             .unwrap();
+        if response.status() == StatusCode::TOO_MANY_REQUESTS {
+            return;
+        }
     }
-    assert!(
-        any_throttled(&app, "10.0.0.1:5000", Some("6.6.6.6, 203.0.113.7"), 1).await,
-        "a prepended address must not mint a fresh bucket"
-    );
+    panic!("a prepended address minted a fresh bucket every time");
 }
 
 /// A header too short to hold the trusted slot falls back to the peer rather
@@ -158,12 +186,16 @@ async fn a_chain_too_short_for_the_trusted_slot_falls_back_to_the_peer() {
     let (store, _guard) = new_store("slimm-bounds-short").await;
     let app = app_with_hops(store, 2);
 
-    for _ in 0..6 {
-        app.clone()
-            .oneshot(login_from("10.0.0.1:5000", Some("203.0.113.7")))
-            .await
-            .unwrap();
-    }
+    assert!(
+        any_throttled(
+            &app,
+            "10.0.0.1:5000",
+            Some("203.0.113.7"),
+            ENOUGH_TO_EXHAUST
+        )
+        .await,
+        "the first caller spends the shared bucket"
+    );
     assert!(
         any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), 1).await,
         "with only one entry and two hops trusted there is no trusted slot, so \
