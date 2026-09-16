@@ -20,3 +20,12 @@ const kMessageMaxChars = 4000;
 /// see [kMessageMaxChars]'s own doc comment for why this is a mirrored
 /// constant rather than a generated one.
 const kUserNoteMaxChars = 500;
+
+/// Shortest a password may be, in characters.
+///
+/// Mirrors the lower bound in `validate_password` in
+/// `crates/slimm-server/src/http/auth.rs`, which registration and reset both
+/// go through; see [kMessageMaxChars] for why this is mirrored rather than
+/// generated. Stating it before submit is the point: the rule was previously
+/// only ever met as a rejection after the fact.
+const kPasswordMinChars = 8;

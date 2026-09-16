@@ -84,6 +84,33 @@ void main() {
     expect(find.text('Roles...'), findsNothing);
     expect(find.text('Remove from Space...'), findsNothing);
     expect(find.text('Time out for...'), findsNothing);
+    expect(find.text('Password reset code...'), findsNothing);
+  });
+
+  testWidgets('only an administrator can issue a password reset code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(_body(_other), permissions: Perm.banMembers | Perm.kickMembers),
+    );
+    await tester.pump();
+
+    expect(
+      find.text('Password reset code...'),
+      findsNothing,
+      reason:
+          'issuing a code sets somebody else password and signs them out '
+          'everywhere; the server gates it on ADMINISTRATOR alone, and a '
+          'moderator who can remove members still must not see it',
+    );
+    expect(find.text('Remove from Space...'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _harness(_body(_other), permissions: Perm.administrator),
+    );
+    await tester.pump();
+
+    expect(find.text('Password reset code...'), findsOneWidget);
   });
 
   testWidgets('the mention row names its channel, and is absent without one', (

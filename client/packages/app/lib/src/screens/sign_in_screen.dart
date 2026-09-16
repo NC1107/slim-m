@@ -21,6 +21,9 @@ import '../widgets/labeled_field.dart';
 import '../widgets/onboarding_shell.dart';
 import '../widgets/server_identity_confirmation.dart';
 import '../widgets/server_notice.dart';
+import '../providers/toasts.dart';
+import 'reset_password_sheet.dart';
+import 'sign_in_alternatives.dart';
 import 'sign_in_error.dart';
 import 'sign_in_updates_handoff.dart';
 
@@ -119,6 +122,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
+  /// One wording, shared by sign-in and recovery, so the two doors onto the
+  /// same field cannot drift apart.
+  void _badAddress() => setState(
+    () => _error = (
+      SignInErrorField.server,
+      'That does not look like a server address.',
+    ),
+  );
+
   /// Reduces a typed address to the scheme, host, and port worth probing.
   /// Anything else it carries (path, query, userinfo) must not ride along
   /// on a request that fires as someone types: pasted userinfo would even
@@ -214,6 +226,27 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     _probeDebounce = Timer(const Duration(milliseconds: 600), _probeServer);
   }
 
+  /// The reset-code flow, which confirms identity the way [_submit] does and
+  /// hands back no session - hence "sign in", rather than signing them in.
+  Future<void> _recoverAccount() async {
+    final done = await startAccountRecovery(
+      context,
+      ref,
+      _probeTarget(_server.text),
+    );
+    if (done == null) {
+      _badAddress();
+      return;
+    }
+    if (!done || !mounted) return;
+    ref
+        .read(toastsProvider.notifier)
+        .show(
+          'Password set. Sign in with your new password.',
+          severity: AppToastSeverity.success,
+        );
+  }
+
   /// Signs in or registers, then starts push.
   ///
   /// On registration the invite code goes in with the signup rather than being
@@ -244,12 +277,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Future<void> _submit() async {
     final address = Uri.tryParse(_server.text.trim());
     if (address == null || !address.hasScheme || address.host.isEmpty) {
-      setState(
-        () => _error = (
-          SignInErrorField.server,
-          'That does not look like a server address.',
-        ),
-      );
+      _badAddress();
       return;
     }
 
@@ -453,37 +481,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           ),
           const SizedBox(height: AppSpacing.s12),
           // The other ways out, in one row so they read as alternatives to the action above rather than a list under it.
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: AppSpacing.s8,
-            runSpacing: AppSpacing.s4,
-            children: [
-              AppButton(
-                label: _creatingAccount
-                    ? 'I already have an account'
-                    : 'Create an account instead',
-                variant: AppButtonVariant.ghost,
-                disabled: _busy,
-                onPressed: () => setState(() {
-                  _creatingAccount = !_creatingAccount;
-                  _error = null;
-                }),
-              ),
-              if (!_addressExpanded)
-                AppButton(
-                  label: 'Use a different server',
-                  variant: AppButtonVariant.ghost,
-                  disabled: _busy,
-                  onPressed: () => setState(() => _addressExpanded = true),
-                ),
-              // Once a Space is remembered this is the only way back to invite redemption.
-              AppButton(
-                label: 'Join a different Space',
-                variant: AppButtonVariant.ghost,
-                disabled: _busy,
-                onPressed: () => context.go(Routes.onboarding),
-              ),
-            ],
+          SignInAlternatives(
+            creatingAccount: _creatingAccount,
+            busy: _busy,
+            addressExpanded: _addressExpanded,
+            onToggleCreating: () => setState(() {
+              _creatingAccount = !_creatingAccount;
+              _error = null;
+            }),
+            onExpandAddress: () => setState(() => _addressExpanded = true),
+            onJoinDifferentSpace: () => context.go(Routes.onboarding),
+            onRecoverAccount: () => unawaited(_recoverAccount()),
           ),
         ],
       ),
