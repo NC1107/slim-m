@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Checks GitHub for a newer client release during the splash, so the startup
-/// screen can offer it. Phase 1 of decision 0020: this only ever reports what
-/// it found, with a format-appropriate action the UI turns into a link or a
-/// package-manager hint - nothing is downloaded or executed here.
+/// Checks GitHub for a newer client release, so the startup screen can offer
+/// it, and `update_watch.dart` can offer it again on a timer for a session
+/// that never revisits the splash. Phase 1 of decision 0020: this only ever
+/// reports what it found, with a format-appropriate action the UI turns into
+/// a link or a package-manager hint - nothing is downloaded or executed here.
 ///
 /// Best-effort by construction: a network failure, a timeout, a rate-limit,
 /// or any unexpected shape resolves to `null` (no update to offer), never an
