@@ -45,6 +45,7 @@ import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_note_sheet.dart';
+import 'reset_code_sheet.dart';
 import 'member_profile_popover.dart';
 import 'member_profile_sections.dart';
 import 'member_roles_sheet.dart';
@@ -227,8 +228,8 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
   }
 
   /// [channelId] is the call this member shares with the caller right now,
-  /// captured before the popover is dismissed for the same reason [_remove]
-  /// captures its container: a kick from a room nobody is in means nothing.
+  /// captured before the popover is dismissed for the same reason
+  /// [removeMemberFromSpace] captures its container: a kick from a room nobody is in means nothing.
   Future<void> _eject(
     BuildContext host,
     ProviderContainer container,
@@ -257,38 +258,6 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     }
   }
 
-  /// [container] must be captured before the popover is dismissed: this
-  /// awaits a confirmation dialog first, and by the time it answers `ref` is
-  /// tied to a disposed element, exactly the bug this whole file exists to
-  /// avoid.
-  Future<void> _remove(BuildContext host, ProviderContainer container) async {
-    final name = widget.profile.displayName;
-    final confirmed = await confirmDangerousAction(
-      host,
-      title: 'Remove $name from this Space?',
-      // Says what it does and does not do; "remove" misleads in both directions.
-      message:
-          'They will be signed out and cannot sign in again, and any '
-          'invites they handed out stop working. Everything they wrote stays, '
-          'still shown as theirs. You can let them back in later. '
-          'This does not stop them making a new account and rejoining, '
-          'especially if this Space is open to anyone with a link.',
-      confirmLabel: 'Remove',
-    );
-    if (!confirmed) return;
-    await runGuarded(
-      whatFailed: 'remove $name',
-      action: () =>
-          container.read(apiProvider).removeMember(userId: widget.profile.id),
-    ).then((failure) {
-      if (failure == null) {
-        container.invalidate(membersProvider);
-      } else if (host.mounted) {
-        showAppSnackbar(host, failure);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -311,6 +280,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
     final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
     final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
+    final canIssueReset = !isSelf && mine.hasPermission(Perm.administrator);
     // The voice kick handler checks KICK_MEMBERS in this call's own channel, since an overwrite may grant it there alone.
     final voiceChannelPermissions = voiceChannelId != null
         ? ref.watch(myChannelPermissionsProvider(voiceChannelId))
@@ -324,7 +294,11 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     // See the library doc above for why this must agree with showModeration.
     final canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null;
     final showModeration =
-        canOfferTimeoutChips || canRemove || canManageRoles || canEject;
+        canOfferTimeoutChips ||
+        canRemove ||
+        canManageRoles ||
+        canEject ||
+        canIssueReset;
 
     // Captured before onDone, whose Navigator.pop disposes this element.
     void run(Future<void> Function(ProviderContainer container) action) {
@@ -436,8 +410,15 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
                 listen: false,
               );
               widget.onDone();
-              unawaited(_remove(host, container));
+              unawaited(removeMemberFromSpace(host, container, profile));
             },
+          ),
+        if (canIssueReset)
+          ResetCodeMenuItem(
+            host: host,
+            subjectId: profile.id,
+            subjectName: profile.displayName,
+            onDone: widget.onDone,
           ),
       ],
 

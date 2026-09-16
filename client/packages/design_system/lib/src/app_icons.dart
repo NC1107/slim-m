@@ -289,6 +289,11 @@ abstract final class AppIcons {
   /// opposite actions that used to share [revoke]'s glyph, which drew the
   /// same icon for both ends of the same toggle in one menu.
   static const IconData restoreAccess = LucideIcons.userCheck300;
+
+  /// Issuing a one-time password reset code for a locked-out account. A key
+  /// rather than [restoreAccess]: that one undoes a block, this one hands
+  /// somebody a credential.
+  static const IconData resetCode = LucideIcons.keyRound300;
   static const IconData dismiss = LucideIcons.x300;
   static const IconData assignRole = LucideIcons.userCog300;
   static const IconData permissions = LucideIcons.lock300;

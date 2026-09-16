@@ -39,14 +39,6 @@ import 'support/code_only.dart';
 /// Each of these is a real gap rather than a decision, except the first. They
 /// are listed so the gap is visible and counted, not so it is forgiven.
 const Map<String, String> _allowlist = {
-  'issueResetCode':
-      'no admin UI issues a reset code. With resetPassword below, these two '
-          'are the whole of the owner decision that self-hosted recovery is an '
-          'admin-issued one-time code, and neither end of it is reachable in the '
-          'client (2026-07-30)',
-  'resetPassword':
-      'no sign-in surface spends a reset code, so an account that cannot sign '
-          'in has no route back even where an admin has issued one (2026-07-30)',
   'pinnedMessageCount':
       'the pins sheet lists pinned messages and shows no count beside the '
           'header, so nothing asks for one (2026-07-30)',
