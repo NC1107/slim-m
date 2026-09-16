@@ -103,7 +103,7 @@ pub(crate) async fn with_reactions(
         dtos.push(dto);
     }
     // Paired positionally: the loop above pushes one `dtos` entry per `ids` entry.
-    super::polls::attach_polls(state, viewer, &ids, &mut dtos).await?;
-    super::apps::attach_app_surfaces(state, &ids, &mut dtos).await?;
+    super::polls::attach_polls(&state.store, viewer, &ids, &mut dtos).await?;
+    super::apps::attach_app_surfaces(&state.store, &ids, &mut dtos).await?;
     Ok(dtos)
 }

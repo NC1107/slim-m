@@ -32,7 +32,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{AppSurface as StoreAppSurface, CreateAppSurfaceError};
+use crate::store::{AppSurface as StoreAppSurface, CreateAppSurfaceError, Store};
 
 /// An app-launch body is tiny: which module and command, plus an optional
 /// caption and the client-generated id.
@@ -100,12 +100,14 @@ struct LaunchAppRequest {
 ///
 /// `ids` and `dtos` must be the same length and in the same order, which holds
 /// because both come from the same source list in `with_reactions`.
+///
+/// Takes `&Store` rather than `&AppState`: nothing here reads any other field.
 pub(crate) async fn attach_app_surfaces(
-    state: &AppState,
+    store: &Store,
     ids: &[MessageId],
     dtos: &mut [MessageDto],
 ) -> anyhow::Result<()> {
-    let surfaces = state.store.app_surfaces_for_messages(ids).await?;
+    let surfaces = store.app_surfaces_for_messages(ids).await?;
     for (message_id, surface) in surfaces {
         if let Some(pos) = ids.iter().position(|id| *id == message_id) {
             dtos[pos].app_surface = Some(surface.into());
@@ -162,8 +164,9 @@ async fn create(
         Err(CreateAppSurfaceError::Internal(e)) => return Err(e.into()),
     };
 
+    let surface = state.store.app_surface_for_message(id).await?;
     let mut dto = MessageDto::from(sent.message.clone());
-    if let Some(surface) = state.store.app_surface_for_message(id).await? {
+    if let Some(surface) = surface.clone() {
         dto.app_surface = Some(surface.into());
     }
 
@@ -178,10 +181,22 @@ async fn create(
         )
         .await?;
 
+        // A run can race this send, so block 0 may already exist by now.
+        let block_zero = state
+            .store
+            .code_runs_for_messages(&[sent.message.id])
+            .await?
+            .into_iter()
+            .next()
+            .and_then(|(_, runs)| runs.into_iter().find(|r| r.block_index == 0));
+
         state.hub.publish(Event::MessageCreated {
             message: Arc::new(sent.message.clone()),
             attachments: Arc::new(Vec::new()),
             forwarded: None,
+            app_surface: surface.map(Arc::new),
+            code_run: block_zero.map(Arc::new),
+            poll: None,
         });
         state.push.notify_message(
             state.store.clone(),

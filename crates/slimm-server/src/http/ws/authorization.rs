@@ -301,13 +301,21 @@ pub(super) async fn authorize(
             message,
             attachments,
             forwarded,
+            app_surface,
+            code_run,
+            poll,
         } => match super::message_frames::created(
             store,
             ctx.user_id,
             // Cloned only here, past every filter above; see `Event::MessageCreated`'s own doc.
             (*message).clone(),
-            (*attachments).clone(),
-            forwarded.map(|f| (*f).clone()),
+            super::message_frames::MessageExtras {
+                attachments: (*attachments).clone(),
+                forwarded: forwarded.map(|f| (*f).clone()),
+                app_surface: app_surface.map(|s| (*s).clone()),
+                code_run: code_run.map(|c| (*c).clone()),
+                poll: poll.map(|p| (*p).clone()),
+            },
         )
         .await
         {

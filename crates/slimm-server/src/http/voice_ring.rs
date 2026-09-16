@@ -187,5 +187,8 @@ pub(crate) async fn record_call(
         message: std::sync::Arc::new(sent.message),
         attachments: std::sync::Arc::new(Vec::new()),
         forwarded: None,
+        app_surface: None,
+        code_run: None,
+        poll: None,
     });
 }
