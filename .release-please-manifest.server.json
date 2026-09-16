@@ -1,4 +1,4 @@
 {
-  "crates/slimm-server": "0.64.0",
-  ".": "0.64.0"
+  "crates/slimm-server": "0.65.0",
+  ".": "0.65.0"
 }
