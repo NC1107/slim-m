@@ -5,6 +5,7 @@
 //! library so it can be exercised by integration tests.
 
 pub mod auth;
+pub mod code_runner;
 pub mod config;
 pub mod cors;
 pub mod db;
@@ -23,6 +24,7 @@ pub mod presence;
 mod process_metrics;
 pub mod push;
 pub mod ratelimit;
+mod sidecar_url;
 pub mod store;
 mod sweeps;
 pub mod typing;
@@ -86,6 +88,7 @@ pub async fn run() -> anyhow::Result<()> {
     let gifs = http::gifs::GifSearch::new(&config)?;
     let link_previews = http::link_preview::LinkPreviews::new(&config);
     let dock = http::dock::Dock::new(&config);
+    let code_runner = code_runner::CodeRunner::new(&config)?;
     let app = cors.apply(http::router(http::AppState {
         store,
         auth,
@@ -97,6 +100,7 @@ pub async fn run() -> anyhow::Result<()> {
         gifs,
         link_previews,
         dock,
+        code_runner,
     }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     let listener = TcpListener::bind(addr).await?;

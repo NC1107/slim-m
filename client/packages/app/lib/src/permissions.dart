@@ -30,6 +30,12 @@ abstract final class Perm {
   /// `crates/slimm-server/src/permissions.rs`'s own doc on this bit.
   static const int mentionEveryone = 1 << 16;
 
+  /// Run a fenced code block through this deployment's configured code
+  /// runner, when one is configured at all (decision 0026). Defaults to
+  /// nobody on every fresh deployment and DM; see the server's own doc on
+  /// this bit for why.
+  static const int runCode = 1 << 17;
+
   /// Every bit that has a name, in the fixed order the editor lists them.
   static const List<(int bit, String label)> editable = [
     (administrator, 'Administrator'),
@@ -49,6 +55,7 @@ abstract final class Perm {
     (manageCanvas, 'Manage the voice canvas'),
     (manageServer, 'Manage Space settings'),
     (mentionEveryone, 'Mention @everyone and @here'),
+    (runCode, 'Run code blocks'),
   ];
 
   /// [editable] minus [administrator]: the server's evaluator returns every

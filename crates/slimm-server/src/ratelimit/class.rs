@@ -212,6 +212,22 @@ pub enum Class {
     /// the *cost* of each call is the module's own `runtime.limits` - its fuel
     /// and wall-clock ceilings - not this, which bounds only the rate.
     Module,
+    /// Running a fenced code block through this deployment's configured code
+    /// runner (`crate::code_runner`), both the generic route and the shared
+    /// message-scoped one - charged in addition to whatever [`Class::Module`]
+    /// this same route already charges (`http::module_commands::execute_code_runner`).
+    ///
+    /// Its own class rather than sharing [`Class::Module`]'s budget: a run
+    /// here is a real outbound call to an external service that spins up a
+    /// sandboxed process per submission, closer in cost to [`Class::Gif`]
+    /// and [`Class::LinkPreview`]'s "a real call to a provider" reasoning
+    /// than to an in-process wasm command. Sized the same as those for the
+    /// same reason - a person pressing Run a handful of times, not a
+    /// per-keystroke loop. What bounds the *cost* of one run is the
+    /// runner's own sandbox plus the explicit timeouts and memory ceiling
+    /// this server asks it for (`code_runner::piston`), not this, which
+    /// bounds only the rate.
+    CodeRunner,
 }
 
 impl Class {
@@ -241,6 +257,8 @@ impl Class {
             Class::AuthedRead => (40.0, 8.0),
             // See this variant's own doc comment for how these were sized.
             Class::Module => (40.0, 8.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::CodeRunner => (10.0, 1.0),
         }
     }
 
@@ -249,7 +267,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 17] = [
+    pub const ALL: [Class; 18] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -267,6 +285,7 @@ impl Class {
         Class::Ring,
         Class::LinkPreview,
         Class::Module,
+        Class::CodeRunner,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -290,6 +309,7 @@ impl Class {
             Class::Ring => "ring",
             Class::AuthedRead => "authed_read",
             Class::Module => "module",
+            Class::CodeRunner => "code_runner",
         }
     }
 }

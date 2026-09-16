@@ -70,6 +70,15 @@ impl Permissions {
     /// `@everyone`/`@here` remain typeable without it, they just reach
     /// nobody extra, the same forgiving shape an unmatched `@nobody` has.
     pub const MENTION_EVERYONE: Self = Self(1 << 16);
+    /// Run a fenced code block through this deployment's configured code
+    /// runner (`crate::code_runner`), when one is configured at all.
+    /// Defaults to nobody, deliberately: `USE_CANVAS` shipping to
+    /// `@everyone` with no removal path is this repository's own cautionary
+    /// example, and running arbitrary code is a larger ask than drawing on a
+    /// canvas. Evaluated per channel for the message-scoped run route and at
+    /// the base (guild) level for the two routes with no channel of their
+    /// own - see `http::module_commands`'s own doc.
+    pub const RUN_CODE: Self = Self(1 << 17);
 
     /// The union of every defined permission. What administrator resolves to.
     pub const ALL: Self = Self(
@@ -89,7 +98,8 @@ impl Permissions {
             | Self::USE_CANVAS.0
             | Self::MANAGE_CANVAS.0
             | Self::MANAGE_SERVER.0
-            | Self::MENTION_EVERYONE.0,
+            | Self::MENTION_EVERYONE.0
+            | Self::RUN_CODE.0,
     );
 
     /// Wraps a raw bitmask, for example one loaded from the database.
@@ -315,6 +325,7 @@ mod tests {
             Permissions::MANAGE_CANVAS,
             Permissions::MANAGE_SERVER,
             Permissions::MENTION_EVERYONE,
+            Permissions::RUN_CODE,
         ];
         let union = named
             .into_iter()

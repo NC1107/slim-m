@@ -82,6 +82,7 @@ impl Contract {
                 link_previews: slimm_server::http::link_preview::LinkPreviews::for_test(),
                 // Also configured, against a fake local registry, for the same reason.
                 dock: slimm_server::http::dock::Dock::for_test(&dock_base),
+                code_runner: slimm_server::code_runner::CodeRunner::disabled(),
             },
             api: Api::load(repo_root),
             covered: BTreeSet::new(),

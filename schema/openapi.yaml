@@ -3794,6 +3794,12 @@ paths:
         as well as the permission the named command declares. A re-run
         replaces the block's stored result. A resource-limit or module error
         still answers 200 with `ok: false`, the same as runModuleCommand.
+
+
+        `moduleId: "code-runner"` reaches the code-runner broker here too
+        (see runModuleCommand's own note), except `RUN_CODE` is evaluated for
+        this message's own channel rather than at the base level, so a
+        channel overwrite can grant or withhold it per channel.
       requestBody:
         required: true
         content:
@@ -5452,6 +5458,16 @@ paths:
         declared resource limits (docs/decisions/0021's "Module ABI v1"
         section); a fuel, memory, or wall-clock limit hit still answers 200
         with `ok: false`, never a 500 and never a hang.
+
+
+        `moduleId: "code-runner"` is reserved: it never names an installed
+        module and instead reaches this deployment's optional code-runner
+        broker (docs/decisions/0026), which speaks a self-hosted Piston
+        instance's own protocol and never executes anything itself. It
+        requires the `RUN_CODE` permission (default: nobody) instead of a
+        module permission, and answers 404 when no runner is configured -
+        absent configuration is this route's normal, fully supported state.
+        `command` is the language name, from `GET /modules/code-block-runners`.
       requestBody:
         required: true
         content:
@@ -5492,6 +5508,14 @@ paths:
         picking the first one regardless of language; a `null` language is a
         wildcard. slim has no notion of what any runner does - see
         docs/decisions/0021's module-agnostic principle.
+
+
+        Also includes one entry per language this deployment's optional code
+        runner currently reports installed, under the reserved
+        `module_id: "code-runner"` (docs/decisions/0026) - only when a runner
+        is configured and the caller holds `RUN_CODE`. This reuses the exact
+        same discovery a module's own `code-block-runner` extension point
+        uses rather than a parallel mechanism.
       responses:
         "200":
           description: The code-block runners this caller may use, possibly empty.

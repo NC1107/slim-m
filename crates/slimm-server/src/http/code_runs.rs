@@ -10,6 +10,13 @@
 //! authorization (mirroring `reactions.rs`: VIEW_CHANNEL, masked as 404) and
 //! the store-plus-broadcast that makes the output shared. slim still has no
 //! notion of what any command does.
+//!
+//! `req.module_id == CODE_RUNNER_MODULE_ID` is the one exception, handled the
+//! same way the generic run route does: `execute_code_runner` in place of
+//! `execute_command`, gated on `RUN_CODE` evaluated with the exact
+//! `permissions` this route already resolved for its own `VIEW_CHANNEL`
+//! check - so unlike the module-permission path, a code-runner invocation
+//! here is channel-scoped and can be overwritten per channel.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -20,7 +27,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{AuthedLimited, Json, MODULE};
 use super::messages::parse_uuid;
-use super::module_commands::execute_command;
+use super::module_commands::{CODE_RUNNER_MODULE_ID, execute_code_runner, execute_command};
 use crate::hub::Event;
 use crate::ids::MessageId;
 use crate::permissions::Permissions;
@@ -81,15 +88,19 @@ async fn run(
         return Err(ApiError::NotFound("no such message"));
     }
 
-    // Module install/enable/permission gating happens inside execute_command.
-    let outcome = execute_command(
-        &state,
-        ctx.user_id,
-        &req.module_id,
-        &req.command,
-        &req.input,
-    )
-    .await?;
+    // Gating happens inside execute_command / execute_code_runner below.
+    let outcome = if req.module_id == CODE_RUNNER_MODULE_ID {
+        execute_code_runner(&state, permissions, ctx.user_id, &req.command, &req.input).await?
+    } else {
+        execute_command(
+            &state,
+            ctx.user_id,
+            &req.module_id,
+            &req.command,
+            &req.input,
+        )
+        .await?
+    };
     let stored = clamp_output(&outcome.payload);
     let ran_at = state
         .store
