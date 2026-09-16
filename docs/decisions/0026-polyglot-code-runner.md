@@ -2,6 +2,8 @@
 # 0026 - One runner service for the common languages, modules for the odd ones
 
 Status: proposed, 2026-09-16.
+Amended the same day.
+The runner is not ours to build and it is not WebAssembly; see "What changed, and why" at the end.
 Raised by the owner after finding that a python code block offered a Run button and answered with a JavaScript engine's `ReferenceError`.
 Their framing: "I would rather have a generalized language container that runs in the background and handles majority of common languages and the odd ones we can split out into their own modules."
 
@@ -26,20 +28,24 @@ A language runtime is tens of megabytes before it has run a line, wants a filesy
 The runner is a separate process the server speaks a defined protocol to, exactly as 0007 requires and exactly as the push relay already works.
 It is absent by default, and absent is a normal state rather than a degraded one: a deployment that never adds it behaves as it does today, with no Run button for anything the in-process modules do not claim.
 
-**Inside that service, each language is a WebAssembly runtime, not a native one. Which means interpreted languages only.**
+**That service is Piston, and we do not build it.**
 
-This is the part 0007 could not have written in August, because it predates the module runtime existing.
-It gives two independent boundaries rather than one: the service boundary bounds what a compromised runner can reach, which is nothing of ours, and the WebAssembly boundary bounds what one run can do to the runner, so a person who hangs a Python interpreter does not take out somebody else's Ruby.
+The owner's instruction, after reading how Piston works: stop treating this as exotic, and put the trust decision in the operator's hands rather than in a sandbox we design.
 
-The research in [docs/research/code-runner-languages.md](../research/code-runner-languages.md) put a hard limit on how far that reaches, and it is the finding that most shaped this record.
-**No compiled language has a WebAssembly-hosted compiler in production, anywhere.**
-Piston, Judge0 and Riju all bake a native compiler into the sandbox image and shell out to it, which was read out of Piston's own build scripts.
-The WebAssembly attempts are abandoned: `wapm-packages/clang` last moved in 2021, `binji/wasm-clang` calls itself alpha demoware and last moved in 2023, and rustc's self-hosting issue has been dormant since 2019.
+[Piston](https://github.com/engineer-man/piston) is the code sandbox most chat bots already use, self-hosted in docker, and on 2026-09-16 its public instance advertised **87 runtimes including python 3.10**.
+So slim-m speaks Piston's protocol and an operator runs Piston.
+There is no runner service in this project, now or later.
 
-So this record covers interpreted languages and declines compiled ones.
-Python, Ruby, PHP, Lua, JavaScript and R all have maintained WebAssembly interpreters, verified with release dates, and between them they cover most of what anyone pastes into a chat message.
-C, C++, Rust, Go, Java and C# need a native toolchain running outside any sandbox before anything executes.
-That is a different architecture with a much larger surface, it is the architecture every existing system was forced into, and it should be its own decision rather than a footnote to this one.
+That is a smaller decision than the one this record originally made, and a better one on every axis that matters here.
+Every language arrives at once rather than one per release, so the bucketing question this record was built around stops mattering: Piston already did that work, for eighty-seven runtimes.
+Its `GET /api/v2/runtimes` says what a given instance actually has, so the deployment asks rather than carrying a hardcoded list, and a language the operator's instance lacks simply gets no Run button.
+
+**The isolation is Piston's, and we do not reimplement it.**
+
+It runs each submission as a different unprivileged user in its own linux namespaces, with outgoing network off by default, processes capped at 256, files capped at 2048, cpu and wall time capped at three seconds, a peak memory cap, stdout truncated at 1024 characters, temp space cleaned after every run, and SIGKILL for anything that misbehaves.
+
+Claiming to add to that would be pretending.
+What this project owes an operator instead is a plain warning at the point they enable it: do not turn this on if you do not trust the people in your space.
 
 **The server brokers and never executes.**
 
@@ -60,36 +66,16 @@ Something now is, so:
 
 - **Discovery is at startup, from configuration.** An operator adds the service the way they add a service to their compose file. Runtime registration would let a reachable process announce itself into a deployment, which is the auto-install problem 0007 exists to avoid.
 - **The runner answers with a result and cannot write messages.** It gets no capability to post, so the worst a compromised runner produces is a wrong answer in the block that invoked it. Posting is what the in-process modules already do under `message.post`, and that capability is not extended here.
-- **The wire is the same additive-only JSON discipline as everything else.** A language the runner does not know is a clean refusal, not a crash, the same way an unrecognised extension-point kind is accepted and ignored.
+- **The wire is Piston's `POST /api/v2/execute`, not ours.** This was written as an open question and answered by not inventing one: a contract we design is a contract we maintain, and matching Piston's means an operator points slim-m at a stock instance with nothing in between.
 
-## Which languages, and why the packs are smaller than they look
+## Which languages
 
-The owner's framing was packs: languages that run together get packed into one module for free.
-The research found that genuine sharing is rarer than that hopes for, so the rule is worth stating precisely.
+Whatever the operator's Piston instance has installed, asked at runtime rather than decided here.
 
-There are two real packs and one half-pack:
+The research in [docs/research/code-runner-languages.md](../research/code-runner-languages.md) spent its length working out which languages could share an artifact, and the answer was two real packs and a long tail of singletons.
+That analysis is now moot for this decision and is kept because it is still the honest record of why the WebAssembly route was abandoned: no compiled language has a WebAssembly-hosted compiler in production anywhere, which is exactly why every existing system, Piston included, uses native toolchains in a container.
 
-- **C# and F#** share the .NET WebAssembly runtime, and this is the only case where the second language is close to actually free, because both compilers are themselves managed code rather than native toolchains.
-- **C and C++** share one clang frontend, where the second language genuinely is a compiler flag. Both are out of scope here anyway, being compiled.
-- **Java, Kotlin and Scala** share bytecode execution, which is free, but each needs its own full native compiler to produce that bytecode, which is not. This is the case that looks like a pack and is not one.
-
-Everything else is a bucket of one, including every interpreted language this record actually covers.
-TypeScript is worth naming as a near miss: it rides a JavaScript engine but needs a transpile step, and type stripping is cheap only by discarding the type errors a code runner exists to show you.
-
-So the rule is not "group by shared runtime", because outside .NET there is almost nothing to group.
-A language belongs in the runner when a maintained WebAssembly interpreter for it exists and fits the ceilings, and each one is its own artifact.
-
-Lua is the best first language, not Python.
-Its interpreter is under a megabyte where Pyodide is seven, so it proves the broker, the protocol and the ceilings at a tenth of the weight.
-Python is the one people actually want, and should be second, once the mechanism is known to work.
-
-## What this costs, stated plainly
-
-A self-hoster who wants code execution now runs another container.
-That is the cost 0007 chose on purpose, because the alternative is every deployment inheriting the security surface whether they want it or not.
-
-The runner is a real service with a real attack surface, and it is the first thing in this project that exists to run code written by whoever can type in a channel.
-It should ship behind an operator's deliberate choice, with the permission bit off, and it should be possible to remove it and have the deployment carry on.
+Python is the language the owner asked for and the one to verify against first.
 
 ## The ceiling that is not free
 
@@ -105,3 +91,19 @@ Compiled languages, which are declined above rather than solved, and are their o
 The runner's own internals: whether one process holds every runtime or one per language, how a run is isolated from the next, and what the pool looks like under concurrency.
 Riju is the interesting prior art there, since reaching two hundred languages pushed it to one container per language, which is the opposite of packing them together.
 None of that changes the boundary this record is about, and it is better settled against a working thing than in advance.
+
+## What changed, and why
+
+This record was written and amended on the same day, and the amendment reversed its central mechanism, so the reasoning is kept rather than tidied away.
+
+As first written it proposed a runner service **we** would build, with **WebAssembly** interpreters inside it, one language at a time, starting with Lua because its interpreter is small.
+Two things killed that.
+
+The research found that no compiled language has a WebAssembly-hosted compiler in production anywhere, which already narrowed the record to interpreted languages only.
+Then the owner pointed at Piston and asked why we were designing a sandbox at all.
+The honest answer was that we should not be: Piston is the thing every comparable product already uses, it carries eighty-seven runtimes, and its isolation rules are more thorough than what this project would have written for itself.
+
+The WebAssembly route was not wrong so much as **it was solving a problem that a maintained service had already solved**, and it would have arrived one language at a time over months.
+Lua as a first language existed only because a WebAssembly interpreter is small, which stopped being a consideration the moment we stopped shipping interpreters.
+
+What survives unchanged from the original is everything about the boundary, because that half was never about the backend: the server brokers and never executes, an invocation carries the block and nothing else, absent configuration is a normal state, the permission bit defaults to nobody, and the ceilings are the server's own.
