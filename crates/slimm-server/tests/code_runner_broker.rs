@@ -170,8 +170,7 @@ async fn an_unconfigured_runner_is_a_clean_no_op_not_an_error() {
     .await;
     assert_eq!(runners, json!([]));
 
-    // A direct attempt is a clean, ordinary-looking refusal, not a 500 or a
-    // hang - even for a caller who holds the permission.
+    // Refused cleanly, not a 500 or a hang, even holding the permission.
     let response = router
         .oneshot(request(
             "POST",
@@ -350,8 +349,7 @@ async fn the_code_runner_rate_limit_class_is_charged() {
     let base_url = fake_piston().await;
     let router = app(store, code_runner_at(&base_url));
 
-    // Class::CodeRunner's burst is 10; the 11th immediate call must be
-    // refused rather than admitted.
+    // Class::CodeRunner bursts at 10, so the 11th immediate call is refused.
     let mut statuses = Vec::new();
     for _ in 0..11 {
         let response = router

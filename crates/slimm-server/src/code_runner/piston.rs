@@ -341,8 +341,7 @@ mod tests {
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
 
-        // A short client timeout stands in for `CLIENT_TIMEOUT`, so this
-        // proves the wall-clock ceiling fires without a real 20-second wait.
+        // Stands in for `CLIENT_TIMEOUT`, so the ceiling is proved without a 20s wait.
         let enabled = enabled_at(format!("http://{addr}"), Duration::from_millis(200));
 
         let started = Instant::now();

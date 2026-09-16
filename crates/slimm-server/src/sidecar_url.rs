@@ -77,11 +77,10 @@ mod tests {
                 "{ok} should be allowed over http"
             );
         }
-        // 172.16.0.0/12 (RFC 1918) ends at 172.31.255.255; 172.32.0.0 is a
-        // routable public address and must not be treated as local.
         assert!(
             validate("http://172.32.0.1", "TEST").is_err(),
-            "172.32 is outside the private range and must require https"
+            "RFC 1918's 172.16/12 ends at 172.31.255.255, so 172.32.0.0 is a \
+             routable public address and must require https"
         );
     }
 
