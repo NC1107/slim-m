@@ -99,6 +99,12 @@ jobs:
   # string is what release.yml's verify-client-ci waits on, and a matrix job
   # publishes one check per leg (`... (app-1)`), none of which would match it.
   # The aggregating job below keeps the name instead.
+  # Eight shards, not four. Measured 2026-09-16 on a main run: the app
+  # package's tests were 590s on the slowest of four shards against ~60s of
+  # setup, so the split is what decides wall clock and the setup is noise.
+  # Halving the split trades four more runners' worth of setup for roughly
+  # half the test time. The count is worth re-measuring rather than raising
+  # on faith: past some point queueing for runners costs more than it saves.
   test-shards:
     name: client tests (${{ matrix.label }})
     runs-on: ubuntu-latest
@@ -108,13 +114,21 @@ jobs:
       matrix:
         include:
           - label: app-1
-            shard: "--total-shards=4 --shard-index=0"
+            shard: "--total-shards=8 --shard-index=0"
           - label: app-2
-            shard: "--total-shards=4 --shard-index=1"
+            shard: "--total-shards=8 --shard-index=1"
           - label: app-3
-            shard: "--total-shards=4 --shard-index=2"
+            shard: "--total-shards=8 --shard-index=2"
           - label: app-4
-            shard: "--total-shards=4 --shard-index=3"
+            shard: "--total-shards=8 --shard-index=3"
+          - label: app-5
+            shard: "--total-shards=8 --shard-index=4"
+          - label: app-6
+            shard: "--total-shards=8 --shard-index=5"
+          - label: app-7
+            shard: "--total-shards=8 --shard-index=6"
+          - label: app-8
+            shard: "--total-shards=8 --shard-index=7"
           - label: other-packages
             shard: ""
     steps:
