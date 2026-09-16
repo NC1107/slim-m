@@ -15,7 +15,6 @@
 library;
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
 
 /// Which chime to play.
 enum NotificationSound {
@@ -82,7 +81,10 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
   /// for it - the "grab system levels" half of the ask is what the OS
   /// volume control already does, since `AudioContext` above asks for no
   /// audio focus and never touches the system volume itself.
-  @visibleForTesting
+  ///
+  /// Public rather than `@visibleForTesting`: `scene_sound_player.dart` plays
+  /// a module's sound at this identical volume too, so a module's cue is
+  /// never louder than the app's own chimes.
   static const double playbackVolume = 0.6;
 
   /// iOS `.ambient`: the platform's own category for a short sound that must
@@ -93,7 +95,11 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
   /// already implies it. Android asks for no audio focus at all
   /// (`AndroidAudioFocus.none`), the closest equivalent: a player that never
   /// contends for focus can never be the reason a call's audio pauses.
-  static final _context = AudioContext(
+  ///
+  /// Public (not `_context`) because `scene_sound_player.dart` plays a
+  /// module's sound under this identical configuration - a module's cue
+  /// must be exactly as unable to steal a call's audio as a chime is.
+  static final sharedAmbientContext = AudioContext(
     iOS: AudioContextIOS(category: AVAudioSessionCategory.ambient),
     android: const AudioContextAndroid(
       contentType: AndroidContentType.sonification,
@@ -109,7 +115,7 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
     await _player.play(
       AssetSource(sound._playerPath),
       volume: playbackVolume,
-      ctx: _context,
+      ctx: sharedAmbientContext,
     );
   }
 
@@ -120,7 +126,7 @@ class AudioPlayersSoundPlayer implements SoundPlayer {
     await _loopPlayer.play(
       AssetSource(sound._playerPath),
       volume: playbackVolume,
-      ctx: _context,
+      ctx: sharedAmbientContext,
     );
   }
 

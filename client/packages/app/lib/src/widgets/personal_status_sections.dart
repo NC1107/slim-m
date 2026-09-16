@@ -15,6 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart'
     show LocalAlertChannel, isAndroidHost, isLinuxHost;
 
+import '../providers/module_sound_settings.dart';
 import '../providers/notification_sound_settings.dart';
 import '../providers/push_controller.dart';
 import '../providers/toasts.dart';
@@ -32,6 +33,7 @@ class NotificationsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(pushControllerProvider);
     final soundsEnabled = ref.watch(messageSoundSettingsProvider);
+    final moduleSoundsEnabled = ref.watch(moduleSoundSettingsProvider);
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final registered = status == PushStatus.registered;
     final blocked = status == PushStatus.registeredNotificationsBlocked;
@@ -55,6 +57,17 @@ class NotificationsSection extends ConsumerWidget {
           onChanged: (value) =>
               ref.read(messageSoundSettingsProvider.notifier).setEnabled(value),
           semanticLabel: 'Play a sound for messages, mentions and errors',
+        ),
+        SettingsToggleRow(
+          label: 'Let Dock modules play sound effects',
+          description:
+              'A module can ask to play a short synthesised cue when you '
+              'interact with it. Off stops every module sound; it never '
+              'plays on its own.',
+          value: moduleSoundsEnabled,
+          onChanged: (value) =>
+              ref.read(moduleSoundSettingsProvider.notifier).setEnabled(value),
+          semanticLabel: 'Let Dock modules play sound effects',
         ),
         const PushContentPreviewRow(),
         const NotificationPreferenceRow(),

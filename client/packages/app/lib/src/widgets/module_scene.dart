@@ -139,6 +139,86 @@ class TextOp extends SceneOp {
   final String align;
 }
 
+/// One note: a frequency to ring, when it starts relative to the scene's own
+/// age in seconds, and how long it rings. The same three numbers
+/// `assets/audio/synth.py`'s `Note` carries, minus `gain` - a module states
+/// none, so it cannot ask for a louder note than the app's own chimes ever
+/// play. See [NotesOp] for the ceilings already applied by the time one of
+/// these exists.
+class SceneNote {
+  const SceneNote({
+    required this.frequency,
+    required this.start,
+    required this.seconds,
+  });
+
+  final double frequency;
+  final double start;
+  final double seconds;
+}
+
+/// A module asks slim to play a short sound built from these notes, rather
+/// than shipping a sample or waveform of its own. Slim renders them with the
+/// same bell-like voice `assets/audio/synth.py` renders the app's own
+/// notification chimes from (see `scene_synth.dart`, a faithful port of that
+/// file's `bell`/`render`), so a module's sound and slim's own always share
+/// one timbre instead of the product suddenly sounding like two apps stapled
+/// together.
+///
+/// Never autoplayed: sound triggered by a message is something every
+/// viewer's device would make on the strength of whoever posted it, so
+/// [ModuleSceneView] only ever plays a `notes` op that comes back as the
+/// direct result of *this* viewer's own tap, drag or control press - never
+/// on a scene's first paint, and never for a scene update that arrived
+/// because another viewer acted on a shared one. A person can also turn
+/// module sound off entirely; see `moduleSoundSettingsProvider`.
+///
+/// The four ceilings below are enforced here, at parse time, not only in the
+/// synthesiser: a scene is bounded before anything downstream ever sees an
+/// unbounded one. See `docs/decisions/0027-module-scene-sound.md` for the
+/// abuse case this whole op is scoped against.
+class NotesOp extends SceneOp {
+  NotesOp(List<SceneNote> notes) : notes = _bounded(notes);
+
+  final List<SceneNote> notes;
+
+  /// A module scene is a small UI, not a sequencer. More notes than this in
+  /// one cue reads as a wall of tone rather than a sound effect, and it also
+  /// bounds how much arithmetic one op can ever ask `scene_synth.dart`'s
+  /// `render()` to do - the same reasoning `ModuleSceneView`'s own
+  /// `_maxQueue` applies to actions.
+  static const maxNotes = 32;
+
+  /// A note ringing longer than this is the "hold a tone for an hour" abuse
+  /// this ceiling exists to rule out, clamped here rather than only trusted
+  /// to a well-behaved module.
+  static const maxNoteSeconds = 3.0;
+
+  /// How far into the cue a note may start. Past this a "short sound effect"
+  /// has stopped being one; clamped separately from [maxNoteSeconds] so a
+  /// module cannot stretch a whole cue's length by starting one note late
+  /// rather than by holding it.
+  static const maxSceneSeconds = 8.0;
+
+  /// Below this a "note" reads as a sub-bass thump rather than a pitch.
+  static const minFrequencyHz = 20.0;
+
+  /// `synth.py`'s highest partial sits at 3.05x the fundamental
+  /// (`_PARTIALS`); above this the app renders at 48kHz (`sampleRate` in
+  /// `scene_synth.dart`), so that partial would sit past the 24kHz Nyquist
+  /// limit and alias back down as noise rather than ring true.
+  static const maxFrequencyHz = 7800.0;
+
+  static List<SceneNote> _bounded(List<SceneNote> notes) => [
+    for (final note in notes.take(maxNotes))
+      SceneNote(
+        frequency: note.frequency.clamp(minFrequencyHz, maxFrequencyHz),
+        start: note.start.clamp(0.0, maxSceneSeconds),
+        seconds: note.seconds.clamp(0.01, maxNoteSeconds),
+      ),
+  ];
+}
+
 /// A whole scene: a logical canvas, the ops to draw on it, the opaque [state]
 /// the module wants handed back on the next call, the [controls] to offer, a
 /// one-line [status] caption, and whether the scene can still change ([live]).
@@ -258,9 +338,29 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         size: _double(op['size'], 12),
         align: _string(op['align']) ?? 'left',
       );
+    case 'notes':
+      final notes = _parseNotes(op['notes']);
+      return notes.isEmpty ? null : NotesOp(notes);
     default:
       return null;
   }
+}
+
+/// Each entry needs a positive frequency and duration and a non-negative
+/// start; anything else is dropped rather than failing the whole op, the same
+/// "skip what is bad" treatment a malformed cell or hex colour already gets.
+List<SceneNote> _parseNotes(Object? raw) {
+  if (raw is! List) return const [];
+  final notes = <SceneNote>[];
+  for (final entry in raw) {
+    if (entry is! Map) continue;
+    final frequency = _double(entry['f'], 0);
+    final start = _double(entry['t'], -1);
+    final seconds = _double(entry['d'], 0);
+    if (frequency <= 0 || start < 0 || seconds <= 0) continue;
+    notes.add(SceneNote(frequency: frequency, start: start, seconds: seconds));
+  }
+  return notes;
 }
 
 double _double(Object? value, double fallback) =>

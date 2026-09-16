@@ -40,10 +40,22 @@ class ModuleSceneView extends StatefulWidget {
     super.key,
     required this.initial,
     required this.runCommand,
+    this.onNotes,
   });
 
   final ModuleScene initial;
   final ModuleSceneRunner runCommand;
+
+  /// Called with a `notes` op's notes when - and only when - the scene that
+  /// carried it just came back as the direct result of this viewer's own tap,
+  /// drag or control press. Never called for the initial scene a message
+  /// mounts with, and never for a scene update that arrived because another
+  /// viewer acted on one shared with this one (see [_isOwnWork]): that is
+  /// what keeps a module's sound from ever playing on someone else's say-so.
+  /// Null means the caller has nothing to play through - the Dock command
+  /// panel's own ephemeral runs, say - not that sound is disabled; the
+  /// enabled/disabled decision belongs to the caller that supplies this.
+  final void Function(List<SceneNote> notes)? onNotes;
 
   @override
   State<ModuleSceneView> createState() => _ModuleSceneViewState();
@@ -176,6 +188,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
         _busy = false;
         if (next != null) {
           _scene = next;
+          _playNotes(next);
           if (!next.live) _stop();
         } else {
           _stop();
@@ -206,6 +219,18 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       // A drag queued behind play's own step has nothing else to restart it.
       if (mounted && !_busy && _queue.isNotEmpty) unawaited(_drain());
     }
+  }
+
+  /// The one call site that may ever trigger [widget.onNotes]: right where
+  /// this view's own action just came back with a fresh scene, which is the
+  /// only moment that satisfies "the viewer interacted with this scene" - see
+  /// [widget.onNotes]'s own doc comment.
+  void _playNotes(ModuleScene scene) {
+    final notes = scene.ops
+        .whereType<NotesOp>()
+        .expand((op) => op.notes)
+        .toList(growable: false);
+    if (notes.isNotEmpty) widget.onNotes?.call(notes);
   }
 
   void _togglePlay() {

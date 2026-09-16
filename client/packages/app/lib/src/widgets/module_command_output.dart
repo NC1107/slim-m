@@ -17,11 +17,15 @@
 /// Dock command panel), the actions are the ephemeral per-caller run.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../audio/scene_sound_player.dart';
+import '../providers/module_sound_settings.dart';
 import '../providers/providers.dart';
 import 'module_scene.dart';
 import 'module_scene_view.dart';
@@ -77,6 +81,11 @@ class ModuleCommandOutput extends ConsumerWidget {
                       command: command,
                       input: input,
                     ),
+          // The other half of "never plays without interaction": see NotesOp's own doc comment for the full defence.
+          onNotes: (notes) {
+            if (!ref.read(moduleSoundSettingsProvider)) return;
+            unawaited(ref.read(moduleSoundPlayerProvider).playNotes(notes));
+          },
         );
       }
     }
