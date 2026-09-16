@@ -75,35 +75,137 @@ void main() {
       expect(op.tap, 'toggle');
     });
 
-    test('parses rect, circle, line and text ops and skips unknown ones', () {
-      final scene = parseModuleScene(
-        jsonEncode({
-          r'$slim': 'scene/1',
-          'width': 100,
-          'height': 100,
-          'ops': [
-            {
-              'op': 'rect',
-              'x': 1,
-              'y': 2,
-              'w': 3,
-              'h': 4,
-              'fill': '#ff0000',
-              'tap': 'a',
-            },
-            {'op': 'circle', 'cx': 5, 'cy': 6, 'r': 7},
-            {'op': 'line', 'x1': 0, 'y1': 0, 'x2': 9, 'y2': 9},
-            {'op': 'text', 's': 'hi', 'x': 1, 'y': 1},
-            {'op': 'mystery'},
-          ],
-        }),
-      )!;
-      expect(scene.ops.length, 4);
-      expect(scene.ops[0], isA<RectOp>());
-      expect((scene.ops[0] as RectOp).tap, 'a');
-      expect(scene.ops[1], isA<CircleOp>());
-      expect(scene.ops[2], isA<LineOp>());
-      expect((scene.ops[3] as TextOp).text, 'hi');
+    test(
+      'parses rect, circle, line, text and notes ops and skips unknown ones',
+      () {
+        final scene = parseModuleScene(
+          jsonEncode({
+            r'$slim': 'scene/1',
+            'width': 100,
+            'height': 100,
+            'ops': [
+              {
+                'op': 'rect',
+                'x': 1,
+                'y': 2,
+                'w': 3,
+                'h': 4,
+                'fill': '#ff0000',
+                'tap': 'a',
+              },
+              {'op': 'circle', 'cx': 5, 'cy': 6, 'r': 7},
+              {'op': 'line', 'x1': 0, 'y1': 0, 'x2': 9, 'y2': 9},
+              {'op': 'text', 's': 'hi', 'x': 1, 'y': 1},
+              {
+                'op': 'notes',
+                'notes': [
+                  {'f': 440.0, 't': 0.0, 'd': 0.3},
+                ],
+              },
+              {'op': 'mystery'},
+            ],
+          }),
+        )!;
+        expect(scene.ops.length, 5);
+        expect(scene.ops[0], isA<RectOp>());
+        expect((scene.ops[0] as RectOp).tap, 'a');
+        expect(scene.ops[1], isA<CircleOp>());
+        expect(scene.ops[2], isA<LineOp>());
+        expect((scene.ops[3] as TextOp).text, 'hi');
+        final notesOp = scene.ops[4] as NotesOp;
+        expect(notesOp.notes, hasLength(1));
+        expect(notesOp.notes.single.frequency, 440.0);
+      },
+    );
+
+    group('notes op', () {
+      test('drops entries with a non-positive frequency or duration', () {
+        final scene = parseModuleScene(
+          jsonEncode({
+            r'$slim': 'scene/1',
+            'width': 10,
+            'height': 10,
+            'ops': [
+              {
+                'op': 'notes',
+                'notes': [
+                  {'f': 440.0, 't': 0.0, 'd': 0.2},
+                  {'f': 0.0, 't': 0.0, 'd': 0.2},
+                  {'f': 440.0, 't': -1.0, 'd': 0.2},
+                  {'f': 440.0, 't': 0.0, 'd': 0.0},
+                ],
+              },
+            ],
+          }),
+        )!;
+        final op = scene.ops.single as NotesOp;
+        expect(op.notes, hasLength(1));
+      });
+
+      test('an op with no valid notes is skipped entirely', () {
+        final scene = parseModuleScene(
+          jsonEncode({
+            r'$slim': 'scene/1',
+            'width': 10,
+            'height': 10,
+            'ops': [
+              {
+                'op': 'notes',
+                'notes': [
+                  {'f': -1.0, 't': 0.0, 'd': 0.2},
+                ],
+              },
+            ],
+          }),
+        )!;
+        expect(scene.ops, isEmpty);
+      });
+
+      test('clamps a note count past maxNotes', () {
+        final scene = parseModuleScene(
+          jsonEncode({
+            r'$slim': 'scene/1',
+            'width': 10,
+            'height': 10,
+            'ops': [
+              {
+                'op': 'notes',
+                'notes': [
+                  for (var i = 0; i < NotesOp.maxNotes + 10; i++)
+                    {'f': 440.0, 't': 0.0, 'd': 0.1},
+                ],
+              },
+            ],
+          }),
+        )!;
+        final op = scene.ops.single as NotesOp;
+        expect(op.notes, hasLength(NotesOp.maxNotes));
+      });
+
+      test(
+        'clamps frequency, start and duration to the documented ceilings',
+        () {
+          final scene = parseModuleScene(
+            jsonEncode({
+              r'$slim': 'scene/1',
+              'width': 10,
+              'height': 10,
+              'ops': [
+                {
+                  'op': 'notes',
+                  'notes': [
+                    {'f': 50000.0, 't': 500.0, 'd': 500.0},
+                  ],
+                },
+              ],
+            }),
+          )!;
+          final note = (scene.ops.single as NotesOp).notes.single;
+          expect(note.frequency, NotesOp.maxFrequencyHz);
+          expect(note.start, NotesOp.maxSceneSeconds);
+          expect(note.seconds, NotesOp.maxNoteSeconds);
+        },
+      );
     });
   });
 
@@ -259,5 +361,94 @@ void main() {
       );
       expect(find.text('Generation 0 · 3 alive'), findsOneWidget);
     });
+
+    testWidgets('a scene with a notes op still renders its drawing', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ModuleSceneView(
+              initial: parseModuleScene(_notesScene())!,
+              runCommand: (_) async =>
+                  const api.RunModuleCommandResult(ok: true, output: ''),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    testWidgets('onNotes fires only for this view\'s own action, never on first '
+        'paint or a scene that arrived from elsewhere', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final played = <List<SceneNote>>[];
+      Future<api.RunModuleCommandResult> run(String input) async =>
+          api.RunModuleCommandResult(
+            ok: true,
+            output: _notesScene(state: 's1'),
+          );
+
+      Widget wrap(String scene) => MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(
+          body: ModuleSceneView(
+            initial: parseModuleScene(scene)!,
+            runCommand: run,
+            onNotes: played.add,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(wrap(_notesScene(state: 's0')));
+      expect(played, isEmpty, reason: 'must never autoplay on first paint');
+
+      await tester.tap(find.byIcon(AppIcons.forward));
+      await tester.pumpAndSettle();
+      expect(played, hasLength(1));
+      expect(played.single.single.frequency, 440.0);
+
+      played.clear();
+      // A brand new scene, as if broadcast from another viewer's action - never this view's own work, so it must not play.
+      await tester.pumpWidget(wrap(_notesScene(state: 's2')));
+      expect(
+        played,
+        isEmpty,
+        reason: 'a scene from elsewhere must never trigger sound',
+      );
+    });
   });
 }
+
+String _notesScene({String state = 's0'}) => jsonEncode({
+  r'$slim': 'scene/1',
+  'width': 10,
+  'height': 10,
+  'ops': [
+    {
+      'op': 'cells',
+      'cols': 2,
+      'rows': 2,
+      'data': '0000',
+      'palette': ['sunken'],
+    },
+    {
+      'op': 'notes',
+      'notes': [
+        {'f': 440.0, 't': 0.0, 'd': 0.1},
+      ],
+    },
+  ],
+  'state': state,
+  'controls': ['step'],
+  'live': true,
+});

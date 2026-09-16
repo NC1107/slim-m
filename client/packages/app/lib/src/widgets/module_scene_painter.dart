@@ -81,6 +81,9 @@ class ModuleScenePainter extends CustomPainter {
         );
       case TextOp():
         _paintText(canvas, op, sx, sy);
+      case NotesOp():
+        // Sound, not drawing; ModuleSceneView plays it, this painter never does.
+        break;
     }
   }
 
