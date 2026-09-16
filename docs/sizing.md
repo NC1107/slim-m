@@ -11,12 +11,14 @@ Runs were constrained with systemd resource limits, which is how Docker expresse
 
 There are two containers to size and they run out of different things.
 
-| Container | Give it | Carries |
-| --- | --- | --- |
-| slim-m server | 2 cores, 512 MB | up to 1024 connected people, the hard cap |
-| LiveKit | 2 cores, 512 MB | about 60 people in one voice call |
+| Container | Give it | Carries | Bound by |
+| --- | --- | --- | --- |
+| slim-m server | 2 cores, 512 MB | up to 1024 connected people, the hard cap | processor |
+| LiveKit, voice | 2 cores, 512 MB | about 60 people in one call | memory |
+| LiveKit, video | 2 cores, 512 MB | 1.3 Mbps per subscriber | your uplink |
 
-Chat is bound by processor and voice by memory, so the dial to turn when either runs short is a different one.
+Three different resources run out first, so the dial to turn is a different one each time.
+Video in particular is not limited by the machine at all in any deployment small enough to be reading this page.
 
 One core for the server is the single most important finding here, and it is not a matter of degree.
 At one core the server is throttled into second-scale delays while using only three quarters of the core it was given.
@@ -136,11 +138,52 @@ Subscriptions grow with the square of the room but processor does not follow.
 Going from five to sixty people multiplied subscriptions by 144 and processor by only 7.5, because LiveKit forwards audio packets rather than mixing them.
 That is good news for call sizes and the reason memory binds first.
 
-### The media port range, which is not measured here
+### The media port range is not a participant limit
 
-The shipped compose publishes 101 UDP media ports, commented as deliberately sized for a friend group.
-These measurements reached LiveKit over its TCP fallback, so nothing here exercised that range.
-If ports are consumed per participant it binds at about the same hundred-person mark as memory, and a deployment expecting large calls should widen it and re-measure rather than trusting either number alone.
+The shipped compose publishes 101 UDP media ports, commented as deliberately sized for a friend group, which invites the worry that it caps a call at about a hundred people.
+It does not.
+
+Measured by giving LiveKit a range of eleven ports and putting thirty participants in one call: it opened all eleven, held at eleven for the whole call, and nothing failed.
+LiveKit binds the configured range up front and spreads connections across it rather than taking a port per participant.
+
+So the range is a pool, not a ceiling, and the default is ample.
+A deployment would have to be running many simultaneous calls before widening it came up, and memory would bind first.
+
+## Video and screen share
+
+Video is the case worth understanding before anyone plans a large call, because the constraint is not the one the rest of this page is about.
+
+Measured against LiveKit at two cores and 512 MB, one publisher at the tester's high resolution:
+
+| Publishers | Subscribers | Processor | Memory |
+| --- | --- | --- | --- |
+| 1 | 5 | 1.3% of a core | 37 MB |
+| 1 | 15 | 2.4% | 63 MB |
+| 1 | 30 | 4.2% | 110 MB |
+| 2 | 20 | 4.5% | 94 MB |
+| 5 | 20 | 7.3% | 138 MB |
+
+Processor barely moves, and that is not a surprise once stated plainly: LiveKit forwards packets, it does not transcode them.
+A video packet costs about what an audio packet costs to relay.
+It is simply a much larger number of much larger packets.
+
+**Bandwidth is the constraint, and it is the only figure here that is not about the machine.**
+One camera stream cost **1.3 Mbps per subscriber**, measured at 26.2 Mbps total for one publisher and twenty subscribers, with zero packet loss.
+
+That number scales the way the fan-out does, so it is worth doing the arithmetic before promising a feature:
+
+| Shape | Streams relayed | Egress |
+| --- | --- | --- |
+| One person presenting to 20 | 20 | 26 Mbps |
+| One person presenting to 50 | 50 | 65 Mbps |
+| 10 people all on camera | 90 | 117 Mbps |
+| 20 people all on camera | 380 | 494 Mbps |
+
+A gigabit uplink carries roughly 770 subscriber-streams.
+A typical home upload carries a handful, which is the real reason a self-hosted deployment should think about screen share before enabling it rather than after.
+
+Everyone on camera is the shape that gets expensive, because it is quadratic in the same way chat fan-out is.
+One person presenting stays affordable well past any call size the memory limit allows.
 
 ## Compose presets
 
@@ -184,8 +227,8 @@ Differences smaller than it are not reported as findings.
 
 Not measured, and not covered by any number above:
 
-- Video and screen share. The voice figures are audio only.
-- LiveKit's media port range, for the reason given in its own section.
+- Sustained video. The video figures are half-minute runs, so a slow leak under an hour-long screen share would not have appeared.
+- Bandwidth as the server experiences it. The 1.3 Mbps per subscriber was measured between processes on one machine, where the network is not a real constraint; a deployment's own uplink is what decides whether that arithmetic holds.
 - Reconnect storms, which is how services usually fall over.
 - Sustained multi-hour runs, so slow leaks would not have appeared.
 - Attachment uploads, which have their own limit class and their own disk path.
