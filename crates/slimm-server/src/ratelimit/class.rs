@@ -7,8 +7,17 @@
 /// A traffic class and its budget: a sustained refill rate and a burst size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Class {
-    /// Password endpoints (register, login). Deliberately tight: each request
-    /// can cost an Argon2id hash.
+    /// Password endpoints (register, login). Tight, because each request can
+    /// cost an Argon2id hash, but sized for the case that actually happens:
+    /// several people signing up together from one office or household, who
+    /// share an address and so share this bucket.
+    ///
+    /// Measured 2026-09-15 at the old (5, 1/6) budget: enrolling a hundred
+    /// accounts from one address took twenty minutes, and a codeless
+    /// registration against a claimed deployment spends a token before it is
+    /// refused, so a joining tester pays twice. The concurrency limit on
+    /// hashing, not this, is what bounds the memory a burst of logins can
+    /// take (`auth::Auth`, four permits of 19 MiB).
     Password,
     /// Token refresh. Cheap, but a leaked token should not be grindable.
     Refresh,
@@ -210,7 +219,7 @@ impl Class {
     /// unit is bytes, not requests; see its own doc.
     pub(super) const fn budget(self) -> (f64, f64) {
         match self {
-            Class::Password => (5.0, 1.0 / 6.0),
+            Class::Password => (10.0, 1.0 / 3.0),
             Class::Refresh => (10.0, 1.0 / 2.0),
             Class::Ticket => (10.0, 1.0),
             Class::Write => (30.0, 5.0),

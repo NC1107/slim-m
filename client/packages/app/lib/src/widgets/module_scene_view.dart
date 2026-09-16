@@ -357,6 +357,7 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       children: [
         ModuleSceneFrame(
           aspect: aspect,
+          sceneHeight: _scene.height,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final size = constraints.biggest;

@@ -102,8 +102,8 @@ async fn without_a_trusted_proxy_every_forwarded_caller_shares_one_bucket() {
 
     // Nothing trusted, so the header is ignored and both key on the proxy.
     assert!(
-        any_throttled(&app, "10.0.0.1:5000", Some("203.0.113.7"), 6).await,
-        "the password budget is a burst of 5, so a run of 6 must be refused"
+        any_throttled(&app, "10.0.0.1:5000", Some("203.0.113.7"), 11).await,
+        "the password budget is a burst of 10, so a run of 11 must be refused"
     );
     assert!(
         any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), 1).await,
@@ -118,11 +118,11 @@ async fn a_trusted_proxy_gives_each_real_caller_its_own_bucket() {
     let app = app_with_hops(store, 1);
 
     assert!(
-        any_throttled(&app, "10.0.0.1:5000", Some("203.0.113.7"), 6).await,
+        any_throttled(&app, "10.0.0.1:5000", Some("203.0.113.7"), 11).await,
         "the first client still spends its own budget"
     );
     assert!(
-        !any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), 5).await,
+        !any_throttled(&app, "10.0.0.1:5000", Some("198.51.100.4"), 10).await,
         "a second real client behind the same proxy has its own budget"
     );
 }

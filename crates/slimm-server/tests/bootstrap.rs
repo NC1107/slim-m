@@ -253,7 +253,7 @@ async fn password_endpoints_are_rate_limited() {
     let app = app(store);
 
     let mut statuses = Vec::new();
-    for i in 0..8 {
+    for i in 0..14 {
         let response = app
             .clone()
             .oneshot(request(
