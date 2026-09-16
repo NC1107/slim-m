@@ -14,6 +14,7 @@ use reqwest::{Client, StatusCode};
 use url::Url;
 
 use super::extract::{Preview, extract};
+use super::oembed;
 use super::ssrf::{GuardResolver, UrlError, validate};
 use super::video;
 
@@ -23,7 +24,7 @@ use super::video;
 const USER_AGENT_VALUE: &str = "slimm-link-preview/1.0 (+https://github.com/NC1107/slim-m)";
 
 const MAX_REDIRECTS: usize = 5;
-const MAX_HTML_BYTES: usize = 256 * 1024;
+pub(super) const MAX_HTML_BYTES: usize = 256 * 1024;
 const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 const TOTAL_TIMEOUT: Duration = Duration::from_secs(5);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -63,8 +64,10 @@ pub(super) fn build_client(allow_private: bool) -> Client {
 
 /// GETs [start], following up to [`MAX_REDIRECTS`] redirects, re-validating
 /// the scheme and any literal host at every hop. Returns the final URL and
-/// its response.
-async fn follow(
+/// its response. Shared by the page fetch, the image fetch, and
+/// [`super::oembed`]'s oembed request, so every one of them gets the exact
+/// same per-hop SSRF re-validation.
+pub(super) async fn follow(
     client: &Client,
     start: &str,
     allow_private: bool,
@@ -98,7 +101,10 @@ async fn follow(
 
 /// Reads at most [cap] bytes from [response], stopping the moment the body
 /// runs over rather than buffering an unbounded one.
-async fn read_capped(mut response: reqwest::Response, cap: usize) -> Result<Vec<u8>, FetchError> {
+pub(super) async fn read_capped(
+    mut response: reqwest::Response,
+    cap: usize,
+) -> Result<Vec<u8>, FetchError> {
     let mut body = Vec::new();
     while let Some(chunk) = response
         .chunk()
@@ -132,10 +138,10 @@ pub(super) async fn fetch_preview(
     start: &str,
     allow_private: bool,
 ) -> Result<Option<Preview>, FetchError> {
-    // YouTube is recognized from the URL, not by scraping: the watch page serves this bot a consent interstitial with no OG tags, so title/thumbnail come from oembed (see youtube_preview).
+    // YouTube is recognized from the URL, not by scraping: the watch page serves this bot a consent interstitial with no OG tags, so title/thumbnail/channel come from oembed (see the oembed module).
     if let Some(video) = video::detect(start, None) {
         return Ok(Some(
-            youtube_preview(client, start, video, allow_private).await,
+            oembed::youtube_preview(client, start, video, allow_private).await,
         ));
     }
 
@@ -162,67 +168,6 @@ pub(super) async fn fetch_preview(
         .map(|abs| abs.to_string());
     preview.video = video::detect(final_url.as_str(), video_url.as_deref());
     Ok(Some(preview))
-}
-
-/// A YouTube video's preview, built without scraping the watch page. Title and
-/// thumbnail come from YouTube's oembed API (reliable JSON to any agent),
-/// falling back to the deterministic thumbnail URL if oembed is unavailable
-/// (a private or deleted video). The id was already parsed from the URL.
-async fn youtube_preview(
-    client: &Client,
-    start: &str,
-    video: video::VideoInfo,
-    allow_private: bool,
-) -> Preview {
-    let (title, thumbnail) = youtube_oembed(client, start, allow_private)
-        .await
-        .unwrap_or((None, None));
-    let image = thumbnail
-        .filter(|url| validate(url, allow_private).is_ok())
-        .or_else(|| {
-            let fallback = format!("https://i.ytimg.com/vi/{}/hqdefault.jpg", video.id);
-            validate(&fallback, allow_private)
-                .is_ok()
-                .then_some(fallback)
-        });
-    Preview {
-        title: title.or_else(|| Some("YouTube".to_string())),
-        description: None,
-        image,
-        site_name: Some("YouTube".to_string()),
-        video_url: None,
-        video: Some(video),
-    }
-}
-
-/// Fetches YouTube's oembed JSON for [start] through the same guarded client,
-/// returning its `title` and `thumbnail_url`. `None` on any failure - the
-/// caller falls back to a deterministic thumbnail and a generic title.
-async fn youtube_oembed(
-    client: &Client,
-    start: &str,
-    allow_private: bool,
-) -> Option<(Option<String>, Option<String>)> {
-    let mut oembed = Url::parse("https://www.youtube.com/oembed").ok()?;
-    oembed
-        .query_pairs_mut()
-        .append_pair("url", start)
-        .append_pair("format", "json");
-    let (_, response) = follow(client, oembed.as_str(), allow_private).await.ok()?;
-    if !response.status().is_success() {
-        return None;
-    }
-    let body = read_capped(response, MAX_HTML_BYTES).await.ok()?;
-    let json: serde_json::Value = serde_json::from_slice(&body).ok()?;
-    let title = json
-        .get("title")
-        .and_then(|v| v.as_str())
-        .map(str::to_string);
-    let thumbnail = json
-        .get("thumbnail_url")
-        .and_then(|v| v.as_str())
-        .map(str::to_string);
-    Some((title, thumbnail))
 }
 
 /// Fetches [start] as an image for proxying, returning its bytes and

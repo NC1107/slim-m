@@ -17,10 +17,19 @@
 //! to happen here rather than the client guessing from the URL alone: this
 //! is already the one place an SSRF-guarded fetch and an allowlist decision
 //! are made for a pasted link.
+//!
+//! A recognized video's title/thumbnail/channel are a separate matter from
+//! detection: [`oembed`] fills them in from the provider's oembed endpoint,
+//! a second SSRF-guarded request behind the same [`fetch::follow`] the page
+//! fetch uses, made only for a recognized video and never for an ordinary
+//! link. Best-effort like the rest of this module: a failed or slow oembed
+//! request degrades to a generic title and no channel rather than failing
+//! the unfurl.
 
 mod cache;
 mod extract;
 mod fetch;
+mod oembed;
 mod ssrf;
 mod video;
 
@@ -121,6 +130,9 @@ struct PreviewParams {
 /// linked page was recognized as a playable video (YouTube today): the
 /// client renders a click-to-play affordance instead of the static card, and
 /// nothing about that provider is ever contacted until the reader taps.
+/// `author_name`/`author_url` are the page's author or publisher, if known -
+/// a YouTube video's channel today, from the same oembed request that fills
+/// in the video's title and thumbnail (see [`oembed`]).
 #[derive(Serialize)]
 struct LinkPreviewDto {
     url: String,
@@ -130,6 +142,8 @@ struct LinkPreviewDto {
     image_token: Option<String>,
     video_provider: Option<video::VideoProvider>,
     video_id: Option<String>,
+    author_name: Option<String>,
+    author_url: Option<String>,
 }
 
 fn to_dto(url: &str, cached: CachedPreview) -> LinkPreviewDto {
@@ -143,6 +157,8 @@ fn to_dto(url: &str, cached: CachedPreview) -> LinkPreviewDto {
         image_token: cached.image_token,
         video_provider,
         video_id,
+        author_name: cached.author_name,
+        author_url: cached.author_url,
     }
 }
 

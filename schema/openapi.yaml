@@ -3002,7 +3002,13 @@ paths:
         returned as an opaque `image_token` redeemed at `getLinkPreviewImage`,
         never the upstream URL. If the page is recognized as a playable video
         (YouTube today), `video_provider`/`video_id` are set so a client can
-        render a click-to-play affordance instead - see those fields.
+        render a click-to-play affordance instead - see those fields. For a
+        recognized video, `title`/`image`/`author_name`/`author_url` come
+        from the provider's oembed endpoint, a second SSRF-guarded request
+        behind the same redirect handling as the page fetch, made only for a
+        recognized video and never for an ordinary link; a failed or slow
+        oembed request degrades to a generic title and no author rather than
+        failing the unfurl.
       parameters:
         - name: url
           in: query
@@ -8268,17 +8274,34 @@ components:
           type: [string, "null"]
           description: >
             Set together with video_id when the linked page was recognized as
-            a playable video during unfurl (from its URL or an og:video tag,
-            no extra request made). Only "youtube" exists today. When set, a
-            client should render a click-to-play affordance instead of the
-            static card, and must not contact the provider until the reader
-            taps. Null for an ordinary link.
+            a playable video during unfurl, purely from its URL or an
+            og:video tag - detecting the provider and id makes no extra
+            request. Only "youtube" exists today. When set, a client should
+            render a click-to-play affordance instead of the static card, and
+            must not contact the provider until the reader taps. Null for an
+            ordinary link. Detection is separate from populating this video's
+            title/image/author, which does make one further request - see
+            author_name.
         video_id:
           type: [string, "null"]
           description: >
             The provider's own canonical video id (paired with
             video_provider), never a URL - a client builds its own playback
             URL from provider and id. Null unless video_provider is set.
+        author_name:
+          type: [string, "null"]
+          description: >
+            The page's author or publisher, if known - a recognized video's
+            channel name today (from the provider's oembed response, a second
+            best-effort request; see the getLinkPreview description). Null
+            for an ordinary link, or when that request failed.
+        author_url:
+          type: [string, "null"]
+          description: >
+            The author's own page, paired with author_name - a channel name a
+            reader cannot click is less useful. Null unless author_name is
+            set, and even then only when the provider supplied a usable
+            http(s) URL.
 
     PinnedMessage:
       description: >-

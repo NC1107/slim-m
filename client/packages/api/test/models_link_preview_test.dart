@@ -29,7 +29,21 @@ void main() {
     expect(preview.imageToken, isNull);
     expect(preview.videoProvider, isNull);
     expect(preview.videoId, isNull);
+    expect(preview.authorName, isNull);
+    expect(preview.authorUrl, isNull);
     expect(preview.isPlayableVideo, isFalse);
+  });
+
+  test('a recognized video reads its channel name and url', () {
+    final preview = LinkPreview.fromJson({
+      'url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'video_provider': 'youtube',
+      'video_id': 'dQw4w9WgXcQ',
+      'author_name': 'A Channel',
+      'author_url': 'https://www.youtube.com/@achannel',
+    });
+    expect(preview.authorName, 'A Channel');
+    expect(preview.authorUrl, 'https://www.youtube.com/@achannel');
   });
 
   test('a recognized YouTube video reads as playable', () {
