@@ -69,11 +69,17 @@ class DockWhatItAddsCard extends StatelessWidget {
       case 'app':
         return (ep.name, described ?? 'An app you can launch into a channel.');
       case 'code-block-runner':
-        final where = ep.language == null
-            ? 'any code block'
-            : '${ep.language} code blocks';
+        // A runner that names no language is offered on nothing, so say so.
+        if (ep.language == null) {
+          return (
+            'Run code blocks',
+            described ??
+                'This module has not said which language it runs, so no Run '
+                    'button is offered until it does.',
+          );
+        }
         return (
-          'Run $where',
+          'Run ${ep.language} code blocks',
           described ?? 'Adds a Run button on matching code blocks.',
         );
       default:

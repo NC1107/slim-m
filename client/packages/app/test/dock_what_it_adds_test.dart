@@ -54,7 +54,9 @@ void main() {
     expect(find.text('roll'), findsNothing);
   });
 
-  testWidgets('a wildcard runner reads as any code block', (tester) async {
+  testWidgets('a runner naming no language says it runs nothing yet', (
+    tester,
+  ) async {
     await _pump(tester, const [
       api.DockExtensionPoint(
         kind: 'code-block-runner',
@@ -63,7 +65,11 @@ void main() {
         permission: 'run',
       ),
     ]);
-    expect(find.text('Run any code block'), findsOneWidget);
+    expect(find.text('Run code blocks'), findsOneWidget);
+    expect(
+      find.textContaining('has not said which language it runs'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('an unrecognised kind still lists generically', (tester) async {

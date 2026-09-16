@@ -98,7 +98,11 @@ void main() {
     await _pump(
       tester,
       runners: const [
-        api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+        api.CodeBlockRunner(
+          moduleId: 'code-exec',
+          command: 'run',
+          language: 'javascript',
+        ),
       ],
     );
 
@@ -112,7 +116,11 @@ void main() {
       await _pump(
         tester,
         runners: const [
-          api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+          api.CodeBlockRunner(
+            moduleId: 'code-exec',
+            command: 'run',
+            language: 'javascript',
+          ),
         ],
         onRunRequest: (request) {
           expect(request.method, 'POST');
@@ -137,7 +145,11 @@ void main() {
       await _pump(
         tester,
         runners: const [
-          api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+          api.CodeBlockRunner(
+            moduleId: 'code-exec',
+            command: 'run',
+            language: 'javascript',
+          ),
         ],
         onRunRequest: (_) =>
             _jsonResponse({'ok': false, 'error': 'syntax error'}),
@@ -159,7 +171,11 @@ void main() {
       await _pump(
         tester,
         runners: const [
-          api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+          api.CodeBlockRunner(
+            moduleId: 'code-exec',
+            command: 'run',
+            language: 'javascript',
+          ),
         ],
         onRunRequest: (_) =>
             _jsonResponse({'error': 'module is not enabled'}, 409),
@@ -182,7 +198,11 @@ void main() {
     await _pump(
       tester,
       runners: const [
-        api.CodeBlockRunner(moduleId: 'code-exec', command: 'run'),
+        api.CodeBlockRunner(
+          moduleId: 'code-exec',
+          command: 'run',
+          language: 'javascript',
+        ),
       ],
       onRunRequest: (_) {
         call += 1;
@@ -240,10 +260,11 @@ void main() {
 
   /// The owner fenced a block as `python`, pressed Run, and got
   /// `ReferenceError: print is not defined` back from a JavaScript engine.
-  /// They did nothing wrong: a runner that declares no language is a
-  /// wildcard and claims every block, and nothing before the press said
-  /// which runtime was about to see it.
-  testWidgets('the Run affordance names the module it will hand the block to', (
+  /// Naming the module on the button was the first answer and it was not
+  /// enough: the owner came back with "it shouldn't appear on ones it can't
+  /// run", which is right. A runner that has not said what it runs is not a
+  /// runner for this block.
+  testWidgets('a runner that declares no language is offered for nothing', (
     tester,
   ) async {
     await _pump(
@@ -254,12 +275,28 @@ void main() {
       ],
     );
 
-    expect(find.bySemanticsLabel('Run with code-exec'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('Run code'),
-      findsNothing,
-      reason: 'a bare "Run code" is what let a python fence look runnable',
+    expect(find.bySemanticsLabel('Run with code-exec'), findsNothing);
+    expect(find.bySemanticsLabel('Run code'), findsNothing);
+  });
+
+  /// The same block with a runner that does claim python keeps its button,
+  /// so this is about an undeclared language and not about python.
+  testWidgets('a runner that declares the block language is still offered', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      language: 'python',
+      runners: const [
+        api.CodeBlockRunner(
+          moduleId: 'py-exec',
+          command: 'run',
+          language: 'python',
+        ),
+      ],
     );
+
+    expect(find.bySemanticsLabel('Run with py-exec'), findsOneWidget);
   });
 
   testWidgets('the first matching runner wins when several are discovered', (
@@ -312,7 +349,11 @@ void main() {
         messageId: 'm1',
         events: events.stream,
         runners: const [
-          api.CodeBlockRunner(moduleId: 'game-of-life', command: 'life'),
+          api.CodeBlockRunner(
+            moduleId: 'game-of-life',
+            command: 'life',
+            language: 'javascript',
+          ),
         ],
         onRunRequest: (request) {
           paths.add(request.url.path);
