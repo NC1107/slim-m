@@ -1,6 +1,6 @@
 # Research corpus index
 
-54 files, roughly 12,400 lines, spanning 2026-07-23 to 2026-08-11.
+55 files, roughly 12,500 lines, spanning 2026-07-23 to 2026-09-16.
 
 **Status: this is a point-in-time record, not a description of current state.**
 Most of it (everything dated 2026-07-23) was written before a line of implementation code existed, to decide what to build and then to attack that decision before committing to it.
@@ -79,6 +79,7 @@ Everything below postdates the pre-build research above by weeks and reports on 
 | [review-product-2026-08-02.md](review-product-2026-08-02.md) | 2026-08-02 | A rendered product and UX review: every routed screen actually opened and looked at, not read from source. A real illegible-text bug in Space Settings, the voice join screen's empty space, the canvas's gap against its own "signature feature" billing, and a first-run walkthrough from a fresh bootstrap |
 | [review-security-2026-08-02.md](review-security-2026-08-02.md) | 2026-08-02 | A security and safety review of the then-new surfaces: threads, replies, DM calling, the report queue, drag-to-reorder, display-name reconciliation, the live thread event, and clipboard. Its first finding (moderation failing to end a DM call already in progress) is the one PR #336 ("Moderation reaching only the channel kind it was written for") closed |
 | [linux-screen-share-teardown-2026-08-11/](linux-screen-share-teardown-2026-08-11/README.md) | 2026-08-11 | The Linux screen-share teardown re-check: re-verifies the CLAUDE.md entry's claims against the real flutter_webrtc and libwebrtc source, traces why PR #529 could not change Linux behaviour, and carries a prepared (not filed) upstream patch, syntax-checked against the pinned SDK headers |
+| [code-runner-languages.md](code-runner-languages.md) | 2026-09-16 | Which languages a code runner can actually carry, for [decision 0026](../decisions/0026-polyglot-code-runner.md): how Piston, Judge0, Riju and Compiler Explorer isolate and package languages, and the finding that no compiled language has a WebAssembly-hosted compiler in production anywhere, which is why 0026 covers interpreted languages only. Also the bucketing the owner asked for, which turns out to be two real packs and a long tail of singletons, and the safety properties a WebAssembly sandbox gives free against the one (wall-clock time) it does not |
 
 ## Why this corpus stays, unpruned
 
