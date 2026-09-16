@@ -145,6 +145,21 @@ pub struct Config {
     /// operator sets here.
     #[serde(default = "default_addons_repo")]
     pub addons_repo: String,
+
+    /// Base URL of a self-hosted Piston instance (engineer-man/piston), for
+    /// example `http://piston:2000` on a compose-internal network; the
+    /// `/api/v2/...` paths are appended when calling it. See
+    /// `crate::code_runner` for the whole broker.
+    ///
+    /// Optional, and absent is the default and fully supported state: a
+    /// deployment that never sets this behaves exactly as it does today,
+    /// with no Run affordance on any code block and nothing resembling a
+    /// startup error - the same first-class two-state shape `push_relay_url`
+    /// above already has. slim-m runs no runner of its own and executes
+    /// nothing itself; this only ever points at a Piston instance the
+    /// operator stood up and trusts, the same relationship this project
+    /// already has with the push relay and a self-hosted LiveKit.
+    pub code_runner_url: Option<String>,
 }
 
 fn default_port() -> u16 {
@@ -197,6 +212,7 @@ impl Default for Config {
             cors_allowed_origins: None,
             trust_proxy_hops: 0,
             addons_repo: default_addons_repo(),
+            code_runner_url: None,
         }
     }
 }
@@ -249,6 +265,7 @@ mod tests {
             defaulted.cors_allowed_origins
         );
         assert_eq!(from_empty_env.addons_repo, defaulted.addons_repo);
+        assert_eq!(from_empty_env.code_runner_url, defaulted.code_runner_url);
     }
 
     /// An unset origin list and an explicitly empty one must be the same

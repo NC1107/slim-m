@@ -57,6 +57,7 @@ fn app_with_events(store: Store) -> (Router, broadcast::Receiver<Event>) {
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
     };
     let events = state.hub.subscribe();
     (http::router(state), events)

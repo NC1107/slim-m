@@ -45,6 +45,7 @@ fn app(store: Store) -> Router {
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
     })
 }
 
@@ -121,6 +122,7 @@ async fn changing_an_avatar_announces_the_profile_change() {
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
     });
     let token = register(&store, "alice").await;
     let me = json_body(
@@ -286,6 +288,7 @@ async fn deleting_an_account_removes_its_avatar_file() {
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
     });
     let token = register(&store, "alice").await;
 

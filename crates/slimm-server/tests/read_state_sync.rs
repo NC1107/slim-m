@@ -54,6 +54,7 @@ async fn setup(everyone: Permissions) -> Fixture {
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
     });
     let user = store.create_user("alice", "Alice").await.unwrap();
     let tokens = store.open_session(user.id, "dev").await.unwrap();

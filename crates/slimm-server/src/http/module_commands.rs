@@ -22,6 +22,15 @@
 //! it only surfaces, per caller, which installed and enabled module declared
 //! a `code-block-runner` extension point the caller holds the permission
 //! for. A deployment with no such module installed answers an empty list.
+//!
+//! [`CODE_RUNNER_MODULE_ID`] is the one reserved exception: on both run
+//! routes, that exact `module_id` is never looked up in the module store at
+//! all and instead reaches [`execute_code_runner`], the broker for this
+//! deployment's optional Piston-compatible code runner (`crate::code_runner`,
+//! docs/decisions/0026). It rides the same routes and the same discovery
+//! list deliberately, per that decision's "reuse discovery, do not invent a
+//! parallel one" - a client never needs to know the difference between an
+//! installed module and this deployment's runner broker.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -34,6 +43,8 @@ use super::error::ApiError;
 use super::extract::{AUTHED_READ, AuthedLimited, Json, MODULE};
 use crate::ids::UserId;
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
+use crate::permissions::Permissions;
+use crate::ratelimit::Class;
 use crate::store::{InstalledModule, ModuleExtensionPoint};
 
 /// A command name is compared verbatim against a module's own persisted
@@ -190,13 +201,68 @@ pub(crate) async fn execute_command(
     Ok(outcome)
 }
 
+/// The reserved `module_id` this deployment's code-runner broker
+/// (`crate::code_runner`) answers to, on the exact same routes an installed
+/// module's command would use - see this file's own module doc. Not a real
+/// installable module: [`execute_code_runner`] never reaches the module
+/// store for it, and nothing in the Dock's install path can register a
+/// module under this fixed id, so a marketplace listing can never shadow or
+/// be shadowed by it.
+pub(crate) const CODE_RUNNER_MODULE_ID: &str = "code-runner";
+
+/// Runs `code` as `language` through this deployment's configured code
+/// runner, gated on [`Permissions::RUN_CODE`] and charged
+/// [`Class::CodeRunner`] - the runner-broker analogue of [`execute_command`],
+/// used instead of it whenever a caller names [`CODE_RUNNER_MODULE_ID`].
+///
+/// `permissions` is resolved by the caller against its own context: the
+/// message-scoped run route (`super::code_runs`) evaluates it per channel,
+/// the same set it already computed for its `VIEW_CHANNEL` check, while this
+/// file's own generic route has no channel to evaluate against and uses the
+/// caller's base (guild-level) permissions instead - mirroring how a plain
+/// module permission is never channel-scoped either.
+pub(crate) async fn execute_code_runner(
+    state: &AppState,
+    permissions: Permissions,
+    user_id: UserId,
+    language: &str,
+    code: &str,
+) -> Result<CommandOutcome, ApiError> {
+    if !state.code_runner.is_enabled() {
+        return Err(ApiError::NotFound(
+            "no code runner is configured for this deployment",
+        ));
+    }
+    if !permissions.contains(Permissions::RUN_CODE) {
+        return Err(ApiError::Forbidden);
+    }
+    // An authenticated key, mirroring `extract::limit_key`'s own branch for one.
+    if !state
+        .limiter
+        .check(Class::CodeRunner, &format!("u:{user_id}"))
+    {
+        return Err(ApiError::TooManyRequests);
+    }
+
+    let outcome = state.code_runner.run(language, code).await;
+    Ok(CommandOutcome {
+        ok: outcome.ok,
+        payload: outcome.payload,
+    })
+}
+
 async fn run_command(
     AuthedLimited(ctx): AuthedLimited<MODULE>,
     State(state): State<AppState>,
     Path((module_id, command)): Path<(String, String)>,
     Json(req): Json<RunCommandRequest>,
 ) -> Result<Json<RunCommandResponse>, ApiError> {
-    let outcome = execute_command(&state, ctx.user_id, &module_id, &command, &req.input).await?;
+    let outcome = if module_id == CODE_RUNNER_MODULE_ID {
+        let permissions = state.store.base_permissions(ctx.user_id).await?;
+        execute_code_runner(&state, permissions, ctx.user_id, &command, &req.input).await?
+    } else {
+        execute_command(&state, ctx.user_id, &module_id, &command, &req.input).await?
+    };
     let response = if outcome.ok {
         RunCommandResponse {
             ok: true,
@@ -322,18 +388,39 @@ async fn list_slash_commands(
 /// code block - never a hardcoded module id, per docs/decisions/0021's
 /// module-agnostic principle. Possibly empty, which means no Run affordance
 /// anywhere in the client.
+///
+/// Also lists one entry per language this deployment's configured code
+/// runner currently declares (`CodeRunner::languages`, per decision 0026),
+/// under the reserved [`CODE_RUNNER_MODULE_ID`] - but only when the broker is
+/// configured at all and the caller holds [`Permissions::RUN_CODE`], so an
+/// unconfigured or ungranted runner adds nothing here, the same clean-no-op
+/// posture the module list already has.
 async fn list_code_block_runners(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CodeBlockRunnerDto>>, ApiError> {
-    let runners = reachable_extension_points(&state, ctx.user_id, "code-block-runner")
-        .await?
-        .into_iter()
-        .map(|r| CodeBlockRunnerDto {
-            module_id: r.module_id,
-            command: r.command,
-            language: r.point.language,
-        })
-        .collect();
+    let mut runners: Vec<CodeBlockRunnerDto> =
+        reachable_extension_points(&state, ctx.user_id, "code-block-runner")
+            .await?
+            .into_iter()
+            .map(|r| CodeBlockRunnerDto {
+                module_id: r.module_id,
+                command: r.command,
+                language: r.point.language,
+            })
+            .collect();
+
+    if state.code_runner.is_enabled() {
+        let permissions = state.store.base_permissions(ctx.user_id).await?;
+        if permissions.contains(Permissions::RUN_CODE) {
+            for language in state.code_runner.languages().await {
+                runners.push(CodeBlockRunnerDto {
+                    module_id: CODE_RUNNER_MODULE_ID.to_owned(),
+                    command: language.clone(),
+                    language: Some(language),
+                });
+            }
+        }
+    }
     Ok(Json(runners))
 }

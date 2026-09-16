@@ -59,6 +59,7 @@ fn app(store: Store, gifs: GifSearch) -> Router {
         gifs,
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
         dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
     })
 }
 

@@ -14,6 +14,7 @@ use tower_http::timeout::{RequestBodyTimeoutLayer, TimeoutLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::auth::Auth;
+use crate::code_runner::CodeRunner;
 use crate::hub::Hub;
 use crate::media::Media;
 use crate::push::PushSender;
@@ -137,6 +138,7 @@ pub struct AppState {
     pub gifs: gifs::GifSearch,
     pub link_previews: link_preview::LinkPreviews,
     pub dock: dock::Dock,
+    pub code_runner: CodeRunner,
 }
 
 /// Builds the router over the shared application state.

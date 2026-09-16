@@ -13,10 +13,11 @@
 //! optional; a LAN-only or NAT-unreachable self-host has nowhere for a relay
 //! to reach it, and that is a fully supported deployment, so an unconfigured
 //! sender is a quiet no-op, not a startup failure. When a relay URL is
-//! configured, its scheme is checked once here at startup ([`validate_relay_url`]):
-//! `http://` leaks every recipient's push token and the relay bearer key in
-//! cleartext, so it is refused unless the relay is loopback or private-range,
-//! where nothing to leak to ever leaves the LAN.
+//! configured, its scheme is checked once here at startup
+//! (`crate::sidecar_url::validate`): `http://` leaks every recipient's push
+//! token and the relay bearer key in cleartext, so it is refused unless the
+//! relay is loopback or private-range, where nothing to leak to ever leaves
+//! the LAN.
 //!
 //! Triggering reads the client-reported lifecycle state, never raw WebSocket
 //! presence: iOS suspends a socket without closing it, so a live connection is
@@ -46,9 +47,6 @@ pub(crate) mod recipients;
 mod relay;
 
 use std::sync::Arc;
-
-use anyhow::Context;
-use url::{Host, Url};
 
 use crate::config::Config;
 use crate::ids::{CallRingId, ChannelId, MessageId, Seq, UserId};
@@ -102,7 +100,7 @@ impl PushSender {
     pub fn with_debounce_window_ms(config: &Config, window_ms: i64) -> anyhow::Result<Self> {
         let inner = match (&config.push_relay_url, &config.push_relay_key) {
             (Some(url), Some(key)) => {
-                validate_relay_url(url)?;
+                crate::sidecar_url::validate(url, "SLIMM_PUSH_RELAY_URL")?;
                 // Redirects refused, not followed; see the note on this
                 // function.
                 let http = reqwest::Client::builder()
@@ -208,44 +206,6 @@ pub struct SentMessage {
     pub presence: PresenceTracker,
 }
 
-/// Refuses a push relay URL that would send every recipient's APNs/FCM token
-/// and the relay bearer key across the network in cleartext. `https://` is
-/// always fine; `http://` is allowed only for a loopback or private-range
-/// host, where a LAN-local relay with nowhere to terminate TLS is a
-/// legitimate deployment and nothing sent to it leaves the LAN. Checked once
-/// here at startup, so a bad scheme fails loudly at boot rather than leaking
-/// silently the first time a push is sent.
-fn validate_relay_url(raw: &str) -> anyhow::Result<()> {
-    let url = Url::parse(raw)
-        .with_context(|| format!("SLIMM_PUSH_RELAY_URL is not a valid URL: {raw:?}"))?;
-    match url.scheme() {
-        "https" => Ok(()),
-        "http" if is_local_relay_host(url.host()) => Ok(()),
-        "http" => anyhow::bail!(
-            "SLIMM_PUSH_RELAY_URL ({raw}) uses http:// for a non-local relay host; \
-             use https://, or point it at a loopback or private-range address"
-        ),
-        other => anyhow::bail!(
-            "SLIMM_PUSH_RELAY_URL ({raw}) has an unsupported scheme {other:?}; \
-             it must be https:// (or http:// only for a loopback/private-range relay)"
-        ),
-    }
-}
-
-/// Whether a relay host is loopback or private-range: the cases where an
-/// unencrypted LAN-local relay is legitimate rather than a leak. Matches the
-/// boundaries RFC 1918 and RFC 4193 define (so, for example, 172.16.0.0/12 is
-/// private but 172.32.0.0 is not, and `localhost` counts without a DNS
-/// lookup).
-fn is_local_relay_host(host: Option<Host<&str>>) -> bool {
-    match host {
-        Some(Host::Domain(domain)) => domain.eq_ignore_ascii_case("localhost"),
-        Some(Host::Ipv4(addr)) => addr.is_loopback() || addr.is_private(),
-        Some(Host::Ipv6(addr)) => addr.is_loopback() || addr.is_unique_local(),
-        None => false,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,38 +215,9 @@ mod tests {
         assert!(!PushSender::disabled().is_enabled());
     }
 
-    #[test]
-    fn relay_url_requires_https_for_a_public_host() {
-        assert!(validate_relay_url("https://relay.example.com").is_ok());
-        assert!(validate_relay_url("http://relay.example.com").is_err());
-        assert!(validate_relay_url("ftp://relay.example.com").is_err());
-        assert!(validate_relay_url("not a url").is_err());
-    }
-
-    #[test]
-    fn relay_url_allows_http_for_loopback_and_private_ranges() {
-        for ok in [
-            "http://127.0.0.1:9000",
-            "http://localhost:9000",
-            "http://LOCALHOST:9000",
-            "http://10.1.2.3",
-            "http://172.16.0.1",
-            "http://172.31.255.255",
-            "http://192.168.1.1",
-            "http://[::1]:9000",
-        ] {
-            assert!(
-                validate_relay_url(ok).is_ok(),
-                "{ok} should be allowed over http"
-            );
-        }
-        // 172.16.0.0/12 (RFC 1918) ends at 172.31.255.255; 172.32.0.0 is a
-        // routable public address and must not be treated as LAN-local.
-        assert!(
-            validate_relay_url("http://172.32.0.1").is_err(),
-            "172.32 is outside the private range and must require https"
-        );
-    }
+    // The URL-scheme rules themselves (https always fine, http only for a
+    // loopback/private host) are `sidecar_url`'s own tests; this file only
+    // proves `PushSender` actually wires that check in below.
 
     #[test]
     fn with_debounce_window_ms_rejects_a_cleartext_public_relay() {
