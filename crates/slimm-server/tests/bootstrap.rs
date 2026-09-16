@@ -247,6 +247,16 @@ async fn channel_list_requires_authentication() {
 }
 
 /// The password class refuses a caller past its burst, so a flood cannot keep
+/// Enough logins to outrun the password bucket's refill on any runner.
+///
+/// Sized rather than tuned, the same way `resource_bounds.rs` sizes its own.
+/// The bucket is ten with one back every three seconds, so a loop slow enough
+/// per request never empties it: at two seconds each, thirty would still be
+/// admitted. A fixed fourteen passed on a laptop and failed on CI, which is a
+/// number tuned to one machine rather than a bound. The loop breaks at the
+/// first refusal, so this ceiling costs nothing in the normal case.
+const ENOUGH_TO_EXHAUST: usize = 40;
+
 /// the Argon2id permits saturated.
 #[tokio::test]
 async fn password_endpoints_are_rate_limited() {
@@ -254,7 +264,7 @@ async fn password_endpoints_are_rate_limited() {
     let app = app(store);
 
     let mut statuses = Vec::new();
-    for i in 0..14 {
+    for i in 0..ENOUGH_TO_EXHAUST {
         let response = app
             .clone()
             .oneshot(request(
@@ -269,11 +279,14 @@ async fn password_endpoints_are_rate_limited() {
             ))
             .await
             .unwrap();
-        statuses.push(response.status());
+        let status = response.status();
+        statuses.push(status);
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            break;
+        }
     }
 
-    // The early attempts are answered normally (401, no such user); once the
-    // burst is spent the limiter takes over.
+    // Early attempts answer 401 (no such user); past the burst the limiter takes over.
     assert!(
         statuses.contains(&StatusCode::UNAUTHORIZED),
         "early attempts are answered: {statuses:?}"
