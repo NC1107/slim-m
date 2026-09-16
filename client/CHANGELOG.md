@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.79.0](https://github.com/NC1107/slim-m/compare/client-v0.78.0...client-v0.79.0) (2026-09-16)
+
+
+### Features
+
+* **client:** let a module scene emit notes, and play them safely ([#1214](https://github.com/NC1107/slim-m/issues/1214)) ([4aafefd](https://github.com/NC1107/slim-m/commit/4aafefd3a35cae2e6d2e1ba04bd92ddf9d863891))
+* **client:** notice a pending update while the app stays open ([#1207](https://github.com/NC1107/slim-m/issues/1207)) ([3971274](https://github.com/NC1107/slim-m/commit/3971274effe47bb4722945421219cbc4ea24da75))
+* **server:** broker code execution through a self-hosted Piston instance ([#1216](https://github.com/NC1107/slim-m/issues/1216)) ([5deb9c7](https://github.com/NC1107/slim-m/commit/5deb9c7d6a38ebbb40df1170b594bbcd713b2949))
+* **server:** show a YouTube video's channel on its link preview ([#1213](https://github.com/NC1107/slim-m/issues/1213)) ([369cdab](https://github.com/NC1107/slim-m/commit/369cdab8fe9cea2e4b1427f1b017ec954497a361))
+
+
+### Bug Fixes
+
+* **client:** offer a code runner only for a language it named ([#1211](https://github.com/NC1107/slim-m/issues/1211)) ([3c03993](https://github.com/NC1107/slim-m/commit/3c03993bed6c49970e0e71151d56b92c9666961f))
+* **client:** route macOS and Windows desktop secrets to the keychain ([#1206](https://github.com/NC1107/slim-m/issues/1206)) ([3c3db3a](https://github.com/NC1107/slim-m/commit/3c3db3a3961b72a882873f6c352552432ad663c9))
+* double the signup limit, and stop a small board filling the screen ([#1205](https://github.com/NC1107/slim-m/issues/1205)) ([8bfda8c](https://github.com/NC1107/slim-m/commit/8bfda8c904634c0559646212d8ac48429834d135))
+
 ## [0.78.0](https://github.com/NC1107/slim-m/compare/client-v0.77.0...client-v0.78.0) (2026-09-15)
 
 
