@@ -135,8 +135,20 @@ async fn a_client_supplied_prefix_cannot_reach_the_trusted_slot() {
     let (store, _guard) = new_store("slimm-bounds-spoof").await;
     let app = app_with_hops(store, 1);
 
-    // One real client, varying only the prefix it controls: one bucket.
-    for spoof in ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5"] {
+    // One real client, varying only the prefix it controls: one bucket. Ten
+    // spends the password burst, so an eleventh request must be refused.
+    for spoof in [
+        "1.1.1.1",
+        "2.2.2.2",
+        "3.3.3.3",
+        "4.4.4.4",
+        "5.5.5.5",
+        "6.6.6.6",
+        "7.7.7.7",
+        "8.8.8.8",
+        "9.9.9.9",
+        "10.10.10.10",
+    ] {
         app.clone()
             .oneshot(login_from(
                 "10.0.0.1:5000",
@@ -146,7 +158,7 @@ async fn a_client_supplied_prefix_cannot_reach_the_trusted_slot() {
             .unwrap();
     }
     assert!(
-        any_throttled(&app, "10.0.0.1:5000", Some("6.6.6.6, 203.0.113.7"), 1).await,
+        any_throttled(&app, "10.0.0.1:5000", Some("11.11.11.11, 203.0.113.7"), 1).await,
         "a prepended address must not mint a fresh bucket"
     );
 }
@@ -158,7 +170,7 @@ async fn a_chain_too_short_for_the_trusted_slot_falls_back_to_the_peer() {
     let (store, _guard) = new_store("slimm-bounds-short").await;
     let app = app_with_hops(store, 2);
 
-    for _ in 0..6 {
+    for _ in 0..11 {
         app.clone()
             .oneshot(login_from("10.0.0.1:5000", Some("203.0.113.7")))
             .await
