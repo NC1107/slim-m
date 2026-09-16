@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The card a pasted URL unfurls into below a message: the linked page's
-/// site name, title, description and proxied image, one card per link - or,
-/// for a link recognized as a playable video (YouTube today), the same card
-/// with a click-to-play affordance over the thumbnail instead of a static
-/// image.
+/// site name, title, author, description and proxied image, one card per
+/// link - or, for a link recognized as a playable video (YouTube today), the
+/// same card with a click-to-play affordance over the thumbnail instead of a
+/// static image and, when known, the video's channel as the author line.
 ///
 /// Privacy is the point of the click-to-play affordance: nothing from the
 /// video provider loads on render, only when the reader taps. On web that
@@ -36,6 +36,14 @@ import 'attachment_reveal.dart';
 import 'attachment_view.dart' show kInlineImageMax;
 import 'image_decode.dart';
 import 'youtube_inline_player.dart';
+
+/// Opens [rawUrl] in the system browser, refusing anything but a plain
+/// http(s) URL - shared by a card's own tap and its author line's tap.
+Future<void> _launchIfHttp(String rawUrl) async {
+  final uri = Uri.tryParse(rawUrl);
+  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
 
 /// One card per URL, below a message's own text. Callers cap [urls] before
 /// handing them here; this renders exactly what it is given.
@@ -79,11 +87,7 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
   /// tap opens the system browser instead of swapping in an inline player.
   bool _playing = false;
 
-  Future<void> _open() async {
-    final uri = Uri.tryParse(widget.url);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+  Future<void> _open() async => _launchIfHttp(widget.url);
 
   /// The click-to-play action for a recognized video: on web, swap the
   /// thumbnail for an inline `youtube-nocookie.com` iframe with nothing
@@ -105,7 +109,8 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
     final hasText =
         preview.siteName != null ||
         preview.title != null ||
-        preview.description != null;
+        preview.description != null ||
+        preview.authorName != null;
     if (!hasText && preview.imageToken == null && !preview.isPlayableVideo) {
       return const SizedBox.shrink();
     }
@@ -168,6 +173,14 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
                         ),
                       ),
                     ),
+                  if (preview.authorName case final authorName?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.s4),
+                      child: _AuthorRow(
+                        name: authorName,
+                        url: preview.authorUrl,
+                      ),
+                    ),
                   if (preview.description case final description?)
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.s4),
@@ -196,6 +209,47 @@ class _LinkPreviewCardState extends ConsumerState<LinkPreviewCard> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The linked page's author or publisher - a recognized video's channel
+/// today - subordinate to the title, the same caption treatment the
+/// site name row above it gets. Tappable to open [url] in the system
+/// browser when known; plain text otherwise.
+class _AuthorRow extends StatelessWidget {
+  const _AuthorRow({required this.name, this.url});
+
+  final String name;
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final authorUrl = url;
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(AppIcons.account, size: 12, color: tokens.textSecondary),
+        const SizedBox(width: AppSpacing.s4),
+        Flexible(
+          child: Text(
+            name,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.caption.copyWith(
+              color: authorUrl == null ? tokens.textSecondary : tokens.accent,
+            ),
+          ),
+        ),
+      ],
+    );
+    if (authorUrl == null) return row;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => unawaited(_launchIfHttp(authorUrl)),
+        child: row,
       ),
     );
   }

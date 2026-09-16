@@ -29,6 +29,15 @@ pub(super) struct Preview {
     /// straight out of [`extract`]; [`super::fetch::fetch_preview`] fills it
     /// in once it has this page's final, redirect-resolved URL to check.
     pub video: Option<VideoInfo>,
+    /// The page's author or publisher, if known - a YouTube video's channel
+    /// name today, from oembed rather than this bounded HTML scan. Always
+    /// `None` straight out of [`extract`]; [`super::fetch::youtube_preview`]
+    /// fills it in for a recognized video.
+    pub author_name: Option<String>,
+    /// The author's own page, paired with [`Self::author_name`] - a channel
+    /// name a reader cannot click is less useful. Always `None` straight out
+    /// of [`extract`].
+    pub author_url: Option<String>,
 }
 
 impl Preview {
@@ -42,7 +51,9 @@ impl Preview {
 }
 
 /// Longest field values kept; a verbose page cannot make an unbounded card.
-const MAX_FIELD_CHARS: usize = 500;
+/// `pub(super)` so [`super::fetch`] can bound the oembed-sourced author
+/// fields the same way, rather than duplicating the constant.
+pub(super) const MAX_FIELD_CHARS: usize = 500;
 
 /// Extracts a [`Preview`] from [html], or `None` if nothing usable was found.
 pub(super) fn extract(html: &str) -> Option<Preview> {
@@ -84,7 +95,7 @@ fn set(field: &mut Option<String>, value: String) {
     }
 }
 
-fn cap(s: &str) -> String {
+pub(super) fn cap(s: &str) -> String {
     s.chars().take(MAX_FIELD_CHARS).collect()
 }
 

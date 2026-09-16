@@ -129,6 +129,18 @@ async fn an_ordinary_page_is_not_flagged_playable() {
 }
 
 #[tokio::test]
+async fn an_ordinary_page_carries_no_author_and_makes_no_oembed_request() {
+    // Only a URL video::detect recognizes as YouTube ever takes the oembed branch that could populate these.
+    let (store, _guard) = new_store().await;
+    let token = register(&store, "reader").await;
+    let upstream = fake_upstream("<meta property=\"og:title\" content=\"Just a blog post\">").await;
+
+    let json = preview_json(store, &token, &upstream).await;
+    assert_eq!(json["author_name"], Value::Null);
+    assert_eq!(json["author_url"], Value::Null);
+}
+
+#[tokio::test]
 async fn a_youtube_watch_url_pasted_directly_is_flagged_playable() {
     let (store, _guard) = new_store().await;
     let token = register(&store, "paster").await;

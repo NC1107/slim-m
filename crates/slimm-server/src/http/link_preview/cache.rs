@@ -31,6 +31,8 @@ pub(super) struct CachedPreview {
     pub site_name: Option<String>,
     pub image_token: Option<String>,
     pub video: Option<VideoInfo>,
+    pub author_name: Option<String>,
+    pub author_url: Option<String>,
     inserted_at: i64,
 }
 
@@ -86,6 +88,8 @@ impl Cache {
             site_name: preview.site_name,
             image_token,
             video: preview.video,
+            author_name: preview.author_name,
+            author_url: preview.author_url,
             inserted_at: now,
         };
         let mut previews = lock(&self.previews);
@@ -190,6 +194,25 @@ mod tests {
         let (bytes, ctype) = cache.image_bytes(&token).unwrap();
         assert_eq!(bytes, vec![1, 2, 3]);
         assert_eq!(ctype, "image/png");
+    }
+
+    #[test]
+    fn an_author_survives_the_round_trip() {
+        let cache = Cache::new();
+        let cached = cache.insert(
+            "https://example.com",
+            Preview {
+                title: Some("A talk".to_owned()),
+                author_name: Some("A Channel".to_owned()),
+                author_url: Some("https://example.com/@achannel".to_owned()),
+                ..Preview::default()
+            },
+        );
+        assert_eq!(cached.author_name.as_deref(), Some("A Channel"));
+        assert_eq!(
+            cached.author_url.as_deref(),
+            Some("https://example.com/@achannel")
+        );
     }
 
     #[test]

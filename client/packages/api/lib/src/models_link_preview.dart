@@ -24,6 +24,9 @@ enum LinkPreviewVideoProvider {
 /// linked page as a playable video (YouTube today): a caller renders a
 /// click-to-play affordance instead of the static card, and must not contact
 /// the provider until the reader taps - see `link_preview_card.dart`.
+///
+/// [authorName]/[authorUrl] are the page's author or publisher, if known - a
+/// recognized video's channel today.
 class LinkPreview {
   const LinkPreview({
     required this.url,
@@ -33,6 +36,8 @@ class LinkPreview {
     this.imageToken,
     this.videoProvider,
     this.videoId,
+    this.authorName,
+    this.authorUrl,
   });
 
   /// The URL this preview is for, echoed back so a caller can key its own
@@ -60,6 +65,15 @@ class LinkPreview {
   /// never a URL, so a caller builds its own playback URL from the two.
   final String? videoId;
 
+  /// The page's author or publisher, if known - a recognized video's channel
+  /// name today. Null for an ordinary link, or when the server's oembed
+  /// request for it failed.
+  final String? authorName;
+
+  /// The author's own page, paired with [authorName] - a channel name a
+  /// reader cannot click is less useful. Null unless [authorName] is set.
+  final String? authorUrl;
+
   /// Whether this preview should render as click-to-play rather than a
   /// static card.
   bool get isPlayableVideo => videoProvider != null && videoId != null;
@@ -74,6 +88,8 @@ class LinkPreview {
           json['video_provider'] as String?,
         ),
         videoId: json['video_id'] as String?,
+        authorName: json['author_name'] as String?,
+        authorUrl: json['author_url'] as String?,
       );
 
   /// The `youtube-nocookie.com` embed URL for inline web playback - no

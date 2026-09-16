@@ -68,6 +68,43 @@ void main() {
     expect(find.text('What it is about.'), findsOneWidget);
   });
 
+  testWidgets('a recognized video preview shows its channel name', (
+    tester,
+  ) async {
+    final container = _container([
+      linkPreviewProvider(_url).overrideWith(
+        (ref) async => const LinkPreview(
+          url: _url,
+          title: 'A talk',
+          videoProvider: LinkPreviewVideoProvider.youtube,
+          videoId: 'dQw4w9WgXcQ',
+          authorName: 'A Channel',
+          authorUrl: 'https://www.youtube.com/@achannel',
+        ),
+      ),
+    ]);
+    await _pump(tester, container);
+
+    expect(find.text('A Channel'), findsOneWidget);
+  });
+
+  testWidgets('an ordinary preview with no author shows no author row', (
+    tester,
+  ) async {
+    final container = _container([
+      linkPreviewProvider(_url).overrideWith(
+        (ref) async => const LinkPreview(
+          url: _url,
+          title: 'An article',
+          siteName: 'Example News',
+        ),
+      ),
+    ]);
+    await _pump(tester, container);
+
+    expect(find.byIcon(AppIcons.account), findsNothing);
+  });
+
   testWidgets('a null preview (disabled or no unfurl) renders nothing', (
     tester,
   ) async {
