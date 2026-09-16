@@ -52,12 +52,19 @@ String _normalizeLanguage(String value) {
   return _languageAliases[lower] ?? lower;
 }
 
-/// The first of [runners], in the order discovery returned them, that
-/// matches [blockLanguage]: a runner with no declared `language` is a
-/// wildcard and matches any block (including one with no language tag of
-/// its own); a runner with one matches only a block whose own tag
-/// normalizes to the same value. Null when nothing matches, meaning no Run
-/// affordance should be shown for this block.
+/// The first of [runners], in the order discovery returned them, whose
+/// declared `language` normalizes to the same value as [blockLanguage].
+/// Null when nothing matches, meaning no Run affordance is shown.
+///
+/// A runner that declares no `language` matches nothing. It used to match
+/// everything, which sounds harmless until a module that only runs one
+/// language is installed from a manifest that predates the field: the stored
+/// extension point has no language, the runner silently becomes a wildcard,
+/// and a Python block is offered a Run button that hands it to a JavaScript
+/// engine. The owner hit exactly that. Offering to run code in an engine
+/// that cannot read it is never the helpful answer, so an undeclared
+/// language is now treated as "this runner has not said what it runs" rather
+/// than as "this runner runs anything".
 api.CodeBlockRunner? matchCodeBlockRunner(
   List<api.CodeBlockRunner> runners,
   String? blockLanguage,
@@ -65,11 +72,11 @@ api.CodeBlockRunner? matchCodeBlockRunner(
   final normalizedBlock = blockLanguage == null
       ? null
       : _normalizeLanguage(blockLanguage);
+  if (normalizedBlock == null) return null;
   for (final runner in runners) {
     final runnerLanguage = runner.language;
-    if (runnerLanguage == null) return runner;
-    if (normalizedBlock != null &&
-        _normalizeLanguage(runnerLanguage) == normalizedBlock) {
+    if (runnerLanguage == null) continue;
+    if (_normalizeLanguage(runnerLanguage) == normalizedBlock) {
       return runner;
     }
   }
