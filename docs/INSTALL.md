@@ -93,9 +93,8 @@ Download `slim-m-client-android.apk` and open it.
 There is no Play Store listing, so this is a sideload and Android will warn you.
 You will be asked to allow installs from whatever app you downloaded with (usually your browser), which means a trip into Settings the first time.
 
-**Download the `.apk`, not the `.aab`.**
-The release also carries `slim-m-client-android.aab`, which is a Play Store upload format and cannot be installed on a phone at all.
-It is there for publishing, not for you.
+Download `slim-m-client-android.apk`.
+Releases from 0.80.0 onward carry only the apk; older ones also list an `.aab`, which is a Play Store upload format and cannot be installed on a phone.
 
 Android also has no in-app update prompt yet, so you will not be told when a new version exists - check the releases page now and then.
 
@@ -120,7 +119,7 @@ Forgotten passwords are handled by the space's admin, not by email: they issue y
 
 ## Which file is which
 
-A release page lists nine files. Most of them are not for you:
+A release page lists several files, and most of them are not for you:
 
 | File | What it is |
 | --- | --- |
@@ -130,7 +129,6 @@ A release page lists nine files. Most of them are not for you:
 | `slim-m-client-<version>-windows-x64.zip` | Windows |
 | `slim-m-client-<version>-macos.zip` | macOS |
 | `slim-m-client-android.apk` | Android, this is the one you want |
-| `slim-m-client-android.aab` | **not installable**, a Play Store upload format |
 | `SHA256SUMS`, `SHA256SUMS.android` | checksums, for verifying a download |
 
 To check a download matches what was published, compare it against the checksums file:
