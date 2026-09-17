@@ -38,19 +38,22 @@ String _formatCount(int n) {
 }
 
 /// What raising or lowering [cap] actually costs, in the one real memory
-/// measurement this can be grounded in - see `canvas_memory_estimate.dart`.
+/// measurement this can be grounded in.
+///
+/// Says the number and how much to trust it, and nothing else. Where the
+/// number comes from - two measured points, the report they are from, and the
+/// roughly 65% run-to-run swing that is why this is an estimate at all - is
+/// documented in `canvas_memory_estimate.dart`, which is where somebody
+/// deciding whether to believe it should be reading. It was previously all
+/// recited here, which on a phone is a paragraph between the reader and the
+/// control.
 String canvasCapConsequence(int cap) {
   final estimate = estimateCanvasMemoryMb(cap).toStringAsFixed(1);
-  final basis = canvasMemoryEstimateIsExtrapolated(cap)
-      ? 'past what was actually measured, so treat this as an order of '
-            'magnitude, not a guarantee'
-      : 'interpolated between real measurements at 5,000 and 20,000 objects';
-  return 'A channel with ${_formatCount(cap)} objects adds roughly '
-      '$estimate MB of resident memory per client that opens it, on top of '
-      'the bare app (Linux desktop measurements in '
-      'docs/reports/perf-2026-08.md; $basis). Per-object cost is not '
-      'constant there - the same report saw it vary by roughly 65% between '
-      'repeat runs of the same count.';
+  final trust = canvasMemoryEstimateIsExtrapolated(cap)
+      ? 'Past what was measured, so treat it as an order of magnitude.'
+      : 'An estimate, not a guarantee.';
+  return 'About $estimate MB of memory per client that opens a channel with '
+      '${_formatCount(cap)} objects. $trust';
 }
 
 /// The per-channel canvas object cap: a client-performance control that

@@ -96,10 +96,8 @@ String retentionConsequence(int days, api.AnalyticsStats? stats) {
     DateTime.now().millisecondsSinceEpoch - days * _dayMs,
   );
   final buffer = StringBuffer(
-    'Prunes anything older than $cutoff. Message text stays in the '
-    'database either way - it is small next to attachment bytes - so this '
-    'mostly bounds attachment storage and old sync history, not the '
-    'messages table itself.',
+    'Prunes anything older than $cutoff. This mostly frees attachment '
+    'storage; message text is small by comparison and stays either way.',
   );
   if (stats != null) {
     buffer.write(

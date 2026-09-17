@@ -119,7 +119,12 @@ void main() {
       findsOneWidget,
       reason: 'the 20,000 anchor is a real measurement, not a guess',
     );
-    expect(find.textContaining('docs/reports/perf-2026-08.md'), findsOneWidget);
+    // The reverse of what this used to assert; see canvas_memory_estimate.dart.
+    expect(
+      find.textContaining('docs/'),
+      findsNothing,
+      reason: 'settings copy names no doc paths; the reasoning lives in code',
+    );
 
     await tester.ensureVisible(find.text('50,000'));
     await tester.pumpAndSettle();
@@ -129,8 +134,9 @@ void main() {
     // Past every measured anchor: the estimate must say so plainly.
     expect(find.textContaining('36.2 MB'), findsNothing);
     expect(
-      find.textContaining('past what was actually measured'),
+      find.textContaining('Past what was measured'),
       findsOneWidget,
+      reason: 'an extrapolated estimate must still say it is one',
     );
   });
 }
