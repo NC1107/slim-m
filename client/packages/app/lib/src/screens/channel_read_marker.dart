@@ -49,7 +49,8 @@ class ReadMarker {
 
   Future<void> _write(String channelId, int seq) async {
     final store = await _ref.read(storeProvider.future);
-    await store.setReadMarker(channelId, seq);
+    // Reading clears the manual mark here too, so the dot goes out at once.
+    await store.setReadMarker(channelId, seq, manuallyUnread: false);
     try {
       await _ref.read(apiProvider).markRead(channelId: channelId, seq: seq);
     } on api.ApiException {

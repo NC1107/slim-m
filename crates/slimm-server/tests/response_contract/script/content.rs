@@ -8,6 +8,7 @@ use serde_json::json;
 use slimm_server::permissions::Permissions;
 use uuid::Uuid;
 
+use super::read_state::read_state;
 use super::{PNG, THUMBS_UP, media_slot_calls, text};
 use crate::world::{Contract, Payload};
 
@@ -423,16 +424,7 @@ pub(super) async fn message_calls(c: &mut Contract, root: &str, channel: &str) -
         root,
     )
     .await;
-    c.get("getReadState", &format!("/channels/{channel}/read"), root)
-        .await;
-    c.json(
-        "markRead",
-        "PUT",
-        &format!("/channels/{channel}/read"),
-        root,
-        json!({ "seq": seq }),
-    )
-    .await;
+    read_state(c, root, channel, seq).await;
 
     // Saved before the list, so listSavedMessages validates a populated answer rather than an empty array.
     c.bare(

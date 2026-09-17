@@ -245,6 +245,16 @@ class SlimmApi {
     return ReadState.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Marks a channel unread without moving the read marker.
+  ///
+  /// The marker is monotonic server-side, so this records an intention beside
+  /// it rather than rewinding it. Reading the channel clears it, which means
+  /// there is no "mark read again" call to make - [markRead] already does it.
+  Future<ReadState> markUnread(String channelId) async {
+    final json = await _send('PUT', '/channels/$channelId/unread');
+    return ReadState.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Catches several scopes up in one request. Scopes the caller cannot view
   /// are omitted from the response rather than refused.
   Future<List<ScopeDelta>> sync(List<ScopeCursor> scopes) async {

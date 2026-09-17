@@ -422,14 +422,26 @@ class MessageStore {
   }
 
   /// Mirrors the server's read marker.
-  Future<void> setReadMarker(String channelId, int seq) async {
+  Future<void> setReadMarker(
+    String channelId,
+    int seq, {
+    bool? manuallyUnread,
+  }) async {
     await db.transaction(() async {
       final row = await (db.select(db.channels)
             ..where((c) => c.id.equals(channelId)))
           .getSingleOrNull();
-      if (row == null || row.lastReadSeq >= seq) return;
+      if (row == null) return;
+      // The marker only moves forward; the flag is independent of it.
+      final advancing = seq > row.lastReadSeq;
+      if (!advancing && manuallyUnread == null) return;
       await (db.update(db.channels)..where((c) => c.id.equals(channelId)))
-          .write(ChannelsCompanion(lastReadSeq: Value(seq)));
+          .write(ChannelsCompanion(
+        lastReadSeq: advancing ? Value(seq) : const Value.absent(),
+        manuallyUnread: manuallyUnread == null
+            ? const Value.absent()
+            : Value(manuallyUnread),
+      ));
     });
   }
 

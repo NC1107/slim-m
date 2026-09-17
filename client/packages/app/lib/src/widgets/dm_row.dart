@@ -34,6 +34,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/dm_call_activity.dart';
+import 'mark_unread_action.dart';
 import '../providers/dms.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
@@ -96,6 +97,14 @@ class DmRow extends ConsumerWidget {
           onTap: () =>
               run(() => hideDmConversation(container, peerId, channel.id)),
         ),
+      AppMenuItem(
+        label: 'Mark as unread',
+        leading: AppIcons.unread,
+        onTap: () {
+          close();
+          unawaited(markChannelUnread(container, channel.id));
+        },
+      ),
       const AppMenuDivider(),
       AppMenuItem(
         label: 'Mute',

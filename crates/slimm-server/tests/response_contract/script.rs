@@ -26,6 +26,7 @@ mod gifs;
 mod link_preview;
 mod members_bulk;
 mod people;
+mod read_state;
 mod threads;
 
 use content::{channel_calls, message_calls};

@@ -281,14 +281,28 @@ class Message {
 
 /// How far a user has read in a channel, and how much is left.
 class ReadState {
-  const ReadState({required this.lastReadSeq, required this.unread});
+  const ReadState({
+    required this.lastReadSeq,
+    required this.unread,
+    this.manuallyUnread = false,
+  });
 
   final int lastReadSeq;
   final int unread;
 
+  /// The caller asked to see this channel as unread even though they have
+  /// read it. Distinct from [unread], which counts messages: this records an
+  /// intention, and the two answer different questions. Defaults false so a
+  /// server too old to send it reads as "not marked" rather than failing.
+  final bool manuallyUnread;
+
+  /// Whether the rail should show this channel as unread at all.
+  bool get showsUnread => unread > 0 || manuallyUnread;
+
   factory ReadState.fromJson(Map<String, dynamic> json) => ReadState(
         lastReadSeq: json['last_read_seq'] as int,
         unread: json['unread'] as int,
+        manuallyUnread: json['manually_unread'] as bool? ?? false,
       );
 }
 

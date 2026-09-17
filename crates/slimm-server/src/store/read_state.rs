@@ -18,6 +18,11 @@ impl Store {
     /// Advances a user's last-read marker in a channel. Monotonic: a lower seq
     /// never moves it backwards, so out-of-order marks are safe.
     ///
+    /// Also clears any manual unread mark ([`Store::mark_unread`]). Reading a
+    /// channel is the natural undo for "remind me about this", and doing it
+    /// here rather than in a second call means the two can never disagree: a
+    /// client that catches up has, by definition, stopped needing the note.
+    ///
     /// Clamped to what the channel has actually reached, because the monotonic
     /// `MAX` below makes an over-large value permanent: one mark of `i64::MAX`
     /// pinned the marker there for good and left the unread count reading zero
@@ -37,6 +42,7 @@ impl Store {
              VALUES (?, ?, ?, ?)
              ON CONFLICT(user_id, channel_id) DO UPDATE SET
                  last_read_seq = MAX(last_read_seq, excluded.last_read_seq),
+                 manually_unread = 0,
                  updated_at = excluded.updated_at",
             user_id,
             channel_id,
@@ -46,6 +52,50 @@ impl Store {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    /// Marks a channel unread without moving the read marker backwards.
+    ///
+    /// The marker is monotonic by design (see [`Store::mark_read`]), so this
+    /// records the intent beside it instead. `last_read_seq` keeps meaning
+    /// "the furthest this person has read"; this means "show it as unread
+    /// anyway". They answer different questions and so cannot contradict.
+    ///
+    /// Inserts a row when one does not exist yet, because a channel nobody has
+    /// ever opened can still be marked - it already reads as unread, and the
+    /// mark is what survives them opening and leaving it.
+    pub async fn mark_unread(&self, user_id: UserId, channel_id: ChannelId) -> anyhow::Result<()> {
+        let now = now_ms();
+        sqlx::query!(
+            "INSERT INTO read_states (user_id, channel_id, last_read_seq, manually_unread, updated_at)
+             VALUES (?, ?, 0, 1, ?)
+             ON CONFLICT(user_id, channel_id) DO UPDATE SET
+                 manually_unread = 1,
+                 updated_at = excluded.updated_at",
+            user_id,
+            channel_id,
+            now
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Whether this user asked to see this channel as unread.
+    pub async fn manually_unread(
+        &self,
+        user_id: UserId,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<bool> {
+        let flag = sqlx::query_scalar!(
+            r#"SELECT manually_unread AS "flag!: i64"
+               FROM read_states WHERE user_id = ? AND channel_id = ?"#,
+            user_id,
+            channel_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(flag.unwrap_or(0) != 0)
     }
 
     /// A user's last-read seq in a channel, or 0 if they have never read it.
