@@ -25,7 +25,11 @@ const _update = ClientUpdate(
   format: InstallFormat.tarball,
 );
 
-Future<void> _pump(WidgetTester tester, ClientUpdate? update) async {
+Future<void> _pump(
+  WidgetTester tester,
+  ClientUpdate? update, {
+  bool restartApplies = true,
+}) async {
   SharedPreferences.setMockInitialValues({});
   await tester.pumpWidget(
     ProviderScope(
@@ -38,7 +42,9 @@ Future<void> _pump(WidgetTester tester, ClientUpdate? update) async {
       ],
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(body: UpdateAvailableBanner()),
+        home: Scaffold(
+          body: UpdateAvailableBanner(restartApplies: restartApplies),
+        ),
       ),
     ),
   );
@@ -76,4 +82,31 @@ void main() {
       expect(prefs.getString(dismissedUpdateVersionKey), '9.9.9');
     },
   );
+  testWidgets('a sideloaded build is offered the release page, not a restart', (
+    tester,
+  ) async {
+    // No splash to pass back through, and no store to hand off to either.
+    await _pump(tester, _update, restartApplies: false);
+
+    expect(find.textContaining('9.9.9'), findsOneWidget);
+    expect(
+      find.textContaining('Restart'),
+      findsNothing,
+      reason: 'restarting a sideloaded apk does not update it',
+    );
+    expect(find.text('Get it'), findsOneWidget);
+  });
+
+  testWidgets('a build that restarts into its update is told to restart', (
+    tester,
+  ) async {
+    await _pump(tester, _update, restartApplies: true);
+
+    expect(find.textContaining('Restart slim-m'), findsOneWidget);
+    expect(
+      find.text('Get it'),
+      findsNothing,
+      reason: 'the splash re-derives the real mechanism on restart',
+    );
+  });
 }
