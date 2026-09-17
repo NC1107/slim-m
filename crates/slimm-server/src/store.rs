@@ -68,6 +68,7 @@ mod quiet_hours;
 mod reactions;
 mod read_state;
 mod recovery;
+mod refresh_rotation;
 mod removals;
 mod reports;
 mod role_mentions;
@@ -133,14 +134,13 @@ pub use polls::{
 pub use push::{PushError, PushRegistration, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
+pub use refresh_rotation::RefreshOutcome;
 pub use removals::{RemoveMemberError, SpaceRemoval};
 pub use reports::{FiledReport, Report, ReportError, ReportSubject, ReporterOwnReport};
 pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};
 pub use safety::Device;
 pub use saved_messages::{MAX_SAVED_MESSAGES, SaveError, SavedMessage};
-pub use sessions::{
-    Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
-};
+pub use sessions::{Account, IssuedTokens, OpenError, RegisterError, SessionContext, SweptTokens};
 pub use space::{JoinPolicy, MAX_SCREEN_SHARE_MAX_HEIGHT, MIN_SCREEN_SHARE_MAX_HEIGHT};
 pub use storage::{ChannelStorage, DatabaseBytes, MAX_STORAGE_CHANNEL_ROWS, SweepStatus};
 pub use thread_listing::ThreadListItem;
