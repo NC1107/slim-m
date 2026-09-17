@@ -680,9 +680,9 @@ jobs:
         if: steps.gate.outputs.ready == 'true'
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
+          # No aab: a Play upload format testers download by mistake; docs/INSTALL.md.
           files: |
             client/packages/app/dist/slim-m-client-android.apk
-            client/packages/app/dist/slim-m-client-android.aab
             client/packages/app/dist/SHA256SUMS.android
 
   # Signed ipa to TestFlight, reviewer-gated. Inert without its six secrets: it
