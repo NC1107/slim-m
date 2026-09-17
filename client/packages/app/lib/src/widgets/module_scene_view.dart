@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import 'module_scene.dart';
+import 'module_scene_controls.dart';
 import 'module_scene_frame.dart';
 import 'module_scene_painter.dart';
 
@@ -41,6 +42,8 @@ class ModuleSceneView extends StatefulWidget {
     required this.initial,
     required this.runCommand,
     this.onNotes,
+    this.fillAvailable = false,
+    this.onExpand,
   });
 
   final ModuleScene initial;
@@ -56,6 +59,15 @@ class ModuleSceneView extends StatefulWidget {
   /// panel's own ephemeral runs, say - not that sound is disabled; the
   /// enabled/disabled decision belongs to the caller that supplies this.
   final void Function(List<SceneNote> notes)? onNotes;
+
+  /// Whether this is the full-screen presentation: it takes all the room
+  /// there is and offers no expand control, being already expanded.
+  final bool fillAvailable;
+
+  /// Opens this scene full screen. Absent means no expand control is offered -
+  /// the Dock panel's ephemeral runs have nowhere to expand to, and the
+  /// full-screen view itself is already there.
+  final VoidCallback? onExpand;
 
   @override
   State<ModuleSceneView> createState() => _ModuleSceneViewState();
@@ -380,27 +392,10 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ModuleSceneFrame(
-          aspect: aspect,
-          sceneHeight: _scene.height,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final size = constraints.biggest;
-              return Listener(
-                onPointerDown: _handlePointerDown,
-                child: GestureDetector(
-                  onTapUp: (d) => _handleTapUp(d, size),
-                  onPanStart: (d) => _handlePanStart(d, size),
-                  onPanUpdate: (d) => _handlePanUpdate(d, size),
-                  child: CustomPaint(
-                    painter: ModuleScenePainter(scene: _scene, tokens: tokens),
-                    size: size,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+        if (widget.fillAvailable)
+          Expanded(child: _frame(aspect, tokens))
+        else
+          _frame(aspect, tokens),
         if (_scene.status != null) ...[
           const SizedBox(height: AppSpacing.s8),
           Text(
@@ -418,78 +413,52 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
             onDismiss: () => setState(() => _error = null),
           ),
         ],
-        if (_scene.controls.isNotEmpty) ...[
+        if (_scene.controls.isNotEmpty || widget.onExpand != null) ...[
           const SizedBox(height: AppSpacing.s8),
-          Row(children: _controls(tokens)),
+          Row(
+            children: [
+              ...sceneControls(
+                controls: _scene.controls,
+                playing: _playing,
+                onTogglePlay: _togglePlay,
+                onAction: _send,
+              ),
+              if (widget.onExpand case final expand?)
+                AppIconButton(
+                  icon: AppIcons.expand,
+                  semanticLabel: 'Open full screen',
+                  tooltip: 'Open full screen',
+                  onPressed: expand,
+                ),
+            ],
+          ),
         ],
       ],
     );
   }
 
-  List<Widget> _controls(AppTokens tokens) {
-    final widgets = <Widget>[];
-    for (final control in _scene.controls) {
-      final button = _controlButton(control);
-      if (button != null) {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.s8),
-            child: button,
+  /// The board itself, in its box. Split out because full screen wraps it in
+  /// an [Expanded] and inline does not, and a widget cannot be both.
+  Widget _frame(double aspect, AppTokens tokens) => ModuleSceneFrame(
+    aspect: aspect,
+    sceneHeight: _scene.height,
+    fillAvailable: widget.fillAvailable,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        return Listener(
+          onPointerDown: _handlePointerDown,
+          child: GestureDetector(
+            onTapUp: (d) => _handleTapUp(d, size),
+            onPanStart: (d) => _handlePanStart(d, size),
+            onPanUpdate: (d) => _handlePanUpdate(d, size),
+            child: CustomPaint(
+              painter: ModuleScenePainter(scene: _scene, tokens: tokens),
+              size: size,
+            ),
           ),
         );
-      }
-    }
-    return widgets;
-  }
-
-  /// One control, or null for a name this client does not offer.
-  ///
-  /// Deliberately never disabled on [_busy]. It used to be, and while playing
-  /// that meant every control greyed out and came back on each generation -
-  /// a visible flicker at eight times a second, reported as the buttons
-  /// flashing. A press landing mid-call is already a no-op, because [_send]
-  /// refuses a second call while one is in flight, so disabling them bought
-  /// nothing the guard did not already do and cost that.
-  Widget? _controlButton(String control) {
-    switch (control) {
-      case 'play':
-        return AppIconButton(
-          icon: _playing ? AppIcons.pause : AppIcons.play,
-          semanticLabel: _playing ? 'Pause' : 'Play',
-          tooltip: _playing ? 'Pause' : 'Play',
-          active: _playing,
-          onPressed: _togglePlay,
-        );
-      case 'step':
-        return AppIconButton(
-          icon: AppIcons.forward,
-          semanticLabel: 'Step forward',
-          tooltip: 'Step forward',
-          onPressed: () => _send('step'),
-        );
-      case 'random':
-        return AppIconButton(
-          icon: AppIcons.highlight,
-          semanticLabel: 'Randomise',
-          tooltip: 'Randomise',
-          onPressed: () => _send('random'),
-        );
-      case 'clear':
-        return AppIconButton(
-          icon: AppIcons.eraser,
-          semanticLabel: 'Clear',
-          tooltip: 'Clear',
-          onPressed: () => _send('clear'),
-        );
-      case 'reset':
-        return AppIconButton(
-          icon: AppIcons.retry,
-          semanticLabel: 'Reset',
-          tooltip: 'Reset',
-          onPressed: () => _send('reset'),
-        );
-      default:
-        return null;
-    }
-  }
+      },
+    ),
+  );
 }
