@@ -24,6 +24,58 @@ cp deploy/.env.example .env
 docker compose up -d
 ```
 
+## Claim it, before you tell anyone the address
+
+**The first account to register becomes the administrator.**
+Do this now, before the domain is in anyone else's hands.
+
+Until somebody registers, the deployment has no roles, no channels and no administrator, so the invite requirement cannot apply - there is nobody to have issued an invite.
+Registration is open to whoever reaches it, and by the time `docker compose ps` looks healthy Caddy is already serving the API publicly.
+Whoever gets there first is the permanent owner of the space.
+
+That window is usually seconds and usually harmless, and it is how the deployment is meant to be claimed.
+It is only dangerous if you stand the stack up, share the address, and register later.
+The server says so in its own startup log while it is unclaimed:
+
+```
+this deployment has no administrator yet; the first account to register
+claims it, so register yours before sharing the address
+```
+
+Once you register, that warning stops and joining follows the space's join policy, which defaults to invite-only.
+
+## Getting yourself in
+
+Install a client from [docs/INSTALL.md](../docs/INSTALL.md) - on the same machine the quickest is usually the Linux tarball or, on Fedora, `dnf copr enable nc1107/slim-m && dnf install slim-m-client`.
+
+On first run it asks which space to join. Give it your `SLIMM_API_DOMAIN`, as an https address:
+
+```
+https://chat.example.com
+```
+
+It will show a **security check** with eight groups of letters and numbers - the server's fingerprint. Compare it against the line your own server logged at startup:
+
+```bash
+docker compose logs server | grep "server identity"
+```
+
+They should match. This is the one moment where you can confirm it cheaply, and it is the same check you will ask your friends to do.
+
+Then create your account. That first registration claims the deployment and makes you its administrator.
+
+## Letting a friend in
+
+The join policy defaults to invite-only, so your friends need a code rather than just the address.
+
+In the app, go to **Settings → Invites** and create one.
+Send them the invite link, which carries both the server address and the code, so they do not have to type either.
+
+They install a client the same way, open the link, and land on the join screen with both fields filled in.
+They will see the same fingerprint check you did - tell them what your fingerprint is through some other channel, so the check is worth something.
+
+If you would rather let anyone with the address sign up, there is a **Who can join** pane in settings. Only do that if you are comfortable with strangers registering.
+
 ## Adding voice and screen share
 
 Voice lives in `docker-compose.voice.yml`, an overlay rather than a replacement.
