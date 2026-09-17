@@ -30,6 +30,43 @@ fn a_disabled_deployment_reports_unavailable_rather_than_failing() {
     assert!(!VoiceService::disabled().is_enabled());
 }
 
+/// `envy` reads `SLIMM_LIVEKIT_URL=` as `Some("")` rather than `None`, so a
+/// compose file that defaults the trio to empty strings used to reach
+/// `http_url_for("")` and fail the whole process at startup. A text-only
+/// deployment must not be able to break itself by leaving voice alone.
+#[test]
+fn blank_livekit_settings_disable_voice_instead_of_refusing_to_start() {
+    let config = Config {
+        livekit_url: Some(String::new()),
+        livekit_api_key: Some("   ".to_owned()),
+        livekit_api_secret: Some(String::new()),
+        ..Config::default()
+    };
+
+    let service =
+        VoiceService::new(&config).expect("blank settings mean no voice, never a startup failure");
+    assert!(
+        !service.is_enabled(),
+        "three blank strings must read as an absent SFU, not a configured one"
+    );
+}
+
+#[test]
+fn a_fully_configured_trio_still_enables_voice() {
+    let config = Config {
+        livekit_url: Some("wss://livekit.example.com".to_owned()),
+        livekit_api_key: Some("APIkey".to_owned()),
+        livekit_api_secret: Some("a-secret-at-least-32-chars-long!".to_owned()),
+        ..Config::default()
+    };
+
+    let service = VoiceService::new(&config).expect("a complete trio is valid");
+    assert!(
+        service.is_enabled(),
+        "trimming blanks must not have broken the ordinary enabled path"
+    );
+}
+
 #[test]
 fn the_room_is_derived_from_the_channel_and_nothing_else() {
     let channel = ChannelId::generate();

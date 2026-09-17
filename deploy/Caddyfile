@@ -3,9 +3,14 @@
 # Production Caddyfile for the slim-m self-host example.
 #
 # Caddy is the only thing bound to port 443 in this stack. It terminates TLS
-# for both the slim-m API domain and LiveKit's WebSocket signaling domain,
-# obtaining and renewing Let's Encrypt certificates automatically for
-# whatever domains are configured below.
+# for the slim-m API domain, obtaining and renewing a Let's Encrypt
+# certificate automatically.
+#
+# Voice is not here. LiveKit's signaling site lives in deploy/caddy-voice/,
+# mounted at /etc/caddy/conf.d only by docker-compose.voice.yml, and picked up
+# by the import at the bottom of this file. A text-only deployment never
+# mounts that directory, the glob matches nothing, and Caddy is content with
+# that - an import matching no files is valid, not an error.
 #
 # {$VAR} is Caddy's own environment-variable syntax, resolved from the
 # `environment:` block of the `caddy` service in docker-compose.yml (which is
@@ -21,8 +26,5 @@
 	reverse_proxy server:8080
 }
 
-# LiveKit's WSS signaling channel only. Call media never passes through Caddy
-# or 443; it binds its own ports on the host. See deploy/README.md.
-{$LIVEKIT_DOMAIN} {
-	reverse_proxy livekit:7880
-}
+# Voice, when docker-compose.voice.yml is in play. Matches nothing otherwise.
+import /etc/caddy/conf.d/*.caddy

@@ -8,12 +8,14 @@ on:
     branches: [main]
     paths:
       - "docker-compose.yml"
+      - "docker-compose.voice.yml"
       - "deploy/**"
       - "docker/server.Dockerfile"
       - ".github/workflows/compose-smoke.yml"
   pull_request:
     paths:
       - "docker-compose.yml"
+      - "docker-compose.voice.yml"
       - "deploy/**"
       - "docker/server.Dockerfile"
       - ".github/workflows/compose-smoke.yml"
@@ -43,35 +45,79 @@ jobs:
         env:
           SQLX_OFFLINE: "true"
 
-      - name: refuse to start without livekit credentials
+      - name: text chat boots with no voice configured at all
         run: |
           set -euo pipefail
+          # The default deployment. A friend group who only want to type should
+          # need no LiveKit keys and no second DNS record, and the server treats
+          # an absent SFU as a normal configuration; see deploy/README.md.
           cp deploy/.env.example .env
-          # Refusing to start without credentials is a security property, not a
-          # convenience, so it gets a test of its own; see docs/ci.md.
-          if docker compose config >/dev/null 2>err.txt; then
-            echo "::error::compose started with no LiveKit credentials set"
+          # Later assignments win in a dotenv file, so these override the
+          # example without editing the lines it ships.
+          {
+            echo "SLIMM_API_DOMAIN=localhost"
+            echo "SLIMM_VERSION=smoke"
+          } >> .env
+          docker compose config >/dev/null || {
+            echo "::error::the text-only example does not even render"
+            exit 1
+          }
+          docker compose up -d server
+          for _ in $(seq 1 60); do
+            state=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q server)" 2>/dev/null || echo starting)
+            [ "$state" = "healthy" ] && break
+            sleep 2
+          done
+          if [ "$state" != "healthy" ]; then
+            echo "::error::a text-only deployment never became healthy"
+            docker compose logs server
             exit 1
           fi
-          # Either name is a correct refusal: compose stops at the first variable
-          # it interpolates, and that order is not ours to fix.
-          grep -qE "LIVEKIT_API_(KEY|SECRET)" err.txt || {
+          # The specific regression: an empty SLIMM_MAX_TOTAL_ATTACHMENT_BYTES
+          # used to abort the process on boot, and the LiveKit requirement was
+          # hiding it. A crash-loop must never read as "voice is off".
+          docker compose logs server | grep -q "voice is disabled" || {
+            echo "::error::text-only server did not report voice disabled"
+            docker compose logs server
+            exit 1
+          }
+          echo "text-only deployment is healthy with voice off"
+
+      - name: tear the text-only stack down
+        run: docker compose down -v
+
+      - name: the voice overlay refuses to start without livekit credentials
+        run: |
+          set -euo pipefail
+          # Refusing to start without credentials is a security property, not a
+          # convenience, so it gets a test of its own; see docs/ci.md.
+          cp deploy/.env.example .env
+          echo "COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml" >> .env
+          if docker compose config >/dev/null 2>err.txt; then
+            echo "::error::the voice overlay started with no LiveKit credentials set"
+            exit 1
+          fi
+          # Any of the three names is a correct refusal: compose stops at the
+          # first variable it interpolates, and that order is not ours to fix.
+          grep -qE "LIVEKIT_(DOMAIN|API_KEY|API_SECRET)" err.txt || {
             echo "::error::compose refused but did not name the missing variable"
             cat err.txt
             exit 1
           }
           echo "refused correctly, naming the variable"
 
-      - name: bring the stack up
+      - name: bring the stack up with voice
         run: |
           set -euo pipefail
           # Real-looking values so the config renders; nothing here is reachable
           # from outside the runner.
-          sed -i "s|^LIVEKIT_API_KEY=.*|LIVEKIT_API_KEY=APIsmoketestkey|" .env
-          sed -i "s|^LIVEKIT_API_SECRET=.*|LIVEKIT_API_SECRET=$(openssl rand -hex 24)|" .env
-          sed -i "s|^SLIMM_API_DOMAIN=.*|SLIMM_API_DOMAIN=localhost|" .env
-          sed -i "s|^LIVEKIT_DOMAIN=.*|LIVEKIT_DOMAIN=localhost|" .env
-          echo "SLIMM_VERSION=smoke" >> .env
+          {
+            echo "SLIMM_API_DOMAIN=localhost"
+            echo "LIVEKIT_DOMAIN=localhost"
+            echo "LIVEKIT_API_KEY=APIsmoketestkey"
+            echo "LIVEKIT_API_SECRET=$(openssl rand -hex 24)"
+            echo "SLIMM_VERSION=smoke"
+          } >> .env
           # Caddy needs a real domain and 80/443 to get a certificate, so this
           # covers the two services that carry the product; see docs/ci.md.
           docker compose up -d server livekit

@@ -1,13 +1,18 @@
 # Self-hosting slim-m
 
 A minimal production stack for a friend group.
-It wires up the slim-m server, Caddy for automatic TLS, LiveKit for voice and screen share, and an optional Litestream sidecar that streams the SQLite database to S3-compatible storage.
+It wires up the slim-m server, Caddy for automatic TLS, and an optional Litestream sidecar that streams the SQLite database to S3-compatible storage.
+Voice and screen share are a second compose file you add when you want them.
+
+**Text chat on its own is a complete deployment, not a degraded one.**
+The server treats a missing SFU as a normal configuration and answers 501 for every voice request, so a group who only want to type need no LiveKit keys and no second DNS record.
+Start there; adding voice later is one line in `.env` and does not disturb anything already running.
 
 ## Prerequisites
 
 - A host (a VPS, or a box at home with a public IP) with Docker and the Docker Compose plugin installed.
-- Two DNS records pointed at that host: one for the slim-m API domain, one for LiveKit's signaling domain.
-- Ports 80 and 443 (TCP and UDP) reachable from the internet, plus the UDP media range you choose in `.env`.
+- One DNS record pointed at that host, for the slim-m API domain. Voice needs a second one; see below.
+- Ports 80 and 443 (TCP and UDP) reachable from the internet. Voice also needs the UDP media range you choose in `.env`.
 
 ## One-command walkthrough
 
@@ -15,9 +20,34 @@ It wires up the slim-m server, Caddy for automatic TLS, LiveKit for voice and sc
 git clone https://github.com/NC1107/slim-m.git
 cd slim-m
 cp deploy/.env.example .env
-# edit .env: both domains, ACME_EMAIL, and a real LIVEKIT_API_KEY/SECRET
+# edit .env: SLIMM_API_DOMAIN and ACME_EMAIL. That is all that is required.
 docker compose up -d
 ```
+
+## Adding voice and screen share
+
+Voice lives in `docker-compose.voice.yml`, an overlay rather than a replacement.
+Turn it on with one line in `.env`:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml
+```
+
+Before that line does anything useful you also need to uncomment `LIVEKIT_DOMAIN` in `.env`, point a second A/AAAA record at this host for it, and generate a key pair:
+
+```bash
+docker run --rm livekit/livekit-server:v1.10.1 generate-keys
+```
+
+Then `docker compose up -d` as usual, and `docker compose ps` shows `livekit` alongside the rest.
+You can also pass the files by hand instead of setting `COMPOSE_FILE`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.voice.yml up -d
+```
+
+Once the overlay is in play the three LiveKit settings are required and Compose refuses to start until they are set, naming the missing one.
+That is deliberate: half-configured voice that comes up and then fails at call time is worse than not starting.
 
 The server image tracks the rolling `latest` tag.
 Set `SLIMM_VERSION` in `.env` to a published release (see the [releases page](https://github.com/NC1107/slim-m/releases)) to freeze it on a specific version instead.
@@ -26,14 +56,16 @@ If you do pin, bump it on every upgrade rather than leaving it: a stale tag is a
 
 `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` have no defaults, on purpose.
 They authorize minting a room token, so a placeholder default would be a publicly known credential on a publicly reachable SFU.
-Compose refuses to start until both are set and tells you which one is missing; generate a pair with `docker run --rm livekit/livekit-server:v1.10.1 generate-keys`.
 
 Check it:
 
 ```bash
 curl https://<SLIMM_API_DOMAIN>/healthz   # -> ok
-docker compose ps                         # server, caddy and livekit should all show healthy
+docker compose ps                         # server and caddy healthy, plus livekit if you enabled voice
 ```
+
+`curl https://<SLIMM_API_DOMAIN>/version` reports what this deployment can do.
+Without the voice overlay it simply has no SFU, which is the expected answer rather than a fault.
 
 ## Backups (optional)
 

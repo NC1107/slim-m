@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# Voice and screen share for the slim-m self-host example: the LiveKit SFU,
+# plus the Caddy site that fronts its signaling channel.
+#
+# This is an overlay on docker-compose.yml, not a replacement. Text chat runs
+# without it, and the server treats a missing SFU as a normal configuration
+# rather than an error, so adding voice is a deliberate step rather than
+# something to undo.
+#
+# Turn it on with one line in your .env:
+#
+#     COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml
+#
+# then `docker compose up -d` as usual. Without that line nothing here loads.
+# You can also pass the files by hand:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.voice.yml up -d
+#
+# Before enabling it you need a second DNS record for LIVEKIT_DOMAIN and a
+# LiveKit key pair. deploy/README.md has both, including the one-line
+# generate-keys command.
+#
+# The three SLIMM_LIVEKIT_* values below take `:?` and never a default, unlike
+# the base file where they fall through to unset. That asymmetry is the point:
+# a deployment that never asks for voice should not have to think about them,
+# and one that does ask should fail loudly rather than come up with voice
+# silently broken.
+
+services:
+  server:
+    environment:
+      SLIMM_LIVEKIT_URL: wss://${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env to enable voice}
+      SLIMM_LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}
+      SLIMM_LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
+
+  caddy:
+    # Caddy fronts LiveKit's WSS signaling, so it needs the domain and the
+    # extra site file. Both arrive only with this overlay.
+    depends_on:
+      livekit:
+        condition: service_started
+    environment:
+      LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env to enable voice}
+    volumes:
+      - ./deploy/caddy-voice:/etc/caddy/conf.d:ro
+
+  livekit:
+    # Pinned to an exact release and its digest; check github.com/livekit/livekit/releases for newer patches.
+    image: livekit/livekit-server:v1.10.1@sha256:698a13999b4b2285866a32903724884b1e10c03259526391d9b3a72d9b73bbb4
+    restart: unless-stopped
+    healthcheck:
+      # Alpine's busybox wget against LiveKit's own unauthenticated "OK" liveness route; see deploy/README.md.
+      test: ["CMD", "wget", "--quiet", "--spider", "-T", "3", "http://127.0.0.1:7880/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # LiveKit exits if its STUN hostname will not resolve, and systemd-resolved's
+    # 127.0.0.53 stub does not exist in a container. See deploy/README.md.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    expose:
+      - "7880" # WebSocket signaling, reverse-proxied by Caddy - not published to the host
+    ports:
+      # TCP fallback for clients that cannot do UDP at all. Configurable because
+      # 7881 is popular and this may not be the only SFU on the host.
+      - "${LIVEKIT_TCP_PORT:-7881}:${LIVEKIT_TCP_PORT:-7881}"
+      # STUN/TURN (UDP), the default LiveKit/TURN port.
+      - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
+      # TURN's relay ports, distinct from the media range below. Missing them is
+      # worse than no TURN: relay candidates are advertised and all time out.
+      - "${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}:${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}/udp"
+      - "${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}:${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}/udp"
+      # TURN/TLS gets 5349, never 443: Caddy owns 443 and TURN is not an HTTP
+      # protocol it can share it with. To enable, see deploy/README.md.
+
+      # - "5349:5349"
+    environment:
+      # LiveKit's own env binding for a full config.yaml body. The key and secret
+      # take `:?` and never a default, on purpose; see deploy/README.md.
+      LIVEKIT_CONFIG: |
+        port: 7880
+        bind_addresses:
+          - "0.0.0.0"
+        rtc:
+          tcp_port: ${LIVEKIT_TCP_PORT:-7881}
+          port_range_start: ${LIVEKIT_UDP_PORT_START:-50000}
+          port_range_end: ${LIVEKIT_UDP_PORT_END:-50100}
+          use_external_ip: true
+        keys:
+          ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
+        turn:
+          enabled: true
+          udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
+          # Narrowed from LiveKit's 30000-40000 default: nobody publishes ten
+          # thousand ports, and unpublished relay ports connect nothing.
+          relay_range_start: ${LIVEKIT_TURN_RELAY_PORT_START:-30000}
+          relay_range_end: ${LIVEKIT_TURN_RELAY_PORT_END:-30100}
+          # TURN/TLS is off: its listener needs a certificate of its own and
+          # cannot borrow Caddy's. The four keys to add: deploy/README.md.

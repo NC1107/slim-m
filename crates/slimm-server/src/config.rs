@@ -77,7 +77,7 @@ pub struct Config {
     /// and they are not rows in `attachments`, so the sum this is checked
     /// against cannot see them anyway. Counting them would need a second
     /// mechanism to bound something that is already bounded.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "empty_as_none")]
     pub max_total_attachment_bytes: Option<u64>,
 
     /// Which third-party GIF search provider this deployment proxies to:
@@ -217,7 +217,52 @@ impl Default for Config {
     }
 }
 
+/// Reads an optional number, treating an empty string as absent.
+///
+/// `envy` hands every variable through as a string, and a compose file that
+/// writes `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES: ${VAR:-}` produces `""` rather
+/// than an unset variable. Without this that empty value reaches `u64`'s own
+/// parser and the process exits with "cannot parse integer from empty
+/// string", which is how the shipped self-host example came to be unable to
+/// start at all. Blank means "no ceiling", which is what leaving the line
+/// alone is plainly meant to say.
+fn empty_as_none<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Option::<String>::deserialize(deserializer)?;
+    match raw.as_deref().map(str::trim) {
+        None | Some("") => Ok(None),
+        Some(value) => value.parse().map(Some).map_err(serde::de::Error::custom),
+    }
+}
+
 impl Config {
+    /// The LiveKit URL, key and secret, but only when all three carry a value.
+    ///
+    /// Blank is absent rather than configured. `envy` reads
+    /// `SLIMM_LIVEKIT_URL=` as `Some("")` rather than `None` - the same
+    /// behaviour `an_empty_origin_list_is_read_as_an_empty_string_not_dropped`
+    /// pins for CORS - so a compose file that helpfully defaults the trio to
+    /// empty strings would otherwise light up the enabled path and kill the
+    /// process on a URL with no scheme. A text-only deployment must not be
+    /// able to break itself by leaving voice alone, so the trimming lives
+    /// here rather than at the call site.
+    pub fn livekit_settings(&self) -> Option<(String, String, String)> {
+        let present = |value: &Option<String>| {
+            value
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned)
+        };
+        Some((
+            present(&self.livekit_url)?,
+            present(&self.livekit_api_key)?,
+            present(&self.livekit_api_secret)?,
+        ))
+    }
+
     /// Reads configuration from `SLIMM_`-prefixed environment variables,
     /// for example `SLIMM_PORT` and `SLIMM_DATABASE_PATH`.
     pub fn from_env() -> anyhow::Result<Self> {
@@ -266,6 +311,43 @@ mod tests {
         );
         assert_eq!(from_empty_env.addons_repo, defaulted.addons_repo);
         assert_eq!(from_empty_env.code_runner_url, defaulted.code_runner_url);
+    }
+
+    /// The shipped `docker-compose.yml` writes
+    /// `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES: ${VAR:-}`, which is an empty string
+    /// rather than an absent variable. That used to reach `u64`'s parser and
+    /// kill the process on boot with "cannot parse integer from empty
+    /// string", so the self-host example could not start unless the operator
+    /// happened to set a ceiling. Blank means no ceiling.
+    #[test]
+    fn a_blank_attachment_ceiling_means_no_ceiling_rather_than_a_boot_failure() {
+        let env = std::collections::HashMap::from([(
+            "MAX_TOTAL_ATTACHMENT_BYTES".to_owned(),
+            String::new(),
+        )]);
+        let config: Config = envy::from_iter(env).expect("a blank ceiling must not fail to parse");
+        assert_eq!(config.max_total_attachment_bytes, None);
+    }
+
+    /// The blank-is-none reading must not have swallowed real values.
+    #[test]
+    fn a_real_attachment_ceiling_is_still_read() {
+        let env = std::collections::HashMap::from([(
+            "MAX_TOTAL_ATTACHMENT_BYTES".to_owned(),
+            "1048576".to_owned(),
+        )]);
+        let config: Config = envy::from_iter(env).expect("a real ceiling parses");
+        assert_eq!(config.max_total_attachment_bytes, Some(1_048_576));
+    }
+
+    /// A value that is not a number is still an operator error worth failing on.
+    #[test]
+    fn a_nonsense_attachment_ceiling_still_fails() {
+        let env = std::collections::HashMap::from([(
+            "MAX_TOTAL_ATTACHMENT_BYTES".to_owned(),
+            "lots".to_owned(),
+        )]);
+        assert!(envy::from_iter::<_, Config>(env).is_err());
     }
 
     /// An unset origin list and an explicitly empty one must be the same
