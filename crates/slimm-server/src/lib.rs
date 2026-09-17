@@ -60,6 +60,29 @@ async fn log_server_identity(store: &store::Store) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Says so, loudly, while the deployment has no administrator yet.
+///
+/// The first account to register claims the deployment: it is granted the
+/// admin role and seeds `@everyone` and a general channel. Until that
+/// happens the invite gate is skipped entirely, because there is nobody to
+/// issue an invite. So between `docker compose up` and the operator getting
+/// round to registering, whoever reaches `/auth/register` first becomes the
+/// permanent administrator - and the stack is already publicly reverse-proxied
+/// by then.
+///
+/// That window is short and usually harmless, but it is invisible, which is
+/// the part worth fixing. An operator who reads their own startup log should
+/// not have to learn this from the source.
+async fn warn_if_unclaimed(store: &store::Store) -> anyhow::Result<()> {
+    if !store.is_bootstrapped().await? {
+        tracing::warn!(
+            "this deployment has no administrator yet; the first account to \
+             register claims it, so register yours before sharing the address"
+        );
+    }
+    Ok(())
+}
+
 /// Loads configuration, opens the embedded database (running migrations), and
 /// serves the HTTP surface until a shutdown signal.
 pub async fn run() -> anyhow::Result<()> {
@@ -72,6 +95,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let store = store::Store::new(pool);
     log_server_identity(&store).await?;
+    warn_if_unclaimed(&store).await?;
     sweeps::spawn_token_sweep(store.clone());
     let media = media::Media::new(config.attachments_dir.clone(), config.attachment_max_bytes)?
         .with_total_ceiling(config.max_total_attachment_bytes);
