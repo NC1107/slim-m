@@ -286,16 +286,28 @@ It runs on changes to the stack itself and on a weekly schedule, because the fai
 The published image is only correct for `main`.
 On a PR that changes the Dockerfile the whole point is to boot what that branch would produce, so the image is built locally under the tag `SLIMM_VERSION=smoke` resolves to, and compose uses it instead of pulling.
 
+### Text chat on its own, which is the default
+
+The base `docker-compose.yml` is a text-only deployment and that is a complete one, not a degraded one: the server treats an absent SFU as a normal configuration and answers 501 for every voice request.
+So the first thing the smoke run does is bring up the stack with nothing but `SLIMM_API_DOMAIN` set, and assert the server becomes healthy and logs that voice is disabled.
+
+That step exists for a specific regression rather than as a formality.
+The shipped example used to pass `SLIMM_MAX_TOTAL_ATTACHMENT_BYTES: ${VAR:-}`, which is an empty string rather than an absent variable, and the server exited on boot with "cannot parse integer from empty string".
+Nobody noticed because LiveKit's own `:?` requirement aborted compose earlier, so the example could not get far enough to reveal it.
+A deployment that crash-loops must never be mistaken for one that simply has voice switched off, which is why the assertion is on the log line and not just on the container's health.
+
 ### Refusing to start without LiveKit credentials
 
 `deploy/.env.example` ships `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` empty on purpose.
-Compose must refuse and name the missing one rather than starting an SFU anybody can mint tokens for, and that refusal is worth a test of its own because it is a security property, not a convenience.
+Once the voice overlay is in play compose must refuse and name the missing one rather than starting an SFU anybody can mint tokens for, and that refusal is worth a test of its own because it is a security property, not a convenience.
 
-Either variable name is a correct refusal: compose stops at the first variable it interpolates, and that order is not ours to fix.
+Any of the three LiveKit names is a correct refusal: compose stops at the first variable it interpolates, and that order is not ours to fix.
 
 ### What the smoke run covers, and why only part of the stack
 
 Caddy wants ports 80 and 443 and a real domain to get a certificate, and neither is available on a runner, so the smoke test covers the two services that carry the product: the server and the SFU.
+Voice arrives through `docker-compose.voice.yml`, an overlay rather than a profile, because Compose refuses a project where a service outside a profile declares `depends_on` a service inside one - and Caddy legitimately depends on LiveKit when voice is on.
+The run therefore covers both shapes in turn: text-only first, then the overlay enabled through `COMPOSE_FILE`.
 The values written into `.env` are real-looking so the config renders; nothing there is reachable from outside the runner.
 
 The server image ships no shell, so `/version` is asked for from the host through a throwaway container on the same network rather than by exec-ing into it.

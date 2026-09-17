@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# LiveKit's WSS signaling channel only. Call media never passes through Caddy
+# or 443; it binds its own ports on the host. See deploy/README.md.
+#
+# Imported by deploy/Caddyfile, and only present in the container when
+# docker-compose.voice.yml mounts this directory at /etc/caddy/conf.d.
+{$LIVEKIT_DOMAIN} {
+	reverse_proxy livekit:7880
+}

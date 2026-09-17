@@ -2,19 +2,28 @@
 #
 # Production self-host example for slim-m: a small friend-group deployment.
 #
-# Four services:
+# Three services:
 #   server     the slim-m home server (this repo's binary), embedded
 #              SQLite on a named volume, reachable only through Caddy.
 #   caddy      the only thing bound to 443. Terminates TLS automatically
-#              (Let's Encrypt) for the API domain and LiveKit's signaling
-#              domain.
-#   livekit    voice and screen share. Its signaling channel is fronted by
-#              Caddy like any other HTTPS traffic, but its TURN/TLS and UDP
-#              media both need ports of their own - see the comments below
-#              and in deploy/Caddyfile.
+#              (Let's Encrypt) for the API domain.
 #   litestream continuously streams the SQLite file to S3-compatible
 #              storage. Disabled by default (see deploy/.env.example);
 #              enable it once you have a real bucket.
+#
+# Text chat is the whole of this file, and that is a complete deployment. The
+# server treats a missing SFU as a normal configuration rather than an error
+# (see SLIMM_LIVEKIT_* below), so a friend group who only want to talk in text
+# need no LiveKit keys and no second DNS record.
+#
+# Voice and screen share are an overlay: docker-compose.voice.yml adds the
+# LiveKit service and the Caddy site that fronts its signaling. Turn it on with
+# one line in your .env -
+#
+#     COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml
+#
+# - after which `docker compose up -d` brings up both. deploy/README.md walks
+# through it, including the two DNS records and generating the keys.
 #
 # Copy deploy/.env.example to `.env` next to this file and fill it in before
 # running `docker compose up -d`. See deploy/README.md for the full
@@ -43,11 +52,13 @@ services:
       # Off by default: unfurling makes the server fetch member-supplied URLs
       # (behind the SSRF guard, decision 0019). Set true to show link previews.
       SLIMM_LINK_PREVIEWS: ${SLIMM_LINK_PREVIEWS:-false}
-      # Unset means no SFU and 501 for every voice request. The URL is the one
-      # clients reach from outside, not the internal name; deploy/README.md.
-      SLIMM_LIVEKIT_URL: wss://${LIVEKIT_DOMAIN:?set LIVEKIT_DOMAIN in .env}
-      SLIMM_LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}
-      SLIMM_LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
+      # No SLIMM_LIVEKIT_* here on purpose, and absent rather than empty: the
+      # server reads an unset trio as "no SFU" and answers 501 for every voice
+      # request, which is a supported way to run this rather than a broken one.
+      # Setting them to "" would NOT be the same thing - envy deserializes an
+      # empty var as Some(""), so the voice gate would light up on three blank
+      # strings and the server would refuse to start. docker-compose.voice.yml
+      # adds all three with `:?`; see deploy/README.md.
     volumes:
       # The whole directory is the volume (SLIMM_DATABASE_PATH defaults to
       # /data/slimm.db) so Litestream can see the database file and its WAL.
@@ -82,15 +93,12 @@ services:
     depends_on:
       server:
         condition: service_healthy
-      livekit:
-        condition: service_started
     ports:
       - "80:80"       # ACME HTTP-01 challenge and plain-HTTP redirect
       - "443:443"     # HTTPS
       - "443:443/udp" # HTTP/3 (QUIC)
     environment:
       SLIMM_API_DOMAIN: ${SLIMM_API_DOMAIN}
-      LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
@@ -104,63 +112,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  livekit:
-    # Pinned to an exact release and its digest; check github.com/livekit/livekit/releases for newer patches.
-    image: livekit/livekit-server:v1.10.1@sha256:698a13999b4b2285866a32903724884b1e10c03259526391d9b3a72d9b73bbb4
-    restart: unless-stopped
-    healthcheck:
-      # Alpine's busybox wget against LiveKit's own unauthenticated "OK" liveness route; see deploy/README.md.
-      test: ["CMD", "wget", "--quiet", "--spider", "-T", "3", "http://127.0.0.1:7880/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
-    # LiveKit exits if its STUN hostname will not resolve, and systemd-resolved's
-    # 127.0.0.53 stub does not exist in a container. See deploy/README.md.
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    expose:
-      - "7880" # WebSocket signaling, reverse-proxied by Caddy - not published to the host
-    ports:
-      # TCP fallback for clients that cannot do UDP at all. Configurable because
-      # 7881 is popular and this may not be the only SFU on the host.
-      - "${LIVEKIT_TCP_PORT:-7881}:${LIVEKIT_TCP_PORT:-7881}"
-      # STUN/TURN (UDP), the default LiveKit/TURN port.
-      - "${LIVEKIT_TURN_UDP_PORT:-3478}:${LIVEKIT_TURN_UDP_PORT:-3478}/udp"
-      # TURN's relay ports, distinct from the media range below. Missing them is
-      # worse than no TURN: relay candidates are advertised and all time out.
-      - "${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}:${LIVEKIT_TURN_RELAY_PORT_START:-30000}-${LIVEKIT_TURN_RELAY_PORT_END:-30100}/udp"
-      - "${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}:${LIVEKIT_UDP_PORT_START:-50000}-${LIVEKIT_UDP_PORT_END:-50100}/udp"
-      # TURN/TLS gets 5349, never 443: Caddy owns 443 and TURN is not an HTTP
-      # protocol it can share it with. To enable, see deploy/README.md.
-
-      # - "5349:5349"
-    environment:
-      # LiveKit's own env binding for a full config.yaml body. The key and secret
-      # take `:?` and never a default, on purpose; see deploy/README.md.
-      LIVEKIT_CONFIG: |
-        port: 7880
-        bind_addresses:
-          - "0.0.0.0"
-        rtc:
-          tcp_port: ${LIVEKIT_TCP_PORT:-7881}
-          port_range_start: ${LIVEKIT_UDP_PORT_START:-50000}
-          port_range_end: ${LIVEKIT_UDP_PORT_END:-50100}
-          use_external_ip: true
-        keys:
-          ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set in .env to a random value of at least 32 characters}
-        turn:
-          enabled: true
-          udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
-          # Narrowed from LiveKit's 30000-40000 default: nobody publishes ten
-          # thousand ports, and unpublished relay ports connect nothing.
-          relay_range_start: ${LIVEKIT_TURN_RELAY_PORT_START:-30000}
-          relay_range_end: ${LIVEKIT_TURN_RELAY_PORT_END:-30100}
-          # TURN/TLS is off: its listener needs a certificate of its own and
-          # cannot borrow Caddy's. The four keys to add: deploy/README.md.
 
   litestream:
     # Held on 0.3.x deliberately: 0.5 replaced the replica format (WAL segments

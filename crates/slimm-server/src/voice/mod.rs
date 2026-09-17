@@ -138,18 +138,14 @@ impl VoiceService {
     /// Builds a service from config. Disabled unless the URL, key, and secret
     /// are all present, and logs which of the two it is once at startup.
     pub fn new(config: &Config) -> anyhow::Result<Self> {
-        let inner = match (
-            &config.livekit_url,
-            &config.livekit_api_key,
-            &config.livekit_api_secret,
-        ) {
-            (Some(url), Some(key), Some(secret)) => {
-                let service_url = http_url_for(url)?;
+        let inner = match config.livekit_settings() {
+            Some((url, key, secret)) => {
+                let service_url = http_url_for(&url)?;
                 tracing::info!(%url, "voice enabled");
                 Some(std::sync::Arc::new(Enabled {
-                    url: url.clone(),
-                    api_key: key.clone(),
-                    api_secret: secret.clone(),
+                    url,
+                    api_key: key,
+                    api_secret: secret,
                     http: reqwest::Client::builder()
                         .timeout(std::time::Duration::from_secs(5))
                         .build()
@@ -157,7 +153,7 @@ impl VoiceService {
                     service_url,
                 }))
             }
-            _ => {
+            None => {
                 tracing::info!(
                     "SLIMM_LIVEKIT_URL / _API_KEY / _API_SECRET not all set; voice is disabled"
                 );
