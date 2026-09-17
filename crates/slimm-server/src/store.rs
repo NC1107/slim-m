@@ -68,6 +68,7 @@ mod quiet_hours;
 mod reactions;
 mod read_state;
 mod recovery;
+mod refresh_rotation;
 mod removals;
 mod reports;
 mod role_mentions;
@@ -133,14 +134,13 @@ pub use polls::{
 pub use push::{PushError, PushRegistration, PushTarget};
 pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
+pub use refresh_rotation::RefreshOutcome;
 pub use removals::{RemoveMemberError, SpaceRemoval};
 pub use reports::{FiledReport, Report, ReportError, ReportSubject, ReporterOwnReport};
 pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};
 pub use safety::Device;
 pub use saved_messages::{MAX_SAVED_MESSAGES, SaveError, SavedMessage};
-pub use sessions::{
-    Account, IssuedTokens, OpenError, RefreshOutcome, RegisterError, SessionContext, SweptTokens,
-};
+pub use sessions::{Account, IssuedTokens, OpenError, RegisterError, SessionContext, SweptTokens};
 pub use space::{JoinPolicy, MAX_SCREEN_SHARE_MAX_HEIGHT, MIN_SCREEN_SHARE_MAX_HEIGHT};
 pub use storage::{ChannelStorage, DatabaseBytes, MAX_STORAGE_CHANNEL_ROWS, SweepStatus};
 pub use thread_listing::ThreadListItem;
@@ -271,10 +271,6 @@ pub struct Message {
     pub reply_to_id: Option<MessageId>,
 }
 
-/// How recently a spent refresh token may be replayed before it counts as reuse
-/// rather than the honest client racing itself. See [`Store::rotate_refresh`].
-const DEFAULT_REUSE_GRACE_MS: i64 = 10 * 1000;
-
 /// A snapshot of [`Store::pool_stats`]: how many of the pool's connections
 /// are open at all, and how many of those are currently checked out.
 #[derive(Debug, Clone, Copy)]
@@ -288,7 +284,6 @@ pub struct PoolStats {
 #[derive(Clone)]
 pub struct Store {
     pool: SqlitePool,
-    reuse_grace_ms: i64,
     /// Backs [`canvas_op_clock::Store::now_ms_unique`]. `Arc`-shared so every
     /// clone of one `Store` sees the same clock, and fresh on every new
     /// `Store` - which is what makes it fresh on every process restart too,
@@ -302,17 +297,6 @@ impl Store {
     pub fn new(pool: SqlitePool) -> Self {
         Self {
             pool,
-            reuse_grace_ms: DEFAULT_REUSE_GRACE_MS,
-            canvas_op_clock: Arc::default(),
-        }
-    }
-
-    /// Builds a store with an explicit refresh-reuse grace window. Mainly for
-    /// tests that need to exercise the out-of-grace reuse path deterministically.
-    pub fn with_reuse_grace_ms(pool: SqlitePool, reuse_grace_ms: i64) -> Self {
-        Self {
-            pool,
-            reuse_grace_ms,
             canvas_op_clock: Arc::default(),
         }
     }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE access_tokens SET confirms_refresh_hash = NULL WHERE token_hash = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c7670e9f34d3037ba90acadd0b8554896dd195e54b63f82900baeb8504676d6f"
+}

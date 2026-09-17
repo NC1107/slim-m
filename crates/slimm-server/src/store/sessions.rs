@@ -10,17 +10,18 @@
 //!   atomic conditional UPDATE issued as the transaction's first statement, so
 //!   two rotations of the same token serialize on the write lock cleanly instead
 //!   of racing a stale WAL snapshot into a spurious error.
-//! - Reuse detection with a grace window. Replaying a long-spent refresh token
-//!   means it leaked and both the attacker and the honest client hold copies, so
-//!   the whole family and its session are revoked. A replay within a short grace
-//!   window is instead treated as the honest client racing itself (two tabs, a
-//!   retry after a dropped response) and is denied softly without revoking, since
-//!   the winning request already handed that client a fresh pair.
+//! - Reuse detection, gated on confirmation rather than on a clock. A spent
+//!   refresh token is *pending*, not finished: it keeps working until the client
+//!   proves it received the replacement by using the access token issued beside
+//!   it. Replaying a token that has been confirmed and retired means it leaked
+//!   and both the attacker and the honest client hold copies, so the whole
+//!   family and its session are revoked. Replaying one that is merely pending is
+//!   the honest client retrying after a dropped response, and rotates again.
 //! - Instant revocation. Revoking a session deletes its access tokens and
 //!   connect tickets and marks its refresh tokens revoked, so a killed session's
 //!   bearer token stops resolving on the next request rather than at expiry.
 
-use sqlx::{Sqlite, SqliteConnection, Transaction};
+use sqlx::SqliteConnection;
 
 use super::invites::{record_redemption, spend_invite};
 use super::{JoinPolicy, Store, now_ms};
@@ -29,9 +30,9 @@ use crate::ids::{DeviceId, FamilyId, SessionId, UserId};
 
 /// Access tokens are short so a leaked one has a small window and the auth hot
 /// path stays a single indexed lookup.
-const ACCESS_TTL_MS: i64 = 15 * 60 * 1000;
+pub(super) const ACCESS_TTL_MS: i64 = 15 * 60 * 1000;
 /// Refresh tokens are long-lived but device-bound and single-use per rotation.
-const REFRESH_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
+pub(super) const REFRESH_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 /// Connect tickets exist only to bridge a REST auth into a WebSocket upgrade.
 const WS_TICKET_TTL_MS: i64 = 30 * 1000;
 
@@ -44,7 +45,7 @@ const WS_TICKET_TTL_MS: i64 = 30 * 1000;
 /// as leaked. Keeping a full extra `REFRESH_TTL_MS` past expiry means anything
 /// still worth detecting is still there: by then the token has been unusable
 /// for a month and the attacker has had nothing to gain from it for as long.
-const REFRESH_SWEEP_GRACE_MS: i64 = REFRESH_TTL_MS;
+pub(super) const REFRESH_SWEEP_GRACE_MS: i64 = REFRESH_TTL_MS;
 
 /// How long past expiry a spent or stale connect ticket is kept. Single use is
 /// enforced by `used_at` inside the 30-second window, so nothing after that
@@ -88,16 +89,6 @@ pub struct SessionContext {
     pub user_id: UserId,
     pub session_id: SessionId,
     pub device_id: DeviceId,
-}
-
-/// The result of presenting a refresh token.
-pub enum RefreshOutcome {
-    /// Accepted: here are the new access and refresh tokens.
-    Rotated(IssuedTokens),
-    /// Rejected for a benign reason (unknown, expired, or already revoked).
-    Denied,
-    /// A spent token was replayed; the family and session were revoked.
-    Reused,
 }
 
 /// Why registration failed.
@@ -466,13 +457,21 @@ impl Store {
     /// Resolves a presented access token to its session, or `None` if unknown or
     /// expired. Revoked sessions have their access tokens deleted, so absence is
     /// sufficient here and this stays one indexed lookup with no join.
+    ///
+    /// Using an access token is also how a client confirms the rotation that
+    /// issued it, which retires the refresh token that rotation spent. The
+    /// confirmation is one extra write, and only on the first request after a
+    /// rotation: `confirms_refresh_hash` is cleared as it is acted on, and is
+    /// already NULL for every later request and for every sign-in token. So the
+    /// hot path keeps costing exactly the lookup above.
     pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<Option<SessionContext>> {
         let hash = hash_secret(access_token);
         let now = now_ms();
         let row = sqlx::query!(
             r#"SELECT user_id AS "user_id!: UserId",
                       session_id AS "session_id!: SessionId",
-                      device_id AS "device_id!: DeviceId"
+                      device_id AS "device_id!: DeviceId",
+                      confirms_refresh_hash
                FROM access_tokens
                WHERE token_hash = ? AND expires_at > ?"#,
             hash,
@@ -480,106 +479,17 @@ impl Store {
         )
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|r| SessionContext {
-            user_id: r.user_id,
-            session_id: r.session_id,
-            device_id: r.device_id,
-        }))
-    }
-
-    /// Exchanges a refresh token for a new pair, detecting replay of a spent one.
-    ///
-    /// The token is spent atomically as the transaction's first statement.
-    /// Making the first statement a write takes the write lock up front, so a
-    /// concurrent rotation of the same token waits on the lock and then finds
-    /// `used_at` already set, rather than both reading a NULL snapshot and one
-    /// failing to promote its stale snapshot to a writer. A matched row means
-    /// this call won the claim; no row means the token was unknown, revoked,
-    /// expired, or already spent, which [`classify_failed_refresh`] sorts out.
-    pub async fn rotate_refresh(&self, refresh_token: &str) -> anyhow::Result<RefreshOutcome> {
-        let presented = hash_secret(refresh_token);
-        let now = now_ms();
-        let mut tx = self.pool.begin().await?;
-
-        // Claim-first, so this transaction opens on a write; see the note on
-        // this function.
-        let claimed = sqlx::query!(
-            r#"UPDATE refresh_tokens SET used_at = ?
-               WHERE token_hash = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?
-               RETURNING session_id AS "session_id!: SessionId",
-                         family_id AS "family_id!: FamilyId""#,
-            now,
-            presented,
-            now
-        )
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        let Some(claimed) = claimed else {
-            return classify_failed_refresh(tx, &presented, now, self.reuse_grace_ms).await;
+        let Some(row) = row else {
+            return Ok(None);
         };
-
-        // Revocation marks the token revoked, which the claim guard excludes,
-        // so this read is for the new tokens; the check is belt and braces.
-        let session = sqlx::query!(
-            r#"SELECT user_id AS "user_id!: UserId",
-                      device_id AS "device_id!: DeviceId",
-                      revoked_at
-               FROM sessions WHERE id = ?"#,
-            claimed.session_id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
-        if session.revoked_at.is_some() {
-            return Ok(RefreshOutcome::Denied);
+        if let Some(predecessor) = row.confirms_refresh_hash.as_deref() {
+            self.retire_confirmed_predecessor(&hash, predecessor, now)
+                .await?;
         }
-
-        let access_token = generate_secret();
-        let refresh_token = generate_secret();
-        let access_hash = hash_secret(&access_token);
-        let refresh_hash = hash_secret(&refresh_token);
-        let access_expires_at = now + ACCESS_TTL_MS;
-        let refresh_expires_at = now + REFRESH_TTL_MS;
-
-        sqlx::query!(
-            "INSERT INTO refresh_tokens (token_hash, session_id, family_id, issued_at, expires_at)
-             VALUES (?, ?, ?, ?, ?)",
-            refresh_hash,
-            claimed.session_id,
-            claimed.family_id,
-            now,
-            refresh_expires_at
-        )
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query!(
-            "DELETE FROM access_tokens WHERE session_id = ?",
-            claimed.session_id
-        )
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query!(
-            "INSERT INTO access_tokens (token_hash, session_id, user_id, device_id, issued_at, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?)",
-            access_hash,
-            claimed.session_id,
-            session.user_id,
-            session.device_id,
-            now,
-            access_expires_at
-        )
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-
-        Ok(RefreshOutcome::Rotated(IssuedTokens {
-            access_token,
-            refresh_token,
-            access_expires_at,
-            refresh_expires_at,
-            session_id: claimed.session_id,
-            user_id: session.user_id,
-            device_id: session.device_id,
+        Ok(Some(SessionContext {
+            user_id: row.user_id,
+            session_id: row.session_id,
+            device_id: row.device_id,
         }))
     }
 
@@ -662,87 +572,6 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
-}
-
-/// Sorts out why a refresh claim matched no row: unknown, revoked, expired, a
-/// benign within-grace concurrent retry, or a genuine reuse. Only the last
-/// revokes the family and session.
-async fn classify_failed_refresh(
-    mut tx: Transaction<'_, Sqlite>,
-    presented: &str,
-    now: i64,
-    reuse_grace_ms: i64,
-) -> anyhow::Result<RefreshOutcome> {
-    let row = sqlx::query!(
-        r#"SELECT session_id AS "session_id!: SessionId",
-                  family_id AS "family_id!: FamilyId",
-                  used_at, revoked_at
-           FROM refresh_tokens WHERE token_hash = ?"#,
-        presented
-    )
-    .fetch_optional(&mut *tx)
-    .await?;
-
-    let Some(row) = row else {
-        // Swept or never issued; the one rejection with no session to name.
-        tracing::info!(reason = "unknown", "refresh rejected");
-        return Ok(RefreshOutcome::Denied);
-    };
-    if row.revoked_at.is_some() {
-        tracing::info!(
-            session_id = %row.session_id,
-            reason = "family already revoked",
-            "refresh rejected"
-        );
-        return Ok(RefreshOutcome::Denied);
-    }
-    let Some(used_at) = row.used_at else {
-        // Never spent, so the claim guard failed on expiry instead.
-        tracing::info!(
-            session_id = %row.session_id,
-            reason = "expired",
-            "refresh rejected"
-        );
-        return Ok(RefreshOutcome::Denied);
-    };
-    if now - used_at <= reuse_grace_ms {
-        // The honest client raced itself; the winning request already rotated and
-        // handed it a fresh pair, so deny this one softly without revoking.
-        tracing::info!(
-            session_id = %row.session_id,
-            spent_ms_ago = now - used_at,
-            reason = "replayed inside the grace window",
-            "refresh rejected"
-        );
-        return Ok(RefreshOutcome::Denied);
-    }
-
-    // A long-spent token was replayed: treat it as a leak and revoke everything.
-    revoke_family(&mut tx, row.family_id, now).await?;
-    revoke_session_rows(&mut tx, row.session_id, now).await?;
-    tx.commit().await?;
-    tracing::warn!(
-        session_id = %row.session_id,
-        spent_ms_ago = now - used_at,
-        "refresh token reuse detected outside the grace window; family and session revoked"
-    );
-    Ok(RefreshOutcome::Reused)
-}
-
-/// Marks every not-yet-revoked token in a family revoked.
-async fn revoke_family(
-    conn: &mut SqliteConnection,
-    family_id: FamilyId,
-    now: i64,
-) -> anyhow::Result<()> {
-    sqlx::query!(
-        "UPDATE refresh_tokens SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL",
-        now,
-        family_id
-    )
-    .execute(conn)
-    .await?;
-    Ok(())
 }
 
 /// Tears down a session's live credentials: access tokens and connect tickets
