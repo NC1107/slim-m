@@ -7,7 +7,7 @@ A lightweight, cross-platform, open source messaging platform with optional self
 ## Status
 
 Phases 0 through 4 (foundations, server and protocol core, client shell, push notifications, voice and screen share) are complete, and later phases are substantially underway: a first Voice Canvas write slice, the admin and moderation screens, the client capability handshake, and part of the motion, accessibility and audio-design polish pass have all shipped.
-Server `crates/slimm-server` is at 0.18.5 and the Flutter client at 0.13.3 (see the `.release-please-manifest.*.json` files), both with signed release artifacts and a running self-hosted instance.
+Both components ship signed release artifacts and run on a live self-hosted instance; the `.release-please-manifest.*.json` files carry the current versions rather than this paragraph, which went stale by forty releases the last time it named them.
 See [CLAUDE.md](CLAUDE.md) for what has shipped most recently and the [roadmap](docs/ROADMAP.md) for phases and exit criteria.
 
 ## Layout
@@ -21,6 +21,18 @@ docs/                 Brief, strategy, roadmap, decisions, and research
 ```
 
 The push relay is a separate repository, adapted from [check-in-relay](https://github.com/NC1107/check-in-relay).
+
+## Installing the app
+
+If you are joining someone's space rather than running one, see **[docs/INSTALL.md](docs/INSTALL.md)** - one section per platform, including the security warnings Windows, macOS and Android will show you and what to click.
+Ask whoever runs the space for its address and an invite code before you start.
+
+If the space offers a web client, opening that address in a browser needs no install at all and is the easiest route.
+
+## Self-hosting a server
+
+The full walkthrough is [deploy/README.md](deploy/README.md).
+Text chat needs one DNS record and two values in a `.env`; voice and screen share are an overlay you add when you want them.
 
 ## Running the server
 
