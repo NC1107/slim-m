@@ -25,6 +25,7 @@ class ModuleSceneFrame extends StatelessWidget {
     required this.aspect,
     required this.child,
     this.sceneHeight = 0,
+    this.fillAvailable = false,
   });
 
   /// Width over height of the scene's own coordinate space; anything at or
@@ -37,6 +38,15 @@ class ModuleSceneFrame extends StatelessWidget {
   final double sceneHeight;
 
   final Widget child;
+
+  /// Take all the room there is, rather than the share an inline board gets.
+  ///
+  /// Every bound below exists because a scene sits in a transcript that has to
+  /// stay readable around it. On a screen of its own there is nothing to stay
+  /// readable around, so a board that still capped itself at 160px a cell
+  /// would be a small square adrift in a large window - the exact complaint
+  /// the cap was added to fix, arrived at from the other direction.
+  final bool fillAvailable;
 
   /// How much of the window a board may take before the width gives way.
   static const viewportShare = 0.6;
@@ -56,6 +66,16 @@ class ModuleSceneFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final ratio = aspect <= 0 ? 1.0 : aspect;
+    if (fillAvailable) {
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: tokens.borderSubtle),
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AspectRatio(aspectRatio: ratio, child: child),
+      );
+    }
     final windowBound = MediaQuery.sizeOf(context).height * viewportShare;
     final cellBound = sceneHeight > 0
         ? sceneHeight * maxCellSize

@@ -28,6 +28,7 @@ import '../audio/scene_sound_player.dart';
 import '../providers/module_sound_settings.dart';
 import '../providers/providers.dart';
 import 'module_scene.dart';
+import 'module_scene_fullscreen.dart';
 import 'module_scene_view.dart';
 
 class ModuleCommandOutput extends ConsumerWidget {
@@ -61,31 +62,47 @@ class ModuleCommandOutput extends ConsumerWidget {
       if (scene != null) {
         final messageId = this.messageId;
         final blockIndex = this.blockIndex;
+        // Shared when this scene belongs to a message: each action stores and broadcasts, so everyone watching sees the same evolving scene.
+        final shared = messageId != null && blockIndex != null;
+        Future<api.RunModuleCommandResult> run(String input) => shared
+            ? ref
+                  .read(apiProvider)
+                  .runCodeBlock(
+                    messageId: messageId,
+                    blockIndex: blockIndex,
+                    moduleId: moduleId,
+                    command: command,
+                    input: input,
+                  )
+            : ref
+                  .read(apiProvider)
+                  .runModuleCommand(
+                    moduleId: moduleId,
+                    command: command,
+                    input: input,
+                  );
+        // The other half of "never plays without interaction": see NotesOp's own doc comment for the full defence.
+        void notes(List<SceneNote> played) {
+          if (!ref.read(moduleSoundSettingsProvider)) return;
+          unawaited(ref.read(moduleSoundPlayerProvider).playNotes(played));
+        }
+
         return ModuleSceneView(
           initial: scene,
-          // Shared when this scene belongs to a message: each action stores and broadcasts, so everyone watching sees the same evolving scene.
-          runCommand: messageId != null && blockIndex != null
-              ? (input) => ref
-                    .read(apiProvider)
-                    .runCodeBlock(
-                      messageId: messageId,
-                      blockIndex: blockIndex,
-                      moduleId: moduleId,
-                      command: command,
-                      input: input,
-                    )
-              : (input) => ref
-                    .read(apiProvider)
-                    .runModuleCommand(
-                      moduleId: moduleId,
-                      command: command,
-                      input: input,
-                    ),
-          // The other half of "never plays without interaction": see NotesOp's own doc comment for the full defence.
-          onNotes: (notes) {
-            if (!ref.read(moduleSoundSettingsProvider)) return;
-            unawaited(ref.read(moduleSoundPlayerProvider).playNotes(notes));
-          },
+          runCommand: run,
+          onNotes: notes,
+          // Only a message-scoped board has a screen of its own to go to.
+          onExpand: shared
+              ? () => unawaited(
+                  showModuleSceneFullscreen(
+                    context,
+                    initial: scene,
+                    runCommand: run,
+                    onNotes: notes,
+                    title: moduleId,
+                  ),
+                )
+              : null,
         );
       }
     }
