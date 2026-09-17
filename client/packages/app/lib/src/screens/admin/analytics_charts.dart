@@ -15,6 +15,31 @@ import '../../widgets/attachment_view.dart' show formatByteSize;
 import '../../widgets/author_label.dart';
 import '../../widgets/settings_section_header.dart';
 
+/// Every sixth hour: the landmarks a reader navigates a day by, rather than
+/// twenty-four labels no width could carry.
+Map<int, String> _hourTicks(int count) => {
+  for (var hour = 0; hour < count; hour += 6)
+    hour: hour.toString().padLeft(2, '0'),
+};
+
+/// First, middle and last day. Bounding the series is what lets a reader
+/// place any bar; the middle is a convenience the axis drops first when the
+/// width cannot hold it.
+Map<int, String> _dateTicks(List<api.AnalyticsDayCount> days) {
+  if (days.isEmpty) return const {};
+  if (days.length < 3) return {0: _shortDate(days.first.date)};
+  return {
+    0: _shortDate(days.first.date),
+    days.length ~/ 2: _shortDate(days[days.length ~/ 2].date),
+    days.length - 1: _shortDate(days.last.date),
+  };
+}
+
+/// `2026-07-24` as `07-24`. The year is the same on every bar of a thirty-day
+/// window, so printing it thirty times would only cost width.
+String _shortDate(String isoDate) =>
+    isoDate.length >= 10 ? isoDate.substring(5) : isoDate;
+
 class MessagesByDayCard extends StatelessWidget {
   const MessagesByDayCard({super.key, required this.stats});
 
@@ -36,6 +61,10 @@ class MessagesByDayCard extends StatelessWidget {
         AnalyticsBarChart(
           values: days.map((d) => d.count.toDouble()).toList(),
           semanticsLabel: 'Messages per day: $summaryLabel',
+          ticks: _dateTicks(days),
+          maxLabel: busiest == null || busiest.count == 0
+              ? null
+              : '${busiest.count}',
         ),
         const SizedBox(height: AppSpacing.s8),
         Text(
@@ -75,6 +104,8 @@ class ActiveHoursCard extends StatelessWidget {
         AnalyticsBarChart(
           values: hours.map((c) => c.toDouble()).toList(),
           semanticsLabel: 'Messages per UTC hour of day: $summaryLabel',
+          ticks: _hourTicks(hours.length),
+          maxLabel: total == 0 ? null : '${hours[peakHour]}',
         ),
         const SizedBox(height: AppSpacing.s8),
         Text(
@@ -123,6 +154,10 @@ class MemoryCard extends StatelessWidget {
         AnalyticsBarChart(
           values: samples.map((s) => s.rssBytes.toDouble()).toList(),
           semanticsLabel: 'Server memory readings, oldest first: $summaryLabel',
+          ticks: samples.length < 2
+              ? const {}
+              : {0: 'oldest', samples.length - 1: 'newest'},
+          maxLabel: formatByteSize(peak),
         ),
         const SizedBox(height: AppSpacing.s8),
         Text(
