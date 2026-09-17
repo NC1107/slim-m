@@ -111,13 +111,19 @@ async fn long_dead_rows_are_removed_from_all_three_tables() {
 #[tokio::test]
 async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
     let (pool, _guard) = pool().await;
-    let store = Store::with_reuse_grace_ms(pool.clone(), 0);
+    let store = Store::new(pool.clone());
     let user = store.create_user("alice", "Alice").await.unwrap();
     let original = store.open_session(user.id, "laptop").await.unwrap();
-    match store.rotate_refresh(&original.refresh_token).await.unwrap() {
-        RefreshOutcome::Rotated(_) => {}
+    let rotated = match store.rotate_refresh(&original.refresh_token).await.unwrap() {
+        RefreshOutcome::Rotated(tokens) => tokens,
         _ => panic!("first rotation should succeed"),
-    }
+    };
+    // Confirming the rotation is what retires the original.
+    store
+        .authenticate(&rotated.access_token)
+        .await
+        .unwrap()
+        .expect("the new access token authenticates");
 
     // Past its own 30-day expiry, but inside the sweep's grace.
     age_rows(&pool, "refresh_tokens", 31 * DAY_MS).await;
@@ -126,10 +132,6 @@ async fn a_spent_refresh_token_survives_long_enough_to_still_catch_reuse() {
         swept.refresh_tokens, 0,
         "a token only just past expiry is still the evidence reuse detection reads"
     );
-
-    // The grace window is zero, but `now - used_at` is whole milliseconds and
-    // landing inside the same one reads as an honest client, not a replay.
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
     assert!(
         matches!(

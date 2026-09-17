@@ -10,12 +10,13 @@
 //!   atomic conditional UPDATE issued as the transaction's first statement, so
 //!   two rotations of the same token serialize on the write lock cleanly instead
 //!   of racing a stale WAL snapshot into a spurious error.
-//! - Reuse detection with a grace window. Replaying a long-spent refresh token
-//!   means it leaked and both the attacker and the honest client hold copies, so
-//!   the whole family and its session are revoked. A replay within a short grace
-//!   window is instead treated as the honest client racing itself (two tabs, a
-//!   retry after a dropped response) and is denied softly without revoking, since
-//!   the winning request already handed that client a fresh pair.
+//! - Reuse detection, gated on confirmation rather than on a clock. A spent
+//!   refresh token is *pending*, not finished: it keeps working until the client
+//!   proves it received the replacement by using the access token issued beside
+//!   it. Replaying a token that has been confirmed and retired means it leaked
+//!   and both the attacker and the honest client hold copies, so the whole
+//!   family and its session are revoked. Replaying one that is merely pending is
+//!   the honest client retrying after a dropped response, and rotates again.
 //! - Instant revocation. Revoking a session deletes its access tokens and
 //!   connect tickets and marks its refresh tokens revoked, so a killed session's
 //!   bearer token stops resolving on the next request rather than at expiry.
@@ -466,13 +467,21 @@ impl Store {
     /// Resolves a presented access token to its session, or `None` if unknown or
     /// expired. Revoked sessions have their access tokens deleted, so absence is
     /// sufficient here and this stays one indexed lookup with no join.
+    ///
+    /// Using an access token is also how a client confirms the rotation that
+    /// issued it, which retires the refresh token that rotation spent. The
+    /// confirmation is one extra write, and only on the first request after a
+    /// rotation: `confirms_refresh_hash` is cleared as it is acted on, and is
+    /// already NULL for every later request and for every sign-in token. So the
+    /// hot path keeps costing exactly the lookup above.
     pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<Option<SessionContext>> {
         let hash = hash_secret(access_token);
         let now = now_ms();
         let row = sqlx::query!(
             r#"SELECT user_id AS "user_id!: UserId",
                       session_id AS "session_id!: SessionId",
-                      device_id AS "device_id!: DeviceId"
+                      device_id AS "device_id!: DeviceId",
+                      confirms_refresh_hash
                FROM access_tokens
                WHERE token_hash = ? AND expires_at > ?"#,
             hash,
@@ -480,22 +489,67 @@ impl Store {
         )
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|r| SessionContext {
-            user_id: r.user_id,
-            session_id: r.session_id,
-            device_id: r.device_id,
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        if let Some(predecessor) = row.confirms_refresh_hash.as_deref() {
+            self.retire_confirmed_predecessor(&hash, predecessor, now)
+                .await?;
+        }
+        Ok(Some(SessionContext {
+            user_id: row.user_id,
+            session_id: row.session_id,
+            device_id: row.device_id,
         }))
     }
 
-    /// Exchanges a refresh token for a new pair, detecting replay of a spent one.
+    /// Retires the refresh token a now-confirmed rotation spent, and clears the
+    /// marker so this runs once per rotation rather than on every request.
     ///
-    /// The token is spent atomically as the transaction's first statement.
-    /// Making the first statement a write takes the write lock up front, so a
-    /// concurrent rotation of the same token waits on the lock and then finds
-    /// `used_at` already set, rather than both reading a NULL snapshot and one
-    /// failing to promote its stale snapshot to a writer. A matched row means
-    /// this call won the claim; no row means the token was unknown, revoked,
-    /// expired, or already spent, which [`classify_failed_refresh`] sorts out.
+    /// Both statements are idempotent and independently safe to lose: if the
+    /// process dies between them the worst case is the marker surviving and the
+    /// retirement being reapplied, which changes nothing.
+    async fn retire_confirmed_predecessor(
+        &self,
+        access_hash: &str,
+        predecessor: &str,
+        now: i64,
+    ) -> anyhow::Result<()> {
+        sqlx::query!(
+            "UPDATE refresh_tokens SET retired_at = ? WHERE token_hash = ? AND retired_at IS NULL",
+            now,
+            predecessor
+        )
+        .execute(&self.pool)
+        .await?;
+        sqlx::query!(
+            "UPDATE access_tokens SET confirms_refresh_hash = NULL WHERE token_hash = ?",
+            access_hash
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Exchanges a refresh token for a new pair, detecting replay of a retired one.
+    ///
+    /// Rotation confirms before it retires. Spending a token marks it *pending*
+    /// rather than finished: it keeps working until the client proves it
+    /// received the replacement, which it does by using the access token issued
+    /// beside it (see [`Store::authenticate`]). A rotation whose response never
+    /// reached the client therefore leaves that client able to try again with
+    /// the token it still holds, instead of being signed out for replaying one
+    /// the server had already spent.
+    ///
+    /// The cost is that a rotation the client never confirms leaves both tokens
+    /// live until they expire. That is the same exposure as a refresh request
+    /// that never reached the server at all, which this system must tolerate
+    /// regardless, and it buys back the sign-out.
+    ///
+    /// The claim is still the transaction's first statement, so it takes the
+    /// write lock up front and a concurrent rotation waits on the lock rather
+    /// than racing a stale snapshot. `used_at` is set with `COALESCE` so a
+    /// replay records the first spend, never pushing the timestamp forward.
     pub async fn rotate_refresh(&self, refresh_token: &str) -> anyhow::Result<RefreshOutcome> {
         let presented = hash_secret(refresh_token);
         let now = now_ms();
@@ -504,8 +558,8 @@ impl Store {
         // Claim-first, so this transaction opens on a write; see the note on
         // this function.
         let claimed = sqlx::query!(
-            r#"UPDATE refresh_tokens SET used_at = ?
-               WHERE token_hash = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?
+            r#"UPDATE refresh_tokens SET used_at = COALESCE(used_at, ?)
+               WHERE token_hash = ? AND retired_at IS NULL AND revoked_at IS NULL AND expires_at > ?
                RETURNING session_id AS "session_id!: SessionId",
                          family_id AS "family_id!: FamilyId""#,
             now,
@@ -516,7 +570,7 @@ impl Store {
         .await?;
 
         let Some(claimed) = claimed else {
-            return classify_failed_refresh(tx, &presented, now, self.reuse_grace_ms).await;
+            return classify_failed_refresh(tx, &presented, now).await;
         };
 
         // Revocation marks the token revoked, which the claim guard excludes,
@@ -559,14 +613,15 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         sqlx::query!(
-            "INSERT INTO access_tokens (token_hash, session_id, user_id, device_id, issued_at, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO access_tokens (token_hash, session_id, user_id, device_id, issued_at, expires_at, confirms_refresh_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             access_hash,
             claimed.session_id,
             session.user_id,
             session.device_id,
             now,
-            access_expires_at
+            access_expires_at,
+            presented
         )
         .execute(&mut *tx)
         .await?;
@@ -664,19 +719,26 @@ impl Store {
     }
 }
 
-/// Sorts out why a refresh claim matched no row: unknown, revoked, expired, a
-/// benign within-grace concurrent retry, or a genuine reuse. Only the last
-/// revokes the family and session.
+/// Sorts out why a refresh claim matched no row: unknown, revoked, expired, or
+/// a genuine reuse. Only the last revokes the family and session.
+///
+/// A pending token no longer reaches here at all - the claim accepts it - so
+/// reaching here with a spent token means it was retired, which means its
+/// rotation was confirmed and the client holds the replacement. A second copy
+/// presenting it is the leak reuse detection exists to catch.
+///
+/// Expiry is deliberately not checked on that path: a token that expired
+/// recently is exactly the one an attacker would replay, and
+/// [`REFRESH_SWEEP_GRACE_MS`] keeps the row precisely so it is still caught.
 async fn classify_failed_refresh(
     mut tx: Transaction<'_, Sqlite>,
     presented: &str,
     now: i64,
-    reuse_grace_ms: i64,
 ) -> anyhow::Result<RefreshOutcome> {
     let row = sqlx::query!(
         r#"SELECT session_id AS "session_id!: SessionId",
                   family_id AS "family_id!: FamilyId",
-                  used_at, revoked_at
+                  retired_at, revoked_at
            FROM refresh_tokens WHERE token_hash = ?"#,
         presented
     )
@@ -696,8 +758,8 @@ async fn classify_failed_refresh(
         );
         return Ok(RefreshOutcome::Denied);
     }
-    let Some(used_at) = row.used_at else {
-        // Never spent, so the claim guard failed on expiry instead.
+    let Some(retired_at) = row.retired_at else {
+        // Live and un-retired, so the claim guard failed on expiry instead.
         tracing::info!(
             session_id = %row.session_id,
             reason = "expired",
@@ -705,26 +767,14 @@ async fn classify_failed_refresh(
         );
         return Ok(RefreshOutcome::Denied);
     };
-    if now - used_at <= reuse_grace_ms {
-        // The honest client raced itself; the winning request already rotated and
-        // handed it a fresh pair, so deny this one softly without revoking.
-        tracing::info!(
-            session_id = %row.session_id,
-            spent_ms_ago = now - used_at,
-            reason = "replayed inside the grace window",
-            "refresh rejected"
-        );
-        return Ok(RefreshOutcome::Denied);
-    }
-
-    // A long-spent token was replayed: treat it as a leak and revoke everything.
+    // A retired token was replayed, so this copy is a leak; revoke everything.
     revoke_family(&mut tx, row.family_id, now).await?;
     revoke_session_rows(&mut tx, row.session_id, now).await?;
     tx.commit().await?;
     tracing::warn!(
         session_id = %row.session_id,
-        spent_ms_ago = now - used_at,
-        "refresh token reuse detected outside the grace window; family and session revoked"
+        retired_ms_ago = now - retired_at,
+        "confirmed refresh token replayed; family and session revoked"
     );
     Ok(RefreshOutcome::Reused)
 }

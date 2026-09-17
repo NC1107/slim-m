@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE refresh_tokens SET retired_at = ? WHERE token_hash = ? AND retired_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "2a5c56395ccce2f4178a66d65c733e7e1ba066aa0f8f96ac559d6f647a1da34d"
+}
