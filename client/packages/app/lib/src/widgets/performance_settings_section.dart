@@ -133,11 +133,9 @@ class PerformanceSettingsSection extends ConsumerWidget {
             SettingsChoice(value: value, label: value.label),
         ],
         sheetFootnote:
-            'A small splash while slim-m starts up, instead of the window '
-            'opening straight into its real size. Disabled turns it off; '
-            'otherwise the value is how long it stays up at minimum - a start '
-            'slower than that is never held back, only a faster one waits out '
-            'the rest.',
+            'A brief splash while slim-m starts, instead of the window opening '
+            'straight into its real size. The value is a minimum: a slower '
+            'start is never held back further.',
         onChanged: (next) =>
             ref.read(splashDurationControllerProvider.notifier).select(next),
       ),

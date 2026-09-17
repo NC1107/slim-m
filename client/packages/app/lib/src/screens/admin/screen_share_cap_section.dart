@@ -40,11 +40,9 @@ String screenShareCapConsequence(int maxHeight) {
   );
   if (tier != null) {
     final mbps = (tier.maxBitrate / 1000000).toStringAsFixed(1);
-    return 'Bounds a share to ${tier.width}x${tier.height}. That does not '
-        'lower the bandwidth ceiling by itself - whichever quality tier a '
-        'sharer picks still governs bitrate, up to $mbps Mbps at this one - '
-        'only how many pixels that budget has to cover, which is what keeps '
-        'a share legible on a slow link instead of soft.';
+    return 'Bounds a share to ${tier.width}x${tier.height}. The sharer\'s '
+        'quality tier still sets the bitrate, up to $mbps Mbps here - this '
+        'only decides how many pixels that budget covers.';
   }
   final maxTierHeight = ScreenShareQuality.values
       .map((q) => q.height)
@@ -109,10 +107,8 @@ class _ScreenShareCapSectionState extends ConsumerState<ScreenShareCapSection>
       title: 'Screen share quality',
       children: [
         Text(
-          'The tallest resolution a screen share may publish at, applied to '
-          'every client. Lower it to keep a share light on bandwidth and the '
-          'media server; this is enforced by the sharing client, not checked '
-          'on the server.',
+          'The tallest resolution a screen share may publish at. Lower it to '
+          'keep shares light on bandwidth; the sharing client enforces it.',
           style: AppText.caption.copyWith(color: tokens.textSecondary),
         ),
         const SizedBox(height: AppSpacing.s12),
