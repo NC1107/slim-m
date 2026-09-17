@@ -253,6 +253,9 @@ abstract final class AppIcons {
   static const IconData notificationsOff = LucideIcons.bellOff300;
   static const IconData mentions = LucideIcons.atSign300;
 
+  /// Marking a conversation unread again: a note to yourself to come back.
+  static const IconData unread = LucideIcons.mail300;
+
   /// Severity and surfaces (callouts, menus, code blocks). Distinct shapes
   /// (circle, triangle, sparkle, octagon) so a tone survives greyscale rather
   /// than resting on colour alone.

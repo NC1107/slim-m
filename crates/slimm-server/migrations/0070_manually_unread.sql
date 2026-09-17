@@ -1,0 +1,23 @@
+-- SPDX-License-Identifier: AGPL-3.0-only
+--
+-- "Mark as unread": a note to yourself to come back to a conversation.
+--
+-- Unread is otherwise derived rather than stored - a count of live messages
+-- past `last_read_seq`, which the (channel_id, seq) index answers cheaply -
+-- so there is nothing to flip. The obvious move is to rewind the marker, and
+-- it is not available: `mark_read` writes
+-- `last_read_seq = MAX(last_read_seq, excluded.last_read_seq)` on purpose, so
+-- that an out-of-order or delayed mark can never un-read a channel somebody
+-- has already caught up on. Weakening that to support a menu item would trade
+-- a correctness guarantee for a convenience.
+--
+-- So the intent is stored beside the marker instead of inside it. The seq
+-- keeps meaning "the furthest this person has read", which is a fact, and
+-- this column means "they asked to see it as unread anyway", which is a
+-- preference. Opening the channel clears the preference without touching the
+-- fact, and the two can never contradict each other because they answer
+-- different questions.
+--
+-- Defaults to 0, so every existing row reads as "not manually marked" without
+-- a backfill.
+ALTER TABLE read_states ADD COLUMN manually_unread INTEGER NOT NULL DEFAULT 0;

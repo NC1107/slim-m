@@ -31,6 +31,7 @@ import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import '../screens/channel_settings_screen.dart';
+import 'mark_unread_action.dart';
 import 'channel_rail.dart' show selectedChannelId;
 
 /// Opening it always, muting it or narrowing it to mentions only (the same
@@ -85,6 +86,14 @@ List<Widget> channelRowMenuItems(
       onTap: () {
         close();
         context.go(Routes.channel(channel.id));
+      },
+    ),
+    AppMenuItem(
+      label: 'Mark as unread',
+      leading: AppIcons.unread,
+      onTap: () {
+        close();
+        unawaited(markChannelUnread(container, channel.id));
       },
     ),
     const AppMenuDivider(),

@@ -57,6 +57,15 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _manuallyUnreadMeta =
+      const VerificationMeta('manuallyUnread');
+  @override
+  late final GeneratedColumn<bool> manuallyUnread = GeneratedColumn<bool>(
+      'manually_unread', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("manually_unread" IN (0, 1))'));
   static const VerificationMeta _isPersonalSpaceMeta =
       const VerificationMeta('isPersonalSpace');
   @override
@@ -126,6 +135,7 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
         cursor,
         lastReadSeq,
         mentionedSeq,
+        manuallyUnread,
         isPersonalSpace,
         dmParticipantId,
         position,
@@ -187,6 +197,12 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           _mentionedSeqMeta,
           mentionedSeq.isAcceptableOrUnknown(
               data['mentioned_seq']!, _mentionedSeqMeta));
+    }
+    if (data.containsKey('manually_unread')) {
+      context.handle(
+          _manuallyUnreadMeta,
+          manuallyUnread.isAcceptableOrUnknown(
+              data['manually_unread']!, _manuallyUnreadMeta));
     }
     if (data.containsKey('is_personal_space')) {
       context.handle(
@@ -257,6 +273,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.int, data['${effectivePrefix}last_read_seq'])!,
       mentionedSeq: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}mentioned_seq'])!,
+      manuallyUnread: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}manually_unread']),
       isPersonalSpace: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}is_personal_space'])!,
       dmParticipantId: attachedDatabase.typeMapping.read(
@@ -304,6 +322,18 @@ class Channel extends DataClass implements Insertable<Channel> {
   /// unread-mention flag, the same `cursor > lastReadSeq` comparison already
   /// drives the plain unread dot - see `rail_channel.dart`.
   final int mentionedSeq;
+
+  /// The reader asked to see this channel as unread even though they have
+  /// read it, mirrored from the server's own flag. Kept beside
+  /// [lastReadSeq] rather than folded into it because the marker is
+  /// monotonic on purpose: rewinding it to fake an unread would break the
+  /// guarantee that a late mark cannot un-read a channel. See the rail's
+  /// `unread` in `rail_channel.dart`, which is the OR of the two.
+  /// Nullable for the same reason [restricted] is: an existing row, and a
+  /// server too old to report the flag, both read as null, and null renders
+  /// the same as false. Nothing here claims somebody marked a channel unread
+  /// when this client cannot vouch for it.
+  final bool? manuallyUnread;
 
   /// Whether this is the caller's own personal space, set only by
   /// `channelFromDm` from `dm.user.id == selfId` - never from `name`, which
@@ -370,6 +400,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       required this.cursor,
       required this.lastReadSeq,
       required this.mentionedSeq,
+      this.manuallyUnread,
       required this.isPersonalSpace,
       this.dmParticipantId,
       required this.position,
@@ -391,6 +422,9 @@ class Channel extends DataClass implements Insertable<Channel> {
     map['cursor'] = Variable<int>(cursor);
     map['last_read_seq'] = Variable<int>(lastReadSeq);
     map['mentioned_seq'] = Variable<int>(mentionedSeq);
+    if (!nullToAbsent || manuallyUnread != null) {
+      map['manually_unread'] = Variable<bool>(manuallyUnread);
+    }
     map['is_personal_space'] = Variable<bool>(isPersonalSpace);
     if (!nullToAbsent || dmParticipantId != null) {
       map['dm_participant_id'] = Variable<String>(dmParticipantId);
@@ -423,6 +457,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       cursor: Value(cursor),
       lastReadSeq: Value(lastReadSeq),
       mentionedSeq: Value(mentionedSeq),
+      manuallyUnread: manuallyUnread == null && nullToAbsent
+          ? const Value.absent()
+          : Value(manuallyUnread),
       isPersonalSpace: Value(isPersonalSpace),
       dmParticipantId: dmParticipantId == null && nullToAbsent
           ? const Value.absent()
@@ -456,6 +493,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       cursor: serializer.fromJson<int>(json['cursor']),
       lastReadSeq: serializer.fromJson<int>(json['lastReadSeq']),
       mentionedSeq: serializer.fromJson<int>(json['mentionedSeq']),
+      manuallyUnread: serializer.fromJson<bool?>(json['manuallyUnread']),
       isPersonalSpace: serializer.fromJson<bool>(json['isPersonalSpace']),
       dmParticipantId: serializer.fromJson<String?>(json['dmParticipantId']),
       position: serializer.fromJson<int>(json['position']),
@@ -478,6 +516,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'cursor': serializer.toJson<int>(cursor),
       'lastReadSeq': serializer.toJson<int>(lastReadSeq),
       'mentionedSeq': serializer.toJson<int>(mentionedSeq),
+      'manuallyUnread': serializer.toJson<bool?>(manuallyUnread),
       'isPersonalSpace': serializer.toJson<bool>(isPersonalSpace),
       'dmParticipantId': serializer.toJson<String?>(dmParticipantId),
       'position': serializer.toJson<int>(position),
@@ -498,6 +537,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           int? cursor,
           int? lastReadSeq,
           int? mentionedSeq,
+          Value<bool?> manuallyUnread = const Value.absent(),
           bool? isPersonalSpace,
           Value<String?> dmParticipantId = const Value.absent(),
           int? position,
@@ -515,6 +555,8 @@ class Channel extends DataClass implements Insertable<Channel> {
         cursor: cursor ?? this.cursor,
         lastReadSeq: lastReadSeq ?? this.lastReadSeq,
         mentionedSeq: mentionedSeq ?? this.mentionedSeq,
+        manuallyUnread:
+            manuallyUnread.present ? manuallyUnread.value : this.manuallyUnread,
         isPersonalSpace: isPersonalSpace ?? this.isPersonalSpace,
         dmParticipantId: dmParticipantId.present
             ? dmParticipantId.value
@@ -541,6 +583,9 @@ class Channel extends DataClass implements Insertable<Channel> {
       mentionedSeq: data.mentionedSeq.present
           ? data.mentionedSeq.value
           : this.mentionedSeq,
+      manuallyUnread: data.manuallyUnread.present
+          ? data.manuallyUnread.value
+          : this.manuallyUnread,
       isPersonalSpace: data.isPersonalSpace.present
           ? data.isPersonalSpace.value
           : this.isPersonalSpace,
@@ -573,6 +618,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('cursor: $cursor, ')
           ..write('lastReadSeq: $lastReadSeq, ')
           ..write('mentionedSeq: $mentionedSeq, ')
+          ..write('manuallyUnread: $manuallyUnread, ')
           ..write('isPersonalSpace: $isPersonalSpace, ')
           ..write('dmParticipantId: $dmParticipantId, ')
           ..write('position: $position, ')
@@ -595,6 +641,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       cursor,
       lastReadSeq,
       mentionedSeq,
+      manuallyUnread,
       isPersonalSpace,
       dmParticipantId,
       position,
@@ -615,6 +662,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.cursor == this.cursor &&
           other.lastReadSeq == this.lastReadSeq &&
           other.mentionedSeq == this.mentionedSeq &&
+          other.manuallyUnread == this.manuallyUnread &&
           other.isPersonalSpace == this.isPersonalSpace &&
           other.dmParticipantId == this.dmParticipantId &&
           other.position == this.position &&
@@ -634,6 +682,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<int> cursor;
   final Value<int> lastReadSeq;
   final Value<int> mentionedSeq;
+  final Value<bool?> manuallyUnread;
   final Value<bool> isPersonalSpace;
   final Value<String?> dmParticipantId;
   final Value<int> position;
@@ -652,6 +701,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.cursor = const Value.absent(),
     this.lastReadSeq = const Value.absent(),
     this.mentionedSeq = const Value.absent(),
+    this.manuallyUnread = const Value.absent(),
     this.isPersonalSpace = const Value.absent(),
     this.dmParticipantId = const Value.absent(),
     this.position = const Value.absent(),
@@ -671,6 +721,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.cursor = const Value.absent(),
     this.lastReadSeq = const Value.absent(),
     this.mentionedSeq = const Value.absent(),
+    this.manuallyUnread = const Value.absent(),
     this.isPersonalSpace = const Value.absent(),
     this.dmParticipantId = const Value.absent(),
     this.position = const Value.absent(),
@@ -693,6 +744,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<int>? cursor,
     Expression<int>? lastReadSeq,
     Expression<int>? mentionedSeq,
+    Expression<bool>? manuallyUnread,
     Expression<bool>? isPersonalSpace,
     Expression<String>? dmParticipantId,
     Expression<int>? position,
@@ -712,6 +764,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (cursor != null) 'cursor': cursor,
       if (lastReadSeq != null) 'last_read_seq': lastReadSeq,
       if (mentionedSeq != null) 'mentioned_seq': mentionedSeq,
+      if (manuallyUnread != null) 'manually_unread': manuallyUnread,
       if (isPersonalSpace != null) 'is_personal_space': isPersonalSpace,
       if (dmParticipantId != null) 'dm_participant_id': dmParticipantId,
       if (position != null) 'position': position,
@@ -733,6 +786,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<int>? cursor,
       Value<int>? lastReadSeq,
       Value<int>? mentionedSeq,
+      Value<bool?>? manuallyUnread,
       Value<bool>? isPersonalSpace,
       Value<String?>? dmParticipantId,
       Value<int>? position,
@@ -751,6 +805,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       cursor: cursor ?? this.cursor,
       lastReadSeq: lastReadSeq ?? this.lastReadSeq,
       mentionedSeq: mentionedSeq ?? this.mentionedSeq,
+      manuallyUnread: manuallyUnread ?? this.manuallyUnread,
       isPersonalSpace: isPersonalSpace ?? this.isPersonalSpace,
       dmParticipantId: dmParticipantId ?? this.dmParticipantId,
       position: position ?? this.position,
@@ -789,6 +844,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     }
     if (mentionedSeq.present) {
       map['mentioned_seq'] = Variable<int>(mentionedSeq.value);
+    }
+    if (manuallyUnread.present) {
+      map['manually_unread'] = Variable<bool>(manuallyUnread.value);
     }
     if (isPersonalSpace.present) {
       map['is_personal_space'] = Variable<bool>(isPersonalSpace.value);
@@ -831,6 +889,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('cursor: $cursor, ')
           ..write('lastReadSeq: $lastReadSeq, ')
           ..write('mentionedSeq: $mentionedSeq, ')
+          ..write('manuallyUnread: $manuallyUnread, ')
           ..write('isPersonalSpace: $isPersonalSpace, ')
           ..write('dmParticipantId: $dmParticipantId, ')
           ..write('position: $position, ')
@@ -2089,6 +2148,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   Value<int> cursor,
   Value<int> lastReadSeq,
   Value<int> mentionedSeq,
+  Value<bool?> manuallyUnread,
   Value<bool> isPersonalSpace,
   Value<String?> dmParticipantId,
   Value<int> position,
@@ -2108,6 +2168,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<int> cursor,
   Value<int> lastReadSeq,
   Value<int> mentionedSeq,
+  Value<bool?> manuallyUnread,
   Value<bool> isPersonalSpace,
   Value<String?> dmParticipantId,
   Value<int> position,
@@ -2151,6 +2212,10 @@ class $$ChannelsTableFilterComposer
 
   ColumnFilters<int> get mentionedSeq => $composableBuilder(
       column: $table.mentionedSeq, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get manuallyUnread => $composableBuilder(
+      column: $table.manuallyUnread,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isPersonalSpace => $composableBuilder(
       column: $table.isPersonalSpace,
@@ -2215,6 +2280,10 @@ class $$ChannelsTableOrderingComposer
       column: $table.mentionedSeq,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get manuallyUnread => $composableBuilder(
+      column: $table.manuallyUnread,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isPersonalSpace => $composableBuilder(
       column: $table.isPersonalSpace,
       builder: (column) => ColumnOrderings(column));
@@ -2277,6 +2346,9 @@ class $$ChannelsTableAnnotationComposer
   GeneratedColumn<int> get mentionedSeq => $composableBuilder(
       column: $table.mentionedSeq, builder: (column) => column);
 
+  GeneratedColumn<bool> get manuallyUnread => $composableBuilder(
+      column: $table.manuallyUnread, builder: (column) => column);
+
   GeneratedColumn<bool> get isPersonalSpace => $composableBuilder(
       column: $table.isPersonalSpace, builder: (column) => column);
 
@@ -2333,6 +2405,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<int> cursor = const Value.absent(),
             Value<int> lastReadSeq = const Value.absent(),
             Value<int> mentionedSeq = const Value.absent(),
+            Value<bool?> manuallyUnread = const Value.absent(),
             Value<bool> isPersonalSpace = const Value.absent(),
             Value<String?> dmParticipantId = const Value.absent(),
             Value<int> position = const Value.absent(),
@@ -2352,6 +2425,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             cursor: cursor,
             lastReadSeq: lastReadSeq,
             mentionedSeq: mentionedSeq,
+            manuallyUnread: manuallyUnread,
             isPersonalSpace: isPersonalSpace,
             dmParticipantId: dmParticipantId,
             position: position,
@@ -2371,6 +2445,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<int> cursor = const Value.absent(),
             Value<int> lastReadSeq = const Value.absent(),
             Value<int> mentionedSeq = const Value.absent(),
+            Value<bool?> manuallyUnread = const Value.absent(),
             Value<bool> isPersonalSpace = const Value.absent(),
             Value<String?> dmParticipantId = const Value.absent(),
             Value<int> position = const Value.absent(),
@@ -2390,6 +2465,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             cursor: cursor,
             lastReadSeq: lastReadSeq,
             mentionedSeq: mentionedSeq,
+            manuallyUnread: manuallyUnread,
             isPersonalSpace: isPersonalSpace,
             dmParticipantId: dmParticipantId,
             position: position,

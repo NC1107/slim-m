@@ -46,6 +46,18 @@ class Channels extends Table {
   /// drives the plain unread dot - see `rail_channel.dart`.
   IntColumn get mentionedSeq => integer().withDefault(const Constant(0))();
 
+  /// The reader asked to see this channel as unread even though they have
+  /// read it, mirrored from the server's own flag. Kept beside
+  /// [lastReadSeq] rather than folded into it because the marker is
+  /// monotonic on purpose: rewinding it to fake an unread would break the
+  /// guarantee that a late mark cannot un-read a channel. See the rail's
+  /// `unread` in `rail_channel.dart`, which is the OR of the two.
+  /// Nullable for the same reason [restricted] is: an existing row, and a
+  /// server too old to report the flag, both read as null, and null renders
+  /// the same as false. Nothing here claims somebody marked a channel unread
+  /// when this client cannot vouch for it.
+  BoolColumn get manuallyUnread => boolean().nullable()();
+
   /// Whether this is the caller's own personal space, set only by
   /// `channelFromDm` from `dm.user.id == selfId` - never from `name`, which
   /// is a display string another member's own display name can collide with.
@@ -226,7 +238,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -318,6 +330,10 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// existing row reads null (unknown, which renders the same as "not
   /// restricted") until the next channel refresh fills in the server's real
   /// value.
+  ///
+  /// v17 adds `channels.manuallyUnread` the same way: false for every existing
+  /// row, and the next refresh reads each channel's real flag back from the
+  /// server, since the refresher already fetches read state per channel.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
@@ -374,6 +390,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 16) {
             await m.addColumn(channels, channels.restricted);
+          }
+          if (from < 17) {
+            await m.addColumn(channels, channels.manuallyUnread);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

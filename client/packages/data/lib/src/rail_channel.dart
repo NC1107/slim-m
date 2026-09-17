@@ -35,7 +35,8 @@ RailChannelKey railChannelKey(Channel channel) => (
       categoryId: channel.categoryId,
       isPersonalSpace: channel.isPersonalSpace,
       dmParticipantId: channel.dmParticipantId,
-      unread: channel.cursor > channel.lastReadSeq,
+      unread: channel.cursor > channel.lastReadSeq ||
+          (channel.manuallyUnread ?? false),
       mentioned: channel.mentionedSeq > channel.lastReadSeq,
     );
 

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
@@ -43,6 +43,7 @@ const SNAPSHOT_GAP: i64 = 1000;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/channels/{channel_id}/read", get(get_read).put(put_read))
+        .route("/channels/{channel_id}/unread", put(put_unread))
         .route("/sync", post(sync))
         .layer(DefaultBodyLimit::max(SYNC_BODY_LIMIT))
 }
@@ -58,6 +59,10 @@ struct MarkReadRequest {
 struct ReadStateDto {
     last_read_seq: i64,
     unread: i64,
+    /// Whether the reader asked to see this channel as unread even though
+    /// they have read it. Separate from `unread` because they are different
+    /// facts: `unread` counts messages, this records an intention.
+    manually_unread: bool,
 }
 
 #[derive(Deserialize)]
@@ -119,12 +124,7 @@ async fn get_read(
     {
         return Err(ApiError::Forbidden);
     }
-    let last_read_seq = state.store.last_read_seq(ctx.user_id, channel_id).await?;
-    let unread = state.store.unread_count(ctx.user_id, channel_id).await?;
-    Ok(Json(ReadStateDto {
-        last_read_seq,
-        unread,
-    }))
+    Ok(Json(read_state_for(&state, ctx.user_id, channel_id).await?))
 }
 
 async fn put_read(
@@ -148,12 +148,44 @@ async fn put_read(
         .store
         .mark_read(ctx.user_id, channel_id, req.seq)
         .await?;
-    let last_read_seq = state.store.last_read_seq(ctx.user_id, channel_id).await?;
-    let unread = state.store.unread_count(ctx.user_id, channel_id).await?;
-    Ok(Json(ReadStateDto {
-        last_read_seq,
-        unread,
-    }))
+    Ok(Json(read_state_for(&state, ctx.user_id, channel_id).await?))
+}
+
+/// Marks a channel unread: the note-to-self every comparable app offers.
+///
+/// A write rather than a read, and rate limited as one, because it stores an
+/// intention. It deliberately does not move `last_read_seq`, which is
+/// monotonic so that a late or out-of-order mark can never un-read a channel;
+/// see [`crate::store::Store::mark_unread`].
+async fn put_unread(
+    AuthedLimited(ctx): AuthedLimited<WRITE>,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<ReadStateDto>, ApiError> {
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    if !state
+        .store
+        .has_permission(ctx.user_id, channel_id, Permissions::VIEW_CHANNEL)
+        .await?
+    {
+        return Err(ApiError::Forbidden);
+    }
+    state.store.mark_unread(ctx.user_id, channel_id).await?;
+    Ok(Json(read_state_for(&state, ctx.user_id, channel_id).await?))
+}
+
+/// The three reads every read-state answer needs, in one place so the two
+/// handlers that return one cannot drift apart.
+async fn read_state_for(
+    state: &AppState,
+    user_id: crate::ids::UserId,
+    channel_id: ChannelId,
+) -> Result<ReadStateDto, ApiError> {
+    Ok(ReadStateDto {
+        last_read_seq: state.store.last_read_seq(user_id, channel_id).await?,
+        unread: state.store.unread_count(user_id, channel_id).await?,
+        manually_unread: state.store.manually_unread(user_id, channel_id).await?,
+    })
 }
 
 /// Catches a client up across several channels at once, under a per-scope, an

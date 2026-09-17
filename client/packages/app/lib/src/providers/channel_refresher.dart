@@ -77,7 +77,11 @@ class ChannelRefresher {
         try {
           final read = await api.readState(channel.id);
           if (!isCurrent()) return;
-          await store.setReadMarker(channel.id, read.lastReadSeq);
+          await store.setReadMarker(
+            channel.id,
+            read.lastReadSeq,
+            manuallyUnread: read.manuallyUnread,
+          );
         } on ApiException {
           // Best-effort: the next refresh retries; until then it just reads as unread.
         }

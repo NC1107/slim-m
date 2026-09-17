@@ -4177,6 +4177,26 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/unread:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    put:
+      operationId: markUnread
+      tags: [sync]
+      summary: Mark the channel unread without moving the marker.
+      description: >-
+        Records an intention beside the marker rather than rewinding it; the
+        marker is monotonic. Reading the channel clears it.
+      responses:
+        "200":
+          $ref: "#/components/responses/ReadStateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/canvas/objects:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -8863,7 +8883,7 @@ components:
 
     ReadState:
       type: object
-      required: [last_read_seq, unread]
+      required: [last_read_seq, unread, manually_unread]
       properties:
         last_read_seq:
           type: integer
@@ -8872,6 +8892,9 @@ components:
           type: integer
           format: int64
           description: Live count of messages past the marker.
+        manually_unread:
+          type: boolean
+          description: The caller asked to see this as unread despite the marker.
 
     MarkReadRequest:
       type: object
