@@ -32,8 +32,8 @@ Memory is what decides how many people fit in a call.
 | Limit | Value | How it fails |
 | --- | --- | --- |
 | Simultaneous websocket connections | 1024 | Refused cleanly. Existing connections are unaffected. |
-| Memory per connection | 144 KB | Linear from 100 to 1024 connections. |
-| Memory at the connection limit | 166 MB | Connections cannot push the server past this, because the count cap stops them first. |
+| Memory per connection | 211 KB | Re-measured 2026-09-17 on 0.65.0; the 2026-09-15 study said 144 KB. See Memory. |
+| Memory at the connection limit | about 222 MB | Connections cannot push the server past this, because the count cap stops them first. |
 | Delivery throughput | about 26,000 per second | Latency degrades before the processor saturates. |
 
 A "delivery" is one message arriving at one connection.
@@ -63,8 +63,15 @@ That is why one core is a cliff rather than a slope, and why the first table row
 
 ## Memory
 
-Memory is generous and predictable.
-The floor is about 17 MB, each connection adds 144 KB, and the connection cap means the total can never exceed about 166 MB from connection load.
+Memory is predictable, and it costs more per connection than this page first reported.
+
+The floor is about 11 MB, each connection adds about 211 KB, and the connection cap means the total can never exceed roughly 222 MB from connection load.
+
+**That per-connection figure is a correction.** The original study measured 144 KB against server 0.63.0. A re-measurement on 2026-09-17 against 0.65.0, on a freshly started process holding 1000 sockets with no other work in flight, found 206 MiB of resident growth - 211 KB each, about 1.47 times the earlier number.
+
+Which of the two conditions explains the gap is not established. The re-measurement isolated the process deliberately (fresh start, accounts already registered, so no Argon2 arenas inflating the total) and is the more careful of the two, but it also ran on a later server, so real growth between versions and a difference in method are both live explanations.
+
+**The provisioning advice below does not change**, which is why this is a corrected figure rather than a corrected recommendation: 222 MB still fits inside the 256 MB the table already suggests at the connection cap. Anyone sizing at the cap was already being told the right number, for a slightly wrong reason.
 
 A server given less than it needs is **killed by the kernel rather than degraded**.
 Holding connections at the cap, a 160 MB ceiling survived and a 144 MB ceiling was killed within a second, having accepted several hundred connections it could not afford.
@@ -106,6 +113,41 @@ Splitting people across channels helps considerably but not completely.
 Measured at the same message rate, sending into a channel only the sender could see cost 2.6 percent of a core where a public channel cost 9.4 percent.
 That is roughly a fourfold difference per connection, and the reason it is not larger is that the hub broadcasts every event to every connection, each of which evaluates whether it may see it.
 A connection that cannot see a channel still pays to work that out.
+
+## Reconnect storms
+
+Every client reconnecting at once is how services usually fall over, and it is not a hypothetical here: `main` is continuously deployed, so a Watchtower restart drops every connected person simultaneously and they all come back together.
+
+Measured 2026-09-17 with `scripts/reconnect-storm.py`, which aborts each socket at the transport rather than closing it politely - a restart does not say goodbye, and the server's cleanup path differs between the two.
+
+**At a realistic shape it is a non-event.** 120 sockets, forty people with three devices each, dropped and returning together:
+
+| Round | Returned | Whole herd back in | Median | p95 | Slowest |
+| --- | --- | --- | --- | --- | --- |
+| first connect | 120/120 | 0.17s | 78 ms | 88 ms | 160 ms |
+| after drop 1 | 120/120 | 0.09s | 65 ms | 69 ms | 88 ms |
+| after drop 2 | 120/120 | 0.08s | 66 ms | 69 ms | 84 ms |
+| after drop 3 | 120/120 | 0.09s | 69 ms | 70 ms | 91 ms |
+
+Nobody is refused, the whole group is back inside a tenth of a second, and the server spends 0.33 seconds of processor time doing it - about three percent of one core. Reconnects get slightly *faster* after the first round rather than degrading.
+
+So the cost of a deploy, to someone with the app open, is about seventy milliseconds.
+
+**What paces a larger storm is the ticket bucket, not the server.**
+
+A connect ticket is single-use, so everyone returning has to mint one, and that route is rate limited per account: ten in a burst, then one a second. Pushed to 1000 sockets, every one still came back, but the timings change completely:
+
+| Sockets | Returned | Whole herd back in | Median | Slowest | Tickets refused |
+| --- | --- | --- | --- | --- | --- |
+| 1000 | 1000/1000 | 18-27s | 3.2-10.2s | 26.4s | 5,312 of 7,312 asked |
+
+The server was bored throughout - 1.98 seconds of processor time, four percent of one core. It refused seven ticket requests in ten, each client backed off and asked again, and an operation that takes 70 ms unimpeded took up to 26 seconds.
+
+**Read that as a property of the harness before reading it as a finding.** Those 1000 sockets sit on forty accounts, twenty-five each, because that is how the harness reaches a high connection count without paying for a thousand registrations. Nobody has twenty-five devices. A real storm of a thousand people is a thousand accounts asking for one ticket each, which is inside the per-account burst and looks like the 120-socket table above.
+
+What it does establish is where the ceiling is when a storm does hit the limiter: the limiter absorbs it, everyone eventually returns, nothing is dropped, and the cost is latency rather than failure. That is the right failure mode. It also means a single account holding many sockets - a bot, or a test harness - is throttled rather than able to stampede the server, which is the behaviour the per-account bucket exists for.
+
+Not measured: a storm of a thousand *distinct* accounts, which needs a thousand registrations and would say whether per-user state changes the per-connection memory above.
 
 ## Voice
 
@@ -219,7 +261,9 @@ Raising the processor limit above two buys lower latency and no extra capacity.
 
 ## What is measured and what is not
 
-Measured directly, and re-measured in a second pass that reproduced every result: the connection limit, memory per connection, the memory ceiling where it is killed, latency against processor quota from a quarter core to eight, delivery throughput, and the difference visibility makes.
+Measured directly: the connection limit, memory per connection, the memory ceiling where it is killed, latency against processor quota from a quarter core to eight, delivery throughput, the difference visibility makes, and reconnect storms.
+
+The 2026-09-15 study re-measured its own results in a second pass and reproduced all of them. A third pass on 2026-09-17, against a later server, did **not** reproduce one: memory per connection came out at 211 KB rather than 144 KB. That figure has been corrected above and the reason is left open, because two things changed between the passes and this page cannot say which mattered. Treat any single number here as good to roughly the version it was taken on.
 
 Two identical runs differed by 23 percent at the median and 43 percent at the tail.
 Every difference reported here is far larger than that.
@@ -229,7 +273,6 @@ Not measured, and not covered by any number above:
 
 - Sustained video. The video figures are half-minute runs, so a slow leak under an hour-long screen share would not have appeared.
 - Bandwidth as the server experiences it. The 1.3 Mbps per subscriber was measured between processes on one machine, where the network is not a real constraint; a deployment's own uplink is what decides whether that arithmetic holds.
-- Reconnect storms, which is how services usually fall over.
 - Sustained multi-hour runs, so slow leaks would not have appeared.
 - Attachment uploads, which have their own limit class and their own disk path.
 - Anything above 1024 connections, which the server refuses.
@@ -238,9 +281,17 @@ Not measured, and not covered by any number above:
 
 ```bash
 cargo build --release --bin slimm-server
+
+# Fan-out under steady load.
 scripts/loadtest.py --base-url http://127.0.0.1:8080 --users 100 --per-account 3 \
   --senders 25 --messages 10 --workers 8
+
+# Everyone dropped and returning at once, the shape a deploy produces.
+scripts/reconnect-storm.py --base-url http://127.0.0.1:8080 --users 40 \
+  --per-account 3 --rounds 3
 ```
+
+For the memory figure specifically, start the server fresh and reuse cached accounts, so no registration pass leaves Argon2 arenas in the total: the first run of `reconnect-storm.py` against a new database registers accounts and inflates resident memory by tens of megabytes that have nothing to do with connections.
 
 Watch the server's own processor time in the output before believing a latency number.
 When the two disagree, the harness is the one that is wrong, and during this study it was wrong four times.
