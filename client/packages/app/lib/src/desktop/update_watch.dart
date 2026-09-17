@@ -28,10 +28,20 @@ import 'update_check.dart';
 /// under a limit it would need to poll roughly 15x more often to ever risk.
 const updateWatchInterval = Duration(hours: 6);
 
-/// Whether this build should ever run the periodic check at all: a desktop
-/// host that has not opted out with `SLIMM_NO_UPDATE_CHECK`, the same rule
-/// `startup_updates.dart` applies to the splash's own one-shot check.
-bool updateWatchShouldRun() => isDesktopHost && !updateChecksDisabled();
+/// Whether this build should ever run the periodic check at all.
+///
+/// Desktop, plus Android, minus anything that opted out with
+/// `SLIMM_NO_UPDATE_CHECK` - the same flag `startup_updates.dart` honours for
+/// the splash's own one-shot check.
+///
+/// Android is here because it is the one platform with no update signal at
+/// all. Desktop has this watcher and the splash; iOS has TestFlight; a
+/// sideloaded apk has nothing, and there is no Play listing to give it one,
+/// so without this a tester learns a new build exists only by thinking to
+/// revisit the releases page. iOS is deliberately still absent: TestFlight
+/// already nags, and a second prompt beside it would be noise.
+bool updateWatchShouldRun() =>
+    (isDesktopHost || isAndroidHost) && !updateChecksDisabled();
 
 /// Runs [checkForClientUpdate] every [interval] for as long as something
 /// keeps [updateWatcherProvider] alive, writing a find that has not already

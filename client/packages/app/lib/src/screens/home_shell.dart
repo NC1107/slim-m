@@ -41,6 +41,7 @@ import '../widgets/drawer_edge_swipe.dart';
 import '../widgets/member_pane.dart';
 import '../widgets/push_to_talk_listener.dart';
 import '../widgets/rail_slot.dart';
+import '../widgets/update_banner_host.dart';
 import '../widgets/voice_strip_indicator.dart';
 import '../widgets/whats_new_gate.dart';
 import 'canvas/canvas_fullscreen.dart';
@@ -237,7 +238,10 @@ class HomeShell extends ConsumerWidget {
           // default makes the shortcut work the instant the app opens.
           child: Focus(
             autofocus: true,
-            child: _LayoutBridge(layout: layout, child: scaffold),
+            child: _LayoutBridge(
+              layout: layout,
+              child: UpdateBannerHost(child: scaffold),
+            ),
           ),
         ),
       ),
