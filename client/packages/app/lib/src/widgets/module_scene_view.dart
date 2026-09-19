@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import 'module_scene.dart';
+import 'module_scene_images.dart';
 import 'module_scene_inputs.dart';
 import 'module_scene_controls.dart';
 import 'module_scene_frame.dart';
@@ -97,6 +98,9 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
 
   late ModuleScene _scene = widget.initial;
   Timer? _timer;
+
+  /// Decoded bitmaps for this view's `image` ops; see `module_scene_images.dart`.
+  final _images = SceneImageCache();
   bool _busy = false;
   bool _playing = false;
   String? _error;
@@ -133,6 +137,12 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
   void initState() {
     super.initState();
     _rememberOwn(widget.initial.state);
+    // A finished decode changes what this paints with no scene or tap involved.
+    _images.addListener(_onImageDecoded);
+  }
+
+  void _onImageDecoded() {
+    if (mounted) setState(() {});
   }
 
   /// A genuinely new run - somebody re-Ran the block, or another viewer acted
@@ -179,6 +189,8 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _images.removeListener(_onImageDecoded);
+    _images.dispose();
     super.dispose();
   }
 
@@ -456,7 +468,11 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
             child: Stack(
               children: [
                 CustomPaint(
-                  painter: ModuleScenePainter(scene: _scene, tokens: tokens),
+                  painter: ModuleScenePainter(
+                    scene: _scene,
+                    tokens: tokens,
+                    images: _images.snapshot(_scene),
+                  ),
                   size: size,
                 ),
                 // Above the paint: a tap for a field must not also fall through.

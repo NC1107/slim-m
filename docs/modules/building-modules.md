@@ -287,6 +287,7 @@ Prefer tokens; a module that hard-codes hex will look wrong in one theme or the 
 | `text` | `x`, `y`, `s` (the string), `fill`, `size`, `align` (`left`/`center`/`right`) |
 | `path` | `d` (an SVG-style path string), `fill`, `stroke`, `sw`, `tap` |
 | `input` | `submit` (the action name), `x`, `y`, `w`, `value`, `placeholder`, `max` |
+| `image` | `x`, `y`, `w`, `h`, `b64` (a base64 raster image), `tap` |
 
 `rect` and `circle` also take a `grad` instead of a flat `fill`; see below.
 
@@ -312,6 +313,26 @@ Three things to know:
 - A path may carry a `tap`, hit-tested against its filled interior. A `tap` on an unfilled outline has almost nothing to land in, so give a tappable path a `fill`.
 
 One path is capped at 512 steps. A scene is a small drawing, not an illustration format.
+
+### Images with `image`
+
+`image` carries a raster image inside the scene as base64:
+
+```json
+{ "op": "image", "x": 10, "y": 10, "w": 40, "h": 40, "b64": "iVBORw0KGgo..." }
+```
+
+It draws stretched to the rectangle you gave, so you control the aspect by choosing `w` and `h`. It can carry a `tap` like a rect.
+
+This is the one op whose cost you choose rather than slim, so it is the one with hard ceilings:
+
+- **the base64 string is capped at 88k**, about 64k of image. That is a sprite, an icon, a small chart. It is deliberately far too small for a photograph: a scene sits next to message attachments rather than replacing them, and a module with a real picture to show should post one.
+- **eight images per scene.** Each is a decode, and a decode is the most expensive thing a scene can ask a client to do. A scene wanting a hundred is a scene that should be one image.
+- a payload over either ceiling, or one that is not valid base64, or one slim cannot decode as an image, is **skipped** - the rest of the scene still draws.
+
+Decoding is asynchronous, so an image appears a frame or two after the rest of the scene rather than instantly. It still paints in op order, so a rect you draw after an image covers it, exactly as it would cover a circle.
+
+If you re-emit the same image every frame, it is decoded once. Slim keys the decode on the bytes, so an unchanged picture costs nothing after the first frame.
 
 ### Gradient fills
 

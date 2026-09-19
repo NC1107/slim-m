@@ -17,6 +17,8 @@
 /// literal `#rrggbb` still passes through untouched.
 library;
 
+import 'dart:typed_data';
+
 export 'module_scene_parse.dart' show parseModuleScene;
 
 import 'module_scene_path.dart';
@@ -201,6 +203,60 @@ class TextOp extends SceneOp {
   final String? fill;
   final double size;
   final String align;
+}
+
+/// A raster image, carried inside the scene as base64.
+///
+/// The last gap decision 0021 named, and the only op whose cost is set by how
+/// much a module chose to send rather than by anything slim decided, so it is
+/// the one with a byte ceiling rather than a count.
+///
+/// [bytes] is already decoded from base64 and already under
+/// [maxEncodedLength]; a payload over that is dropped at parse rather than
+/// handed on, because the point of a ceiling is that nothing downstream ever
+/// holds an oversized one. Turning those bytes into something paintable is a
+/// separate, asynchronous step - see `module_scene_images.dart` - because a
+/// `CustomPainter` cannot await a decode.
+///
+/// [key] identifies these bytes for that cache, so a module re-emitting the
+/// same image on every frame decodes it once. It is a digest of the bytes, not
+/// a cryptographic hash: a collision would show one of this module's own
+/// pictures in place of another, which is a rendering bug and not a boundary
+/// being crossed.
+class ImageOp extends SceneOp {
+  const ImageOp({
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+    required this.bytes,
+    required this.key,
+    this.tap,
+  });
+
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+  final Uint8List bytes;
+  final int key;
+  final String? tap;
+
+  /// How long the base64 string may be.
+  ///
+  /// Checked before decoding, so an oversized payload costs a length comparison
+  /// rather than an allocation. 88k of base64 is about 64k of image: a sprite,
+  /// an icon, a small chart - enough to be useful and far too small to be a
+  /// photograph. A scene is a message attachment's neighbour, not its
+  /// replacement; a module with a real picture to show should be posting one.
+  static const maxEncodedLength = 88 * 1024;
+
+  /// How many images one scene may carry.
+  ///
+  /// Each one is a decode, and a decode is the most expensive thing a scene can
+  /// ask a client to do. Eight is a sprite sheet's worth; a scene wanting a
+  /// hundred is a scene that should be one image.
+  static const maxPerScene = 8;
 }
 
 /// A text entry region. The op that makes a scene answerable in words rather

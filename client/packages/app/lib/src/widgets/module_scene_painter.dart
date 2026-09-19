@@ -6,6 +6,8 @@
 /// light and dark without the module choosing either.
 library;
 
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -13,10 +15,20 @@ import 'module_scene.dart';
 import 'module_scene_path.dart';
 
 class ModuleScenePainter extends CustomPainter {
-  const ModuleScenePainter({required this.scene, required this.tokens});
+  const ModuleScenePainter({
+    required this.scene,
+    required this.tokens,
+    this.images = const {},
+  });
 
   final ModuleScene scene;
   final AppTokens tokens;
+
+  /// The decoded images available this frame, keyed by [ImageOp.key]. An image
+  /// still decoding is simply absent, and its op draws nothing until a later
+  /// frame has it - which is what lets an image take its place in the op order
+  /// instead of being layered over the canvas.
+  final Map<int, ui.Image> images;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -107,6 +119,15 @@ class ModuleScenePainter extends CustomPainter {
         );
       case TextOp():
         _paintText(canvas, op, sx, sy);
+      case ImageOp():
+        final image = images[op.key];
+        if (image == null) break;
+        canvas.drawImageRect(
+          image,
+          Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+          Rect.fromLTWH(op.x * sx, op.y * sy, op.w * sx, op.h * sy),
+          Paint()..filterQuality = FilterQuality.medium,
+        );
       case InputOp():
         // A real text field, not paint; ModuleSceneView overlays it.
         break;
@@ -200,7 +221,9 @@ class ModuleScenePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(ModuleScenePainter old) =>
-      !identical(old.scene, scene) || old.tokens != tokens;
+      !identical(old.scene, scene) ||
+      old.tokens != tokens ||
+      !identical(old.images, images);
 }
 
 /// Maps a scene colour name to a real colour: a `#rgb`/`#rrggbb`/`#aarrggbb`
@@ -266,6 +289,9 @@ String? sceneTapAction(ModuleScene scene, Offset local, Size size) {
       case CircleOp() when op.tap != null:
         final center = Offset(op.cx * sx, op.cy * sy);
         if ((local - center).distance <= op.r * ((sx + sy) / 2)) return op.tap;
+      case ImageOp() when op.tap != null:
+        final rect = Rect.fromLTWH(op.x * sx, op.y * sy, op.w * sx, op.h * sy);
+        if (rect.contains(local)) return op.tap;
       case PathOp() when op.tap != null:
         if (buildScenePath(op.steps, sx, sy).contains(local)) return op.tap;
       default:
