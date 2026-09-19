@@ -297,8 +297,11 @@ Two ceilings are known and deliberate:
 - It is a retained-scene model over a request/response round trip, not a framebuffer: each frame is one sandboxed run, which suits turn-based and steppable modules (Life plays at roughly 8fps) but is not a path to real-time or high-framerate rendering.
   That would need the module's wasm running client-side in the browser, or a streaming tick channel - a larger step left for later.
 - The op set is bounded, and grows additively rather than being lifted all at once.
-  `path` (an SVG-style `d` string, so arbitrary shapes are expressible), `input` (a real text field, so a scene can be answered in words) and gradient fills on `rect` and `circle` have since been added, leaving images as the one remaining named gap.
-  Each is additive to `scene/1` and grows the client without a wire change; expressiveness is capped only by which ops the client currently understands.
-  `input` is the one op that is a widget rather than paint - a text field has a cursor, a keyboard and focus, none of which a `CustomPainter` can draw - so it is overlaid on the canvas rather than painted into it.
+  Every gap this record named has since been closed: `path` (an SVG-style `d` string, so arbitrary shapes are expressible), `input` (a real text field, so a scene can be answered in words), gradient fills on `rect` and `circle`, and `image` (base64, bounded).
+  Each was additive to `scene/1` and grew the client without a wire change; expressiveness is capped only by which ops the client currently understands, and the op set is no longer the thing holding a module back.
+  Two of them are not plain paint, for reasons a `CustomPainter` cannot get around.
+  `input` is a widget - a text field has a cursor, a keyboard and focus - so it is overlaid on the canvas.
+  `image` needs an asynchronous decode, so the bytes are decoded beside the painter and drawn in op order once ready, which keeps an image under a later `rect` rather than above everything as an overlaid widget would have been.
+  `image` is also the one op whose cost a module chooses rather than slim, so it carries hard ceilings on payload size, count per scene, and total decoded bitmap.
 
 Rendering is also separate from side effects: a scene lets a module draw anything, but a module is still pure compute with zero imports, so it cannot fetch or persist - that remains the capabilities system's job, declared but not yet wired.

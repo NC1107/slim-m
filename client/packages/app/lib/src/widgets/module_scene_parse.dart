@@ -18,6 +18,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'module_scene.dart';
 import 'module_scene_path.dart';
@@ -39,12 +40,15 @@ ModuleScene? parseModuleScene(String raw) {
 
   final opsRaw = decoded['ops'];
   final ops = <SceneOp>[];
+  var images = 0;
   if (opsRaw is List) {
     for (final entry in opsRaw) {
-      if (entry is Map) {
-        final op = _parseOp(entry);
-        if (op != null) ops.add(op);
-      }
+      if (entry is! Map) continue;
+      final op = _parseOp(entry);
+      if (op == null) continue;
+      // Counted here: _parseOp sees one op and cannot know how many preceded it.
+      if (op is ImageOp && ++images > ImageOp.maxPerScene) continue;
+      ops.add(op);
     }
   }
 
@@ -145,12 +149,55 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
           InputOp.defaultMaxLength.toDouble(),
         ).toInt().clamp(1, InputOp.maxMaxLength),
       );
+    case 'image':
+      return _parseImage(op);
     case 'notes':
       final notes = _parseNotes(op['notes']);
       return notes.isEmpty ? null : NotesOp(notes);
     default:
       return null;
   }
+}
+
+/// An image op, or null if its payload is missing, oversized, or not base64.
+///
+/// The length check comes before the decode so an oversized payload costs a
+/// comparison rather than an allocation, which is the whole point of having a
+/// ceiling at all.
+SceneOp? _parseImage(Map<Object?, Object?> op) {
+  final encoded = _string(op['b64']);
+  if (encoded == null || encoded.isEmpty) return null;
+  if (encoded.length > ImageOp.maxEncodedLength) return null;
+  final Uint8List bytes;
+  try {
+    bytes = base64Decode(encoded);
+  } on FormatException {
+    return null;
+  }
+  if (bytes.isEmpty) return null;
+  return ImageOp(
+    x: _double(op['x'], 0),
+    y: _double(op['y'], 0),
+    w: _double(op['w'], 0),
+    h: _double(op['h'], 0),
+    bytes: bytes,
+    key: _digest(bytes),
+    tap: _string(op['tap']),
+  );
+}
+
+/// FNV-1a over the bytes, to key the decode cache.
+///
+/// Not a cryptographic hash and does not need to be: a collision would draw one
+/// of this module's own images in place of another, which is a rendering bug
+/// rather than a boundary being crossed. What it has to be is cheap, because it
+/// runs on every frame a scene arrives.
+int _digest(Uint8List bytes) {
+  var hash = 0x811c9dc5;
+  for (final byte in bytes) {
+    hash = ((hash ^ byte) * 0x01000193) & 0x7fffffff;
+  }
+  return hash;
 }
 
 /// Each entry needs a positive frequency and duration and a non-negative
