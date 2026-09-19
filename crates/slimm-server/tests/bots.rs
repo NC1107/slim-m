@@ -378,3 +378,43 @@ async fn a_new_bot_holds_no_more_than_everyone_does() {
         StatusCode::FORBIDDEN
     );
 }
+
+/// The badge's whole job is that a reader can tell without inspecting
+/// anything, which means the flag has to reach the wire on the surfaces that
+/// draw a name: a profile and the member list.
+#[tokio::test]
+async fn a_bot_is_marked_as_one_wherever_a_name_is_drawn() {
+    let (store, _guard) = new_store("slimm-bots-badge").await;
+    let (_admin_id, root) = admin(&store, "root").await;
+    let app = app(store.clone());
+    let (bot_id, _bot_token) = create_bot(&app, &root, "helper").await;
+
+    let profile = json_body(
+        app.clone()
+            .oneshot(request("GET", &format!("/users/{bot_id}"), &root, None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(profile["is_bot"], true, "a bot's own profile says so");
+
+    let members = json_body(
+        app.clone()
+            .oneshot(request("GET", "/members", &root, None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let members = members.as_array().unwrap();
+    let bot = members
+        .iter()
+        .find(|m| m["id"] == bot_id)
+        .expect("a bot is a member like anyone else");
+    assert_eq!(bot["is_bot"], true);
+    assert!(
+        members
+            .iter()
+            .any(|m| m["id"] != bot_id && m["is_bot"] == false),
+        "and a person in the same list is not marked as one"
+    );
+}
