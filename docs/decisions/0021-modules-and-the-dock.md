@@ -281,7 +281,7 @@ A module returns one opaque `output` string; ABI v1 carries no content type, and
 Rich output is instead a client-side reading of that string: when the output parses as a JSON object tagged `{"$slim":"scene/1", ...}`, the client paints it as a scene; anything else stays plain monospace text exactly as before.
 So a module opts into drawing purely by choosing to emit a scene, and slim keeps zero module-specific rendering knowledge - the same principle as the rest of this record, applied to output.
 
-A scene is a logical canvas (`width` x `height`) plus a bounded list of ops - `cells` (a colour grid, the workhorse for boards, heatmaps and automata), `rect`, `circle`, `line`, `text`, `path` - drawn by a single `CustomPainter` that scales the logical coordinates to whatever box it is given.
+A scene is a logical canvas (`width` x `height`) plus a bounded list of ops - `cells` (a colour grid, the workhorse for boards, heatmaps and automata), `rect`, `circle`, `line`, `text`, `path` - drawn by a single `CustomPainter`, plus `input`, which is overlaid as a real field that scales the logical coordinates to whatever box it is given.
 Colours are named, not baked: an op may name a theme token (`accent`, `surface`, `sunken`, `muted`, `text`, `border`, `danger`) which the painter resolves against the viewer's theme, so a module's drawing is native to light and dark without the module choosing either; a `#rrggbb` literal still passes through.
 
 Interaction is what makes a scene a game rather than a picture, and it reuses the module's own stateless nature rather than adding a session.
@@ -297,7 +297,8 @@ Two ceilings are known and deliberate:
 - It is a retained-scene model over a request/response round trip, not a framebuffer: each frame is one sandboxed run, which suits turn-based and steppable modules (Life plays at roughly 8fps) but is not a path to real-time or high-framerate rendering.
   That would need the module's wasm running client-side in the browser, or a streaming tick channel - a larger step left for later.
 - The op set is bounded, and grows additively rather than being lifted all at once.
-  `path` has since been added (an SVG-style `d` string, so arbitrary shapes are expressible), leaving images, gradients and text-input widgets as the remaining named gaps.
-  Each is additive to `scene/1` (an `image` op carrying base64, a gradient fill, an `input` op) and grows the client painter without a wire change; expressiveness is capped only by which ops the painter currently understands.
+  `path` (an SVG-style `d` string, so arbitrary shapes are expressible) and `input` (a real text field, so a scene can be answered in words) have since been added, leaving images and gradients as the remaining named gaps.
+  Each is additive to `scene/1` and grows the client without a wire change; expressiveness is capped only by which ops the client currently understands.
+  `input` is the one op that is a widget rather than paint - a text field has a cursor, a keyboard and focus, none of which a `CustomPainter` can draw - so it is overlaid on the canvas rather than painted into it.
 
 Rendering is also separate from side effects: a scene lets a module draw anything, but a module is still pure compute with zero imports, so it cannot fetch or persist - that remains the capabilities system's job, declared but not yet wired.

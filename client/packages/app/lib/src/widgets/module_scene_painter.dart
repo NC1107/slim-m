@@ -96,6 +96,9 @@ class ModuleScenePainter extends CustomPainter {
         );
       case TextOp():
         _paintText(canvas, op, sx, sy);
+      case InputOp():
+        // A real text field, not paint; ModuleSceneView overlays it.
+        break;
       case NotesOp():
         // Sound, not drawing; ModuleSceneView plays it, this painter never does.
         break;

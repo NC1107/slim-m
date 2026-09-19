@@ -286,6 +286,7 @@ Prefer tokens; a module that hard-codes hex will look wrong in one theme or the 
 | `line` | `x1`, `y1`, `x2`, `y2`, `stroke`, `sw` |
 | `text` | `x`, `y`, `s` (the string), `fill`, `size`, `align` (`left`/`center`/`right`) |
 | `path` | `d` (an SVG-style path string), `fill`, `stroke`, `sw`, `tap` |
+| `input` | `submit` (the action name), `x`, `y`, `w`, `value`, `placeholder`, `max` |
 
 `cells` is the workhorse for boards, heatmaps, and automata: a grid of palette indices drawn in one op.
 An op slim does not recognise is skipped rather than failing the scene, so a new op is an additive change a newer client can use.
@@ -309,6 +310,25 @@ Three things to know:
 - A path may carry a `tap`, hit-tested against its filled interior. A `tap` on an unfilled outline has almost nothing to land in, so give a tappable path a `fill`.
 
 One path is capped at 512 steps. A scene is a small drawing, not an illustration format.
+
+### Asking for words with `input`
+
+`input` puts a real text field on the canvas, so a scene can be answered in words rather than only in taps.
+
+```json
+{ "op": "input", "x": 10, "y": 40, "w": 80, "submit": "guess", "placeholder": "your guess", "max": 20 }
+```
+
+A submission arrives as the action `"guess:otter"` - the same colon-separated shape a tapped cell already uses - with the text trimmed.
+
+Four things to know:
+
+- **You declare where and how wide; slim decides how tall.** A module cannot describe a control that looks native at an arbitrary height, and a field that does not match the rest of the app is worse than one you could not place to the pixel.
+- **You own the value.** Whatever `value` you send back in the next scene is what the field shows, so you can correct, clear or reformat what somebody typed. The one exception is a field they currently have focused: a scene arriving mid-typing leaves it alone rather than overwriting under their cursor.
+- **`submit` is required** and must be non-empty, because nothing could report a submission otherwise. An op without one is skipped.
+- **`max` is clamped** to 512 characters. The text rides back to you on every submission, so a module cannot ask for an unbounded one.
+
+An `input` op carries no `tap`. A tap in its area goes to the field, never to the scene underneath it.
 
 ## Interactive scenes
 
