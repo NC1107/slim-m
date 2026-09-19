@@ -166,6 +166,48 @@ class TextOp extends SceneOp {
   final String align;
 }
 
+/// A text entry region. The op that makes a scene answerable in words rather
+/// than only in taps: a guess, a name, a formula, a search.
+///
+/// The module declares where the field sits and how wide it is, and slim
+/// decides how tall. A module cannot describe a control that looks native at an
+/// arbitrary height, and a text field that does not look like the rest of the
+/// app is worse than one an op could not place precisely.
+///
+/// [value] is the module's: whatever comes back in the next scene is what the
+/// field shows, so a module can correct, clear or reformat what was typed. A
+/// submission arrives as the action `"<submit>:<text>"`, the same
+/// colon-separated shape a tapped cell already uses.
+class InputOp extends SceneOp {
+  const InputOp({
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.submit,
+    this.value = '',
+    this.placeholder,
+    this.maxLength = defaultMaxLength,
+  });
+
+  final double x;
+  final double y;
+  final double w;
+
+  /// The action name a submission is reported under.
+  final String submit;
+
+  final String value;
+  final String? placeholder;
+
+  /// How much may be typed. Bounded because the text rides back to the module
+  /// on every submission and a module should not be able to ask for an
+  /// unbounded one; clamped at parse rather than trusted.
+  final int maxLength;
+
+  static const defaultMaxLength = 64;
+  static const maxMaxLength = 512;
+}
+
 /// One note: a frequency to ring, when it starts relative to the scene's own
 /// age in seconds, and how long it rings. The same three numbers
 /// `assets/audio/synth.py`'s `Note` carries, minus `gain` - a module states
@@ -376,6 +418,21 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         fill: _string(op['fill']),
         size: _double(op['size'], 12),
         align: _string(op['align']) ?? 'left',
+      );
+    case 'input':
+      final submit = _string(op['submit']);
+      if (submit == null || submit.isEmpty) return null;
+      return InputOp(
+        x: _double(op['x'], 0),
+        y: _double(op['y'], 0),
+        w: _double(op['w'], 0),
+        submit: submit,
+        value: _string(op['value']) ?? '',
+        placeholder: _string(op['placeholder']),
+        maxLength: _double(
+          op['max'],
+          InputOp.defaultMaxLength.toDouble(),
+        ).toInt().clamp(1, InputOp.maxMaxLength),
       );
     case 'notes':
       final notes = _parseNotes(op['notes']);

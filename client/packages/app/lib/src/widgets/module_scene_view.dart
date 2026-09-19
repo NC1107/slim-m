@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import 'module_scene.dart';
+import 'module_scene_inputs.dart';
 import 'module_scene_controls.dart';
 import 'module_scene_frame.dart';
 import 'module_scene_painter.dart';
@@ -452,9 +453,19 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
             onTapUp: (d) => _handleTapUp(d, size),
             onPanStart: (d) => _handlePanStart(d, size),
             onPanUpdate: (d) => _handlePanUpdate(d, size),
-            child: CustomPaint(
-              painter: ModuleScenePainter(scene: _scene, tokens: tokens),
-              size: size,
+            child: Stack(
+              children: [
+                CustomPaint(
+                  painter: ModuleScenePainter(scene: _scene, tokens: tokens),
+                  size: size,
+                ),
+                // Above the paint: a tap for a field must not also fall through.
+                SceneInputOverlay(
+                  scene: _scene,
+                  size: size,
+                  onSubmit: _enqueue,
+                ),
+              ],
             ),
           ),
         );
