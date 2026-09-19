@@ -14,6 +14,25 @@ Start there; adding voice later is one line in `.env` and does not disturb anyth
 - One DNS record pointed at that host, for the slim-m API domain. Voice needs a second one; see below.
 - Ports 80 and 443 (TCP and UDP) reachable from the internet. Voice also needs the UDP media range you choose in `.env`.
 
+### If you are behind CGNAT, or have no public IP
+
+The list above assumes inbound connections reach your host, which is what Caddy needs for a Let's Encrypt certificate and what voice needs for media.
+Plenty of residential connections cannot do that: a CGNAT address is shared, so there is no port to forward, and a dynamic address breaks a DNS record every time it changes.
+This is not an edge case for the audience this project is for, so it is worth deciding before you start rather than discovering at the first failed call.
+
+Three ways through it, in the order most people should try them:
+
+- **Dynamic DNS**, if you have a real public IP that simply changes. Your router or a client updates the A record; everything else in this document works unchanged.
+- **A tunnel** (Cloudflare Tunnel, Tailscale Funnel, or similar), if you have no forwardable port at all. The tunnel terminates TLS and reaches your host outbound, so Caddy's certificate step becomes the tunnel's job rather than yours.
+- **LAN only**, deliberately. Everything works between devices on your own network and nothing reaches it from outside, which is a real answer for a household.
+
+**The catch worth knowing before you pick a tunnel.** An HTTP tunnel carries signalling and text, and it does not carry WebRTC media, which is UDP.
+So a tunnel can give you a working text deployment and calls that connect and then carry no audio, which looks like a broken app rather than a networking choice.
+Voice over a tunnel needs TURN reachable separately (see [Voice and screen share](#voice-and-screen-share) below), or it needs the media ports genuinely forwarded.
+
+The same trap applies to a forwarded deployment that forwards only 80 and 443: signalling works from anywhere, media does not, and calls fail only for people outside your network.
+If calls work at home and not away, the media ports are the first thing to check, not the caller's device.
+
 ## One-command walkthrough
 
 ```bash
@@ -501,6 +520,24 @@ The server image is `${SLIMM_VERSION:-latest}` in `docker-compose.yml`, so upgra
 Caddy, LiveKit, and Litestream are hardcoded tags in `docker-compose.yml`; bump those directly and run `docker compose up -d` again.
 Newer patches are at hub.docker.com for Caddy and Litestream and at github.com/livekit/livekit/releases for LiveKit.
 The named volumes (`slimm_data`, `caddy_data`, `caddy_config`) are untouched by an image swap.
+
+### If an upgrade goes wrong
+
+**Rolling the image back is not enough on its own.**
+Migrations run automatically on every start (`sqlx::migrate!` in `crates/slimm-server/src/db.rs`) and they are forward-only by design, with no down path.
+So a newer server has already changed the database by the time you decide you want the older one, and the older one may not recognise what it finds.
+
+Restoring a snapshot is the rollback procedure, not a last resort:
+
+1. `docker compose down` - stop writing before you copy anything.
+2. Restore the database from a backup taken *before* the upgrade. See [Backups](#backups-optional); `scripts/backup.py` makes one and `scripts/restore-drill.py` is what proves a backup actually restores.
+3. Put `SLIMM_VERSION` back to the version that made that backup.
+4. `docker compose up -d`.
+
+Which means the useful moment to take a backup is immediately *before* bumping `SLIMM_VERSION`, not on whatever schedule you otherwise run.
+A backup taken after the upgrade restores you to the state you are trying to leave.
+
+Practising this once on a copy, with `scripts/restore-drill.py`, is worth more than reading it: an untested backup is a hope rather than a plan.
 
 Litestream is deliberately held on the 0.3.x line rather than 0.5.x.
 0.5 replaced the replica format (WAL segments became LTX), and this example targets the longer-documented, more stable 0.3 config and CLI surface.

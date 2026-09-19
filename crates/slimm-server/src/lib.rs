@@ -37,6 +37,8 @@ pub use sweeps::{
 
 use std::net::SocketAddr;
 
+use anyhow::Context as _;
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -127,7 +129,9 @@ pub async fn run() -> anyhow::Result<()> {
         code_runner,
     }));
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
-    let listener = TcpListener::bind(addr).await?;
+    let listener = TcpListener::bind(addr)
+        .await
+        .with_context(|| format!("binding to {addr}"))?;
     tracing::info!(%addr, version = env!("CARGO_PKG_VERSION"), "slim-m server listening");
 
     axum::serve(
