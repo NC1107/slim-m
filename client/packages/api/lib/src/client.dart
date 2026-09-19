@@ -28,6 +28,7 @@ part 'client_metrics_parser.dart';
 part 'client_moderation.dart';
 part 'client_module_commands.dart';
 part 'client_module_permissions.dart';
+part 'client_bots.dart';
 part 'client_presence.dart';
 part 'client_push.dart';
 part 'client_roles.dart';

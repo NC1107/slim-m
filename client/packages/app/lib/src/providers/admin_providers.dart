@@ -42,6 +42,11 @@ final removedMembersProvider =
       (ref) => ref.watch(apiProvider).listRemovedMembers(),
     );
 
+/// Every bot in the deployment, including revoked ones.
+final botsProvider = FutureProvider.autoDispose<List<api.Bot>>(
+  (ref) => ref.watch(apiProvider).listBots(),
+);
+
 /// Every role.
 final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),

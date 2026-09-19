@@ -16,6 +16,8 @@ use uuid::Uuid;
 
 use super::world::{Contract, Payload};
 
+mod admin_recovery;
+mod bots;
 mod content;
 mod content_dm_calls;
 mod content_emoji;
@@ -29,6 +31,8 @@ mod people;
 mod read_state;
 mod threads;
 
+use admin_recovery::recovery_calls;
+use bots::bot_calls;
 use content::{channel_calls, message_calls};
 use content_dm_calls::dm_call_ring_calls;
 use content_emoji::emoji_calls;
@@ -478,23 +482,6 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
 
     bulk_member_calls(c, root, &erin_id).await;
 
-    let issued = c
-        .bare(
-            "issueResetCode",
-            "POST",
-            &format!("/admin/users/{bob_id}/reset-code"),
-            root,
-        )
-        .await;
-    c.call(
-        "resetPassword",
-        "POST",
-        "/auth/reset",
-        None,
-        Payload::Json(json!({
-            "code": text(&issued, "code"),
-            "new_password": "an-entirely-new-password",
-        })),
-    )
-    .await;
+    recovery_calls(c, root, bob_id).await;
+    bot_calls(c, root).await;
 }

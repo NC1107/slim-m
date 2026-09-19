@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../providers/threads.dart';
 import '../screens/admin/analytics_screen.dart';
+import '../screens/admin/bots_screen.dart';
 import '../screens/admin/categories_screen.dart';
 
 import 'package:slimm_data/data.dart' show Channel;
@@ -140,6 +141,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminRoles,
         pageBuilder: (context, state) =>
             modalPage(context, const RolesScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminBots,
+        pageBuilder: (context, state) => modalPage(context, const BotsScreen()),
       ),
       GoRoute(
         path: Routes.adminRemovedMembers,

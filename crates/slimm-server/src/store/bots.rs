@@ -1,0 +1,274 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+//! Bot accounts and their tokens.
+//!
+//! A bot is a user-shaped principal, not a parallel one: a row in `users` with
+//! `is_bot` set, a membership, and roles. So authorship, authorization,
+//! fan-out and moderation all reach a bot through the code paths they already
+//! use for a person, and nothing here re-implements any of them. See
+//! `docs/decisions/0028-bot-accounts.md`.
+//!
+//! Two things are specific to a bot, and they are the whole of this module.
+//!
+//! **A bot token resolves to a real session.** Creating one writes a `devices`
+//! row and a `sessions` row exactly as a sign-in does, and the token points at
+//! that session. That is what lets a bot mint a ws ticket, be revoked, and be
+//! authorized per subscriber with no second code path - and it means revoking
+//! a bot is [`Store::revoke_session`], the function that already does it.
+//!
+//! **The token does not rotate.** A bot is typically a container holding a
+//! credential in an environment variable, with nowhere to persist a rotated
+//! pair and nobody to sign in again when a response is lost. Rotation would
+//! turn every dropped response into a dead bot. The mitigation for a
+//! long-lived credential is revocation and audit, not a short TTL.
+
+use crate::auth::{generate_secret, hash_secret};
+use crate::ids::{DeviceId, SessionId, UserId};
+
+use super::sessions::SessionContext;
+use super::{Store, now_ms};
+
+/// Marks a bot token in its plaintext, so the auth extractor can route a
+/// presented credential to the right table without a second lookup on the
+/// human hot path. Not a secret and not load-bearing for security - the hash
+/// is what authenticates.
+pub const BOT_TOKEN_PREFIX: &str = "slimbot_";
+
+/// How stale `last_used_at` may get before a request bothers writing it.
+///
+/// A bot is a program and can call constantly, so stamping every request would
+/// add a write per request to answer a question nobody asks to the second.
+const LAST_USED_WRITE_AFTER_MS: i64 = 60 * 1000;
+
+/// A bot, as an operator sees it in the admin surface. Carries no secret.
+#[derive(Debug, Clone)]
+pub struct Bot {
+    pub user_id: UserId,
+    pub username: String,
+    pub display_name: String,
+    pub created_at: i64,
+    /// Null once the token has been revoked, so a listing can say whether this
+    /// bot can currently do anything at all.
+    pub token_name: Option<String>,
+    pub token_last_used_at: Option<i64>,
+}
+
+/// A newly created bot and the one time its token is ever legible.
+pub struct NewBot {
+    pub bot: Bot,
+    pub token: String,
+}
+
+/// Why creating a bot failed.
+#[derive(Debug)]
+pub enum CreateBotError {
+    UsernameTaken,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for CreateBotError {
+    fn from(err: sqlx::Error) -> Self {
+        CreateBotError::Internal(err.into())
+    }
+}
+
+impl Store {
+    /// Creates a bot and issues its first token, in one transaction.
+    ///
+    /// The two are one step because a bot with no token can do nothing and is
+    /// not a state worth being able to reach; the token is returned once here
+    /// and is unrecoverable afterwards.
+    pub async fn create_bot(
+        &self,
+        username: &str,
+        display_name: &str,
+        created_by: UserId,
+    ) -> Result<NewBot, CreateBotError> {
+        let user_id = UserId::generate();
+        let device_id = DeviceId::generate();
+        let session_id = SessionId::generate();
+        let token = format!("{BOT_TOKEN_PREFIX}{}", generate_secret());
+        let token_hash = hash_secret(&token);
+        let now = now_ms();
+
+        let mut tx = self.pool.begin().await?;
+        let inserted = sqlx::query!(
+            "INSERT INTO users (id, username, display_name, created_at, is_bot)
+             VALUES (?, ?, ?, ?, 1)",
+            user_id,
+            username,
+            display_name,
+            now
+        )
+        .execute(&mut *tx)
+        .await;
+        match inserted {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(CreateBotError::UsernameTaken);
+            }
+            Err(e) => return Err(CreateBotError::Internal(e.into())),
+        }
+
+        sqlx::query!(
+            "INSERT INTO devices (id, user_id, name, created_at) VALUES (?, ?, ?, ?)",
+            device_id,
+            user_id,
+            display_name,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO sessions (id, user_id, device_id, created_at) VALUES (?, ?, ?, ?)",
+            session_id,
+            user_id,
+            device_id,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO bot_tokens
+               (token_hash, bot_user_id, session_id, name, created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            token_hash,
+            user_id,
+            session_id,
+            display_name,
+            created_by,
+            now
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+
+        Ok(NewBot {
+            bot: Bot {
+                user_id,
+                username: username.to_owned(),
+                display_name: display_name.to_owned(),
+                created_at: now,
+                token_name: Some(display_name.to_owned()),
+                token_last_used_at: None,
+            },
+            token,
+        })
+    }
+
+    /// Every bot in the deployment, newest first. No secrets.
+    pub async fn list_bots(&self) -> anyhow::Result<Vec<Bot>> {
+        let rows = sqlx::query!(
+            r#"SELECT u.id AS "user_id!: UserId", u.username, u.display_name,
+                      u.created_at,
+                      t.name AS token_name, t.last_used_at
+               FROM users u
+               LEFT JOIN bot_tokens t
+                 ON t.bot_user_id = u.id AND t.revoked_at IS NULL
+               WHERE u.is_bot = 1 AND u.deleted_at IS NULL
+               ORDER BY u.created_at DESC"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Bot {
+                user_id: r.user_id,
+                username: r.username,
+                display_name: r.display_name,
+                created_at: r.created_at,
+                token_name: r.token_name,
+                token_last_used_at: r.last_used_at,
+            })
+            .collect())
+    }
+
+    /// Resolves a presented bot token to its session, or `None` if it is
+    /// unknown, revoked, or its account is gone.
+    ///
+    /// Stamps `last_used_at` at most once per [`LAST_USED_WRITE_AFTER_MS`], so
+    /// a chatty bot does not turn every read into a write.
+    pub async fn authenticate_bot(&self, token: &str) -> anyhow::Result<Option<SessionContext>> {
+        let hash = hash_secret(token);
+        let row = sqlx::query!(
+            r#"SELECT t.bot_user_id AS "user_id!: UserId",
+                      t.session_id AS "session_id!: SessionId",
+                      s.device_id AS "device_id!: DeviceId",
+                      t.last_used_at
+               FROM bot_tokens t
+               JOIN sessions s ON s.id = t.session_id
+               JOIN users u ON u.id = t.bot_user_id
+               WHERE t.token_hash = ?
+                 AND t.revoked_at IS NULL
+                 AND s.revoked_at IS NULL
+                 AND u.deleted_at IS NULL"#,
+            hash
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+
+        let now = now_ms();
+        if row
+            .last_used_at
+            .is_none_or(|at| now - at > LAST_USED_WRITE_AFTER_MS)
+        {
+            sqlx::query!(
+                "UPDATE bot_tokens SET last_used_at = ? WHERE token_hash = ?",
+                now,
+                hash
+            )
+            .execute(&self.pool)
+            .await?;
+        }
+
+        Ok(Some(SessionContext {
+            user_id: row.user_id,
+            session_id: row.session_id,
+            device_id: row.device_id,
+        }))
+    }
+
+    /// Whether this user is a bot, for the badge the interface draws.
+    pub async fn is_bot(&self, user_id: UserId) -> anyhow::Result<bool> {
+        let row = sqlx::query!(
+            "SELECT is_bot FROM users WHERE id = ? AND deleted_at IS NULL",
+            user_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| r.is_bot != 0).unwrap_or(false))
+    }
+
+    /// Revokes a bot's token and its session, so it stops resolving on the very
+    /// next request. The account stays, so its authorship survives - the same
+    /// treatment revoking any session gives.
+    ///
+    /// Returns false if no live bot by that id exists, so the caller can answer
+    /// 404 rather than pretending.
+    pub async fn revoke_bot(&self, bot_user_id: UserId) -> anyhow::Result<bool> {
+        let now = now_ms();
+        let sessions = sqlx::query!(
+            r#"SELECT session_id AS "session_id!: SessionId"
+               FROM bot_tokens WHERE bot_user_id = ? AND revoked_at IS NULL"#,
+            bot_user_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        if sessions.is_empty() {
+            return self.is_bot(bot_user_id).await;
+        }
+        sqlx::query!(
+            "UPDATE bot_tokens SET revoked_at = ? WHERE bot_user_id = ? AND revoked_at IS NULL",
+            now,
+            bot_user_id
+        )
+        .execute(&self.pool)
+        .await?;
+        for row in sessions {
+            self.revoke_session(row.session_id).await?;
+        }
+        Ok(true)
+    }
+}

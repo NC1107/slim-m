@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE bot_tokens SET created_by = NULL WHERE created_by = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "07a21a684349e922b3b0269dfed3ca6d4914c3e489ae1ee7eb8dba1dcab6bc97"
+}

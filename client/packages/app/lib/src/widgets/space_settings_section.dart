@@ -21,6 +21,7 @@ import '../providers/admin_providers.dart';
 import '../providers/channel_permissions.dart';
 import '../routing/routes.dart';
 import '../screens/admin/analytics_screen.dart';
+import '../screens/admin/bots_screen.dart';
 import '../screens/admin/categories_screen.dart';
 import '../screens/admin/channel_overwrites_screen.dart';
 import '../screens/admin/dock_screen.dart';
@@ -106,6 +107,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.invite,
             compactRoute: Routes.adminInvites,
             builder: (_) => const InvitesPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'bots',
+            label: 'Bots',
+            icon: AppIcons.code,
+            compactRoute: Routes.adminBots,
+            builder: (_) => const BotsPane(),
           ),
         if (canManageServer)
           SettingsPane(

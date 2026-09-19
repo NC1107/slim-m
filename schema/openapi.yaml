@@ -78,6 +78,10 @@ tags:
       MANAGE_ROLES.
   - name: admin
     description: Administrator-only account recovery.
+  - name: bots
+    description: >
+      Provisioning bot accounts. Requires MANAGE_SERVER, and the caller must
+      not itself be a bot.
   - name: invites
     description: Creating, listing, checking, and redeeming invite codes.
   - name: channels
@@ -5008,6 +5012,91 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /bots:
+    get:
+      operationId: listBots
+      tags: [bots]
+      summary: Every bot in the deployment.
+      description: >-
+        Carries no token. A bot whose token has been revoked is still listed,
+        with its token fields absent, so an operator can see that it can no
+        longer act.
+      responses:
+        "200":
+          description: The bots.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    post:
+      operationId: createBot
+      tags: [bots]
+      summary: Create a bot and issue its token.
+      description: >-
+        The only response that ever carries the token; it is stored hashed and
+        cannot be read back. A bot is created with no roles, so it holds
+        whatever everyone holds and nothing more. Refused for a caller that is
+        itself a bot, so one compromised credential cannot mint another that
+        survives revoking it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBotRequest"
+      responses:
+        "201":
+          description: The bot, and its token once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewBot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /bots/{botId}/revoke:
+    parameters:
+      - name: botId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The bot's user id.
+    post:
+      operationId: revokeBot
+      tags: [bots]
+      summary: Revoke a bot's token and session.
+      description: >-
+        Stops the bot on its next request. The account stays, so what it wrote
+        stays attributed to it, exactly as revoking a person's session does.
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /space/analytics:
     get:
       operationId: getSpaceAnalytics
@@ -7297,6 +7386,52 @@ components:
               format: int64
               description: Unix milliseconds; null means it never expires.
 
+    Bot:
+      type: object
+      required: [user_id, username, display_name, created_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        display_name:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        token_name:
+          type: [string, "null"]
+          description: Absent once the token is revoked.
+        token_last_used_at:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            Written at most once a minute, so it is a recency hint rather than
+            an exact last-call time.
+    CreateBotRequest:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          description: >-
+            1 to 32 characters, letters, digits and _ . - only, the same rule a
+            person's username follows so a bot is mentionable the same way.
+        display_name:
+          type: [string, "null"]
+          description: Defaults to the username.
+    NewBot:
+      type: object
+      required: [bot, token]
+      properties:
+        bot:
+          $ref: "#/components/schemas/Bot"
+        token:
+          type: string
+          description: >-
+            Shown once and never again. Prefixed so a presented credential can
+            be routed without a second lookup.
     Channel:
       type: object
       required: [id, name, kind, created_at]

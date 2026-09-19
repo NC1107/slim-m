@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT u.id AS \"user_id!: UserId\", u.username, u.display_name,\n                      u.created_at,\n                      t.name AS token_name, t.last_used_at\n               FROM users u\n               LEFT JOIN bot_tokens t\n                 ON t.bot_user_id = u.id AND t.revoked_at IS NULL\n               WHERE u.is_bot = 1 AND u.deleted_at IS NULL\n               ORDER BY u.created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "username",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "token_name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_used_at",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "97daf2101e9b6dbb674107d5ebe489cfc2a555ba132b9b116824a4342208fa7d"
+}
