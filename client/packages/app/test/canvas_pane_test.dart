@@ -19,6 +19,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_pane_harness.dart';
+import 'support/async_wait.dart';
 
 void main() {
   testWidgets('opening the canvas fetches the region and paints it', (
@@ -49,9 +50,13 @@ void main() {
       // A real codec decode needs real asynchrony; pumpAndSettle alone never observes it, the same trap fullscreen_image_viewer_test.dart already documents.
       await tester.runAsync(() async {
         await pumpCanvasPane(tester, container);
-        await Future<void>.delayed(const Duration(milliseconds: 20));
       });
-      await tester.pumpAndSettle();
+      await waitUntil(tester, () {
+        final document = surfaceDocument(tester);
+        final order = document.paintOrder;
+        if (order.length != 1) return false;
+        return document.strokeIfAlive(order.single)?.image != null;
+      }, reason: 'the fetched image was never decoded');
 
       expect(fixture.attachmentFetches, 1);
       final document = surfaceDocument(tester);
@@ -96,10 +101,13 @@ void main() {
           ),
         ),
       );
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      });
-      await tester.pumpAndSettle();
+      // Wait for the decoded image, not for a delay guessed on this machine.
+      await waitUntil(tester, () {
+        final document = surfaceDocument(tester);
+        final order = document.paintOrder;
+        if (order.length != 1) return false;
+        return document.strokeIfAlive(order.single)?.image != null;
+      }, reason: 'the live-event image placement was never hydrated');
 
       expect(fixture.attachmentFetches, 1);
       final document = surfaceDocument(tester);
