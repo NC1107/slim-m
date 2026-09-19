@@ -224,18 +224,24 @@ class MessageRowHeader extends ConsumerWidget {
   final Message message;
   final bool isWebhook;
 
+  /// An author who has not resolved yet reads as not a bot, so the badge is
+  /// absent until the profile is known rather than appearing a moment after
+  /// the name. A badge that pops in late is worse than one that is simply
+  /// right once there is something to be right about.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, message.authorId ?? ''),
+      ),
+    );
     final name = authorLabelResolved(
       authorId: message.authorId,
       cachedDisplayName: message.authorDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, message.authorId ?? ''),
-        ),
-      ),
+      resolution: resolution,
     );
+    final isBot = resolution.profile?.isBot ?? false;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s4),
       child: Row(
@@ -259,6 +265,10 @@ class MessageRowHeader extends ConsumerWidget {
           if (isWebhook) ...[
             const SizedBox(width: AppSpacing.s8),
             const AppBadge(variant: AppBadgeVariant.tag, label: 'Webhook'),
+          ],
+          if (isBot) ...[
+            const SizedBox(width: AppSpacing.s8),
+            const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot'),
           ],
           const SizedBox(width: AppSpacing.s8),
           MessageTimeMark(message: message),

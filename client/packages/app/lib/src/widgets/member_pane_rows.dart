@@ -107,8 +107,12 @@ class MemberRow extends ConsumerWidget {
           memberProfileOverridesProvider.select((m) => m[profile.id]),
         ) ??
         profile;
-    // Only the first: a row that grew with role count would push the name out of a 236px pane.
-    final badge = displayed.roles.isEmpty ? null : displayed.roles.first;
+    // One slot only in a 236px pane; bot beats a role, whose names are a tap away.
+    final badge = displayed.isBot
+        ? 'Bot'
+        : displayed.roles.isEmpty
+        ? null
+        : displayed.roles.first;
 
     // Scoped to this row's two facts: the set is a new object per toggle, so watching it rebuilds every row.
     final (selecting, selected) = ref.watch(
@@ -133,7 +137,12 @@ class MemberRow extends ConsumerWidget {
       stateDescription: _presenceDescription(status),
       trailing: badge == null
           ? null
-          : AppBadge(variant: AppBadgeVariant.role, label: badge),
+          : AppBadge(
+              variant: displayed.isBot
+                  ? AppBadgeVariant.tag
+                  : AppBadgeVariant.role,
+              label: badge,
+            ),
       leading: UserAvatar(
         userId: profile.id,
         avatarUpdatedAt: displayed.avatarUpdatedAt,

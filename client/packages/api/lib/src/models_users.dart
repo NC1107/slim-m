@@ -19,6 +19,7 @@ class UserProfile {
     this.roleIds = const [],
     this.timedOutUntil,
     this.statusText,
+    this.isBot = false,
   });
 
   final String id;
@@ -60,6 +61,15 @@ class UserProfile {
   /// unknown rather than as "no status".
   final String? statusText;
 
+  /// Whether this account is a bot rather than a person, which the interface
+  /// draws a badge from. False on a server older than this field: an older
+  /// deployment has no bots to mistake anyone for, so reading absent as "not a
+  /// bot" is accurate there rather than merely safe.
+  ///
+  /// Says nothing about what the account may do - that is its roles, exactly
+  /// as for a person. See `docs/decisions/0028-bot-accounts.md`.
+  final bool isBot;
+
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -73,6 +83,7 @@ class UserProfile {
             (json['role_ids'] as List<dynamic>?)?.cast<String>() ?? const [],
         timedOutUntil: json['timed_out_until'] as int?,
         statusText: json['status_text'] as String?,
+        isBot: json['is_bot'] as bool? ?? false,
       );
 
   /// Value equality so a `.select`ed [UserProfile] (see

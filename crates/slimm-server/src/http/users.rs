@@ -113,6 +113,13 @@ struct UserDto {
     /// account; see MOD9.
     #[serde(skip_serializing_if = "Option::is_none")]
     invite_code: Option<String>,
+    /// Whether this account is a bot rather than a person.
+    ///
+    /// The interface draws a badge from this, which is the one affordance that
+    /// matters: a reader has to be able to tell that something was written by a
+    /// program without inspecting anything. It says nothing about what the
+    /// account may do - that is its roles, exactly as for a person.
+    is_bot: bool,
 }
 
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
@@ -148,6 +155,7 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
                 timed_out_until: timed_out.get(&user.id).copied(),
                 status_text: user.status_text,
                 invite_code: None,
+                is_bot: user.is_bot,
             }
         })
         .collect())
