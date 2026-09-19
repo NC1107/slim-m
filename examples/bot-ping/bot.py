@@ -33,6 +33,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -71,6 +72,26 @@ def send(channel_id, content):
     )
 
 
+def socket_url(base):
+    """The WebSocket URL for `base`, refusing to carry a token in plaintext.
+
+    An https deployment becomes wss. Plain http is allowed only for a loopback
+    address, because that is a developer running a server on their own machine;
+    anywhere else it would put a long-lived bot credential on the wire in the
+    clear, and a token is the one thing a bot cannot afford to leak.
+    """
+    parts = urllib.parse.urlsplit(base)
+    if parts.scheme == "https":
+        return urllib.parse.urlunsplit(("wss", parts.netloc, "/ws", "", ""))
+    if parts.scheme == "http" and parts.hostname in ("localhost", "127.0.0.1", "::1"):
+        print("warning: plaintext ws, loopback only", file=sys.stderr)
+        return urllib.parse.urlunsplit(("ws", parts.netloc, "/ws", "", ""))
+    raise RuntimeError(
+        f"refusing to send a bot token over {parts.scheme or 'no'} scheme to "
+        f"{parts.hostname or base}; use https"
+    )
+
+
 def should_answer(message, me):
     """Whether this message is a `!ping` from somebody other than us.
 
@@ -87,7 +108,7 @@ async def listen():
     print(f"connected as {me}", flush=True)
 
     ticket = call("POST", "/auth/ws-ticket")["ticket"]
-    ws_url = BASE.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
+    ws_url = socket_url(BASE)
 
     async with websockets.connect(ws_url) as socket:
         await socket.send(

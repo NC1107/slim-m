@@ -94,6 +94,9 @@ SLIMM_URL=https://your.space SLIMM_BOT_TOKEN=slimbot_... python3 examples/bot-pi
 ```
 
 It does the five things above and nothing else, so it is short enough to read in one sitting.
+
+It refuses to connect over plain `ws://` to anything but a loopback address.
+A bot token is long-lived, so putting one on the wire in the clear is the one leak a bot cannot recover from - `http://localhost` is a developer's own machine, and anywhere else needs https.
 What it deliberately leaves out, and what a bot doing real work needs:
 
 - **A cursor.** It only sees what arrives while connected. A bot that must not miss anything records the `seq` on each event and calls `/sync` on reconnect to catch up.
