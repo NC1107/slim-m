@@ -288,6 +288,8 @@ Prefer tokens; a module that hard-codes hex will look wrong in one theme or the 
 | `path` | `d` (an SVG-style path string), `fill`, `stroke`, `sw`, `tap` |
 | `input` | `submit` (the action name), `x`, `y`, `w`, `value`, `placeholder`, `max` |
 
+`rect` and `circle` also take a `grad` instead of a flat `fill`; see below.
+
 `cells` is the workhorse for boards, heatmaps, and automata: a grid of palette indices drawn in one op.
 An op slim does not recognise is skipped rather than failing the scene, so a new op is an additive change a newer client can use.
 
@@ -310,6 +312,20 @@ Three things to know:
 - A path may carry a `tap`, hit-tested against its filled interior. A `tap` on an unfilled outline has almost nothing to land in, so give a tappable path a `fill`.
 
 One path is capped at 512 steps. A scene is a small drawing, not an illustration format.
+
+### Gradient fills
+
+`rect` and `circle` take a `grad` in place of a flat `fill`:
+
+```json
+{ "op": "rect", "x": 0, "y": 0, "w": 100, "h": 40, "grad": { "from": "accent", "to": "bg", "dir": "v" } }
+```
+
+`from` and `to` are colours like any other - a theme token or a `#hex`. `dir` is `v` (top to bottom, the default), `h` (left to right) or `d` (diagonal).
+
+Two stops only. If you need a third, draw two shapes.
+
+A gradient wins over `fill` when both are set. A gradient missing either stop is not a gradient at all, and the shape falls back to its `fill` rather than disappearing - a flourish should never be able to take the shape with it.
 
 ### Asking for words with `input`
 

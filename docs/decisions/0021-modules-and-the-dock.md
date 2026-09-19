@@ -297,7 +297,7 @@ Two ceilings are known and deliberate:
 - It is a retained-scene model over a request/response round trip, not a framebuffer: each frame is one sandboxed run, which suits turn-based and steppable modules (Life plays at roughly 8fps) but is not a path to real-time or high-framerate rendering.
   That would need the module's wasm running client-side in the browser, or a streaming tick channel - a larger step left for later.
 - The op set is bounded, and grows additively rather than being lifted all at once.
-  `path` (an SVG-style `d` string, so arbitrary shapes are expressible) and `input` (a real text field, so a scene can be answered in words) have since been added, leaving images and gradients as the remaining named gaps.
+  `path` (an SVG-style `d` string, so arbitrary shapes are expressible), `input` (a real text field, so a scene can be answered in words) and gradient fills on `rect` and `circle` have since been added, leaving images as the one remaining named gap.
   Each is additive to `scene/1` and grows the client without a wire change; expressiveness is capped only by which ops the client currently understands.
   `input` is the one op that is a widget rather than paint - a text field has a cursor, a keyboard and focus, none of which a `CustomPainter` can draw - so it is overlaid on the canvas rather than painted into it.
 
