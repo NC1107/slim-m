@@ -136,3 +136,8 @@ To check a download matches what was published, compare it against the checksums
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
 ```
+
+---
+
+**Running the beta rather than joining it?**
+[`docs/BETA-TESTERS.md`](BETA-TESTERS.md) is what to tell a tester before they start, and what to ask them afterwards - including the four iOS paths and the Android call path that no real device has ever confirmed.
