@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.80.0](https://github.com/NC1107/slim-m/compare/client-v0.79.0...client-v0.80.0) (2026-09-19)
+
+
+### Features
+
+* bot accounts, end to end ([#1237](https://github.com/NC1107/slim-m/issues/1237)) ([ea505cf](https://github.com/NC1107/slim-m/commit/ea505cfc80a7894618518119532e40447f01a0b2))
+* **client:** let a module scene ask for words, not just taps ([#1238](https://github.com/NC1107/slim-m/issues/1238)) ([15117eb](https://github.com/NC1107/slim-m/commit/15117eb7c1ec1d20bfede01a10dd466fdd2b732e))
+* **client:** let a module scene draw arbitrary shapes ([#1234](https://github.com/NC1107/slim-m/issues/1234)) ([da503f8](https://github.com/NC1107/slim-m/commit/da503f89fb27842c5f16221d35ebd52da84e6814))
+* **client:** let an admin issue a reset code, and a locked-out person spend it ([#1220](https://github.com/NC1107/slim-m/issues/1220)) ([098007b](https://github.com/NC1107/slim-m/commit/098007b4ac79796c509fbc31a88fc1ba2a4fe7ec))
+* **client:** open a module scene on a screen of its own ([#1230](https://github.com/NC1107/slim-m/issues/1230)) ([66fc570](https://github.com/NC1107/slim-m/commit/66fc5707694c513e3879864a19123a78dd7790d2))
+* **client:** tell a sideloaded android build when a new one exists ([#1226](https://github.com/NC1107/slim-m/issues/1226)) ([e802110](https://github.com/NC1107/slim-m/commit/e8021105e5a5af2e1c91b8c87525682c422ea113))
+* mark a channel or DM as unread ([#1231](https://github.com/NC1107/slim-m/issues/1231)) ([b477416](https://github.com/NC1107/slim-m/commit/b477416dc2887afcdcc73235c1e20384da6f3638))
+
+
+### Bug Fixes
+
+* **client:** give the analytics charts an axis, so a bar can be read ([#1228](https://github.com/NC1107/slim-m/issues/1228)) ([11e95a5](https://github.com/NC1107/slim-m/commit/11e95a5251d2053fdcacb36dd721f6519c7dea2c))
+* **client:** make the space settings read in one glance on a phone ([#1229](https://github.com/NC1107/slim-m/issues/1229)) ([a099d5f](https://github.com/NC1107/slim-m/commit/a099d5fd7c169cd3ed4cd03a4728d1fc0ec64688))
+* **client:** say the username and password rules before a signup fails ([#1233](https://github.com/NC1107/slim-m/issues/1233)) ([656243f](https://github.com/NC1107/slim-m/commit/656243fdf05af73a3c8b490d93cbc046757cde3e))
+
 ## [0.79.0](https://github.com/NC1107/slim-m/compare/client-v0.78.0...client-v0.79.0) (2026-09-16)
 
 
