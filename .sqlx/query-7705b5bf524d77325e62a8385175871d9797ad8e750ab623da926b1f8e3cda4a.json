@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE bot_tokens SET revoked_at = ? WHERE bot_user_id = ? AND revoked_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "7705b5bf524d77325e62a8385175871d9797ad8e750ab623da926b1f8e3cda4a"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM bot_tokens WHERE bot_user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9fd43ae208dff4626d272994492be37dc9ab90385e514962bb30a6df68cc9b3a"
+}

@@ -19,10 +19,16 @@ use super::error::ApiError;
 use crate::ids::UserId;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::SessionContext;
+use crate::store::{BOT_TOKEN_PREFIX, SessionContext};
 
 /// The session a request is authenticated as, resolved from its bearer access
 /// token. Rejects with 401 when the header is absent or the token is invalid.
+///
+/// A bot presents a bot token instead, which resolves to a session of its own
+/// (see `docs/decisions/0028-bot-accounts.md`). The two are told apart by the
+/// token's prefix rather than by trying both tables, so a person's request
+/// still costs exactly one indexed lookup. The prefix is a routing hint and
+/// never an authorization one - the hash is what authenticates either way.
 pub(crate) struct Authed(pub(crate) SessionContext);
 
 impl FromRequestParts<AppState> for Authed {
@@ -39,11 +45,12 @@ impl FromRequestParts<AppState> for Authed {
             .and_then(|header| header.strip_prefix("Bearer "))
             .map(str::to_owned)
             .ok_or(ApiError::Unauthorized)?;
-        let ctx = state
-            .store
-            .authenticate(&token)
-            .await?
-            .ok_or(ApiError::Unauthorized)?;
+        let ctx = if token.starts_with(BOT_TOKEN_PREFIX) {
+            state.store.authenticate_bot(&token).await?
+        } else {
+            state.store.authenticate(&token).await?
+        }
+        .ok_or(ApiError::Unauthorized)?;
         Ok(Authed(ctx))
     }
 }

@@ -195,6 +195,13 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // Who provisioned a bot is the provisioner's own data; the bot itself is a separate account and keeps working.
+        sqlx::query!(
+            "UPDATE bot_tokens SET created_by = NULL WHERE created_by = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // A call stays in the transcript the way any other message does; who placed it goes the way a launched app surface's creator does.
         sqlx::query!(
             "UPDATE call_records SET caller_id = NULL WHERE caller_id = ?",
@@ -276,6 +283,10 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // A deleted bot's credential goes with it, or its hash outlives the account.
+        sqlx::query!("DELETE FROM bot_tokens WHERE bot_user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query!(
             "DELETE FROM channel_overwrites WHERE target_type = 'member' AND target_id = ?",
             user_id

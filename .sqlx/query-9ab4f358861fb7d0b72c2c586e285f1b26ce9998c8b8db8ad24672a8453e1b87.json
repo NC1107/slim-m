@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO bot_tokens\n               (token_hash, bot_user_id, session_id, name, created_by, created_at)\n             VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "9ab4f358861fb7d0b72c2c586e285f1b26ce9998c8b8db8ad24672a8453e1b87"
+}

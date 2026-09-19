@@ -30,6 +30,7 @@ mod attachment_ids;
 mod attachment_range;
 mod attachments;
 mod auth;
+mod bots;
 mod canvas;
 mod canvas_media_slots;
 mod canvas_ops;
@@ -187,6 +188,7 @@ pub fn router(state: AppState) -> Router {
         .merge(storage::routes())
         .merge(sync::routes())
         .merge(threads::routes())
+        .merge(bots::routes())
         .merge(voice::routes())
         .merge(voice_ring::routes())
         .merge(polls::routes())
