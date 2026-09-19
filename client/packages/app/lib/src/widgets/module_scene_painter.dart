@@ -41,7 +41,9 @@ class ModuleScenePainter extends CustomPainter {
           rect,
           Radius.circular(op.radius * sx),
         );
-        if (op.fill != null) {
+        if (op.gradient case final gradient?) {
+          canvas.drawRRect(rrect, _gradientPaint(gradient, rect));
+        } else if (op.fill != null) {
           canvas.drawRRect(
             rrect,
             Paint()..color = _resolve(op.fill, tokens.accent),
@@ -56,7 +58,16 @@ class ModuleScenePainter extends CustomPainter {
       case CircleOp():
         final center = Offset(op.cx * sx, op.cy * sy);
         final radius = op.r * ((sx + sy) / 2);
-        if (op.fill != null) {
+        if (op.gradient case final gradient?) {
+          canvas.drawCircle(
+            center,
+            radius,
+            _gradientPaint(
+              gradient,
+              Rect.fromCircle(center: center, radius: radius),
+            ),
+          );
+        } else if (op.fill != null) {
           canvas.drawCircle(
             center,
             radius,
@@ -145,6 +156,28 @@ class ModuleScenePainter extends CustomPainter {
       _ => op.x * sx,
     };
     painter.paint(canvas, Offset(dx, op.y * sy - painter.height / 2));
+  }
+
+  /// A two-stop linear gradient across [bounds].
+  ///
+  /// The shader is built per paint rather than cached: it depends on the shape's
+  /// own rectangle, which changes with every resize, so a cache keyed on
+  /// anything less than that would be wrong more often than it helped.
+  Paint _gradientPaint(SceneGradient gradient, Rect bounds) {
+    final (begin, end) = switch (gradient.direction) {
+      'h' => (Alignment.centerLeft, Alignment.centerRight),
+      'd' => (Alignment.topLeft, Alignment.bottomRight),
+      _ => (Alignment.topCenter, Alignment.bottomCenter),
+    };
+    return Paint()
+      ..shader = LinearGradient(
+        begin: begin,
+        end: end,
+        colors: [
+          _resolve(gradient.from, tokens.accent),
+          _resolve(gradient.to, tokens.surfaceSunken),
+        ],
+      ).createShader(bounds);
   }
 
   void _stroke(

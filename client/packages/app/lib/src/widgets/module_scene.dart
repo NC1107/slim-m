@@ -17,7 +17,7 @@
 /// literal `#rrggbb` still passes through untouched.
 library;
 
-import 'dart:convert';
+export 'module_scene_parse.dart' show parseModuleScene;
 
 import 'module_scene_path.dart';
 
@@ -61,6 +61,34 @@ class CellsOp extends SceneOp {
   final bool tapBatch;
 }
 
+/// A two-stop linear gradient, for a `rect` or `circle`'s fill.
+///
+/// Its own type rather than three more keys on each op: a gradient is one
+/// choice with three parts, and an op carrying `grad_from`, `grad_to` and
+/// `grad_dir` separately can express two thirds of one, which is a state the
+/// painter would have to invent an answer for.
+///
+/// Two stops only. A module that needs a third can draw two shapes, and every
+/// extra stop is another list the parser has to bound.
+class SceneGradient {
+  const SceneGradient({
+    required this.from,
+    required this.to,
+    this.direction = 'v',
+  });
+
+  /// Colour names, resolved the same way any other op's are: a theme token or
+  /// a `#hex`.
+  final String from;
+  final String to;
+
+  /// `v` top to bottom, `h` left to right, `d` diagonally. Anything else is
+  /// read as `v`, the same "skip what is bad" treatment a malformed colour
+  /// already gets, because a gradient that refused to draw would take the
+  /// whole shape with it.
+  final String direction;
+}
+
 class RectOp extends SceneOp {
   const RectOp({
     required this.x,
@@ -68,6 +96,7 @@ class RectOp extends SceneOp {
     required this.w,
     required this.h,
     this.fill,
+    this.gradient,
     this.stroke,
     this.strokeWidth = 1,
     this.radius = 0,
@@ -79,6 +108,10 @@ class RectOp extends SceneOp {
   final double w;
   final double h;
   final String? fill;
+
+  /// Wins over [fill] when both are set. A module that sends both has said two
+  /// things about one surface, and the richer one is the one it meant.
+  final SceneGradient? gradient;
   final String? stroke;
   final double strokeWidth;
   final double radius;
@@ -91,6 +124,7 @@ class CircleOp extends SceneOp {
     required this.cy,
     required this.r,
     this.fill,
+    this.gradient,
     this.stroke,
     this.strokeWidth = 1,
     this.tap,
@@ -100,6 +134,9 @@ class CircleOp extends SceneOp {
   final double cy;
   final double r;
   final String? fill;
+
+  /// See [RectOp.gradient].
+  final SceneGradient? gradient;
   final String? stroke;
   final double strokeWidth;
   final String? tap;
@@ -312,158 +349,3 @@ class ModuleScene {
   final String? status;
   final bool live;
 }
-
-/// Reads [raw] as a scene, or returns null if it is not one - the fast path
-/// for the overwhelmingly common case of ordinary text output. Never throws:
-/// malformed JSON, a wrong tag or a bad field all fall back to null (or a
-/// skipped op) so a broken scene degrades to plain text rather than an error.
-ModuleScene? parseModuleScene(String raw) {
-  final trimmed = raw.trimLeft();
-  if (!trimmed.startsWith('{')) return null;
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(trimmed);
-  } on FormatException {
-    return null;
-  }
-  if (decoded is! Map || decoded[r'$slim'] != 'scene/1') return null;
-
-  final opsRaw = decoded['ops'];
-  final ops = <SceneOp>[];
-  if (opsRaw is List) {
-    for (final entry in opsRaw) {
-      if (entry is Map) {
-        final op = _parseOp(entry);
-        if (op != null) ops.add(op);
-      }
-    }
-  }
-
-  return ModuleScene(
-    width: _double(decoded['width'], 100),
-    height: _double(decoded['height'], 100),
-    ops: ops,
-    background: _string(decoded['background']),
-    state: _string(decoded['state']),
-    controls: _stringList(decoded['controls']),
-    status: _string(decoded['status']),
-    live: decoded['live'] == true,
-  );
-}
-
-SceneOp? _parseOp(Map<Object?, Object?> op) {
-  switch (op['op']) {
-    case 'cells':
-      final data = _string(op['data']);
-      if (data == null) return null;
-      return CellsOp(
-        cols: _double(op['cols'], 0).toInt(),
-        rows: _double(op['rows'], 0).toInt(),
-        data: data,
-        palette: _stringList(op['palette']),
-        gap: _double(op['gap'], 0),
-        tap: _string(op['tap']),
-        tapBatch: op['tap_batch'] == true,
-      );
-    case 'rect':
-      return RectOp(
-        x: _double(op['x'], 0),
-        y: _double(op['y'], 0),
-        w: _double(op['w'], 0),
-        h: _double(op['h'], 0),
-        fill: _string(op['fill']),
-        stroke: _string(op['stroke']),
-        strokeWidth: _double(op['sw'], 1),
-        radius: _double(op['r'], 0),
-        tap: _string(op['tap']),
-      );
-    case 'circle':
-      return CircleOp(
-        cx: _double(op['cx'], 0),
-        cy: _double(op['cy'], 0),
-        r: _double(op['r'], 0),
-        fill: _string(op['fill']),
-        stroke: _string(op['stroke']),
-        strokeWidth: _double(op['sw'], 1),
-        tap: _string(op['tap']),
-      );
-    case 'line':
-      return LineOp(
-        x1: _double(op['x1'], 0),
-        y1: _double(op['y1'], 0),
-        x2: _double(op['x2'], 0),
-        y2: _double(op['y2'], 0),
-        stroke: _string(op['stroke']),
-        strokeWidth: _double(op['sw'], 1),
-      );
-    case 'path':
-      final d = _string(op['d']);
-      if (d == null) return null;
-      final steps = parseScenePathData(d);
-      if (steps.isEmpty) return null;
-      return PathOp(
-        steps: steps,
-        fill: _string(op['fill']),
-        stroke: _string(op['stroke']),
-        strokeWidth: _double(op['sw'], 1),
-        tap: _string(op['tap']),
-      );
-    case 'text':
-      final text = _string(op['s']);
-      if (text == null) return null;
-      return TextOp(
-        x: _double(op['x'], 0),
-        y: _double(op['y'], 0),
-        text: text,
-        fill: _string(op['fill']),
-        size: _double(op['size'], 12),
-        align: _string(op['align']) ?? 'left',
-      );
-    case 'input':
-      final submit = _string(op['submit']);
-      if (submit == null || submit.isEmpty) return null;
-      return InputOp(
-        x: _double(op['x'], 0),
-        y: _double(op['y'], 0),
-        w: _double(op['w'], 0),
-        submit: submit,
-        value: _string(op['value']) ?? '',
-        placeholder: _string(op['placeholder']),
-        maxLength: _double(
-          op['max'],
-          InputOp.defaultMaxLength.toDouble(),
-        ).toInt().clamp(1, InputOp.maxMaxLength),
-      );
-    case 'notes':
-      final notes = _parseNotes(op['notes']);
-      return notes.isEmpty ? null : NotesOp(notes);
-    default:
-      return null;
-  }
-}
-
-/// Each entry needs a positive frequency and duration and a non-negative
-/// start; anything else is dropped rather than failing the whole op, the same
-/// "skip what is bad" treatment a malformed cell or hex colour already gets.
-List<SceneNote> _parseNotes(Object? raw) {
-  if (raw is! List) return const [];
-  final notes = <SceneNote>[];
-  for (final entry in raw) {
-    if (entry is! Map) continue;
-    final frequency = _double(entry['f'], 0);
-    final start = _double(entry['t'], -1);
-    final seconds = _double(entry['d'], 0);
-    if (frequency <= 0 || start < 0 || seconds <= 0) continue;
-    notes.add(SceneNote(frequency: frequency, start: start, seconds: seconds));
-  }
-  return notes;
-}
-
-double _double(Object? value, double fallback) =>
-    value is num ? value.toDouble() : fallback;
-
-String? _string(Object? value) => value is String ? value : null;
-
-List<String> _stringList(Object? value) => value is List
-    ? value.whereType<String>().toList(growable: false)
-    : const [];
