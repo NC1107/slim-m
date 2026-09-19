@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'module_scene.dart';
+import 'module_scene_path.dart';
 
 class ModuleScenePainter extends CustomPainter {
   const ModuleScenePainter({required this.scene, required this.tokens});
@@ -78,6 +79,20 @@ class ModuleScenePainter extends CustomPainter {
             Offset(op.x2 * sx, op.y2 * sy),
             p,
           ),
+        );
+      case PathOp():
+        final path = buildScenePath(op.steps, sx, sy);
+        if (op.fill != null) {
+          canvas.drawPath(
+            path,
+            Paint()..color = _resolve(op.fill, tokens.accent),
+          );
+        }
+        _stroke(
+          canvas,
+          op.stroke,
+          op.strokeWidth * sx,
+          (paint) => canvas.drawPath(path, paint),
         );
       case TextOp():
         _paintText(canvas, op, sx, sy);
@@ -215,6 +230,8 @@ String? sceneTapAction(ModuleScene scene, Offset local, Size size) {
       case CircleOp() when op.tap != null:
         final center = Offset(op.cx * sx, op.cy * sy);
         if ((local - center).distance <= op.r * ((sx + sy) / 2)) return op.tap;
+      case PathOp() when op.tap != null:
+        if (buildScenePath(op.steps, sx, sy).contains(local)) return op.tap;
       default:
         break;
     }

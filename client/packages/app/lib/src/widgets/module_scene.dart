@@ -19,6 +19,8 @@ library;
 
 import 'dart:convert';
 
+import 'module_scene_path.dart';
+
 /// One drawing primitive. Coordinates are in the scene's own logical units
 /// ([ModuleScene.width] by [ModuleScene.height]); the painter scales them to
 /// whatever box it is given.
@@ -119,6 +121,31 @@ class LineOp extends SceneOp {
   final double y2;
   final String? stroke;
   final double strokeWidth;
+}
+
+/// An arbitrary shape, from an SVG-style `d` string. The op that stops the
+/// contract capping a drawing at rectangles and circles: anything a module can
+/// describe with lines and beziers, it can now draw.
+///
+/// [steps] is already parsed and already bounded (see [sceneMaxPathSteps]), so
+/// the painter walks a fixed list rather than a string.
+class PathOp extends SceneOp {
+  const PathOp({
+    required this.steps,
+    this.fill,
+    this.stroke,
+    this.strokeWidth = 1,
+    this.tap,
+  });
+
+  final List<ScenePathStep> steps;
+  final String? fill;
+  final String? stroke;
+  final double strokeWidth;
+
+  /// Hit-tested against the filled shape, so a tappable path wants a [fill];
+  /// an unfilled outline has almost no interior to land in.
+  final String? tap;
 }
 
 class TextOp extends SceneOp {
@@ -326,6 +353,18 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         y2: _double(op['y2'], 0),
         stroke: _string(op['stroke']),
         strokeWidth: _double(op['sw'], 1),
+      );
+    case 'path':
+      final d = _string(op['d']);
+      if (d == null) return null;
+      final steps = parseScenePathData(d);
+      if (steps.isEmpty) return null;
+      return PathOp(
+        steps: steps,
+        fill: _string(op['fill']),
+        stroke: _string(op['stroke']),
+        strokeWidth: _double(op['sw'], 1),
+        tap: _string(op['tap']),
       );
     case 'text':
       final text = _string(op['s']);
