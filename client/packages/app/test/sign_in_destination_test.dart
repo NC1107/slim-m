@@ -130,7 +130,9 @@ Finder _field(String label) => find.descendant(
 Future<void> _signIn(WidgetTester tester) async {
   await tester.enterText(_field('Username'), 'alice');
   await tester.enterText(_field('Password'), 'hunter2');
-  await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
+  final submit = find.widgetWithText(AppButton, 'Sign in');
+  await tester.ensureVisible(submit);
+  await tester.tap(submit);
   await tester.pumpAndSettle();
 }
 

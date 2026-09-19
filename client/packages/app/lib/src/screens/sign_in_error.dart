@@ -30,7 +30,7 @@ enum SignInErrorField { server, username, password, form }
     'That username is already taken.',
   ),
   BadRequestException(:final message) => (
-    SignInErrorField.form,
+    _badRequestField(message),
     sentenceCase(message),
   ),
   RateLimitedException() => (
@@ -51,3 +51,19 @@ enum SignInErrorField { server, username, password, form }
     'The server refused that. ${sentenceCase(e.message)}',
   ),
 };
+
+/// Which field a 400 belongs to.
+///
+/// The onboarding 400s name the thing that failed as their first word
+/// ("username must be 1 to 32 characters", "password must be 8 to 1024
+/// characters"), so that word is enough to put the message under the input
+/// that caused it rather than in a caption at the foot of the form. Matching
+/// the first word rather than the whole string means a reworded rule still
+/// lands on the right field; a 400 that names nothing recognisable stays on
+/// the form, which is where a failure no one field owns belongs.
+SignInErrorField _badRequestField(String message) =>
+    switch (message.trimLeft().split(' ').first.toLowerCase()) {
+      'username' => SignInErrorField.username,
+      'password' => SignInErrorField.password,
+      _ => SignInErrorField.form,
+    };
