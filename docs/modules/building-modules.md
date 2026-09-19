@@ -285,9 +285,30 @@ Prefer tokens; a module that hard-codes hex will look wrong in one theme or the 
 | `circle` | `cx`, `cy`, `r`, `fill`, `stroke`, `sw`, `tap` |
 | `line` | `x1`, `y1`, `x2`, `y2`, `stroke`, `sw` |
 | `text` | `x`, `y`, `s` (the string), `fill`, `size`, `align` (`left`/`center`/`right`) |
+| `path` | `d` (an SVG-style path string), `fill`, `stroke`, `sw`, `tap` |
 
 `cells` is the workhorse for boards, heatmaps, and automata: a grid of palette indices drawn in one op.
 An op slim does not recognise is skipped rather than failing the scene, so a new op is an additive change a newer client can use.
+
+### Arbitrary shapes with `path`
+
+`path` takes a `d` string in a subset of SVG's path grammar, so anything you can describe with lines and curves you can draw.
+
+```json
+{ "op": "path", "d": "M 10 80 C 40 10 65 10 95 80 Z", "fill": "accent-soft", "stroke": "accent", "sw": 2 }
+```
+
+The commands are `M` (move), `L` (line), `H` and `V` (horizontal and vertical line), `Q` (quadratic curve), `C` (cubic curve) and `Z` (close).
+Lowercase means relative to where the pen is.
+Coordinates are in the scene's own logical units, the same as every other op.
+
+Three things to know:
+
+- Arcs (`A`) and smooth continuations (`S`, `T`) are not in the grammar. Express them with `Q` or `C`.
+- A `d` that stops making sense is truncated at that point rather than failing, and whatever parsed before it is still drawn. A letter the grammar does not know ends the path there, so a stray `A` costs you the rest of the shape - it does not mangle what came before.
+- A path may carry a `tap`, hit-tested against its filled interior. A `tap` on an unfilled outline has almost nothing to land in, so give a tappable path a `fill`.
+
+One path is capped at 512 steps. A scene is a small drawing, not an illustration format.
 
 ## Interactive scenes
 
