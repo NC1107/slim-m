@@ -24,6 +24,7 @@ import '../widgets/server_notice.dart';
 import '../providers/toasts.dart';
 import 'reset_password_sheet.dart';
 import 'sign_in_alternatives.dart';
+import 'sign_in_credential_fields.dart';
 import 'sign_in_error.dart';
 import 'sign_in_updates_handoff.dart';
 
@@ -424,41 +425,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   'new messages while the app is open.',
             ),
           const SizedBox(height: AppSpacing.s16),
-          LabeledField(
-            label: 'Username',
-            child: AppInput(
-              controller: _username,
-              errorText: _errorFor(SignInErrorField.username),
-              autocorrect: false,
-              autofillHints: const [AutofillHints.username],
-              textInputAction: TextInputAction.next,
-              semanticLabel: 'Username',
-            ),
-          ),
-          if (_creatingAccount) ...[
-            const SizedBox(height: AppSpacing.s16),
-            LabeledField(
-              label: 'Display name',
-              helper: 'What others see. Defaults to your username.',
-              child: AppInput(
-                controller: _displayName,
-                textInputAction: TextInputAction.next,
-                semanticLabel: 'Display name',
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.s16),
-          LabeledField(
-            label: 'Password',
-            child: AppInput(
-              controller: _password,
-              errorText: _errorFor(SignInErrorField.password),
-              obscureText: true,
-              autofillHints: const [AutofillHints.password],
-              textInputAction: TextInputAction.done,
-              semanticLabel: 'Password',
-              onSubmitted: (_) => _busy ? null : _submit(),
-            ),
+          SignInCredentialFields(
+            username: _username,
+            displayName: _displayName,
+            password: _password,
+            creatingAccount: _creatingAccount,
+            busy: _busy,
+            errorFor: _errorFor,
+            onSubmit: _submit,
           ),
           if (_errorFor(SignInErrorField.form) case final formError?) ...[
             const SizedBox(height: AppSpacing.s16),

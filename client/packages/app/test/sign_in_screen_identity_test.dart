@@ -122,6 +122,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
+      await tester.ensureVisible(find.widgetWithText(AppButton, 'Sign in'));
       await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
 
@@ -176,6 +177,7 @@ void main() {
       );
       await tester.enterText(find.byType(TextField).at(1), 'alice');
       await tester.enterText(find.byType(TextField).at(2), 'hunter2');
+      await tester.ensureVisible(find.widgetWithText(AppButton, 'Sign in'));
       await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
       await tester.pumpAndSettle();
 
@@ -383,6 +385,7 @@ void main() {
 
         await tester.enterText(find.byType(TextField).at(1), 'alice');
         await tester.enterText(find.byType(TextField).at(2), 'hunter2');
+        await tester.ensureVisible(find.widgetWithText(AppButton, 'Sign in'));
         await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
         await tester.pumpAndSettle();
 
@@ -459,6 +462,7 @@ void main() {
 
         await tester.enterText(find.byType(TextField).at(1), 'alice');
         await tester.enterText(find.byType(TextField).at(2), 'hunter2');
+        await tester.ensureVisible(find.widgetWithText(AppButton, 'Sign in'));
         await tester.tap(find.widgetWithText(AppButton, 'Sign in'));
         await tester.pumpAndSettle();
 
