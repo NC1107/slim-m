@@ -167,6 +167,7 @@ async fn a_call_nobody_answered_leaves_a_record_in_the_dm() {
         &h.voice,
         &h.hub,
         &h.store,
+        &PushSender::disabled(),
         std::time::Instant::now() + RING_TIMEOUT,
     )
     .await;
@@ -240,6 +241,7 @@ async fn each_missed_call_is_its_own_record() {
             &h.voice,
             &h.hub,
             &h.store,
+            &PushSender::disabled(),
             std::time::Instant::now() + RING_TIMEOUT,
         )
         .await;
