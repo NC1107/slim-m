@@ -246,6 +246,11 @@ pub struct User {
     /// carries no independent live event - `Event::ProfileChanged` already
     /// covers it the same way it covers a rename.
     pub status_text: Option<String>,
+    /// Whether this account is a bot rather than a person, so a reader can be
+    /// told without inspecting anything. See
+    /// `docs/decisions/0028-bot-accounts.md`; it changes how the account
+    /// authenticates and how it is labelled, never what it may do.
+    pub is_bot: bool,
 }
 
 /// A message. `author_id` is null once the author's account is anonymized.
@@ -366,6 +371,7 @@ impl Store {
             created_at: now,
             avatar_updated_at: None,
             status_text: None,
+            is_bot: false,
         })
     }
 

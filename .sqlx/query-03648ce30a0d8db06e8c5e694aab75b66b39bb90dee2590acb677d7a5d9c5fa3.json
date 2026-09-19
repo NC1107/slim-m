@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at, status_text\n               FROM users WHERE deleted_at IS NULL AND id > ?\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)\n               ORDER BY id ASC LIMIT ?",
+  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at, status_text, is_bot AS \"is_bot!\"\n               FROM users WHERE deleted_at IS NULL AND id > ?\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)\n               ORDER BY id ASC LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -32,6 +32,11 @@
         "name": "status_text",
         "ordinal": 5,
         "type_info": "Text"
+      },
+      {
+        "name": "is_bot!",
+        "ordinal": 6,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -43,8 +48,9 @@
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "a4e1ceb6c6042fb71e9f7904eab754ca733ec12464e0e4ad2dbe9549db409eaf"
+  "hash": "03648ce30a0d8db06e8c5e694aab75b66b39bb90dee2590acb677d7a5d9c5fa3"
 }

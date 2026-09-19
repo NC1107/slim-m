@@ -24,7 +24,7 @@ impl Store {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at, status_text
+                      avatar_updated_at, status_text, is_bot AS "is_bot!"
                FROM users WHERE id = ? AND deleted_at IS NULL"#,
             id
         )
@@ -37,6 +37,7 @@ impl Store {
             created_at: r.created_at,
             avatar_updated_at: r.avatar_updated_at,
             status_text: r.status_text,
+            is_bot: r.is_bot != 0,
         }))
     }
 
@@ -54,7 +55,7 @@ impl Store {
             // Built rather than a fixed `query!` because the id list is variable
             // length and SQLite has no array binding.
             let mut builder = QueryBuilder::new(
-                "SELECT id, username, display_name, created_at, avatar_updated_at, status_text \
+                "SELECT id, username, display_name, created_at, avatar_updated_at, status_text, is_bot \
                  FROM users WHERE deleted_at IS NULL AND id IN (",
             );
             let mut separated = builder.separated(", ");
@@ -71,6 +72,7 @@ impl Store {
                     created_at: row.try_get("created_at")?,
                     avatar_updated_at: row.try_get("avatar_updated_at")?,
                     status_text: row.try_get("status_text")?,
+                    is_bot: row.try_get::<i64, _>("is_bot")? != 0,
                 });
             }
         }
@@ -227,7 +229,7 @@ impl Store {
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at, status_text
+                      avatar_updated_at, status_text, is_bot AS "is_bot!"
                FROM users WHERE deleted_at IS NULL AND id > ?
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)
                ORDER BY id ASC LIMIT ?"#,
@@ -245,6 +247,7 @@ impl Store {
                 created_at: r.created_at,
                 avatar_updated_at: r.avatar_updated_at,
                 status_text: r.status_text,
+                is_bot: r.is_bot != 0,
             })
             .collect())
     }

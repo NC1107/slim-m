@@ -6377,6 +6377,15 @@ components:
             null for none. Shown in the member pane under the name. Absent
             on servers older than this field, which a client must treat as
             unknown rather than "no status".
+        is_bot:
+          type: boolean
+          description: >
+            Whether this account is a bot rather than a person. The interface
+            draws a badge from it, so a reader can tell that something was
+            written by a program without inspecting anything. It says nothing
+            about what the account may do - that is its roles, exactly as for
+            a person. Absent on servers older than this field, which a client
+            reads as not a bot.
         invite_code:
           type: [string, "null"]
           description: >
