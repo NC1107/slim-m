@@ -15,5 +15,6 @@
 
 mod delivery;
 mod harness;
+mod missed_call;
 #[path = "../support/mod.rs"]
 mod support;
