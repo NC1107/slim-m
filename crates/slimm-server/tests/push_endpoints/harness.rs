@@ -44,13 +44,33 @@ async fn new_store() -> (Store, crate::support::TestDbGuard) {
 }
 
 pub(crate) fn app(store: Store, push: PushSender) -> Router {
+    app_with_voice(
+        store,
+        push,
+        slimm_server::voice::VoiceService::disabled(),
+        Hub::new(),
+    )
+}
+
+/// [`app`] with a voice service and hub the caller keeps a handle on.
+///
+/// Ringing needs a configured SFU, and driving the ring sweep by hand needs the
+/// same hub the router publishes through, neither of which [`app`] can hand
+/// back. Only the missed-call test needs either, so this is the variant rather
+/// than the default.
+pub(crate) fn app_with_voice(
+    store: Store,
+    push: PushSender,
+    voice: slimm_server::voice::VoiceService,
+    hub: Hub,
+) -> Router {
     http::router(AppState {
         store,
         auth: Auth::new(2).expect("auth service"),
-        hub: Hub::new(),
+        hub,
         limiter: RateLimiter::new(),
         push,
-        voice: slimm_server::voice::VoiceService::disabled(),
+        voice,
         media: slimm_server::media::Media::for_tests(),
         gifs: slimm_server::http::gifs::GifSearch::disabled(),
         link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
