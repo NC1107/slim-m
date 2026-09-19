@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.66.0](https://github.com/NC1107/slim-m/compare/server-v0.65.0...server-v0.66.0) (2026-09-19)
+
+
+### Features
+
+* bot accounts, end to end ([#1237](https://github.com/NC1107/slim-m/issues/1237)) ([ea505cf](https://github.com/NC1107/slim-m/commit/ea505cfc80a7894618518119532e40447f01a0b2))
+* mark a channel or DM as unread ([#1231](https://github.com/NC1107/slim-m/issues/1231)) ([b477416](https://github.com/NC1107/slim-m/commit/b477416dc2887afcdcc73235c1e20384da6f3638))
+
+
+### Bug Fixes
+
+* **server:** let a text-only deployment actually start ([#1222](https://github.com/NC1107/slim-m/issues/1222)) ([31b945b](https://github.com/NC1107/slim-m/commit/31b945b66b28188afeef942e358d43ce612a2c19))
+* stop a lost rotation response from signing the client out ([#1232](https://github.com/NC1107/slim-m/issues/1232)) ([57da9b3](https://github.com/NC1107/slim-m/commit/57da9b3c5d68e9e81757226daae96e22256ae50e))
+
 ## [0.65.0](https://github.com/NC1107/slim-m/compare/server-v0.64.0...server-v0.65.0) (2026-09-16)
 
 
