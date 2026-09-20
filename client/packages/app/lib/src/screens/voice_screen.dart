@@ -115,6 +115,8 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
         inThisChannel && voice.state == VoiceSessionState.connecting;
     // Without this, `join`'s own in-flight window (see its own comment) reads as `attemptedThis` and briefly flashes the rejoin screen.
     final joiningHere = inThisChannel && voice.joining;
+    // See VoiceState.rejoining for why the gap between two attempts is not "you left".
+    final rejoiningHere = inThisChannel && voice.rejoining;
     final busyElsewhere = _busyElsewhere(voice, channelId);
     // The same canvas-pane remount that connectedHere guards against also
     // wipes this memory when the user hung up *before* closing the canvas:
@@ -145,7 +147,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
 
     final stage = connectedHere
         ? 'call'
-        : (connectingHere || joiningHere)
+        : (connectingHere || joiningHere || rejoiningHere)
         ? 'connecting'
         : busyElsewhere
         ? 'switch'
@@ -160,7 +162,10 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
       key: ValueKey('voice-${stage == 'joining' ? 'connecting' : stage}'),
       child: switch (stage) {
         'call' => _InCall(channelId: channelId, isDm: widget.isDm),
-        'connecting' || 'joining' => const VoiceConnecting(),
+        'connecting' || 'joining' => VoiceConnecting(
+          // The word is all that separates a rejoin from a first connection.
+          label: rejoiningHere ? 'Reconnecting' : 'Connecting',
+        ),
         'switch' => VoiceSwitchPrompt(onSwitch: () => _switchNow(controller)),
         _ => VoiceRejoinScreen(
           channelId: channelId,

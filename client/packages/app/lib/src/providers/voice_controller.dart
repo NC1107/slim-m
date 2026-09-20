@@ -18,6 +18,7 @@ import '../api_failure.dart';
 import '../diagnostics/debug_log.dart';
 import 'call_recap.dart';
 import 'providers.dart';
+import 'voice_auto_rejoin.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
 import 'voice_camera_failure.dart';
@@ -29,11 +30,13 @@ export 'voice_state.dart' show VoiceState;
 
 part 'voice_controller_audio_devices.dart';
 part 'voice_controller_input.dart';
+part 'voice_controller_rejoin.dart';
 part 'voice_controller_share.dart';
 
 class VoiceController extends StateNotifier<VoiceState>
     with
         VoiceControllerInputMixin,
+        VoiceControllerRejoinMixin,
         VoiceControllerShareMixin,
         VoiceControllerAudioDevicesMixin {
   VoiceController(
@@ -42,10 +45,12 @@ class VoiceController extends StateNotifier<VoiceState>
     CallLifecycleChannel? callLifecycle,
     this.broadcastStartTimeout = const Duration(seconds: 30),
     Duration voiceHeartbeatInterval = const Duration(seconds: 15),
+    List<Duration> autoRejoinDelays = VoiceAutoRejoin.defaultDelays,
     DateTime Function()? now,
   }) : _session = session ?? VoiceSession(),
        _callLifecycle = callLifecycle ?? CallLifecycleChannel(),
        _heartbeat = VoiceCallHeartbeat(_ref, interval: voiceHeartbeatInterval),
+       _autoRejoin = VoiceAutoRejoin(delays: autoRejoinDelays),
        _now = now ?? DateTime.now,
        _activity = CallActivityTracker(now: now ?? DateTime.now),
        super(const VoiceState()) {
@@ -60,17 +65,27 @@ class VoiceController extends StateNotifier<VoiceState>
       if (s == VoiceSessionState.failed && dropped != null) {
         _heartbeat.stop();
         _log('Call ended: ${dropped.name}', detail: dropped.message);
+        // Read before the copyWith clears it: only a connected call is one to put back.
+        final wasConnected = state.connectedAt != null;
         state = state.copyWith(
           state: s,
           error: dropped.message,
           clearConnectedAt: true,
         );
+        final channelId = state.channelId;
+        if (wasConnected &&
+            VoiceControllerRejoinMixin._rejoinableDrop(dropped) &&
+            channelId != null) {
+          _scheduleAutoRejoin(channelId);
+        }
         return;
       }
       switch (s) {
         case VoiceSessionState.connected:
           // Not gated on lifecycle: only termination may let this lapse.
           _heartbeat.start(state.channelId);
+          _autoRejoin.reset();
+          if (state.rejoining) state = state.copyWith(rejoining: false);
         case VoiceSessionState.idle:
         case VoiceSessionState.failed:
           _heartbeat.stop();
@@ -118,10 +133,13 @@ class VoiceController extends StateNotifier<VoiceState>
   @override
   VoiceSession get _inputSession => _session;
   @override
+  VoiceAutoRejoin get _rejoinAttempts => _autoRejoin;
+  @override
   Ref get _inputRef => _ref;
 
   final CallLifecycleChannel _callLifecycle;
   final VoiceCallHeartbeat _heartbeat;
+  final VoiceAutoRejoin _autoRejoin;
   final DateTime Function() _now;
   final CallActivityTracker _activity;
   late final StreamSubscription<VoiceSessionState> _states;
@@ -132,12 +150,6 @@ class VoiceController extends StateNotifier<VoiceState>
   /// tell it has been superseded; see [join]'s own comment on why this
   /// exists.
   int _callGeneration = 0;
-
-  /// Whether push-to-talk is on, kept here so [join] can start the mic closed
-  /// without reaching into another provider on the hot path. Voice Settings
-  /// pushes changes through [setPushToTalkPreference], the same way it feeds
-  /// [setCameraPreference] and [setVoiceActivitySensitivity].
-  bool _pushToTalkEnabled = false;
 
   /// Sets the camera preference before joining; use [toggleCamera] for the
   /// live in-call control. Its microphone sibling died with the join lobby
@@ -158,31 +170,17 @@ class VoiceController extends StateNotifier<VoiceState>
     setCameraPreference(await loadCameraOnJoinPreference(_ref));
   }
 
-  /// Records whether push-to-talk is on, and applies the change to a call
-  /// already in progress: enabling closes the mic so it is push-only from
-  /// now, disabling reopens it, since the person is no longer holding a key
-  /// to be heard on. Outside a call it only sets the flag [join] reads.
-  void setPushToTalkPreference(bool enabled) {
-    _pushToTalkEnabled = enabled;
-    if (state.state != VoiceSessionState.connected) return;
-    unawaited(setPushToTalkHeld(enabled ? false : true));
-  }
-
-  /// Seeds [setPushToTalkPreference] at launch, [restoreCameraPreference]'s
-  /// own shape and for the same reason: [join] must know before the first
-  /// call, not only once Voice Settings has been opened this session.
-  Future<void> restorePushToTalkPreference() async {
-    setPushToTalkPreference(await loadPushToTalkEnabled(_ref));
-  }
-
   /// A channel switch (or a [leave]) mid-join starts or ends a newer call on
   /// this same instance, so every write below is guarded by [superseded]:
   /// reproduced without it, an abandoned join's belated failure landed as
   /// the *current* (different) channel's error, hiding a call that had
   /// actually connected - see `voice_controller_join_race_test.dart`.
+  @override
   Future<void> join(String channelId) async {
     // A recap belongs to the call that just ended, never to this new one.
     _activity.reset();
+    // A queued rejoin was about the call this one replaces; see VoiceAutoRejoin.cancelPending.
+    _autoRejoin.cancelPending();
     // See this method's own doc comment for what generation/superseded guard.
     final generation = ++_callGeneration;
     bool superseded() => generation != _callGeneration;
@@ -192,6 +190,7 @@ class VoiceController extends StateNotifier<VoiceState>
       clearError: true,
       clearRecap: true,
       joining: true,
+      rejoining: false,
       clearJustLeft: true,
     );
     try {
@@ -291,6 +290,7 @@ class VoiceController extends StateNotifier<VoiceState>
           )
         : null;
     _heartbeat.stop();
+    _autoRejoin.reset();
     await _session.leave();
     if (generation != _callGeneration) return;
     // Best-effort and fire-and-forget: this client already disconnected.
@@ -468,6 +468,7 @@ class VoiceController extends StateNotifier<VoiceState>
   void dispose() {
     _cancelBroadcastDeadline();
     _heartbeat.stop();
+    _autoRejoin.reset();
     unawaited(_states.cancel());
     unawaited(_participants.cancel());
     unawaited(_endCallRequests.cancel());

@@ -29,6 +29,32 @@ mixin VoiceControllerInputMixin on StateNotifier<VoiceState> {
     _inputSession.setSpeakingSensitivity(sensitivityPercent / 100);
   }
 
+  /// Whether push-to-talk is on, kept on the controller so
+  /// [VoiceController.join] can start the microphone closed without reaching
+  /// into another provider on the hot path. Voice Settings pushes changes
+  /// through [setPushToTalkPreference], the same way it feeds
+  /// [VoiceController.setCameraPreference] and [setVoiceActivitySensitivity].
+  bool _pushToTalkEnabled = false;
+
+  /// Records whether push-to-talk is on, and applies the change to a call
+  /// already in progress: enabling closes the mic so it is push-only from
+  /// now, disabling reopens it, since the person is no longer holding a key
+  /// to be heard on. Outside a call it only sets the flag
+  /// [VoiceController.join] reads.
+  void setPushToTalkPreference(bool enabled) {
+    _pushToTalkEnabled = enabled;
+    if (state.state != VoiceSessionState.connected) return;
+    unawaited(setPushToTalkHeld(enabled ? false : true));
+  }
+
+  /// Seeds [setPushToTalkPreference] at launch,
+  /// [VoiceController.restoreCameraPreference]'s own shape and for the same
+  /// reason: [VoiceController.join] must know before the first call, not only
+  /// once Voice Settings has been opened this session.
+  Future<void> restorePushToTalkPreference() async {
+    setPushToTalkPreference(await loadPushToTalkEnabled(_inputRef));
+  }
+
   /// Push-to-talk's own entry point: sets the microphone explicitly to
   /// [heldOpen] rather than flipping it, since a repeated or out-of-order
   /// key event must never invert this. A no-op outside a live call, so a
