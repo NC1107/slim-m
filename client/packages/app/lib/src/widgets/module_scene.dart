@@ -42,6 +42,7 @@ class CellsOp extends SceneOp {
     this.gap = 0,
     this.tap,
     this.tapBatch = false,
+    this.box,
   });
 
   final int cols;
@@ -50,6 +51,19 @@ class CellsOp extends SceneOp {
   final List<String> palette;
   final double gap;
   final String? tap;
+
+  /// Where the grid sits, in scene units, or null for the whole scene.
+  ///
+  /// Null is what every module written before this could rely on, and stays
+  /// the default: a grid was the scene. Naming a box lets one be a part of a
+  /// scene instead, next to labels, buttons or other art - which the
+  /// `music-box` module wanted and worked around by shading every fourth
+  /// column, because nothing can be drawn between a full-scene grid's cells.
+  ///
+  /// Both the painting and the hit test read this, so a tap outside the box
+  /// falls through to whatever op is underneath rather than being claimed by a
+  /// grid that is not there.
+  final SceneBox? box;
 
   /// Whether this module reads several cells from one [tap] action, as a
   /// `;`-separated list.
@@ -61,6 +75,25 @@ class CellsOp extends SceneOp {
   /// a module that declares it still accepts a list of one, which is what a
   /// client that never looks at this field keeps sending.
   final bool tapBatch;
+}
+
+/// A box in scene units: where an op that is not naturally a rectangle sits.
+///
+/// Only [CellsOp] takes one so far. It is a type rather than four loose fields
+/// because the four are meaningless apart - a width with no height describes
+/// nothing - and because "absent" has to be one answer rather than four.
+class SceneBox {
+  const SceneBox({
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+  });
+
+  final double x;
+  final double y;
+  final double w;
+  final double h;
 }
 
 /// A two-stop linear gradient, for a `rect` or `circle`'s fill.

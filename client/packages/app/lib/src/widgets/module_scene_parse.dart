@@ -77,6 +77,7 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         gap: _double(op['gap'], 0),
         tap: _string(op['tap']),
         tapBatch: op['tap_batch'] == true,
+        box: _parseBox(op),
       );
     case 'rect':
       return RectOp(
@@ -215,6 +216,20 @@ List<SceneNote> _parseNotes(Object? raw) {
     notes.add(SceneNote(frequency: frequency, start: start, seconds: seconds));
   }
   return notes;
+}
+
+/// Where a grid sits, or null for the whole scene.
+///
+/// A box needs a positive width and height to describe anything, so one
+/// missing either reads as absent rather than dropping the op: the grid then
+/// fills the scene, which is both the older behaviour and visibly wrong in a
+/// way a silently missing grid would not be. `x` and `y` default to the
+/// origin, so a module that only wants to shrink a grid need not restate them.
+SceneBox? _parseBox(Map<Object?, Object?> op) {
+  final w = _double(op['w'], 0);
+  final h = _double(op['h'], 0);
+  if (w <= 0 || h <= 0) return null;
+  return SceneBox(x: _double(op['x'], 0), y: _double(op['y'], 0), w: w, h: h);
 }
 
 /// A gradient needs both stops to mean anything, so one without them is no
