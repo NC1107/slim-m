@@ -22,7 +22,7 @@ import '../providers/providers.dart';
 import 'run_guarded.dart';
 
 /// Matches the server's own ceiling (`STATUS_TEXT_MAX_CHARS` in
-/// `crates/slimm-server/src/http/users.rs`), so the counter here never
+/// `crates/slimm-server/src/http/user_status.rs`), so the counter here never
 /// disagrees with the length check the request will actually be judged
 /// against.
 const int statusTextMaxChars = 80;

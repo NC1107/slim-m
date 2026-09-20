@@ -188,6 +188,54 @@ void main() {
     });
   });
 
+  /// The narrow case `join`'s own `cancelPending` is for.
+  ///
+  /// A manual rejoin that *succeeds* does not need it: reaching `connected`
+  /// calls `reset()`, which cancels the queued timer on its way past. The line
+  /// earns its place only when the manual attempt fails, where without it the
+  /// old timer still fires afterwards and starts an automatic attempt the
+  /// person's own failed one was supposed to have replaced.
+  test('a failed manual rejoin is not followed by the queued attempt', () {
+    fakeAsync((async) {
+      final session = _RejoiningSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        autoRejoinDelays: delays,
+      );
+
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
+      session.dropWith(VoiceDisconnect.connectionLost);
+      async.flushMicrotasks();
+      expect(controller.state.rejoining, isTrue);
+
+      // The person taps Try again before the timer fires, and it fails too.
+      session.connects = false;
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
+      expect(session.joins, 2);
+      expect(controller.state.state, VoiceSessionState.failed);
+      expect(
+        controller.state.rejoining,
+        isFalse,
+        reason:
+            'their own attempt replaced the queued one, so the screen must not '
+            'claim to be reconnecting on the strength of a dead timer',
+      );
+
+      async.elapse(wholeBudget);
+      async.flushMicrotasks();
+      expect(
+        session.joins,
+        2,
+        reason:
+            'the queued attempt belonged to the call this join replaced; its '
+            'only other guard is the channel id, unchanged here',
+      );
+    });
+  });
+
   test('a hang-up while an attempt is queued stays hung up', () {
     fakeAsync((async) {
       final session = _RejoiningSession();

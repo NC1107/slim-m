@@ -8,9 +8,12 @@
 /// measure before restructuring, and to close it with the number if the copy is
 /// under a millisecond at realistic sizes.
 ///
-/// This is that measurement, and it is also a regression bound: if the copy ever
-/// stops being a flat map copy - a per-channel partition, a different structure -
-/// these numbers are what the change has to beat.
+/// This is that measurement. What it measures is the map spread itself, written
+/// out here rather than driven through `MessageExtrasController._set`, which is
+/// private: so it is a number for the operation `_set` performs, not a guard on
+/// `_set` continuing to perform it. If the controller ever stops being a flat
+/// map copy, this file keeps reporting the spread's cost and will not notice.
+/// Read it as "this is what the copy costs", not as a regression bound.
 ///
 /// **It is a dev-box number, which is a lower bound, not the phone measurement
 /// the card asked for.** What it can settle is the shape: whether the cost is
