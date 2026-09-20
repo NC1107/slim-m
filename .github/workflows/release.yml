@@ -150,7 +150,8 @@ jobs:
   # cosign-signs it keylessly over OIDC. Reviewer-gated.
   server-image-merge:
     needs: [release-please, server-image, verify-server-ci]
-    if: needs.verify-server-ci.result == 'success'
+    # Both results: any `if:` drops the implicit needs gate, and a failed arch used to ship single-arch. See docs/ci.md.
+    if: needs.verify-server-ci.result == 'success' && needs.server-image.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -176,6 +177,7 @@ jobs:
           pattern: server-image-digest-*
           path: /tmp/digests
           merge-multiple: true
+          if-no-files-found: error
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
       - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4
@@ -268,7 +270,8 @@ jobs:
   # The GPG secrets are optional; only the .asc is skipped. See docs/ci.md.
   server-release-assets:
     needs: [release-please, server-binaries, verify-server-ci]
-    if: needs.verify-server-ci.result == 'success'
+    # Same as server-image-merge: without the second clause a failed arch still published a partial release.
+    if: needs.verify-server-ci.result == 'success' && needs.server-binaries.result == 'success'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -291,6 +294,7 @@ jobs:
           pattern: server-binary-*
           path: dist
           merge-multiple: true
+          if-no-files-found: error
 
       - name: checksums
         working-directory: dist
