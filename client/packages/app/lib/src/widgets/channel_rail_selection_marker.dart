@@ -55,7 +55,8 @@ class SelectionMarkerLayerState extends State<SelectionMarkerLayer> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        widget.child,
+        // This layer draws the one bar, so rows below must not draw their own.
+        AppSelectionMarkerScope(child: widget.child),
         if (_rect case final rect?)
           AnimatedPositioned(
             duration: AppMotion.reduced(context, AppMotion.base),
