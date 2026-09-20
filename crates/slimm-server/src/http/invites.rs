@@ -175,37 +175,42 @@ async fn create(
     Ok(Json(dto(invite, now_ms())))
 }
 
+/// Every invite for MANAGE_ROLES, and only your own for anybody else who may
+/// issue one.
+///
+/// CREATE_INVITE alone used to list the whole deployment's, which leaked a
+/// credential: see [`Store::list_invites`] for why a code in somebody else's
+/// row is one, and why MANAGE_ROLES is the bit that draws this line.
 async fn list(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<InviteDto>>, ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::CREATE_INVITE)
-    {
+    let permissions = state.store.base_permissions(ctx.user_id).await?;
+    if !permissions.contains(Permissions::CREATE_INVITE) {
         return Err(ApiError::Forbidden);
     }
+    let scope = (!permissions.contains(Permissions::MANAGE_ROLES)).then_some(ctx.user_id);
     let now = now_ms();
-    let invites = state.store.list_invites().await?;
+    let invites = state.store.list_invites(scope).await?;
     Ok(Json(invites.into_iter().map(|i| dto(i, now)).collect()))
 }
 
+/// Revokes an invite: anybody's for MANAGE_ROLES, your own otherwise.
+///
+/// Answers NO_CONTENT either way. A revoke that matched nothing is not
+/// distinguished from one that did, because the alternative tells somebody
+/// holding only CREATE_INVITE whether a code they guessed exists.
 async fn revoke(
     AuthedLimited(ctx): AuthedLimited<WRITE>,
     Path(code): Path<String>,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::CREATE_INVITE)
-    {
+    let permissions = state.store.base_permissions(ctx.user_id).await?;
+    if !permissions.contains(Permissions::CREATE_INVITE) {
         return Err(ApiError::Forbidden);
     }
-    state.store.revoke_invite(&code).await?;
+    let scope = (!permissions.contains(Permissions::MANAGE_ROLES)).then_some(ctx.user_id);
+    state.store.revoke_invite(&code, scope).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

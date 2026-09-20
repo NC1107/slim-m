@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT code AS \"code!\", max_uses, uses AS \"uses!\", expires_at,\n                      created_at AS \"created_at!\", revoked_at,\n                      role_grant AS \"role_grant: RoleId\"\n               FROM invites ORDER BY created_at DESC",
+  "query": "SELECT code AS \"code!\", max_uses, uses AS \"uses!\", expires_at,\n                      created_at AS \"created_at!\", revoked_at,\n                      role_grant AS \"role_grant: RoleId\"\n               FROM invites\n               WHERE ?1 IS NULL OR created_by = ?1\n               ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
@@ -40,7 +40,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -52,5 +52,5 @@
       true
     ]
   },
-  "hash": "40aae5cdf8d9f922b4b4ec8c52cc8f588d012a7373a0b77affaa618b6eee9157"
+  "hash": "4da125edb8106f95450aba6b9d5b98555bab5aad13f87882569026870399efb6"
 }
