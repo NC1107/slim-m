@@ -389,6 +389,11 @@ A scene becomes interactive by offering `controls` and carrying `state`, and by 
 ```
 
 - `controls` is a list of button labels shown under the scene.
+  A label slim has an icon for gets the icon: `play`, `step`, `random`, `clear`, `reset`.
+  Any other label is drawn as that label, and pressing it sends the label back as the action, so you can offer a verb slim has never heard of.
+  Those five names are therefore reserved, and `play` is the one to watch: it drives slim's own animation loop, repeatedly sending `step` while the scene stays `live`, rather than sending you an action called `play`.
+  If you want a button that plays something once, call it something else (`music-box` calls it `play tune`).
+  The buttons wrap onto another line rather than being clipped, so offering several is safe on a phone.
 - `state` is an opaque string slim stores and hands back on the next call - it is how a stateless module remembers the board between frames.
   Put whatever you need in it (packed cells, a generation counter, a seed); slim never looks inside.
 - An op's `tap` makes it interactive.

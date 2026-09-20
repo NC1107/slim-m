@@ -19,20 +19,29 @@ List<Widget> sceneControls({
 }) {
   final widgets = <Widget>[];
   for (final control in controls) {
-    final button = _controlButton(control, playing, onTogglePlay, onAction);
-    if (button != null) {
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.only(right: AppSpacing.s8),
-          child: button,
-        ),
-      );
-    }
+    widgets.add(_controlButton(control, playing, onTogglePlay, onAction));
   }
   return widgets;
 }
 
-/// One control, or null for a name this client does not offer.
+/// Whether [control] is one of the names with behaviour of its own.
+///
+/// Named so the doc in `docs/modules/building-modules.md` and this list cannot
+/// drift: a module author reads that page, and it promises `controls` is "a
+/// list of button labels". It is, for everything outside this set.
+bool sceneControlIsReserved(String control) => switch (control) {
+  'play' || 'step' || 'random' || 'clear' || 'reset' => true,
+  _ => false,
+};
+
+/// One control's button.
+///
+/// A reserved name gets its icon. Anything else is what the module called it,
+/// rendered as a labelled button that sends that name back as the action - so
+/// a module can offer a verb this client has never heard of, which is the
+/// whole point of the contract. Returning null here is what used to happen
+/// instead, and it meant a module could declare a control, see no button, and
+/// have nothing say why.
 ///
 /// Deliberately never disabled on [_busy]. It used to be, and while playing
 /// that meant every control greyed out and came back on each generation -
@@ -40,7 +49,7 @@ List<Widget> sceneControls({
 /// flashing. A press landing mid-call is already a no-op, because [_send]
 /// refuses a second call while one is in flight, so disabling them bought
 /// nothing the guard did not already do and cost that.
-Widget? _controlButton(
+Widget _controlButton(
   String control,
   bool playing,
   VoidCallback onTogglePlay,
@@ -84,6 +93,27 @@ Widget? _controlButton(
         onPressed: () => onAction('reset'),
       );
     default:
-      return null;
+      return _CustomControl(label: control, onPressed: () => onAction(control));
   }
+}
+
+/// A control this client has no icon for, drawn as its own name.
+///
+/// Lowercase as the module wrote it: these read as verbs in a sentence under
+/// the scene ("play tune", "tempo"), and title-casing somebody else's label
+/// would be this client deciding how their module speaks.
+class _CustomControl extends StatelessWidget {
+  const _CustomControl({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => AppButton(
+    label: label,
+    size: AppButtonSize.sm,
+    variant: AppButtonVariant.secondary,
+    onPressed: onPressed,
+    semanticLabel: label,
+  );
 }
