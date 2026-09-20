@@ -14,6 +14,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/widgets/toast_overlay.dart';
@@ -53,6 +55,8 @@ Future<ProviderContainer> _pump(
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+      // CREATE_INVITE only: MANAGE_SERVER would add a row this mock cannot serve.
+      myPermissionsProvider.overrideWithValue(Perm.createInvite),
       sessionProvider.overrideWithValue(SessionStore(tokens: _tokens)),
       apiProvider.overrideWith((ref) {
         final api = SlimmApi(

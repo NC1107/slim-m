@@ -22,7 +22,8 @@ import '../../touch_targets.dart';
 /// A single-line row: optional leading content, a label, an optional `meta`
 /// caption, an optional trailing widget, and four states that combine freely.
 ///
-/// - [selected]: a left accent marker plus a soft accent fill, one of the
+/// - [selected]: a soft accent fill, plus a left accent marker unless an
+///   [AppSelectionMarkerScope] above says an ancestor draws one. One of the
 ///   seven closed accent roles.
 /// - [unread]: the source lifts both colour (`text-secondary` to
 ///   `text-primary`) and weight (regular to medium) for `selected || unread`
@@ -49,6 +50,26 @@ import '../../touch_targets.dart';
 /// are byte-identical in every theme, so they are kept apart by shape rather
 /// than colour: a row can be selected, unread, and focused all at once with
 /// every state still legible (see the combined case in the test file).
+/// Marks a subtree whose selection marker is drawn by an ancestor, so the
+/// rows inside it do not draw their own.
+///
+/// The channel rail owns one accent bar that slides between rows, which is
+/// the whole point of it travelling. An [AppListRow] inside that layer still
+/// wants everything else `selected` gives it - the soft fill, the weight -
+/// and wants exactly one bar, not its own on top of the layer's. Without
+/// this the rail drew two, and had since the travelling marker landed.
+class AppSelectionMarkerScope extends InheritedWidget {
+  const AppSelectionMarkerScope({required super.child, super.key});
+
+  /// Whether something above [context] is already drawing the marker.
+  static bool ownedAbove(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppSelectionMarkerScope>() !=
+      null;
+
+  @override
+  bool updateShouldNotify(AppSelectionMarkerScope oldWidget) => false;
+}
+
 class AppListRow extends StatefulWidget {
   const AppListRow({
     super.key,
@@ -331,7 +352,7 @@ class _AppListRowState extends State<AppListRow> {
               ),
             ),
             content,
-            if (widget.selected)
+            if (widget.selected && !AppSelectionMarkerScope.ownedAbove(context))
               Positioned(
                 left: 0,
                 top: 5,

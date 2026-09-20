@@ -103,7 +103,7 @@ Future<void> _pump(
 void main() {
   testWidgets('wide: the nav lists every gated area and embeds the first '
       'pane beside it', (tester) async {
-    // Every gating bit, so every pane (join policy included) renders.
+    // Every gating bit, so every pane renders. Who can join is not one now.
     await _pump(tester, permissions: -1);
 
     expect(find.text('MODERATION'), findsOneWidget);
@@ -113,7 +113,6 @@ void main() {
       'Reports',
       'Removed members',
       'Invites',
-      'Who can join',
       'Roles',
       'Channel permissions',
       'Channel categories',
@@ -224,13 +223,15 @@ void main() {
     );
   });
 
-  testWidgets('the embedded join-policy row still opens its picker', (
+  testWidgets('the join-policy row still opens its picker, from Invites', (
     tester,
   ) async {
     await _pump(tester, permissions: -1);
-    await tester.tap(find.text('Who can join'));
+    // Who can join moved in with the invites; it is a row there, not a pane.
+    await tester.tap(find.text('Invites'));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('People with an invite'));
+    // Tapping the row opens the picker directly; there is no pane to enter.
+    await tester.tap(find.text('Who can join'));
     await tester.pumpAndSettle();
     expect(find.text('Anyone with the address'), findsOneWidget);
   });
