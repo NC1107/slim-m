@@ -11,6 +11,7 @@ import 'rail_channel.dart';
 
 part 'message_store_batch.dart';
 part 'message_store_channels.dart';
+part 'message_store_drafts.dart';
 part 'message_store_rows.dart';
 part 'message_store_recovery.dart';
 part 'message_store_retention.dart';
@@ -356,8 +357,20 @@ class MessageStore {
     await db.transaction(() async {
       await db.delete(db.messages).go();
       await db.delete(db.channels).go();
+      // Drafts: the one thing here nobody else has a copy of. See clear's doc.
+      await db.delete(db.channelDrafts).go();
     });
   }
+
+  /// Every channel's unsent composer text, as a map. See
+  /// `message_store_drafts.dart`.
+  Future<Map<String, String>> drafts() => _drafts(this);
+
+  /// Saves [text] as [channelId]'s draft, or deletes the row when it is empty.
+  Future<void> saveDraft(String channelId, String text, {required int now}) =>
+      _saveDraft(this, channelId, text, now);
+
+  Future<void> clearDraft(String channelId) => _clearDraft(this, channelId);
 
   /// Records a message the user just sent, before the server has seen it, so it
   /// appears immediately. Replaced in place by [applyMessage] on acknowledgement

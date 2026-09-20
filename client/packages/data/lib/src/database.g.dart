@@ -2124,6 +2124,246 @@ class ChannelCategoriesCompanion extends UpdateCompanion<ChannelCategoryRow> {
   }
 }
 
+class $ChannelDraftsTable extends ChannelDrafts
+    with TableInfo<$ChannelDraftsTable, ChannelDraftRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChannelDraftsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta =
+      const VerificationMeta('channelId');
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+      'channel_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+      'body', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [channelId, body, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'channel_drafts';
+  @override
+  VerificationContext validateIntegrity(Insertable<ChannelDraftRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(_channelIdMeta,
+          channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta));
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+          _bodyMeta, body.isAcceptableOrUnknown(data['body']!, _bodyMeta));
+    } else if (isInserting) {
+      context.missing(_bodyMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId};
+  @override
+  ChannelDraftRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ChannelDraftRow(
+      channelId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}channel_id'])!,
+      body: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}body'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $ChannelDraftsTable createAlias(String alias) {
+    return $ChannelDraftsTable(attachedDatabase, alias);
+  }
+}
+
+class ChannelDraftRow extends DataClass implements Insertable<ChannelDraftRow> {
+  final String channelId;
+
+  /// Never empty. An empty draft and no draft have to read the same way, so the
+  /// controller deletes the row rather than storing a blank one.
+  ///
+  /// Named `body` rather than `text`: a column called `text` shadows drift's own
+  /// `text()` builder, so the getter recursively returns itself and the analyzer
+  /// is the only thing that catches it.
+  final String body;
+
+  /// When it was last typed, so a future "you have unsent drafts" surface can
+  /// order them without another migration. Nothing reads it yet.
+  final int updatedAt;
+  const ChannelDraftRow(
+      {required this.channelId, required this.body, required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    map['body'] = Variable<String>(body);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  ChannelDraftsCompanion toCompanion(bool nullToAbsent) {
+    return ChannelDraftsCompanion(
+      channelId: Value(channelId),
+      body: Value(body),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ChannelDraftRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ChannelDraftRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      body: serializer.fromJson<String>(json['body']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'body': serializer.toJson<String>(body),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  ChannelDraftRow copyWith({String? channelId, String? body, int? updatedAt}) =>
+      ChannelDraftRow(
+        channelId: channelId ?? this.channelId,
+        body: body ?? this.body,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  ChannelDraftRow copyWithCompanion(ChannelDraftsCompanion data) {
+    return ChannelDraftRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      body: data.body.present ? data.body.value : this.body,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelDraftRow(')
+          ..write('channelId: $channelId, ')
+          ..write('body: $body, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(channelId, body, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ChannelDraftRow &&
+          other.channelId == this.channelId &&
+          other.body == this.body &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ChannelDraftsCompanion extends UpdateCompanion<ChannelDraftRow> {
+  final Value<String> channelId;
+  final Value<String> body;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const ChannelDraftsCompanion({
+    this.channelId = const Value.absent(),
+    this.body = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChannelDraftsCompanion.insert({
+    required String channelId,
+    required String body,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  })  : channelId = Value(channelId),
+        body = Value(body),
+        updatedAt = Value(updatedAt);
+  static Insertable<ChannelDraftRow> custom({
+    Expression<String>? channelId,
+    Expression<String>? body,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (body != null) 'body': body,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChannelDraftsCompanion copyWith(
+      {Value<String>? channelId,
+      Value<String>? body,
+      Value<int>? updatedAt,
+      Value<int>? rowid}) {
+    return ChannelDraftsCompanion(
+      channelId: channelId ?? this.channelId,
+      body: body ?? this.body,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChannelDraftsCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('body: $body, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$SlimmDatabase extends GeneratedDatabase {
   _$SlimmDatabase(QueryExecutor e) : super(e);
   $SlimmDatabaseManager get managers => $SlimmDatabaseManager(this);
@@ -2131,12 +2371,13 @@ abstract class _$SlimmDatabase extends GeneratedDatabase {
   late final $MessagesTable messages = $MessagesTable(this);
   late final $ChannelCategoriesTable channelCategories =
       $ChannelCategoriesTable(this);
+  late final $ChannelDraftsTable channelDrafts = $ChannelDraftsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [channels, messages, channelCategories];
+      [channels, messages, channelCategories, channelDrafts];
 }
 
 typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
@@ -3035,6 +3276,150 @@ typedef $$ChannelCategoriesTableProcessedTableManager = ProcessedTableManager<
     ),
     ChannelCategoryRow,
     PrefetchHooks Function()>;
+typedef $$ChannelDraftsTableCreateCompanionBuilder = ChannelDraftsCompanion
+    Function({
+  required String channelId,
+  required String body,
+  required int updatedAt,
+  Value<int> rowid,
+});
+typedef $$ChannelDraftsTableUpdateCompanionBuilder = ChannelDraftsCompanion
+    Function({
+  Value<String> channelId,
+  Value<String> body,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$ChannelDraftsTableFilterComposer
+    extends Composer<_$SlimmDatabase, $ChannelDraftsTable> {
+  $$ChannelDraftsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get channelId => $composableBuilder(
+      column: $table.channelId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get body => $composableBuilder(
+      column: $table.body, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$ChannelDraftsTableOrderingComposer
+    extends Composer<_$SlimmDatabase, $ChannelDraftsTable> {
+  $$ChannelDraftsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get channelId => $composableBuilder(
+      column: $table.channelId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get body => $composableBuilder(
+      column: $table.body, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ChannelDraftsTableAnnotationComposer
+    extends Composer<_$SlimmDatabase, $ChannelDraftsTable> {
+  $$ChannelDraftsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get channelId =>
+      $composableBuilder(column: $table.channelId, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ChannelDraftsTableTableManager extends RootTableManager<
+    _$SlimmDatabase,
+    $ChannelDraftsTable,
+    ChannelDraftRow,
+    $$ChannelDraftsTableFilterComposer,
+    $$ChannelDraftsTableOrderingComposer,
+    $$ChannelDraftsTableAnnotationComposer,
+    $$ChannelDraftsTableCreateCompanionBuilder,
+    $$ChannelDraftsTableUpdateCompanionBuilder,
+    (
+      ChannelDraftRow,
+      BaseReferences<_$SlimmDatabase, $ChannelDraftsTable, ChannelDraftRow>
+    ),
+    ChannelDraftRow,
+    PrefetchHooks Function()> {
+  $$ChannelDraftsTableTableManager(
+      _$SlimmDatabase db, $ChannelDraftsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ChannelDraftsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ChannelDraftsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ChannelDraftsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> channelId = const Value.absent(),
+            Value<String> body = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ChannelDraftsCompanion(
+            channelId: channelId,
+            body: body,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String channelId,
+            required String body,
+            required int updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ChannelDraftsCompanion.insert(
+            channelId: channelId,
+            body: body,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ChannelDraftsTableProcessedTableManager = ProcessedTableManager<
+    _$SlimmDatabase,
+    $ChannelDraftsTable,
+    ChannelDraftRow,
+    $$ChannelDraftsTableFilterComposer,
+    $$ChannelDraftsTableOrderingComposer,
+    $$ChannelDraftsTableAnnotationComposer,
+    $$ChannelDraftsTableCreateCompanionBuilder,
+    $$ChannelDraftsTableUpdateCompanionBuilder,
+    (
+      ChannelDraftRow,
+      BaseReferences<_$SlimmDatabase, $ChannelDraftsTable, ChannelDraftRow>
+    ),
+    ChannelDraftRow,
+    PrefetchHooks Function()>;
 
 class $SlimmDatabaseManager {
   final _$SlimmDatabase _db;
@@ -3045,4 +3430,6 @@ class $SlimmDatabaseManager {
       $$MessagesTableTableManager(_db, _db.messages);
   $$ChannelCategoriesTableTableManager get channelCategories =>
       $$ChannelCategoriesTableTableManager(_db, _db.channelCategories);
+  $$ChannelDraftsTableTableManager get channelDrafts =>
+      $$ChannelDraftsTableTableManager(_db, _db.channelDrafts);
 }

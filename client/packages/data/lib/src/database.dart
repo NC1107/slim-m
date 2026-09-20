@@ -142,6 +142,36 @@ class ChannelCategories extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Unsent composer text, one row per channel.
+///
+/// The one table here that is not a cache of server state: nobody else has
+/// these words, so unlike [Messages] a wipe loses something real rather than
+/// something refetchable. That is why it is written at all - on a phone, the OS
+/// killing a backgrounded app is indistinguishable from a restart to the person
+/// who just lost what they typed, and it happens without anyone choosing it.
+///
+/// Still wiped on sign-out, along with everything else: the next account on this
+/// device must never read the last one's unfinished words.
+@DataClassName('ChannelDraftRow')
+class ChannelDrafts extends Table {
+  TextColumn get channelId => text()();
+
+  /// Never empty. An empty draft and no draft have to read the same way, so the
+  /// controller deletes the row rather than storing a blank one.
+  ///
+  /// Named `body` rather than `text`: a column called `text` shadows drift's own
+  /// `text()` builder, so the getter recursively returns itself and the analyzer
+  /// is the only thing that catches it.
+  TextColumn get body => text()();
+
+  /// When it was last typed, so a future "you have unsent drafts" surface can
+  /// order them without another migration. Nothing reads it yet.
+  IntColumn get updatedAt => integer()();
+
+  @override
+  Set<Column> get primaryKey => {channelId};
+}
+
 /// Locally cached messages.
 ///
 /// `@DataClassName('MessageRow')`: the same collision `ChannelCategories`
@@ -233,12 +263,12 @@ extension MessageRowMapping on MessageRow {
       );
 }
 
-@DriftDatabase(tables: [Channels, Messages, ChannelCategories])
+@DriftDatabase(tables: [Channels, Messages, ChannelCategories, ChannelDrafts])
 class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -393,6 +423,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 17) {
             await m.addColumn(channels, channels.manuallyUnread);
+          }
+          if (from < 18) {
+            await m.createTable(channelDrafts);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

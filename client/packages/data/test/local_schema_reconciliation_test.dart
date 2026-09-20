@@ -34,6 +34,15 @@
 /// missed live event only means the next full channel refresh - already
 /// triggered by any category change - is what catches it up, not a gap
 /// nothing revisits.
+///
+/// `channel_drafts` is listed for a different reason again, and it is the first
+/// table here that is not a cache of anything. The server never has an unsent
+/// draft, so there is no authoritative copy for a local one to drift from and
+/// nothing a reconciliation could reconcile it against - the debt this test
+/// guards is about a local copy of server state going stale, which a draft
+/// cannot do. What it needs instead is the opposite guarantee: `MessageStore
+/// .clear()` deletes it on sign-out, because the words are real and belong to
+/// the account that typed them. See `channel_drafts_store_test.dart`.
 library;
 
 import 'package:drift/native.dart';
@@ -41,19 +50,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_data/data.dart';
 
 void main() {
-  test('the local schema holds only channels, messages and categories',
-      () async {
+  test('the local schema holds only the tables reasoned about above', () async {
     final db = SlimmDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     final names = db.allTables.map((t) => t.actualTableName).toSet();
     expect(
       names,
-      {'channels', 'messages', 'channel_categories'},
-      reason: 'a new local table beyond these three means reactions, pins or '
-          'polls (or something else) just started being cached - read the '
-          'reconciliation debt in CLAUDE.md before adding one, and build '
-          'reconciliation for it in the same change rather than leaving '
-          'this test to catch it later',
+      {'channels', 'messages', 'channel_categories', 'channel_drafts'},
+      reason: 'a new local table means either something server-owned just '
+          'started being cached - read the reconciliation debt in CLAUDE.md '
+          'and build reconciliation for it in the same change - or it is '
+          'local-only data like channel_drafts, which needs a sign-out wipe '
+          'instead. Say which in this file, the way the four above do.',
     );
   });
 }
