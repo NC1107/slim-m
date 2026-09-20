@@ -80,18 +80,21 @@ void main() {
   /// (`require_manage_server` in `crates/slimm-server/src/http/emoji.rs`), so
   /// it is the bit the row is gated on. It unlocks nothing else: a caller who
   /// can change what the deployment is cannot thereby read the report queue.
-  testWidgets('MANAGE_SERVER alone unlocks only the emoji and who-can-join '
-      'rows', (tester) async {
-    // Compact, or the embedded join-policy pane double-counts its own label.
+  /// Who can join moved into the Invites pane, so MANAGE_SERVER now reaches
+  /// that pane too - otherwise a role holding it without CREATE_INVITE would
+  /// have lost the setting entirely. The invite half inside stays gated on
+  /// CREATE_INVITE; only the policy row shows here.
+  testWidgets('MANAGE_SERVER alone unlocks the emoji and invites rows', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(500, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await pumpSpaceSettings(tester, Perm.manageServer);
 
     expect(find.text('Emoji'), findsOneWidget);
-    expect(find.text('Who can join'), findsOneWidget);
+    expect(find.text('Invites'), findsOneWidget);
     expect(find.text('Reports'), findsNothing);
-    expect(find.text('Invites'), findsNothing);
     expect(find.text('Roles'), findsNothing);
     expect(find.text('Channel permissions'), findsNothing);
   });
@@ -117,7 +120,6 @@ void main() {
     expect(find.text('Invites'), findsOneWidget);
     expect(find.text('Roles'), findsOneWidget);
     expect(find.text('Channel permissions'), findsOneWidget);
-    expect(find.text('Who can join'), findsOneWidget);
     expect(find.text('Emoji'), findsOneWidget);
   });
 

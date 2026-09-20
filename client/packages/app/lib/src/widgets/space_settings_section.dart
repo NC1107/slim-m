@@ -33,9 +33,7 @@ import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
-import 'join_policy_row.dart';
 import 'settings_panes.dart';
-import 'settings_section_header.dart';
 
 /// Whether [permissions] carries any of the bits that gate a pane here.
 /// Shared with the rail's Space menu, which must hide its own entry point on
@@ -100,7 +98,8 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
     SettingsPaneGroup(
       label: 'Access',
       panes: [
-        if (canInvite)
+        // MANAGE_SERVER too: who may join lives in this pane now, gated inside.
+        if (canInvite || canManageServer)
           SettingsPane(
             id: 'invites',
             label: 'Invites',
@@ -115,16 +114,6 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.code,
             compactRoute: Routes.adminBots,
             builder: (_) => const BotsPane(),
-          ),
-        if (canManageServer)
-          SettingsPane(
-            id: 'join-policy',
-            label: 'Who can join',
-            icon: AppIcons.members,
-            builder: (_) => const SettingsSectionCard(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [JoinPolicyRow()],
-            ),
           ),
       ],
     ),

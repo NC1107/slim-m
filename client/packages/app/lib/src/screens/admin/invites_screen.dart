@@ -14,9 +14,11 @@ import '../../format.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/display_preferences.dart';
 import '../../invite_link.dart';
+import '../../permissions.dart';
 import '../../providers/providers.dart';
 import '../../providers/toasts.dart';
 import '../../routing/routes.dart';
+import '../../widgets/join_policy_row.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
@@ -50,26 +52,49 @@ class InvitesPane extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final invites = ref.watch(invitesProvider);
+    final permissions = ref.watch(myPermissionsProvider);
+    final canInvite = permissions.hasPermission(Perm.createInvite);
+    final canManageServer = permissions.hasPermission(Perm.manageServer);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _CreateInviteCard(),
-        const SizedBox(height: AppSpacing.s16),
-        AppAsyncView<List<api.Invite>>(
-          value: AppAsyncState(data: invites.valueOrNull, error: invites.error),
-          center: false,
-          errorMessage: 'Could not load invites.',
-          onRetry: () => ref.invalidate(invitesProvider),
-          isEmpty: (list) => list.isEmpty,
-          emptyMessage: 'No invites yet.',
-          data: (context, list) => SettingsSectionCard(
-            title: 'Invites',
-            children: [for (final invite in list) _InviteRow(invite: invite)],
+        // Who may join sits above the codes that let them in; see JoinPolicyRow.
+        if (canManageServer) ...[
+          const SettingsSectionCard(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [JoinPolicyRow()],
           ),
-        ),
+          if (canInvite) const SizedBox(height: AppSpacing.s16),
+        ],
+        if (canInvite) ...[
+          const _CreateInviteCard(),
+          const SizedBox(height: AppSpacing.s16),
+          const _InviteList(),
+        ],
       ],
+    );
+  }
+}
+
+/// Every invite in force, for whoever may issue one.
+class _InviteList extends ConsumerWidget {
+  const _InviteList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invites = ref.watch(invitesProvider);
+    return AppAsyncView<List<api.Invite>>(
+      value: AppAsyncState(data: invites.valueOrNull, error: invites.error),
+      center: false,
+      errorMessage: 'Could not load invites.',
+      onRetry: () => ref.invalidate(invitesProvider),
+      isEmpty: (list) => list.isEmpty,
+      emptyMessage: 'No invites yet.',
+      data: (context, list) => SettingsSectionCard(
+        title: 'Invites',
+        children: [for (final invite in list) _InviteRow(invite: invite)],
+      ),
     );
   }
 }
