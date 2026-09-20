@@ -28,6 +28,7 @@ class VoiceFlags {
     this.channelId,
     this.state = VoiceSessionState.idle,
     this.joining = false,
+    this.rejoining = false,
     this.microphoneEnabled = true,
     this.cameraEnabled = false,
     this.screenSharing = false,
@@ -46,6 +47,7 @@ class VoiceFlags {
     channelId: state.channelId,
     state: state.state,
     joining: state.joining,
+    rejoining: state.rejoining,
     microphoneEnabled: state.microphoneEnabled,
     cameraEnabled: state.cameraEnabled,
     screenSharing: state.screenSharing,
@@ -63,6 +65,9 @@ class VoiceFlags {
   final String? channelId;
   final VoiceSessionState state;
   final bool joining;
+
+  /// See [VoiceState.rejoining].
+  final bool rejoining;
   final bool microphoneEnabled;
   final bool cameraEnabled;
   final bool screenSharing;
@@ -82,6 +87,7 @@ class VoiceFlags {
       other.channelId == channelId &&
       other.state == state &&
       other.joining == joining &&
+      other.rejoining == rejoining &&
       other.microphoneEnabled == microphoneEnabled &&
       other.cameraEnabled == cameraEnabled &&
       other.screenSharing == screenSharing &&
@@ -100,6 +106,7 @@ class VoiceFlags {
     channelId,
     state,
     joining,
+    rejoining,
     microphoneEnabled,
     cameraEnabled,
     screenSharing,

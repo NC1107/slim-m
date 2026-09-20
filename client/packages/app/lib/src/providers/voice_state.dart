@@ -8,12 +8,14 @@ library;
 import 'package:slimm_rtc/rtc.dart';
 
 import 'call_recap.dart';
+import 'voice_auto_rejoin.dart';
 
 class VoiceState {
   const VoiceState({
     this.channelId,
     this.state = VoiceSessionState.idle,
     this.joining = false,
+    this.rejoining = false,
     this.participants = const [],
     this.microphoneEnabled = true,
     this.cameraEnabled = false,
@@ -57,6 +59,13 @@ class VoiceState {
   /// answered, so this is what tells a screen arriving elsewhere that a
   /// join is under way during that gap; see `voice_screen.dart`'s `_busyElsewhere`.
   final bool joining;
+
+  /// True while an automatic rejoin is waiting to run after the network took
+  /// the call: see [VoiceAutoRejoin]. Distinct from [joining], which covers
+  /// an attempt actually in flight, because the gap between two attempts is
+  /// still time the app spends reconnecting and a screen that read it as
+  /// "you left" would be showing an error nobody had been asked to act on.
+  final bool rejoining;
 
   /// What the user has asked for, which is not always what they got: a token
   /// without SPEAK cannot open a microphone however the toggle is set.
@@ -116,6 +125,7 @@ class VoiceState {
     String? channelId,
     VoiceSessionState? state,
     bool? joining,
+    bool? rejoining,
     List<VoiceParticipant>? participants,
     bool? microphoneEnabled,
     bool? cameraEnabled,
@@ -137,6 +147,7 @@ class VoiceState {
     channelId: channelId ?? this.channelId,
     state: state ?? this.state,
     joining: joining ?? this.joining,
+    rejoining: rejoining ?? this.rejoining,
     participants: participants ?? this.participants,
     microphoneEnabled: microphoneEnabled ?? this.microphoneEnabled,
     cameraEnabled: cameraEnabled ?? this.cameraEnabled,
