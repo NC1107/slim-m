@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// `ChannelDraftsController` in isolation: the plain get/save/clear
-/// contract, and the sign-out and account-switch wipes that close the same
-/// leak `BlocksController` already closed (a draft is the same shape as a
-/// blocked-user list - session state a device must not hand to whoever
-/// signs in next).
+/// `ChannelDraftsController`: the plain get/save/clear contract, the sign-out
+/// and account-switch wipes that close the same leak `BlocksController` already
+/// closed (a draft is the same shape as a blocked-user list - session state a
+/// device must not hand to whoever signs in next), and the restore that makes a
+/// draft survive the process.
+///
+/// The persistence cases run against a real in-memory database rather than a
+/// fake store, because what is being tested is that the words come back - and a
+/// fake that returns whatever it was handed would prove that whatever happens.
 library;
 
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/channel_drafts.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_data/data.dart';
 
 const _alice = api.TokenPair(
   userId: 'alice',
@@ -125,5 +131,100 @@ void main() {
           'the session stream also fires on routine access-token rotation, '
           'not just a real account change',
     );
+  });
+
+  group('surviving the process', () {
+    /// A container wired to [db], so two of them in a row are what a restart
+    /// looks like from the controller's side.
+    ProviderContainer containerOn(SlimmDatabase db, api.SessionStore session) {
+      final made = ProviderContainer(
+        overrides: [
+          sessionProvider.overrideWithValue(session),
+          storeProvider.overrideWith((ref) async => MessageStore(db)),
+        ],
+      );
+      addTearDown(made.dispose);
+      return made;
+    }
+
+    test('a draft typed before a restart is there after one', () async {
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      final first = containerOn(db, api.SessionStore(tokens: _alice));
+      final before = first.read(channelDraftsProvider);
+      await before.restored;
+      before.save('c1', 'half a thought');
+      // The write is fire-and-forget by design, so let it land.
+      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
+
+      final second = containerOn(db, api.SessionStore(tokens: _alice));
+      final after = second.read(channelDraftsProvider);
+      await after.restored;
+
+      expect(after.draftFor('c1'), 'half a thought');
+    });
+
+    test('a draft sent before the restart does not come back', () async {
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      final first = containerOn(db, api.SessionStore(tokens: _alice));
+      final before = first.read(channelDraftsProvider);
+      await before.restored;
+      before.save('c1', 'about to send this');
+      await pumpEventQueue();
+      before.clear('c1');
+      await pumpEventQueue();
+
+      final second = containerOn(db, api.SessionStore(tokens: _alice));
+      final after = second.read(channelDraftsProvider);
+      await after.restored;
+
+      expect(after.draftFor('c1'), isEmpty);
+    });
+
+    test('typing during the restore wins over what was on disk', () async {
+      final db = SlimmDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await MessageStore(db).saveDraft('c1', 'the old words', now: 1);
+
+      final container = containerOn(db, api.SessionStore(tokens: _alice));
+      final drafts = container.read(channelDraftsProvider);
+      // Before the restore has had a chance to land.
+      drafts.save('c1', 'the new words');
+      await drafts.restored;
+
+      expect(
+        drafts.draftFor('c1'),
+        'the new words',
+        reason: 'somebody typing states a newer intent than a row being read',
+      );
+    });
+
+    test('a restore that fails leaves the controller usable', () async {
+      final container = ProviderContainer(
+        overrides: [
+          sessionProvider.overrideWithValue(api.SessionStore(tokens: _alice)),
+          storeProvider.overrideWith(
+            (ref) async => throw StateError('no database here'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final drafts = container.read(channelDraftsProvider);
+      await drafts.restored;
+      drafts.save('c1', 'still works');
+
+      expect(
+        drafts.draftFor('c1'),
+        'still works',
+        reason:
+            'a draft that cannot be read back is the loss a crash already '
+            'was; it must not also break the composer',
+      );
+    });
   });
 }
