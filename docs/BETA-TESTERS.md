@@ -13,6 +13,11 @@ There is no web page behind it, so an `https://` version of the same link 404s.
 Send the `slimm://` link, or send the bare code and the server address.
 This is a deliberate decision, not an oversight - see `docs/OPEN-QUESTIONS.md` item 21.
 
+**A link to one message is `slimm://message?...` and works the other way round.**
+"Copy link" on a message produces one, and tapping it opens the app on that message.
+It only does anything while signed in, and only when the link names the deployment you are signed into.
+A link to somebody else's server is ignored, for the same reason an invite is ignored while signed in: one deployment is one community in v1.
+
 **Voice may not work from outside the host's network** unless the operator has forwarded LiveKit's media ports.
 Signalling and text go over 443 and work anywhere; call media does not and cannot.
 If calls connect and then carry no audio, or never connect at all, that is the first thing to check - not the tester's device.

@@ -48,12 +48,15 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Invite links: slimm://join?... opens the app on the join flow (see lib/src/deep_links.dart). -->
+            <!-- slimm:// links: join?... opens the join flow, message?... jumps to a message (see lib/src/deep_links.dart).
+                 Both hosts are listed because a data element scoped to one host is what decides whether the OS
+                 hands the link over at all; a link to an unlisted host never reaches the app to be parsed. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="slimm" android:host="join"/>
+                <data android:scheme="slimm" android:host="message"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
