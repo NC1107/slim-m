@@ -670,6 +670,15 @@ The runner is ephemeral, and a dedicated keychain keeps the private key out of a
 xcodebuild finds a provisioning profile by its UUID under `~/Library/MobileDevice/Provisioning Profiles`, so the file has to be named for the UUID embedded in its own signed plist.
 
 The job prints the identities visible to codesign before building.
+
+**An upload is not a delivery, and this job used to imply it was.**
+`altool --upload-app` finishing with `UPLOAD SUCCEEDED` means Apple accepted the bytes and nothing more.
+Whether the build then processes, and whether any tester is offered it, happens in App Store Connect where this workflow has no say.
+Between 2026-09-15 and 2026-09-20 that gap hid itself: 36 successful runs uploaded 36 builds, every `ios-testflight` job went green, and the owner's phone stayed on client 0.76.0 the whole time.
+A `report recent TestFlight build states` step now lists the app's recent builds into the run summary after the upload, so a queue that is stuck or a build nobody was offered is visible from the run rather than only from App Store Connect.
+It is `continue-on-error` and always exits 0 on purpose: it reports, and a flaky query must not turn a good build red.
+
+What it cannot do is distribute. Internal testers are offered a build once it processes; an external group needs Beta App Review per build, and neither is something a workflow step arranges here.
 A signing failure downstream is otherwise reported only as "no valid code signing certificates were found", which says nothing about whether the import worked.
 
 ### Build numbers and build names, on both mobile jobs

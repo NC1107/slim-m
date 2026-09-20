@@ -449,6 +449,23 @@ jobs:
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
 
+      # An upload is not a delivery: processing and distribution happen in
+      # App Store Connect. Reports, never gates; see docs/ci.md.
+      - name: report recent TestFlight build states
+        if: steps.gate.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          out="$(xcrun altool --list-builds \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --output-format json 2>&1)" || out="could not list builds: $out"
+          {
+            echo "### TestFlight builds"
+            echo '```'
+            echo "$out" | tail -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # Pulled into its own file, copr-publish.yml, once this workflow reached
   # the 500-line hard ceiling - a reusable workflow rather than a composite
   # action, since the job needs its own container image.
