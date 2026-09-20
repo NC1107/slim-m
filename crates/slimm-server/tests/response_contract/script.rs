@@ -26,6 +26,7 @@ mod content_messages_window;
 mod dock;
 mod gifs;
 mod link_preview;
+mod member_account;
 mod members_bulk;
 mod people;
 mod read_state;
@@ -57,7 +58,7 @@ pub(super) fn text(value: &Value, field: &str) -> String {
         .to_owned()
 }
 
-fn signup(username: &str, device: &str, invite: Option<&str>) -> Value {
+pub(super) fn signup(username: &str, device: &str, invite: Option<&str>) -> Value {
     json!({
         "username": username,
         "display_name": username,
@@ -481,6 +482,8 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
     .await;
 
     bulk_member_calls(c, root, &erin_id).await;
+
+    member_account::member_account_calls(c, root, code).await;
 
     recovery_calls(c, root, bob_id).await;
     bot_calls(c, root).await;

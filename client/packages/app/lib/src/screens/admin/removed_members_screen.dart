@@ -7,6 +7,8 @@
 /// reversible. Requires BAN_MEMBERS, the same bit that performs it.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -14,8 +16,10 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
 import '../../providers/member_presence.dart' show membersProvider;
+import '../../permissions.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_notice.dart';
@@ -71,6 +75,11 @@ class _RemovalRowState extends ConsumerState<_RemovalRow>
     with GuardedActionState<_RemovalRow> {
   bool _busy = false;
 
+  /// ADMINISTRATOR, matching the route. Someone with BAN_MEMBERS can remove
+  /// and restore, which is reversible; this is not, so it asks for more.
+  bool get canDeleteAccounts =>
+      ref.watch(myPermissionsProvider).hasPermission(Perm.administrator);
+
   Future<void> _restore() async {
     setState(() => _busy = true);
     final ok = await guard(
@@ -82,6 +91,37 @@ class _RemovalRowState extends ConsumerState<_RemovalRow>
     if (ok) {
       ref.invalidate(removedMembersProvider);
       // The member list gains a row again, so it is stale too.
+      ref.invalidate(membersProvider);
+    }
+  }
+
+  /// Deleting the account outright, which is the only way a removed member
+  /// stops being listed here: `listRemovedMembers` skips tombstoned users.
+  ///
+  /// Confirmed because nothing undoes it, and worded to say what survives -
+  /// what they wrote stays, anonymized, so a conversation does not develop
+  /// holes when somebody is deleted.
+  Future<void> _deleteAccount() async {
+    final removal = widget.removal;
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Delete ${removal.displayName}?',
+      message:
+          'Deletes the account for good and frees @${removal.username} for '
+          'somebody else to register. What they wrote stays, no longer '
+          'attributed to them. This cannot be undone.',
+      confirmLabel: 'Delete account',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _busy = true);
+    final ok = await guard(
+      whatFailed: 'delete ${removal.displayName}',
+      action: () => ref.read(apiProvider).deleteMemberAccount(removal.userId),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) {
+      ref.invalidate(removedMembersProvider);
       ref.invalidate(membersProvider);
     }
   }
@@ -107,6 +147,13 @@ class _RemovalRowState extends ConsumerState<_RemovalRow>
           size: AppButtonSize.sm,
           onPressed: _busy ? null : _restore,
         ),
+        if (canDeleteAccounts)
+          AppButton(
+            label: 'Delete',
+            variant: AppButtonVariant.danger,
+            size: AppButtonSize.sm,
+            onPressed: _busy ? null : () => unawaited(_deleteAccount()),
+          ),
       ],
       error: actionError,
       onErrorDismiss: clearActionError,

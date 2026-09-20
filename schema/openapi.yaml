@@ -2190,6 +2190,51 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /members/{userId}/account:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        description: The member's UUID.
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteMemberAccount
+      tags: [moderation]
+      summary: Delete a member's account outright. Requires ADMINISTRATOR.
+      description: >
+        Does to somebody else's account exactly what `deleteAccount` does to
+        your own: purges their personal data, anonymizes what they wrote,
+        tombstones the user, revokes every session, and frees the username
+        for reuse.
+
+        ADMINISTRATOR rather than BAN_MEMBERS, deliberately. A removal takes
+        access away and `restoreMember` undoes it; nothing undoes this, so
+        the two are not the same power and do not share a permission.
+
+        A removed member stops being listed by `listRemovedMembers` once
+        deleted, because that list skips tombstoned users. The removal row
+        itself is kept, so the moderation record outlives the account.
+
+        Refused on yourself - delete your own account with `deleteAccount`,
+        so that an administrator can leave without needing another one to do
+        it for them - and on the last administrator.
+      responses:
+        "204":
+          description: The account is deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /members/{userId}/removal:
     parameters:
       - name: userId

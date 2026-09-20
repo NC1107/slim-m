@@ -183,6 +183,20 @@ extension SlimmApiMemberModeration on SlimmApi {
         expectNoContent: true,
       );
 
+  /// Deletes a member's account outright. Requires ADMINISTRATOR.
+  ///
+  /// The same thing [deleteAccount] does to your own: personal data purged,
+  /// authored content anonymized, the user tombstoned, sessions revoked, and
+  /// the username freed. Nothing undoes it, which is why it asks for a
+  /// stricter permission than [removeMember] does.
+  ///
+  /// 400 on yourself, 409 on the last administrator.
+  Future<void> deleteMemberAccount(String userId) => _send(
+        'DELETE',
+        '/members/$userId/account',
+        expectNoContent: true,
+      );
+
   /// Removes several members at once. Requires BAN_MEMBERS.
   ///
   /// The batch is all or nothing: if any named member sits above the caller's

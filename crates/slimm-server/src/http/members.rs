@@ -22,7 +22,7 @@ use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::{get, put};
+use axum::routing::{delete, get, put};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
@@ -35,7 +35,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, now_ms};
+use crate::store::{DeleteAccountError, MAX_TIMEOUT_MS, RemoveMemberError, SpaceRemoval, now_ms};
 use crate::voice::VoiceError;
 
 const BODY_LIMIT: usize = 4 * 1024;
@@ -52,6 +52,7 @@ pub fn routes() -> Router<AppState> {
             put(remove_member).delete(restore_member),
         )
         .route("/members/removed", get(list_removed))
+        .route("/members/{user_id}/account", delete(delete_member_account))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -238,6 +239,57 @@ async fn restore_member(
     } else {
         Err(ApiError::NotFound("that member is not removed"))
     }
+}
+
+/// Deletes somebody else's account outright, the way they could delete their
+/// own: personal data purged, authored content anonymized, the user
+/// tombstoned, every session revoked, and the username freed for reuse.
+///
+/// Requires ADMINISTRATOR rather than BAN_MEMBERS, and deliberately so.
+/// Removing a member takes their access away and is undone by
+/// [`restore_member`]; this cannot be undone by anything. The two are not the
+/// same power and must not share a permission.
+///
+/// Self-deletion keeps its own route (`DELETE /account`): a person deleting
+/// their own account is not a moderation act, and routing it through here
+/// would mean an administrator could not leave without another administrator
+/// to do it for them.
+///
+/// The tombstone is what makes a removed account stop being listed:
+/// [`Store::list_removals`] already skips deleted users, so nothing has to
+/// clear the removal row, and the moderation record of it survives.
+async fn delete_member_account(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path(user_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let target = UserId(parse_uuid(&user_id)?);
+    require(&state, ctx.user_id, Permissions::ADMINISTRATOR).await?;
+
+    if target == ctx.user_id {
+        return Err(ApiError::BadRequest(
+            "delete your own account with DELETE /account",
+        ));
+    }
+
+    let revoked = match state.store.delete_account(target).await {
+        Ok(revoked) => revoked,
+        Err(DeleteAccountError::WouldStrandDeployment) => {
+            return Err(ApiError::Conflict(
+                "that is the only administrator; appoint another before deleting it",
+            ));
+        }
+        Err(DeleteAccountError::Internal(e)) => return Err(e.into()),
+    };
+    for session_id in revoked {
+        state.hub.publish(Event::SessionRevoked(session_id));
+    }
+    if let Err(err) = state.media.delete_avatar(&target.to_string()).await {
+        tracing::warn!(error = %err, "failed to delete an account's avatar file");
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Every removal in force. Requires BAN_MEMBERS, because this is the only
