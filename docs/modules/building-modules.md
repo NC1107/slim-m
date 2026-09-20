@@ -280,7 +280,7 @@ Prefer tokens; a module that hard-codes hex will look wrong in one theme or the 
 
 | op | fields |
 | --- | --- |
-| `cells` | `cols`, `rows`, `data` (one char per cell, row-major, each a palette index `'0'`..), `palette` (list of colours), `gap`, `tap` |
+| `cells` | `cols`, `rows`, `data` (one char per cell, row-major, each a palette index `'0'`..), `palette` (list of colours), `gap`, `tap`, and optionally `x`, `y`, `w`, `h` |
 | `rect` | `x`, `y`, `w`, `h`, `fill`, `stroke`, `sw` (stroke width), `r` (corner radius), `tap` |
 | `circle` | `cx`, `cy`, `r`, `fill`, `stroke`, `sw`, `tap` |
 | `line` | `x1`, `y1`, `x2`, `y2`, `stroke`, `sw` |
@@ -292,6 +292,10 @@ Prefer tokens; a module that hard-codes hex will look wrong in one theme or the 
 `rect` and `circle` also take a `grad` instead of a flat `fill`; see below.
 
 `cells` is the workhorse for boards, heatmaps, and automata: a grid of palette indices drawn in one op.
+By default it fills the whole scene.
+Give it `w` and `h` (and `x`, `y`, which default to the origin) to place it, so a grid can be one part of a scene next to labels, buttons or other art rather than the whole of it.
+Both the painting and the tap reading follow the box, so a tap outside it falls through to whatever op is underneath.
+A `w` or `h` that is missing or not positive describes nothing, so the grid falls back to filling the scene rather than disappearing.
 An op slim does not recognise is skipped rather than failing the scene, so a new op is an additive change a newer client can use.
 
 ### Arbitrary shapes with `path`

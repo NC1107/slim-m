@@ -139,8 +139,9 @@ class ModuleScenePainter extends CustomPainter {
 
   void _paintCells(Canvas canvas, CellsOp op, double sx, double sy) {
     if (op.cols <= 0 || op.rows <= 0 || op.palette.isEmpty) return;
-    final cellW = (scene.width / op.cols) * sx;
-    final cellH = (scene.height / op.rows) * sy;
+    final grid = cellsGridRect(op, scene, sx, sy);
+    final cellW = grid.width / op.cols;
+    final cellH = grid.height / op.rows;
     final inset = op.gap * (cellW < cellH ? cellW : cellH) / 2;
     final colors = op.palette
         .map((name) => _resolve(name, tokens.surfaceSunken))
@@ -151,8 +152,8 @@ class ModuleScenePainter extends CustomPainter {
       final col = i % op.cols;
       final row = i ~/ op.cols;
       final rect = Rect.fromLTWH(
-        col * cellW + inset,
-        row * cellH + inset,
+        grid.left + col * cellW + inset,
+        grid.top + row * cellH + inset,
         cellW - inset * 2,
         cellH - inset * 2,
       );
@@ -272,14 +273,31 @@ bool sceneAllowsTapBatch(ModuleScene scene, String action) {
   return false;
 }
 
+/// The painted box a grid occupies, in widget pixels.
+///
+/// Shared by the painter and the hit test on purpose: they disagreed about a
+/// boxed grid the moment either one was written alone, and a grid whose cells
+/// are drawn somewhere its taps are not read is the exact bug that is hardest
+/// to see in a screenshot.
+Rect cellsGridRect(CellsOp op, ModuleScene scene, double sx, double sy) {
+  final box = op.box;
+  return Rect.fromLTWH(
+    (box?.x ?? 0) * sx,
+    (box?.y ?? 0) * sy,
+    (box?.w ?? scene.width) * sx,
+    (box?.h ?? scene.height) * sy,
+  );
+}
+
 String? sceneTapAction(ModuleScene scene, Offset local, Size size) {
   final sx = scene.width == 0 ? 1.0 : size.width / scene.width;
   final sy = scene.height == 0 ? 1.0 : size.height / scene.height;
   for (final op in scene.ops.reversed) {
     switch (op) {
       case CellsOp() when op.tap != null && op.cols > 0 && op.rows > 0:
-        final col = (local.dx / (size.width / op.cols)).floor();
-        final row = (local.dy / (size.height / op.rows)).floor();
+        final grid = cellsGridRect(op, scene, sx, sy);
+        final col = ((local.dx - grid.left) / (grid.width / op.cols)).floor();
+        final row = ((local.dy - grid.top) / (grid.height / op.rows)).floor();
         if (col >= 0 && col < op.cols && row >= 0 && row < op.rows) {
           return '${op.tap}:$row,$col';
         }
