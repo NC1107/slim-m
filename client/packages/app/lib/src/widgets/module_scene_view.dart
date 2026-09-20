@@ -428,7 +428,10 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
         ],
         if (_scene.controls.isNotEmpty || widget.onExpand != null) ...[
           const SizedBox(height: AppSpacing.s8),
-          Row(
+          // Wraps because a Row overflowed on a phone and clipped what sat last: the full-screen button.
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
             children: [
               ...sceneControls(
                 controls: _scene.controls,
