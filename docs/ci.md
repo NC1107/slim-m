@@ -546,6 +546,13 @@ It needs no secrets beyond the automatic `GITHUB_TOKEN` (`packages: write` to pu
 `server-image-merge` assembles the per-arch digests into one multi-arch manifest tag and cosign-signs it keylessly over OIDC.
 It signs the manifest-list digest, which covers both arch images and every tag that resolves to it.
 
+It also requires that *every* arch actually built, and that requirement has to be written out.
+`server-image` is a `fail-fast: false` matrix, so one arch can fail while the other succeeds.
+A job carrying any `if:` at all loses GitHub's implicit "every need succeeded" gate, and `server-image-merge`'s condition named only `verify-server-ci` - so a failed arch left it assembling a manifest out of whichever digests did arrive.
+That publishes a **single-arch** image under the version tag, `sha-<commit>` and, when `decide-latest-tag.sh` allows it, `latest`, with the job green and nothing saying an architecture is missing.
+Both halves of the fix are in `release.yml`: the condition names `needs.server-image.result` as well, and the digest download sets `if-no-files-found: error`.
+`server-release-assets` had the same shape against `server-binaries` and carries the same fix, where the consequence was a GitHub Release with only one arch's binary attached.
+
 `latest` is the rolling tag deployments track for auto-updates, since Watchtower polls a mutable tag.
 The version and sha tags stay alongside it, for pinning and for tracing an image back to its commit.
 
