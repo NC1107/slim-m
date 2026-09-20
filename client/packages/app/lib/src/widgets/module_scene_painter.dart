@@ -143,12 +143,13 @@ class ModuleScenePainter extends CustomPainter {
     final cellW = grid.width / op.cols;
     final cellH = grid.height / op.rows;
     final inset = op.gap * (cellW < cellH ? cellW : cellH) / 2;
-    final colors = op.palette
-        .map((name) => _resolve(name, tokens.surfaceSunken))
+    // One Paint per palette entry, not per cell: a ticking board repaints cols*rows a second.
+    final brushes = op.palette
+        .map((name) => Paint()..color = _resolve(name, tokens.surfaceSunken))
         .toList(growable: false);
     for (var i = 0; i < op.data.length && i < op.cols * op.rows; i++) {
       final index = op.data.codeUnitAt(i) - 0x30;
-      if (index < 0 || index >= colors.length) continue;
+      if (index < 0 || index >= brushes.length) continue;
       final col = i % op.cols;
       final row = i ~/ op.cols;
       final rect = Rect.fromLTWH(
@@ -157,7 +158,7 @@ class ModuleScenePainter extends CustomPainter {
         cellW - inset * 2,
         cellH - inset * 2,
       );
-      canvas.drawRect(rect, Paint()..color = colors[index]);
+      canvas.drawRect(rect, brushes[index]);
     }
   }
 

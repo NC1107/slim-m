@@ -197,10 +197,12 @@ impl Store {
     /// The lowest op seq still retained for a channel, `None` where the stream
     /// holds nothing.
     ///
-    /// Nothing sweeps `message_ops` today, so the floor is always the first op
-    /// ever written. This exists so a sweep can be added later with no wire
-    /// change, and so the reset branch depending on it is written and tested
-    /// now rather than discovered missing then.
+    /// The floor moves: `Store::reclaim_message_ops_before` (the message
+    /// retention sweep) drops ops past the cutoff, so this is the sweep's
+    /// high-water mark rather than the first op ever written. It was the
+    /// latter when this was added, and the reset branch depending on it was
+    /// written and tested before there was a sweep to move it - see
+    /// `http::sync_ops`'s `effective_floor` for the caller that reads it.
     pub async fn earliest_message_op_seq(
         &self,
         channel_id: ChannelId,

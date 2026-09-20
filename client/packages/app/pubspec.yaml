@@ -47,7 +47,6 @@ dependencies:
   slimm_platform:
   slimm_rtc:
   slimm_voice_canvas:
-  drift: ^2.20.0
   http: ^1.2.0
   # 10.x, not 9.x: file_picker 12 requires win32 6, so the whole tree moves
   # off win32 5 and the old hold on 9.x no longer resolves.
@@ -66,6 +65,8 @@ dependencies:
   app_links: ^7.2.1
   url_launcher: ^6.3.2
 dev_dependencies:
+  # Only ever imported from test/; production app code reaches drift through slimm_data.
+  drift: ^2.20.0
   fake_async: ^1.3.3
   flutter_lints: ^5.0.0
   flutter_test:
