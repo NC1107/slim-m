@@ -68,6 +68,22 @@ class InlineLink extends InlineNode {
   final String url;
 }
 
+/// A `slimm://message?...` link typed or pasted into a message.
+///
+/// Deliberately its own node rather than an [InlineLink] with a different
+/// scheme. [InlineLink] is what `message_text.dart` hands to `launchUrl`, and
+/// that path checks for http or https precisely so nothing can smuggle an app
+/// scheme past the opener. A message link is never opened by the OS at all: it
+/// is navigation inside this app, so it takes a separate route through the
+/// renderer and that guard stays exactly as tight as it was.
+class InlineMessageLink extends InlineNode {
+  const InlineMessageLink(this.raw);
+
+  /// The matched text, still to be parsed by `parseMessageLink`. Kept raw so
+  /// this file needs no opinion about what a valid one looks like.
+  final String raw;
+}
+
 class InlineBold extends InlineNode {
   const InlineBold(this.children);
   final List<InlineNode> children;
@@ -100,6 +116,15 @@ final RegExp _mentionPattern = RegExp(r'@[A-Za-z0-9_][A-Za-z0-9_.-]*');
 /// sentence punctuation is trimmed afterward by [_trimUrlEnd] rather than
 /// excluded here, since a `)` or `.` can be genuinely part of a URL.
 final RegExp _urlPattern = RegExp(r'https?://[^\s]+');
+
+/// A message link, matched narrowly: this exact scheme and host, nothing else.
+///
+/// Narrow on purpose. Widening it to any `slimm://` would make every app-scheme
+/// link in a message body tappable, and the only one this app has any business
+/// acting on from a message is a link to a message. An invite arriving in a
+/// message body is deliberately not tappable - `deep_links.dart` explains why a
+/// pasted invite must still go through the join flow's own checks.
+final RegExp _messageLinkPattern = RegExp(r'slimm://message\?[^\s]+');
 final RegExp _emojiPattern = RegExp(r':[A-Za-z0-9_]{1,32}:');
 final RegExp _digitsOnly = RegExp(r'^[0-9]+$');
 final RegExp _wordChar = RegExp(r'[A-Za-z0-9_]');
@@ -370,6 +395,16 @@ List<InlineNode> parseInline(String content) {
         flush();
         nodes.add(InlineEmoji(m.group(0)!));
         i = m.end;
+        continue;
+      }
+    } else if (ch == 's' && !_isWordAt(content, i - 1)) {
+      // Same "only starts a token" rule the http match below follows.
+      final m = _messageLinkPattern.matchAsPrefix(content, i);
+      if (m != null) {
+        final end = _trimUrlEnd(content, i, m.end);
+        flush();
+        nodes.add(InlineMessageLink(content.substring(i, end)));
+        i = end;
         continue;
       }
     } else if (ch == 'h' && !_isWordAt(content, i - 1)) {

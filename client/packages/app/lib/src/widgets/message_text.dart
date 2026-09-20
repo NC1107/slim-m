@@ -25,15 +25,24 @@ library;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../message_link.dart';
+import '../providers/providers.dart';
+import 'app_snackbar.dart';
+import 'channel_rail.dart' show selectedChannelId;
 import 'custom_emoji_image.dart';
+import 'message_jump.dart' show jumpToMessage;
 import 'message_code_block_runner.dart';
 import 'message_fences.dart';
 import 'message_inline.dart';
 import 'message_markdown_blocks.dart';
 import 'message_spoiler.dart';
+
+part 'message_text_spans.dart';
 
 /// One line tall: [AppText.body] is 15px at a 1.45 line height, so an inline
 /// emoji is that product rather than a pixel value chosen to look right.
@@ -222,7 +231,7 @@ Widget _buildMarkdownBlock(
 /// One run of text with inline markdown, mentions and custom emoji picked
 /// out. [baseStyle] carries size and weight; [color] is applied on top of it
 /// so dimmed (pending/failed) messages still work at any heading level.
-class _MessageTextRun extends StatefulWidget {
+class _MessageTextRun extends ConsumerStatefulWidget {
   const _MessageTextRun({
     required this.text,
     required this.knownUsernames,
@@ -240,10 +249,10 @@ class _MessageTextRun extends StatefulWidget {
   final TextStyle baseStyle;
 
   @override
-  State<_MessageTextRun> createState() => _MessageTextRunState();
+  ConsumerState<_MessageTextRun> createState() => _MessageTextRunState();
 }
 
-class _MessageTextRunState extends State<_MessageTextRun> {
+class _MessageTextRunState extends ConsumerState<_MessageTextRun> {
   /// Link tap recognizers built for the current spans. A `TextSpan`'s
   /// recognizer is not disposed for you, so they are owned here, rebuilt on
   /// each build and released in [dispose] - a link inside a message row that
@@ -267,6 +276,37 @@ class _MessageTextRunState extends State<_MessageTextRun> {
     final recognizer = TapGestureRecognizer()..onTap = () => _open(url);
     _recognizers.add(recognizer);
     return recognizer;
+  }
+
+  TapGestureRecognizer _makeMessageLinkRecognizer(String raw) {
+    final recognizer = TapGestureRecognizer()..onTap = () => _openMessage(raw);
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  /// Follows a message link inside the app. Never reaches [launchUrl]: see
+  /// [InlineMessageLink] for why that separation is the point.
+  ///
+  /// A link to another deployment is refused rather than followed, which is the
+  /// same call `deep_links.dart` makes about an invite arriving while signed in:
+  /// one deployment is one community in v1, so following it would be a server
+  /// switch, and that is a product decision a tapped link has no standing to
+  /// make.
+  void _openMessage(String raw) {
+    final link = parseMessageLink(raw);
+    if (link == null) return;
+    if (!messageLinkIsHere(link, ref.read(serverUrlProvider))) {
+      // A server switch is not a tapped link's call; see _openMessage's doc.
+      showAppSnackbar(context, 'That link is for a different server.');
+      return;
+    }
+    jumpToMessage(
+      GoRouter.of(context),
+      ref.read,
+      currentChannelId: selectedChannelId(context),
+      channelId: link.channelId,
+      messageId: link.messageId,
+    );
   }
 
   Future<void> _open(String url) async {
@@ -293,6 +333,7 @@ class _MessageTextRunState extends State<_MessageTextRun> {
             ambientStyle: style,
             linkColor: tokens.accent,
             makeLinkRecognizer: _makeLinkRecognizer,
+            makeMessageLinkRecognizer: _makeMessageLinkRecognizer,
           ),
         ),
       ),
@@ -305,144 +346,3 @@ class _MessageTextRunState extends State<_MessageTextRun> {
 /// `http/auth.rs` refuses to register either, case-insensitively) - kept
 /// lower-case, matched the same way against a lower-cased [raw].
 const _reservedMentions = {'everyone', 'here'};
-
-/// Whether [raw] (the whole `@name` token, `@` included) should render as a
-/// chip: either it names someone in [knownUsernames], or it is one of the
-/// two reserved words above. Rendering a reserved word as a chip says
-/// nothing about whether the sender actually held `Perm.mentionEveryone` -
-/// that permission only ever gates who gets woken for it, never whether the
-/// word itself is recognised - so it is drawn the same way regardless.
-bool _isRenderableMention(String raw, Set<String> knownUsernames) {
-  final name = raw.substring(1).toLowerCase();
-  return knownUsernames.contains(name) || _reservedMentions.contains(name);
-}
-
-/// Whether [name] (already brackets-stripped) should render as a role chip:
-/// it names a role in [knownRoleNames]. Unlike [_isRenderableMention] there
-/// is no reserved-word fallback - `@[everyone]` is a literal role name, not
-/// the mass mention, and `roles_for_names` on the server refuses to resolve
-/// it for exactly that reason; see its own doc comment.
-bool _isRenderableRole(String name, Set<String> knownRoleNames) =>
-    knownRoleNames.contains(name.toLowerCase());
-
-/// Walks a [parseInline] tree into `InlineSpan`s. Bold, italic and
-/// strikethrough are a style diff on a wrapping [TextSpan]; Flutter merges a
-/// child span's style onto its parent's at paint time, which is the whole
-/// mechanism nesting rides on: an [InlineBold] wrapping an [InlineItalic]
-/// needs no combined style computed here, each node states only its own diff.
-/// Everything [_buildSpans] needs beyond the nodes themselves, bundled so the
-/// recursion passes one value rather than six and so a link can reach both
-/// its colour and the recognizer owner that will dispose it.
-class _InlineContext {
-  const _InlineContext({
-    required this.knownUsernames,
-    required this.knownRoleNames,
-    required this.customEmoji,
-    required this.ambientStyle,
-    required this.linkColor,
-    required this.makeLinkRecognizer,
-  });
-
-  final Set<String> knownUsernames;
-  final Set<String> knownRoleNames;
-  final Map<String, String> customEmoji;
-  final TextStyle ambientStyle;
-  final Color linkColor;
-
-  /// Creates a tap recognizer for [url] and hands it to whoever owns the
-  /// run's lifecycle, so it is disposed with the widget rather than leaked.
-  final TapGestureRecognizer Function(String url) makeLinkRecognizer;
-}
-
-List<InlineSpan> _buildSpans(List<InlineNode> nodes, _InlineContext ctx) => [
-  for (final node in nodes)
-    switch (node) {
-      InlineText(:final text) => TextSpan(text: text),
-      InlineCode(:final text) => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: AppInlineCode(text),
-      ),
-      InlineMention(:final raw) =>
-        _isRenderableMention(raw, ctx.knownUsernames)
-            ? WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: _MentionChip(raw),
-              )
-            : TextSpan(text: raw),
-      InlineRoleMention(:final name) =>
-        _isRenderableRole(name, ctx.knownRoleNames)
-            ? WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: _MentionChip('@$name'),
-              )
-            : TextSpan(text: '@[$name]'),
-      InlineEmoji(:final raw) => _emojiSpan(raw, ctx.customEmoji),
-      InlineLink(:final url) => TextSpan(
-        text: url,
-        style: TextStyle(
-          color: ctx.linkColor,
-          decoration: TextDecoration.underline,
-          decorationColor: ctx.linkColor,
-        ),
-        recognizer: ctx.makeLinkRecognizer(url),
-        mouseCursor: SystemMouseCursors.click,
-      ),
-      InlineBold(:final children) => TextSpan(
-        style: const TextStyle(fontWeight: AppWeights.semi),
-        children: _buildSpans(children, ctx),
-      ),
-      InlineItalic(:final children) => TextSpan(
-        style: const TextStyle(fontStyle: FontStyle.italic),
-        children: _buildSpans(children, ctx),
-      ),
-      InlineStrikethrough(:final children) => TextSpan(
-        style: const TextStyle(decoration: TextDecoration.lineThrough),
-        children: _buildSpans(children, ctx),
-      ),
-      InlineSpoiler(:final children) => WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: MessageSpoiler(
-          style: ctx.ambientStyle,
-          spans: _buildSpans(children, ctx),
-        ),
-      ),
-    },
-];
-
-InlineSpan _emojiSpan(String raw, Map<String, String> customEmoji) {
-  final id = customEmojiIdFor(raw, customEmoji);
-  return id == null
-      ? TextSpan(text: raw)
-      : WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: CustomEmojiImage(emojiId: id, label: raw, size: _emojiSize),
-        );
-}
-
-/// `--accent-text` on `--accent-soft`, matching the design's mention pill.
-/// Not a design-system component: a mention is a message-body decoration
-/// specific to this screen, not a control other surfaces reuse.
-class _MentionChip extends StatelessWidget {
-  const _MentionChip(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
-      decoration: BoxDecoration(
-        color: tokens.accentSoft,
-        borderRadius: BorderRadius.circular(AppRadii.control),
-      ),
-      child: Text(
-        text,
-        style: AppText.body.copyWith(
-          color: tokens.accent,
-          fontWeight: AppWeights.medium,
-        ),
-      ),
-    );
-  }
-}

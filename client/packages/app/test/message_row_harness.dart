@@ -59,6 +59,8 @@ const noActions = MessageActions(
   onBlockAuthor: noop,
   canOpenThread: false,
   onOpenThread: noop,
+  canCopyLink: false,
+  onCopyLink: noop,
   canForward: false,
   onForward: noop,
   canSave: true,

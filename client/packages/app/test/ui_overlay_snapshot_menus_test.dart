@@ -60,6 +60,8 @@ const _fullActions = MessageActions(
   onBlockAuthor: noop,
   canOpenThread: true,
   onOpenThread: noop,
+  canCopyLink: false,
+  onCopyLink: noop,
   canForward: true,
   onForward: noop,
   canSave: true,

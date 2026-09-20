@@ -168,6 +168,16 @@ bool canReportMessage(Message message, String? myUserId) =>
 /// channel at all.
 bool canForwardMessage(Message message) => !message.pending && !message.failed;
 
+/// Linking needs a message the server already has, for the same reason
+/// forwarding and saving do: the id is the client's, but nothing else can reach
+/// the row it names until the send is acknowledged, so a link to a pending
+/// message would resolve to nothing for whoever followed it.
+///
+/// No permission check. A link is a string; following one runs the same
+/// authorization the recipient's own channel read already does, and a link to a
+/// channel they cannot see simply fails to find the message.
+bool canCopyMessageLink(Message message) => !message.pending && !message.failed;
+
 /// Saving needs a message the server already has, for the same reason
 /// forwarding does: the id is the client's, but the row it names is not
 /// there until the send is acknowledged. No permission beyond being able
