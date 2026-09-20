@@ -149,13 +149,26 @@ impl Store {
         })
     }
 
-    /// The deployment's invites, newest first.
-    pub async fn list_invites(&self) -> anyhow::Result<Vec<Invite>> {
+    /// Invites, newest first. [`created_by`] scopes the answer to one
+    /// account's own; `None` asks for every invite in the deployment.
+    ///
+    /// The filter exists because a code is a credential. An invite row carries
+    /// its own `code` and its `role_grant`, so an unscoped listing hands
+    /// everybody who may issue an invite the live codes for everybody else's -
+    /// including a single-use one an administrator minted to grant a specific
+    /// person a role. `redeem` gives that role to whoever spends the code, so
+    /// reading another account's code is enough to take the role meant for
+    /// them. Only MANAGE_ROLES, which is what minting such an invite already
+    /// requires, passes `None`.
+    pub async fn list_invites(&self, created_by: Option<UserId>) -> anyhow::Result<Vec<Invite>> {
         let rows = sqlx::query!(
             r#"SELECT code AS "code!", max_uses, uses AS "uses!", expires_at,
                       created_at AS "created_at!", revoked_at,
                       role_grant AS "role_grant: RoleId"
-               FROM invites ORDER BY created_at DESC"#
+               FROM invites
+               WHERE ?1 IS NULL OR created_by = ?1
+               ORDER BY created_at DESC"#,
+            created_by
         )
         .fetch_all(&self.pool)
         .await?;
@@ -173,16 +186,32 @@ impl Store {
             .collect())
     }
 
-    pub async fn revoke_invite(&self, code: &str) -> anyhow::Result<()> {
+    /// Revokes an invite, optionally only if [`required_creator`] issued it.
+    ///
+    /// Answers whether a row changed, so a caller can tell "revoked" from
+    /// "not yours, or already revoked, or never existed" - deliberately one
+    /// answer for those three, the same reason [`Store::check_invite`] gives
+    /// for collapsing its own unusable cases.
+    ///
+    /// The ownership test is a clause in the UPDATE rather than a read before
+    /// it: checked separately, two requests could both read an invite as
+    /// theirs to revoke and only one of them be right.
+    pub async fn revoke_invite(
+        &self,
+        code: &str,
+        required_creator: Option<UserId>,
+    ) -> anyhow::Result<bool> {
         let now = now_ms();
-        sqlx::query!(
-            "UPDATE invites SET revoked_at = ? WHERE code = ? AND revoked_at IS NULL",
+        let result = sqlx::query!(
+            "UPDATE invites SET revoked_at = ?
+             WHERE code = ? AND revoked_at IS NULL AND (?3 IS NULL OR created_by = ?3)",
             now,
-            code
+            code,
+            required_creator
         )
         .execute(&self.pool)
         .await?;
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
     /// Whether a code could be redeemed, without spending it. A thin

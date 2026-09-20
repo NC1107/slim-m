@@ -35,7 +35,7 @@ fn now_ms() -> i64 {
 
 /// The Rust-side answer for `code`, read straight off `Invite::is_usable`.
 async fn rust_says_usable(s: &Store, code: &str) -> bool {
-    s.list_invites()
+    s.list_invites(None)
         .await
         .unwrap()
         .into_iter()
@@ -103,7 +103,7 @@ async fn a_revoked_invite_is_unusable_on_both_paths() {
     let owner = s.create_user("owner", "Owner").await.unwrap();
     let user = s.create_user("user", "User").await.unwrap();
     let invite = s.create_invite(owner.id, None, None, None).await.unwrap();
-    s.revoke_invite(&invite.code).await.unwrap();
+    s.revoke_invite(&invite.code, None).await.unwrap();
 
     let rust_usable = rust_says_usable(&s, &invite.code).await;
     let sql_usable = sql_says_usable(&s, &invite.code, user.id).await;

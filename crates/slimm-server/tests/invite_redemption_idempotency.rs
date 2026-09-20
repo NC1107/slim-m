@@ -27,7 +27,7 @@ async fn new_store() -> (Store, SqlitePool, support::TestDbGuard) {
 /// The current use count of `code`.
 async fn uses(store: &Store, code: &str) -> i64 {
     store
-        .list_invites()
+        .list_invites(None)
         .await
         .unwrap()
         .into_iter()
