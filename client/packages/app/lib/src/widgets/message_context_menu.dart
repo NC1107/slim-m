@@ -33,6 +33,8 @@ class MessageActions {
     required this.canOpenThread,
     required this.onOpenThread,
     this.hasExistingThread = false,
+    required this.canCopyLink,
+    required this.onCopyLink,
     required this.canForward,
     required this.onForward,
     required this.canSave,
@@ -110,6 +112,10 @@ class MessageActions {
   /// [content], it never re-sends this exact message, and the destination
   /// picker itself only ever offers a channel or DM the caller can actually
   /// send to.
+  /// Whether a link to this message can be built; see [canCopyMessageLink].
+  final bool canCopyLink;
+  final VoidCallback onCopyLink;
+
   final bool canForward;
   final VoidCallback onForward;
 }
@@ -208,6 +214,12 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
         onTap: () =>
             run(() => Clipboard.setData(ClipboardData(text: widget.content))),
       ),
+      if (actions.canCopyLink)
+        AppMenuItem(
+          label: 'Copy link',
+          leading: AppIcons.link,
+          onTap: () => run(actions.onCopyLink),
+        ),
       if (actions.canForward)
         AppMenuItem(
           label: 'Forward message',

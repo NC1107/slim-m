@@ -25,10 +25,17 @@ library;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../message_link.dart';
+import '../providers/providers.dart';
+import 'app_snackbar.dart';
+import 'channel_rail.dart' show selectedChannelId;
 import 'custom_emoji_image.dart';
+import 'message_jump.dart' show jumpToMessage;
 import 'message_code_block_runner.dart';
 import 'message_fences.dart';
 import 'message_inline.dart';
@@ -222,7 +229,7 @@ Widget _buildMarkdownBlock(
 /// One run of text with inline markdown, mentions and custom emoji picked
 /// out. [baseStyle] carries size and weight; [color] is applied on top of it
 /// so dimmed (pending/failed) messages still work at any heading level.
-class _MessageTextRun extends StatefulWidget {
+class _MessageTextRun extends ConsumerStatefulWidget {
   const _MessageTextRun({
     required this.text,
     required this.knownUsernames,
@@ -240,10 +247,10 @@ class _MessageTextRun extends StatefulWidget {
   final TextStyle baseStyle;
 
   @override
-  State<_MessageTextRun> createState() => _MessageTextRunState();
+  ConsumerState<_MessageTextRun> createState() => _MessageTextRunState();
 }
 
-class _MessageTextRunState extends State<_MessageTextRun> {
+class _MessageTextRunState extends ConsumerState<_MessageTextRun> {
   /// Link tap recognizers built for the current spans. A `TextSpan`'s
   /// recognizer is not disposed for you, so they are owned here, rebuilt on
   /// each build and released in [dispose] - a link inside a message row that
@@ -267,6 +274,37 @@ class _MessageTextRunState extends State<_MessageTextRun> {
     final recognizer = TapGestureRecognizer()..onTap = () => _open(url);
     _recognizers.add(recognizer);
     return recognizer;
+  }
+
+  TapGestureRecognizer _makeMessageLinkRecognizer(String raw) {
+    final recognizer = TapGestureRecognizer()..onTap = () => _openMessage(raw);
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  /// Follows a message link inside the app. Never reaches [launchUrl]: see
+  /// [InlineMessageLink] for why that separation is the point.
+  ///
+  /// A link to another deployment is refused rather than followed, which is the
+  /// same call `deep_links.dart` makes about an invite arriving while signed in:
+  /// one deployment is one community in v1, so following it would be a server
+  /// switch, and that is a product decision a tapped link has no standing to
+  /// make.
+  void _openMessage(String raw) {
+    final link = parseMessageLink(raw);
+    if (link == null) return;
+    if (!messageLinkIsHere(link, ref.read(serverUrlProvider))) {
+      // A server switch is not a tapped link's call; see _openMessage's doc.
+      showAppSnackbar(context, 'That link is for a different server.');
+      return;
+    }
+    jumpToMessage(
+      GoRouter.of(context),
+      ref.read,
+      currentChannelId: selectedChannelId(context),
+      channelId: link.channelId,
+      messageId: link.messageId,
+    );
   }
 
   Future<void> _open(String url) async {
@@ -293,6 +331,7 @@ class _MessageTextRunState extends State<_MessageTextRun> {
             ambientStyle: style,
             linkColor: tokens.accent,
             makeLinkRecognizer: _makeLinkRecognizer,
+            makeMessageLinkRecognizer: _makeMessageLinkRecognizer,
           ),
         ),
       ),
@@ -341,6 +380,7 @@ class _InlineContext {
     required this.ambientStyle,
     required this.linkColor,
     required this.makeLinkRecognizer,
+    required this.makeMessageLinkRecognizer,
   });
 
   final Set<String> knownUsernames;
@@ -352,6 +392,10 @@ class _InlineContext {
   /// Creates a tap recognizer for [url] and hands it to whoever owns the
   /// run's lifecycle, so it is disposed with the widget rather than leaked.
   final TapGestureRecognizer Function(String url) makeLinkRecognizer;
+
+  /// The same, for a message link, which is followed inside the app rather than
+  /// handed to the OS.
+  final TapGestureRecognizer Function(String raw) makeMessageLinkRecognizer;
 }
 
 List<InlineSpan> _buildSpans(List<InlineNode> nodes, _InlineContext ctx) => [
@@ -385,6 +429,16 @@ List<InlineSpan> _buildSpans(List<InlineNode> nodes, _InlineContext ctx) => [
           decorationColor: ctx.linkColor,
         ),
         recognizer: ctx.makeLinkRecognizer(url),
+        mouseCursor: SystemMouseCursors.click,
+      ),
+      InlineMessageLink(:final raw) => TextSpan(
+        text: 'message link',
+        style: TextStyle(
+          color: ctx.linkColor,
+          decoration: TextDecoration.underline,
+          decorationColor: ctx.linkColor,
+        ),
+        recognizer: ctx.makeMessageLinkRecognizer(raw),
         mouseCursor: SystemMouseCursors.click,
       ),
       InlineBold(:final children) => TextSpan(

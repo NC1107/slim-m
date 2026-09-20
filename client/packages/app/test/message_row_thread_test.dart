@@ -108,6 +108,8 @@ void main() {
         onBlockAuthor: noop,
         canOpenThread: true,
         onOpenThread: () => opened = true,
+        canCopyLink: false,
+        onCopyLink: noop,
         canForward: false,
         onForward: noop,
         canSave: true,

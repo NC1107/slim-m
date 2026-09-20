@@ -16,12 +16,14 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../message_link.dart';
 import '../providers/message_actions.dart';
 import '../providers/message_selection.dart';
 import '../providers/pins_controller.dart';
@@ -146,6 +148,34 @@ Future<void> saveMessageForLater(
   ref
       .read(toastsProvider.notifier)
       .show('Saved.', severity: AppToastSeverity.success);
+}
+
+/// Copies a link to [message] onto the clipboard.
+///
+/// Purely local: there is nothing to ask the server for, since the link is built
+/// from the deployment address this client is already signed into plus two ids it
+/// already has. So unlike its neighbours here it has no failure worth guarding -
+/// a clipboard write that goes wrong is not something a retry would fix.
+///
+/// Confirms with a toast rather than silently, because a clipboard write is
+/// invisible: nothing on screen changes, so without it the only way to know it
+/// worked is to paste somewhere and look.
+Future<void> copyMessageLink(
+  WidgetRef ref,
+  BuildContext context, {
+  required String channelId,
+  required Message message,
+}) async {
+  final link = buildMessageLink(
+    server: ref.read(serverUrlProvider),
+    channelId: channelId,
+    messageId: message.id,
+  );
+  await Clipboard.setData(ClipboardData(text: link));
+  if (!context.mounted) return;
+  ref
+      .read(toastsProvider.notifier)
+      .show('Link copied.', severity: AppToastSeverity.success);
 }
 
 /// Pins or unpins, [pinned] being what it is now rather than what to make it.
@@ -275,6 +305,10 @@ MessageActions messageActionsFor(
     ),
     onOpenThread: () => unawaited(openThreadForMessage(context, message)),
     hasExistingThread: hasExistingThread,
+    canCopyLink: canCopyMessageLink(message),
+    onCopyLink: () => unawaited(
+      copyMessageLink(ref, context, channelId: channelId, message: message),
+    ),
     canForward: canForwardMessage(message),
     onForward: () => unawaited(forwardMessage(context, ref, message)),
     canSave: canSaveMessage(message),
