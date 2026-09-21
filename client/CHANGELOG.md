@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.80.0](https://github.com/NC1107/slim-m/compare/client-v0.79.0...client-v0.80.0) (2026-09-21)
+
+
+### Features
+
+* bot accounts, end to end ([#1237](https://github.com/NC1107/slim-m/issues/1237)) ([ea505cf](https://github.com/NC1107/slim-m/commit/ea505cfc80a7894618518119532e40447f01a0b2))
+* **client:** copy a link to a message, and follow one ([#1246](https://github.com/NC1107/slim-m/issues/1246)) ([6d6c220](https://github.com/NC1107/slim-m/commit/6d6c220990d8ca9d7871f5fed3f3b8915849c69f))
+* **client:** follow a message link that arrives from outside the app ([#1249](https://github.com/NC1107/slim-m/issues/1249)) ([0eae2a2](https://github.com/NC1107/slim-m/commit/0eae2a2bbbe02731c4d875bd636519fc1ef7dde9))
+* **client:** keep an unsent draft through a restart ([#1245](https://github.com/NC1107/slim-m/issues/1245)) ([fdbd1a9](https://github.com/NC1107/slim-m/commit/fdbd1a97cf265ba218cb7fe694699d5259dc5df2))
+* **client:** let a module fill a shape with a gradient ([#1242](https://github.com/NC1107/slim-m/issues/1242)) ([fc5477f](https://github.com/NC1107/slim-m/commit/fc5477f0354450697483a5c6532e11f364c18d5d))
+* **client:** let a module place a cells grid instead of filling the scene ([#1250](https://github.com/NC1107/slim-m/issues/1250)) ([e59b0f4](https://github.com/NC1107/slim-m/commit/e59b0f42e2d718d8ddcb6b6aa4a78bc868db4470))
+* **client:** let a module scene ask for words, not just taps ([#1238](https://github.com/NC1107/slim-m/issues/1238)) ([15117eb](https://github.com/NC1107/slim-m/commit/15117eb7c1ec1d20bfede01a10dd466fdd2b732e))
+* **client:** let a module scene carry an image ([#1243](https://github.com/NC1107/slim-m/issues/1243)) ([d9e5aa5](https://github.com/NC1107/slim-m/commit/d9e5aa5772d74f7ad17dde4b66931f5f3edcf4c1))
+* **client:** let a module scene draw arbitrary shapes ([#1234](https://github.com/NC1107/slim-m/issues/1234)) ([da503f8](https://github.com/NC1107/slim-m/commit/da503f89fb27842c5f16221d35ebd52da84e6814))
+* **client:** let an admin issue a reset code, and a locked-out person spend it ([#1220](https://github.com/NC1107/slim-m/issues/1220)) ([098007b](https://github.com/NC1107/slim-m/commit/098007b4ac79796c509fbc31a88fc1ba2a4fe7ec))
+* **client:** open a module scene on a screen of its own ([#1230](https://github.com/NC1107/slim-m/issues/1230)) ([66fc570](https://github.com/NC1107/slim-m/commit/66fc5707694c513e3879864a19123a78dd7790d2))
+* **client:** rejoin a dropped call without waiting for a tap ([#1248](https://github.com/NC1107/slim-m/issues/1248)) ([36b02b8](https://github.com/NC1107/slim-m/commit/36b02b8046cfa0eb956ae87094d4db935897aba2))
+* **client:** tell a sideloaded android build when a new one exists ([#1226](https://github.com/NC1107/slim-m/issues/1226)) ([e802110](https://github.com/NC1107/slim-m/commit/e8021105e5a5af2e1c91b8c87525682c422ea113))
+* **client:** update every outdated module in one press ([#1255](https://github.com/NC1107/slim-m/issues/1255)) ([8b978f0](https://github.com/NC1107/slim-m/commit/8b978f03c7d9975bf0080732d9da4e57300584cf))
+* let an administrator delete a member's account outright ([#1257](https://github.com/NC1107/slim-m/issues/1257)) ([3e039e1](https://github.com/NC1107/slim-m/commit/3e039e189e1de0caa461f1c62135e707eb07a75d))
+* mark a channel or DM as unread ([#1231](https://github.com/NC1107/slim-m/issues/1231)) ([b477416](https://github.com/NC1107/slim-m/commit/b477416dc2887afcdcc73235c1e20384da6f3638))
+* say which accounts are bots ([#1240](https://github.com/NC1107/slim-m/issues/1240)) ([ce4c68d](https://github.com/NC1107/slim-m/commit/ce4c68df80edb33a7123d952e71013c5fd84a868))
+
+
+### Bug Fixes
+
+* **client:** give the analytics charts an axis, so a bar can be read ([#1228](https://github.com/NC1107/slim-m/issues/1228)) ([11e95a5](https://github.com/NC1107/slim-m/commit/11e95a5251d2053fdcacb36dd721f6519c7dea2c))
+* **client:** let a module name its own scene controls ([#1254](https://github.com/NC1107/slim-m/issues/1254)) ([3ae45e2](https://github.com/NC1107/slim-m/commit/3ae45e26640a8714a5590fec0a53f1bfc1574808))
+* **client:** make the space settings read in one glance on a phone ([#1229](https://github.com/NC1107/slim-m/issues/1229)) ([a099d5f](https://github.com/NC1107/slim-m/commit/a099d5fd7c169cd3ed4cd03a4728d1fc0ec64688))
+* **client:** one selection bar in the rail, and who-can-join moves in with the invites ([#1256](https://github.com/NC1107/slim-m/issues/1256)) ([76aa2fe](https://github.com/NC1107/slim-m/commit/76aa2fe0d6ac70ac91110b19ac5759e45d829acb))
+* **client:** say the username and password rules before a signup fails ([#1233](https://github.com/NC1107/slim-m/issues/1233)) ([656243f](https://github.com/NC1107/slim-m/commit/656243fdf05af73a3c8b490d93cbc046757cde3e))
+* the small findings from the audit, and two claims that were not true ([#1253](https://github.com/NC1107/slim-m/issues/1253)) ([9004ead](https://github.com/NC1107/slim-m/commit/9004ead6f170ce9a2dbc2f9cdbee7367c5105987))
+
 ## [0.79.0](https://github.com/NC1107/slim-m/compare/client-v0.78.0...client-v0.79.0) (2026-09-16)
 
 
