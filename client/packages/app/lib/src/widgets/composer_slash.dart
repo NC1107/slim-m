@@ -11,9 +11,14 @@
 library;
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 
 import '../api_failure.dart';
+import '../providers/app_launch.dart';
+import '../providers/providers.dart';
+import '../providers/slash_command.dart';
+import 'app_launcher_sheet.dart';
 
 /// Runs [command] with [args] and applies the outcome: on a non-empty result,
 /// replaces the field text with it and [post]s; on an empty-but-ok result,
@@ -51,4 +56,59 @@ Future<void> sendSlashCommand({
   } on ApiException catch (e) {
     fail(describeApiFailure('run /${command.name}', e));
   }
+}
+
+/// Runs whatever command the composed text names, answering whether it took
+/// the send. False means the text is an ordinary message and the caller should
+/// post it itself.
+///
+/// The two command paths and the ordinary send were interleaved in
+/// `Composer._send`, which is how [hasStagedFile] came to be missed: neither
+/// command path carries an attachment - [launchApp] takes none and the slash
+/// run posts through `post()` with an empty list - and neither cleared the
+/// staging list, so a command typed with a file staged went out without it and
+/// said nothing. Refused here instead, before either path can run.
+Future<bool> runComposedCommand({
+  required WidgetRef ref,
+  required String channelId,
+  required TextEditingController controller,
+  required List<App> apps,
+  required List<SlashCommand> commands,
+  required bool hasStagedFile,
+  required bool Function() isMounted,
+  required void Function() clearError,
+  required Future<void> Function() post,
+  required void Function(String message) fail,
+}) async {
+  // An app wins its own keyword, so it is matched before the command run.
+  final app = matchApp(apps, controller.text);
+  final match = matchSlashCommand(commands, controller.text);
+  if (app == null && match == null) return false;
+  if (hasStagedFile) {
+    fail(
+      'A command cannot carry an attachment. Send the file on its own, or remove it first.',
+    );
+    return true;
+  }
+  clearError();
+  if (app != null) {
+    final launched = await launchApp(
+      ref: ref,
+      channelId: channelId,
+      app: app,
+      onError: fail,
+    );
+    if (launched && isMounted()) controller.clear();
+    return true;
+  }
+  await sendSlashCommand(
+    api: ref.read(apiProvider),
+    command: match!.$1,
+    args: match.$2,
+    controller: controller,
+    isMounted: isMounted,
+    post: post,
+    fail: fail,
+  );
+  return true;
 }

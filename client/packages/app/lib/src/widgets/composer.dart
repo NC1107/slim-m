@@ -547,33 +547,19 @@ class _ComposerState extends ConsumerState<Composer> {
   /// A `/command` for a module runs it and posts its output; anything else is
   /// an ordinary send. See `composer_slash.dart` for the run itself.
   Future<void> _send() async {
-    // A `/name` matching an app launches it (a shared, interactive surface) instead of posting text; checked before the slash-command run so an app wins its own keyword.
-    final app = matchApp(_apps, widget.controller.text);
-    if (app != null) {
-      setState(() => _commandError = null);
-      final launched = await launchApp(
-        ref: ref,
-        channelId: widget.channelId,
-        app: app,
-        onError: _reportCommandError,
-      );
-      if (launched && mounted) widget.controller.clear();
-      return;
-    }
-    final match = matchSlashCommand(_slashCommands, widget.controller.text);
-    if (match != null) {
-      setState(() => _commandError = null);
-      await sendSlashCommand(
-        api: ref.read(apiProvider),
-        command: match.$1,
-        args: match.$2,
-        controller: widget.controller,
-        isMounted: () => mounted,
-        post: () => widget.onSend(const []),
-        fail: _reportCommandError,
-      );
-      return;
-    }
+    final handled = await runComposedCommand(
+      ref: ref,
+      channelId: widget.channelId,
+      controller: widget.controller,
+      apps: _apps,
+      commands: _slashCommands,
+      hasStagedFile: !_attachments.isEmpty,
+      isMounted: () => mounted,
+      clearError: () => setState(() => _commandError = null),
+      post: () => widget.onSend(const []),
+      fail: _reportCommandError,
+    );
+    if (handled) return;
     final ids = _attachments.readyIds;
     await widget.onSend(ids);
     if (mounted) _attachments.clear();
