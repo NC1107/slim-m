@@ -313,6 +313,37 @@ async fn install_refuses_a_version_that_no_longer_matches_the_registry() {
     assert_eq!(response.status(), StatusCode::CONFLICT);
 }
 
+/// `code-runner` is the id the optional Piston broker answers to, resolved
+/// before the module store is ever consulted. A registry listing under that id
+/// would once have installed cleanly and then been permanently unreachable,
+/// because both run routes branch on the id first and would have sent every one
+/// of its commands to the broker. Refused at the door instead, with a reason.
+#[tokio::test]
+async fn install_refuses_the_id_reserved_for_the_code_runner() {
+    let (s, _guard) = store("slimm-dock-reserved-id").await;
+    let (admin, _member) = deployment(&s).await;
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let token = session.access_token.as_str();
+    let dock = Dock::for_test(&fake_registry().await);
+    let router = app(s, dock);
+
+    for (method, uri) in [
+        ("POST", "/space/dock/modules/code-runner/install"),
+        ("GET", "/space/dock/modules/code-runner"),
+    ] {
+        let response = router
+            .clone()
+            .oneshot(req_json(method, uri, token, json!({ "version": "1.0.0" })))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "{method} {uri} must refuse the reserved id"
+        );
+    }
+}
+
 /// The install-time half of artifact integrity (the run-time half is
 /// `module_runtime`'s own hash check): bytes that do not hash to the
 /// manifest's `sha256` are refused as a bad upstream - the registry, not the

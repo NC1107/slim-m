@@ -10,6 +10,8 @@
 //! route that runs or lists a module's extension points (`http::module_commands`,
 //! `http::apps`) resolves the caller's grant through it before anything runs.
 
+use std::collections::HashSet;
+
 use uuid::Uuid;
 
 use super::Store;
@@ -161,6 +163,46 @@ impl Store {
     /// permissions are a separate, module-scoped namespace the core
     /// evaluator never resolves, so an administrator sees this the same way
     /// every other role does, by holding the grant like anyone else.
+    /// Every `(module_id, perm_key)` `user_id` holds, in one round trip.
+    ///
+    /// The batched form of [`Store::user_has_module_permission`], for the
+    /// discovery loop in `http::module_commands` that asks the same question
+    /// once per extension point. Asking singly re-ran `load_roles` - two
+    /// queries - plus a lookup for every point of every installed module, for
+    /// the same caller and the same role set each time, on a route the composer
+    /// refetches whenever it remounts. This is two queries regardless of how
+    /// many modules the deployment has installed.
+    ///
+    /// Does not bypass for `Permissions::ADMINISTRATOR`, for the reason given
+    /// on [`Store::user_has_module_permission`].
+    pub async fn held_module_permissions(
+        &self,
+        user_id: UserId,
+    ) -> anyhow::Result<HashSet<(String, String)>> {
+        let roles = self.load_roles(user_id).await?;
+        let mut role_ids: Vec<Uuid> = roles.role_ids;
+        role_ids.extend(roles.everyone_id);
+        if role_ids.is_empty() {
+            return Ok(HashSet::new());
+        }
+
+        use sqlx::QueryBuilder;
+        let mut builder = QueryBuilder::new(
+            "SELECT DISTINCT module_id, perm_key FROM role_module_permissions WHERE role_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in &role_ids {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+
+        use sqlx::Row;
+        let rows = builder.build().fetch_all(&self.pool).await?;
+        rows.into_iter()
+            .map(|row| Ok((row.try_get("module_id")?, row.try_get("perm_key")?)))
+            .collect()
+    }
+
     pub async fn user_has_module_permission(
         &self,
         user_id: UserId,

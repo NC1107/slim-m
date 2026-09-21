@@ -151,7 +151,20 @@ impl From<ManifestError> for ApiError {
 /// `pub(crate)` rather than `pub(self)`: `http::module_commands` validates a
 /// command route's own `moduleId` path segment the same way, and a second
 /// slug validator there could silently drift from this one's rules.
+///
+/// Also the one place the broker ids are held back. `CODE_RUNNER_MODULE_ID` is
+/// answered before the module store is ever consulted, so a registry listing
+/// under that id would install, show as enabled, register its permissions, and
+/// then have every one of its commands routed to the code runner instead -
+/// permanently unreachable, with nothing said at install time. Refusing it here
+/// covers install and manifest fetch together, and cannot reach the runner's own
+/// path: both run routes branch on the id before `execute_command` calls this.
 pub(crate) fn validate_module_id(id: &str) -> Result<(), ApiError> {
+    if id == super::module_commands::CODE_RUNNER_MODULE_ID {
+        return Err(ApiError::BadRequest(
+            "that module id is reserved for this deployment's code runner",
+        ));
+    }
     validate_slug(id, MAX_MODULE_ID_LEN).map_err(|_| ApiError::BadRequest("invalid module id"))
 }
 
