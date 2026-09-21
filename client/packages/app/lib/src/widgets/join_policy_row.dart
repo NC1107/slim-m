@@ -113,7 +113,7 @@ class _JoinPolicyRowState extends ConsumerState<JoinPolicyRow>
   Future<void> _open(BuildContext context, api.JoinPolicy current) async {
     final chosen = await SettingsSelectRow.pick<api.JoinPolicy>(
       context,
-      title: 'Who can create an account',
+      title: 'Who can join',
       value: current,
       choices: _choices,
     );

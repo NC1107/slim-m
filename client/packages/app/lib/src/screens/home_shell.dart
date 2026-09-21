@@ -441,9 +441,14 @@ class _ChannelTitle extends ConsumerWidget {
                 size: AppSizes.icon16,
               ),
               const SizedBox(width: AppSpacing.s8),
-              Text(
-                channel?.name ?? '',
-                style: const TextStyle(fontWeight: AppWeights.semi),
+              // Expanded above makes this Row tight, so min does not hold it in.
+              Flexible(
+                child: Text(
+                  channel?.name ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: AppWeights.semi),
+                ),
               ),
             ],
           );
