@@ -39,6 +39,7 @@ void main() {
     expect(find.text('Channel permissions'), findsNothing);
     expect(find.text('Who can join'), findsNothing);
     expect(find.text('Emoji'), findsNothing);
+    expect(find.text('Account recovery'), findsNothing);
   });
 
   testWidgets('MANAGE_MESSAGES alone unlocks only the reports row', (
@@ -121,6 +122,7 @@ void main() {
     expect(find.text('Roles'), findsOneWidget);
     expect(find.text('Channel permissions'), findsOneWidget);
     expect(find.text('Emoji'), findsOneWidget);
+    expect(find.text('Account recovery'), findsOneWidget);
   });
 
   /// The screen used to zero out its own padding, which sat its bare rows

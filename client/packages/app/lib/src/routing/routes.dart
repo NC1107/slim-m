@@ -29,6 +29,7 @@ abstract final class Routes {
   static const adminServerMetrics = '/settings/server-metrics';
   static const adminDock = '/settings/dock';
   static const adminBots = '/settings/bots';
+  static const adminAccountRecovery = '/settings/account-recovery';
   static const debugLog = '/settings/debug-log';
 
   /// One module's manifest and lifecycle, drilled into from the Dock.

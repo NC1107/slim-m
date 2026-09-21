@@ -20,6 +20,7 @@ import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../providers/channel_permissions.dart';
 import '../routing/routes.dart';
+import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
 import '../screens/admin/categories_screen.dart';
@@ -61,6 +62,7 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
   final canManageServer = permissions.hasPermission(Perm.manageServer);
   final canManageChannels = permissions.hasPermission(Perm.manageChannels);
   final canBan = permissions.hasPermission(Perm.banMembers);
+  final canIssueResetCodes = permissions.hasPermission(Perm.administrator);
   // Unlike Roles (deployment-wide), this pane also opens via one overwrite.
   final visibleChannels =
       ref.watch(myVisibleChannelsProvider).valueOrNull ?? const [];
@@ -114,6 +116,15 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.code,
             compactRoute: Routes.adminBots,
             builder: (_) => const BotsPane(),
+          ),
+        // ADMINISTRATOR, matching the route it opens; see AccountRecoveryPane.
+        if (canIssueResetCodes)
+          SettingsPane(
+            id: 'account-recovery',
+            label: 'Account recovery',
+            icon: AppIcons.resetCode,
+            compactRoute: Routes.adminAccountRecovery,
+            builder: (_) => const AccountRecoveryPane(),
           ),
       ],
     ),

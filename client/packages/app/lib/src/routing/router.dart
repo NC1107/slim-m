@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/providers.dart';
 import '../providers/threads.dart';
+import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
 import '../screens/admin/categories_screen.dart';
@@ -145,6 +146,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.adminBots,
         pageBuilder: (context, state) => modalPage(context, const BotsScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminAccountRecovery,
+        pageBuilder: (context, state) =>
+            modalPage(context, const AccountRecoveryScreen()),
       ),
       GoRoute(
         path: Routes.adminRemovedMembers,

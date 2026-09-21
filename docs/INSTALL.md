@@ -117,6 +117,9 @@ If you cannot, "It matches - continue" carries on.
 
 Forgotten passwords are handled by the space's admin, not by email: they issue you a one-time reset code, and "Trouble signing in?" on the sign-in screen is where you spend it.
 
+If you are the admin doing the issuing, it is **Space settings -> Account recovery**, or the same action on the member's own profile.
+It needs the administrator permission, and the code is legible once, so hand it over before closing the sheet.
+
 ## Which file is which
 
 A release page lists several files, and most of them are not for you:
