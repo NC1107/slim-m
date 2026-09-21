@@ -6435,10 +6435,11 @@ components:
           type: [string, "null"]
           description: >
             The invite this member registered through, present only to
-            callers with BAN_MEMBERS - a moderation signal for spotting a
+            callers with MANAGE_ROLES - a moderation signal for spotting a
             returning (ban-evading) account, never a public value. Absent
-            entirely for any other caller, and for a member who registered
-            without an invite.
+            for any other caller, and for a member who registered without one.
+            MANAGE_ROLES, not BAN_MEMBERS: redeeming a code applies the role
+            it grants, so a caller who could not grant it must not read one.
 
     SpaceRemoval:
       type: object
@@ -6465,9 +6466,8 @@ components:
           type: [string, "null"]
           description: >
             The invite this member registered through, or null if they had
-            none. Every caller of this endpoint already holds BAN_MEMBERS, so
-            unlike `UserProfile.invite_code` this is never gated by
-            permission - it is always present, either a code or null.
+            none. Gated as `UserProfile.invite_code` is: the endpoint needs
+            BAN_MEMBERS, the code itself also needs MANAGE_ROLES.
 
     Me:
       type: object

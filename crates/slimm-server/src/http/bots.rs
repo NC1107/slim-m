@@ -25,18 +25,16 @@ use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
+use super::auth::{validate_label, validate_username};
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce, require_manage_server};
 use super::messages::parse_uuid;
+use crate::hub::Event;
 use crate::ids::UserId;
 use crate::ratelimit::Class;
 use crate::store::{Bot, CreateBotError};
 
 const BODY_LIMIT: usize = 1024;
-
-/// Bot names follow the same rules a person's username does, so a bot is
-/// mentionable and addressable exactly as any member is.
-const MAX_NAME_LEN: usize = 32;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -106,6 +104,12 @@ async fn list(
     Ok(Json(bots.into_iter().map(BotDto::from).collect()))
 }
 
+/// Bot names follow the same rules a person's username does, so a bot is
+/// mentionable and addressable exactly as any member is. That means calling
+/// registration's own validators rather than restating them here: the inline
+/// copies this replaced checked length and charset only, so a bot could hold a
+/// reserved `@everyone`/`@here` name and a display name carrying a
+/// right-to-left override that a person is refused at register and at `/me`.
 async fn create(
     State(state): State<AppState>,
     parts: Parts,
@@ -117,28 +121,14 @@ async fn create(
     require_human(&state, ctx.user_id).await?;
 
     let username = body.username.trim();
-    if username.is_empty() || username.chars().count() > MAX_NAME_LEN {
-        return Err(ApiError::BadRequest("username must be 1 to 32 characters"));
-    }
-    if !username
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
-    {
-        return Err(ApiError::BadRequest(
-            "username may contain only letters, digits, and _ . -",
-        ));
-    }
+    validate_username(username)?;
     let display_name = body
         .display_name
         .as_deref()
         .map(str::trim)
         .filter(|name| !name.is_empty())
         .unwrap_or(username);
-    if display_name.chars().count() > MAX_NAME_LEN {
-        return Err(ApiError::BadRequest(
-            "display name must be 32 characters or fewer",
-        ));
-    }
+    validate_label(display_name, "display_name must be 1 to 64 characters")?;
 
     match state
         .store
@@ -159,6 +149,10 @@ async fn create(
 
 /// Revokes a bot's token and session. The account stays, so what it wrote stays
 /// attributed to it - the same thing revoking anyone's session does.
+///
+/// Publishes `SessionRevoked` per revoked session, the same as every other
+/// revocation path. Without it the row is dead but an already-open socket keeps
+/// streaming, so a leaked token survived the response to its own leak.
 async fn revoke(
     State(state): State<AppState>,
     parts: Parts,
@@ -168,8 +162,11 @@ async fn revoke(
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     require_manage_server(&state, ctx.user_id).await?;
     let bot_id = UserId(parse_uuid(&bot_id)?);
-    if !state.store.revoke_bot(bot_id).await? {
+    let Some(revoked) = state.store.revoke_bot(bot_id).await? else {
         return Err(ApiError::NotFound("no such bot"));
+    };
+    for session_id in revoked {
+        state.hub.publish(Event::SessionRevoked(session_id));
     }
     Ok(StatusCode::NO_CONTENT)
 }

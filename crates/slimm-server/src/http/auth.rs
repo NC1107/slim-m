@@ -265,7 +265,9 @@ async fn delete_account(
 /// it first".
 const RESERVED_USERNAMES: [&str; 2] = ["everyone", "here"];
 
-fn validate_username(username: &str) -> Result<(), ApiError> {
+/// Shared with bot provisioning, so a bot name cannot claim a reserved
+/// mention or a character class a person's username could never hold.
+pub(crate) fn validate_username(username: &str) -> Result<(), ApiError> {
     let len = username.chars().count();
     if !(1..=32).contains(&len) {
         return Err(ApiError::BadRequest("username must be 1 to 32 characters"));
