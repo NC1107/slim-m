@@ -37,7 +37,7 @@ CHANGE_STATUS = "Change your status"
 DND = "Do not disturb"
 
 # Space settings
-WHO_CAN_JOIN = "Who can join"
+INVITES = "Invites"
 # The embedded pane's own row, distinct from the nav row by its value suffix.
 WHO_CAN_JOIN_ROW = "Who can join, currently"
 JOIN_OPEN = "Anyone with the address"

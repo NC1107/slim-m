@@ -13,7 +13,7 @@ import e2e_labels as L
 def _open_personal(client):
     """Each scenario starts from the channel list, so each finds its own way."""
     if '#/settings' not in (client.ev('location.href') or '') or \
-            client.find(L.WHO_CAN_JOIN):
+            client.find(L.ROLES):
         client.click(L.PERSONAL_SETTINGS, settle=3)
 
 
@@ -28,7 +28,7 @@ def personal_settings_reachable(client):
     client.click(L.PERSONAL_SETTINGS, settle=3)
     client.wait_url('#/settings')
     client.wait_for(L.CHANGE_AVATAR)
-    assert not client.find(L.WHO_CAN_JOIN), \
+    assert not client.find(L.ROLES), \
         'personal settings is showing Space settings'
     client.shot('personal-settings')
     print('  personal settings opens on its own, with no Space section in it')
@@ -118,20 +118,21 @@ def space_settings_reachable(client):
     """The Space menu opens Space settings, which personal settings is not."""
     _open_space(client)
     client.wait_url('#/settings/space')
-    for label in ('Reports', 'Invites', L.ROLES, L.WHO_CAN_JOIN):
+    # Who can join is a row inside Invites now, not a pane; see #1256.
+    for label in ('Reports', L.INVITES, L.ROLES):
         client.wait_for(label)
     assert not client.find(L.CHANGE_AVATAR), \
         'Space settings is showing personal settings'
     client.shot('space-settings')
-    print('  Space settings opens on its own, with all four sections')
+    print('  Space settings opens on its own, with its sections')
 
 
 def change_join_policy(client, api):
     """Who can join is one row in the database and the whole security model."""
     _open_space(client)
     before = api.space_settings()['join_policy']
-    # Two taps since #617: select the pane, then its row opens the picker.
-    client.click(L.WHO_CAN_JOIN, settle=2)
+    # Through Invites since #1256; the row inside it opens the picker.
+    client.click(L.INVITES, settle=2)
     client.wait_for(L.WHO_CAN_JOIN_ROW)
     client.click(L.WHO_CAN_JOIN_ROW, settle=2)
     client.wait_for(L.JOIN_OPEN)
