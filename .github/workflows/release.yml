@@ -475,7 +475,7 @@ jobs:
   # and best effort: the .rpm is on the release, so a failure only warns.
   copr:
     needs: [release-please, linux-client, verify-client-ci]
-    if: needs.verify-client-ci.result == 'success'
+    if: needs.verify-client-ci.result == 'success' && needs.linux-client.result == 'success'
     runs-on: ubuntu-latest
     container: fedora:44
     environment: release

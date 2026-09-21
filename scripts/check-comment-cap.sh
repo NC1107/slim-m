@@ -8,8 +8,13 @@
 #
 # Doc comments are exempt (`///`, `//!`, `/**`): they carry an item's contract
 # to its callers and to `dart doc` / `cargo doc`, which is a different job.
-# So is a `#` block at the very top of a YAML, TOML or shell file, which is
-# that file's only documentation mechanism.
+#
+# Scope is Dart, Rust and Python only. Shell, YAML and TOML are not checked at
+# all - not exempted in part, not checked - because a `#` block at the top of
+# one is that file's only documentation mechanism and this counter cannot tell
+# it from a run of ordinary comments further down. So the rule CLAUDE.md states
+# for everywhere is enforced here for three languages; extending it means
+# teaching the counter about file headers first, and seeding the allowlist.
 #
 # Ratcheting, not a big-bang sweep: 174 runs across 68 files predate this gate
 # (an audit counted them), so scripts/comment-cap-allow.txt holds each file's
@@ -85,12 +90,6 @@ over=0
 while IFS= read -r file; do
   case $file in
     *.g.dart | *.freezed.dart | .sqlx/* | */generated/*) continue ;;
-    *) ;;
-  esac
-  # Shell, YAML and TOML get a file-header exemption this counter cannot see,
-  # so they are out of scope entirely rather than counted wrongly.
-  case $file in
-    *.sh | *.yml | *.yaml | *.toml) continue ;;
     *) ;;
   esac
   checked=$((checked + 1))

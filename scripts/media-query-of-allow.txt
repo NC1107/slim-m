@@ -3,6 +3,9 @@
 # Files allowed to call the unscoped `MediaQuery.of(context)` rather than a
 # scoped accessor (`MediaQuery.sizeOf`, `MediaQuery.viewInsetsOf`, and so on).
 # One path per line, relative to the repo root, with a one-line why.
+# A path allows exactly one unscoped call; write a count after it to allow
+# more. It is a ceiling, not a blanket pass - listing a file used to exempt
+# all of it, so a second, unrelated call added later was never flagged.
 #
 # The scoped accessors exist precisely so a widget rebuilds only when the
 # one field it reads changes; `MediaQuery.of(context)` subscribes to every
