@@ -252,6 +252,73 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.78.0',
+    headline: 'Seeing where the server spends its time',
+    points: [
+      WhatsNewPoint(
+        'Space settings has a metrics screen: how long each route takes, how '
+        'busy the database pool is, and how much memory the server is '
+        'holding. Useful when something feels slow and you want a number '
+        'rather than a hunch.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.79.0',
+    headline: 'Modules that make a noise, and a safer keychain',
+    points: [
+      WhatsNewPoint(
+        'A module can ask slim-m to play a short sound, built from the same '
+        'notes the notification chimes use, so it sounds like the rest of '
+        'the app. It never plays on its own: only in answer to your own tap, '
+        'and you can turn module sound off entirely in settings.',
+      ),
+      WhatsNewPoint(
+        'Code blocks can run through a self-hosted runner, and the Run '
+        'button only appears for a language a runner actually named.',
+      ),
+      WhatsNewPoint(
+        'The app notices an update while it is still open instead of waiting '
+        'for a restart, a YouTube link preview says which channel it came '
+        'from, and macOS and Windows keep their secrets in the system '
+        'keychain rather than beside the app.',
+      ),
+    ],
+  ),
+  WhatsNewEntry(
+    version: '0.80.0',
+    headline: 'Bots, links to a single message, and modules worth building',
+    points: [
+      WhatsNewPoint(
+        'A Space can have bots. They are their own accounts rather than a '
+        'flag on yours, they are badged as bots wherever they speak, and an '
+        'administrator can revoke one without touching anybody else. There '
+        'is a worked example and a guide for writing your own.',
+      ),
+      WhatsNewPoint(
+        'Copy a link to any message and follow one back, from inside the app '
+        'or from a link somebody sent you elsewhere. A link to a different '
+        'Space is refused rather than followed.',
+      ),
+      WhatsNewPoint(
+        'A half-typed message survives closing the app, and a call dropped '
+        'by a flaky network comes back on its own instead of waiting for you '
+        'to notice and tap.',
+      ),
+      WhatsNewPoint(
+        'Modules can draw far more: arbitrary shapes, images, gradients, '
+        'text boxes you type into, a grid placed anywhere on the scene, and '
+        'a screen of their own to open on. There is a music box in the '
+        'marketplace built out of all of it.',
+      ),
+      WhatsNewPoint(
+        'An administrator can issue a password reset code from a member\'s '
+        'profile, and delete an account for good. Who can join now sits with '
+        'the invites, and the Dock can update every module in one press.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,

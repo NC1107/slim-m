@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.66.0](https://github.com/NC1107/slim-m/compare/server-v0.65.0...server-v0.66.0) (2026-09-21)
+
+
+### Features
+
+* bot accounts, end to end ([#1237](https://github.com/NC1107/slim-m/issues/1237)) ([ea505cf](https://github.com/NC1107/slim-m/commit/ea505cfc80a7894618518119532e40447f01a0b2))
+* let an administrator delete a member's account outright ([#1257](https://github.com/NC1107/slim-m/issues/1257)) ([3e039e1](https://github.com/NC1107/slim-m/commit/3e039e189e1de0caa461f1c62135e707eb07a75d))
+* mark a channel or DM as unread ([#1231](https://github.com/NC1107/slim-m/issues/1231)) ([b477416](https://github.com/NC1107/slim-m/commit/b477416dc2887afcdcc73235c1e20384da6f3638))
+* say which accounts are bots ([#1240](https://github.com/NC1107/slim-m/issues/1240)) ([ce4c68d](https://github.com/NC1107/slim-m/commit/ce4c68df80edb33a7123d952e71013c5fd84a868))
+* **server:** wake somebody whose call went unanswered ([#1241](https://github.com/NC1107/slim-m/issues/1241)) ([373cbac](https://github.com/NC1107/slim-m/commit/373cbacc2f039e7fae3b4d2a734a3bfdeb5b2ad3))
+
+
+### Bug Fixes
+
+* **server:** let a text-only deployment actually start ([#1222](https://github.com/NC1107/slim-m/issues/1222)) ([31b945b](https://github.com/NC1107/slim-m/commit/31b945b66b28188afeef942e358d43ce612a2c19))
+* **server:** scope invite listing and revocation to their creator ([#1252](https://github.com/NC1107/slim-m/issues/1252)) ([c412135](https://github.com/NC1107/slim-m/commit/c41213506432bb92711af3667e4e2f52abfb6d6a))
+* stop a lost rotation response from signing the client out ([#1232](https://github.com/NC1107/slim-m/issues/1232)) ([57da9b3](https://github.com/NC1107/slim-m/commit/57da9b3c5d68e9e81757226daae96e22256ae50e))
+* the small findings from the audit, and two claims that were not true ([#1253](https://github.com/NC1107/slim-m/issues/1253)) ([9004ead](https://github.com/NC1107/slim-m/commit/9004ead6f170ce9a2dbc2f9cdbee7367c5105987))
+* three rough edges an operator hits before anything works ([#1244](https://github.com/NC1107/slim-m/issues/1244)) ([f4e20f2](https://github.com/NC1107/slim-m/commit/f4e20f2828b40eb0d4cc1580b76559e976cb5bdf))
+
 ## [0.65.0](https://github.com/NC1107/slim-m/compare/server-v0.64.0...server-v0.65.0) (2026-09-16)
 
 
