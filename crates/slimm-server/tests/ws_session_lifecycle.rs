@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! End-to-end tests for the ways a session's live socket dies: logout,
-//! device removal, account deletion, and a bad connect ticket. Split out of
-//! `tests/ws.rs`, which stayed focused on fan-out and delivery.
+//! device removal, account deletion, bot revocation, and a bad connect
+//! ticket. Split out of `tests/ws.rs`, which stayed focused on fan-out and
+//! delivery.
 
 use std::time::Duration;
 
@@ -140,6 +141,77 @@ async fn logout_closes_the_live_socket() {
     // The socket closes promptly rather than lingering with fan-out access.
     let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut alice_ws)).await;
     assert!(closed.is_ok(), "the socket should close after logout");
+}
+
+/// Revoking a bot is the documented answer to a leaked bot token, which never
+/// rotates and lives in a container env var. The REST side always worked; the
+/// socket did not, because the handler marked the row and published nothing, so
+/// an attacker who had already connected kept receiving every event the bot
+/// could see for as long as they held the socket open. `Store::revoke_bot`
+/// returns the sessions it revoked precisely so this cannot silently regress.
+#[tokio::test]
+async fn revoking_a_bot_closes_its_live_socket() {
+    let (store, _guard) = new_store().await;
+    let state = state_for(&store);
+
+    let admin = store
+        .create_account("root", "Root", "not-a-real-hash")
+        .await
+        .unwrap();
+    store.bootstrap_deployment(admin.id).await.unwrap();
+    let admin_token = store
+        .open_session(admin.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+
+    let addr = serve(state.clone()).await;
+    let created = http::router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/bots")
+                .header("authorization", format!("Bearer {admin_token}"))
+                .header("content-type", "application/json")
+                .body(Body::from(json!({ "username": "helper" }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::CREATED);
+    let bytes = axum::body::to_bytes(created.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body: Value = serde_json::from_slice(&bytes).unwrap();
+    let bot_id = body["bot"]["user_id"].as_str().unwrap().to_owned();
+    let bot_token = body["token"].as_str().unwrap().to_owned();
+
+    let ctx = store
+        .authenticate_bot(&bot_token)
+        .await
+        .unwrap()
+        .expect("a fresh bot token authenticates");
+    let (ticket, _expires_at) = store.mint_ws_ticket(&ctx).await.unwrap();
+    let mut bot_ws = connect(addr, &ticket).await;
+
+    let revoked = http::router(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/bots/{bot_id}/revoke"))
+                .header("authorization", format!("Bearer {admin_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(revoked.status(), StatusCode::NO_CONTENT);
+
+    let closed = tokio::time::timeout(Duration::from_secs(2), wait_closed(&mut bot_ws)).await;
+    assert!(
+        closed.is_ok(),
+        "revoking a bot must close the socket it already holds, not just stop the next request"
+    );
 }
 
 /// Removing a device is the third way a session dies, alongside logout and

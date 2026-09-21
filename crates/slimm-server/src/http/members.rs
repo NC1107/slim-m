@@ -294,6 +294,11 @@ async fn delete_member_account(
 
 /// Every removal in force. Requires BAN_MEMBERS, because this is the only
 /// place a removed member is still nameable - the member list drops them.
+///
+/// The `invite_code` on each entry needs MANAGE_ROLES on top, for the reason
+/// given on [`super::users::list`]: the code is redeemable for the role it
+/// grants, so a caller who could not grant that role must not be able to read
+/// one. The removal itself stays visible to any BAN_MEMBERS holder.
 async fn list_removed(
     Authed(ctx): Authed,
     parts: Parts,
@@ -303,8 +308,25 @@ async fn list_removed(
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require(&state, ctx.user_id, Permissions::BAN_MEMBERS).await?;
 
+    // Blanked below unless held; see the note in `http::users::list`.
+    let sees_codes = state
+        .store
+        .base_permissions(ctx.user_id)
+        .await?
+        .contains(Permissions::MANAGE_ROLES);
     let removals = state.store.list_removals().await?;
-    Ok(Json(removals.into_iter().map(RemovalDto::from).collect()))
+    Ok(Json(
+        removals
+            .into_iter()
+            .map(|removal| {
+                let mut dto = RemovalDto::from(removal);
+                if !sees_codes {
+                    dto.invite_code = None;
+                }
+                dto
+            })
+            .collect(),
+    ))
 }
 
 // --- Guards ---

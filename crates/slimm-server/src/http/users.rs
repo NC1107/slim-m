@@ -332,10 +332,18 @@ async fn list_users(
 /// caller may read it: a member list is deployment-wide, not scoped to any
 /// one channel, so there is no channel permission to check it against.
 ///
-/// A BAN_MEMBERS caller additionally gets each member's registration invite
+/// A MANAGE_ROLES caller additionally gets each member's registration invite
 /// code attached (see MOD9) - a moderation signal, not a public one, so it
 /// is fetched and attached only here rather than in [`to_dtos`] itself,
 /// which every other `UserDto` response also goes through.
+///
+/// MANAGE_ROLES rather than the BAN_MEMBERS this once used: a code is a
+/// credential, not a label. `Store::redeem_invite` applies the invite's
+/// `role_grant` to whoever spends it, and redeeming needs nothing but a
+/// session, so a moderator who could not grant a role could read a still-live
+/// code off this list and take that role - up to ADMINISTRATOR. Gating on the
+/// permission that could grant it anyway closes that without losing the
+/// ban-evasion signal for the people who set the roles in the first place.
 async fn list_members(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Query(params): Query<ListMembersParams>,
@@ -356,12 +364,13 @@ async fn list_members(
     let ids: Vec<UserId> = members.iter().map(|m| m.id).collect();
     let mut dtos = to_dtos(&state.store, members).await?;
 
-    let is_moderator = state
+    // A code is a credential: redeeming it applies the role it grants.
+    let sees_codes = state
         .store
         .base_permissions(ctx.user_id)
         .await?
-        .contains(Permissions::BAN_MEMBERS);
-    if is_moderator {
+        .contains(Permissions::MANAGE_ROLES);
+    if sees_codes {
         let invite_codes = state.store.registration_invite_codes(&ids).await?;
         for (dto, id) in dtos.iter_mut().zip(ids.iter()) {
             dto.invite_code = invite_codes.get(id).cloned();

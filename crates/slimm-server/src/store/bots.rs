@@ -245,9 +245,13 @@ impl Store {
     /// next request. The account stays, so its authorship survives - the same
     /// treatment revoking any session gives.
     ///
-    /// Returns false if no live bot by that id exists, so the caller can answer
-    /// 404 rather than pretending.
-    pub async fn revoke_bot(&self, bot_user_id: UserId) -> anyhow::Result<bool> {
+    /// Returns `None` if no bot by that id exists, so the caller can answer 404
+    /// rather than pretending, and otherwise the sessions it revoked - possibly
+    /// empty, for a bot whose token was already spent. The caller must publish
+    /// [`crate::hub::Event::SessionRevoked`] for each: revoking the row stops
+    /// the next request, but an already-open socket is only closed by the
+    /// event, and a leaked token's socket is the thing revocation exists to cut.
+    pub async fn revoke_bot(&self, bot_user_id: UserId) -> anyhow::Result<Option<Vec<SessionId>>> {
         let now = now_ms();
         let sessions = sqlx::query!(
             r#"SELECT session_id AS "session_id!: SessionId"
@@ -257,7 +261,7 @@ impl Store {
         .fetch_all(&self.pool)
         .await?;
         if sessions.is_empty() {
-            return self.is_bot(bot_user_id).await;
+            return Ok(self.is_bot(bot_user_id).await?.then(Vec::new));
         }
         sqlx::query!(
             "UPDATE bot_tokens SET revoked_at = ? WHERE bot_user_id = ? AND revoked_at IS NULL",
@@ -266,9 +270,11 @@ impl Store {
         )
         .execute(&self.pool)
         .await?;
+        let mut revoked = Vec::with_capacity(sessions.len());
         for row in sessions {
             self.revoke_session(row.session_id).await?;
+            revoked.push(row.session_id);
         }
-        Ok(true)
+        Ok(Some(revoked))
     }
 }
