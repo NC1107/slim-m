@@ -81,9 +81,14 @@ const MAX_PREVIEW_BYTES: u64 = 5 * 1024 * 1024;
 /// An outer sanity bound on a full-resolution download, independent of the
 /// operator's own `SLIMM_ATTACHMENT_MAX_BYTES`: that ceiling is enforced
 /// afterward, in [`select`], the same way [`super::attachments::upload`]
-/// enforces it against a client-supplied body. This one exists only so a
-/// misbehaving provider cannot make the server buffer an unbounded response
-/// before that check ever runs.
+/// enforces it against a client-supplied body. This one is a sanity bound on a
+/// provider the operator chose, not a hard memory ceiling: `Content-Length`
+/// over it is refused before anything is downloaded, but a provider that sends
+/// none - chunked transfer is ordinary - is still buffered whole by
+/// [`fetch_capped`] and only then measured. What bounds that case is
+/// [`PROVIDER_TIMEOUT`]. Making it a real ceiling means streaming the body,
+/// which needs reqwest's `stream` feature that this workspace deliberately
+/// cuts; see docs/dependencies.md.
 const MAX_DOWNLOAD_BYTES: u64 = 25 * 1024 * 1024;
 
 /// How long a provider request may take before this deployment gives up and

@@ -204,10 +204,9 @@ pub(crate) async fn execute_command(
 /// The reserved `module_id` this deployment's code-runner broker
 /// (`crate::code_runner`) answers to, on the exact same routes an installed
 /// module's command would use - see this file's own module doc. Not a real
-/// installable module: [`execute_code_runner`] never reaches the module
-/// store for it, and nothing in the Dock's install path can register a
-/// module under this fixed id, so a marketplace listing can never shadow or
-/// be shadowed by it.
+/// installable module: [`execute_code_runner`] never reaches the module store
+/// for it, and [`super::dock::validate_module_id`] refuses this id on install,
+/// so a marketplace listing can never shadow or be shadowed by it.
 pub(crate) const CODE_RUNNER_MODULE_ID: &str = "code-runner";
 
 /// Runs `code` as `language` through this deployment's configured code
@@ -332,6 +331,8 @@ pub(super) async fn reachable_extension_points(
     user_id: UserId,
     kind: &str,
 ) -> Result<Vec<Reachable>, ApiError> {
+    // One role load for the whole sweep, not one per extension point.
+    let held = state.store.held_module_permissions(user_id).await?;
     let mut reachable = Vec::new();
     for module in state.store.list_installed_modules().await? {
         if !module.enabled {
@@ -344,11 +345,7 @@ pub(super) async fn reachable_extension_points(
             let (Some(command), Some(permission)) = (&point.command, &point.permission) else {
                 continue;
             };
-            if state
-                .store
-                .user_has_module_permission(user_id, &module.id, permission)
-                .await?
-            {
+            if held.contains(&(module.id.clone(), permission.clone())) {
                 reachable.push(Reachable {
                     module_id: module.id.clone(),
                     command: command.clone(),
