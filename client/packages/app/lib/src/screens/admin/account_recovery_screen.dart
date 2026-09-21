@@ -8,9 +8,16 @@
 /// a move: [ResetCodeMenuItem] on the popover still works and is still the
 /// fastest route when you already have the person in front of you.
 ///
-/// ADMINISTRATOR, matching `POST /admin/users/{id}/reset-code`, which refuses
-/// anything less. Issuing a code is a way into somebody else's account, so it
+/// Requires ADMINISTRATOR, matching `POST /admin/users/{id}/reset-code`, which
+/// refuses anything less. Issuing a code is a way into somebody else's account, so it
 /// asks for more than the MANAGE_SERVER that gates most of Space settings.
+///
+/// Without the bit the action is absent rather than disabled, which is the
+/// rule `space_settings_section.dart`'s own gate states: a member should not
+/// be shown a surface and left to answer 403. `removed_members_screen.dart`
+/// hides its ADMINISTRATOR-only delete the same way. That state is reachable
+/// only by typing the route, since Space settings does not list this pane
+/// otherwise, and it still says why it is empty rather than going blank.
 library;
 
 import 'package:flutter/material.dart';
@@ -23,6 +30,7 @@ import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/reset_code_sheet.dart';
+import '../../widgets/settings_notice.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
 import 'overwrite_target_picker_sheets.dart';
@@ -51,6 +59,17 @@ class AccountRecoveryPane extends ConsumerWidget {
         .watch(myPermissionsProvider)
         .hasPermission(Perm.administrator);
 
+    // Hidden, not inert: see this library's doc for the rule.
+    if (!canIssue) {
+      return const SettingsNotice(
+        message: 'Issuing a reset code needs the administrator permission.',
+        detail:
+            'Somebody locked out of their account gets back in with a '
+            'one-time code an administrator issues them. There is no '
+            'recovery email.',
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -66,14 +85,13 @@ class AccountRecoveryPane extends ConsumerWidget {
             AppListRow(
               label: 'Issue a reset code',
               leading: const Icon(AppIcons.resetCode),
-              meta: canIssue ? null : 'Administrators only',
               semanticLabel: 'Issue a reset code, choose a member',
               trailing: Icon(
                 AppIcons.chevronRight,
                 size: AppSizes.icon16,
                 color: tokens.textSecondary,
               ),
-              onTap: canIssue ? () => _pickThenIssue(context) : null,
+              onTap: () => _pickThenIssue(context),
             ),
           ],
         ),

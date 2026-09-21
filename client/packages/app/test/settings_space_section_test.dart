@@ -98,6 +98,11 @@ void main() {
     expect(find.text('Reports'), findsNothing);
     expect(find.text('Roles'), findsNothing);
     expect(find.text('Channel permissions'), findsNothing);
+    expect(
+      find.text('Account recovery'),
+      findsNothing,
+      reason: 'MANAGE_SERVER opens most of Space settings but not this one',
+    );
   });
 
   testWidgets('MANAGE_ROLES does not bring the emoji row with it', (

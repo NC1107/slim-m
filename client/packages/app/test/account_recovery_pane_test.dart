@@ -115,11 +115,16 @@ void main() {
     await tester.tap(find.text('Ada'));
     await tester.pumpAndSettle();
 
-    // The existing sheet, named for the member the picker returned.
+    // textContaining('Ada') would match the picker's own row; these do not.
     expect(
-      find.textContaining('Ada'),
-      findsWidgets,
-      reason: 'the picked member has to reach showResetCodeSheet',
+      find.text('Choose a member'),
+      findsNothing,
+      reason: 'the picker closes once a member is chosen',
+    );
+    expect(
+      find.text('Password reset code for Ada'),
+      findsOneWidget,
+      reason: 'the title only _ResetCodeSheet renders, for the member picked',
     );
   });
 
@@ -141,18 +146,25 @@ void main() {
     );
   });
 
-  testWidgets('without ADMINISTRATOR the row is inert and says why', (
+  /// Hidden, not shown inert. `space_settings_section.dart`'s own gate states
+  /// the rule - a member without the bit should not see the surface exists at
+  /// all rather than be shown it and left to answer 403 - and
+  /// `removed_members_screen.dart` hides its ADMINISTRATOR-only delete the same
+  /// way. Reachable only by typing the route, since the pane is not listed.
+  testWidgets('without ADMINISTRATOR the action is absent, not disabled', (
     tester,
   ) async {
     await _pump(tester, permissions: Perm.manageServer);
 
-    expect(find.text('Administrators only'), findsOneWidget);
-    await tester.tap(find.text('Issue a reset code'));
-    await tester.pumpAndSettle();
     expect(
-      find.text('Choose a member'),
+      find.text('Issue a reset code'),
       findsNothing,
-      reason: 'the server refuses anything less, so the client must not ask',
+      reason: 'the action must not be visible to somebody who cannot take it',
+    );
+    expect(
+      find.textContaining('needs the administrator permission'),
+      findsOneWidget,
+      reason: 'but the page still says why it is empty; see decision 0013',
     );
   });
 }
