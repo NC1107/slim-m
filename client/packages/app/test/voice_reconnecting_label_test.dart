@@ -18,7 +18,6 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
-import 'package:slimm_app/src/providers/voice_state.dart';
 import 'package:slimm_app/src/screens/voice_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';

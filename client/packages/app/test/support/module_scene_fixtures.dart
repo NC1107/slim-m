@@ -77,10 +77,6 @@ Future<List<String>> actionsFrom(
     of: find.byType(ModuleSceneView),
     matching: find.byType(CustomPaint),
   );
-  // ignore: avoid_print
-  print(
-    'BOARD n=${board.evaluate().length} rect=${tester.getRect(board.last)}',
-  );
   await drive(tester, tester.getTopLeft(board.last));
   await tester.pumpAndSettle();
   return actions;

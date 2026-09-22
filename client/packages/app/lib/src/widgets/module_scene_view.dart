@@ -30,6 +30,7 @@ import 'module_scene_images.dart';
 import 'module_scene_inputs.dart';
 import 'module_scene_controls.dart';
 import 'module_scene_frame.dart';
+import 'module_scene_pacing.dart';
 import 'module_scene_painter.dart';
 
 /// Runs one action against the module and returns its raw result. The action
@@ -76,25 +77,9 @@ class ModuleSceneView extends StatefulWidget {
 }
 
 class _ModuleSceneViewState extends State<ModuleSceneView> {
-  /// How often play asks for the next generation, at its fastest.
-  ///
-  /// Not the rate it settles at. The shared code-block route is rate limited
-  /// as an ordinary write (30 burst, 5 a second refilling), and playing at
-  /// this tick outruns that: a long run used to sail through the burst and
-  /// then fail outright with "too many requests", which is a rate limit doing
-  /// its job and an animation handling it badly. [_backoff] is what turns that
-  /// into pacing rather than a stop.
-  static const _tick = Duration(milliseconds: 130);
-
-  /// The ceiling [_interval] backs off to. Beyond a couple of seconds a board
-  /// is not really playing any more, and something is wrong that waiting
-  /// longer will not fix.
-  static const _maxTick = Duration(seconds: 2);
-
-  /// The interval play is currently running at, between [_tick] and
-  /// [_maxTick]. Doubles on a refused call and eases back on a run of good
-  /// ones, so a deployment's own limit is found rather than assumed.
-  Duration _interval = _tick;
+  /// How fast this may ask, and what to do when told it is asking too fast.
+  /// Shared by play's timer and the drag queue; see [ScenePacing].
+  final _pacing = ScenePacing();
 
   late ModuleScene _scene = widget.initial;
   Timer? _timer;
@@ -194,7 +179,10 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     super.dispose();
   }
 
-  Future<void> _send(String action) async {
+  /// [queued] marks an action the drag queue is draining, which is the only
+  /// caller a refusal paces rather than reports: a control press is one
+  /// deliberate act and has to say straight away that it did nothing.
+  Future<void> _send(String action, {bool queued = false}) async {
     if (_busy) return;
     setState(() {
       _busy = true;
@@ -208,7 +196,10 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       final next = result.ok && result.output != null
           ? parseModuleScene(result.output!)
           : null;
-      if (next != null) _rememberOwn(next.state);
+      if (next != null) {
+        _rememberOwn(next.state);
+        _pacing.succeeded();
+      }
       setState(() {
         _busy = false;
         if (next != null) {
@@ -222,12 +213,20 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       });
     } on api.RateLimitedException catch (e) {
       if (!mounted) return;
-      // Only play can outrun the budget; see _backOff.
+      _backOff(e.retryAfter);
       if (_playing) {
         setState(() => _busy = false);
-        _backOff(e.retryAfter);
         return;
       }
+      if (queued && !_pacing.exhausted) {
+        // Put it back and hold: see _drain on why not just drop it.
+        _queue.insert(0, action);
+        await Future<void>.delayed(_pacing.interval);
+        if (!mounted) return;
+        setState(() => _busy = false);
+        return;
+      }
+      _queue.clear();
       setState(() {
         _busy = false;
         _stop();
@@ -263,15 +262,15 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
       _stopAndRepaint();
       return;
     }
-    // A fresh press starts at full speed again; see _backOff.
-    _interval = _tick;
+    // A fresh press starts at full speed again; see ScenePacing.reset.
+    _pacing.reset();
     setState(() => _playing = true);
     _startTimer();
   }
 
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(_interval, (_) {
+    _timer = Timer.periodic(_pacing.interval, (_) {
       if (!_busy && _scene.live) {
         _send('step');
       } else if (!_scene.live) {
@@ -280,20 +279,9 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     });
   }
 
-  /// Slows play after the server refused a call for asking too fast.
-  ///
-  /// Doubles, or waits whatever `Retry-After` asked for if that is longer,
-  /// capped at [_maxTick]. It does not speed back up inside a run: creeping
-  /// back toward [_tick] would find the limit again, and a board that keeps
-  /// stuttering into refusals is worse than one that settled slightly slow.
-  /// Pressing play again is how you ask for full speed.
+  /// Slows down after a refusal, and re-arms play's timer at the new interval.
   void _backOff(Duration? retryAfter) {
-    final doubled = _interval * 2;
-    var next = retryAfter != null && retryAfter > doubled
-        ? retryAfter
-        : doubled;
-    if (next > _maxTick) next = _maxTick;
-    _interval = next;
+    _pacing.backOff(retryAfter);
     if (_playing) _startTimer();
   }
 
@@ -371,11 +359,19 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
   /// Sends queued actions, coalescing what the module said it can read in one
   /// go. Re-entrant calls return immediately, so the drain already running is
   /// the only one.
+  ///
+  /// A refusal pauses this rather than ending it. [_send] puts the refused
+  /// action back at the front and waits [ScenePacing.interval] before letting
+  /// the loop continue, so a burst limit paces the rest of a drawn line instead
+  /// of emptying the queue against a closed limit - dropping it would leave the
+  /// line unfinished, which is the same hole the queue exists to avoid. After
+  /// [ScenePacing.maxRefusals] waits in a row it does give up, once, with one
+  /// error.
   Future<void> _drain() async {
     while (_queue.isNotEmpty && mounted) {
       // Per iteration: play's step can take _busy between sends.
       if (_busy) return;
-      await _send(_takeNext());
+      await _send(_takeNext(), queued: true);
     }
   }
 
