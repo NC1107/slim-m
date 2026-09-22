@@ -75,6 +75,18 @@ Fedora's `filesystem` package carries a file trigger on that directory and rebui
 The `.desktop` file is itself named for the GTK application id in `client/packages/app/linux/CMakeLists.txt`.
 Wayland matches a window to its launcher entry by that id, so the two names have to agree.
 
+## The COPR repo file
+
+`slim-m-client.repo` is `Source12`, installed `%config(noreplace)` to `/etc/yum.repos.d/slim-m-client.repo`.
+It exists so the two install routes end up in the same place: someone who downloads the `.rpm` from a release gets the repo configured by the package, rather than having the client ask polkit to run `dnf copr enable` the first time it updates itself.
+
+Its repo id is `slim-m`, not COPR's own `copr:copr.fedorainfracloud.org:nc1107:slim-m`.
+Anyone who ran `dnf copr enable` already has a file declaring that id, and two files declaring one id leaves it ambiguous which wins and hands rpm ownership of a definition `dnf copr remove` expects to delete.
+Checked on Fedora 44 rather than assumed: dnf5 tolerates the duplicate and silently keeps one, and both ids enabled at once works fine, costing a second metadata fetch.
+
+`client/packages/app/lib/src/desktop/rpm_updater.dart` accepts either id, so the enable path stays the fallback for an rpm from an older release that predates this file.
+`%check` asserts the `[slim-m]` section header is present, because the updater matches on the id and a renamed section would silently put the polkit prompt back.
+
 ## rpmlint findings left in place
 
 `rpmlint` is not clean, and what remains is upstream payload or a check that does not fit this shape.

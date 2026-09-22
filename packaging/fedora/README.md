@@ -5,8 +5,8 @@ The spec is `packaging/rpm/slim-m-client.spec`; this directory holds the operato
 
 It repackages the Linux release tarball rather than building from source: a Flutter build resolves pub dependencies over the network, and a COPR (mock) buildroot has no network at all.
 
-**Not live yet.** The COPR project does not exist until someone creates it, and `dnf copr enable` fails with a 404 until then.
-The `.rpm` on the GitHub release arrives on the first client tag cut after this lands; COPR needs the manual step at the bottom of this file as well.
+**Live since at least 2026-09-22**, when `dnf --enablerepo=slim-m list --available slim-m-client` in a `fedora:44` container answered `slim-m-client.x86_64 0.80.0-1.fc44`.
+An earlier version of this line said the project did not exist yet; it does, and the note is kept rather than deleted so nobody re-derives the old conclusion from a stale copy.
 
 ## Install
 
@@ -16,6 +16,8 @@ sudo dnf install slim-m-client
 ```
 
 Or take the `.rpm` straight from a [client release](https://github.com/NC1107/slim-m/releases) and `sudo dnf install ./slim-m-client-*.rpm` - no COPR needed.
+That route configures the repo too: the package ships `/etc/yum.repos.d/slim-m-client.repo`, so `dnf upgrade slim-m-client` and the client's own in-app update both work straight away, with no `dnf copr enable` step and no polkit prompt for one.
+The two repo ids coexist if you also ran `dnf copr enable`; see that file's header for why the ids differ.
 The release also carries a `SHA256SUMS`, and a `SHA256SUMS.asc` when the signing key is configured.
 
 x86_64 only, on purpose.

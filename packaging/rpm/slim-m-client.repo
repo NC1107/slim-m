@@ -1,0 +1,26 @@
+# The COPR repo the client updates from, shipped in the rpm so a
+# download-and-install arrives already configured and `dnf upgrade
+# slim-m-client` works without first asking polkit to enable a repo.
+#
+# The repo id is deliberately `slim-m` rather than COPR's own
+# `copr:copr.fedorainfracloud.org:nc1107:slim-m`. Anyone who ran
+# `dnf copr enable nc1107/slim-m` already has a file declaring that id, and two
+# files declaring one id leaves it ambiguous which definition wins and hands rpm
+# ownership of one `dnf copr remove` expects to delete. Measured on Fedora 44
+# rather than assumed: dnf5 tolerates the duplicate and silently keeps one, so
+# this is about ownership, not about dnf breaking. Both ids enabled at once also
+# works - checked - and costs only a second metadata fetch.
+#
+# skip_if_unavailable matters more here than in a repo someone opted into: this
+# one arrives with the package, so a COPR outage must not break every unrelated
+# dnf transaction on the machine.
+[slim-m]
+name=slim-m desktop client (COPR nc1107/slim-m)
+baseurl=https://download.copr.fedorainfracloud.org/results/nc1107/slim-m/fedora-$releasever-$basearch/
+type=rpm-md
+skip_if_unavailable=True
+gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/nc1107/slim-m/pubkey.gpg
+repo_gpgcheck=0
+enabled=1
+enabled_metadata=1
