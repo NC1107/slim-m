@@ -66,7 +66,12 @@ class _SectionLabel extends StatelessWidget {
     );
     return Padding(
       // Mirrors AppListRow's horizontal padding, so header and row text share a left edge.
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s8,
+        AppRhythm.headingTop,
+        AppSpacing.s8,
+        AppRhythm.headingBottom,
+      ),
       child: trailing == null
           ? label
           : Row(

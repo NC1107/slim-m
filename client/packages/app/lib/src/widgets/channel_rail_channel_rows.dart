@@ -270,6 +270,15 @@ VoiceParticipant _asVoiceParticipant(api.VoiceRosterParticipant p) =>
 
 /// Who is in a voice channel: real-time for the one the caller has joined,
 /// a periodic snapshot ([voiceRosterProvider]) for every other one.
+/// Left indent that puts the strip under a channel row's *label* rather than
+/// its icon, so the faces read as belonging to the channel named above them.
+/// Off the 4dp grid because it tracks the icon column's width, not the grid.
+const double _stripIndent = 30;
+
+/// A sub-grid optical gap: the strip sits just under the row's text baseline,
+/// close enough to read as part of that row rather than as its own row.
+const double _stripTop = 2;
+
 class _ParticipantStrip extends StatelessWidget {
   const _ParticipantStrip({required this.participants});
 
@@ -279,7 +288,12 @@ class _ParticipantStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 2, 8, 4),
+      padding: const EdgeInsets.fromLTRB(
+        _stripIndent,
+        _stripTop,
+        AppSpacing.s8,
+        AppSpacing.s4,
+      ),
       child: Row(
         children: [
           for (final participant in participants.take(8))

@@ -14,6 +14,10 @@ import '../routing/breakpoints.dart';
 
 import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
 
+/// A sub-grid optical gap under the message text, so the "Edited" note reads as
+/// trailing that line rather than starting a new one.
+const double _editedLabelTop = 2;
+
 class EditedMarker extends StatelessWidget {
   const EditedMarker({super.key, this.onTap});
 
@@ -35,10 +39,13 @@ class EditedMarker extends StatelessWidget {
       ),
     );
     if (onTap == null) {
-      return Padding(padding: const EdgeInsets.only(top: 2), child: label);
+      return Padding(
+        padding: const EdgeInsets.only(top: _editedLabelTop),
+        child: label,
+      );
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 2),
+      padding: const EdgeInsets.only(top: _editedLabelTop),
       child: Semantics(
         button: true,
         label: 'Edited. View edit history',
@@ -283,7 +290,12 @@ class NewMessagesDivider extends StatelessWidget {
         ? AppSizes.paneGutterCompact
         : AppSizes.paneGutter;
     return Padding(
-      padding: EdgeInsets.fromLTRB(gutter, 14, gutter, 6),
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        AppRhythm.dividerTop,
+        gutter,
+        AppRhythm.headingBottom,
+      ),
       child: Stack(
         alignment: Alignment.centerRight,
         children: [
@@ -320,7 +332,12 @@ class DayDivider extends StatelessWidget {
     Widget rule() =>
         Expanded(child: Container(height: 1, color: tokens.borderSubtle));
     return Padding(
-      padding: EdgeInsets.fromLTRB(gutter, 16, gutter, 6),
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        AppSpacing.s16,
+        gutter,
+        AppRhythm.headingBottom,
+      ),
       child: Row(
         children: [
           rule(),
