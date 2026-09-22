@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.68.0](https://github.com/NC1107/slim-m/compare/server-v0.67.0...server-v0.68.0) (2026-09-22)
+
+
+### Features
+
+* account recovery in settings, image gallery paging, and the audit follow-ups ([#1267](https://github.com/NC1107/slim-m/issues/1267)) ([05c2508](https://github.com/NC1107/slim-m/commit/05c2508e0a33a6f61e94fa5745bf7ffec7293470))
+
+
+### Bug Fixes
+
+* **server:** close an invite-code disclosure and make bot revocation cut the socket ([#1263](https://github.com/NC1107/slim-m/issues/1263)) ([776c97e](https://github.com/NC1107/slim-m/commit/776c97e73f305eeb6454099f9057c18b51791ceb))
+* **server:** reserve the code-runner id at install, and stop re-loading roles per extension point ([#1264](https://github.com/NC1107/slim-m/issues/1264)) ([162c58c](https://github.com/NC1107/slim-m/commit/162c58c2a7bf6a5ff93adbc8d1794cf184ac6899))
+
 ## [0.67.0](https://github.com/NC1107/slim-m/compare/server-v0.66.0...server-v0.67.0) (2026-09-21)
 
 
