@@ -70,8 +70,8 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
       final data = _string(op['data']);
       if (data == null) return null;
       return CellsOp(
-        cols: _double(op['cols'], 0).toInt(),
-        rows: _double(op['rows'], 0).toInt(),
+        cols: _axis(op['cols']),
+        rows: _axis(op['rows']),
         data: data,
         palette: _stringList(op['palette']),
         gap: _double(op['gap'], 0),
@@ -248,6 +248,17 @@ SceneGradient? _parseGradient(Object? raw) {
 
 double _double(Object? value, double fallback) =>
     value is num ? value.toDouble() : fallback;
+
+/// One axis of a `cells` grid, clamped to [CellsOp.maxPerAxis].
+///
+/// Clamped rather than refused, the way [InputOp.maxLength] is: a grid past
+/// the ceiling still draws, just no larger than the contract allows, so a
+/// module that asks for too much renders small instead of not at all.
+int _axis(Object? value) {
+  final raw = _double(value, 0).toInt();
+  if (raw < 0) return 0;
+  return raw > CellsOp.maxPerAxis ? CellsOp.maxPerAxis : raw;
+}
 
 String? _string(Object? value) => value is String ? value : null;
 

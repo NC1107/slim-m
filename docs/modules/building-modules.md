@@ -296,6 +296,8 @@ By default it fills the whole scene.
 Give it `w` and `h` (and `x`, `y`, which default to the origin) to place it, so a grid can be one part of a scene next to labels, buttons or other art rather than the whole of it.
 Both the painting and the tap reading follow the box, so a tap outside it falls through to whatever op is underneath.
 A `w` or `h` that is missing or not positive describes nothing, so the grid falls back to filling the scene rather than disappearing.
+`cols` and `rows` are each capped at **128** and clamped at parse, so a grid asking for more draws at the cap rather than not at all.
+That is where a cell stops being something a person can see or aim at - about three points across on a phone - and where one paint stays inside a frame; the largest grid any shipped module uses is 48 by 48.
 An op slim does not recognise is skipped rather than failing the scene, so a new op is an additive change a newer client can use.
 
 ### Arbitrary shapes with `path`
