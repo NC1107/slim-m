@@ -72,6 +72,27 @@ jobs:
           tool: cargo-machete
       - name: no unused dependencies
         run: cargo machete
+      # A new or edited query with no cache entry fails the offline build loudly,
+      # so the gap this closes is narrower and quieter: a migration that changes
+      # a column's nullability or type WITHOUT touching any query text. The
+      # committed `.sqlx/` entries keep their old inferred types, the offline
+      # build compiles clean, and nothing re-derives them against the new
+      # schema - so a relaxed NOT NULL ships a Rust type the database can no
+      # longer satisfy, surfacing as a runtime decode error against real data.
+      #
+      # CLAUDE.md is the realistic way in rather than a theoretical one: it says
+      # to regenerate `.sqlx/` after changing a query, which a migration-only
+      # change is not. `--check` is the `cargo fmt --check` of this cache.
+      - name: install sqlx-cli
+        uses: taiki-e/install-action@d438492cf8a250514fa2d34b30bc3c0dc37c65ff # v2.87.8
+        with:
+          tool: sqlx-cli@0.8.6
+      - name: sqlx cache matches the migrated schema
+        env:
+          DATABASE_URL: sqlite:///tmp/slimm-sqlx-check.db
+        run: |
+          (cd crates/slimm-server && sqlx database create && sqlx migrate run --source migrations)
+          cargo sqlx prepare --workspace --check -- --all-targets
       - name: install nextest
         # Pinned version, checksum-verified by the action rather than piped from
         # the network straight into tar. nextest runs the workspace's test

@@ -10,7 +10,7 @@ Each section below is named for its workflow file.
 
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
-| `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
+| `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
 | `client-ci` | changes under `client/`, or to `schema/openapi.yaml`; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
@@ -51,6 +51,18 @@ Path-gated so a client-only change never triggers a server build.
 
 `schema/openapi.yaml` is in the path filter even though it is not Rust.
 `crates/slimm-server/tests/openapi_contract.rs` gates the schema against the router, so a schema-only edit that documents a path nothing serves, without touching `crates/`, must still run that test.
+
+### The sqlx cache
+
+`cargo sqlx prepare --workspace --check -- --all-targets`, against a database created and migrated in the same step.
+It is the `cargo fmt --check` of `.sqlx/`: it re-derives every query's metadata from the real schema and fails if that differs from what is committed.
+
+A *new or edited* query never needed this - sqlx keys each cache entry by a hash of the query text, so a query with no entry fails the offline build loudly on its own.
+The gap is narrower and much quieter: a migration that changes a column's nullability or type **without touching any query text**.
+The committed entries keep their old inferred types, the offline build compiles clean, and nothing re-derives them against the new schema.
+A relaxed `NOT NULL` then ships a Rust type the database can no longer satisfy, and it surfaces as a runtime decode error against real data rather than as a red build.
+
+`CLAUDE.md` is the realistic way in rather than a theoretical one: it says to regenerate `.sqlx/` after changing a `query!`, which a migration-only change is not.
 
 ### Unused dependencies
 
