@@ -44,6 +44,19 @@ const Set<String> inlineImageTypes = {
 bool isInlineImage(String contentType) =>
     inlineImageTypes.contains(contentType);
 
+/// The images on a message, in message order, so opening one fullscreen can
+/// page to the rest.
+///
+/// Only what this client will actually display inline: a pdf or an svg is not
+/// a page in a photo gallery, and [AttachmentView] would not open one anyway.
+/// It lives beside [isInlineImage] rather than in the row that calls it, so
+/// the rule the gallery pages by and the rule a thumbnail renders by are the
+/// same rule.
+List<api.Attachment> openableImages(List<api.Attachment> attachments) =>
+    attachments
+        .where((a) => isInlineImage(a.contentType))
+        .toList(growable: false);
+
 /// A prefix match, unlike [inlineImageTypes]: there is no server-side
 /// allowlist to disagree with here (the server never treats video as
 /// inline, so every `video/*` is served as a forced download either way),
@@ -66,9 +79,18 @@ bool isVideo(String contentType) => contentType.startsWith('video/');
 const double kInlineImageMax = kMessageColumnMax / 2;
 
 class AttachmentView extends ConsumerStatefulWidget {
-  const AttachmentView({super.key, required this.attachment});
+  const AttachmentView({
+    super.key,
+    required this.attachment,
+    this.siblings = const [],
+  });
 
   final api.Attachment attachment;
+
+  /// Every image on the same message, in the order the message shows them,
+  /// so opening one fullscreen can page to the rest. Empty for a caller with
+  /// nothing to page to, which opens [attachment] alone.
+  final List<api.Attachment> siblings;
 
   @override
   ConsumerState<AttachmentView> createState() => _AttachmentViewState();
@@ -161,12 +183,20 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
         }
         return _tappable(
           label: 'Open ${attachment.filename} fullscreen',
-          onTap: () => showFullscreenImage(
-            context,
-            filename: attachment.filename,
-            bytes: bytes,
-            heroTag: _heroTag,
-          ),
+          onTap: () {
+            final images = widget.siblings.isEmpty
+                ? [attachment]
+                : widget.siblings;
+            final index = images.indexWhere((a) => a.id == attachment.id);
+            showFullscreenImage(
+              context,
+              images: images,
+              // A list somehow lacking this attachment would open at -1.
+              index: index < 0 ? 0 : index,
+              bytes: bytes,
+              heroTag: _heroTag,
+            );
+          },
           // Bordered like the chip and error states beside it (border-first
           // elevation), and captioned: a bare rectangle with no name or size
           // read as decoration rather than a file anyone could open.

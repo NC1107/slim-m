@@ -390,6 +390,7 @@ class MessageRow extends StatelessWidget {
                                         ),
                                         child: AttachmentView(
                                           attachment: attachment,
+                                          siblings: openableImages(attachments),
                                         ),
                                       ),
                                   if (!_unsent)
