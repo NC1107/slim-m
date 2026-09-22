@@ -2,10 +2,16 @@
 /// One permission's three-way state in a channel overwrite: inherit
 /// (neither bit set), allow (forced on), or deny (forced off). Split out of
 /// `channel_overwrites_screen.dart` to keep that file under budget.
+///
+/// Only the control is here now. The row around it is [PermissionRow], shared
+/// with the role editor's toggle so the two screens read as one product; see
+/// that widget's own doc.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+import '../../widgets/permission_row.dart';
 
 /// Matches [OverwriteState.deny]'s index, so a caller can read the selected
 /// segment straight back into the tri-state this represents.
@@ -32,7 +38,6 @@ class PermissionOverwriteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final options = [
       const AppSegmentedOption(label: 'Inherit'),
       // Dimmed rather than merely inert: the server refuses granting a bit
@@ -41,22 +46,15 @@ class PermissionOverwriteRow extends StatelessWidget {
       const AppSegmentedOption(label: 'Deny'),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppText.ui.copyWith(color: tokens.textPrimary)),
-          const SizedBox(height: AppSpacing.s4),
-          AppSegmentedControl.inline(
-            semanticLabel: label,
-            options: options,
-            selectedIndex: value.index,
-            // The option itself wires no tap when disabled, so nothing to
-            // guard against here.
-            onSegmentSelected: (i) => onChanged(OverwriteState.values[i]),
-          ),
-        ],
+    return PermissionRow(
+      label: label,
+      controlBelow: true,
+      control: AppSegmentedControl.inline(
+        semanticLabel: label,
+        options: options,
+        selectedIndex: value.index,
+        // The option itself wires no tap when disabled, so nothing to guard here.
+        onSegmentSelected: (i) => onChanged(OverwriteState.values[i]),
       ),
     );
   }

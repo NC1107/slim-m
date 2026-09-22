@@ -18,6 +18,7 @@ import '../../api_failure.dart';
 import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import '../../widgets/permission_row.dart';
 import 'module_permissions_section.dart';
 
 Future<void> showRoleEditorSheet(BuildContext context, {api.Role? role}) {
@@ -154,15 +155,20 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
                   ),
                   const SizedBox(height: AppSpacing.s4),
                   for (final (bit, label) in Perm.editable)
-                    _PermissionRow(
+                    PermissionRow(
                       label: label,
-                      value: _permissions.hasPermission(bit),
-                      enabled: myPermissions.hasPermission(bit),
-                      onChanged: (v) => setState(() {
-                        _permissions = v
-                            ? (_permissions | bit)
-                            : (_permissions & ~bit);
-                      }),
+                      dimmed: !myPermissions.hasPermission(bit),
+                      control: AppToggle(
+                        value: _permissions.hasPermission(bit),
+                        semanticLabel: label,
+                        onChanged: myPermissions.hasPermission(bit)
+                            ? (v) => setState(() {
+                                _permissions = v
+                                    ? (_permissions | bit)
+                                    : (_permissions & ~bit);
+                              })
+                            : null,
+                      ),
                     ),
                   const SizedBox(height: AppSpacing.s16),
                   Text(
@@ -170,11 +176,13 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
                     style: AppText.label.copyWith(color: tokens.textSecondary),
                   ),
                   const SizedBox(height: AppSpacing.s4),
-                  _PermissionRow(
+                  PermissionRow(
                     label: 'Anyone can @mention this role',
-                    value: _mentionable,
-                    enabled: true,
-                    onChanged: (v) => setState(() => _mentionable = v),
+                    control: AppToggle(
+                      value: _mentionable,
+                      semanticLabel: 'Anyone can @mention this role',
+                      onChanged: (v) => setState(() => _mentionable = v),
+                    ),
                   ),
                   // A role being created has no id yet to grant a module permission against.
                   if (!_isCreate) ...[
@@ -205,45 +213,6 @@ class _RoleEditorSheetState extends ConsumerState<_RoleEditorSheet> {
             full: true,
             disabled: !_canSubmit,
             onPressed: _submit,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PermissionRow extends StatelessWidget {
-  const _PermissionRow({
-    required this.label,
-    required this.value,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final String label;
-  final bool value;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: AppText.ui.copyWith(
-                color: enabled ? tokens.textPrimary : tokens.textSecondary,
-              ),
-            ),
-          ),
-          AppToggle(
-            value: value,
-            onChanged: enabled ? onChanged : null,
-            semanticLabel: label,
           ),
         ],
       ),
