@@ -37,6 +37,7 @@ const _spaceRows = [
   'Channel permissions',
   'Who can join',
   'Emoji',
+  'Account recovery',
 ];
 
 void main() {

@@ -373,8 +373,8 @@ class _ChannelOverwritesPaneState extends ConsumerState<ChannelOverwritesPane>
           SettingsSectionCard(
             title: 'Permissions',
             description:
-                'Each one starts at Inherit because this screen cannot '
-                'read back what is already set.',
+                'Inherit leaves this permission to the roles the member '
+                'already has. Allow and Deny override them, here only.',
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (bit, label) in Perm.channelOverwriteEditable)

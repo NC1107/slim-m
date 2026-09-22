@@ -31,6 +31,7 @@ import '../providers/providers.dart';
 import '../routing/routes.dart';
 import 'settings_section_header.dart';
 import 'settings_toggle_row.dart';
+import 'update_status_rows.dart';
 
 class AppInfoSection extends ConsumerWidget {
   const AppInfoSection({super.key});
@@ -61,6 +62,7 @@ class AppInfoSection extends ConsumerWidget {
             onChanged: (v) =>
                 unawaited(ref.read(autoUpdateProvider.notifier).set(v)),
           ),
+        const UpdateStatusRows(),
         AppListRow(
           leading: const Icon(AppIcons.activityLog),
           label: 'Debug log',

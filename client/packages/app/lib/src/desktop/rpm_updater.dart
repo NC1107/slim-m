@@ -22,8 +22,15 @@ Future<ProcessResult> _realRunner(String executable, List<String> arguments) =>
 /// The COPR project the rpm updates from.
 const coprProject = 'nc1107/slim-m';
 
-/// The repo id dnf lists once that project is enabled.
+/// The repo id dnf lists once `dnf copr enable` has run.
 const coprRepoId = 'copr:copr.fedorainfracloud.org:nc1107:slim-m';
+
+/// The repo id of the file the rpm itself ships, in
+/// `packaging/rpm/slim-m-client.repo`. Same COPR project, a different id on
+/// purpose, so it can never contend with the file `dnf copr enable` writes for
+/// [coprRepoId]; that file's own header has the reasoning. Either id being
+/// enabled means dnf can see the package, which is all this checks for.
+const packagedRepoId = 'slim-m';
 
 const rpmPackage = 'slim-m-client';
 
@@ -133,8 +140,15 @@ class RpmUpdater {
 
 /// Whether [repolist] (dnf's `repolist --enabled` output) names the COPR
 /// repo. Matched on the id, not the description column, which dnf5 renames.
-bool repoListed(String repolist) =>
-    repolist.split('\n').any((line) => line.trim().startsWith(coprRepoId));
+bool repoListed(String repolist) => repolist
+    .split('\n')
+    .map((line) => line.trim())
+    .any(
+      (line) =>
+          line.startsWith(coprRepoId) ||
+          line == packagedRepoId ||
+          line.startsWith('$packagedRepoId '),
+    );
 
 /// The last few non-empty lines of [output], for a failure detail line.
 String lastLines(String output, {int count = 3}) {

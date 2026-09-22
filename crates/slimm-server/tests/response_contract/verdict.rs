@@ -18,6 +18,14 @@ pub struct Answer<'a> {
     pub status: StatusCode,
     pub media_type: Option<String>,
     pub bytes: &'a [u8],
+    /// The caller drove this operation expecting a refusal, so a non-2xx is
+    /// the point rather than a failed setup.
+    ///
+    /// Everything below the success guard already validates against whatever
+    /// status the schema documents; only that guard stood between it and the
+    /// documented error surface, which is large - 401 on 158 operations, 403
+    /// on 103, 400 on 87 - and was checked by nothing.
+    pub expect_error: bool,
 }
 
 /// Returns the decoded body (so a case can pull ids out of it) and every way
@@ -34,6 +42,7 @@ pub fn judge(api: &Api, answer: Answer<'_>) -> (Value, Vec<String>) {
         status,
         media_type,
         bytes,
+        expect_error,
     } = answer;
     let operation = api
         .operations
@@ -52,12 +61,23 @@ pub fn judge(api: &Api, answer: Answer<'_>) -> (Value, Vec<String>) {
 
     let at = format!("{} {} -> {}", operation.method, operation.path, status);
     let body = String::from_utf8_lossy(bytes).into_owned();
-    if !status.is_success() {
+    if !status.is_success() && !expect_error {
         return (
             Value::Null,
             vec![format!(
                 "{at}: never reached a success status, so its response body was never \
                  checked against the schema. Body: {body}"
+            )],
+        );
+    }
+    // Reported, not panicked: a refusal that succeeds is server drift.
+    if status.is_success() && expect_error {
+        return (
+            Value::Null,
+            vec![format!(
+                "{at}: driven as a refusal case but the server allowed it. Either the \
+                 guard it was exercising is gone, or the case no longer sets it up. \
+                 Body: {body}"
             )],
         );
     }

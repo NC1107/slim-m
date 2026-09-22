@@ -41,7 +41,12 @@ class MemberGroupLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s8,
+        AppRhythm.headingTop,
+        AppSpacing.s8,
+        AppRhythm.headingBottom,
+      ),
       // A heading in its natural case, for the same reason the rail's are.
       child: Semantics(
         container: true,

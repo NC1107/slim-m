@@ -2,20 +2,32 @@
 /// A tapped image, opened over the app: pinch to zoom, drag to pan, and
 /// either a swipe down or the close control to leave.
 ///
-/// It is handed bytes rather than an attachment id, so it cannot start a
-/// second fetch. `attachmentBytesProvider` is `autoDispose`, the only way in
-/// is a tap on an image already showing those exact bytes, and passing them
-/// down is what makes "still loading" and "a fetch failed" unreachable states
-/// here rather than a black screen with nothing on it.
+/// A message can carry several images, and tapping one used to open exactly
+/// that one with no way to reach its siblings. The viewer is a gallery now:
+/// the whole message's images page left and right, the header says which of
+/// how many, and the arrow keys work where there is a keyboard. Each page is
+/// a [FullscreenImagePage]; this file owns the backdrop, the header and the
+/// paging.
 ///
-/// A decode failure is reachable, though: `AttachmentView`'s own inline
-/// thumbnail offers this route as its only tap target even once its bytes
-/// have already failed to decode there, so the same bytes are tried again
-/// here rather than assuming they will now succeed - [_DecodeFailure] is
-/// what stops that retry from surfacing as an uncaught exception.
+/// The tapped image is handed its bytes rather than an id, so it cannot start
+/// a second fetch: the only way in is a tap on an image already showing those
+/// exact bytes, and passing them down is what makes "still loading" and "a
+/// fetch failed" unreachable states for that page. Its siblings have no such
+/// guarantee - nothing has fetched them - so they load through
+/// `attachmentBytesProvider` and do render those two states. That asymmetry is
+/// deliberate: the page the reader tapped must never flash a spinner.
 ///
-/// A `Hero` flight now carries the image from its thumbnail into this
-/// viewer, and the tag choice is the whole trick: an attachment is
+/// A decode failure is reachable on the tapped page too: `AttachmentView`'s
+/// own inline thumbnail offers this route as its only tap target even once its
+/// bytes have already failed to decode there, so the same bytes are tried
+/// again here rather than assuming they will now succeed -
+/// [FullscreenDecodeFailure] is what stops that retry from surfacing as an
+/// uncaught exception.
+///
+/// A `Hero` flight carries the tapped image from its thumbnail into this
+/// viewer, and only that page takes the tag: a sibling has no thumbnail this
+/// route flew from, and two pages sharing one tag would throw. The tag choice
+/// is the whole trick: an attachment is
 /// content-addressed, so one id legitimately rides on more than one message
 /// (`models_attachments.dart`), and two rows showing the same image with one
 /// shared id-based tag would throw the moment a flight starts. Each
@@ -36,21 +48,27 @@
 /// its content in a transparent [Material] for exactly this reason.
 library;
 
-import 'dart:math' as math;
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
+
+import '../providers/attachment_bytes.dart';
+import 'fullscreen_image_page.dart';
+import 'message_row_parts.dart';
 
 /// How large the floating viewer is allowed to get on a desktop window.
 const double kViewerMaxWidth = 1100;
 const double kViewerMaxHeight = 820;
 
-/// Opens [bytes] fullscreen. Non-opaque so the conversation behind stays
-/// visible through the fade rather than the route cutting to black.
+/// Opens [images] fullscreen at [index], with that page's [bytes] already in
+/// hand. Non-opaque so the conversation behind stays visible through the fade
+/// rather than the route cutting to black.
 Future<void> showFullscreenImage(
   BuildContext context, {
-  required String filename,
+  required List<api.Attachment> images,
+  required int index,
   required Uint8List bytes,
   Object? heroTag,
 }) {
@@ -68,7 +86,8 @@ Future<void> showFullscreenImage(
       pageBuilder: (_, animation, _) => FadeTransition(
         opacity: animation,
         child: FullscreenImageViewer(
-          filename: filename,
+          images: images,
+          index: index,
           bytes: bytes,
           heroTag: heroTag,
         ),
@@ -77,78 +96,111 @@ Future<void> showFullscreenImage(
   );
 }
 
-class FullscreenImageViewer extends StatefulWidget {
+class FullscreenImageViewer extends ConsumerStatefulWidget {
   const FullscreenImageViewer({
     super.key,
-    required this.filename,
+    required this.images,
+    required this.index,
     required this.bytes,
     this.heroTag,
   });
 
-  final String filename;
+  /// Every image on the message, in the order the message shows them.
+  final List<api.Attachment> images;
+
+  /// Which of [images] was tapped, and so which page opens first and which
+  /// one [bytes] belongs to.
+  final int index;
+
+  /// The tapped image's bytes, already fetched by the row that opened this.
   final Uint8List bytes;
 
-  /// The thumbnail's own identity tag, or null for a caller with no
+  /// The tapped thumbnail's own identity tag, or null for a caller with no
   /// thumbnail to fly from; see the library doc for why never a shared id.
   final Object? heroTag;
 
   @override
-  State<FullscreenImageViewer> createState() => _FullscreenImageViewerState();
+  ConsumerState<FullscreenImageViewer> createState() =>
+      _FullscreenImageViewerState();
 }
 
-class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
-  static const double _maxScale = 8;
-  static const double _zoomedAbove = 1.01;
-  static const double _dismissDistance = 96;
-  static const double _dismissVelocity = 700;
-
-  final TransformationController _transform = TransformationController();
+class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
+  late final PageController _pages = PageController(initialPage: widget.index);
+  late int _current = widget.index;
   bool _zoomed = false;
-  double _dragged = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _transform.addListener(_syncZoom);
-  }
 
   @override
   void dispose() {
-    _transform.removeListener(_syncZoom);
-    _transform.dispose();
+    _pages.dispose();
     super.dispose();
-  }
-
-  void _syncZoom() {
-    final zoomed = _transform.value.getMaxScaleOnAxis() > _zoomedAbove;
-    if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
-  }
-
-  void _onDragUpdate(DragUpdateDetails details) {
-    setState(() => _dragged = math.max(0, _dragged + details.delta.dy));
-  }
-
-  void _onDragEnd(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    if (_dragged >= _dismissDistance || velocity >= _dismissVelocity) {
-      _close();
-      return;
-    }
-    setState(() => _dragged = 0);
   }
 
   void _close() {
     Navigator.of(context).maybePop();
   }
 
-  Widget _maybeHero(Widget child) =>
-      widget.heroTag == null ? child : Hero(tag: widget.heroTag!, child: child);
+  void _step(int by) {
+    final target = _current + by;
+    if (target < 0 || target >= widget.images.length) return;
+    _pages.animateToPage(
+      target,
+      duration: AppMotion.reduced(context, const Duration(milliseconds: 180)),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// The arrow keys, for the desktop window where there is no swipe. Escape is
+  /// left to the route's own pop handling rather than duplicated here.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      _step(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _step(-1);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// One page. The tapped image already has its bytes and must never flash a
+  /// spinner; a sibling has never been fetched, so it shows the two states the
+  /// tapped page cannot reach.
+  Widget _page(int index) {
+    final image = widget.images[index];
+    if (index == widget.index) {
+      return FullscreenImagePage(
+        filename: image.filename,
+        bytes: widget.bytes,
+        heroTag: widget.heroTag,
+        onDismiss: _close,
+        onZoomChanged: _onZoomChanged,
+      );
+    }
+    return ref
+        .watch(attachmentBytesProvider(image.id))
+        .when(
+          loading: () => const Center(child: AttachmentPlaceholder()),
+          error: (_, _) => FullscreenLoadFailure(
+            filename: image.filename,
+            onRetry: () => ref.invalidate(attachmentBytesProvider(image.id)),
+          ),
+          data: (bytes) => FullscreenImagePage(
+            filename: image.filename,
+            bytes: bytes,
+            onDismiss: _close,
+            onZoomChanged: _onZoomChanged,
+          ),
+        );
+  }
+
+  void _onZoomChanged(bool zoomed) => setState(() => _zoomed = zoomed);
 
   @override
   Widget build(BuildContext context) {
-    // Zoomed, every drag belongs to the viewer's own pan; the dismiss
-    // gesture would otherwise steal it and leave the image un-pannable.
-    final dismissible = !_zoomed;
     // A phone gives the image the whole window, which is the point of opening
     // it. A desktop window has room to keep the app visible around it, so the
     // image floats in a panel and a click beside it puts the image away.
@@ -162,34 +214,33 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
           compact: compact,
           onDismiss: _close,
           child: SafeArea(
-            child: Column(
-              children: [
-                _ViewerHeader(filename: widget.filename, onClose: _close),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onVerticalDragUpdate: dismissible ? _onDragUpdate : null,
-                    onVerticalDragEnd: dismissible ? _onDragEnd : null,
-                    child: Transform.translate(
-                      offset: Offset(0, _dragged),
-                      child: InteractiveViewer(
-                        transformationController: _transform,
-                        maxScale: _maxScale,
-                        child: _maybeHero(
-                          Image.memory(
-                            widget.bytes,
-                            fit: BoxFit.contain,
-                            semanticLabel: widget.filename,
-                            // The inline thumbnail already tried and failed to decode these same bytes; see this widget's own doc comment.
-                            errorBuilder: (context, error, stackTrace) =>
-                                _DecodeFailure(filename: widget.filename),
-                          ),
-                        ),
-                      ),
+            child: Focus(
+              autofocus: true,
+              onKeyEvent: _onKey,
+              child: Column(
+                children: [
+                  _ViewerHeader(
+                    filename: widget.images[_current].filename,
+                    counter: widget.images.length > 1
+                        ? '${_current + 1} of ${widget.images.length}'
+                        : null,
+                    onClose: _close,
+                  ),
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pages,
+                      // Zoomed in, a horizontal drag is a pan across this image, never a turn to the next one.
+                      physics: _zoomed
+                          ? const NeverScrollableScrollPhysics()
+                          : null,
+                      itemCount: widget.images.length,
+                      onPageChanged: (index) =>
+                          setState(() => _current = index),
+                      itemBuilder: (_, index) => _page(index),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -198,33 +249,19 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
   }
 }
 
-/// What renders in place of the image when the bytes this viewer was handed
-/// fail to decode, on the dark theme [FullscreenImageViewer] always applies.
-class _DecodeFailure extends StatelessWidget {
-  const _DecodeFailure({required this.filename});
-
-  final String filename;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s24),
-        child: Text(
-          'Could not open $filename.',
-          textAlign: TextAlign.center,
-          style: AppText.body.copyWith(color: tokens.textSecondary),
-        ),
-      ),
-    );
-  }
-}
-
 class _ViewerHeader extends StatelessWidget {
-  const _ViewerHeader({required this.filename, required this.onClose});
+  const _ViewerHeader({
+    required this.filename,
+    required this.counter,
+    required this.onClose,
+  });
 
   final String filename;
+
+  /// "2 of 5", or null when the message carries only this one image and there
+  /// is nothing to count.
+  final String? counter;
+
   final VoidCallback onClose;
 
   @override
@@ -245,6 +282,14 @@ class _ViewerHeader extends StatelessWidget {
               style: AppText.ui.copyWith(color: tokens.textSecondary),
             ),
           ),
+          if (counter case final counter?)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+              child: Text(
+                counter,
+                style: AppText.label.copyWith(color: tokens.textSecondary),
+              ),
+            ),
           AppIconButton(
             icon: AppIcons.dismiss,
             semanticLabel: 'Close image',

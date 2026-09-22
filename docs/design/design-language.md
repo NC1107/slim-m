@@ -85,6 +85,10 @@ Risk: Plex can render slightly heavier than Inter on Linux fontconfig at small s
 ## Spacing, Radius, and Elevation
 
 Spacing is a 4dp base grid (4, 8, 12, 16, 20, 24, 32, 40, 48, 64), named by value, matching the 4dp/8dp convention most Flutter contributors already know even though the visual style is not Material.
+Three vertical insets deliberately sit off that grid, named in `AppRhythm`: 10 above a heading in a side pane, 14 above a divider band in the transcript, 6 below either.
+A heading wants more air above it than below, so that it reads as belonging to what follows, and the grid's nearest pair - 12 above, 8 below - is both too loose and too even to say that.
+The rail, the member pane and the transcript each arrived at the same answer independently, which is what made it a rhythm worth naming rather than drift worth re-gridding.
+Nothing else is allowed off the grid: a value used at a single site stays a named constant in the file that owns it, where what it aligns to can be named too.
 Radius is four steps: 4 (chips), 6 (buttons, inputs), 10 (cards, panels, modals), 16 (floating canvas windows), plus full for avatars and pills.
 Elevation is border-first: a 1px hairline is the default separator, and only two soft, low-opacity shadow tokens exist, reserved for surfaces that must visually float (menus, canvas windows, modals).
 This is performance and identity together: blurred shadows and backdrop blur cost more to composite than a hairline border, which matters on the lightweight self-host and older-device targets, and reads calmer than Discord's shadowed panels.

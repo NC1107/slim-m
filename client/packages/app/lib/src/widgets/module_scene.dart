@@ -45,6 +45,27 @@ class CellsOp extends SceneOp {
     this.box,
   });
 
+  /// The most cells one axis may ask for, clamped at parse like every other
+  /// ceiling in this contract.
+  ///
+  /// Two measurements meet here. At a phone's ~390 logical points a 128-column
+  /// grid gives each cell about 3 points, and below that a cell stops being
+  /// something a person can see or aim at, so a bigger grid is not a grid any
+  /// more. And one paint of 128x128 measured 2.5ms on the machine this was
+  /// written on against 10.4ms for 256x256 - a phone is several times slower
+  /// again, which puts 256 outside a frame while 128 stays inside one.
+  ///
+  /// 128 is also 2.6x the largest grid any shipped module asks for
+  /// (game-of-life's 48x48; connect-four is 7x6, music-box 16x8), so the
+  /// ceiling is well clear of real use rather than shaped around it.
+  ///
+  /// `data` already bounds the painter's work - it draws no more cells than
+  /// characters it was sent - so this is a robustness ceiling rather than a
+  /// fix for a live hang. That is the point: "it happens to be bounded by the
+  /// module output size limit" is a guarantee that stops being true the moment
+  /// that unrelated limit moves.
+  static const maxPerAxis = 128;
+
   final int cols;
   final int rows;
   final String data;

@@ -12,7 +12,7 @@
 //! happened in one. Riding a message also means this inherits ordering,
 //! pagination, sync, unread state and notification without any of them
 //! learning about calls. [`Store::record_call`] therefore mirrors
-//! [`super::app_surfaces::Store::send_app_message`]: the same per-channel `seq`
+//! [`super::apps::Store::send_app_message`]: the same per-channel `seq`
 //! allocation and side-table insert in one transaction.
 //!
 //! Unlike every other message writer here, the author is the **caller** even

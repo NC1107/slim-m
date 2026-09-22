@@ -151,8 +151,7 @@ void main() {
 
       expect(
         find.textContaining(
-          'every message, and whatever it attached, is '
-          'kept indefinitely',
+          'messages and their attachments are kept indefinitely',
         ),
         findsOneWidget,
       );
@@ -204,7 +203,7 @@ void main() {
       await tester.pumpWidget(_app(container));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('holding 4.9 KB'), findsOneWidget);
+      expect(find.textContaining('holds 4.9 KB'), findsOneWidget);
       expect(find.textContaining('123 messages'), findsOneWidget);
     },
   );

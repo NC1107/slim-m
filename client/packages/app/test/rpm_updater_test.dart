@@ -63,8 +63,30 @@ void main() {
       );
     });
 
+    test('the repo the rpm itself ships counts too', () {
+      expect(
+        repoListed(
+          'repo id   repo name\n'
+          '$packagedRepoId    slim-m desktop client (COPR nc1107/slim-m)\n'
+          'fedora    Fedora 44',
+        ),
+        isTrue,
+        reason:
+            'an rpm installed from a release download arrives with this '
+            'one, and must not be asked to enable a repo it already has',
+      );
+    });
+
     test('an enabled list without it is not a match', () {
       expect(repoListed('fedora  Fedora 44\nupdates  Updates'), isFalse);
+    });
+
+    test('a repo whose id merely starts the same is not a match', () {
+      expect(
+        repoListed('repo id   repo name\nslim-m-nightly   Somebody else'),
+        isFalse,
+        reason: 'matching on a prefix would call an unrelated repo ours',
+      );
     });
   });
 

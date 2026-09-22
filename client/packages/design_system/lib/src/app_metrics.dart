@@ -23,6 +23,38 @@ abstract final class AppSpacing {
   static const double s64 = 64;
 }
 
+/// The three vertical insets that deliberately sit off the 4dp grid.
+///
+/// A heading is not a row. It wants more air above it than below, so that it
+/// reads as belonging to what follows rather than floating between two groups,
+/// and the 4dp grid's nearest pair - 12 above, 8 below - is both too loose and
+/// too even to say that. The rail, the member pane and the transcript all
+/// settled on the same answer independently, which is what makes this a rhythm
+/// worth naming rather than drift worth re-gridding: 10 above a heading in a
+/// side pane, 14 above a divider band in the transcript, 6 below either.
+///
+/// Named rather than re-gridded on purpose. Moving these onto the grid shifts
+/// real pixels on the two surfaces a person looks at most, and that is a design
+/// call rather than a hygiene one; naming them costs nothing and stops the next
+/// contributor reading them as four unrelated magic numbers.
+///
+/// A value used at one site is not a token. Anything smaller or more local than
+/// these - a 2dp optical nudge under a line of text, an indent aligning to a
+/// particular row's icon column - stays a named constant in the file that owns
+/// it, where the thing it aligns to can be named too.
+abstract final class AppRhythm {
+  /// Above a heading or a grouped block in a side pane.
+  static const double headingTop = 10;
+
+  /// Below a heading or a divider, before what it introduces.
+  static const double headingBottom = 6;
+
+  /// Above a divider band in the transcript, which carries more weight than a
+  /// side pane's heading and needs the extra air to separate two days or the
+  /// read from the unread.
+  static const double dividerTop = 14;
+}
+
 /// Corner radii; elevation is border-first, so shadows are rare.
 ///
 /// Three steps plus full. A 4dp and a 6dp corner are indistinguishable under a

@@ -34,11 +34,13 @@ import 'package:slimm_app/src/providers/notification_sound_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/modal_page.dart';
+import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/screens/admin/categories_screen.dart';
 import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
+import 'package:slimm_app/src/screens/admin/performance_screen.dart';
 import 'package:slimm_app/src/screens/admin/removed_members_screen.dart';
 import 'package:slimm_app/src/screens/admin/reports_screen.dart';
 import 'package:slimm_app/src/screens/admin/roles_screen.dart';
@@ -276,6 +278,16 @@ GoRouter fixtureRouter(String location) => GoRouter(
       path: '/settings/analytics',
       pageBuilder: (context, state) =>
           modalPage(context, const AnalyticsScreen()),
+    ),
+    GoRoute(
+      path: '/settings/performance',
+      pageBuilder: (context, state) =>
+          modalPage(context, const PerformanceScreen()),
+    ),
+    GoRoute(
+      path: '/settings/account-recovery',
+      pageBuilder: (context, state) =>
+          modalPage(context, const AccountRecoveryScreen()),
     ),
     GoRoute(
       path: '/settings/debug-log',

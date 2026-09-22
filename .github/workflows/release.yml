@@ -435,7 +435,7 @@ jobs:
             dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
             mkdir -p rpmbuild/SOURCES
             cp dist/slim-m-client-*-linux-amd64.tar.gz \
-              packaging/rpm/top.npcserver.slimm.desktop \
+              packaging/rpm/top.npcserver.slimm.desktop packaging/rpm/slim-m-client.repo \
               packaging/linux/icons/top.npcserver.slimm*.png \
               packaging/linux/icons/top.npcserver.slimm.svg rpmbuild/SOURCES/
             # The same stamp the copr job applies, so the .rpm on the release and
@@ -475,7 +475,7 @@ jobs:
   # and best effort: the .rpm is on the release, so a failure only warns.
   copr:
     needs: [release-please, linux-client, verify-client-ci]
-    if: needs.verify-client-ci.result == 'success'
+    if: needs.verify-client-ci.result == 'success' && needs.linux-client.result == 'success'
     runs-on: ubuntu-latest
     container: fedora:44
     environment: release
@@ -532,7 +532,7 @@ jobs:
           cp "$spec" ~/rpmbuild/SPECS/slim-m-client.spec
           # spectool below fetches remote sources only, so the local ones have
           # to be placed by hand or rpmbuild -bs fails on a missing Source.
-          cp packaging/rpm/top.npcserver.slimm.desktop \
+          cp packaging/rpm/top.npcserver.slimm.desktop packaging/rpm/slim-m-client.repo \
             packaging/linux/icons/top.npcserver.slimm*.png \
             packaging/linux/icons/top.npcserver.slimm.svg ~/rpmbuild/SOURCES/
           # Stamp the version only when the spec hardcodes it. A spec that

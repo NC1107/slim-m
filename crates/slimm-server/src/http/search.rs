@@ -59,7 +59,13 @@ use crate::store::{MessageSearchFilters, SearchError};
 
 /// Longest a search query may be.
 const MAX_QUERY_CHARS: usize = 200;
-/// Default and maximum page sizes, matching plain message history.
+/// Default and maximum page sizes. The same numbers `http::messages` uses
+/// today, deliberately not imported from it: a page size is a per-route
+/// decision each module is entitled to make, and coupling the two would mean
+/// search could not be retuned without moving history with it. Raised twice
+/// as duplication (2026-07-30, 2026-09-20) and rejected both times; see
+/// `docs/research/audit-2026-07-30/rejected.md`. This comment says they
+/// happen to agree, not that anything holds them together.
 const DEFAULT_LIMIT: i64 = 50;
 const MAX_LIMIT: i64 = 100;
 

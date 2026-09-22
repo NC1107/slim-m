@@ -12,7 +12,7 @@ use uuid::Uuid;
 macro_rules! uuid_id {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, sqlx::Type)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, sqlx::Type)]
         #[sqlx(transparent)]
         pub struct $name(pub Uuid);
 

@@ -15,18 +15,30 @@ import 'blocks_controller.dart';
 import 'live_events.dart';
 import 'sync_controller.dart';
 
+/// The server's own typing TTL: `DEFAULT_TTL` in
+/// `crates/slimm-server/src/typing.rs`, in seconds.
+///
+/// Named rather than folded into [_refreshEvery] as a bare 3, so the refresh
+/// is derived from it at compile time instead of the two being tied only by a
+/// comment claiming to be "comfortably inside" a number it never states. The
+/// shape `voice/heartbeat.rs` already uses for the mirror in the other
+/// direction. Still hand-updated if the server's value changes, which is the
+/// point: one number to change, and `scripts/lib/test_typing_ttl_drift.py`
+/// fails if only one side of the mirror moves.
+const int _serverTypingTtlSeconds = 6;
+
+/// How long to wait before telling the server again that the user is still
+/// typing. Half the server's expiry, so a single dropped refresh still leaves
+/// the indicator lit, and far enough apart to stay under the rate limit that
+/// would otherwise silently drop it.
+const Duration _refreshEvery = Duration(seconds: _serverTypingTtlSeconds ~/ 2);
+
 /// The set of user ids currently typing in one channel.
 ///
 /// No client-side expiry timer: the server guarantees a `typing.stopped`
 /// for every `typing.started` it ever sent, even for a client that
 /// disconnects mid-typing (`crates/slimm-server/src/typing.rs`), so trusting
 /// that pair is enough rather than re-implementing the same TTL here.
-/// How long to wait before telling the server again that the user is still
-/// typing. Comfortably inside the server's own expiry so the indicator never
-/// flickers off mid-sentence, and far enough apart to stay under the rate
-/// limit that would otherwise silently drop the refresh.
-const Duration _refreshEvery = Duration(seconds: 3);
-
 class TypingController extends StateNotifier<Set<String>> {
   TypingController(this._ref, this._channelId) : super(const {}) {
     _sub = _ref.read(liveEventsProvider).listen((event) {

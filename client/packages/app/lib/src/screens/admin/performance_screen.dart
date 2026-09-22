@@ -89,21 +89,20 @@ String _dateOnly(int epochMs) {
 /// to show, so this says so instead of guessing.
 String retentionConsequence(int days, api.AnalyticsStats? stats) {
   if (days <= 0) {
-    return 'Nothing is pruned: every message, and whatever it attached, is '
-        'kept indefinitely.';
+    return 'Nothing is pruned: messages and their attachments are kept '
+        'indefinitely.';
   }
   final cutoff = _dateOnly(
     DateTime.now().millisecondsSinceEpoch - days * _dayMs,
   );
   final buffer = StringBuffer(
-    'Prunes anything older than $cutoff. This mostly frees attachment '
-    'storage; message text is small by comparison and stays either way.',
+    'Prunes anything older than $cutoff, freeing mostly attachment storage.',
   );
   if (stats != null) {
     buffer.write(
-      ' This space is holding ${formatByteSize(stats.attachmentBytes)} of '
-      'attachments across ${stats.totalMessages} messages in total; only '
-      'whatever predates the cutoff is actually freed.',
+      ' This space holds ${formatByteSize(stats.attachmentBytes)} across '
+      '${stats.totalMessages} messages; only what predates the cutoff is '
+      'freed.',
     );
   } else {
     buffer.write(

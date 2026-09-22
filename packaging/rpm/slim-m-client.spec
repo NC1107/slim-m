@@ -48,6 +48,10 @@ Source8:        top.npcserver.slimm-128.png
 Source9:        top.npcserver.slimm-256.png
 Source10:       top.npcserver.slimm-512.png
 Source11:       top.npcserver.slimm.svg
+# The COPR repo, so an rpm installed from a release download can update itself
+# without first asking polkit to enable a repo. See the file's own header for
+# why its id is not COPR's.
+Source12:       slim-m-client.repo
 
 # The upstream Flutter engine and the bundled libwebrtc are x86_64-only builds.
 ExclusiveArch:  x86_64
@@ -131,6 +135,8 @@ done
 install -Dpm0644 %{SOURCE11} \
     %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
 
+install -Dpm0644 %{SOURCE12} %{buildroot}%{_sysconfdir}/yum.repos.d/%{name}.repo
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/%{appid}.desktop
 # The runner is useless without these two, and a bundle that lost them would
@@ -143,6 +149,9 @@ for px in %{iconsizes}; do
     test -f %{buildroot}%{_datadir}/icons/hicolor/${px}x${px}/apps/%{appid}.png
 done
 test -f %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
+# The updater matches on the repo id, so a renamed section is a silent
+# regression: it would fall back to prompting for polkit on every update.
+grep -qx '\[slim-m\]' %{buildroot}%{_sysconfdir}/yum.repos.d/%{name}.repo
 
 %files
 %license LICENSE
@@ -154,6 +163,7 @@ test -f %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
 # trigger on this directory that rebuilds the cache for us.
 %{_datadir}/icons/hicolor/*/apps/%{appid}.png
 %{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
+%config(noreplace) %{_sysconfdir}/yum.repos.d/%{name}.repo
 
 %changelog
 * Mon Jul 27 2026 NC1107 <nickpconn@gmail.com> - 0.4.0-1

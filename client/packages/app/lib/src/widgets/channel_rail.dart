@@ -96,7 +96,12 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
         children: [
           const RailHeader(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s12,
+              AppRhythm.headingTop,
+              AppSpacing.s12,
+              AppRhythm.headingBottom,
+            ),
             // A real field would take focus and a keyboard; this only opens the
             // palette, so AbsorbPointer stops events and the trigger gets them.
             child: GestureDetector(
@@ -143,7 +148,12 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
           ),
           if (orderState.error != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s8,
+                0,
+                AppSpacing.s8,
+                AppRhythm.headingBottom,
+              ),
               child: AppErrorState(
                 message: orderState.error!,
                 onRetry: () => unawaited(orderController.retry()),
@@ -183,7 +193,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                         // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.s8,
-                          6,
+                          AppRhythm.headingBottom,
                           AppSpacing.s8,
                           0,
                         ),

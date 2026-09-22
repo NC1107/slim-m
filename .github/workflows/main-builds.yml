@@ -454,7 +454,7 @@ jobs:
   # action, since the job needs its own container image.
   copr:
     needs: [changes, linux-client]
-    if: needs.changes.outputs.client == 'true' || needs.changes.outputs.packaging == 'true'
+    if: (needs.changes.outputs.client == 'true' || needs.changes.outputs.packaging == 'true') && needs.linux-client.result == 'success'
     uses: ./.github/workflows/copr-publish.yml
     # Named rather than `inherit`: this job reads COPR_CONFIG and nothing else,
     # and inherit would hand a container running dnf-installed tooling ambient

@@ -53,6 +53,16 @@ const _surfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/analytics',
     viewports: [...phoneAndDesktop, ...compactBracket],
   ),
+  // Capacity dials, analytics off: retentionConsequence's ungrounded branch.
+  'admin-performance': (
+    route: '/settings/performance',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
+  // Reads only myPermissionsProvider, which fixtureContainer grants in full.
+  'admin-account-recovery': (
+    route: '/settings/account-recovery',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
 };
 
 /// States reachable only by overriding a provider the plain [_surfaces]
@@ -74,6 +84,27 @@ final _overrideSurfaces =
           apiProvider.overrideWith(
             (ref) =>
                 _apiWith(ref, {'/space/analytics': fixtureAnalyticsEnabled}),
+          ),
+        ],
+      ),
+
+      /// The long paragraph that grew unnoticed on a phone while nothing
+      /// rendered this pane at all.
+      ///
+      /// Both overrides are load-bearing: `retentionConsequence` returns early
+      /// on `days <= 0`, so analytics alone renders this byte-identical to the
+      /// plain surface above. The first version of this entry did exactly that
+      /// and added four tests that asserted nothing, which only showed up on
+      /// comparing the two captures.
+      'admin-performance-populated': (
+        route: '/settings/performance',
+        viewports: phoneAndDesktop,
+        overrides: () => [
+          apiProvider.overrideWith(
+            (ref) => _apiWith(ref, {
+              '/space/analytics': fixtureAnalyticsEnabled,
+              '/space/retention': const {'retention_days': 90},
+            }),
           ),
         ],
       ),

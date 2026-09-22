@@ -10,7 +10,7 @@ Each section below is named for its workflow file.
 
 | Workflow | Runs on | What it gates |
 | --- | --- | --- |
-| `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, tests, release build, binary size budget |
+| `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
 | `client-ci` | changes under `client/`, or to `schema/openapi.yaml`; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
 | `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
@@ -51,6 +51,20 @@ Path-gated so a client-only change never triggers a server build.
 
 `schema/openapi.yaml` is in the path filter even though it is not Rust.
 `crates/slimm-server/tests/openapi_contract.rs` gates the schema against the router, so a schema-only edit that documents a path nothing serves, without touching `crates/`, must still run that test.
+`crates/slimm-server/tests/response_contract/` goes further and validates real response bodies against the document, including refusals: one representative case per documented error status, since `Error` is the same object on every route.
+Before that, every non-2xx returned before the schema was consulted, so an error body that had drifted from `Error` passed every gate here.
+
+### The sqlx cache
+
+`cargo sqlx prepare --workspace --check -- --all-targets`, against a database created and migrated in the same step.
+It is the `cargo fmt --check` of `.sqlx/`: it re-derives every query's metadata from the real schema and fails if that differs from what is committed.
+
+A *new or edited* query never needed this - sqlx keys each cache entry by a hash of the query text, so a query with no entry fails the offline build loudly on its own.
+The gap is narrower and much quieter: a migration that changes a column's nullability or type **without touching any query text**.
+The committed entries keep their old inferred types, the offline build compiles clean, and nothing re-derives them against the new schema.
+A relaxed `NOT NULL` then ships a Rust type the database can no longer satisfy, and it surfaces as a runtime decode error against real data rather than as a red build.
+
+`CLAUDE.md` is the realistic way in rather than a theoretical one: it says to regenerate `.sqlx/` after changing a `query!`, which a migration-only change is not.
 
 ### Unused dependencies
 
@@ -218,7 +232,9 @@ Splitting them is real work with real regression risk and does not belong in the
 
 `scripts/check-comment-cap.sh` enforces the other half of the same `CLAUDE.md` rule: a plain `//` or `#` comment never exceeds one line.
 It ratchets rather than merely allows: a file may not gain a new run past its listed count, and the pre-existing ones are frozen at the count they were found at in `scripts/comment-cap-allow.txt`, the same shape as the file-size allowlist above.
-Doc comments (`///`, `//!`, `/**`) are exempt everywhere, and a `#` block at the very top of a YAML, TOML or shell file is treated as that file's doc comment for the same reason those languages have no other doc-comment syntax.
+Doc comments (`///`, `//!`, `/**`) are exempt everywhere.
+Scope is Dart, Rust and Python: shell, YAML and TOML are not checked at all, because a `#` block at the top of one is that file's only documentation mechanism and the counter cannot tell it from an ordinary run further down.
+So the `CLAUDE.md` rule is stated for everywhere and enforced here for three languages; the inline `run:` blocks in these workflows are not covered.
 
 ## licenses
 
@@ -552,6 +568,9 @@ A job carrying any `if:` at all loses GitHub's implicit "every need succeeded" g
 That publishes a **single-arch** image under the version tag, `sha-<commit>` and, when `decide-latest-tag.sh` allows it, `latest`, with the job green and nothing saying an architecture is missing.
 Both halves of the fix are in `release.yml`: the condition names `needs.server-image.result` as well, and the digest download sets `if-no-files-found: error`.
 `server-release-assets` had the same shape against `server-binaries` and carries the same fix, where the consequence was a GitHub Release with only one arch's binary attached.
+`copr` was the third instance of it, found by an audit on 2026-09-21, in both `release.yml` and `main-builds.yml`: it consumes `linux-client`'s tarball with an `if:` that named only `verify-client-ci` and the `changes` outputs.
+That one degraded quietly rather than publishing something wrong, because both COPR submission scripts run `set -uo pipefail` without `-e`, so a missing tarball became a `::warning::` and an exit 0 - a broken Linux client build showing green in a job nobody was watching.
+All four pairs are pinned by name now in `scripts/lib/test_conditional_jobs_keep_their_needs_gate.py`, which also records why a blanket "every need appears in the `if:`" rule was rejected: nine jobs legitimately omit `release-please`, because the gate reaches them through `verify-server-ci` / `verify-client-ci`.
 
 `latest` is the rolling tag deployments track for auto-updates, since Watchtower polls a mutable tag.
 The version and sha tags stay alongside it, for pinning and for tracing an image back to its commit.

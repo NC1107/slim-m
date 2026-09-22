@@ -43,6 +43,10 @@ class UpdateAvailableBanner extends ConsumerWidget {
     ref.watch(updateWatcherProvider);
     final update = ref.watch(inSessionUpdateProvider);
     if (update == null) return const SizedBox.shrink();
+    // Dismissal hides this banner; it does not forget the update.
+    if (ref.watch(dismissedBannerVersionProvider) == update.version) {
+      return const SizedBox.shrink();
+    }
 
     // A sideloaded apk never re-runs the splash, so a restart gets it nothing.
     final restartApplies = this.restartApplies ?? !isAndroidHost;
@@ -86,7 +90,7 @@ class UpdateAvailableBanner extends ConsumerWidget {
   }
 
   Future<void> _dismiss(WidgetRef ref, ClientUpdate update) async {
-    ref.read(inSessionUpdateProvider.notifier).state = null;
+    ref.read(dismissedBannerVersionProvider.notifier).state = update.version;
     final prefs = await ref.read(preferencesProvider.future);
     await prefs.setString(dismissedUpdateVersionKey, update.version);
   }

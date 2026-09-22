@@ -44,14 +44,52 @@ ALLOWLIST_PATH = Path(__file__).resolve().parent / "media-query-of-allow.txt"
 MEDIA_QUERY_OF = re.compile(r"MediaQuery\.of\(")
 
 
-def load_allowlist(path: Path) -> set[str]:
-    allowed: set[str] = set()
+def load_allowlist(path: Path) -> dict[str, int]:
+    """Each listed path mapped to how many unscoped calls it may hold.
+
+    A ceiling, not a blanket pass: listing a file used to exempt the whole of
+    it, so a second, unrelated `MediaQuery.of(` added to an already-listed file
+    was never flagged. The count is the same ratchet `check-comment-cap.sh`
+    uses, and it is deliberately not a line number - a line number drifts with
+    every edit above it, while a count only changes when the thing being
+    counted does. `N` after the path sets the ceiling; omitting it means one.
+    """
+    allowed: dict[str, int] = {}
     for line in path.read_text().splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        allowed.add(stripped.split("#", 1)[0].strip())
+        entry = stripped.split("#", 1)[0].strip()
+        if not entry:
+            continue
+        parts = entry.split()
+        allowed[parts[0]] = int(parts[1]) if len(parts) > 1 else 1
     return allowed
+
+
+def offenders_in(sources: dict[str, str], allowed: dict[str, int]) -> list[str]:
+    """Which calls are over their file's ceiling, as `path:line`.
+
+    Split out of [main] so it can be tested against files that do not exist.
+    The end-to-end run reads the real repository, where no allowlisted file
+    currently holds more than its ceiling - so the case this gate exists for is
+    the one the real tree cannot exercise, and only a fixture can.
+
+    The ceiling is per file, not per path: a listed file's own calls stay quiet
+    up to its recorded count, and the next one is reported. An earlier version
+    exempted the whole file, which is how a second, unrelated call was added to
+    an allowlisted file with nothing failing.
+    """
+    offenders: list[str] = []
+    for rel, source in sources.items():
+        text = strip_block_comments(source)
+        hits = [
+            lineno
+            for lineno, line in enumerate(text.splitlines(), start=1)
+            if MEDIA_QUERY_OF.search(line)
+        ]
+        offenders.extend(f"{rel}:{lineno}" for lineno in hits[allowed.get(rel, 0):])
+    return offenders
 
 
 def main() -> int:
@@ -71,14 +109,9 @@ def main() -> int:
 
     allowed = load_allowlist(ALLOWLIST_PATH)
 
-    offenders: list[str] = []
-    for rel in files:
-        if rel in allowed:
-            continue
-        text = strip_block_comments((root / rel).read_text())
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            if MEDIA_QUERY_OF.search(line):
-                offenders.append(f"{rel}:{lineno}")
+    offenders = offenders_in(
+        {rel: (root / rel).read_text() for rel in files}, allowed
+    )
 
     for offender in offenders:
         path, _, lineno = offender.partition(":")
@@ -87,7 +120,8 @@ def main() -> int:
             "MediaQueryData field; use the scoped accessor this call site actually needs "
             "(MediaQuery.sizeOf, MediaQuery.viewInsetsOf, MediaQuery.textScalerOf, ...), or "
             f"if the whole MediaQueryData is genuinely needed, add '{path} # why' to "
-            "scripts/media-query-of-allow.txt"
+            "scripts/media-query-of-allow.txt (or raise that entry's count, "
+            "which is 1 when unwritten)"
         )
 
     print(f"MediaQuery.of: {len(files)} file(s) checked, {len(allowed)} allowlisted, {len(offenders)} offender(s)")
