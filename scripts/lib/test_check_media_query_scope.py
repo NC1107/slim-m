@@ -72,5 +72,48 @@ class LoadAllowlistTest(unittest.TestCase):
                 self.assertGreaterEqual(ceiling, 1)
 
 
+class OffenderCeilingTest(unittest.TestCase):
+    def setUp(self):
+        self.mod = _load_module()
+
+    """The per-file ceiling itself, which the real-repository run cannot reach.
+
+    The gate's own history is the reason this exists: the allowlist used to
+    exempt a whole file, so a second, unrelated `MediaQuery.of(` added to a
+    listed file went unflagged. The fix is a per-file ceiling - and no
+    allowlisted file in the tree today holds more than its count, so an
+    end-to-end run over the real repository would pass either way.
+    """
+
+    def test_a_listed_file_stays_quiet_up_to_its_count(self):
+        source = "MediaQuery.of(context);\nMediaQuery.of(context);\n"
+        self.assertEqual(
+            self.mod.offenders_in({"a.dart": source}, {"a.dart": 2}),
+            [],
+        )
+
+    def test_the_call_past_the_ceiling_is_reported(self):
+        source = "MediaQuery.of(context);\nMediaQuery.of(context);\n"
+        self.assertEqual(
+            self.mod.offenders_in({"a.dart": source}, {"a.dart": 1}),
+            ["a.dart:2"],
+            "a blanket per-file exemption is the bug this gate was fixed for",
+        )
+
+    def test_an_unlisted_file_is_reported_from_its_first_call(self):
+        self.assertEqual(
+            self.mod.offenders_in({"a.dart": "MediaQuery.of(context);\n"}, {}),
+            ["a.dart:1"],
+        )
+
+    def test_a_call_inside_a_block_comment_does_not_count(self):
+        source = "/* MediaQuery.of(context); */\nMediaQuery.of(context);\n"
+        self.assertEqual(
+            self.mod.offenders_in({"a.dart": source}, {}),
+            ["a.dart:2"],
+            "a commented-out call is not a subscription",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

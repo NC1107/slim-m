@@ -67,6 +67,31 @@ def load_allowlist(path: Path) -> dict[str, int]:
     return allowed
 
 
+def offenders_in(sources: dict[str, str], allowed: dict[str, int]) -> list[str]:
+    """Which calls are over their file's ceiling, as `path:line`.
+
+    Split out of [main] so it can be tested against files that do not exist.
+    The end-to-end run reads the real repository, where no allowlisted file
+    currently holds more than its ceiling - so the case this gate exists for is
+    the one the real tree cannot exercise, and only a fixture can.
+
+    The ceiling is per file, not per path: a listed file's own calls stay quiet
+    up to its recorded count, and the next one is reported. An earlier version
+    exempted the whole file, which is how a second, unrelated call was added to
+    an allowlisted file with nothing failing.
+    """
+    offenders: list[str] = []
+    for rel, source in sources.items():
+        text = strip_block_comments(source)
+        hits = [
+            lineno
+            for lineno, line in enumerate(text.splitlines(), start=1)
+            if MEDIA_QUERY_OF.search(line)
+        ]
+        offenders.extend(f"{rel}:{lineno}" for lineno in hits[allowed.get(rel, 0):])
+    return offenders
+
+
 def main() -> int:
     root = Path(
         subprocess.run(
@@ -84,18 +109,9 @@ def main() -> int:
 
     allowed = load_allowlist(ALLOWLIST_PATH)
 
-    offenders: list[str] = []
-    for rel in files:
-        text = strip_block_comments((root / rel).read_text())
-        hits = [
-            lineno
-            for lineno, line in enumerate(text.splitlines(), start=1)
-            if MEDIA_QUERY_OF.search(line)
-        ]
-        ceiling = allowed.get(rel, 0)
-        # Past the ceiling only: a listed file's own call stays quiet.
-        for lineno in hits[ceiling:]:
-            offenders.append(f"{rel}:{lineno}")
+    offenders = offenders_in(
+        {rel: (root / rel).read_text() for rel in files}, allowed
+    )
 
     for offender in offenders:
         path, _, lineno = offender.partition(":")

@@ -277,4 +277,23 @@ void main() {
       reason: 'and only that one - lazily still means lazily',
     );
   });
+
+  testWidgets('the tapped page is the tapped one, not merely the first', (
+    tester,
+  ) async {
+    await _openAt(tester, _images[1], _images, [_servesPng()]);
+
+    final page = tester.widget<FullscreenImagePage>(
+      find.byType(FullscreenImagePage),
+    );
+    expect(page.filename, 'second.png');
+    expect(
+      page.heroTag,
+      isNotNull,
+      reason:
+          'only the bytes-in-hand branch carries the hero tag, so a null '
+          'one here means the tapped page went through the fetch provider - '
+          'which is the spinner this viewer promises never to show',
+    );
+  });
 }
