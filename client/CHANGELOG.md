@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.81.0](https://github.com/NC1107/slim-m/compare/client-v0.80.0...client-v0.81.0) (2026-09-22)
+
+
+### Features
+
+* account recovery in settings, image gallery paging, and the audit follow-ups ([#1267](https://github.com/NC1107/slim-m/issues/1267)) ([05c2508](https://github.com/NC1107/slim-m/commit/05c2508e0a33a6f61e94fa5745bf7ffec7293470))
+
+
+### Bug Fixes
+
+* **client:** refuse a command with a file staged, and ellipsize a long voice channel name ([#1265](https://github.com/NC1107/slim-m/issues/1265)) ([76e0734](https://github.com/NC1107/slim-m/commit/76e0734f41fdef83a94fd3d9777cecea3b7a6e17))
+
 ## [0.80.0](https://github.com/NC1107/slim-m/compare/client-v0.79.0...client-v0.80.0) (2026-09-21)
 
 
