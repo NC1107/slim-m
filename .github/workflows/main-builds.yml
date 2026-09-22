@@ -196,7 +196,7 @@ jobs:
             dnf -y install rpm-build patchelf desktop-file-utils tar gzip >/dev/null
             mkdir -p rpmbuild/SOURCES
             cp dist/slim-m-client-*-linux-amd64.tar.gz \
-              packaging/rpm/top.npcserver.slimm.desktop \
+              packaging/rpm/top.npcserver.slimm.desktop packaging/rpm/slim-m-client.repo \
               packaging/linux/icons/top.npcserver.slimm*.png \
               packaging/linux/icons/top.npcserver.slimm.svg rpmbuild/SOURCES/
             sed "s/^Version:.*/Version:        ${VER}/" \

@@ -72,7 +72,7 @@ jobs:
           chmod 600 ~/.config/copr
           rpmdev-setuptree
           cp "$spec" ~/rpmbuild/SPECS/slim-m-client.spec
-          cp packaging/rpm/top.npcserver.slimm.desktop \
+          cp packaging/rpm/top.npcserver.slimm.desktop packaging/rpm/slim-m-client.repo \
             packaging/linux/icons/top.npcserver.slimm*.png \
             packaging/linux/icons/top.npcserver.slimm.svg ~/rpmbuild/SOURCES/
           cp "dist/slim-m-client-${VER}-linux-amd64.tar.gz" ~/rpmbuild/SOURCES/
