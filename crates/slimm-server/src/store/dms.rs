@@ -46,7 +46,7 @@ pub(crate) const DM_CHANNEL_KIND: &str = "dm";
 /// anyone's-object power, only placing and removing your own. `KICK_MEMBERS`
 /// stays out on purpose too, so neither party can evict the other from their
 /// own call; leaving is each side's own doing.
-const DM_BASE: Permissions = Permissions::VIEW_CHANNEL
+pub(super) const DM_BASE: Permissions = Permissions::VIEW_CHANNEL
     .union(Permissions::SEND_MESSAGES)
     .union(Permissions::ADD_REACTIONS)
     .union(Permissions::ATTACH_FILES)
@@ -77,7 +77,7 @@ const DM_BASE: Permissions = Permissions::VIEW_CHANNEL
 /// channel, not just a DM, so it is left as an open question rather than
 /// done as a side effect. `dm_canvas.rs` pins the current behaviour so it
 /// cannot drift silently either way.
-const BLOCKED_DENY: Permissions = Permissions::SEND_MESSAGES
+pub(super) const BLOCKED_DENY: Permissions = Permissions::SEND_MESSAGES
     .union(Permissions::ADD_REACTIONS)
     .union(Permissions::ATTACH_FILES)
     .union(Permissions::CONNECT)

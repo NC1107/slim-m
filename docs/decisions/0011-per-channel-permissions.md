@@ -212,3 +212,22 @@ Whether embedding `channel_permissions` on `ReportDto` is the right long-term tr
 The embedded field was chosen because it avoids a second round trip and reuses this codebase's own batching shape, but the new per-page store function's cost was not measured against a real dataset.
 
 There is no query-counting test harness anywhere in this suite, checked rather than assumed, so the batched function's cost claim stays a doc comment the way `channels_where`'s already is, rather than something a test asserts.
+(No longer true, and the doc comment it settled for was wrong: see the 2026-09-22 amendment at the end.)
+
+## Amended 2026-09-22: there is a query-counting harness now, and the cost claim was wrong twice
+
+Two statements above no longer hold: that this suite has no query-counting harness, and that `Store::permissions_in_channels` costs a bounded number of statements.
+
+**The cost claim was wrong.** The doc comment this record deferred to said "one `channel` fetch per distinct requested id" as though that were the bound.
+It is not a bound at all: `Store::send_message` reaches `may_link`, which hands `permissions_in_channels` *every* channel that has ever attached a given sha256, so the statement count grew with how far a file had travelled, on the message-send path.
+The 2026-09-20 audit found it. Counted, with the per-id loop still in place: asked about 2 channels directly it cost 6 statements and about 24 it cost 28, and a whole `send_message` linking a file on 2 channels cost 13 against 35 for the same file on 24.
+Batched, the same four measurements are 5, 5, 12 and 12.
+
+This is the second time a comment here stated a bound that was not there - `viewers_among` did the same thing in July - which is the argument against settling a cost question in prose.
+
+**So the harness exists now.** sqlx emits one `sqlx::query` tracing event per statement, so a subscriber counting those events counts statements.
+It lives in `crates/slimm-server/tests/permissions_batch_cost.rs` and it has one real constraint worth knowing before reusing it: sqlite is synchronous, so sqlx runs each connection on a worker thread of its own and emits the event there.
+A thread-local `set_default` subscriber therefore counts nothing, and a test built on one passes vacuously at zero - which is why that file installs a global subscriber, holds itself to a single test so nothing interleaves its counts, and asserts the counter saw sqlx at all before asserting anything about a number.
+
+The resolution itself moved to `store/permissions_resolve.rs`: three rounds for the channel lookups whatever the id count, and one pair query plus two block reads for however many DMs are in the list.
+The equivalence tests this record asked for still carry the correctness argument; the new file only carries the cost.

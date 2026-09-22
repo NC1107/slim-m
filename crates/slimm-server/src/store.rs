@@ -61,6 +61,7 @@ mod modules;
 mod notifications;
 mod permissions;
 mod permissions_batch;
+mod permissions_resolve;
 mod pins;
 mod polls;
 mod presence;

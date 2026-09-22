@@ -355,13 +355,15 @@ impl Store {
     /// `http::channel_permissions` applies to its own answer and for the
     /// identical existence-probe reason.
     ///
-    /// Query cost is this doc comment, not a test: this suite has no
-    /// query-counting harness (checked; see docs/decisions/0011). Per call:
-    /// one `timeout_deny`, one `load_roles`, one `channel` fetch per
-    /// distinct requested id (a thread's parent needs a live read to find,
-    /// so this cannot be pre-batched the way the overwrite fetch is), one
-    /// `dm_permissions` call per distinct DM id in the page, and one batched
-    /// overwrite query for the rest.
+    /// Query cost is bounded independently of how long the id list is, which
+    /// matters because `may_link` hands this every channel that has ever
+    /// attached one sha256 - a widely forwarded image, on the message-send
+    /// path. Per call: one `timeout_deny`, one `load_roles`, at most three
+    /// rounds in [`Self::resolve_permission_channels`], one
+    /// [`Self::dm_permissions_batch`] (two queries) if any id is a DM, and one
+    /// batched overwrite query for the rest. It was a `channel` fetch per
+    /// distinct id plus a `dm_permissions` call per distinct DM until this was
+    /// batched; the doc comment recording that cost is what made it findable.
     pub async fn permissions_in_channels(
         &self,
         user_id: UserId,
@@ -377,32 +379,26 @@ impl Store {
         let timeout_deny = self.timeout_deny(user_id).await?;
         let roles = self.load_roles(user_id).await?;
 
-        // The DM and dead/nonexistent branches are answered here, before the shared batched fetch below.
-        let mut ordinary: Vec<(ChannelId, super::Channel)> = Vec::new();
-        for &channel_id in channel_ids {
-            if result.contains_key(&channel_id) {
-                continue;
-            }
-            let Some(channel) = self.channel(channel_id).await? else {
-                result.insert(channel_id, Permissions::NONE);
-                continue;
-            };
-            // A thread has no overwrites of its own; see `permission_channel`.
-            let Some(resolved) = self.permission_channel(channel).await? else {
-                result.insert(channel_id, Permissions::NONE);
-                continue;
-            };
-            if resolved.kind == super::dms::DM_CHANNEL_KIND {
-                let permissions = self
-                    .dm_permissions(user_id, resolved.id)
-                    .await?
+        let resolved = self.resolve_permission_channels(channel_ids).await?;
+        for channel_id in resolved.dead {
+            result.insert(channel_id, Permissions::NONE);
+        }
+        if !resolved.dms.is_empty() {
+            let mut dm_ids: Vec<ChannelId> = resolved.dms.iter().map(|(_, dm)| *dm).collect();
+            dm_ids.sort();
+            dm_ids.dedup();
+            let dm_permissions = self.dm_permissions_batch(user_id, &dm_ids).await?;
+            for (requested_id, dm_id) in resolved.dms {
+                let permissions = dm_permissions
+                    .get(&dm_id)
+                    .copied()
+                    .unwrap_or(Permissions::NONE)
                     .remove(timeout_deny);
-                result.insert(channel_id, mask_unless_viewable(permissions));
-                continue;
+                result.insert(requested_id, mask_unless_viewable(permissions));
             }
-            ordinary.push((channel_id, resolved));
         }
 
+        let ordinary = resolved.ordinary;
         if ordinary.is_empty() {
             return Ok(result);
         }
