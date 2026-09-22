@@ -139,6 +139,37 @@ impl Contract {
         token: Option<&str>,
         payload: Payload,
     ) -> Value {
+        self.drive(op, method, uri, token, payload, false).await
+    }
+
+    /// Drives `op` expecting a refusal, and checks the refusal's body against
+    /// the status the schema documents for it.
+    ///
+    /// Deliberately does NOT mark the operation covered. `covered` answers
+    /// "was this operation's real response seen", and an error body is not
+    /// that - counting it would let a happy path lapse while the enumeration
+    /// still read as complete, which is the same trap this file's own note on
+    /// the fresh rate limiter describes for 429.
+    pub async fn refuses(
+        &mut self,
+        op: &str,
+        method: &str,
+        uri: &str,
+        token: Option<&str>,
+        payload: Payload,
+    ) -> Value {
+        self.drive(op, method, uri, token, payload, true).await
+    }
+
+    async fn drive(
+        &mut self,
+        op: &str,
+        method: &str,
+        uri: &str,
+        token: Option<&str>,
+        payload: Payload,
+        expect_error: bool,
+    ) -> Value {
         let mut builder = Request::builder().method(method).uri(uri);
         if let Some(token) = token {
             builder = builder.header("authorization", format!("Bearer {token}"));
@@ -159,7 +190,9 @@ impl Contract {
             ..self.state.clone()
         });
         let response = router.oneshot(request).await.expect("router answered");
-        self.covered.insert(op.to_string());
+        if !expect_error {
+            self.covered.insert(op.to_string());
+        }
 
         let status = response.status();
         let media_type = response
@@ -180,6 +213,7 @@ impl Contract {
                 status,
                 media_type,
                 bytes: &bytes,
+                expect_error,
             },
         );
         self.problems.extend(problems);

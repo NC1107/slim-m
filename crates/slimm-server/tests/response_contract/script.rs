@@ -30,6 +30,7 @@ mod member_account;
 mod members_bulk;
 mod people;
 mod read_state;
+mod refusals;
 mod threads;
 
 use admin_recovery::recovery_calls;
@@ -281,6 +282,8 @@ pub async fn run(c: &mut Contract) {
 
     push_calls(c, root, &channel).await;
     invite_calls(c, root, bob_token).await;
+    // Last: a refusal leaves no state behind.
+    refusals::refusal_calls(c, bob_token, &admin_id, &code).await;
     farewell_calls(c, root, &bob_id, &code, &channel).await;
 }
 

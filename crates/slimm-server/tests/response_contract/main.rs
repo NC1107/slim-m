@@ -29,6 +29,18 @@
 //! too. Silence is the one outcome this test must never produce, because a
 //! contract test that quietly skips an endpoint reads as assurance while
 //! giving none.
+//!
+//! Refusals are checked too, by `script/refusals.rs`. Until it existed this
+//! test returned before the schema was consulted on any non-2xx, so the whole
+//! documented error surface - 401 on 158 operations, 403 on 103, 400 on 87,
+//! 404 on 50, 409 on 23 - was validated by nothing, and a handler whose error
+//! body had drifted from `Error` passed every gate here. One representative
+//! case per status rather than one per operation: `Error` is the same object
+//! on every route, so the shape is what is bought. The status-to-condition
+//! mapping per operation is not, and is not claimed.
+//!
+//! A refusal deliberately does not count toward `covered`; see
+//! `Contract::refuses` for why counting it would let a happy path lapse.
 
 mod openapi;
 mod script;

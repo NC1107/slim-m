@@ -51,6 +51,8 @@ Path-gated so a client-only change never triggers a server build.
 
 `schema/openapi.yaml` is in the path filter even though it is not Rust.
 `crates/slimm-server/tests/openapi_contract.rs` gates the schema against the router, so a schema-only edit that documents a path nothing serves, without touching `crates/`, must still run that test.
+`crates/slimm-server/tests/response_contract/` goes further and validates real response bodies against the document, including refusals: one representative case per documented error status, since `Error` is the same object on every route.
+Before that, every non-2xx returned before the schema was consulted, so an error body that had drifted from `Error` passed every gate here.
 
 ### The sqlx cache
 
