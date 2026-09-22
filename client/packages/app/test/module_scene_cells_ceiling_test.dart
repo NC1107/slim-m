@@ -78,4 +78,35 @@ void main() {
       reason: 'a ceiling at or below real use would be a behaviour change',
     );
   });
+
+  test('a non-finite number is treated as absent, not the scene', () {
+    // Literal JSON: jsonEncode cannot emit an infinity, and a module sends text.
+    final scene = parseModuleScene(
+      '{"\$slim":"scene/1","width":100,"height":100,'
+      '"ops":[{"op":"cells","cols":1e999,"rows":4,'
+      '"data":"....","tap":"toggle"}]}',
+    );
+
+    expect(
+      scene,
+      isNotNull,
+      reason:
+          'a module emitting an infinity must not take the whole scene '
+          "down; a module is somebody else's code",
+    );
+    final cells = scene!.ops.whereType<CellsOp>().single;
+    expect(cells.cols, 0, reason: 'absent, not clamped to the ceiling');
+    expect(cells.rows, 4);
+  });
+
+  test('an infinite offset never reaches the painter', () {
+    final scene = parseModuleScene(
+      '{"\$slim":"scene/1","width":100,"height":100,'
+      '"ops":[{"op":"rect","x":1e999,"y":0,"w":10,"h":10}]}',
+    );
+
+    expect(scene, isNotNull);
+    final rect = scene!.ops.whereType<RectOp>().single;
+    expect(rect.x.isFinite, isTrue);
+  });
 }

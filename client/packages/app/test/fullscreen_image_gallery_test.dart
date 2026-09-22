@@ -233,4 +233,48 @@ void main() {
           'decode',
     );
   });
+
+  testWidgets(
+    'opening the viewer fetches no sibling the reader has not reached',
+    (tester) async {
+      final fetched = <String>[];
+      final counting = attachmentBytesProvider.overrideWith((ref, id) async {
+        fetched.add(id);
+        return _png;
+      });
+      await _openAt(tester, _images.first, _images, [counting]);
+
+      expect(
+        fetched,
+        ['a1'],
+        reason:
+            'only the tapped image, fetched by the row before the viewer '
+            'opened; an attachment can be megabytes and a reader who opens one '
+            'image must not pay for the two beside it',
+      );
+    },
+  );
+
+  testWidgets('paging to a sibling is what fetches it', (tester) async {
+    final fetched = <String>[];
+    final counting = attachmentBytesProvider.overrideWith((ref, id) async {
+      fetched.add(id);
+      return _png;
+    });
+    await _openAt(tester, _images.first, _images, [counting]);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    expect(
+      fetched,
+      containsAll(<String>['a1', 'a2']),
+      reason: 'the page the reader actually reached does load',
+    );
+    expect(
+      fetched,
+      isNot(contains('a3')),
+      reason: 'and only that one - lazily still means lazily',
+    );
+  });
 }

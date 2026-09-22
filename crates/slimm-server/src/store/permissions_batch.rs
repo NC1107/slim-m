@@ -360,7 +360,8 @@ impl Store {
     /// attached one sha256 - a widely forwarded image, on the message-send
     /// path. Per call: one `timeout_deny`, one `load_roles`, at most three
     /// rounds in [`Self::resolve_permission_channels`], one
-    /// [`Self::dm_permissions_batch`] (two queries) if any id is a DM, and one
+    /// [`Self::dm_permissions_batch`] (a pair query plus two block reads) if
+    /// any id is a DM, and one
     /// batched overwrite query for the rest. It was a `channel` fetch per
     /// distinct id plus a `dm_permissions` call per distinct DM until this was
     /// batched; the doc comment recording that cost is what made it findable.

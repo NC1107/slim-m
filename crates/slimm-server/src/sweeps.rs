@@ -40,7 +40,8 @@ async fn record_sweep_run(store: &store::Store, name: &str, reclaimed: i64) {
 /// written this way it cannot be forgotten. Each caller hands over a closure
 /// rather than a future, since the pass runs again on every tick - the handles
 /// these capture (`Store`, `Hub`, `VoiceService`, `Media`, `PushSender`) are
-/// all cheap `Arc` clones.
+/// `Arc` clones, bar `Media`'s two owned `PathBuf`s - and that one is captured
+/// only by the hourly and six-hourly sweeps, never the two-second ring.
 fn spawn_sweep<F, Fut>(interval: std::time::Duration, pass: F)
 where
     F: Fn() -> Fut + Send + 'static,

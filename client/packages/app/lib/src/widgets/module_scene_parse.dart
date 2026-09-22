@@ -246,8 +246,16 @@ SceneGradient? _parseGradient(Object? raw) {
   );
 }
 
+/// A number from a module, or [fallback].
+///
+/// Non-finite is treated as absent rather than passed on. JSON can carry it -
+/// `1e999` decodes to `double.infinity` - and it reaches two different kinds
+/// of harm: `toInt()` on it throws `UnsupportedError`, which escapes
+/// [parseModuleScene] entirely because only `FormatException` is caught there,
+/// and an infinite width or offset reaches the painter. A module is somebody
+/// else's code, so this is the same posture as every ceiling in the contract.
 double _double(Object? value, double fallback) =>
-    value is num ? value.toDouble() : fallback;
+    value is num && value.isFinite ? value.toDouble() : fallback;
 
 /// One axis of a `cells` grid, clamped to [CellsOp.maxPerAxis].
 ///
