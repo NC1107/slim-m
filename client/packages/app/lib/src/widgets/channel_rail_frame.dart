@@ -10,6 +10,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../desktop/update_watch.dart';
 import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
@@ -285,11 +286,63 @@ List<Widget> railVoiceToggleButtons({
 
 /// The personal-settings nav button, shared the same way
 /// [railVoiceToggleButtons] is.
-Widget railSettingsButton(BuildContext context) => AppIconButton(
-  icon: AppIcons.settings,
-  semanticLabel: 'Personal settings',
-  onPressed: () => context.push(Routes.personalSettings),
+///
+/// Carries a dot when an update is waiting. The banner says the same thing in
+/// words, but it is dismissible and this is not: once the banner is gone the
+/// only remaining sign used to be relaunching and hitting the splash check
+/// again. The dot points at the pane that can act on it, and About is where
+/// the two version numbers and the manual re-check live.
+Widget railSettingsButton(BuildContext context) => Consumer(
+  builder: (context, ref, _) {
+    final pending = ref.watch(updatePendingProvider);
+    final button = AppIconButton(
+      icon: AppIcons.settings,
+      semanticLabel: pending
+          ? 'Personal settings, an update is available'
+          : 'Personal settings',
+      onPressed: () => context.push(Routes.personalSettings),
+    );
+    if (!pending) return button;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        button,
+        // The dot means "something is waiting" by being there, not by its hue.
+        Positioned(
+          top: 2,
+          right: 2,
+          child: ExcludeSemantics(child: _UpdateDot(key: updateBadgeDotKey)),
+        ),
+      ],
+    );
+  },
 );
+
+/// Finds the gear's dot in a test, which nothing else about the rail can be
+/// mistaken for.
+const updateBadgeDotKey = Key('rail-gear-update-dot');
+
+/// The gear's pending-update dot. Sized against nothing in particular: it has
+/// to read as a mark on the icon rather than as a second control, and 8 is the
+/// smallest that survives a HiDPI downscale without turning into a smudge.
+class _UpdateDot extends StatelessWidget {
+  const _UpdateDot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: tokens.accent,
+        shape: BoxShape.circle,
+        // A ring of the surface behind it, so the dot stays legible on the glyph.
+        border: Border.all(color: tokens.surfaceSunken, width: 1.5),
+      ),
+    );
+  }
+}
 
 class RailUserFooter extends ConsumerWidget {
   const RailUserFooter({super.key, this.activeChannelId});

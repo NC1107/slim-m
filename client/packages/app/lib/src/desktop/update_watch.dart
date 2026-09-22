@@ -102,11 +102,27 @@ class UpdateWatcher {
   }
 }
 
-/// The update this session's periodic check has found and not yet
-/// dismissed, or null. Dismissing it (see `update_available_banner.dart`)
-/// writes the same [dismissedUpdateVersionKey] the splash's own "Not now"
-/// does, so either surface's dismissal holds for the other.
+/// The update this session knows about, or null.
+///
+/// Set by [UpdateWatcher]'s poll and by the manual check in Settings, and
+/// deliberately *not* cleared when the banner is dismissed: the rail's gear
+/// badge reads this, and the whole point of the badge is that it outlives the
+/// banner. Dismissal is [dismissedBannerVersionProvider] plus the persisted
+/// [dismissedUpdateVersionKey], which is what the splash's own "Not now"
+/// writes, so either surface's dismissal holds for the other across launches.
 final inSessionUpdateProvider = StateProvider<ClientUpdate?>((ref) => null);
+
+/// The version whose banner has been dismissed in this session, or null.
+///
+/// Separate from [inSessionUpdateProvider] because "stop showing me the
+/// banner" and "there is no update" are different facts, and the badge needs
+/// the second one to stay true after the first.
+final dismissedBannerVersionProvider = StateProvider<String?>((ref) => null);
+
+/// Whether a known update is waiting, which is all the gear badge needs.
+final updatePendingProvider = Provider<bool>(
+  (ref) => ref.watch(inSessionUpdateProvider) != null,
+);
 
 /// Forces [UpdateWatcher] into existence for as long as
 /// [UpdateAvailableBanner] is mounted - see that widget, the one place that
