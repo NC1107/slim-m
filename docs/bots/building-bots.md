@@ -40,6 +40,10 @@ Authorization: Bearer slimbot_...
 
 Call `GET /me` first. It returns the bot's own id and its effective base permissions, which is the cheapest way to confirm the token works and to learn the id you will need to avoid answering yourself.
 
+**Send a real `User-Agent`.** A deployment behind a CDN may refuse a default library user-agent before the request ever reaches slim-m, and what you get back is that CDN's 403 rather than anything from the API.
+Python's `urllib` is the common case: `Python-urllib/3.x` is blocked by Cloudflare's defaults, and the same call with any named user-agent succeeds.
+Name your bot there and the problem does not exist.
+
 ## Receiving events
 
 Events come over the WebSocket, and getting on it is two steps:
