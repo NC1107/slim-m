@@ -22,6 +22,7 @@ import 'op_adjacency.dart';
 import 'message_extras.dart';
 import 'providers.dart';
 import 'reconnect_backoff.dart';
+import 'typing_controller.dart';
 import 'user_profiles.dart';
 
 part 'sync_controller_events.dart';
@@ -161,6 +162,8 @@ class SyncController extends StateNotifier<SyncStatus> {
     // A missed voice.activity frame while disconnected is otherwise unrecoverable.
     _ref.read(dmCallActivityProvider.notifier).clear();
     _ref.read(dmCallRingControllerProvider.notifier).clear();
+    // Same: typing.stopped is ephemeral, so one missed frame sticks forever.
+    _ref.invalidate(typingControllerProvider);
     try {
       final api = _ref.read(apiProvider);
       final store = await _ref.read(storeProvider.future);
