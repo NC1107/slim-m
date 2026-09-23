@@ -10,9 +10,12 @@
 ///
 /// The name and handle used to sit above the settings nav, outside every
 /// named section - editable, yet nowhere a caller would think to look for
-/// "rename yourself". They live in this card now, which is what the
-/// "Account & presence" pane opens onto, so renaming sits beside the picture
-/// it is next to on every other profile in this app.
+/// "rename yourself". They live in this card now, which is the whole of the
+/// `Profile` pane, so renaming sits beside the picture it is next to on
+/// every other profile in this app. The card carries no title of its own:
+/// `Profile` under `Profile` would restate the nav row it already sits
+/// under, the case decision 0013 made `SettingsSectionCard.title` nullable
+/// for.
 library;
 
 import 'dart:async';
@@ -148,7 +151,6 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
     final enabled = me != null && !_busy;
 
     return SettingsSectionCard(
-      title: 'Profile',
       children: [
         Padding(
           padding: const EdgeInsets.all(AppSpacing.s8),

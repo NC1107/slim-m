@@ -20,7 +20,7 @@ SPACE_SETTINGS = "Space settings"
 PERSONAL_SETTINGS = "Personal settings"
 
 # Personal settings. Nav entries first: a control needs its own pane selected.
-ACCOUNT_PANE = "Account & profile"
+PROFILE_PANE = "Profile"
 APPEARANCE_PANE = "Appearance"
 CHANGE_AVATAR = "Change profile picture"
 CROP_TITLE = "Crop your picture"

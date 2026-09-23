@@ -2,7 +2,7 @@
 /// Tests for the personal settings screen's own structure: a failure
 /// partway through sign-out or deletion reaches the screen rather than
 /// vanishing, the nav lays out and carries an icon per pane, and the
-/// "Account & profile" pane opens onto the rename affordance.
+/// "Profile" pane opens onto the rename affordance.
 ///
 /// The presence visibility control has its own file,
 /// `personal_settings_presence_test.dart`, split out to stay under the
@@ -138,7 +138,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Deletion sits with the account it deletes, not under "About slim-m".
-    await tester.tap(find.text('Account & profile'));
+    await tester.tap(find.text('Account & devices'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();
@@ -231,6 +231,7 @@ void main() {
 
       for (final icon in const [
         AppIcons.account,
+        AppIcons.devices,
         AppIcons.appearance,
         AppIcons.notificationsOn,
         AppIcons.voice,
@@ -262,7 +263,7 @@ void main() {
 
     await tester.pumpWidget(_screen(container));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Account & profile'));
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
 
     final avatar = tester.getRect(find.byType(UserAvatar).last);
@@ -280,8 +281,8 @@ void main() {
     await tester.pumpWidget(_screen(container));
     await tester.pumpAndSettle();
 
-    // Renaming lives in the "Account & profile" pane, not above the nav.
-    await tester.tap(find.text('Account & profile'));
+    // Renaming lives in the "Profile" pane, not above the nav.
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
 
     expect(find.text('Self'), findsOneWidget);

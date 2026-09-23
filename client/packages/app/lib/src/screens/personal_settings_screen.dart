@@ -28,16 +28,21 @@
 /// `settings_taxonomy_test.dart` holds as a rule rather than a habit.
 ///
 /// `Delete account` moved with it, out of the pane labelled `About slim-m`
-/// and into `Account & profile`. It is permanent and irreversible, and it
+/// and into `Account & devices`. It is permanent and irreversible, and it
 /// was reached by opening a pane whose name promises a version number. About
 /// is the app's own build information now and nothing else.
 ///
 /// Who you are, and the rename affordance for it, used to float above the nav
 /// as its own unlabelled block - editable, yet outside every named section,
 /// so "rename yourself" read as belonging to nothing. It lives inside
-/// [AvatarSettingsSection]'s own "Profile" card now, which is what the
-/// "Account & presence" pane opens onto, and each pane in the nav carries a
-/// leading icon the way [SpaceSettingsSection]'s rows already do.
+/// [AvatarSettingsSection]'s own "Profile" card, which is its own pane now:
+/// `Account & profile` used to also hold devices, app lock and account
+/// deletion in the same scroll, four unrelated questions (who you are, what
+/// signs in as you, whether opening this app needs a passcode, and how to
+/// leave) stacked under one name. `Profile` is who you are; `Account &
+/// devices` is everything about the account and what signs into it. Each
+/// pane in the nav carries a leading icon the way [SpaceSettingsSection]'s
+/// rows already do.
 library;
 
 import 'package:flutter/material.dart';
@@ -71,13 +76,18 @@ class PersonalSettingsScreen extends StatelessWidget {
           label: 'You',
           panes: [
             SettingsPane(
-              id: 'account',
-              label: 'Account & profile',
+              id: 'profile',
+              label: 'Profile',
               icon: AppIcons.account,
               // No presence rows: the rail footer's own status menu already sets both the state and the status text.
+              builder: (context) => const AvatarSettingsSection(),
+            ),
+            SettingsPane(
+              id: 'account-devices',
+              label: 'Account & devices',
+              icon: AppIcons.devices,
               builder: (context) => const Column(
                 children: [
-                  AvatarSettingsSection(),
                   DevicesSection(),
                   AppLockSection(),
                   AccountSection(),
