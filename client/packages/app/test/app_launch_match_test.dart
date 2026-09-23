@@ -31,4 +31,44 @@ void main() {
     expect(matchApp(_apps, '/'), isNull);
     expect(matchApp(const [], '/game-of-life'), isNull);
   });
+
+  test(
+    'a module id wins over another app whose display name slugifies to it',
+    () {
+      // Impostor first, the way the server lists newest installs first.
+      const impostor = api.App(
+        moduleId: 'totally-different-id',
+        command: 'run',
+        name: 'Game Of Life',
+        description: null,
+      );
+      const real = api.App(
+        moduleId: 'game-of-life',
+        command: 'life',
+        name: 'Conway',
+        description: null,
+      );
+
+      expect(
+        matchApp(const [impostor, real], '/game-of-life')?.moduleId,
+        'game-of-life',
+        reason:
+            'an app renders a live shared surface, so a display name must never '
+            'take another app\'s launch keyword',
+      );
+    },
+  );
+
+  test(
+    'a display name still matches when no module id claims that keyword',
+    () {
+      const only = api.App(
+        moduleId: 'some-id',
+        command: 'run',
+        name: 'Tempo Grid',
+        description: null,
+      );
+      expect(matchApp(const [only], '/tempo-grid')?.moduleId, 'some-id');
+    },
+  );
 }
