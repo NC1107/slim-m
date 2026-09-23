@@ -85,7 +85,9 @@ class MessageTimeMark extends ConsumerWidget {
   final Message message;
 
   /// Glyph-only pending/failed marks, for the 36px continuation gutter where
-  /// a word cannot fit.
+  /// a word cannot fit. The sent branch has no glyph fallback, so it instead
+  /// scales its full timestamp down to fit that same width rather than
+  /// wrapping and dropping the am/pm suffix onto a second line.
   final bool compact;
 
   @override
@@ -114,10 +116,20 @@ class MessageTimeMark extends ConsumerWidget {
             );
     } else {
       final use24Hour = watchUse24Hour(ref, context);
-      mark = Text(
+      final text = Text(
         formatMessageTime(message.createdAt, use24Hour: use24Hour),
         style: mono,
+        maxLines: 1,
+        softWrap: false,
       );
+      // See [compact]; the header call site has room and stays at natural size.
+      mark = compact
+          ? FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: text,
+            )
+          : text;
     }
     // Keyed on the state, never the text, so a minute tick never replays.
     final state = message.failed

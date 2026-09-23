@@ -10,6 +10,7 @@
 library;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/display_preferences.dart';
 import 'package:slimm_app/src/widgets/message_row.dart';
@@ -82,5 +83,24 @@ void main() {
       find.text(formatMessageTime(1700000000000, use24Hour: true)),
       findsNothing,
     );
+  });
+
+  testWidgets('h12 stays on one line in the 36px gutter and keeps its '
+      'meridiem', (tester) async {
+    await _pumpGrouped(tester, TimeFormatPreference.h12);
+    await _hover(tester);
+
+    // The gutter is the 36px message-row avatar column; a wrapped time spills past it.
+    final gutterSize = tester.getSize(find.byType(MessageTimeMark));
+    expect(gutterSize.width, lessThanOrEqualTo(36));
+
+    // A FittedBox lays this out unconstrained, so a wrapped render still doubles this height.
+    final textSize = tester.getSize(
+      find.descendant(
+        of: find.byType(MessageTimeMark),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(textSize.height, lessThan(20));
   });
 }
