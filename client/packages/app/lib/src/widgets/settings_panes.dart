@@ -298,7 +298,14 @@ class _Nav extends StatelessWidget {
                 for (final pane in group.panes)
                   AppListRow(
                     label: pane.label,
-                    leading: pane.icon == null ? null : Icon(pane.icon),
+                    // Sized and colored to match the trailing chevron below, not Flutter's ~24px default.
+                    leading: pane.icon == null
+                        ? null
+                        : Icon(
+                            pane.icon,
+                            size: AppSizes.icon16,
+                            color: tokens.textSecondary,
+                          ),
                     meta: pane.badge,
                     selected: showSelection && pane.id == selectedId,
                     // A chevron only where the row actually goes somewhere.
