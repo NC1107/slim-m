@@ -204,15 +204,21 @@ class SlimmApi {
         .toList(growable: false);
   }
 
-  /// Creates a channel. Requires the manage-channels permission.
+  /// Creates a channel. Requires the manage-channels permission, and, only
+  /// when [restricted] is true, manage-roles as well - writing the
+  /// overwrites a private channel needs is a permissions edit.
   /// [categoryId] files the new channel straight into that rail section.
   /// Null leaves it uncategorised. Naming a category that does not exist is
   /// a 400 rather than a silent fall back, so a stale category id surfaces
   /// instead of quietly putting the channel somewhere nobody chose.
+  /// [restricted] denies `@everyone` VIEW_CHANNEL and grants only the
+  /// caller, written atomically with the channel row itself so it can never
+  /// be observed public first.
   Future<Channel> createChannel({
     required String name,
     String kind = 'text',
     String? categoryId,
+    bool restricted = false,
   }) async {
     final json = await _send(
       'POST',
@@ -221,6 +227,7 @@ class SlimmApi {
         'name': name,
         'kind': kind,
         if (categoryId != null) 'category_id': categoryId,
+        if (restricted) 'restricted': true,
       },
     );
     return Channel.fromJson(json as Map<String, dynamic>);

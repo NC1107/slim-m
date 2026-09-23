@@ -1,11 +1,26 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The sheet for making a channel: a name and a text/voice choice, sent
-/// through `POST /channels` ([api.SlimmApi.createChannel]).
+/// The sheet for making a channel: a name, a text/voice choice, and - for a
+/// caller who holds MANAGE_ROLES - a Private toggle, sent through
+/// `POST /channels` ([api.SlimmApi.createChannel]).
 ///
 /// Opened from the Space menu's "Add channel", and from the `+` on a
 /// category header in the rail - which passes that category so the channel
 /// lands in the section the person asked from, rather than appearing
 /// uncategorised and needing a drag straight afterwards.
+///
+/// The toggle exists to close the window a create-then-restrict two-step
+/// otherwise leaves open: every new channel is public by construction (see
+/// `EVERYONE_DEFAULTS` in `crates/slimm-server/src/store/bootstrap.rs`), so
+/// without it a channel meant to be private is briefly visible to everyone
+/// between creation and a follow-up permissions edit. It denies `@everyone`
+/// and grants only the creator - no role picker, for the same reason
+/// [categoryId] is not one either: others are added afterwards through the
+/// existing channel-permissions surface.
+///
+/// Absent, not disabled, for a caller without MANAGE_ROLES: the server
+/// refuses that combination outright (see `create`'s own doc in
+/// `http/channels.rs`), and a control that can only fail is the thing this
+/// codebase keeps taking back out.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,8 +30,11 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
+import '../permissions.dart';
+import '../providers/admin_providers.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
+import 'settings_toggle_row.dart';
 
 /// The server's own ceiling (`validate_channel_name` in
 /// `crates/slimm-server/src/http/channels.rs`), so a name that is already
@@ -59,6 +77,7 @@ class _CreateChannelSheet extends ConsumerStatefulWidget {
 class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
   final _name = TextEditingController();
   late String _kind = widget.initialKind;
+  bool _restricted = false;
   bool _submitting = false;
   String? _error;
 
@@ -95,6 +114,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
             name: _name.text.trim(),
             kind: _kind,
             categoryId: widget.categoryId,
+            restricted: _restricted,
           );
       final store = await ref.read(storeProvider.future);
       await store.upsertChannels([created]);
@@ -115,6 +135,10 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // Absent, not disabled, for a caller without MANAGE_ROLES - see this class's own doc.
+    final canRestrict = ref
+        .watch(myPermissionsProvider)
+        .hasPermission(Perm.manageRoles);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -157,6 +181,15 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
               onSegmentSelected: (i) =>
                   setState(() => _kind = i == 1 ? 'voice' : 'text'),
             ),
+            if (canRestrict)
+              SettingsToggleRow(
+                label: 'Private',
+                description:
+                    'Only you can see this channel until you add others.',
+                value: _restricted,
+                onChanged: (v) => setState(() => _restricted = v),
+                semanticLabel: 'Make this channel private',
+              ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),
               AppErrorState(message: _error!),

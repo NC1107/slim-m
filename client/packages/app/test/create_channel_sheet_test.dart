@@ -4,17 +4,35 @@
 /// `poll_composer_sheet_test.dart` already covers for its own sheet - and
 /// refuses a name past the server's own 64-character ceiling before ever
 /// sending it.
+///
+/// The Private toggle is absent rather than disabled for a caller without
+/// MANAGE_ROLES, the same convention `channel_settings_screen_test.dart`
+/// covers for its own MANAGE_ROLES-gated section.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/permissions.dart';
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/create_channel_sheet.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-Future<void> _openSheet(WidgetTester tester) async {
+Future<void> _openSheet(WidgetTester tester, {int permissions = 0}) async {
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        meProvider.overrideWith(
+          (ref) async => api.Me(
+            id: 'user-1',
+            username: 'user-1',
+            displayName: 'User',
+            createdAt: 0,
+            permissions: permissions,
+          ),
+        ),
+      ],
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
         home: Scaffold(
@@ -43,6 +61,10 @@ AppButton _primaryButton(WidgetTester tester) => tester.widget<AppButton>(
   ),
 );
 
+Finder _privateToggle() => find.byWidgetPredicate(
+  (w) => w is AppToggle && w.semanticLabel == 'Make this channel private',
+);
+
 void main() {
   testWidgets('names what is missing rather than sitting disabled mute', (
     tester,
@@ -64,4 +86,28 @@ void main() {
     expect(_primaryButton(tester).label, 'Name is too long');
     expect(_primaryButton(tester).disabled, isTrue);
   });
+
+  testWidgets('the Private toggle is absent without MANAGE_ROLES', (
+    tester,
+  ) async {
+    await _openSheet(tester, permissions: 0);
+
+    expect(_privateToggle(), findsNothing);
+  });
+
+  testWidgets(
+    'the Private toggle appears, defaults off, and can be switched on for a '
+    'MANAGE_ROLES holder',
+    (tester) async {
+      await _openSheet(tester, permissions: Perm.manageRoles);
+
+      expect(_privateToggle(), findsOneWidget);
+      expect(tester.widget<AppToggle>(_privateToggle()).value, isFalse);
+
+      await tester.tap(_privateToggle());
+      await tester.pump();
+
+      expect(tester.widget<AppToggle>(_privateToggle()).value, isTrue);
+    },
+  );
 }

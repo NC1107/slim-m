@@ -4,6 +4,7 @@
 //! The pure precedence logic lives in [`crate::permissions`]; this module loads
 //! a user's roles and a channel's overwrites and feeds them to the evaluator.
 
+use sqlx::SqliteExecutor;
 use uuid::Uuid;
 
 use super::Store;
@@ -50,8 +51,7 @@ impl Store {
         allow: Permissions,
         deny: Permissions,
     ) -> anyhow::Result<()> {
-        self.set_overwrite(channel_id, "role", role_id.0, allow, deny)
-            .await
+        set_overwrite(&self.pool, channel_id, "role", role_id.0, allow, deny).await
     }
 
     /// Sets (or replaces) a channel overwrite for a single member.
@@ -62,34 +62,7 @@ impl Store {
         allow: Permissions,
         deny: Permissions,
     ) -> anyhow::Result<()> {
-        self.set_overwrite(channel_id, "member", user_id.0, allow, deny)
-            .await
-    }
-
-    async fn set_overwrite(
-        &self,
-        channel_id: ChannelId,
-        target_type: &str,
-        target_id: Uuid,
-        allow: Permissions,
-        deny: Permissions,
-    ) -> anyhow::Result<()> {
-        let allow = allow.bits();
-        let deny = deny.bits();
-        sqlx::query!(
-            "INSERT INTO channel_overwrites (channel_id, target_type, target_id, allow, deny)
-             VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(channel_id, target_type, target_id)
-             DO UPDATE SET allow = excluded.allow, deny = excluded.deny",
-            channel_id,
-            target_type,
-            target_id,
-            allow,
-            deny
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
+        set_overwrite(&self.pool, channel_id, "member", user_id.0, allow, deny).await
     }
 
     /// The overwrite currently set for one target in one channel, if any.
@@ -428,4 +401,55 @@ impl Store {
             role_ids,
         })
     }
+}
+
+/// Sets (or replaces) one channel overwrite, over any executor - the pool
+/// for [`Store::set_role_overwrite`] and [`Store::set_member_overwrite`], or
+/// an open transaction for a write that must land atomically with something
+/// else, such as the private-channel overwrites
+/// [`super::channel_create::Store::create_channel_with_id`] writes alongside the
+/// channel row itself.
+pub(super) async fn set_overwrite<'e, E>(
+    executor: E,
+    channel_id: ChannelId,
+    target_type: &str,
+    target_id: Uuid,
+    allow: Permissions,
+    deny: Permissions,
+) -> anyhow::Result<()>
+where
+    E: SqliteExecutor<'e>,
+{
+    let allow = allow.bits();
+    let deny = deny.bits();
+    sqlx::query!(
+        "INSERT INTO channel_overwrites (channel_id, target_type, target_id, allow, deny)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(channel_id, target_type, target_id)
+         DO UPDATE SET allow = excluded.allow, deny = excluded.deny",
+        channel_id,
+        target_type,
+        target_id,
+        allow,
+        deny
+    )
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// The current `@everyone` role's id, over any executor - `None` on a
+/// deployment that has not bootstrapped yet.
+/// [`super::channel_create::Store::create_channel_with_id`] treats that as a
+/// refusal rather than silently creating a "private" channel with no deny in
+/// place to make it private.
+pub(super) async fn everyone_role_id<'e, E>(executor: E) -> anyhow::Result<Option<Uuid>>
+where
+    E: SqliteExecutor<'e>,
+{
+    let row =
+        sqlx::query!(r#"SELECT id AS "id!: RoleId" FROM roles WHERE is_everyone = 1 LIMIT 1"#)
+            .fetch_optional(executor)
+            .await?;
+    Ok(row.map(|r| r.id.0))
 }
