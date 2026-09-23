@@ -20,6 +20,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import '../providers/gif_preview_bytes.dart';
+import '../providers/gif_trending.dart';
 import '../providers/providers.dart';
 import 'composer_attachments.dart';
 import 'image_decode.dart';
@@ -144,44 +145,15 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
   String? _error;
   List<api.GifResult>? _results;
 
-  /// The picker's default content, fetched once on open so the grid is never
-  /// blank before a member types anything - the same "trending on open"
-  /// behavior Discord's own picker has.
-  List<api.GifResult>? _trending;
-  bool _trendingLoading = true;
-
   /// The result currently being picked, so its own tile can show a spinner
   /// and every other tile is disabled until this one resolves.
   String? _selectingId;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadTrending());
-  }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _queryController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadTrending() async {
-    try {
-      final results = await ref.read(apiProvider).fetchTrendingGifs();
-      if (!mounted) return;
-      setState(() {
-        _trending = results;
-        _trendingLoading = false;
-      });
-    } on api.ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = describeApiFailure('load trending gifs', e);
-        _trendingLoading = false;
-      });
-    }
   }
 
   void _onQueryChanged(String value) {
@@ -245,14 +217,28 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
 
   /// Re-runs whatever is on screen - the current search, or trending when the
   /// box is empty - so the grid comes back with tokens that still redeem.
+  /// Invalidating [trendingGifsProvider] rather than re-reading it directly:
+  /// the provider is cached for the session (see its own doc comment), so a
+  /// stale-token reload has to force a real refetch, not just re-read the
+  /// same cached list that just failed to redeem.
   Future<void> _reload() {
     final query = _queryController.text.trim();
-    return query.isEmpty ? _loadTrending() : _search(query);
+    if (query.isEmpty) {
+      ref.invalidate(trendingGifsProvider);
+      return Future.value();
+    }
+    return _search(query);
   }
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final trending = ref.watch(trendingGifsProvider);
+    // Only shown once nothing has been searched: a search failure reports through _error instead, and the two must not both claim the one banner slot.
+    final trendingError = _results == null && trending.hasError
+        ? _describeTrendingFailure(trending.error)
+        : null;
+    final error = _error ?? trendingError;
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.s12),
       child: Column(
@@ -272,21 +258,26 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
             semanticLabel: 'Search GIFs',
           ),
           const SizedBox(height: AppSpacing.s12),
-          if (_error != null) ...[
-            AppErrorState(message: _error!),
+          if (error != null) ...[
+            AppErrorState(
+              message: error,
+              onRetry: trendingError != null
+                  ? () => ref.invalidate(trendingGifsProvider)
+                  : null,
+            ),
             const SizedBox(height: AppSpacing.s12),
           ],
           ConstrainedBox(
             constraints: BoxConstraints(maxHeight: gifGridCeiling(context)),
-            child: _content(tokens),
+            child: _content(tokens, trending),
           ),
         ],
       ),
     );
   }
 
-  Widget _content(AppTokens tokens) {
-    if (_loading || (_results == null && _trendingLoading)) {
+  Widget _content(AppTokens tokens, AsyncValue<List<api.GifResult>> trending) {
+    if (_loading || (_results == null && trending.isLoading)) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(AppSpacing.s24),
@@ -294,7 +285,7 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
         ),
       );
     }
-    final results = _results ?? _trending;
+    final results = _results ?? trending.valueOrNull;
     if (results == null) {
       // Trending failed and nothing has been searched; the banner above explains.
       return const SizedBox.shrink();
@@ -328,6 +319,15 @@ class _GifPickerBodyState extends ConsumerState<GifPickerBody> {
     );
   }
 }
+
+/// [trendingGifsProvider]'s own error, described the same way a caught
+/// [api.ApiException] would be - it never surfaces as anything else, since
+/// [SlimmApiGifs.fetchTrendingGifs] never throws otherwise - but `AsyncValue
+/// .error` is typed `Object?`, so this still falls back to a generic
+/// sentence rather than a cast that could throw from inside a build method.
+String _describeTrendingFailure(Object? error) => error is api.ApiException
+    ? describeApiFailure('load trending gifs', error)
+    : 'Could not load trending gifs.';
 
 class _GifTile extends ConsumerWidget {
   const _GifTile({
