@@ -6,6 +6,14 @@
 /// surface ever read [inSessionUpdateProvider]. These tests are about the
 /// mounting decision rather than the banner's content, which
 /// `desktop/update_available_banner_test.dart` covers.
+///
+/// The geometry checks below are the actual regression: a `SafeArea` insets
+/// by adding padding around its child whatever that child's own size is, so
+/// wrapping an empty banner in one the whole time reserved a full
+/// status-bar-height band of nothing above the rail on every phone - "costs
+/// nothing but the child" was true of the widget tree but not of the screen,
+/// and a check that only asked whether `AppCallout` was present passed
+/// against that exact mistake.
 library;
 
 import 'package:flutter/material.dart';
@@ -24,12 +32,19 @@ const _update = ClientUpdate(
   format: InstallFormat.unknown,
 );
 
+/// An iPhone's own notch inset, matching `rail_safe_area_test.dart`.
+const double _topInset = 59;
+
 Future<void> _pump(
   WidgetTester tester, {
   required bool ownsBanner,
   ClientUpdate? update,
+  double topInset = 0,
 }) async {
   SharedPreferences.setMockInitialValues({});
+  tester.view.padding = FakeViewPadding(top: topInset);
+  tester.view.viewPadding = FakeViewPadding(top: topInset);
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -85,4 +100,44 @@ void main() {
     expect(find.byType(AppCallout), findsNothing);
     expect(find.text('the app'), findsOneWidget);
   });
+
+  testWidgets(
+    'reserves no dead band above the child on a notched phone with no '
+    'update to show',
+    (tester) async {
+      await _pump(tester, ownsBanner: false, topInset: _topInset);
+
+      expect(
+        tester.getRect(find.text('the app')).top,
+        0.0,
+        reason:
+            'nothing is showing, so the host must hand the child straight '
+            "back rather than reserving the banner's own status-bar inset "
+            'above it',
+      );
+    },
+  );
+
+  testWidgets(
+    "does not inset the child a second time below a banner that's really "
+    'showing',
+    (tester) async {
+      await _pump(
+        tester,
+        ownsBanner: false,
+        update: _update,
+        topInset: _topInset,
+      );
+
+      final bannerBottom = tester.getRect(find.byType(AppCallout)).bottom;
+      expect(
+        tester.getRect(find.text('the app')).top,
+        bannerBottom,
+        reason:
+            "the banner's own SafeArea already spent the top inset; the "
+            'child must start right where the banner ends, not one more '
+            'inset below it',
+      );
+    },
+  );
 }

@@ -9,19 +9,33 @@
 /// Everywhere else the signed-in shell is the outermost thing there is, which
 /// is why this wrapper exists at all. The banner is only ever visible when
 /// `update_watch.dart` has actually found something, so on a platform that
-/// never polls this costs one `SizedBox.shrink` in the tree.
+/// never polls, or one that has not found anything yet, this hands the child
+/// straight back too rather than building the `Column` below at all.
 ///
-/// The `SafeArea` is deliberately top-only: the scaffold underneath already
-/// insets its own body, and a banner painted above it would otherwise sit
-/// under the status bar or a notch.
+/// That early return matters for more than the cheap case: a `SafeArea`
+/// insets its child by adding padding around it, whatever that child's own
+/// size is - so wrapping an empty `UpdateAvailableBanner` in one the whole
+/// time still reserved a full status-bar-height band of nothing above the
+/// rail on every phone, update pending or not. `bannerVisibleProvider` is the
+/// one place that answers "is there really something to show", shared with
+/// the banner itself so the two can never disagree about it.
+///
+/// While a banner *is* showing, its own `SafeArea` is what spends the top
+/// inset - so [child] gets it stripped from its `MediaQuery`, the same way
+/// [Scaffold] itself only removes the body's top padding when there is an
+/// `appBar` to have already spent it. Without that, [child]'s own chrome
+/// (the rail header, a compact app bar) would still think it was sitting
+/// under the status bar and inset a second time underneath the banner.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_platform/platform.dart';
 
 import '../desktop/update_available_banner.dart';
+import '../desktop/update_watch.dart';
 
-class UpdateBannerHost extends StatelessWidget {
+class UpdateBannerHost extends ConsumerWidget {
   const UpdateBannerHost({super.key, required this.child, this.ownsBanner});
 
   final Widget child;
@@ -32,12 +46,21 @@ class UpdateBannerHost extends StatelessWidget {
   final bool? ownsBanner;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (ownsBanner ?? isDesktopHost) return child;
+    // Kept alive here so polling continues while nothing is showing yet.
+    ref.watch(updateWatcherProvider);
+    if (!ref.watch(bannerVisibleProvider)) return child;
     return Column(
       children: [
         const SafeArea(bottom: false, child: UpdateAvailableBanner()),
-        Expanded(child: child),
+        Expanded(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: child,
+          ),
+        ),
       ],
     );
   }

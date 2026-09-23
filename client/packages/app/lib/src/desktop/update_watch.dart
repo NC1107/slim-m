@@ -124,6 +124,20 @@ final updatePendingProvider = Provider<bool>(
   (ref) => ref.watch(inSessionUpdateProvider) != null,
 );
 
+/// Whether [UpdateAvailableBanner] actually has something to paint right
+/// now: an update found and not yet dismissed.
+///
+/// Shared between that widget and [UpdateBannerHost] rather than each
+/// re-deriving it, because the host uses the answer to decide whether to
+/// reserve the banner's own status-bar inset at all - reserving it while
+/// nothing is showing there left a permanent empty band above the rail on
+/// every phone, banner or not.
+final bannerVisibleProvider = Provider<bool>((ref) {
+  final update = ref.watch(inSessionUpdateProvider);
+  if (update == null) return false;
+  return ref.watch(dismissedBannerVersionProvider) != update.version;
+});
+
 /// Forces [UpdateWatcher] into existence for as long as
 /// [UpdateAvailableBanner] is mounted - see that widget, the one place that
 /// watches this. Nothing here reads its own state; the timer it starts is
