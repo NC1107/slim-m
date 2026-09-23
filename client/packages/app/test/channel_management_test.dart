@@ -6,6 +6,7 @@
 /// `channel_management_harness.dart`.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -212,12 +213,14 @@ void main() {
       );
     });
 
-    /// The capability the hidden section would otherwise have taken with it:
-    /// dragging onto "Channels" was the only way out of a category, and that
-    /// section is not drawn once every channel is filed. A menu action is a
-    /// better route than a drag anyway.
-    testWidgets('a manager can take a channel out of its category from the '
-        'row menu', (tester) async {
+    /// The row menu's own "Remove from category" entry is gone (owner:
+    /// dragging out is self-explanatory), so this is the only route left,
+    /// and it has to work in exactly the state that used to defeat it: every
+    /// channel filed, nothing uncategorised, the implicit "Channels" section
+    /// nowhere on screen until the drag itself reveals it (see
+    /// `channel_rail_sections.dart`'s `_ChannelCategorySectionsState`).
+    testWidgets('a manager can drag a channel out of its category onto the '
+        'implicit section a drag reveals', (tester) async {
       List<ChannelOrderGroup>? reported;
       await tester.pumpWidget(
         harness(
@@ -237,11 +240,27 @@ void main() {
         ),
       );
 
-      await tester.tap(find.bySemanticsLabel('Manage chat'));
+      // Hidden while every channel sits in "dev" - the exact gap the drag has to close.
+      expect(find.text('CHANNELS'), findsNothing);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('chat')),
+      );
+      await tester.pump(kLongPressTimeout + kPressTimeout);
+      for (var i = 0; i < 4; i++) {
+        await gesture.moveBy(const Offset(0, -20));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      // Revealed for the length of the drag, with a real drop target rather than a zero-size placeholder.
+      expect(find.text('CHANNELS'), findsOneWidget);
+      expect(tester.getSize(find.text('CHANNELS')).height, greaterThan(0));
+
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Remove from category'));
+      await gesture.up();
       await tester.pumpAndSettle();
 
+      // Hides again once idle: the section holds something now, so this checks the same seam catches a still-empty one too.
       expect(reported, isNotNull);
       expect(reported!.firstWhere((g) => g.categoryId == null).channelIds, [
         'c1',
@@ -251,13 +270,15 @@ void main() {
       ], reason: 'only the one channel moves; the rest of the category stays');
     });
 
-    testWidgets('a channel already outside every category is offered no such '
-        'action', (tester) async {
+    testWidgets('the row menu never offers to remove a channel from its '
+        'category - dragging is the only route now', (tester) async {
       await tester.pumpWidget(
         harness(
           ChannelCategorySections(
-            channels: [channel('c1', 'loose')],
-            categories: const [],
+            channels: [channel('c1', 'chat', categoryId: 'cat-1')],
+            categories: const [
+              ChannelCategoryRow(id: 'cat-1', name: 'dev', position: 0),
+            ],
             selectedId: null,
             canManage: true,
             onReorder: (_) {},
@@ -266,7 +287,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.bySemanticsLabel('Manage loose'));
+      await tester.tap(find.bySemanticsLabel('Manage chat'));
       await tester.pumpAndSettle();
 
       expect(find.text('Remove from category'), findsNothing);

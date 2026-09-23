@@ -200,7 +200,7 @@ class DirectMessagesSection extends StatelessWidget {
 /// or a category is [SpaceMenuButton]'s job now, not a header button here;
 /// every named category is exactly the ones [SpaceSettingsSection]'s
 /// "Channel categories" screen manages.
-class ChannelCategorySections extends ConsumerWidget {
+class ChannelCategorySections extends ConsumerStatefulWidget {
   const ChannelCategorySections({
     super.key,
     required this.channels,
@@ -220,22 +220,44 @@ class ChannelCategorySections extends ConsumerWidget {
   final ValueChanged<List<ChannelOrderGroup>> onReorder;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChannelCategorySections> createState() =>
+      _ChannelCategorySectionsState();
+}
+
+class _ChannelCategorySectionsState
+    extends ConsumerState<ChannelCategorySections> {
+  /// Whether a channel is currently being dragged. The implicit "Channels"
+  /// header is the only way to pull a channel out of every named category
+  /// (removing it from the row menu was backlog item 135's own follow-up),
+  /// and it is not drawn once empty - so it is drawn empty for the length of
+  /// a drag, and only then. It stays a structural item at every other time
+  /// too (see `header` below): `ReorderableChannelRows` cancels an
+  /// in-progress drag outright the moment its item count changes, so
+  /// flipping this bit must never add or remove an item, only change what
+  /// one item renders as.
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final channels = widget.channels;
+    final categories = widget.categories;
+    final selectedId = widget.selectedId;
+    final canManage = widget.canManage;
+    final onReorder = widget.onReorder;
     final byCategory = channelsByCategory(channels);
+    final implicitEmpty = (byCategory[null] ?? const <Channel>[]).isEmpty;
     // An empty category is a drop target for a manager and a dead header for
     // anyone else; migration 0031's unconditional Text/Voice seed gives every
-    // fresh deployment two of them (the 2026-08-11 review's M8).
+    // fresh deployment two of them (the 2026-08-11 review's M8). The implicit
+    // section gets the same structural treatment now - see `header` for why
+    // it still renders as nothing while empty and idle.
     final sections = <ChannelSection>[
       for (final section in <ChannelSection>[
         (null, byCategory[null] ?? const []),
         for (final category in categories)
           (category, byCategory[category.id] ?? const []),
       ])
-        // A named category stays visible while empty (rename, delete, drop target); the implicit one is a header over nothing.
-        if (section.$1 == null
-            ? section.$2.isNotEmpty
-            : canManage || section.$2.isNotEmpty)
-          section,
+        if (canManage || section.$2.isNotEmpty) section,
     ];
 
     // Every channel hangs off its header rather than sharing its left edge, which is what read as floating rows between dividers.
@@ -246,11 +268,6 @@ class ChannelCategorySections extends ConsumerWidget {
             selected: channel.id == selectedId,
             child: ManagedChannelRow(
               canManage: canManage,
-              onRemoveFromCategory: channel.categoryId == null
-                  ? null
-                  : () => onReorder(
-                      channelsWithoutCategory(channel, byCategory, categories),
-                    ),
               reorderable: longPressDrags,
               dragHandleIndex: dragHandleIndex,
               channel: channel,
@@ -270,6 +287,10 @@ class ChannelCategorySections extends ConsumerWidget {
         );
 
     Widget header(ChannelCategoryRow? category) {
+      // Structurally always an item (see _dragging's doc comment); nothing while idle and empty.
+      if (category == null && implicitEmpty && !_dragging) {
+        return const SizedBox.shrink();
+      }
       // Any section, the implicit uncategorised one included: it is a real place a channel can live.
       final add = !canManage
           ? null
@@ -315,6 +336,8 @@ class ChannelCategorySections extends ConsumerWidget {
       onReorder: onReorder,
       rowBuilder: row,
       headerBuilder: header,
+      onDragStart: () => setState(() => _dragging = true),
+      onDragEnd: () => setState(() => _dragging = false),
     );
   }
 }
@@ -359,29 +382,4 @@ class _TextChannelRow extends ConsumerWidget {
       onTap: () => context.go(Routes.channel(channel.id)),
     );
   }
-}
-
-/// The whole rail's arrangement with [moved] taken out of whatever category
-/// it is in and put back among the uncategorised.
-///
-/// The reorder route takes the entire arrangement rather than one move, so a
-/// menu action has to rebuild it the same way a finished drag does.
-@visibleForTesting
-List<ChannelOrderGroup> channelsWithoutCategory(
-  Channel moved,
-  Map<String?, List<Channel>> byCategory,
-  List<ChannelCategoryRow> categories,
-) {
-  List<String> idsIn(String? categoryId) => [
-    for (final channel in byCategory[categoryId] ?? const <Channel>[])
-      if (channel.id != moved.id) channel.id,
-  ];
-  return [
-    ChannelOrderGroup(categoryId: null, channelIds: [...idsIn(null), moved.id]),
-    for (final category in categories)
-      ChannelOrderGroup(
-        categoryId: category.id,
-        channelIds: idsIn(category.id),
-      ),
-  ];
 }
