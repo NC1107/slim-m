@@ -173,6 +173,76 @@ void main() {
     expect(find.textContaining('no roles beyond @everyone'), findsOneWidget);
   });
 
+  // The owner: "very ugly role menu" - the card must actually be inset, not merely present, at both a phone and a desktop width.
+  for (final width in [390.0, 900.0]) {
+    testWidgets(
+      'at ${width.toInt()}px, with a single role the row sits inside a '
+      'card inset from the sheet edges rather than touching them',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          _harness(
+            roles: [_role('role-mod', 'mod', Perm.manageMessages)],
+            member: _member(const ['role-mod'], const ['mod']),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final sheet = tester.getRect(find.byType(MemberRolesSheet));
+        final card = tester.getRect(find.byKey(memberRolesListBoxKey));
+
+        expect(
+          card.left - sheet.left,
+          AppSpacing.s16,
+          reason:
+              'the card must sit off the sheet edge like the title above it',
+        );
+        expect(
+          sheet.right - card.right,
+          AppSpacing.s16,
+          reason: 'same inset on the trailing edge',
+        );
+        expect(
+          sheet.bottom - card.bottom,
+          greaterThanOrEqualTo(AppSpacing.s16),
+          reason: 'the row must not touch the sheet\'s own bottom edge either',
+        );
+      },
+    );
+  }
+
+  // "Design for one role and for fifteen": grouping has to scale, not just look deliberate for the one-row case the owner's screenshot showed.
+  testWidgets(
+    'with many roles, each one is set apart by a real divider, not just '
+    'stacked bare rows',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const count = 15;
+      await tester.pumpWidget(
+        _harness(
+          roles: [
+            for (var i = 0; i < count; i++) _role('role-$i', 'role-$i', 0),
+          ],
+          member: _member(const [], const []),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppListRow), findsNWidgets(count));
+      expect(
+        find.byType(Divider),
+        findsNWidgets(count - 1),
+        reason: 'one separator between each pair of rows, none at the ends',
+      );
+    },
+  );
+
   /// overlays.md: this sheet forced a fixed `height * 0.7` regardless of row
   /// count, leaving most of the card empty for two roles. It must now size
   /// to its content, which a `shrinkWrap` `ListView` inside a `maxHeight`

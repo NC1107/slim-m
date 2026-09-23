@@ -95,7 +95,6 @@ class _RoleAssignSheetState extends ConsumerState<_RoleAssignSheet>
             child: AppErrorState(message: error, onDismiss: clearActionError),
           ),
         ConstrainedBox(
-          key: roleAssignBodyBoxKey,
           constraints: BoxConstraints(maxHeight: listCeiling),
           child: AppAsyncView(
             value: AppAsyncState(
@@ -104,24 +103,44 @@ class _RoleAssignSheetState extends ConsumerState<_RoleAssignSheet>
             ),
             errorMessage: 'Could not load members.',
             onRetry: () => ref.invalidate(membersProvider),
-            data: (context, list) => ListView.builder(
-              shrinkWrap: true,
-              itemCount: list.length,
-              itemBuilder: (context, i) {
-                final member = list[i];
-                final has = member.roleIds.contains(widget.role.id);
-                return AppListRow(
-                  leading: const Icon(AppIcons.account),
-                  label: member.displayName,
-                  meta: grantable ? null : 'Needs permissions you do not hold',
-                  trailing: AppToggle(
-                    value: has,
-                    onChanged: grantable ? (v) => _toggle(member, v) : null,
-                    semanticLabel:
-                        'Assign ${widget.role.name} to ${member.displayName}',
-                  ),
-                );
-              },
+            emptyMessage: 'This Space has no members to assign a role to.',
+            isEmpty: (list) => list.isEmpty,
+            // A bordered, sunken group so one row reads as finished, not floating - mirrors member_roles_sheet.dart's own version of this fix.
+            data: (context, list) => Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                0,
+                AppSpacing.s16,
+                AppSpacing.s16,
+              ),
+              child: AppCard(
+                key: roleAssignBodyBoxKey,
+                sunken: true,
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: list.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final member = list[i];
+                    final has = member.roleIds.contains(widget.role.id);
+                    return AppListRow(
+                      leading: const Icon(AppIcons.account),
+                      label: member.displayName,
+                      meta: grantable
+                          ? null
+                          : 'Needs permissions you do not hold',
+                      trailing: AppToggle(
+                        value: has,
+                        onChanged: grantable ? (v) => _toggle(member, v) : null,
+                        semanticLabel:
+                            'Assign ${widget.role.name} to '
+                            '${member.displayName}',
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
