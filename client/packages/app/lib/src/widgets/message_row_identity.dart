@@ -85,7 +85,11 @@ class MessageTimeMark extends ConsumerWidget {
   final Message message;
 
   /// Glyph-only pending/failed marks, for the 36px continuation gutter where
-  /// a word cannot fit.
+  /// a word cannot fit. The sent branch has no glyph fallback: no string
+  /// `formatMessageTime` produces fits a mono face at the type scale's
+  /// smallest legible size into 36px, so the gutter positions this mark as
+  /// an unconstrained overlay instead (see [MessageRowLeading]) rather than
+  /// shrinking or wrapping it.
   final bool compact;
 
   @override
@@ -114,9 +118,12 @@ class MessageTimeMark extends ConsumerWidget {
             );
     } else {
       final use24Hour = watchUse24Hour(ref, context);
+      // Always natural size (see [compact]): never scaled below the floor.
       mark = Text(
         formatMessageTime(message.createdAt, use24Hour: use24Hour),
         style: mono,
+        maxLines: 1,
+        softWrap: false,
       );
     }
     // Keyed on the state, never the text, so a minute tick never replays.
@@ -128,6 +135,52 @@ class MessageTimeMark extends ConsumerWidget {
     return AnimatedSwitcher(
       duration: AppMotion.reduced(context, AppMotion.base),
       child: KeyedSubtree(key: ValueKey(state), child: mark),
+    );
+  }
+}
+
+/// The 36px continuation gutter's delivery/timestamp mark, rendered as an
+/// unconstrained overlay rather than laid out in flow.
+///
+/// No string [formatMessageTime] produces fits this column at the type
+/// scale's smallest legible size (a mono face there advances roughly a
+/// character-width per glyph, and even the shortest 12-hour form is five or
+/// six characters), so the mark must never shrink below that floor or
+/// resist the reader's text-scale setting just to make itself fit (PR
+/// #1289 held a `FittedBox` version of this widget for exactly that: it
+/// rendered as small as 6px and the setting did nothing in this gutter).
+///
+/// [Positioned] instead of a constrained child: left-aligned so it starts
+/// where an avatar would and grows rightward into the 12px gap before the
+/// message column, and past that into the column's own leading edge when
+/// the format or the reader's text scale needs more room than the gap has.
+/// That overlap is cosmetic and only while hovering; a [Positioned] child
+/// never affects its [Stack]'s own size, so the message content beside it
+/// never shifts.
+///
+/// The always-present [SizedBox.shrink] child is load-bearing, not
+/// decorative: a [Stack] with only [Positioned] children and an unbounded
+/// parent height has no way to size itself and asserts, so this gives it
+/// one non-positioned child to size against instead.
+class _ContinuationGutterMark extends StatelessWidget {
+  const _ContinuationGutterMark({required this.message, required this.show});
+
+  final Message message;
+  final bool show;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const SizedBox.shrink(),
+        if (show)
+          Positioned(
+            top: 3,
+            left: 0,
+            child: MessageTimeMark(message: message, compact: true),
+          ),
+      ],
     );
   }
 }
@@ -159,12 +212,7 @@ class MessageRowLeading extends ConsumerWidget {
       final showMark = message.pending || message.failed || hovered;
       return SizedBox(
         width: _avatarSize,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: showMark
-              ? MessageTimeMark(message: message, compact: true)
-              : const SizedBox.shrink(),
-        ),
+        child: _ContinuationGutterMark(message: message, show: showMark),
       );
     }
 
