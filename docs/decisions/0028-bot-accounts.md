@@ -31,6 +31,8 @@ The reason to do it this way is that slim already has one answer to every questi
 A parallel bot principal would need a second answer to each of those, and second answers are where authorization bugs live.
 So the flag is deliberately thin: it changes how a bot *authenticates* and how it is *labelled*, and nothing about how it is *authorized*.
 
+The one place the thin flag was not enough: restoring a removed member. That path was written for a human and reasons "readmission restores the right to sign in, not the old credentials", which is correct for a human and vacuous for a bot, since a bot has no sign-in to retry and its token *is* its only credential. Left alone, that made restoring a removed bot a member-list fiction - it reappeared, and its token stayed permanently dead. The fix keeps the flag thin rather than adding a bot-shaped restore path: restoring a bot un-revokes the one session its live token still points at, scoped by that token's own `revoked_at`, so a token the operator revoked separately stays revoked. See `crates/slimm-server/src/store/removals.rs`.
+
 "Full CRUD permissions within spaces", then, is not a new subsystem.
 It is giving the bot a role with the bits it needs, out of the eighteen that already exist.
 A fresh bot holds whatever `@everyone` holds in that space and nothing more - default-deny, as with any new member.

@@ -88,6 +88,15 @@ It takes effect immediately, not at some expiry.
 A 401 is therefore not something to retry: back off on a network error, but treat a 401 as "stop, the credential is gone".
 The account itself stays, so everything the bot wrote stays attributed to it.
 
+## When a bot is removed from the Space
+
+Removal and revocation are different operations, aimed at different things.
+Revoking a token is "stop trusting this credential"; removing a member is "take this account out of the Space", and it can be undone.
+
+For a human, removing them revokes every session and undoing it does not bring an old one back - they sign in again and get a fresh one.
+A bot has no sign-in to retry, so it gets different treatment: removing a bot revokes its token's session immediately (its next REST call 401s, same as a revoke), but restoring it un-revokes that same session, and its original token starts working again with no new credential to fetch.
+That only applies to the token the bot still holds. If you revoked the bot's token yourself before it was removed, restoring the membership does not undo your revocation - the token stays dead and the bot needs a new one.
+
 ## The templates
 
 [`bot-ping`](https://github.com/NC1107/slim-bots/tree/main/bot-ping) in [slim-bots](https://github.com/NC1107/slim-bots) is a working bot in one file: it answers `!ping` with `pong`.

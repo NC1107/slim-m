@@ -89,8 +89,17 @@ impl Store {
 
     /// Lets a removed member back in. `false` if they were not removed.
     ///
-    /// Their sessions stay revoked: readmission restores the right to sign in,
-    /// not the credentials on whatever devices were signed in at the time.
+    /// A human's sessions stay revoked: readmission restores the right to
+    /// sign in, not the credentials on whatever devices were signed in at the
+    /// time. That reasoning is vacuous for a bot, which has no sign-in to
+    /// retry - its token *is* its only credential, so leaving its session
+    /// revoked would make restoring it a member-list fiction that still
+    /// 401s on the next request. So a bot's session is the one exception: if
+    /// it still backs a live (non-revoked) `bot_tokens` row, restoring
+    /// un-revokes it too. A token an admin revoked before the removal stays
+    /// dead, because that row's `revoked_at` is already set and the join
+    /// below excludes it - restoring reverses the removal, not an earlier,
+    /// unrelated revocation.
     ///
     /// Deleting the row is what lifts the removal, so the act itself is only
     /// recorded in `moderation_audit_log` - and only when there was something
@@ -109,6 +118,7 @@ impl Store {
             .rows_affected()
             > 0;
         if restored {
+            unrevoke_live_bot_session(&mut tx, user_id).await?;
             record_moderation_audit(
                 &mut tx,
                 ModerationAudit {
@@ -175,6 +185,33 @@ pub(super) async fn removed(
     .fetch_optional(&mut *conn)
     .await?
     .is_some())
+}
+
+/// Un-revokes the session behind `user_id`'s live bot token, if it is a bot
+/// and has one.
+///
+/// Scoped by joining on `bot_tokens.revoked_at IS NULL`, so this only ever
+/// touches the one session an active bot token still points at - never a
+/// human's session, and never a bot session whose token was independently
+/// revoked before the removal it is now being lifted from. A no-op for a
+/// human, and for a bot with no live token, since the `UPDATE` then matches
+/// nothing.
+async fn unrevoke_live_bot_session(
+    tx: &mut SqliteConnection,
+    user_id: UserId,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE sessions SET revoked_at = NULL
+         WHERE revoked_at IS NOT NULL
+           AND id IN (
+             SELECT session_id FROM bot_tokens
+             WHERE bot_user_id = ? AND revoked_at IS NULL
+           )",
+        user_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    Ok(())
 }
 
 /// One removal, inside a transaction the caller owns.
