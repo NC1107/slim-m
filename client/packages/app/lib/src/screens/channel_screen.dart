@@ -243,8 +243,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   void _toggleSearch() =>
       ref.read(channelSearchProvider(widget.channelId).notifier).toggle();
 
-  void _markReadUpToLatest(int seq, int lastReadSeq) =>
-      _readMarker.advance(widget.channelId, seq: seq, lastReadSeq: lastReadSeq);
+  void _markReadUpToLatest(int seq, int lastReadSeq, bool manuallyUnread) =>
+      _readMarker.advance(
+        widget.channelId,
+        seq: seq,
+        lastReadSeq: lastReadSeq,
+        manuallyUnread: manuallyUnread,
+      );
 
   void _scrollToLatest() => _scrollTracker.scrollToLatest(
     duration: AppMotion.reduced(context, AppMotion.slow),
@@ -275,6 +280,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           final channel = channelSnapshot.data;
           final channelName = channel?.name ?? '';
           final lastReadSeq = channel?.lastReadSeq ?? 0;
+          final manuallyUnread = channel?.manuallyUnread ?? false;
           final dmPartnerId = channel?.dmParticipantId;
           final blockedDm =
               dmPartnerId != null && blocked.contains(dmPartnerId);
@@ -321,6 +327,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                 channelTopic: channel?.topic,
                 isThread: isThread,
                 lastReadSeq: lastReadSeq,
+                manuallyUnread: manuallyUnread,
                 onMarkRead: _markReadUpToLatest,
                 onReply: _startReply,
               ),

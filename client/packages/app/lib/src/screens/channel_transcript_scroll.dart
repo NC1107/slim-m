@@ -24,9 +24,9 @@ class TranscriptScrollTracker {
     controller.addListener(_onScrollChanged);
   }
 
-  /// Called with the channel's newest delivered seq and last-read marker
-  /// once the transcript is confirmed at the latest message.
-  final void Function(int seq, int lastReadSeq) markRead;
+  /// Called with the channel's newest delivered seq, last-read marker, and
+  /// hand-mark state once the transcript is confirmed at the latest message.
+  final void Function(int seq, int lastReadSeq, bool manuallyUnread) markRead;
 
   final ScrollController controller = ScrollController();
 
@@ -40,6 +40,7 @@ class TranscriptScrollTracker {
   bool _disposed = false;
   int _latestSeq = 0;
   int _lastReadSeq = 0;
+  bool _manuallyUnread = false;
 
   /// The offset last seen while genuinely away from the latest message; null
   /// while at rest, so a fresh departure has no direction to compare against
@@ -124,14 +125,19 @@ class TranscriptScrollTracker {
       }
       _lastAwayPixels = pixels;
     }
-    if (wasAtLatest) markRead(_latestSeq, _lastReadSeq);
+    if (wasAtLatest) markRead(_latestSeq, _lastReadSeq, _manuallyUnread);
   }
 
   /// Called on every transcript rebuild, so a scroll event arriving between
   /// rebuilds always marks read against the channel actually on screen.
-  void updateKnownSeqs({required int latestSeq, required int lastReadSeq}) {
+  void updateKnownSeqs({
+    required int latestSeq,
+    required int lastReadSeq,
+    required bool manuallyUnread,
+  }) {
     _latestSeq = latestSeq;
     _lastReadSeq = lastReadSeq;
+    _manuallyUnread = manuallyUnread;
   }
 
   /// A new channel always opens at its own newest message: without this, a
