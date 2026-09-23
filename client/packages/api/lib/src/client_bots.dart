@@ -58,9 +58,15 @@ class NewBot {
 /// not to be a bot - see `docs/decisions/0028-bot-accounts.md` for why a bot
 /// may not provision a bot.
 extension SlimmApiBots on SlimmApi {
-  /// Every bot in the deployment, newest first. Revoked ones are still listed.
-  Future<List<Bot>> listBots() async {
-    final json = await _send('GET', '/bots');
+  /// Bots in the deployment, newest first. A revoked bot that is still a
+  /// member is still listed; one also removed from the Space is not, unless
+  /// [includeRemoved] is true - it is already gone from [listMembers].
+  Future<List<Bot>> listBots({bool includeRemoved = false}) async {
+    final json = await _send(
+      'GET',
+      '/bots',
+      query: includeRemoved ? const {'include_removed': 'true'} : null,
+    );
     return (json as List<dynamic>)
         .map((entry) => Bot.fromJson(entry as Map<String, dynamic>))
         .toList(growable: false);

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT u.id AS \"user_id!: UserId\", u.username, u.display_name,\n                      u.created_at,\n                      t.name AS token_name, t.last_used_at\n               FROM users u\n               LEFT JOIN bot_tokens t\n                 ON t.bot_user_id = u.id AND t.revoked_at IS NULL\n               WHERE u.is_bot = 1 AND u.deleted_at IS NULL\n               ORDER BY u.created_at DESC",
+  "query": "SELECT u.id AS \"user_id!: UserId\", u.username, u.display_name,\n                      u.created_at,\n                      t.name AS token_name, t.last_used_at\n               FROM users u\n               LEFT JOIN bot_tokens t\n                 ON t.bot_user_id = u.id AND t.revoked_at IS NULL\n               WHERE u.is_bot = 1 AND u.deleted_at IS NULL\n                 AND (? = 1 OR NOT EXISTS (\n                   SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id\n                 ))\n               ORDER BY u.created_at DESC",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -46,5 +46,5 @@
       true
     ]
   },
-  "hash": "97daf2101e9b6dbb674107d5ebe489cfc2a555ba132b9b116824a4342208fa7d"
+  "hash": "c3317b0b473a7c39ab3b45a59934ad46bd746c5ca5ef296d8b9b05318c379e84"
 }

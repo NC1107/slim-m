@@ -5091,11 +5091,25 @@ paths:
     get:
       operationId: listBots
       tags: [bots]
-      summary: Every bot in the deployment.
+      summary: Bots in the deployment.
       description: >-
-        Carries no token. A bot whose token has been revoked is still listed,
-        with its token fields absent, so an operator can see that it can no
-        longer act.
+        Carries no token. A bot that is still a member is always listed, even
+        with its token revoked, with its token fields absent, so an operator
+        can see that it can no longer act. A bot that has been removed from
+        the Space is left out by default: it is already gone from `GET
+        /members`, so keeping it here forever would answer "every bot ever
+        minted" rather than "what has a credential on this deployment". Pass
+        `include_removed=true` to see those too.
+      parameters:
+        - name: include_removed
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: >-
+            Include bots that have been removed from the Space. Default
+            false.
       responses:
         "200":
           description: The bots.

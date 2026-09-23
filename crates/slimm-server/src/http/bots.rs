@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::auth::{validate_label, validate_username};
 use super::error::ApiError;
-use super::extract::{Authed, Json, enforce, require_manage_server};
+use super::extract::{Authed, Json, Query, enforce, require_manage_server};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::UserId;
@@ -47,6 +47,12 @@ pub fn routes() -> Router<AppState> {
 struct CreateBotDto {
     username: String,
     display_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ListBotsParams {
+    #[serde(default)]
+    include_removed: bool,
 }
 
 #[derive(Serialize)]
@@ -97,10 +103,11 @@ async fn list(
     State(state): State<AppState>,
     parts: Parts,
     Authed(ctx): Authed,
+    Query(params): Query<ListBotsParams>,
 ) -> Result<Json<Vec<BotDto>>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::AuthedRead)?;
     require_manage_server(&state, ctx.user_id).await?;
-    let bots = state.store.list_bots().await?;
+    let bots = state.store.list_bots(params.include_removed).await?;
     Ok(Json(bots.into_iter().map(BotDto::from).collect()))
 }
 
