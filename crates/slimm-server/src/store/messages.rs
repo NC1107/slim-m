@@ -115,6 +115,11 @@ pub enum Edited {
     Edited {
         message: Message,
         op_seq: i64,
+        /// Whether this edit dropped shared `code_runs` rows for the message.
+        /// A block's content just changed underneath its stored output, so
+        /// every run for the message is cleared rather than trying to track
+        /// which block index still matches - see `store::messages::edit_message`.
+        code_runs_cleared: bool,
     },
 }
 
@@ -344,6 +349,12 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // See Edited::Edited::code_runs_cleared for why this is unconditional and whole-message.
+        let code_runs_cleared = sqlx::query!("DELETE FROM code_runs WHERE message_id = ?", id)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected()
+            > 0;
         let op_seq = insert_message_op(
             &mut tx,
             existing.channel_id,
@@ -358,7 +369,11 @@ impl Store {
         let message = fetch_message(&self.pool, id)
             .await?
             .context("a message this transaction just edited vanished after it")?;
-        Ok(Edited::Edited { message, op_seq })
+        Ok(Edited::Edited {
+            message,
+            op_seq,
+            code_runs_cleared,
+        })
     }
 
     /// Soft-deletes a message and releases its attachments. Returns whether

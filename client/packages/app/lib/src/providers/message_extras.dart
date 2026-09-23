@@ -152,6 +152,8 @@ class MessageExtrasController
         _applyReactionsChanged(messageId, reactions);
       case api.CodeRunChanged(:final messageId, :final run):
         _applyCodeRunChanged(messageId, run);
+      case api.CodeRunsCleared(:final messageId):
+        _applyCodeRunsCleared(messageId);
       case api.PollVoted(:final messageId, :final options):
         _applyPollTally(messageId, options);
       case api.ThreadUpdated(
@@ -274,6 +276,15 @@ class MessageExtrasController
       run,
     ]..sort((a, b) => a.blockIndex.compareTo(b.blockIndex));
     _set(messageId, extrasFor(messageId).copyWith(codeRuns: next));
+  }
+
+  /// Drops every cached run for a message whose content just changed: the
+  /// explicit signal [api.CodeRunsCleared]'s own doc explains a bare
+  /// `message.edited` frame cannot give, since [_merged] only ever adds to
+  /// what this cache already holds. No block index to key off, on purpose -
+  /// see that event's doc for why the whole message clears at once.
+  void _applyCodeRunsCleared(String messageId) {
+    _set(messageId, extrasFor(messageId).copyWith(codeRuns: const []));
   }
 
   /// A thread just opened, or gained a reply: what makes the "N replies"

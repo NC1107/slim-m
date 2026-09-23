@@ -139,6 +139,19 @@ pub enum Event {
         ran_by: Option<UserId>,
         ran_at: i64,
     },
+    /// Every stored run for a message was dropped because its content just
+    /// changed underneath them; see `store::messages::edit_message`. No block
+    /// index: an edit can add or remove a block above another one, shifting
+    /// every later block's index, so this clears the whole message at once
+    /// rather than naming a block a shifted index could get wrong. A viewer's
+    /// cached run cannot fall out of a `MessageEdited` frame on its own (that
+    /// frame's bare DTO is merged, never used to shrink what a client already
+    /// holds - see `message_extras.dart`), so this is the explicit signal to
+    /// drop it.
+    CodeRunsCleared {
+        channel_id: ChannelId,
+        message_id: MessageId,
+    },
     /// A thread's reply summary changed: it was just opened, or gained a
     /// reply. Carries the current `reply_count`/`last_reply_at` rather than a
     /// delta, the "whole current answer" shape [`Event::PollVoted`] already

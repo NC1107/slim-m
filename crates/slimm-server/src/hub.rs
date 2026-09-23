@@ -118,6 +118,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
         | Event::CodeRunChanged { .. }
+        | Event::CodeRunsCleared { .. }
         | Event::ThreadUpdated { .. }
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
@@ -178,6 +179,7 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
         | Event::CodeRunChanged { .. }
+        | Event::CodeRunsCleared { .. }
         | Event::ThreadUpdated { .. }
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }

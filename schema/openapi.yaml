@@ -9537,6 +9537,7 @@ components:
         - $ref: "#/components/schemas/MessageDeleted"
         - $ref: "#/components/schemas/ReactionsChanged"
         - $ref: "#/components/schemas/CodeRunChanged"
+        - $ref: "#/components/schemas/CodeRunsCleared"
         - $ref: "#/components/schemas/ThreadUpdated"
         - $ref: "#/components/schemas/MessagePinned"
         - $ref: "#/components/schemas/MessageUnpinned"
@@ -9981,6 +9982,29 @@ components:
         ran_at:
           type: integer
           format: int64
+
+    CodeRunsCleared:
+      type: object
+      required: [type, channel_id, message_id]
+      description: >
+        Every stored run for this message was dropped because its content
+        just changed. Carries no block index: an edit can add or remove a
+        block above another one and shift every later index, so this clears
+        the whole message at once rather than naming a block a shifted index
+        could get wrong. A client drops every cached run for the message on
+        receiving this rather than waiting for a `message.edited` frame to
+        imply it, since that frame's bare DTO is merged and never used to
+        shrink what a client already holds.
+      properties:
+        type:
+          type: string
+          enum: [code_runs.cleared]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
 
     ReactionCount:
       type: object
