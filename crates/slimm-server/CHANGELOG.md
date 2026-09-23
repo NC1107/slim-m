@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.69.0](https://github.com/NC1107/slim-m/compare/server-v0.68.0...server-v0.69.0) (2026-09-23)
+
+
+### Features
+
+* **server,client:** add a Private toggle to channel creation ([#1279](https://github.com/NC1107/slim-m/issues/1279)) ([b96d83f](https://github.com/NC1107/slim-m/commit/b96d83f9ea643fc6c56ddd6b883bc6084c22b719))
+
+
+### Bug Fixes
+
+* **client:** narrow the member pane to who can view the channel ([#1272](https://github.com/NC1107/slim-m/issues/1272)) ([e5ce199](https://github.com/NC1107/slim-m/commit/e5ce19989f5e0ef635e2600eaff5e9b005808392))
+* **client:** render a thread's parent message above its replies ([#1280](https://github.com/NC1107/slim-m/issues/1280)) ([3d686e6](https://github.com/NC1107/slim-m/commit/3d686e6fc7a8df6e679b1287d6a1a8d43f170013))
+
 ## [0.68.0](https://github.com/NC1107/slim-m/compare/server-v0.67.0...server-v0.68.0) (2026-09-22)
 
 
