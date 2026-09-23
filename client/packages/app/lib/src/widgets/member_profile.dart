@@ -122,7 +122,6 @@ Future<void> showMemberProfile(
     pageBuilder: (context, _, __) => AnchoredMemberPopover(
       origin: origin,
       anchorSize: anchorSize,
-      width: _popoverWidth,
       child: MemberProfileBody(
         profile: profile,
         status: status,
