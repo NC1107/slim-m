@@ -54,9 +54,9 @@ class ChannelHeader extends ConsumerWidget {
   final String? dmParticipantId;
   final bool isVoice;
 
-  /// The self-DM. Its name is "You" (`personalSpaceName`), so it takes the same
-  /// notebook glyph the rail's `PersonalSpaceRow` shows rather than an avatar
-  /// of those initials. Defaults false; a real DM sets [isDm] instead.
+  /// The self-DM. Its name is "Notes" (`personalSpaceName`), so it takes the
+  /// same notebook glyph the rail's `PersonalSpaceRow` shows rather than an
+  /// avatar of those initials. Defaults false; a real DM sets [isDm] instead.
   final bool isPersonalSpace;
 
   /// A DM has exactly two participants by construction, never the
