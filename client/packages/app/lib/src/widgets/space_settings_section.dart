@@ -10,6 +10,13 @@
 /// The panes embed the same admin surfaces beside the nav on a wide window;
 /// each still names its route as [SettingsPane.compactRoute], so a phone
 /// keeps the real, deep-linkable screens and the routes stay reachable.
+///
+/// Configuration used to also carry Performance, Analytics, Storage and
+/// Server metrics, which mixed what the Space *is* with how it is *running*
+/// under one heading (owner backlog request). Those four now sit under
+/// their own `Server` heading instead; every one of them is gated on
+/// MANAGE_SERVER, so the group appears and disappears as a unit exactly the
+/// way Addons already does.
 library;
 
 import 'package:flutter/material.dart';
@@ -156,6 +163,12 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             compactRoute: Routes.adminEmoji,
             builder: (_) => const EmojiPane(),
           ),
+      ],
+    ),
+    // What the Space is above; how it is running below - see the library doc.
+    SettingsPaneGroup(
+      label: 'Server',
+      panes: [
         if (canManageServer)
           SettingsPane(
             id: 'performance',
