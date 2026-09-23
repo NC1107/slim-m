@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 # No concurrency group at all, and that is the whole point rather than an
 # omission. This workflow was written on 2026-08-06 to catch a release run
@@ -33,7 +34,7 @@ permissions:
 
 jobs:
   check:
-    name: release manifests match their tags
+    name: release bookkeeping matches reality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -43,3 +44,10 @@ jobs:
 
       - name: compare manifest versions against their tags
         run: bash scripts/check-release-tag-lag.sh
+
+      # Always, so one stuck release never hides the other.
+      - name: check no merged release PR is stuck pending
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-stuck-release-label.sh
