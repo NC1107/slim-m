@@ -146,6 +146,16 @@ struct CreateRequest {
     /// not exist is a 400, never a silent fall back to uncategorised.
     #[serde(default)]
     category_id: Option<String>,
+    /// True to deny `@everyone` VIEW_CHANNEL here and grant it only to the
+    /// creator, closing the window a create-then-restrict two-step leaves
+    /// open where the channel exists and is visible to everyone before a
+    /// follow-up edit narrows it. Absent or false creates a channel visible
+    /// to `@everyone` as usual. Requires MANAGE_ROLES in addition to the
+    /// MANAGE_CHANNELS this route already needs - see `create`'s own doc for
+    /// why. No role picker: others are added afterwards through the existing
+    /// channel-permissions surface.
+    #[serde(default)]
+    restricted: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -200,7 +210,14 @@ async fn list(
     Ok(Json(visible))
 }
 
-/// Creates a channel. Requires MANAGE_CHANNELS at the deployment level.
+/// Creates a channel. Requires MANAGE_CHANNELS at the deployment level, and,
+/// only when `restricted` is set, MANAGE_ROLES as well: writing the
+/// overwrites a private channel needs is a permissions edit, and a
+/// MANAGE_CHANNELS holder without MANAGE_ROLES must not gain a new way to do
+/// that just because it happens at create time. Denying `@everyone` and
+/// granting the creator escalates nothing the creator lacks, so this is not
+/// the privilege-escalation case `set_role_overwrite`'s callers otherwise
+/// guard against.
 async fn create(
     Authed(ctx): Authed,
     parts: Parts,
@@ -210,12 +227,8 @@ async fn create(
     // Charged like rename and delete, which both do; create was the one write
     // in this file that was not, so it could be looped without limit.
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    if !state
-        .store
-        .base_permissions(ctx.user_id)
-        .await?
-        .contains(Permissions::MANAGE_CHANNELS)
-    {
+    let base_permissions = state.store.base_permissions(ctx.user_id).await?;
+    if !base_permissions.contains(Permissions::MANAGE_CHANNELS) {
         return Err(ApiError::Forbidden);
     }
 
@@ -237,9 +250,15 @@ async fn create(
         .map(|raw| parse_uuid(raw).map(ChannelCategoryId))
         .transpose()?;
 
+    let restricted = req.restricted.unwrap_or(false);
+    if restricted && !base_permissions.contains(Permissions::MANAGE_ROLES) {
+        return Err(ApiError::Forbidden);
+    }
+    let private_to = restricted.then_some(ctx.user_id);
+
     let created = state
         .store
-        .create_channel_with_id(id, name, kind, category_id)
+        .create_channel_with_id(id, name, kind, category_id, private_to)
         .await?;
     // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
     if created.fresh {

@@ -209,6 +209,10 @@ impl From<CreateChannelError> for ApiError {
             CreateChannelError::UnknownCategory => {
                 ApiError::BadRequest("category_id must name a category that exists")
             }
+            CreateChannelError::MissingEveryoneRole => {
+                tracing::error!("private channel create found no @everyone role");
+                ApiError::Internal
+            }
             CreateChannelError::Internal(e) => {
                 tracing::error!(error = %e, "channel create failed");
                 ApiError::Internal

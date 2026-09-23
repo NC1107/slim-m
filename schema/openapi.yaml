@@ -1273,11 +1273,13 @@ paths:
       tags: [channels]
       summary: Create a channel.
       description: >
-        Requires the MANAGE_CHANNELS permission. Idempotent by the optional
-        client-supplied `id`: a retry with the same id returns the channel
-        already stored under it. `channels` also holds DM channels and
-        threads under the same id namespace, so an id already used by either
-        is a conflict rather than a wrong-typed 200.
+        Requires the MANAGE_CHANNELS permission, and, only when `restricted`
+        is set, MANAGE_ROLES as well - see `restricted` on
+        `CreateChannelRequest`. Idempotent by the optional client-supplied
+        `id`: a retry with the same id returns the channel already stored
+        under it. `channels` also holds DM channels and threads under the
+        same id namespace, so an id already used by either is a conflict
+        rather than a wrong-typed 200.
       requestBody:
         required: true
         content:
@@ -7664,6 +7666,18 @@ components:
             can fail on its own and leave the channel in a section nobody
             chose. A category that does not exist is a 400, never a silent
             fall back to uncategorised.
+        restricted:
+          type: boolean
+          default: false
+          description: >
+            True to deny `@everyone` VIEW_CHANNEL here and grant it only to
+            the creator, written atomically with the channel row itself so a
+            caller can never observe the channel public before a follow-up
+            edit narrows it. Absent or false creates a channel visible to
+            `@everyone` as usual. Requires MANAGE_ROLES in addition to the
+            MANAGE_CHANNELS this route already needs; there is no role
+            picker here, others are granted afterwards through
+            `setRoleOverwrite`/`setMemberOverwrite`.
 
     UpdateChannelRequest:
       type: object

@@ -48,7 +48,7 @@ impl Store {
 
     /// Creates a category, appended after every live one - the same
     /// "read the live maximum inside this transaction" shape
-    /// [`super::channels::Store::create_channel_with_id`] uses for a
+    /// [`super::channel_create::Store::create_channel_with_id`] uses for a
     /// channel's own position, so two concurrent creates cannot both claim
     /// the last slot.
     ///
@@ -60,7 +60,7 @@ impl Store {
     /// [`CreatedCategory::fresh`] true, since a freshly generated UUIDv7 id
     /// cannot already be in use.
     ///
-    /// Unlike [`super::channels::Store::create_channel_with_id`] and
+    /// Unlike [`super::channel_create::Store::create_channel_with_id`] and
     /// [`super::permissions::Store::create_role_with_id`], the id probe
     /// below is never scoped to a sub-type: `channel_categories` is written
     /// by nothing but this function and migration 0031's own seed, so every

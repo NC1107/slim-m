@@ -34,6 +34,7 @@ mod canvas_ops_apply;
 mod canvas_ops_sweep;
 mod canvas_ops_write;
 mod categories;
+mod channel_create;
 mod channel_notification_prefs;
 mod channel_order;
 mod channel_slow_mode;
@@ -106,8 +107,9 @@ pub use canvas_ops::{
 pub use canvas_ops_sweep::{CANVAS_OP_RETENTION_MS, SweptCanvasOps};
 pub use canvas_ops_write::{CanvasOpRequest, MAX_REMOVE_IDS_PER_OP, SubmitOpError, SubmittedOp};
 pub use categories::CreatedCategory;
+pub use channel_create::{CreateChannelError, CreatedChannel};
 pub use channel_order::{ChannelOrderGroup, ReorderChannelsError, ReorderOutcome};
-pub use channels::{CreateChannelError, CreatedChannel, DeleteChannelError};
+pub use channels::DeleteChannelError;
 pub use code_runs::{CodeRunSummary, MAX_SHARED_OUTPUT_BYTES, clamp_output};
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
