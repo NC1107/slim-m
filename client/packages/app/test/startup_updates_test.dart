@@ -173,13 +173,15 @@ void main() {
     );
   });
 
-  test('saying yes installs through dnf and offers the restart', () async {
+  test('a dnf install relaunches into the new build without asking', () async {
     SharedPreferences.setMockInitialValues({autoUpdateKey: true});
     final c = container();
     final dnf = _Dnf();
     var relaunched = false;
+    final prompts = <StartupPrompt?>[];
+    final sub = c.listen(startupPromptProvider, (_, next) => prompts.add(next));
 
-    final pass = runStartupUpdates(
+    await runStartupUpdates(
       c,
       check: _Check(_update()).call,
       rpm: dnf,
@@ -187,32 +189,16 @@ void main() {
       format: InstallFormat.rpm,
       currentVersion: '1.0.0',
     );
-    final prompt = await answer(c, primary: true);
-    await pass;
+    sub.close();
 
     expect(dnf.applied, isTrue);
-    expect(prompt.title, 'Updated to 9.9.9');
     expect(relaunched, isTrue);
-    expect(c.read(startupPromptProvider), isNull);
-  });
-
-  test('taking the update later leaves the running build alone', () async {
-    SharedPreferences.setMockInitialValues({autoUpdateKey: true});
-    final c = container();
-    var relaunched = false;
-
-    final pass = runStartupUpdates(
-      c,
-      check: _Check(_update()).call,
-      rpm: _Dnf(),
-      relaunch: () async => relaunched = true,
-      format: InstallFormat.rpm,
-      currentVersion: '1.0.0',
+    expect(
+      prompts.whereType<StartupPrompt>(),
+      isEmpty,
+      reason: 'the splash must not stop on a question it answers itself',
     );
-    await answer(c, primary: false);
-    await pass;
-
-    expect(relaunched, isFalse);
+    expect(c.read(startupStatusProvider), 'Restarting into 9.9.9');
   });
 
   test('a dnf that fails falls back to offering the release, and does not '
