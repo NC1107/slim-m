@@ -108,9 +108,14 @@ Future<bool> _askToEnable(
 }
 
 /// The rpm path: dnf does the install behind the system's own polkit prompt,
-/// and the new files only become the running build after a relaunch, so that
-/// is offered rather than assumed - someone who opened slim-m to answer a
-/// message can take the update on the next launch instead.
+/// and the new files only become the running build after a relaunch, so this
+/// relaunches straight into them.
+///
+/// It does not ask. This runs on the mini splash, before the client is up, so
+/// there is no conversation to interrupt and nothing in flight to lose - the
+/// old "Restart now / Later" prompt only ever stood between someone and the
+/// app they had just opened, and "Later" left them on a build they had already
+/// replaced on disk.
 Future<void> _installWithDnf(
   ProviderContainer container,
   ClientUpdate update,
@@ -128,18 +133,9 @@ Future<void> _installWithDnf(
     return;
   }
 
-  final now = Completer<bool>();
-  container.read(startupPromptProvider.notifier).state = StartupPrompt(
-    title: 'Updated to ${update.version}',
-    detail: 'Restart slim-m to start using it.',
-    primaryLabel: 'Restart now',
-    onPrimary: () => now.complete(true),
-    secondaryLabel: 'Later',
-    onSecondary: () => now.complete(false),
-  );
-  final restart = await now.future;
-  container.read(startupPromptProvider.notifier).state = null;
-  if (restart) await relaunch();
+  container.read(startupStatusProvider.notifier).state =
+      'Restarting into ${update.version}';
+  await relaunch();
 }
 
 /// Every format dnf does not cover, and every dnf run that failed: say the
