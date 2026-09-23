@@ -88,13 +88,13 @@ It takes effect immediately, not at some expiry.
 A 401 is therefore not something to retry: back off on a network error, but treat a 401 as "stop, the credential is gone".
 The account itself stays, so everything the bot wrote stays attributed to it.
 
-## The example
+## The templates
 
-[`examples/bot-ping/`](../../examples/bot-ping/) is a working bot in one file: it answers `!ping` with `pong`.
+[`bot-ping`](https://github.com/NC1107/slim-bots/tree/main/bot-ping) in [slim-bots](https://github.com/NC1107/slim-bots) is a working bot in one file: it answers `!ping` with `pong`.
 
 ```bash
 pip install websockets
-SLIMM_URL=https://your.space SLIMM_BOT_TOKEN=slimbot_... python3 examples/bot-ping/bot.py
+SLIMM_URL=https://your.space SLIMM_BOT_TOKEN=slimbot_... python3 bot-ping/bot.py
 ```
 
 It does the five things above and nothing else, so it is short enough to read in one sitting.
@@ -106,6 +106,9 @@ What it deliberately leaves out, and what a bot doing real work needs:
 - **A cursor.** It only sees what arrives while connected. A bot that must not miss anything records the `seq` on each event and calls `/sync` on reconnect to catch up.
 - **Backoff.** It reconnects on a flat delay. Use exponential backoff against a real deployment.
 - **Scoping.** It answers in any channel it can see. Most bots should be told which channels are theirs.
+
+[slim-bots](https://github.com/NC1107/slim-bots) has templates that do each of those: `bot-reminders` for durable state and a cursor, `bot-roles` for a command-driven flow, `bot-canvas-board` for driving the canvas, `bot-modlog` for watching moderation events.
+Each one's readme says what it deliberately leaves out, which is usually the more useful half.
 
 ## Where a bot should live
 
