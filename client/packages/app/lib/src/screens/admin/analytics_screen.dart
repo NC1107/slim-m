@@ -3,11 +3,20 @@
 /// MANAGE_SERVER, the same bit `/space/settings` and the Emoji screen use.
 ///
 /// Off by default on every deployment; see
-/// `docs/decisions/0008-space-analytics.md`. The toggle at the top is not
-/// decoration - it is the whole feature's on switch, and nothing below it is
-/// computed while it reads off, including the counts this file derives on
-/// read rather than records: the point is that the feature does not run at
-/// all until asked for, not only that a background job is paused.
+/// `docs/decisions/0008-space-analytics.md`. The toggle is the whole
+/// feature's on switch, and nothing below it is computed while it reads
+/// off, including the counts this file derives on read rather than
+/// records: the point is that the feature does not run at all until asked
+/// for, not only that a background job is paused.
+///
+/// The toggle's own presentation depends on that same on/off value: off,
+/// the full explanation sits beside it because deciding whether to turn
+/// this on is the one moment that explanation earns its space, alongside a
+/// ghost preview of what turning it on reveals ([AnalyticsGhostPreview]).
+/// On, the row collapses to a label and a switch - a permanent paragraph
+/// on a screen opened to read numbers is not decoration, it is a tax - and
+/// the explanation stays reachable behind an info affordance rather than
+/// gone.
 library;
 
 import 'package:flutter/material.dart';
@@ -20,11 +29,11 @@ import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/attachment_view.dart' show formatByteSize;
 import '../../widgets/run_guarded.dart';
-import '../../widgets/settings_section_header.dart';
-import '../../widgets/settings_toggle_row.dart';
 import '../../widgets/success_flash.dart';
 import '../settings_screen_scaffold.dart';
 import 'analytics_charts.dart';
+import 'analytics_ghost.dart';
+import 'analytics_toggle.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
@@ -83,11 +92,12 @@ class _AnalyticsPaneState extends ConsumerState<AnalyticsPane>
       }
     });
 
+    final enabled = _optimistic ?? analytics.valueOrNull?.enabled ?? false;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ToggleCard(
-          enabled: _optimistic ?? analytics.valueOrNull?.enabled ?? false,
+        AnalyticsToggleHeader(
+          enabled: enabled,
           busy: _toggling || analytics.isLoading,
           onChanged: _setEnabled,
         ),
@@ -97,67 +107,28 @@ class _AnalyticsPaneState extends ConsumerState<AnalyticsPane>
           AppErrorState(message: actionError!, onDismiss: clearActionError),
         ],
         const SizedBox(height: AppSpacing.s16),
-        AppAsyncView<api.SpaceAnalytics>(
-          // A failed retry keeps the stats on screen; see AppAsyncView's own doc.
-          value: AppAsyncState(
-            data: analytics.valueOrNull,
-            error: analytics.error,
+        if (!enabled)
+          const AnalyticsGhostPreview()
+        else
+          AppAsyncView<api.SpaceAnalytics>(
+            // A failed retry keeps the stats on screen; see AppAsyncView's own doc.
+            value: AppAsyncState(
+              data: analytics.valueOrNull,
+              error: analytics.error,
+            ),
+            center: false,
+            errorMessage: 'Could not load analytics.',
+            onRetry: () => ref.invalidate(spaceAnalyticsProvider),
+            data: (context, value) => value.stats == null
+                ? const AnalyticsGhostPreview()
+                : _StatsView(
+                    stats: value.stats!,
+                    memberStorage: value.memberStorage ?? const [],
+                  ),
           ),
-          center: false,
-          errorMessage: 'Could not load analytics.',
-          onRetry: () => ref.invalidate(spaceAnalyticsProvider),
-          data: (context, value) => value.stats == null
-              ? const _OffNotice()
-              : _StatsView(
-                  stats: value.stats!,
-                  memberStorage: value.memberStorage ?? const [],
-                ),
-        ),
       ],
     );
   }
-}
-
-class _ToggleCard extends StatelessWidget {
-  const _ToggleCard({
-    required this.enabled,
-    required this.busy,
-    required this.onChanged,
-  });
-
-  final bool enabled;
-  final bool busy;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) => SettingsSectionCard(
-    children: [
-      SettingsToggleRow(
-        label: 'Record Space analytics',
-        description:
-            'Off by default. Counts messages and reads this server\'s '
-            'own memory use; never a per-member activity log. Turning '
-            'this off hides the numbers below but keeps whatever was '
-            'already recorded.',
-        value: enabled,
-        onChanged: busy ? null : onChanged,
-        semanticLabel: enabled ? 'Space analytics on' : 'Space analytics off',
-      ),
-    ],
-  );
-}
-
-class _OffNotice extends StatelessWidget {
-  const _OffNotice();
-
-  @override
-  Widget build(BuildContext context) => const AppCallout(
-    tone: AppCalloutTone.info,
-    child: Text(
-      'Analytics is off. Turn it on above to see message counts, active '
-      'hours, and this server\'s own memory use over time.',
-    ),
-  );
 }
 
 class _StatsView extends StatelessWidget {

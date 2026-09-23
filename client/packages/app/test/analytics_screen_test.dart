@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The Space analytics screen: the toggle, the off notice, and that the
+/// The Space analytics screen: the toggle's two shapes (a full explanation
+/// off, a collapsed row on), the off-state ghost preview, and that the
 /// headline numbers are visible text rather than only pixels in a chart.
 ///
 /// Retention, the canvas object cap and the screen-share resolution ceiling
@@ -21,6 +22,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/screens/admin/analytics_ghost.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/widgets/analytics_bar_chart.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -82,26 +84,30 @@ Widget _app(ProviderContainer container) => UncontrolledProviderScope(
 );
 
 void main() {
-  testWidgets('off by default: the notice shows and no stat is computed', (
-    tester,
-  ) async {
-    final client = MockClient((request) async {
-      return http.Response(
-        jsonEncode({'enabled': false}),
-        200,
-        headers: {'content-type': 'application/json'},
-      );
-    });
-    final container = _containerFor(client);
-    addTearDown(container.dispose);
+  testWidgets(
+    'off by default: the full explanation and a ghost preview show, no '
+    'stat is computed',
+    (tester) async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({'enabled': false}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('Analytics is off'), findsOneWidget);
-    expect(find.textContaining('Total messages'), findsNothing);
-    expect(find.byType(AnalyticsBarChart), findsNothing);
-  });
+      expect(find.text('Record Space analytics'), findsOneWidget);
+      expect(find.textContaining('Off by default'), findsOneWidget);
+      expect(find.byType(AnalyticsGhostPreview), findsOneWidget);
+      expect(find.textContaining('Total messages'), findsNothing);
+      expect(find.byType(AnalyticsBarChart), findsNothing);
+    },
+  );
 
   testWidgets('turning it on sends enabled: true and the screen shows stats', (
     tester,
@@ -133,9 +139,43 @@ void main() {
     expect(patchedBodies, [
       {'enabled': true},
     ]);
-    expect(find.textContaining('Analytics is off'), findsNothing);
+    expect(find.byType(AnalyticsGhostPreview), findsNothing);
+    expect(find.text('Space analytics is on'), findsOneWidget);
     expect(find.text('42'), findsOneWidget);
   });
+
+  testWidgets(
+    'enabled collapses the toggle to a single row, with the explanation '
+    'reachable but closed by default',
+    (tester) async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode(_enabledBody),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final container = _containerFor(client);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(_app(container));
+      await tester.pumpAndSettle();
+
+      // Collapsed: the label shows, the paragraph does not.
+      expect(find.text('Space analytics is on'), findsOneWidget);
+      expect(find.textContaining('Off by default'), findsNothing);
+
+      // The info button reveals it in place.
+      await tester.tap(find.byTooltip('What this records'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Off by default'), findsOneWidget);
+
+      // And hides it again on a second tap.
+      await tester.tap(find.byTooltip('Hide what this records'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Off by default'), findsNothing);
+    },
+  );
 
   testWidgets(
     'the toggle flips the instant it is tapped, ahead of the server',
