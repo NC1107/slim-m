@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// `DevicesSection`, `BlockedSection` and `AccountSection` used to render
-/// their rows as bare `ListTile`s: taller, differently inset, and with none
-/// of `AppListRow`'s hover, press or keyboard-focus chrome.
+/// `DevicesSection` and `BlockedSection` used to render their rows as bare
+/// `ListTile`s: taller, differently inset, and with none of `AppListRow`'s
+/// hover, press or keyboard-focus chrome. `AccountSection`'s own deletion row
+/// has since moved off `AppListRow` entirely, onto an outlined danger button:
+/// see its own test below.
 library;
 
 import 'dart:convert';
@@ -91,7 +93,7 @@ void main() {
     expect(find.byType(AppListRow), findsOneWidget);
   });
 
-  testWidgets('AccountSection is an AppListRow, never a bare ListTile', (
+  testWidgets('AccountSection renders deletion as an outlined danger button', (
     tester,
   ) async {
     final container = ProviderContainer(
@@ -123,8 +125,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ListTile), findsNothing);
-    expect(find.byType(AppListRow), findsOneWidget);
-    expect(find.text('Delete account'), findsOneWidget);
+    expect(find.byType(AppListRow), findsNothing);
+    final button = tester.widget<AppButton>(
+      find.widgetWithText(AppButton, 'Delete account'),
+    );
+    expect(button.variant, AppButtonVariant.danger);
   });
 
   testWidgets('BlockedSection rows are AppListRow, never a bare ListTile', (

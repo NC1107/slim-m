@@ -165,14 +165,13 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
       title: 'Account',
       description: 'Deleting your account is permanent and cannot be undone.',
       children: [
-        AppListRow(
-          // Matches SignOutRow: only the leading glyph carries the danger tone.
-          leading: Icon(
-            AppIcons.failed,
-            color: Theme.of(context).extension<AppTokens>()!.dangerText,
-          ),
+        // Matches channel_settings_danger_zone.dart's own "Delete channel":
+        // an irreversible action reads as a button, not a navigation row.
+        AppButton(
           label: 'Delete account',
-          onTap: () => _confirmDeletion(context, ref),
+          variant: AppButtonVariant.danger,
+          full: true,
+          onPressed: () => _confirmDeletion(context, ref),
         ),
         if (_deleteError case final error?)
           Padding(
