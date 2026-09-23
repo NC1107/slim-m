@@ -35,32 +35,62 @@ const _maxMemberPages = 500;
 /// anything past the first page needs a follow-up keyed on the last id
 /// already seen; a page shorter than [_memberPageLimit] is the contract's
 /// own signal that there is no next one.
-final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>((
-  ref,
+final membersProvider = FutureProvider.autoDispose<List<api.UserProfile>>(
+  (ref) => _pagedMembers(ref.watch(apiProvider), null),
+);
+
+/// The members who can view [channelId], for a member pane sitting beside
+/// that channel. Same endpoint and same paging as [membersProvider]; the
+/// server applies the filter before it cuts a page, so the short-page
+/// contract this loop relies on still holds.
+///
+/// A separate provider rather than a parameter on [membersProvider]: the
+/// roster's other readers - role assignment, the overwrite pickers, the
+/// removed-members screen - all want the deployment-wide list, and narrowing
+/// it under them would hide exactly the people they exist to reach.
+final channelMembersProvider = FutureProvider.autoDispose
+    .family<List<api.UserProfile>, String>(
+      (ref, channelId) => _pagedMembers(ref.watch(apiProvider), channelId),
+    );
+
+Future<List<api.UserProfile>> _pagedMembers(
+  api.SlimmApi client,
+  String? channelId,
 ) async {
-  final client = ref.watch(apiProvider);
   final members = <api.UserProfile>[];
   String? after;
   for (var page = 0; page < _maxMemberPages; page++) {
     final batch = await client.listMembers(
       after: after,
       limit: _memberPageLimit,
+      channel: channelId,
     );
     members.addAll(batch);
     if (batch.length < _memberPageLimit) return members;
     after = batch.last.id;
   }
   return members;
-});
+}
 
-/// Seeds live presence for the resolved member list. A trigger, not a data
-/// source in its own right: `AppMemberPane` watches this purely to start it,
-/// and reads the actual statuses back from [presenceControllerProvider].
-/// `autoDispose` and depending on the (also `autoDispose`) [membersProvider]
-/// keeps this from outliving the pane, unlike [presenceControllerProvider]
-/// itself, which is worth keeping warm for the rest of the session.
-final presenceSeedProvider = FutureProvider.autoDispose<void>((ref) async {
-  final members = await ref.watch(membersProvider.future);
+/// Seeds live presence for the member list the pane is actually showing. A
+/// trigger, not a data source in its own right: `AppMemberPane` watches this
+/// purely to start it, and reads the actual statuses back from
+/// [presenceControllerProvider]. `autoDispose`, and depending on the (also
+/// `autoDispose`) roster, keeps this from outliving the pane, unlike
+/// [presenceControllerProvider] itself, which is worth keeping warm for the
+/// rest of the session.
+///
+/// Keyed on the same channel the pane is, so it seeds from the same list
+/// rather than fetching the deployment roster beside it: seeding from
+/// [membersProvider] while the pane read [channelMembersProvider] meant two
+/// full pagings of `/members` per mount for one pane.
+final presenceSeedProvider = FutureProvider.autoDispose.family<void, String?>((
+  ref,
+  channelId,
+) async {
+  final members = channelId == null
+      ? await ref.watch(membersProvider.future)
+      : await ref.watch(channelMembersProvider(channelId).future);
   await ref
       .read(presenceControllerProvider.notifier)
       .refresh(members.map((m) => m.id));
@@ -75,37 +105,48 @@ const _rosterKeepAliveDebounce = Duration(milliseconds: 500);
 /// a join from what one already produces on the live socket - a presence
 /// frame, or, failing that, the author id on a first message - and
 /// invalidates the cached roster so the pane catches up without a reload.
-/// [membersProvider] now pages to the whole roster, so an id truly absent
-/// from it is either someone who just joined or someone who never will be
-/// there (removed, anonymized, or a race before their account commits);
-/// [_refetchedIds] bounds it to one refetch per id so the latter case
-/// cannot re-invalidate forever on their own later activity.
-final memberRosterKeepAliveProvider = Provider.autoDispose<void>((ref) {
-  Timer? debounce;
-  final refetchedIds = <String>{};
-  final sub = ref.read(liveEventsProvider).listen((event) {
-    final candidateId = switch (event) {
-      api.PresenceChanged(:final userId) => userId,
-      api.MessageCreated(:final message) => message.authorId,
-      _ => null,
-    };
-    if (candidateId == null) return;
+/// The roster pages to completion, so an id truly absent from it is either
+/// someone who just joined or someone who never will be there (removed,
+/// anonymized, a race before their account commits, or - once the pane is
+/// channel-scoped - somebody who simply cannot view it); `refetchedIds`
+/// bounds it to one refetch per id so none of those re-invalidate forever on
+/// their own later activity.
+///
+/// Keyed on the same channel as the pane so it reads and invalidates the one
+/// roster the pane is showing. Reading a different one meant reading a
+/// provider nothing had warmed, whose `valueOrNull` is null, which returned
+/// early every time and quietly stopped refetching at all.
+final memberRosterKeepAliveProvider = Provider.autoDispose
+    .family<void, String?>((ref, channelId) {
+      final roster = channelId == null
+          ? membersProvider
+          : channelMembersProvider(channelId);
+      Timer? debounce;
+      final refetchedIds = <String>{};
+      final sub = ref.read(liveEventsProvider).listen((event) {
+        final candidateId = switch (event) {
+          api.PresenceChanged(:final userId) => userId,
+          api.MessageCreated(:final message) => message.authorId,
+          _ => null,
+        };
+        if (candidateId == null) return;
 
-    final members = ref.read(membersProvider).valueOrNull;
-    if (members == null) return;
-    if (members.any((m) => m.id == candidateId)) return;
-    if (!refetchedIds.add(candidateId)) return;
+        final members = ref.read(roster).valueOrNull;
+        if (members == null) return;
+        if (members.any((m) => m.id == candidateId)) return;
+        if (!refetchedIds.add(candidateId)) return;
 
-    debounce?.cancel();
-    debounce = Timer(_rosterKeepAliveDebounce, () {
-      ref.invalidate(membersProvider);
+        debounce?.cancel();
+        debounce = Timer(
+          _rosterKeepAliveDebounce,
+          () => ref.invalidate(roster),
+        );
+      });
+      ref.onDispose(() {
+        debounce?.cancel();
+        unawaited(sub.cancel());
+      });
     });
-  });
-  ref.onDispose(() {
-    debounce?.cancel();
-    unawaited(sub.cancel());
-  });
-});
 
 /// Refetches the roster when a moderation event says one of its rows is now
 /// wrong: somebody was timed out (their badge belongs on screen), had a
@@ -125,6 +166,8 @@ final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
         event is api.MemberRestored ||
         event is api.MemberRoleChanged) {
       ref.invalidate(membersProvider);
+      // A role change can also change who may view a channel at all.
+      ref.invalidate(channelMembersProvider);
     }
   });
   ref.onDispose(() => unawaited(sub.cancel()));

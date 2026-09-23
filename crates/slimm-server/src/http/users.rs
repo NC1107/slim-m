@@ -12,22 +12,19 @@ use std::collections::HashMap;
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::response::Response;
 use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
-use super::attachments::serve;
 use super::auth::validate_label;
 use super::error::ApiError;
-use super::extract::{ASSET, AUTHED_READ, Authed, AuthedLimited, Bytes, Json, Query, enforce};
+use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::messages::parse_uuid;
+use super::user_avatars::{delete_avatar, get_avatar, upload_avatar};
 use super::user_status::validate_status_text;
 use crate::hub::Event;
-use crate::ids::{RoleId, UserId};
-use crate::media;
+use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Store, User};
@@ -38,7 +35,7 @@ const BODY_LIMIT: usize = 4 * 1024;
 /// ceiling and not operator-configurable: an avatar is always a small,
 /// single image, never a document or a large photo, so there is nothing here
 /// a self-host operator would need to tune.
-const AVATAR_MAX_BYTES: u64 = 2 * 1024 * 1024;
+pub(super) const AVATAR_MAX_BYTES: u64 = 2 * 1024 * 1024;
 
 /// Most ids `GET /users` may be asked about in one request.
 const MAX_USER_BATCH: usize = 100;
@@ -72,7 +69,7 @@ pub fn routes() -> Router<AppState> {
 // --- Wire types ---
 
 #[derive(Serialize)]
-struct UserDto {
+pub(super) struct UserDto {
     id: String,
     username: String,
     display_name: String,
@@ -125,7 +122,7 @@ struct UserDto {
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
 /// A single extra query beyond the profile fetch itself; see [`to_dtos`] for
 /// the batched form a page of users needs instead of paying this per row.
-async fn to_dto(store: &Store, user: User) -> anyhow::Result<UserDto> {
+pub(super) async fn to_dto(store: &Store, user: User) -> anyhow::Result<UserDto> {
     Ok(to_dtos(store, vec![user]).await?.remove(0))
 }
 
@@ -223,6 +220,8 @@ struct ListUsersParams {
 struct ListMembersParams {
     after: Option<String>,
     limit: Option<i64>,
+    /// Narrows the roster to who can view this channel; see [`list_members`].
+    channel: Option<String>,
 }
 
 // --- Handlers: /me ---
@@ -332,6 +331,11 @@ async fn list_users(
 /// caller may read it: a member list is deployment-wide, not scoped to any
 /// one channel, so there is no channel permission to check it against.
 ///
+/// `channel` narrows the roster to the members who can view that channel,
+/// which is what a member pane beside a channel means by "who is here". It is
+/// a display filter, not a confidentiality boundary: the unfiltered roster is
+/// readable by any authenticated caller from this same route, by design.
+///
 /// A MANAGE_ROLES caller additionally gets each member's registration invite
 /// code attached (see MOD9) - a moderation signal, not a public one, so it
 /// is fetched and attached only here rather than in [`to_dtos`] itself,
@@ -360,7 +364,15 @@ async fn list_members(
         .unwrap_or(MEMBERS_DEFAULT_LIMIT)
         .clamp(1, MEMBERS_MAX_LIMIT);
 
-    let members = state.store.list_members(after, limit).await?;
+    let members = match params.channel.as_deref().map(parse_uuid).transpose()? {
+        Some(id) => {
+            state
+                .store
+                .list_members_who_view(ChannelId(id), after, limit)
+                .await?
+        }
+        None => state.store.list_members(after, limit).await?,
+    };
     let ids: Vec<UserId> = members.iter().map(|m| m.id).collect();
     let mut dtos = to_dtos(&state.store, members).await?;
 
@@ -377,112 +389,4 @@ async fn list_members(
         }
     }
     Ok(Json(dtos))
-}
-
-// --- Handlers: avatars ---
-
-/// Uploads (or replaces) the caller's avatar. Deliberately not an attachment:
-/// one mutable image per user, keyed by user id rather than content hash, and
-/// replaced wholesale rather than accumulated - see migration 0013.
-///
-/// The file is written before the database row is updated, so a crash
-/// between the two steps leaves the old row pointing at bytes that were just
-/// overwritten (self-heals on the next successful upload) rather than a row
-/// that promises an avatar no file backs.
-///
-/// An avatar is always a picture: sniffed against the same allowlist as a
-/// message attachment, but only the inline (image) entries qualify - a PDF is
-/// a valid attachment and not a valid avatar. The content type itself is not
-/// stored here; [`get_avatar`] re-sniffs it from disk.
-async fn upload_avatar(
-    Authed(ctx): Authed,
-    parts: Parts,
-    State(state): State<AppState>,
-    Bytes(body): Bytes,
-) -> Result<Json<UserDto>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Upload)?;
-
-    if body.is_empty() {
-        return Err(ApiError::BadRequest("avatar is empty"));
-    }
-    if body.len() as u64 > AVATAR_MAX_BYTES {
-        return Err(ApiError::BadRequest("avatar is too large"));
-    }
-    // Inline (image) entries of the attachment allowlist only; see the note
-    // on this function.
-    let is_image = media::sniff_content_type(&body).is_some_and(media::is_inline);
-    if !is_image {
-        return Err(ApiError::BadRequest("unsupported avatar type"));
-    }
-
-    let user_id = ctx.user_id.to_string();
-    state
-        .media
-        .write_avatar(&user_id, body.to_vec())
-        .await
-        .map_err(|err| {
-            tracing::error!(error = %err, "failed to write an uploaded avatar");
-            ApiError::Internal
-        })?;
-
-    let user = state
-        .store
-        .set_avatar_updated(ctx.user_id)
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-    // Announced like a rename: a client's avatar cache is keyed by `avatar_updated_at`, so with no event every other client draws the old picture until it restarts.
-    state.hub.publish(Event::ProfileChanged(ctx.user_id));
-    Ok(Json(to_dto(&state.store, user).await?))
-}
-
-/// Removes the caller's avatar.
-async fn delete_avatar(
-    Authed(ctx): Authed,
-    parts: Parts,
-    State(state): State<AppState>,
-) -> Result<StatusCode, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    state.store.clear_avatar(ctx.user_id).await?;
-    if let Err(err) = state.media.delete_avatar(&ctx.user_id.to_string()).await {
-        tracing::warn!(error = %err, "failed to delete a cleared avatar file");
-    }
-    // Announced like an upload: removing a picture is as much a profile change as setting one.
-    state.hub.publish(Event::ProfileChanged(ctx.user_id));
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// Fetches a user's avatar bytes. Any authenticated caller may fetch any
-/// live user's avatar: it is a public profile picture, gated the same way
-/// the rest of a `UserProfile` is (authentication only, no channel
-/// permission), not a message attachment.
-async fn get_avatar(
-    AuthedLimited(_ctx): AuthedLimited<ASSET>,
-    Path(user_id): Path<String>,
-    State(state): State<AppState>,
-) -> Result<Response, ApiError> {
-    let user_id = UserId(parse_uuid(&user_id)?);
-    let user = state
-        .store
-        .user_profile(user_id)
-        .await?
-        .ok_or(ApiError::NotFound("user not found"))?;
-    if user.avatar_updated_at.is_none() {
-        return Err(ApiError::NotFound("user has no avatar"));
-    }
-
-    let bytes = state
-        .media
-        .read_avatar(&user_id.to_string())
-        .await
-        .map_err(|err| {
-            tracing::error!(error = %err, "failed to read a stored avatar");
-            ApiError::Internal
-        })?;
-    // Re-sniffed from the bytes on disk rather than trusting a stored content
-    // type: the file is the only thing that can never disagree with itself.
-    let content_type = media::sniff_content_type(&bytes).ok_or_else(|| {
-        tracing::error!("stored avatar bytes no longer match the upload allowlist");
-        ApiError::Internal
-    })?;
-    Ok(serve(bytes, content_type, "avatar"))
 }

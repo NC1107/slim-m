@@ -68,6 +68,7 @@ List<Override> _overrides(List<UserProfile> members) => [
     return api;
   }),
   membersProvider.overrideWith((ref) async => members),
+  channelMembersProvider.overrideWith((ref, _) async => members),
 ];
 
 Future<void> _pump(WidgetTester tester, List<UserProfile> members) async {
@@ -79,7 +80,7 @@ Future<void> _pump(WidgetTester tester, List<UserProfile> members) async {
       container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(body: AppMemberPane()),
+        home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
       ),
     ),
   );

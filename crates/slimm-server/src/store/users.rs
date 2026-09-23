@@ -10,7 +10,7 @@ use sqlx::QueryBuilder;
 use uuid::Uuid;
 
 use super::{Store, User};
-use crate::ids::UserId;
+use crate::ids::{ChannelId, UserId};
 
 impl Store {
     /// A user's public profile: id, username, display name, and creation
@@ -250,6 +250,51 @@ impl Store {
                 is_bot: r.is_bot != 0,
             })
             .collect())
+    }
+
+    /// The live members who can view `channel_id`, in the same order and with
+    /// the same keyset contract as [`Self::list_members`].
+    ///
+    /// The filter cannot be applied after a page is cut. A caller pages until
+    /// it gets one shorter than it asked for, so dropping rows from a full
+    /// page would read as the end of the roster and silently truncate it.
+    /// This walks candidate pages instead and stops once `limit` viewers are
+    /// in hand, so a short page still means what it always meant.
+    ///
+    /// Visibility itself is [`Self::viewers_among`], not a second evaluator:
+    /// that path already resolves threads to their parent, handles a DM's
+    /// pair, and carries an equivalence test against the per-user answer.
+    pub async fn list_members_who_view(
+        &self,
+        channel_id: ChannelId,
+        after: Option<UserId>,
+        limit: i64,
+    ) -> anyhow::Result<Vec<User>> {
+        let mut viewers = Vec::new();
+        let mut cursor = after;
+        while (viewers.len() as i64) < limit {
+            let candidates = self.list_members(cursor, limit).await?;
+            let exhausted = (candidates.len() as i64) < limit;
+            if candidates.is_empty() {
+                break;
+            }
+            cursor = candidates.last().map(|user| user.id);
+
+            let ids: Vec<UserId> = candidates.iter().map(|user| user.id).collect();
+            let allowed = self.viewers_among(channel_id, &ids).await?;
+            for user in candidates {
+                if allowed.contains(&user.id) {
+                    viewers.push(user);
+                    if (viewers.len() as i64) == limit {
+                        return Ok(viewers);
+                    }
+                }
+            }
+            if exhausted {
+                break;
+            }
+        }
+        Ok(viewers)
     }
 
     /// Marks the caller's avatar as freshly set, stamping `avatar_updated_at`

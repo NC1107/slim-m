@@ -87,6 +87,7 @@ mod storage;
 mod sync;
 mod sync_ops;
 mod threads;
+mod user_avatars;
 mod user_notes;
 mod user_status;
 mod users;

@@ -185,9 +185,9 @@ class HomeShell extends ConsumerWidget {
           // conversation, which is the only pane there is at this width.
           endDrawer: isDm
               ? null
-              : const Drawer(
+              : Drawer(
                   width: AppMemberPane.width,
-                  child: SafeArea(child: AppMemberPane()),
+                  child: SafeArea(child: AppMemberPane(channelId: channelId)),
                 ),
           // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
           body: SafeArea(

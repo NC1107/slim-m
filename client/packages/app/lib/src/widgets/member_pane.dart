@@ -12,13 +12,16 @@
 /// so an empty list means no badge rather than no data. There is still no
 /// in-voice flag on a profile, so the design's speaker glyph is left off.
 ///
-/// `membersProvider` is deliberately deployment-wide, never filtered to who
-/// can see whichever channel is open (`GET /members`'s own doc comment: any
-/// authenticated caller may read it, since the list is not scoped to one
-/// channel). Nothing here is a new information leak - the same roster is
-/// already readable directly by any authenticated caller - but it means this
-/// pane must never be offered for a DM, whose two participants are never
-/// this list; `home_shell.dart`'s `_MemberPaneSlot` and
+/// The roster is `channelMembersProvider`, narrowed server-side to who holds
+/// VIEW_CHANNEL in [AppMemberPane.channelId]. It used to be the whole
+/// deployment, which listed people an overwrite had shut out of the channel
+/// the pane was sitting beside - the pane's own heading claims to say who is
+/// here, so that was wrong even though none of it was secret. The unfiltered
+/// roster is still readable from the same route by any authenticated caller,
+/// which is why this is a display filter and nothing more.
+///
+/// The pane must still never be offered for a DM, whose two participants are
+/// never this list; `home_shell.dart`'s `_MemberPaneSlot` and
 /// `channel_header.dart`'s `ChannelHeader.isDm` are what withhold it there.
 ///
 /// This pane watches presence only through `reachablePresenceKey`, a
@@ -54,18 +57,29 @@ final memberPaneVisibleProvider = StateProvider<bool>((ref) => true);
 
 /// 236px, `--surface-sunken`, a left hairline: the design's right member pane.
 class AppMemberPane extends ConsumerWidget {
-  const AppMemberPane({super.key});
+  const AppMemberPane({super.key, required this.channelId});
+
+  /// The channel this pane sits beside. The roster is narrowed to who can
+  /// view it, so a channel an overwrite closes off does not list the people
+  /// shut out of it.
+  ///
+  /// Null when nothing is selected, which is the one case with no channel to
+  /// narrow to; the deployment roster stands in rather than an empty pane.
+  final String? channelId;
 
   static const double width = 236;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final membersAsync = ref.watch(membersProvider);
+    final channelId = this.channelId;
+    final membersAsync = channelId == null
+        ? ref.watch(membersProvider)
+        : ref.watch(channelMembersProvider(channelId));
     // Purely to start the seed fetch; statuses come back through presenceControllerProvider below.
-    ref.watch(presenceSeedProvider);
+    ref.watch(presenceSeedProvider(channelId));
     // Purely a side-effect subscription: no value of its own, only a possible invalidate on membersProvider.
-    ref.watch(memberRosterKeepAliveProvider);
+    ref.watch(memberRosterKeepAliveProvider(channelId));
     // Same shape: a timeout or a removal makes a row on screen wrong.
     ref.watch(memberModerationWatcherProvider);
     // Scoped watch: see the class doc comment above for why.
@@ -121,7 +135,8 @@ class AppMemberPane extends ConsumerWidget {
                       if (error is! api.ForbiddenException) ...[
                         const SizedBox(height: AppSpacing.s12),
                         TextButton(
-                          onPressed: () => ref.invalidate(membersProvider),
+                          onPressed: () =>
+                              ref.invalidate(channelMembersProvider),
                           child: const Text('Retry'),
                         ),
                       ],

@@ -67,6 +67,7 @@ ProviderContainer _wire({List<api.UserProfile> members = const [_other]}) {
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
       databaseProvider.overrideWith((ref) async => db),
       membersProvider.overrideWith((ref) async => members),
+      channelMembersProvider.overrideWith((ref, _) async => members),
       // Keeps the pane's keep-alive watchers from starting a real sync loop.
       liveEventsProvider.overrideWithValue(const Stream.empty()),
       apiProvider.overrideWith((ref) {
@@ -116,7 +117,7 @@ Widget _shell(BuildContext context, GoRouterState state, Widget child) =>
     Scaffold(
       endDrawer: const Drawer(
         width: AppMemberPane.width,
-        child: SafeArea(child: AppMemberPane()),
+        child: SafeArea(child: AppMemberPane(channelId: 'c1')),
       ),
       body: child,
     );

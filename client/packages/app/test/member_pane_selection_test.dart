@@ -79,6 +79,9 @@ Future<ProviderContainer> _pump(
       membersProvider.overrideWith(
         (ref) async => [_profile('1', 'Priya'), _profile('2', 'Kess')],
       ),
+      channelMembersProvider.overrideWith(
+        (ref, _) async => [_profile('1', 'Priya'), _profile('2', 'Kess')],
+      ),
       myPermissionsProvider.overrideWithValue(mine),
     ],
   );
@@ -88,7 +91,7 @@ Future<ProviderContainer> _pump(
       container: container,
       child: MaterialApp(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const Scaffold(body: AppMemberPane()),
+        home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
       ),
     ),
   );
@@ -168,6 +171,10 @@ void main() {
           if (fails) throw const TransportException('offline');
           return [_profile('1', 'Priya')];
         }),
+        channelMembersProvider.overrideWith((ref, _) async {
+          if (fails) throw const TransportException('offline');
+          return [_profile('1', 'Priya')];
+        }),
         myPermissionsProvider.overrideWithValue(Perm.banMembers),
       ],
     );
@@ -177,7 +184,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );
@@ -188,7 +195,7 @@ void main() {
     expect(container.read(memberSelectionProvider).active, isTrue);
 
     fails = true;
-    container.invalidate(membersProvider);
+    container.invalidate(channelMembersProvider);
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load members.'), findsOneWidget);
@@ -214,6 +221,9 @@ void main() {
           return api;
         }),
         membersProvider.overrideWith((ref) async => [_profile('1', 'Priya')]),
+        channelMembersProvider.overrideWith(
+          (ref, _) async => [_profile('1', 'Priya')],
+        ),
         myPermissionsProvider.overrideWith((ref) => ref.watch(_perms)),
       ],
     );
@@ -223,7 +233,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );
