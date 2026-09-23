@@ -12,12 +12,41 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/call_recap.dart';
+import '../providers/dm_call.dart';
 import '../providers/voice_roster.dart';
+import '../routing/routes.dart';
 import '../widgets/call_recap_card.dart';
 import '../widgets/user_avatar.dart';
+
+/// Leaves the ended call for wherever this channel's own conversation
+/// already is.
+///
+/// A DM's call is only ever a mode of that channel's own pane
+/// ([dmCallOpenProvider]); closing it is the identical action
+/// `_DmCallBar`'s own dismiss button already takes, so a DM's messages are
+/// straight back where this same screen sits. A real voice channel has no
+/// separate text view to return to - `ConversationPane` shows this same
+/// screen for as long as the channel's kind says voice - so there is
+/// nowhere "back" to go but away from it, the same fallback
+/// `CompactChannelAppBar`'s own back arrow and a deleted channel's own
+/// redirect already land on. Either way this only leaves the call's screen;
+/// a call already joined keeps running regardless (see `dm_call_pane.dart`'s
+/// own doc comment).
+void leaveRecapScreen(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isDm,
+}) {
+  if (isDm) {
+    ref.read(dmCallOpenProvider.notifier).state = null;
+    return;
+  }
+  context.go(Routes.channels);
+}
 
 class VoiceConnecting extends StatelessWidget {
   const VoiceConnecting({super.key, this.label = 'Connecting'});
@@ -146,9 +175,10 @@ class VoiceSwitchPrompt extends StatelessWidget {
 }
 
 /// Shown after a hang-up (no error, just left) or a failed automatic join
-/// (an error the caller can read and, if [canRetry], act on). The only
-/// remaining manual step in a voice channel's whole flow.
-class VoiceRejoinScreen extends StatelessWidget {
+/// (an error the caller can read and, if [canRetry], act on). Rejoining is
+/// the one manual step that remains once a call ends; leaving the screen
+/// entirely is the other, via [leaveRecapScreen].
+class VoiceRejoinScreen extends ConsumerWidget {
   const VoiceRejoinScreen({
     super.key,
     required this.channelId,
@@ -173,7 +203,7 @@ class VoiceRejoinScreen extends StatelessWidget {
   final CallRecap? recap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -229,7 +259,7 @@ class VoiceRejoinScreen extends StatelessWidget {
                         ),
                       ),
                     // No button for a failure a retry cannot fix.
-                    if (canRetry)
+                    if (canRetry) ...[
                       FilledButton(
                         onPressed: onRetry,
                         style: FilledButton.styleFrom(
@@ -243,6 +273,18 @@ class VoiceRejoinScreen extends StatelessWidget {
                           errorMessage != null ? 'Try again' : 'Rejoin call',
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.s8),
+                    ],
+                    AppButton(
+                      label: isDm ? 'Back to messages' : 'Back to channel',
+                      // Distinct from `_DmCallBar`'s own "Back to messages" dismiss, on screen at once.
+                      semanticLabel: isDm
+                          ? 'Back to messages from this call'
+                          : 'Back to channel',
+                      variant: AppButtonVariant.ghost,
+                      onPressed: () =>
+                          leaveRecapScreen(context, ref, isDm: isDm),
+                    ),
                   ],
                 ),
               ),
