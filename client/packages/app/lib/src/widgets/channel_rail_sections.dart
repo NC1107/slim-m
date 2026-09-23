@@ -14,6 +14,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/member_presence.dart' show presenceSeedProvider;
 import '../routing/routes.dart';
 import 'channel_grouping.dart';
 import 'channel_kind_icon.dart';
@@ -137,7 +138,7 @@ class _AddChannelGlyph extends StatelessWidget {
 /// must still render, and open, as an ordinary row rather than as this one.
 /// `orderedChannels` (`channel_grouping.dart`) calls the same function, so
 /// the next/previous-channel shortcuts cycle in the order shown here.
-class DirectMessagesSection extends StatelessWidget {
+class DirectMessagesSection extends ConsumerWidget {
   const DirectMessagesSection({
     super.key,
     required this.channels,
@@ -148,7 +149,9 @@ class DirectMessagesSection extends StatelessWidget {
   final String? selectedId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Seeds every DM peer's presence dot; membersProvider is already fetched for RailHeader's count.
+    ref.watch(presenceSeedProvider(null));
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final split = splitPersonalSpace(channels);
     final personal = split.personal;
