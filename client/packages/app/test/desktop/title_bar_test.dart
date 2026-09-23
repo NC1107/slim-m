@@ -8,10 +8,16 @@ library;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/desktop/close_behavior.dart';
 import 'package:slimm_app/src/desktop/title_bar.dart';
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 
 import 'support/fake_desktop_window_port.dart';
 
@@ -19,6 +25,10 @@ import 'support/fake_desktop_window_port.dart';
 /// inside a fixed-height slot, the same shape `DesktopChrome`'s own
 /// `Column` gives it, so a tap or drag lands where it really would - and
 /// the real `AppTokens` theme, since [AppIconButton] reads it unconditionally.
+/// [TitleBar] reads `serverInfoProvider`/`syncControllerProvider` now, so
+/// this needs the same minimal `apiProvider`/`keyStoreProvider` overrides
+/// every other suite hitting a real `SlimmApi` gives it, rather than
+/// constructing one against an unconfigured session.
 Future<SemanticsHandle> _pump(
   WidgetTester tester, {
   required FakeDesktopWindowPort port,
@@ -27,18 +37,32 @@ Future<SemanticsHandle> _pump(
 }) async {
   final handle = tester.ensureSemantics();
   await tester.pumpWidget(
-    MaterialApp(
-      theme: buildTheme(Brightness.dark, AppTokens.dark),
-      home: Scaffold(
-        body: Column(
-          children: [
-            TitleBar(
-              port: port,
-              platform: platform,
-              onRequestClose: onRequestClose,
-            ),
-            const Expanded(child: SizedBox()),
-          ],
+    ProviderScope(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        apiProvider.overrideWith((ref) {
+          final client = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient((_) async => http.Response('', 404)),
+          );
+          ref.onDispose(client.close);
+          return client;
+        }),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: Column(
+            children: [
+              TitleBar(
+                port: port,
+                platform: platform,
+                onRequestClose: onRequestClose,
+              ),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
         ),
       ),
     ),

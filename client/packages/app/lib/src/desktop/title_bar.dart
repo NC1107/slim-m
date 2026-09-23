@@ -10,13 +10,26 @@
 /// once each platform is actually built, not as dead code nobody can prove
 /// works. [DesktopWindowShell] only ever hides the native frame on Linux, so
 /// this widget is unreachable on the other two branches in this build.
+///
+/// The name line consolidates three things `RailHeader` already shows below
+/// it in the routed content - the Space's name, its connection state, and
+/// this build's own version - rather than the static literal `slim-m` this
+/// bar shipped with, which never changed no matter which deployment was
+/// open or whether it was still reachable. `RailHeader` keeps its own copy:
+/// it is the only one of the two visible on every other platform, and it
+/// also carries the member count this bar has no room for.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/providers.dart' show appInfoProvider;
+import '../providers/sync_controller.dart' show syncControllerProvider;
+import '../widgets/channel_rail_frame.dart'
+    show SpaceConnectionDot, serverInfoProvider;
 import 'close_behavior.dart';
 import 'desktop_window_port.dart';
 import 'window_menu_button.dart';
@@ -31,13 +44,12 @@ const double titleBarHeight = AppSpacing.s40;
 /// this number can be checked against a real window.
 const double _macOSTrafficLightInset = 78;
 
-class TitleBar extends StatelessWidget {
+class TitleBar extends ConsumerWidget {
   const TitleBar({
     super.key,
     required this.port,
     required this.platform,
     required this.onRequestClose,
-    this.title = 'slim-m',
   });
 
   final DesktopWindowPort port;
@@ -48,12 +60,17 @@ class TitleBar extends StatelessWidget {
   /// native close/delete-event of its own to trigger the tray-availability
   /// fallback, so it has to ask for the same decision explicitly.
   final Future<void> Function() onRequestClose;
-  final String title;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>() ?? AppTokens.dark;
     final isMac = platform == DesktopPlatform.macOS;
+
+    // `/version` needs no session, same as `ClientTooOldGate`'s own read of it.
+    final server = ref.watch(serverInfoProvider);
+    final syncStatus = ref.watch(syncControllerProvider);
+    final appVersion = ref.watch(appInfoProvider).valueOrNull?.version;
+    final name = server.valueOrNull?.name ?? 'slim-m';
 
     return SizedBox(
       height: titleBarHeight,
@@ -68,11 +85,26 @@ class TitleBar extends StatelessWidget {
             const SizedBox(width: AppSpacing.s12),
             AppBrandMark(size: AppSizes.icon20, color: tokens.accent),
             const SizedBox(width: AppSpacing.s8),
-            Text(
-              title,
-              style: AppText.ui.copyWith(color: tokens.textPrimary),
-              overflow: TextOverflow.ellipsis,
+            SpaceConnectionDot(status: syncStatus),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                name,
+                style: AppText.ui.copyWith(color: tokens.textPrimary),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            if (appVersion != null) ...[
+              const SizedBox(width: AppSpacing.s8),
+              Text(
+                'v$appVersion',
+                overflow: TextOverflow.ellipsis,
+                style: AppText.micro.copyWith(
+                  color: tokens.textSecondary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
             Expanded(child: _DragRegion(port: port)),
             if (!isMac)
               _WindowControls(port: port, onRequestClose: onRequestClose),
