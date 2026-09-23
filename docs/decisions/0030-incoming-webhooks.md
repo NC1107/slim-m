@@ -317,10 +317,23 @@ If the broker is ever built, a webhook is not the thing that needed it.
 **A `/slack` compatibility suffix.**
 Cheap and additive once the Discord path exists; not worth building before a tool demands it.
 
-## Open questions for the owner
+## Answered by the owner, 2026-09-23
 
-- Confirm accepting Discord's payload shape at all, versus a slim-m-native body that would need a plugin written per tool.
-- Confirm dropping `avatar_url`. The compatibility cost is cosmetic and the alternative is a proxied per-post image fetch for the sole purpose of making a machine look like a person.
-- Confirm no edit-in-place, which is the one genuine Discord-parity loss here and which "alert resolved" style updates rely on. What would settle it is a tool in the owner's own stack that only speaks edit, rather than posting a second message.
-- Whether `username` should be honoured as a label at all, or refused outright so a webhook always posts under the name it was minted with. Refusing is stricter and costs the one-webhook-per-source pattern; what would settle it is whether the owner expects to point Apprise or Uptime Kuma at a single URL.
-- Whether per-channel delegation (a nineteenth permission bit) is wanted, or `MANAGE_SERVER` is the right bar on a one-community deployment.
+Every one of these was put to the owner with the alternative stated, and every answer matched what this record already proposed.
+They are recorded here rather than left open, so the implementation has no decision left to make.
+
+- **Accept Discord's payload shape.**
+  Acceptance, not fidelity, as set out above.
+  The deciding argument was that the alternative is a plugin written and maintained per tool, forever.
+- **Drop `avatar_url`.**
+  Taken as proposed; the compatibility cost is cosmetic and the alternative is a proxied per-post image fetch whose only purpose is making a machine look like a person.
+- **No edit-in-place.**
+  Accepted with the parity loss understood: a Grafana-style "firing" then "resolved" pair posts twice rather than editing once.
+  The owner's reading was that two lines is the better audit trail anyway.
+  Revisit only if a tool in the stack turns out to speak edit and nothing else.
+- **Honour `username` as a per-post label.**
+  Kept, because the owner does expect to point one URL at several sources - Apprise and Uptime Kuma both multiplex that way - and telling sonarr from grafana in the channel is the whole value.
+  Never `author_display_name`, never mentionable, never collision-checked; the always-on `Webhook` badge is what stops it reading as a person.
+- **`MANAGE_SERVER` to mint, no new permission bit.**
+  A nineteenth bit was considered and declined for now: on a one-community deployment it is a new row in the role editor and a new thing to get wrong, for a problem nobody has yet.
+  It stays addable later without changing anything else here.
