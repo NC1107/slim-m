@@ -209,8 +209,9 @@ Grows a Run button on a fenced code block in chat.
 ```
 
 - `command` (required) names a `command` extension point this manifest also declares.
-- `language` (optional) is the fence tag this runner matches (`js`, `python`, ...).
-  Omit it for a wildcard that matches any block.
+- `language` (required in practice) is the fence tag this runner matches (`js`, `python`, ...).
+  It is optional in the schema, but a runner that omits it now matches **nothing** rather than everything.
+  That changed in #1211: a wildcard runner was handing a `python` block to a JavaScript engine, so a runner is offered only for a language it named.
   The client normalises case and applies a small alias map (`js` -> `javascript`) before comparing.
 
 When a member runs a block, the result is stored against the message and broadcast, so everyone viewing sees the same output without rerunning it.
