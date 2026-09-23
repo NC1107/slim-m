@@ -2,7 +2,7 @@
 /// The rail's voice row for a channel the caller has not joined: it now has
 /// a real roster to draw on ([voiceRosterProvider]) instead of always
 /// rendering as empty. See `channel_rail_channel_rows.dart`'s
-/// `_ParticipantStrip` for the counterpart that is still, correctly, always
+/// `_ParticipantList` for the counterpart that is still, correctly, always
 /// empty for a channel nobody in this client has joined and the server has
 /// never been asked about.
 library;
