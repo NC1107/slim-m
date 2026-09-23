@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.82.0](https://github.com/NC1107/slim-m/compare/client-v0.81.0...client-v0.82.0) (2026-09-23)
+
+
+### Features
+
+* **server,client:** add a Private toggle to channel creation ([#1279](https://github.com/NC1107/slim-m/issues/1279)) ([b96d83f](https://github.com/NC1107/slim-m/commit/b96d83f9ea643fc6c56ddd6b883bc6084c22b719))
+
+
+### Bug Fixes
+
+* **client:** cache the GIF picker's trending list for the session ([#1282](https://github.com/NC1107/slim-m/issues/1282)) ([b13867c](https://github.com/NC1107/slim-m/commit/b13867c25f8f0e462cbfa78bf6fc8a1940ef19f6))
+* **client:** collapse the analytics toggle and ghost the off state ([#1276](https://github.com/NC1107/slim-m/issues/1276)) ([0e19335](https://github.com/NC1107/slim-m/commit/0e193353256e08f6c35bfa553ad7a7cd5a78d074))
+* **client:** forget who was typing on every reconnect ([#1274](https://github.com/NC1107/slim-m/issues/1274)) ([8dcb4dc](https://github.com/NC1107/slim-m/commit/8dcb4dce815cce41184772a7874c2e6a27b9f0dd))
+* **client:** give the post-call recap screen a way back ([#1278](https://github.com/NC1107/slim-m/issues/1278)) ([fea9635](https://github.com/NC1107/slim-m/commit/fea9635892760f4038612730511e3390b64c9f28))
+* **client:** narrow the member pane to who can view the channel ([#1272](https://github.com/NC1107/slim-m/issues/1272)) ([e5ce199](https://github.com/NC1107/slim-m/commit/e5ce19989f5e0ef635e2600eaff5e9b005808392))
+* **client:** render a thread's parent message above its replies ([#1280](https://github.com/NC1107/slim-m/issues/1280)) ([3d686e6](https://github.com/NC1107/slim-m/commit/3d686e6fc7a8df6e679b1287d6a1a8d43f170013))
+* **client:** restart into a dnf-installed update instead of asking ([#1271](https://github.com/NC1107/slim-m/issues/1271)) ([4560878](https://github.com/NC1107/slim-m/commit/45608782adac7967d360592676d5246b5d16d8e1))
+* **client:** stop reserving a dead band above the rail on mobile ([#1277](https://github.com/NC1107/slim-m/issues/1277)) ([1700852](https://github.com/NC1107/slim-m/commit/1700852633f69cc48a3fb54a35ecd05bb8ca5a89))
+* **client:** turn a module on when somebody is granted it ([#1281](https://github.com/NC1107/slim-m/issues/1281)) ([4611b4e](https://github.com/NC1107/slim-m/commit/4611b4ecb44c8aae5f9def20aef868a9fe7fd849))
+
 ## [0.81.0](https://github.com/NC1107/slim-m/compare/client-v0.80.0...client-v0.81.0) (2026-09-22)
 
 
