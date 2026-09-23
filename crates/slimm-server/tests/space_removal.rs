@@ -352,3 +352,92 @@ async fn removing_an_account_that_does_not_exist_says_so() {
         Err(RemoveMemberError::UserNotFound)
     ));
 }
+
+/// A bot has no sign-in to retry. "Readmission restores the right to sign in"
+/// is the correct call for a human, and vacuous for a principal that cannot
+/// sign in at all: restoring it must leave the one credential it has working
+/// again, or removal is a one-way trip for a bot.
+#[tokio::test]
+async fn restoring_a_removed_bot_revives_its_token() {
+    let (s, _guard) = store().await;
+    let (admin, _member) = deployment(&s).await;
+
+    let new_bot = s.create_bot("modbot", "Modbot", admin.id).await.unwrap();
+    let bot_id = new_bot.bot.user_id;
+    let token = new_bot.token;
+    assert!(s.authenticate_bot(&token).await.unwrap().is_some());
+
+    s.remove_from_space(bot_id, admin.id, Some("investigating"))
+        .await
+        .unwrap();
+    assert!(
+        s.authenticate_bot(&token).await.unwrap().is_none(),
+        "removal must still cut the bot off immediately"
+    );
+
+    assert!(s.restore_to_space(bot_id, admin.id).await.unwrap());
+
+    assert!(
+        s.authenticate_bot(&token).await.unwrap().is_some(),
+        "a restored bot must be able to authenticate with its original token"
+    );
+}
+
+/// The human path must stay exactly as it was: readmission lifts the refusal
+/// to sign in, it does not raise the session that was live at removal time.
+#[tokio::test]
+async fn restoring_a_removed_human_does_not_revive_their_old_session() {
+    let (s, _guard) = store().await;
+    let (admin, member) = deployment(&s).await;
+
+    let issued = s.open_session(member.id, "phone").await.unwrap();
+
+    s.remove_from_space(member.id, admin.id, None)
+        .await
+        .unwrap();
+    assert!(
+        s.authenticate(&issued.access_token)
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    assert!(s.restore_to_space(member.id, admin.id).await.unwrap());
+
+    assert!(
+        s.authenticate(&issued.access_token)
+            .await
+            .unwrap()
+            .is_none(),
+        "restoring a human must not revive the session token they held when removed"
+    );
+    assert!(
+        s.open_session(member.id, "phone").await.is_ok(),
+        "a restored human signs back in fresh instead"
+    );
+}
+
+/// A bot whose token was independently revoked before its removal must stay
+/// dead on restore. Readmission only reverses what the removal itself did; it
+/// is not a second way to undo an explicit revocation.
+#[tokio::test]
+async fn restoring_a_bot_does_not_revive_a_token_already_revoked_before_removal() {
+    let (s, _guard) = store().await;
+    let (admin, _member) = deployment(&s).await;
+
+    let new_bot = s
+        .create_bot("watchbot", "Watchbot", admin.id)
+        .await
+        .unwrap();
+    let bot_id = new_bot.bot.user_id;
+    let token = new_bot.token;
+
+    s.revoke_bot(bot_id).await.unwrap();
+    s.remove_from_space(bot_id, admin.id, None).await.unwrap();
+    assert!(s.restore_to_space(bot_id, admin.id).await.unwrap());
+
+    assert!(
+        s.authenticate_bot(&token).await.unwrap().is_none(),
+        "an explicitly revoked bot token must not come back from a restore"
+    );
+}
