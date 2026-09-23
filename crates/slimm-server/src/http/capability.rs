@@ -21,17 +21,23 @@ use tower::ServiceExt as _;
 pub enum Capability {
     Block,
     Report,
+    /// Whether this build serves the incoming-webhook delivery route at all.
+    /// A client uses this to decide whether the (future) webhook admin
+    /// surface is worth showing - `docs/decisions/0030-incoming-webhooks.md`
+    /// names this exact use before that surface exists.
+    Webhook,
 }
 
 impl Capability {
     /// Every capability `/version` speaks about, in the order it reports them.
-    pub const ALL: [Capability; 2] = [Capability::Block, Capability::Report];
+    pub const ALL: [Capability; 3] = [Capability::Block, Capability::Report, Capability::Webhook];
 
     /// The name this goes over the wire under.
     pub fn wire_name(self) -> &'static str {
         match self {
             Capability::Block => "block",
             Capability::Report => "report",
+            Capability::Webhook => "webhooks",
         }
     }
 
@@ -46,6 +52,10 @@ impl Capability {
         match self {
             Capability::Block => (Method::POST, "/blocks/00000000-0000-0000-0000-000000000000"),
             Capability::Report => (Method::POST, "/reports"),
+            Capability::Webhook => (
+                Method::POST,
+                "/webhooks/00000000-0000-0000-0000-000000000000/probe",
+            ),
         }
     }
 }

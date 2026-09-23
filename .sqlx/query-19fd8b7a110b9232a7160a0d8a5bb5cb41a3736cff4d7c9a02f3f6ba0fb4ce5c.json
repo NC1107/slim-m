@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: UserId\" FROM users\n               WHERE deleted_at IS NULL AND is_webhook = 0\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "19fd8b7a110b9232a7160a0d8a5bb5cb41a3736cff4d7c9a02f3f6ba0fb4ce5c"
+}

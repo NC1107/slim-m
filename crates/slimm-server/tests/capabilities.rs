@@ -51,11 +51,11 @@ async fn app() -> (Router, support::TestDbGuard) {
 }
 
 #[tokio::test]
-async fn the_real_router_serves_both_safety_capabilities() {
+async fn the_real_router_serves_every_capability() {
     let (router, _guard) = app().await;
     assert_eq!(
         served_by(router).await,
-        vec![Capability::Block, Capability::Report],
+        vec![Capability::Block, Capability::Report, Capability::Webhook],
     );
 }
 
@@ -77,7 +77,10 @@ async fn version_advertises_what_the_router_serves() {
         .await
         .unwrap();
     let body: Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(body["capabilities"], serde_json::json!(["block", "report"]));
+    assert_eq!(
+        body["capabilities"],
+        serde_json::json!(["block", "report", "webhooks"])
+    );
 }
 
 /// The derivation has to be able to say no, or advertising yes proves nothing.

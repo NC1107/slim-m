@@ -228,6 +228,34 @@ pub enum Class {
     /// this server asks it for (`code_runner::piston`), not this, which
     /// bounds only the rate.
     CodeRunner,
+    /// Delivering an incoming webhook post (`POST
+    /// /webhooks/{webhook_id}/{token}`), unauthenticated by anything but
+    /// possession of the token.
+    ///
+    /// Sized against push cost, not write cost, for the reason
+    /// [`Class::Ring`]'s own doc gives for the same move: one delivered post
+    /// fans out over the hub and fires a push through the relay to
+    /// everyone who can see the channel, so it "wakes a device, starts a
+    /// looping tone" (there, one device; here, every phone in the
+    /// community) far more like a ring than like an ordinary write.
+    ///
+    /// Two independent buckets share this one class rather than each
+    /// getting its own: an address-keyed bucket, checked before the token
+    /// lookup so an unknown-token flood costs a map probe rather than a
+    /// database query, and a webhook-keyed bucket, checked after, on the
+    /// principal id the token resolved to - `docs/decisions/0030-incoming-webhooks.md`'s
+    /// own reasoning for why the second must never key on the caller's
+    /// address, the same argument 0028 makes for a bot. Both share one
+    /// budget because the cost this bounds - one successful delivery's
+    /// fan-out - is identical regardless of which bucket is doing the
+    /// asking.
+    ///
+    /// Sustained refill well under one per second, so a loop against a
+    /// leaked URL cannot sustain more than a token every few seconds; burst
+    /// generous enough for the honest bursts an alert feed produces, which
+    /// are real - a flapping monitor retrying, or an importer that lands
+    /// thirty episodes at once.
+    Webhook,
 }
 
 impl Class {
@@ -259,6 +287,8 @@ impl Class {
             Class::Module => (40.0, 8.0),
             // See this variant's own doc comment for how these were sized.
             Class::CodeRunner => (10.0, 1.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::Webhook => (30.0, 1.0 / 3.0),
         }
     }
 
@@ -267,7 +297,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 18] = [
+    pub const ALL: [Class; 19] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -286,6 +316,7 @@ impl Class {
         Class::LinkPreview,
         Class::Module,
         Class::CodeRunner,
+        Class::Webhook,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -310,6 +341,7 @@ impl Class {
             Class::AuthedRead => "authed_read",
             Class::Module => "module",
             Class::CodeRunner => "code_runner",
+            Class::Webhook => "webhook",
         }
     }
 }
@@ -385,6 +417,24 @@ mod all_tests {
             write_refill / ring_refill >= 10.0,
             "ring is only {}x tighter than write; that is not a throttle",
             write_refill / ring_refill
+        );
+    }
+
+    /// A webhook delivery wakes every phone in the community, not just one -
+    /// a bigger amplification than a ring's single device - so its sustained
+    /// rate must stay well under one per second, and its burst must still
+    /// absorb an honest alert-feed flurry (this variant's own doc names
+    /// thirty).
+    #[test]
+    fn webhook_delivery_is_throttled_well_under_once_a_second() {
+        let (burst, refill) = Class::Webhook.budget();
+        assert!(
+            refill < 1.0,
+            "webhook refill {refill} is not well under one per second"
+        );
+        assert!(
+            burst >= 30.0,
+            "webhook burst {burst} does not cover a thirty-item import"
         );
     }
 }

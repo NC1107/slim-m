@@ -72,7 +72,6 @@ class MessageRow extends StatelessWidget {
     required this.onCancelEdit,
     this.onViewEditHistory,
     this.customEmoji = const {},
-    this.isWebhook = false,
     this.reactions = const [],
     this.attachments = const [],
     this.poll,
@@ -150,13 +149,6 @@ class MessageRow extends StatelessWidget {
   /// Called to leave edit mode without saving, however that happened
   /// (Escape, the Cancel button, or submitting empty text).
   final VoidCallback onCancelEdit;
-
-  /// TODO(ui-backend): always false at every real call site. The schema's
-  /// `Message` has no bot/webhook flag (there is no webhook or bot-account
-  /// feature in this product at all yet), so nothing can set this true
-  /// outside a test. It exists so the row shape the design specifies is
-  /// built and exercised now rather than guessed at later.
-  final bool isWebhook;
 
   /// Reaction summaries for this message, from `Message.reactions` (a REST
   /// fetch) merged with any live `reactions.changed` update; see
@@ -278,7 +270,6 @@ class MessageRow extends StatelessWidget {
                       children: [
                         MessageRowLeading(
                           grouped: grouped,
-                          isWebhook: isWebhook,
                           message: message,
                           hovered: hovered,
                         ),
@@ -297,10 +288,7 @@ class MessageRow extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (!grouped)
-                                    MessageRowHeader(
-                                      message: message,
-                                      isWebhook: isWebhook,
-                                    ),
+                                    MessageRowHeader(message: message),
                                   if (message.replyToId != null)
                                     ReplyQuote(
                                       resolved: replyTo,

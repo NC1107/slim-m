@@ -459,7 +459,7 @@ async fn edit(
 /// The over-limit reply names how far over and what the limit is, rather
 /// than a bare "too long": a client composing a long paste (logs, say) needs
 /// the number to trim by, not just the fact that it failed.
-fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
+pub(super) fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
     if !empty_ok && content.trim().is_empty() {
         return Err(ApiError::BadRequest("message content must not be empty"));
     }

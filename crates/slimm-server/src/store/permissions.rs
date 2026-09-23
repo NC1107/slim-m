@@ -367,7 +367,32 @@ impl Store {
             .contains(needed))
     }
 
+    /// A webhook's principal answers with an empty context, checked and
+    /// returned before either query below ever runs: a webhook holds no
+    /// roles at all, not even `@everyone`'s base grant, so an `@everyone`
+    /// role that happens to carry a broad bit (ADMINISTRATOR,
+    /// MENTION_EVERYONE) can never reach it by accident. Every
+    /// base-permission check in this crate goes through this function, so
+    /// this one guard is the whole of that enforcement. See
+    /// `docs/decisions/0030-incoming-webhooks.md`.
     pub(super) async fn load_roles(&self, user_id: UserId) -> anyhow::Result<RoleContext> {
+        // Checked first; see this function's own doc comment.
+        let is_webhook = sqlx::query_scalar!(
+            r#"SELECT is_webhook AS "is_webhook!: i64" FROM users WHERE id = ?"#,
+            user_id
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .unwrap_or(0);
+        if is_webhook != 0 {
+            return Ok(RoleContext {
+                everyone_id: None,
+                everyone_perms: Permissions::NONE,
+                role_perms: Vec::new(),
+                role_ids: Vec::new(),
+            });
+        }
+
         // At most one @everyone role exists (a partial unique index enforces it),
         // so LIMIT 1 resolves the base deterministically.
         let everyone = sqlx::query!(

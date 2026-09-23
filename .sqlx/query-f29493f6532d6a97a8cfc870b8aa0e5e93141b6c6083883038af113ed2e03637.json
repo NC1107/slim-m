@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT username FROM webhook_message_usernames WHERE message_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "username",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f29493f6532d6a97a8cfc870b8aa0e5e93141b6c6083883038af113ed2e03637"
+}

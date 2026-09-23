@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO webhook_message_usernames (message_id, username) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "e418cf4bdc675d050867951964ff8f41a445140cefa7be93126bd7136ffab936"
+}

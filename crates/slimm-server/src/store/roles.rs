@@ -451,6 +451,12 @@ impl Store {
 /// `@everyone` base (which applies with no explicit assignment) or a role
 /// assigned to them directly.
 ///
+/// Excludes a webhook's principal even though it is a live `users` row that
+/// would otherwise inherit `@everyone`'s grant like anyone else: a webhook
+/// holds no roles at all (`docs/decisions/0030-incoming-webhooks.md`), and a
+/// principal that is not a member must never be miscounted by this query the
+/// way 0015 already records happening once for a different gap.
+///
 /// Callers run this inside their own transaction, after the mutation under
 /// test, so it sees a write that has not committed yet; that is the whole
 /// point, since the caller rolls back by simply not committing if this comes
@@ -459,7 +465,7 @@ pub(super) async fn administrator_count(conn: &mut SqliteConnection) -> Result<i
     let admin_bit = Permissions::ADMINISTRATOR.bits();
     sqlx::query_scalar!(
         r#"SELECT COUNT(*) AS "count!: i64" FROM users u
-           WHERE u.deleted_at IS NULL
+           WHERE u.deleted_at IS NULL AND u.is_webhook = 0
            AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id) AND (
                EXISTS (SELECT 1 FROM roles WHERE is_everyone = 1 AND (permissions & ?) != 0)
                OR EXISTS (

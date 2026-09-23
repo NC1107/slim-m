@@ -82,6 +82,12 @@ tags:
     description: >
       Provisioning bot accounts. Requires MANAGE_SERVER, and the caller must
       not itself be a bot.
+  - name: webhooks
+    description: >
+      Delivering an incoming webhook post. Unauthenticated by anything but
+      the token in the URL; see docs/decisions/0030-incoming-webhooks.md.
+      Minting, listing, and revoking a webhook are not documented here yet -
+      there is no admin route for them in this build.
   - name: invites
     description: Creating, listing, checking, and redeeming invite codes.
   - name: channels
@@ -5159,6 +5165,87 @@ paths:
           $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+
+  /webhooks/{webhookId}/{token}:
+    parameters:
+      - name: webhookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The webhook's own id, from the URL pasted into a caller's configuration.
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+        description: >-
+          The webhook's bearer credential. In the path, not a header, because
+          the callers this route exists for take one URL field and
+          paste-ability is the entire feature.
+      - name: wait
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: >-
+          When true, answers 200 with a minimal acknowledgement instead of
+          204. Never the full `Message` DTO: its per-viewer fields
+          (`mentions_me`, a reaction's own `reacted`) mean nothing for a
+          caller that is not a viewer.
+    post:
+      operationId: deliverWebhook
+      tags: [webhooks]
+      security: []
+      summary: Post as a webhook, unauthenticated by anything but the token.
+      description: >-
+        The only route in the product a webhook credential can use, and the
+        only one with no client binding by design: a webhook URL is pasted
+        into somebody else's program, never sent by this repo's own client.
+        See docs/decisions/0030-incoming-webhooks.md.
+
+
+        A missing id, an unknown id, a wrong token, and a revoked webhook all
+        answer the identical 404 below, so this route is never an existence
+        oracle for which webhook ids are live.
+
+
+        Rate limited twice: an address-keyed budget charged before the token
+        even resolves, so a flood of unknown tokens costs a cheap in-memory
+        check rather than a database lookup per request, then a second
+        budget keyed on the webhook's own id once it does. Both answer 429.
+
+
+        An `Idempotency-Key` header makes a retried delivery land on the
+        exact same message rather than posting twice. A caller that sends
+        none gets ordinary at-least-once delivery: a genuine retry of a
+        request whose response never arrived can post a duplicate, which is
+        treated as the honest case it is rather than something to silently
+        deduplicate by content.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncomingWebhookPayload"
+      responses:
+        "204":
+          description: Delivered.
+        "200":
+          description: Delivered, answered instead of 204 because the caller asked with `?wait=true`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveredWebhookMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /space/analytics:
     get:
       operationId: getSpaceAnalytics
@@ -6195,13 +6282,17 @@ components:
           type: array
           items:
             type: string
-            enum: [block, report]
+            enum: [block, report, webhooks]
           description: >
             The optional features this build serves, read off the router at
             runtime rather than declared, so the list cannot drift from what
             is really mounted. `report` means a member can file a report
             (`POST /reports`, not the moderator queue `GET /reports`), and
             `block` means a member can block someone (`POST /blocks/{userId}`).
+            `webhooks` means this build serves incoming webhook delivery
+            (`POST /webhooks/{webhookId}/{token}`) - a client uses it to
+            decide whether the webhook admin surface is worth showing, since
+            there is no admin route to mint one in this build yet.
 
 
             slim-m's safety model is manual reporting plus blocking and
@@ -6448,6 +6539,15 @@ components:
             about what the account may do - that is its roles, exactly as for
             a person. Absent on servers older than this field, which a client
             reads as not a bot.
+        is_webhook:
+          type: boolean
+          description: >
+            Whether this account is a webhook's principal rather than a
+            person or a bot. The interface draws its always-on `Webhook`
+            badge from this - see docs/decisions/0030-incoming-webhooks.md.
+            A webhook never appears in `GET /members`, so this is only ever
+            seen by resolving a message's own author id. Absent on servers
+            older than this field, which a client reads as not a webhook.
         invite_code:
           type: [string, "null"]
           description: >
@@ -7503,6 +7603,85 @@ components:
           description: >-
             Shown once and never again. Prefixed so a presented credential can
             be routed without a second lookup.
+    IncomingWebhookPayload:
+      type: object
+      description: >-
+        A Discord incoming-webhook body. The promise is acceptance, not
+        fidelity: an unrecognised field never refuses the request, since the
+        caller here is somebody else's program and a loud refusal would hide
+        their bug rather than ours. Only `content` and `username` are
+        honoured; every other property below is accepted and silently
+        discarded, field by field, rather than refused.
+      properties:
+        content:
+          type: string
+          maxLength: 4000
+          description: >-
+            Honoured. The same 4000-character ceiling `SendMessageRequest.content`
+            carries, comfortably above Discord's own 2000, so no compatible
+            caller can overflow it. `@name` mentions inside it resolve
+            exactly as they do for a person; `@everyone`, `@here`, and role
+            mentions never resolve, because a webhook holds no permission
+            that could grant them.
+        username:
+          type: string
+          maxLength: 64
+          description: >-
+            Honoured, as a per-post label shown in the name slot beside the
+            always-on `Webhook` badge - the badge is the whole mitigation, so
+            this label is never checked for collision with a real member's
+            name and is never mentionable. Never written to the webhook's own
+            account name and never returned as a message's own author name.
+        embeds:
+          description: Accepted and discarded in this build; a later stage renders these.
+        avatar_url:
+          description: >-
+            Accepted and discarded, permanently. Honouring it would mean
+            either this server fetching an arbitrary caller-supplied URL per
+            post, reopening the SSRF surface link-preview fetching already
+            guards against for a cosmetic field, or every viewer's own
+            client fetching it and leaking their address to whatever host
+            the caller named.
+        tts:
+          description: Accepted and discarded.
+        flags:
+          description: Accepted and discarded.
+        components:
+          description: Accepted and discarded.
+        thread_name:
+          description: Accepted and discarded.
+        poll:
+          description: Accepted and discarded.
+        attachments:
+          description: >-
+            Accepted and discarded. A webhook cannot upload a file - no
+            multipart, despite Discord supporting it - so the storage
+            ceiling and the orphaned-attachment sweep never see an
+            unauthenticated writer.
+        allowed_mentions:
+          description: >-
+            Accepted and discarded in this build. Intended to later narrow,
+            never widen, which of a message's mentions resolve; not yet
+            wired in.
+    DeliveredWebhookMessage:
+      type: object
+      description: >-
+        The minimal acknowledgement `?wait=true` asks for, never the full
+        `Message` DTO - see `deliverWebhook`'s own description for why.
+      required: [id, channel_id, seq, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int64
+        created_at:
+          type: integer
+          format: int64
     Channel:
       type: object
       required: [id, name, kind, created_at]

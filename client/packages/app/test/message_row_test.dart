@@ -246,36 +246,6 @@ void main() {
     expect(find.text('NEW'), findsNothing);
   });
 
-  testWidgets(
-    'a webhook row shows a code-box leading glyph and the tag badge',
-    (tester) async {
-      await tester.pumpWidget(
-        harness(
-          MessageRow(
-            message: message(authorDisplayName: 'CI Bot'),
-            grouped: false,
-            showNewDivider: false,
-            knownUsernames: const {},
-            onRetry: () {},
-            onDiscard: () {},
-            onPickReaction: (_) {},
-            onReactionTap: (_) {},
-            onVote: (_) {},
-            isWebhook: true,
-            actions: noActions,
-            editing: false,
-            onSubmitEdit: (_) {},
-            onCancelEdit: () {},
-          ),
-        ),
-      );
-
-      expect(find.byType(AppAvatar), findsNothing);
-      expect(find.byType(AppBadge), findsOneWidget);
-      expect(find.text('CI Bot'), findsOneWidget);
-    },
-  );
-
   testWidgets('a failed send shows the retry and discard actions', (
     tester,
   ) async {
