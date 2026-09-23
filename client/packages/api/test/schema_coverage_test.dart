@@ -63,6 +63,10 @@ const Map<String, String> _allowlist = {
       'same as GET /attachments/{}',
   'GET /link-preview/image/{}': 'reads raw bytes through '
       'SlimmApi._fetchBytes, the same as GET /attachments/{}',
+  'POST /webhooks/{}/{}': 'unauthenticated delivery for a webhook credential '
+      'pasted into somebody else\'s program, never sent by this client - see '
+      'docs/decisions/0030-incoming-webhooks.md, which calls out that this '
+      'route has no client binding by design',
 };
 
 const _httpMethods = {

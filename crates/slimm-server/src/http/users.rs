@@ -117,6 +117,16 @@ pub(super) struct UserDto {
     /// program without inspecting anything. It says nothing about what the
     /// account may do - that is its roles, exactly as for a person.
     is_bot: bool,
+    /// Whether this account is a webhook's principal rather than a person or
+    /// a bot.
+    ///
+    /// The interface draws its always-on `Webhook` badge from this - the same
+    /// affordance `is_bot` gets, and for the same reason: a reader has to be
+    /// able to tell without inspecting anything. See
+    /// `docs/decisions/0030-incoming-webhooks.md`. A webhook never appears in
+    /// `GET /members` at all (it is not a participant), so this is only ever
+    /// seen by resolving a message's own author id.
+    is_webhook: bool,
 }
 
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
@@ -153,6 +163,7 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
                 status_text: user.status_text,
                 invite_code: None,
                 is_bot: user.is_bot,
+                is_webhook: user.is_webhook,
             }
         })
         .collect())

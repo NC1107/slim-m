@@ -24,7 +24,8 @@ impl Store {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at, status_text, is_bot AS "is_bot!"
+                      avatar_updated_at, status_text, is_bot AS "is_bot!",
+                      is_webhook AS "is_webhook!"
                FROM users WHERE id = ? AND deleted_at IS NULL"#,
             id
         )
@@ -38,6 +39,7 @@ impl Store {
             avatar_updated_at: r.avatar_updated_at,
             status_text: r.status_text,
             is_bot: r.is_bot != 0,
+            is_webhook: r.is_webhook != 0,
         }))
     }
 
@@ -55,8 +57,8 @@ impl Store {
             // Built rather than a fixed `query!` because the id list is variable
             // length and SQLite has no array binding.
             let mut builder = QueryBuilder::new(
-                "SELECT id, username, display_name, created_at, avatar_updated_at, status_text, is_bot \
-                 FROM users WHERE deleted_at IS NULL AND id IN (",
+                "SELECT id, username, display_name, created_at, avatar_updated_at, status_text, \
+                 is_bot, is_webhook FROM users WHERE deleted_at IS NULL AND id IN (",
             );
             let mut separated = builder.separated(", ");
             for id in chunk {
@@ -73,6 +75,7 @@ impl Store {
                     avatar_updated_at: row.try_get("avatar_updated_at")?,
                     status_text: row.try_get("status_text")?,
                     is_bot: row.try_get::<i64, _>("is_bot")? != 0,
+                    is_webhook: row.try_get::<i64, _>("is_webhook")? != 0,
                 });
             }
         }
@@ -206,10 +209,16 @@ impl Store {
     /// mention badge is not limited to whoever has registered for push, and
     /// a self-host's whole membership is the bound this project already
     /// accepts for that query.
+    ///
+    /// Excludes a webhook's principal: it is not a participant candidate for
+    /// anything a mention could wake, the same "not mentionable, not
+    /// resolvable to a user" the per-post `username` label already has, and
+    /// keeping it out of this pool is what makes that true rather than merely
+    /// intended. See `docs/decisions/0030-incoming-webhooks.md`.
     pub async fn all_live_user_ids(&self) -> anyhow::Result<Vec<UserId>> {
         let rows = sqlx::query_scalar!(
             r#"SELECT id AS "id!: UserId" FROM users
-               WHERE deleted_at IS NULL
+               WHERE deleted_at IS NULL AND is_webhook = 0
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)"#
         )
         .fetch_all(&self.pool)
@@ -220,6 +229,12 @@ impl Store {
     /// The deployment's live members, oldest first, keyset-paginated by id.
     /// UUIDv7 sorts chronologically, so id order is already creation order
     /// and no separate cursor column is needed.
+    ///
+    /// Excludes a webhook's principal: it holds one verb on one channel and
+    /// is not a participant, so a member list padded with alert feeds would
+    /// be noise. See `docs/decisions/0030-incoming-webhooks.md`; a webhook's
+    /// principal is still readable through [`Self::user_profile`], which a
+    /// message's own author id resolves through.
     pub async fn list_members(
         &self,
         after: Option<UserId>,
@@ -229,8 +244,9 @@ impl Store {
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at, status_text, is_bot AS "is_bot!"
-               FROM users WHERE deleted_at IS NULL AND id > ?
+                      avatar_updated_at, status_text, is_bot AS "is_bot!",
+                      is_webhook AS "is_webhook!"
+               FROM users WHERE deleted_at IS NULL AND is_webhook = 0 AND id > ?
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)
                ORDER BY id ASC LIMIT ?"#,
             after,
@@ -248,6 +264,7 @@ impl Store {
                 avatar_updated_at: r.avatar_updated_at,
                 status_text: r.status_text,
                 is_bot: r.is_bot != 0,
+                is_webhook: r.is_webhook != 0,
             })
             .collect())
     }

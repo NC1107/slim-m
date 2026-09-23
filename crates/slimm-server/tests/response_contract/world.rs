@@ -100,6 +100,14 @@ impl Contract {
         &self.covered
     }
 
+    /// Direct store access for the one case nothing over HTTP can set up:
+    /// minting a webhook. There is no admin route for that yet (decision
+    /// 0030's stage 4), and the one route this stage ships needs a live
+    /// `(webhook_id, token)` pair already in hand just to be reached at all.
+    pub fn store(&self) -> &Store {
+        &self.state.store
+    }
+
     pub fn problems(&self) -> &[String] {
         &self.problems
     }

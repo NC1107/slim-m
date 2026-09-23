@@ -32,6 +32,7 @@ mod people;
 mod read_state;
 mod refusals;
 mod threads;
+mod webhooks;
 
 use admin_recovery::recovery_calls;
 use bots::bot_calls;
@@ -46,6 +47,7 @@ use link_preview::link_preview_calls;
 use members_bulk::bulk_member_calls;
 use people::{moderation_calls, profile_calls, safety_calls};
 use threads::thread_calls;
+use webhooks::webhook_calls;
 
 const PASSWORD: &str = "a-long-enough-password";
 /// A PNG header is all the server's content sniffing looks at.
@@ -490,4 +492,5 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
 
     recovery_calls(c, root, bob_id).await;
     bot_calls(c, root).await;
+    webhook_calls(c, channel).await;
 }

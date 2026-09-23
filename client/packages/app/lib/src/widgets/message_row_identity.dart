@@ -136,13 +136,11 @@ class MessageRowLeading extends ConsumerWidget {
   const MessageRowLeading({
     super.key,
     required this.grouped,
-    required this.isWebhook,
     required this.message,
     required this.hovered,
   });
 
   final bool grouped;
-  final bool isWebhook;
   final Message message;
 
   /// The row's own hover state (mouse only - touch never sets this). Gates
@@ -170,7 +168,13 @@ class MessageRowLeading extends ConsumerWidget {
       );
     }
 
-    if (isWebhook) {
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, message.authorId ?? ''),
+      ),
+    );
+
+    if (resolution.profile?.isWebhook ?? false) {
       return Container(
         width: _avatarSize,
         height: _avatarSize,
@@ -197,37 +201,27 @@ class MessageRowLeading extends ConsumerWidget {
       decorativeWhenUnresolved: true,
       child: AuthorAvatar(
         userId: message.authorId,
-        name: _label(ref),
+        name: authorLabelResolved(
+          authorId: message.authorId,
+          cachedDisplayName: message.authorDisplayName,
+          resolution: resolution,
+        ),
         size: _avatarSize,
       ),
     );
   }
-
-  String _label(WidgetRef ref) => authorLabelResolved(
-    authorId: message.authorId,
-    cachedDisplayName: message.authorDisplayName,
-    resolution: ref.watch(
-      batchProfilesControllerProvider.select(
-        (m) => authorResolution(m, message.authorId ?? ''),
-      ),
-    ),
-  );
 }
 
 class MessageRowHeader extends ConsumerWidget {
-  const MessageRowHeader({
-    super.key,
-    required this.message,
-    required this.isWebhook,
-  });
+  const MessageRowHeader({super.key, required this.message});
 
   final Message message;
-  final bool isWebhook;
 
-  /// An author who has not resolved yet reads as not a bot, so the badge is
-  /// absent until the profile is known rather than appearing a moment after
-  /// the name. A badge that pops in late is worse than one that is simply
-  /// right once there is something to be right about.
+  /// An author who has not resolved yet reads as neither a bot nor a
+  /// webhook, so a badge is absent until the profile is known rather than
+  /// appearing a moment after the name. A badge that pops in late is worse
+  /// than one that is simply right once there is something to be right
+  /// about.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -241,6 +235,7 @@ class MessageRowHeader extends ConsumerWidget {
       cachedDisplayName: message.authorDisplayName,
       resolution: resolution,
     );
+    final isWebhook = resolution.profile?.isWebhook ?? false;
     final isBot = resolution.profile?.isBot ?? false;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s4),

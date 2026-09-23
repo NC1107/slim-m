@@ -86,6 +86,7 @@ mod threads;
 mod timeouts;
 mod user_notes;
 mod users;
+mod webhooks;
 
 pub use account_deletion::DeleteAccountError;
 pub use analytics::{
@@ -154,6 +155,7 @@ pub use threads::{
 };
 pub use timeouts::{MAX_TIMEOUT_MS, MemberTimeout};
 pub use user_notes::UserNote;
+pub use webhooks::{NewWebhook, Webhook, WebhookContext};
 
 /// Largest number of ids to bind into one `IN (...)` list, for the batched
 /// reads that build a variable-length query. Well under SQLite's default
@@ -254,6 +256,13 @@ pub struct User {
     /// `docs/decisions/0028-bot-accounts.md`; it changes how the account
     /// authenticates and how it is labelled, never what it may do.
     pub is_bot: bool,
+    /// Whether this account is a webhook's principal rather than a person or
+    /// a bot. See `docs/decisions/0030-incoming-webhooks.md`; like `is_bot`
+    /// it changes how the account authenticates (a webhook has no session at
+    /// all) and how it is labelled, never what it may do - except that a
+    /// webhook holds no roles in the first place, so there is nothing for it
+    /// to do beyond posting through its one delivery route.
+    pub is_webhook: bool,
 }
 
 /// A message. `author_id` is null once the author's account is anonymized.
@@ -375,6 +384,7 @@ impl Store {
             avatar_updated_at: None,
             status_text: None,
             is_bot: false,
+            is_webhook: false,
         })
     }
 

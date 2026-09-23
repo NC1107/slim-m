@@ -20,6 +20,7 @@ class UserProfile {
     this.timedOutUntil,
     this.statusText,
     this.isBot = false,
+    this.isWebhook = false,
   });
 
   final String id;
@@ -70,6 +71,15 @@ class UserProfile {
   /// as for a person. See `docs/decisions/0028-bot-accounts.md`.
   final bool isBot;
 
+  /// Whether this account is a webhook's principal rather than a person or a
+  /// bot, which the interface draws its always-on `Webhook` badge from. False
+  /// on a server older than this field: an older deployment has no webhooks
+  /// to mistake anyone for, so reading absent as "not a webhook" is accurate
+  /// there rather than merely safe. A webhook never appears in the member
+  /// list, so this is only ever seen by resolving a message's own author id.
+  /// See `docs/decisions/0030-incoming-webhooks.md`.
+  final bool isWebhook;
+
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -84,6 +94,7 @@ class UserProfile {
         timedOutUntil: json['timed_out_until'] as int?,
         statusText: json['status_text'] as String?,
         isBot: json['is_bot'] as bool? ?? false,
+        isWebhook: json['is_webhook'] as bool? ?? false,
       );
 
   /// Value equality so a `.select`ed [UserProfile] (see

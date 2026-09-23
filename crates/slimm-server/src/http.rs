@@ -4,6 +4,7 @@
 
 use std::time::Duration;
 
+use axum::extract::MatchedPath;
 use axum::http::StatusCode;
 use axum::{Extension, Router, extract::State, routing::get};
 use base64::Engine as _;
@@ -93,6 +94,7 @@ mod user_status;
 mod users;
 mod voice;
 mod voice_ring;
+mod webhooks;
 mod ws;
 
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
@@ -144,6 +146,18 @@ pub struct AppState {
 }
 
 /// Builds the router over the shared application state.
+///
+/// The trailing `TraceLayer` is given a `make_span_with` that labels its span
+/// by the matched route *template* (`MatchedPath`), never the raw request
+/// URI `TraceLayer::new_for_http()` records by default. Several routes carry
+/// a caller-controlled credential in the path itself - most pressingly
+/// `/webhooks/{webhook_id}/{token}`, whose token is a bearer credential in
+/// plaintext - and the default span would write it into every debug-level
+/// log line. `route_timing::record` already reads `MatchedPath` the same way
+/// for the same reason (unbounded cardinality from a caller-supplied id or
+/// search term), and the template is strictly more useful in a log besides:
+/// "which route" beats "which exact URL" for grepping. See
+/// `docs/decisions/0030-incoming-webhooks.md`'s "Leak" section.
 pub fn router(state: AppState) -> Router {
     // Fresh per call, like `state.limiter`; see `route_timing`'s own doc.
     let route_timings = route_timing::RouteTimings::new();
@@ -192,6 +206,7 @@ pub fn router(state: AppState) -> Router {
         .merge(bots::routes())
         .merge(voice::routes())
         .merge(voice_ring::routes())
+        .merge(webhooks::routes())
         .merge(polls::routes())
         .merge(users::routes())
         .merge(user_notes::routes())
@@ -210,7 +225,17 @@ pub fn router(state: AppState) -> Router {
         ))
         .layer(RequestBodyTimeoutLayer::new(BODY_READ_TIMEOUT))
         .merge(ws::routes())
-        .layer(TraceLayer::new_for_http())
+        // Route-template span labeling; see this function's own doc comment.
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &axum::extract::Request| {
+                let route = request
+                    .extensions()
+                    .get::<MatchedPath>()
+                    .map(MatchedPath::as_str)
+                    .unwrap_or("unmatched");
+                tracing::info_span!("http_request", method = %request.method(), route)
+            }),
+        )
         .with_state(state)
 }
 

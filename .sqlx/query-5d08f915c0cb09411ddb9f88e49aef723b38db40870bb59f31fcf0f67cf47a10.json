@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at, status_text, is_bot AS \"is_bot!\"\n               FROM users WHERE id = ? AND deleted_at IS NULL",
+  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at, status_text, is_bot AS \"is_bot!\",\n                      is_webhook AS \"is_webhook!\"\n               FROM users WHERE deleted_at IS NULL AND is_webhook = 0 AND id > ?\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)\n               ORDER BY id ASC LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -37,10 +37,15 @@
         "name": "is_bot!",
         "ordinal": 6,
         "type_info": "Integer"
+      },
+      {
+        "name": "is_webhook!",
+        "ordinal": 7,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -49,8 +54,9 @@
       false,
       true,
       true,
+      false,
       false
     ]
   },
-  "hash": "bb076afa5bbc7ac00b661ccea8c3f9222db8f43ca41320100f4aa1eb4d9ab911"
+  "hash": "5d08f915c0cb09411ddb9f88e49aef723b38db40870bb59f31fcf0f67cf47a10"
 }
