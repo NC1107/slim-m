@@ -95,6 +95,18 @@ struct ThreadParentDto {
     parent_channel_id: Option<String>,
     parent_channel_name: Option<String>,
     parent_message_id: Option<String>,
+    /// The parent message's current text. Null once [`Self::parent_deleted`]
+    /// is true, since a soft-deleted row's content is never sent to a client
+    /// through any other path either.
+    parent_content: Option<String>,
+    /// True once the parent message itself has been soft-deleted. A thread
+    /// stays open (its replies are a separate channel) even after its parent
+    /// is gone, so this is distinct from the whole-response masking above.
+    parent_deleted: bool,
+    /// Null once the parent's author account is anonymized, the same reason
+    /// `Message::author_id` goes null.
+    parent_author_id: Option<String>,
+    parent_author_display_name: Option<String>,
 }
 
 impl ThreadParentDto {
@@ -102,6 +114,10 @@ impl ThreadParentDto {
         parent_channel_id: None,
         parent_channel_name: None,
         parent_message_id: None,
+        parent_content: None,
+        parent_deleted: false,
+        parent_author_id: None,
+        parent_author_display_name: None,
     };
 }
 
@@ -110,13 +126,16 @@ impl ThreadParentDto {
 /// never appears in `listChannels`/`listDirectMessages`, so it never learns
 /// its own parent any other way.
 ///
-/// All three fields answer together, masked to all-null exactly the way
-/// `getChannelPermissions` masks its own bitmask: whenever `channel_id`
+/// The first three fields answer together, masked to all-null exactly the
+/// way `getChannelPermissions` masks its own bitmask: whenever `channel_id`
 /// does not exist, is not a thread, or the caller lacks VIEW_CHANNEL there
 /// (already resolved through the thread-to-parent rule), so this cannot
 /// become a second channel-existence oracle - see
 /// docs/decisions/0011-per-channel-permissions.md for the precedent this
-/// reuses rather than reinvents.
+/// reuses rather than reinvents. The remaining fields describe the parent
+/// message itself, resolved through [`Store::message`] the same way any
+/// other read does, so a deleted parent answers `parent_deleted: true` with
+/// no content rather than a stale copy or a second masked state.
 async fn thread_parent(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Path(channel_id): Path<String>,
@@ -138,10 +157,26 @@ async fn thread_parent(
         .channel(parent.parent_channel_id)
         .await?
         .map(|c| c.name);
+    let message = state.store.message(parent.parent_message_id).await?;
+    let (parent_content, parent_deleted, parent_author_id, parent_author_display_name) =
+        match message {
+            Some(m) => (
+                Some(m.content),
+                false,
+                m.author_id.map(|id| id.to_string()),
+                m.author_display_name,
+            ),
+            // A channel's parent_message_id always names a real row, so a miss here means it was soft-deleted.
+            None => (None, true, None, None),
+        };
     Ok(Json(ThreadParentDto {
         parent_channel_id: Some(parent.parent_channel_id.to_string()),
         parent_channel_name: name,
         parent_message_id: Some(parent.parent_message_id.to_string()),
+        parent_content,
+        parent_deleted,
+        parent_author_id,
+        parent_author_display_name,
     }))
 }
 

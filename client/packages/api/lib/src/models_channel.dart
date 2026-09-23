@@ -145,11 +145,28 @@ class ThreadParent {
     this.parentChannelId,
     this.parentChannelName,
     this.parentMessageId,
+    this.parentContent,
+    this.parentDeleted = false,
+    this.parentAuthorId,
+    this.parentAuthorDisplayName,
   });
 
   final String? parentChannelId;
   final String? parentChannelName;
   final String? parentMessageId;
+
+  /// The parent message's current text, joined server-side at read time.
+  /// Null exactly when [parentDeleted] is true.
+  final String? parentContent;
+
+  /// True once the parent message itself has been soft-deleted. A thread
+  /// stays open even after its parent is gone, so this is independent of
+  /// whether [parentChannelId] and friends resolved at all.
+  final bool parentDeleted;
+
+  /// Null once the parent's author account is anonymized.
+  final String? parentAuthorId;
+  final String? parentAuthorDisplayName;
 
   bool get isThread => parentChannelId != null;
 
@@ -157,6 +174,10 @@ class ThreadParent {
         parentChannelId: json['parent_channel_id'] as String?,
         parentChannelName: json['parent_channel_name'] as String?,
         parentMessageId: json['parent_message_id'] as String?,
+        parentContent: json['parent_content'] as String?,
+        parentDeleted: json['parent_deleted'] as bool? ?? false,
+        parentAuthorId: json['parent_author_id'] as String?,
+        parentAuthorDisplayName: json['parent_author_display_name'] as String?,
       );
 }
 
