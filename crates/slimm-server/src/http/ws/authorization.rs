@@ -69,6 +69,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MessageDeleted { .. }
         | Event::ReactionsChanged { .. }
         | Event::CodeRunChanged { .. }
+        | Event::CodeRunsCleared { .. }
         | Event::ThreadUpdated { .. }
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
@@ -201,6 +202,7 @@ pub(super) async fn authorize(
             Event::MessageDeleted { channel_id, .. } => *channel_id,
             Event::ReactionsChanged { channel_id, .. } => *channel_id,
             Event::CodeRunChanged { channel_id, .. } => *channel_id,
+            Event::CodeRunsCleared { channel_id, .. } => *channel_id,
             Event::ThreadUpdated { channel_id, .. } => *channel_id,
             Event::MessagePinned { channel_id, .. } => *channel_id,
             Event::MessageUnpinned { channel_id, .. } => *channel_id,
@@ -401,6 +403,13 @@ pub(super) async fn authorize(
             output,
             ran_by: ran_by.map(|u| u.to_string()),
             ran_at,
+        },
+        Event::CodeRunsCleared {
+            channel_id,
+            message_id,
+        } => ServerFrame::CodeRunsCleared {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
         },
         Event::ThreadUpdated {
             channel_id,

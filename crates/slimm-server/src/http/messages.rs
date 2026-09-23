@@ -425,7 +425,11 @@ async fn edit(
         Edited::Gone => return Err(ApiError::NotFound("message not found")),
         // No op row was written, so nothing changed for anybody to be told about.
         Edited::Unchanged(message) => message,
-        Edited::Edited { message, op_seq } => {
+        Edited::Edited {
+            message,
+            op_seq,
+            code_runs_cleared,
+        } => {
             // Content changed, so the mention set may have too; see resolve_and_store's own doc for the author-vs-editor choice below.
             super::message_mentions::resolve_and_store(
                 &state,
@@ -441,6 +445,13 @@ async fn edit(
                 op_seq,
                 forwarded: forwarded.clone(),
             });
+            // A bare MessageEdited frame cannot shrink a client's cached runs (message_extras.dart), so this is the only signal that does.
+            if code_runs_cleared {
+                state.hub.publish(Event::CodeRunsCleared {
+                    channel_id,
+                    message_id: message.id,
+                });
+            }
             message
         }
     };

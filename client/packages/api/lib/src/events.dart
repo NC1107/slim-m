@@ -71,6 +71,13 @@ sealed class ServerEvent {
           messageId: decoded['message_id'] as String,
           run: CodeRun.fromJson(decoded),
         ),
+      'code_runs.cleared'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String =>
+        CodeRunsCleared(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+        ),
       'thread.updated'
           when decoded['channel_id'] is String &&
               decoded['parent_message_id'] is String &&

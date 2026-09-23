@@ -131,4 +131,35 @@ void main() {
       expect(controller.extrasFor('m1').codeRuns.first.output, 'fetched');
     },
   );
+
+  test(
+    'a code_runs.cleared frame drops every run, unlike a bare edited frame',
+    () async {
+      final events = StreamController<api.ServerEvent>.broadcast();
+      addTearDown(events.close);
+      final container = ProviderContainer(
+        overrides: [liveEventsProvider.overrideWithValue(events.stream)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(messageExtrasProvider.notifier);
+
+      events.add(
+        api.CodeRunChanged(channelId: 'c1', messageId: 'm1', run: _run(0, '2')),
+      );
+      events.add(
+        api.CodeRunChanged(channelId: 'c1', messageId: 'm1', run: _run(1, 'x')),
+      );
+      await _settle();
+      expect(controller.extrasFor('m1').codeRuns, hasLength(2));
+
+      events.add(const api.CodeRunsCleared(channelId: 'c1', messageId: 'm1'));
+      await _settle();
+
+      expect(
+        controller.extrasFor('m1').codeRuns,
+        isEmpty,
+        reason: 'an edit must not leave an older run attached to new code',
+      );
+    },
+  );
 }

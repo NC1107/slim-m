@@ -45,6 +45,20 @@ void main() {
     expect(changed.run.ranBy, 'u1');
   });
 
+  test('parses a code_runs.cleared frame', () {
+    final event = ServerEvent.parse(
+      jsonEncode({
+        'type': 'code_runs.cleared',
+        'channel_id': 'c1',
+        'message_id': 'm1',
+      }),
+    );
+    expect(event, isA<CodeRunsCleared>());
+    final cleared = event as CodeRunsCleared;
+    expect(cleared.channelId, 'c1');
+    expect(cleared.messageId, 'm1');
+  });
+
   test('a code_run.changed frame missing block_index is ignored, not thrown',
       () {
     final event = ServerEvent.parse(

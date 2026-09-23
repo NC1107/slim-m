@@ -70,6 +70,17 @@ class CodeRunChanged extends ServerEvent {
   final CodeRun run;
 }
 
+/// Every stored run for this message was dropped because its content just
+/// changed. No block index: an edit can add or remove a block above another
+/// one and shift every later index, so the server clears the whole message
+/// rather than naming a block a shifted index could get wrong.
+class CodeRunsCleared extends ServerEvent {
+  const CodeRunsCleared({required this.channelId, required this.messageId});
+
+  final String channelId;
+  final String messageId;
+}
+
 /// A thread's reply summary changed: it was just opened, or gained a reply.
 /// Carries the current count rather than a delta, the same "whole current
 /// answer" shape [PollVoted] already uses, so a client that missed a frame
