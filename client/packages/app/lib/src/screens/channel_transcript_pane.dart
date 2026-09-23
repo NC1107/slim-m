@@ -58,6 +58,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
     required this.channelTopic,
     required this.isThread,
     required this.lastReadSeq,
+    required this.manuallyUnread,
     required this.onMarkRead,
     required this.onReply,
   });
@@ -76,9 +77,16 @@ class ChannelTranscriptPane extends ConsumerWidget {
   final bool isThread;
   final int lastReadSeq;
 
+  /// Mirrored from the server's own hand-mark flag; see `Channel.
+  /// manuallyUnread`'s doc comment in `database.dart`. Threaded down to
+  /// [onMarkRead] because reading a channel is the only client-side undo for
+  /// it, and that undo has to fire even when [lastReadSeq] already equals the
+  /// newest seq - see `channel_read_marker.dart`.
+  final bool manuallyUnread;
+
   /// `_ChannelScreenState._markReadUpToLatest`: read-marking goes through
   /// its own `ReadMarker`, owned by the screen, not duplicated here.
-  final void Function(int seq, int lastReadSeq) onMarkRead;
+  final void Function(int seq, int lastReadSeq, bool manuallyUnread) onMarkRead;
 
   /// `_ChannelScreenState._startReply`: shows the reply banner above the
   /// composer, which lives outside this pane entirely.
@@ -177,10 +185,15 @@ class ChannelTranscriptPane extends ConsumerWidget {
                         scrollTracker.updateKnownSeqs(
                           latestSeq: transcript.newestSeq,
                           lastReadSeq: lastReadSeq,
+                          manuallyUnread: manuallyUnread,
                         );
                         // Gated on the viewport: scrolled into history, this rebuild is a message arriving somewhere unread.
                         if (scrollTracker.atLatest) {
-                          onMarkRead(transcript.newestSeq, lastReadSeq);
+                          onMarkRead(
+                            transcript.newestSeq,
+                            lastReadSeq,
+                            manuallyUnread,
+                          );
                         }
                         return MessageTranscript(
                           channelId: channelId,

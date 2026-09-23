@@ -39,10 +39,23 @@ class ReadMarker {
   final WidgetRef _ref;
   final Map<String, int> _sent = {};
 
-  void advance(String channelId, {required int seq, required int lastReadSeq}) {
+  /// [manuallyUnread] is the hand-mark's current value, not an edge trigger:
+  /// the caller has no seq of its own to guard it with, since the server's
+  /// `markUnread` deliberately does not move `lastReadSeq` (`seq ==
+  /// lastReadSeq` is the ordinary result of marking an already-read channel
+  /// unread). Both guards below are bypassed while it is true, so sitting at
+  /// the latest message still clears it even though there is no seq to
+  /// advance to; they resume once the local write flips it false and the next
+  /// build passes that back in.
+  void advance(
+    String channelId, {
+    required int seq,
+    required int lastReadSeq,
+    required bool manuallyUnread,
+  }) {
     if (seq == 0) return;
-    if (seq <= lastReadSeq) return;
-    if ((_sent[channelId] ?? 0) >= seq) return;
+    if (seq <= lastReadSeq && !manuallyUnread) return;
+    if (!manuallyUnread && (_sent[channelId] ?? 0) >= seq) return;
     _sent[channelId] = seq;
     unawaited(_write(channelId, seq));
   }
