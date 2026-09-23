@@ -3872,6 +3872,13 @@ paths:
         (see runModuleCommand's own note), except `RUN_CODE` is evaluated for
         this message's own channel rather than at the base level, so a
         channel overwrite can grant or withhold it per channel.
+
+
+        If this message launched an app surface (see launchAppMessage), the
+        named `moduleId`/`command` must match the ones that launched it, on
+        every block index, or the call is refused with 403 - a module
+        permission held for something else can never overwrite a surface it
+        did not launch.
       requestBody:
         required: true
         content:

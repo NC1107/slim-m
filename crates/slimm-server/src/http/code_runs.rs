@@ -17,6 +17,21 @@
 //! `permissions` this route already resolved for its own `VIEW_CHANNEL`
 //! check - so unlike the module-permission path, a code-runner invocation
 //! here is channel-scoped and can be overwritten per channel.
+//!
+//! `execute_command`'s gate is "does the caller hold a permission for the
+//! module they named", not "is the module they named the one this message
+//! actually launched". A message that carries an `app_surfaces` row owns its
+//! entire code-run surface - `record_code_run` overwrites the same row
+//! regardless of which block a request names, and `app_surfaces` has no
+//! `block_index` of its own - so before ever reaching `execute_command` or
+//! `execute_code_runner`, this route checks the request's `module_id` and
+//! `command` against that row when one exists and refuses a mismatch. The
+//! refusal is `Forbidden`, not the probe-defense `NotFound` above: that mask
+//! exists to hide whether a message a caller cannot even view exists at all,
+//! but a caller reaching this check has already cleared `VIEW_CHANNEL` and
+//! the surface's `module_id`/`command` are already visible to them on the
+//! message DTO, so there is nothing left to hide - this is an ordinary
+//! authorization refusal.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -86,6 +101,13 @@ async fn run(
         .await?;
     if !permissions.contains(Permissions::VIEW_CHANNEL) {
         return Err(ApiError::NotFound("no such message"));
+    }
+
+    // An app surface owns its whole code-run surface; see this file's doc comment.
+    if let Some(surface) = state.store.app_surface_for_message(message_id).await?
+        && (surface.module_id != req.module_id || surface.command != req.command)
+    {
+        return Err(ApiError::Forbidden);
     }
 
     // Gating happens inside execute_command / execute_code_runner below.
