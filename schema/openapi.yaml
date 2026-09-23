@@ -1411,13 +1411,18 @@ paths:
         notification - never appears in `listChannels`/`listDirectMessages`
         and so never learns its own parent channel or the message it hangs
         off any other way. This is that lookup, keyed only on the thread's
-        own channel id. All three fields answer together: either all three
-        are set, or all three are null, whenever `channelId` does not
-        exist, is not a thread, or the caller lacks VIEW_CHANNEL there
-        (which already resolves through the thread-to-parent rule) - the
-        same masking `getChannelPermissions` uses, so this cannot become a
-        second channel-existence oracle. There is accordingly no 403 or 404
-        here.
+        own channel id. `parent_channel_id`, `parent_channel_name` and
+        `parent_message_id` answer together: either all three are set, or
+        all three are null, whenever `channelId` does not exist, is not a
+        thread, or the caller lacks VIEW_CHANNEL there (which already
+        resolves through the thread-to-parent rule) - the same masking
+        `getChannelPermissions` uses, so this cannot become a second
+        channel-existence oracle. There is accordingly no 403 or 404 here.
+        The remaining fields describe the parent message itself and are
+        null (with `parent_deleted: false`) alongside the same masking, or
+        once it exists, `parent_content` is null and `parent_deleted` is
+        true exactly when the parent has been soft-deleted - the thread
+        itself stays open either way.
       responses:
         "200":
           description: The thread's parent, or all-null if this is not one.
@@ -9019,7 +9024,16 @@ components:
 
     ThreadParent:
       type: object
-      required: [parent_channel_id, parent_channel_name, parent_message_id]
+      required:
+        [
+          parent_channel_id,
+          parent_channel_name,
+          parent_message_id,
+          parent_content,
+          parent_deleted,
+          parent_author_id,
+          parent_author_display_name,
+        ]
       properties:
         parent_channel_id:
           type: string
@@ -9035,6 +9049,22 @@ components:
           format: uuid
           nullable: true
           description: The message this thread hangs off.
+        parent_content:
+          type: [string, "null"]
+          description: >-
+            The parent message's current text, joined at read time. Null
+            exactly when parent_deleted is true.
+        parent_deleted:
+          type: boolean
+          description: >-
+            True once the parent message has been soft-deleted. The thread
+            stays open either way, since its replies are a separate channel.
+        parent_author_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null once the parent's author account is anonymized.
+        parent_author_display_name:
+          type: [string, "null"]
 
     ThreadListItem:
       description: >-

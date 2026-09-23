@@ -4,6 +4,9 @@
 /// second `ChannelHeader` underneath it at any width that shows both panes -
 /// two bars where there should be one. Covers both layouts, since the same
 /// wrapper drives compact and expanded and only expanded was reported.
+///
+/// `ThreadParentCard`'s own rendering is `thread_parent_card_test.dart`,
+/// split out for the file budget.
 library;
 
 import 'dart:convert';
@@ -60,11 +63,19 @@ http.Response _threadParentJson({
   String? parentChannelId,
   String? parentChannelName,
   String? parentMessageId,
+  String? parentContent,
+  bool parentDeleted = false,
+  String? parentAuthorId,
+  String? parentAuthorDisplayName,
 }) => http.Response(
   jsonEncode({
     'parent_channel_id': parentChannelId,
     'parent_channel_name': parentChannelName,
     'parent_message_id': parentMessageId,
+    'parent_content': parentContent,
+    'parent_deleted': parentDeleted,
+    'parent_author_id': parentAuthorId,
+    'parent_author_display_name': parentAuthorDisplayName,
   }),
   200,
   headers: {'content-type': 'application/json'},

@@ -95,6 +95,12 @@
 /// cannot resolve (a deleted parent, a permission lost between opening the
 /// notification and this screen mounting) - never a stale or invented name.
 ///
+/// The same resolved answer is also what [ThreadParentCard] renders above
+/// the transcript: before this, the parent message was never shown anywhere
+/// in the thread panel, so a thread carried replies with no visible subject.
+/// A deleted parent or an anonymized author is the card's own concern, not
+/// this screen's - see its doc comment.
+///
 /// The same resolved answer also closes a second, separate bug: a thread
 /// opened cold never got a local `channels` row at all (see above), so
 /// `MessageStore.setReadMarker`'s plain `UPDATE` silently no-op'd and the
@@ -125,6 +131,7 @@ import '../providers/threads.dart';
 import '../routing/close_screen.dart';
 import '../routing/routes.dart';
 import '../widgets/compact_channel_app_bar.dart' show ChannelSearchAction;
+import '../widgets/thread_parent_card.dart';
 import 'channel_screen.dart';
 
 class ThreadScreen extends ConsumerStatefulWidget {
@@ -181,10 +188,10 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final parentName = ref
+    final parent = ref
         .watch(threadParentProvider(widget.channelId))
-        .valueOrNull
-        ?.parentChannelName;
+        .valueOrNull;
+    final parentName = parent?.parentChannelName;
     final title = parentName == null || parentName.isEmpty
         ? 'Thread'
         : 'Thread in #$parentName';
@@ -209,7 +216,15 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
           const SizedBox(width: AppSpacing.s8),
         ],
       ),
-      body: ChannelScreen(channelId: widget.channelId, isThread: true),
+      body: Column(
+        children: [
+          if (parent != null && parent.isThread)
+            ThreadParentCard(parent: parent, threadChannelId: widget.channelId),
+          Expanded(
+            child: ChannelScreen(channelId: widget.channelId, isThread: true),
+          ),
+        ],
+      ),
     );
   }
 }
