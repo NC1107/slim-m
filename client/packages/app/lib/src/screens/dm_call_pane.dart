@@ -23,12 +23,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/dm_call.dart';
 import '../widgets/voice_strip_indicator.dart' show CallChannelName;
 import 'canvas/canvas_open_button.dart';
 import 'voice_screen.dart';
 
-/// The DM channel whose call pane is open, or null.
-final dmCallOpenProvider = StateProvider<String?>((ref) => null);
+export '../providers/dm_call.dart' show dmCallOpenProvider;
 
 class DmCallPane extends ConsumerWidget {
   const DmCallPane({super.key, required this.channelId});
