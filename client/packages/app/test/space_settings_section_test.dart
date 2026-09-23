@@ -109,6 +109,7 @@ void main() {
     expect(find.text('MODERATION'), findsOneWidget);
     expect(find.text('ACCESS'), findsOneWidget);
     expect(find.text('CONFIGURATION'), findsOneWidget);
+    expect(find.text('SERVER'), findsOneWidget);
     for (final label in [
       'Reports',
       'Removed members',
@@ -119,6 +120,8 @@ void main() {
       'Emoji',
       'Performance',
       'Analytics',
+      'Storage',
+      'Server metrics',
     ]) {
       expect(find.text(label), findsWidgets, reason: '$label missing');
     }
@@ -126,7 +129,48 @@ void main() {
     // Wide always shows something: the first pane is embedded, not routed.
     expect(find.byType(ReportsPane), findsOneWidget);
     expect(find.text('The queue is empty.'), findsOneWidget);
+
+    // Geometry, not just text: the four panes sit under SERVER, between CONFIGURATION and ADDONS.
+    final configurationY = tester.getTopLeft(find.text('CONFIGURATION')).dy;
+    final serverY = tester.getTopLeft(find.text('SERVER')).dy;
+    final performanceY = tester.getTopLeft(find.text('Performance')).dy;
+    final addonsY = tester.getTopLeft(find.text('ADDONS')).dy;
+    expect(configurationY, lessThan(serverY));
+    expect(serverY, lessThan(performanceY));
+    expect(performanceY, lessThan(addonsY));
   });
+
+  testWidgets(
+    'MANAGE_SERVER alone shows the Server group, with Configuration down to '
+    'just Emoji',
+    (tester) async {
+      // Emoji stays MANAGE_SERVER, same as before the split, so Configuration survives on that pane alone.
+      await _pump(tester, permissions: Perm.manageServer);
+
+      expect(find.text('SERVER'), findsOneWidget);
+      for (final label in [
+        'Performance',
+        'Analytics',
+        'Storage',
+        'Server metrics',
+      ]) {
+        expect(find.text(label), findsWidgets, reason: '$label missing');
+      }
+      expect(find.text('CONFIGURATION'), findsOneWidget);
+      expect(find.text('Emoji'), findsWidgets);
+      for (final label in [
+        'Roles',
+        'Channel permissions',
+        'Channel categories',
+      ]) {
+        expect(
+          find.text(label),
+          findsNothing,
+          reason: '$label needs a different bit',
+        );
+      }
+    },
+  );
 
   testWidgets('wide: choosing another pane swaps it in place, with the New '
       'role action surfacing in the app bar', (tester) async {
