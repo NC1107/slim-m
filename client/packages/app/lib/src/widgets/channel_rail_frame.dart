@@ -358,6 +358,11 @@ class RailUserFooter extends ConsumerWidget {
   /// [SpaceConnectionDot]'s job in [RailHeader], not this one's, and
   /// conflating the two here used to blank a chosen status behind
   /// "connecting"/"offline" for the whole time a reconnect was in flight.
+  ///
+  /// A typed status (`api.Me.statusText`) outranks the generic word once one
+  /// is set, the same way the member pane's own row shows it rather than
+  /// alongside "online": this footer used to say `connected` forever
+  /// regardless of what was typed into the status menu directly above it.
   final String? activeChannelId;
 
   @override
@@ -374,6 +379,11 @@ class RailUserFooter extends ConsumerWidget {
         inCall && callChannelId != null && callChannelId != activeChannelId;
 
     final (statusLabel, presence) = presenceDisplayOf(visibility);
+    // A typed status outranks the generic presence word, same as on any profile that shows it.
+    final statusText = me.valueOrNull?.statusText;
+    final secondLine = statusText != null && statusText.isNotEmpty
+        ? statusText
+        : statusLabel;
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the
     // screen edge while [SafeArea] lifts the content off the home indicator.
@@ -421,7 +431,7 @@ class RailUserFooter extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            statusLabel,
+                            secondLine,
                             overflow: TextOverflow.ellipsis,
                             style: AppText.micro.copyWith(
                               color: tokens.textSecondary,

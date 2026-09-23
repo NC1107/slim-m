@@ -299,8 +299,9 @@ void main() {
     await tester.tap(find.text(personalSpaceName));
     await tester.pumpAndSettle();
 
-    expect(requests, hasLength(1));
-    expect(requests.single.url.path, '/dms/self');
+    // Filtered past the presence seed's own GET /members.
+    final opens = requests.where((r) => r.url.path == '/dms/self');
+    expect(opens, hasLength(1));
     expect(find.text('channel:dm-self'), findsOneWidget);
     container.dispose();
   });
@@ -341,7 +342,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      requests,
+      requests.where((r) => r.url.path == '/dms/self'),
       isEmpty,
       reason: 'an already-open personal space needs no round trip',
     );

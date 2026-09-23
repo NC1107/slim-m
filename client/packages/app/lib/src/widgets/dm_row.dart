@@ -20,6 +20,11 @@
 /// DM would silently disagree with every other device signed into the same
 /// account. It reverses itself once the other person sends something new, or
 /// the moment this device opens or messages them again.
+///
+/// The avatar carries the peer's live presence dot now, the same
+/// [AppAvatar.status] overlay `MemberRow` already draws; `DirectMessagesSection`
+/// seeds it from the deployment-wide roster, since one deployment is one
+/// community and every DM peer is already a member of it.
 library;
 
 import 'dart:async';
@@ -36,6 +41,8 @@ import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/dm_call_activity.dart';
 import 'mark_unread_action.dart';
 import '../providers/dms.dart';
+import '../providers/member_presence.dart' show presenceOf;
+import '../providers/presence_controller.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
@@ -162,6 +169,13 @@ class DmRow extends ConsumerWidget {
     final muted = ref.watch(
       channelNotificationOverridesProvider.select((s) => s.isMuted(channel.id)),
     );
+    // Seeded by DirectMessagesSection from the deployment-wide roster; absent here, this stays offline until that seed or a live event lands.
+    final peerId = channel.dmParticipantId;
+    final presence = peerId == null
+        ? null
+        : presenceOf(
+            ref.watch(presenceControllerProvider.select((m) => m[peerId])),
+          );
     return ContextMenuRegion(
       itemsBuilder: (menuContext, close) => _menuItems(menuContext, ref, close),
       // AppListRow is already its own tab stop; see ContextMenuFocus.ownsFocusNode.
@@ -176,6 +190,7 @@ class DmRow extends ConsumerWidget {
           name: channel.name,
           tintKey: channel.dmParticipantId,
           size: 20,
+          status: presence,
         ),
         trailing: inCall
             ? Icon(
