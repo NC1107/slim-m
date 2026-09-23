@@ -73,7 +73,7 @@ class MemberSelectionBar extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _label(selection),
+              _label(selection, canTimeOut: canTimeOut, canRemove: canRemove),
               style: AppText.body.copyWith(
                 color: any ? tokens.textPrimary : tokens.textSecondary,
               ),
@@ -106,8 +106,25 @@ class MemberSelectionBar extends ConsumerWidget {
   /// Deliberately not the header button's own wording: two controls sharing an
   /// accessible name makes a screen reader announce the same phrase for the
   /// thing that starts the mode and the line reporting its state.
-  String _label(MemberSelection selection) {
-    if (selection.count == 0) return 'Nobody selected yet';
+  ///
+  /// Nobody selected yet is a dead end on its own - it says the mode is
+  /// waiting but not what for, so it reads as broken rather than idle. The
+  /// verb named here is scoped to what the viewer actually holds, since
+  /// [canTimeOut] and [canRemove] are held separately and the bar itself is
+  /// only ever shown once at least one is true.
+  String _label(
+    MemberSelection selection, {
+    required bool canTimeOut,
+    required bool canRemove,
+  }) {
+    if (selection.count == 0) {
+      final verb = canTimeOut && canRemove
+          ? 'time out or remove'
+          : canTimeOut
+          ? 'time out'
+          : 'remove';
+      return 'Tap members to $verb';
+    }
     final n = selection.count;
     final counted = n == 1 ? '1 selected' : '$n selected';
     return selection.atCap ? '$counted, the most at once' : counted;

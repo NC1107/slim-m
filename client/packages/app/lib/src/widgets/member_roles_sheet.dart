@@ -41,6 +41,10 @@ import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import 'run_guarded.dart';
 
+/// Marks the bordered card around the role rows, so a test can measure it
+/// directly rather than inferring the fix from a screenshot.
+const memberRolesListBoxKey = Key('member_roles_list_box');
+
 Future<void> showMemberRolesSheet(BuildContext context, String userId) {
   return showAppSheet<void>(
     context,
@@ -127,32 +131,47 @@ class _MemberRolesSheetState extends ConsumerState<MemberRolesSheet>
               final assignable = list
                   .where((r) => !r.isEveryone)
                   .toList(growable: false);
-              return ListView.builder(
-                shrinkWrap: true,
-                itemCount: assignable.length,
-                itemBuilder: (context, i) {
-                  final role = assignable[i];
-                  // By id, never name: two roles can share one and both light up.
-                  final held = member?.roleIds.contains(role.id) ?? false;
-                  // Mirrors the server's refusal, so the toggle cannot spring back.
-                  final grantable = mine.hasPermission(role.permissions);
-                  return AppListRow(
-                    leading: const Icon(AppIcons.shield),
-                    label: role.name,
-                    meta: grantable
-                        ? null
-                        : 'Needs permissions you do not hold',
-                    trailing: AppToggle(
-                      value: held,
-                      onChanged: grantable && member != null
-                          ? (v) => _toggle(role, v)
-                          : null,
-                      semanticLabel:
-                          '${role.name} for '
-                          '${member?.displayName ?? 'this member'}',
-                    ),
-                  );
-                },
+              // A bordered, sunken group so one role reads as finished, not a bare row floating on the sheet's own background.
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.s16,
+                  0,
+                  AppSpacing.s16,
+                  AppSpacing.s16,
+                ),
+                child: AppCard(
+                  key: memberRolesListBoxKey,
+                  sunken: true,
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s4),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: assignable.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, i) {
+                      final role = assignable[i];
+                      // By id, never name: two roles can share one and both light up.
+                      final held = member?.roleIds.contains(role.id) ?? false;
+                      // Mirrors the server's refusal, so the toggle cannot spring back.
+                      final grantable = mine.hasPermission(role.permissions);
+                      return AppListRow(
+                        leading: const Icon(AppIcons.shield),
+                        label: role.name,
+                        meta: grantable
+                            ? null
+                            : 'Needs permissions you do not hold',
+                        trailing: AppToggle(
+                          value: held,
+                          onChanged: grantable && member != null
+                              ? (v) => _toggle(role, v)
+                              : null,
+                          semanticLabel:
+                              '${role.name} for '
+                              '${member?.displayName ?? 'this member'}',
+                        ),
+                      );
+                    },
+                  ),
+                ),
               );
             },
           ),

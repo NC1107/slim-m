@@ -121,4 +121,79 @@ void main() {
       expect(find.byType(AppToggle), findsOneWidget);
     },
   );
+
+  // Previously this sheet had no isEmpty/emptyMessage at all, unlike member_roles_sheet.dart's own version of it - an empty roster rendered blank.
+  testWidgets(
+    'a Space with no members to assign says so rather than showing blank',
+    (tester) async {
+      await _pumpSheet(
+        tester,
+        role: _role('role-mod', 'mod', Perm.manageMessages),
+        permissions: Perm.manageRoles,
+        members: (ref) async => [],
+      );
+
+      expect(find.textContaining('no members'), findsOneWidget);
+    },
+  );
+
+  // The owner: "very ugly role menu" - the card must be inset on the desktop dialog `showAppSheet` renders at this window width.
+  testWidgets('on a desktop window, the row sits inside a card inset from the '
+      'dialog edges rather than touching them', (tester) async {
+    await _pumpSheet(
+      tester,
+      role: _role('role-mod', 'mod', Perm.manageMessages),
+      permissions: Perm.manageRoles,
+    );
+
+    final sheet = tester.getRect(
+      find.byWidgetPredicate(
+        (w) => w is ConstrainedBox && w.constraints.maxWidth == kSheetMaxWidth,
+      ),
+    );
+    final card = tester.getRect(find.byKey(roleAssignBodyBoxKey));
+
+    expect(
+      card.left - sheet.left,
+      AppSpacing.s16,
+      reason: 'the card must sit off the sheet edge like the title above it',
+    );
+    expect(
+      sheet.right - card.right,
+      AppSpacing.s16,
+      reason: 'same inset on the trailing edge',
+    );
+  });
+
+  // Below kCompactWidth, showAppSheet renders a full-width bottom sheet: the same inset holds against the screen edge, not a ConstrainedBox.
+  testWidgets(
+    'on a phone window, the row sits inside a card inset from the sheet '
+    'edges rather than touching them',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await _pumpSheet(
+        tester,
+        role: _role('role-mod', 'mod', Perm.manageMessages),
+        permissions: Perm.manageRoles,
+      );
+
+      final windowWidth =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      final card = tester.getRect(find.byKey(roleAssignBodyBoxKey));
+
+      expect(
+        card.left,
+        AppSpacing.s16,
+        reason: 'the card must sit off the screen edge like the title above it',
+      );
+      expect(
+        windowWidth - card.right,
+        AppSpacing.s16,
+        reason: 'same inset on the trailing edge',
+      );
+    },
+  );
 }
