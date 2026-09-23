@@ -90,7 +90,7 @@ Giving one null two meanings would put the distinction into every read path and 
 Worse, a null author is not a principal, so there would be nothing to authorize the write against - a second answer to a question already answered, which is where authorization bugs live.
 
 **Rejected: reusing `users.is_bot`.**
-A new `users.is_webhook` flag, mirroring how 0072 added `is_bot`, because the two differ in what they may do rather than only in how they are labelled.
+A new `users.is_webhook` flag, mirroring how migration 0072 added `is_bot`, because the two differ in what they may do rather than only in how they are labelled.
 Sharing one flag would mean the member list, the badge, and the ws-ticket path all had to re-derive which kind they were looking at.
 
 ### Where this departs from 0028, deliberately
@@ -262,8 +262,8 @@ Messages it already posted follow the channel, like everything else in it.
 There is no session to revoke and no socket to kill, so the row going away is the whole of it - no `SessionRevoked` fan-out, no already-open connection that outlives the response to its own leak.
 
 **Mint, rotate and revoke go on the moderation audit trail** (0015), with the acting human as `actor_id` and the webhook's own principal as `subject_id`, which works because a webhook is a `users` row and `moderation_audit_log.subject_id` is `NOT NULL REFERENCES users(id)`.
-One trap, stated so it is not discovered late: `moderation_audit_log` constrains `action` with a `CHECK`, SQLite cannot widen a `CHECK` in place, and 0049 had to rebuild the table to add one action.
-Adding webhook actions is that same rebuild, and 0049's own header records the `foreign_keys=ON` cascade trap that cost 0034 its first attempt.
+One trap, stated so it is not discovered late: `moderation_audit_log` constrains `action` with a `CHECK`, SQLite cannot widen a `CHECK` in place, and migration 0049 had to rebuild the table to add one action.
+Adding webhook actions is that same rebuild, and migration 0049's own header records the `foreign_keys=ON` cascade trap that cost migration 0034 its first attempt.
 
 ## What a webhook must never be able to do
 
