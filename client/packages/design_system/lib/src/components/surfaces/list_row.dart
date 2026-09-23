@@ -30,12 +30,16 @@ import '../../touch_targets.dart';
 ///   alike, so unread's *distinguishing* cue from selected is the dot, shown
 ///   only when [trailing] is absent (a trailing count badge already carries
 ///   the same meaning, so the dot would be redundant next to it).
-/// - [mentioned]: the same dot, painted in [AppTokens.accentFill] instead of
-///   [AppTokens.textPrimary] - "unread badge" and "mentions of you" are two
-///   of the seven closed accent roles (`docs/decisions/0004-visual-identity-
-///   review.md`), and this is what tells them apart without a second glyph.
-///   Implies [unread] visually (a mention is always unread) but is read
-///   independently, so a caller need not also pass `unread: true`.
+/// - [mentioned]: a diamond in place of the unread dot's circle, painted in
+///   [AppTokens.accentFill] instead of [AppTokens.textPrimary] - "unread
+///   badge" and "mentions of you" are two of the seven closed accent roles
+///   (`docs/decisions/0004-visual-identity-review.md`). Colour used to be the
+///   only cue between them, which loses the distinction for anyone who
+///   cannot separate the two hues; shape now carries it instead, and colour
+///   only reinforces it. Implies [unread] visually (a mention is always
+///   unread) but is read independently, so a caller need not also pass
+///   `unread: true`; a row that is both still renders only the one diamond,
+///   never a second dot alongside it.
 /// - [muted]: dims the leading and trailing content to `opacity: 0.62`, but
 ///   deliberately not the label. The source dimmed the whole row, and doing
 ///   that here dragged an offline member's name below the AA contrast floor
@@ -154,8 +158,9 @@ class AppListRow extends StatefulWidget {
   /// Exposed so a test can find the unread dot without depending on colour.
   static const Key unreadDotKey = Key('app_list_row_unread_dot');
 
-  /// [unreadDotKey]'s own sibling for [mentioned]'s accent-coloured dot, so
-  /// a test can tell the two apart by key rather than by reading colour.
+  /// [unreadDotKey]'s counterpart for [mentioned]: a diamond rather than a
+  /// circle, painted in accent fill, so a test - or a viewer who cannot
+  /// separate the two hues - can tell the two apart without reading colour.
   static const Key mentionDotKey = Key('app_list_row_mention_dot');
 
   /// The height a row built here takes, for a sibling that must line up with
@@ -211,6 +216,41 @@ class _AppListRowState extends State<AppListRow> {
   /// appears the instant the finger touches down rather than on release.
   bool _pressed = false;
 
+  /// The side of the square [_dotFor] rotates into a diamond, chosen so the
+  /// rotated bounding box lands exactly on the unread dot's 6x6 footprint -
+  /// neither shape reflows the row's trailing slot when the other replaces it.
+  static const double _diamondSide = 6 * math.sqrt1_2;
+
+  /// Unread's circle and a mention's diamond, both boxed to the same 6x6
+  /// footprint regardless of shape. See [AppListRow.mentioned] for why this
+  /// exists: colour alone did not survive greyscale.
+  static Widget _dotFor({required bool mentioned, required Color color}) {
+    if (!mentioned) {
+      return DecoratedBox(
+        key: AppListRow.unreadDotKey,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(AppRadii.full),
+        ),
+        child: const SizedBox(width: 6, height: 6),
+      );
+    }
+    return SizedBox(
+      width: 6,
+      height: 6,
+      child: Center(
+        child: Transform.rotate(
+          angle: math.pi / 4,
+          child: DecoratedBox(
+            key: AppListRow.mentionDotKey,
+            decoration: BoxDecoration(color: color),
+            child: const SizedBox(width: _diamondSide, height: _diamondSide),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -242,16 +282,9 @@ class _AppListRowState extends State<AppListRow> {
               opacity: t,
               child: Transform.scale(scale: 0.85 + 0.15 * t, child: child),
             ),
-            child: DecoratedBox(
-              key: widget.mentioned
-                  ? AppListRow.mentionDotKey
-                  : AppListRow.unreadDotKey,
-              decoration: BoxDecoration(
-                color:
-                    widget.mentioned ? tokens.accentFill : tokens.textPrimary,
-                borderRadius: BorderRadius.circular(AppRadii.full),
-              ),
-              child: const SizedBox(width: 6, height: 6),
+            child: _dotFor(
+              mentioned: widget.mentioned,
+              color: widget.mentioned ? tokens.accentFill : tokens.textPrimary,
             ),
           )
         : null;
