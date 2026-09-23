@@ -176,7 +176,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );
@@ -202,7 +202,7 @@ void main() {
         );
         final membersSub = container.listen(membersProvider, (_, __) {});
         final keepAliveSub = container.listen(
-          memberRosterKeepAliveProvider,
+          memberRosterKeepAliveProvider(null),
           (_, __) {},
         );
         async.flushMicrotasks();
@@ -251,7 +251,7 @@ void main() {
         );
         final membersSub = container.listen(membersProvider, (_, __) {});
         final keepAliveSub = container.listen(
-          memberRosterKeepAliveProvider,
+          memberRosterKeepAliveProvider(null),
           (_, __) {},
         );
         async.flushMicrotasks();

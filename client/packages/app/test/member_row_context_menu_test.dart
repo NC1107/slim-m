@@ -68,6 +68,16 @@ ProviderContainer _container() => ProviderContainer(
         ),
       ],
     ),
+    channelMembersProvider.overrideWith(
+      (ref, _) async => [
+        const api.UserProfile(
+          id: 'user-maya',
+          username: 'maya',
+          displayName: 'Maya',
+          createdAt: 0,
+        ),
+      ],
+    ),
   ],
 );
 
@@ -83,7 +93,7 @@ Future<void> main() async {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );

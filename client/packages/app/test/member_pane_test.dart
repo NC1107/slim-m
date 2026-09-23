@@ -84,6 +84,7 @@ List<Override> _overrides({
     return api;
   }),
   membersProvider.overrideWith((ref) async => members),
+  channelMembersProvider.overrideWith((ref, _) async => members),
 ];
 
 void main() {
@@ -153,7 +154,7 @@ void main() {
           container: container,
           child: MaterialApp(
             theme: buildTheme(Brightness.light, AppTokens.light),
-            home: const Scaffold(body: AppMemberPane()),
+            home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
           ),
         ),
       );
@@ -182,7 +183,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );
@@ -211,6 +212,10 @@ void main() {
           if (fail) throw const TransportException('offline');
           return [_profile('1', 'Priya')];
         }),
+        channelMembersProvider.overrideWith((ref, _) async {
+          if (fail) throw const TransportException('offline');
+          return [_profile('1', 'Priya')];
+        }),
       ],
     );
     addTearDown(container.dispose);
@@ -220,7 +225,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );
@@ -249,6 +254,9 @@ void main() {
         membersProvider.overrideWith(
           (ref) async => throw const ForbiddenException('nope'),
         ),
+        channelMembersProvider.overrideWith(
+          (ref, _) async => throw const ForbiddenException('nope'),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -258,7 +266,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );
@@ -293,7 +301,9 @@ void main() {
             return api;
           }),
           liveEventsProvider.overrideWithValue(events.stream),
-          membersProvider.overrideWith((ref) async {
+          // Uncounted: only the keep-alive reads this; the pane reads below.
+          membersProvider.overrideWith((ref) async => members()),
+          channelMembersProvider.overrideWith((ref, _) async {
             onFetch();
             return members();
           }),
@@ -317,7 +327,7 @@ void main() {
           container: built.container,
           child: MaterialApp(
             theme: buildTheme(Brightness.light, AppTokens.light),
-            home: const Scaffold(body: AppMemberPane()),
+            home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
           ),
         ),
       );
@@ -358,7 +368,7 @@ void main() {
           container: built.container,
           child: MaterialApp(
             theme: buildTheme(Brightness.light, AppTokens.light),
-            home: const Scaffold(body: AppMemberPane()),
+            home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
           ),
         ),
       );
@@ -402,7 +412,7 @@ void main() {
           container: built.container,
           child: MaterialApp(
             theme: buildTheme(Brightness.light, AppTokens.light),
-            home: const Scaffold(body: AppMemberPane()),
+            home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
           ),
         ),
       );

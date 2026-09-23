@@ -55,10 +55,21 @@ extension SlimmApiUsers on SlimmApi {
   /// The deployment's members, oldest first. Deployment-wide rather than
   /// scoped to a channel, so any authenticated caller may read it. Keyset
   /// paginated on id; pass the last id seen as [after] for the next page.
-  Future<List<UserProfile>> listMembers({String? after, int? limit}) async {
+  ///
+  /// [channel] narrows the page to who can view that channel, for a member
+  /// list shown beside it. It is a display filter, not a confidentiality
+  /// boundary - the unfiltered roster stays readable from this same route -
+  /// and it does not change paging: a page shorter than [limit] is still the
+  /// last one.
+  Future<List<UserProfile>> listMembers({
+    String? after,
+    int? limit,
+    String? channel,
+  }) async {
     final query = <String, String>{
       if (after != null) 'after': after,
       if (limit != null) 'limit': '$limit',
+      if (channel != null) 'channel': channel,
     };
     final json = await _send(
       'GET',

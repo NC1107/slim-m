@@ -105,6 +105,7 @@ void main() {
           }),
           liveEventsProvider.overrideWithValue(events.stream),
           membersProvider.overrideWith((ref) async => members),
+          channelMembersProvider.overrideWith((ref, _) async => members),
         ],
       );
       addTearDown(container.dispose);
@@ -114,7 +115,7 @@ void main() {
           container: container,
           child: MaterialApp(
             theme: buildTheme(Brightness.light, AppTokens.light),
-            home: const Scaffold(body: AppMemberPane()),
+            home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
           ),
         ),
       );
@@ -167,6 +168,7 @@ void main() {
         }),
         liveEventsProvider.overrideWithValue(events.stream),
         membersProvider.overrideWith((ref) async => members),
+        channelMembersProvider.overrideWith((ref, _) async => members),
         myPermissionsProvider.overrideWithValue(Perm.banMembers),
       ],
     );
@@ -177,7 +179,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: buildTheme(Brightness.light, AppTokens.light),
-          home: const Scaffold(body: AppMemberPane()),
+          home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
         ),
       ),
     );

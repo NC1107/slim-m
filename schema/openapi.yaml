@@ -519,6 +519,16 @@ paths:
             minimum: 1
             maximum: 200
             default: 50
+        - name: channel
+          in: query
+          description: >
+            Narrow the page to members who can view this channel, for a member
+            list shown beside it. A display filter, not a confidentiality
+            boundary - the unfiltered roster stays readable from this route.
+            Paging is unchanged: a page shorter than `limit` is still the last.
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: A page of members, oldest first.

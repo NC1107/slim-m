@@ -41,9 +41,9 @@ class _MemberPaneSlot extends ConsumerWidget {
               minWidth: AppMemberPane.width,
               maxWidth: AppMemberPane.width,
               alignment: Alignment.centerLeft,
-              child: const AppPanelReveal(
+              child: AppPanelReveal(
                 fromLeft: false,
-                child: AppMemberPane(),
+                child: AppMemberPane(channelId: channelId),
               ),
             )
           : const SizedBox.shrink(),
