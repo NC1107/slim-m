@@ -222,6 +222,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                       if (!canManageChannels) return list;
                       // Wraps the whole viewport so the space under the last row is a target too; a row's own menu sits deeper and wins the arena.
                       return ContextMenuRegion(
+                        // False: child is the whole scrollable list, not one row - each row already owns a tab stop, and a second one here rang the whole rail.
+                        ownsFocusNode: false,
                         // Pointer-only on purpose: a long press here would fight the scroll, and touch has the section headers' own + instead.
                         enableLongPress: false,
                         itemsBuilder: (context, close) => [
