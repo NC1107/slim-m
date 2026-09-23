@@ -26,15 +26,16 @@ import 'channel_rail_selection_marker.dart';
 import 'dm_row.dart';
 import 'personal_space_row.dart';
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text, {this.trailing, this.chrome = true});
+class _SectionLabel extends StatefulWidget {
+  const _SectionLabel(this.text, {this.trailingBuilder, this.chrome = true});
 
   final String text;
 
-  /// The section's add glyph, or null for a section nobody may add to. Sits
-  /// on the right edge `ChannelRow`'s kebab shares; both are
-  /// [AppIconButtonSize.sm].
-  final Widget? trailing;
+  /// Builds the section's add glyph given whether it should currently show,
+  /// and a callback to report the glyph's own focus back up to this header -
+  /// null for a section nobody may add to. See [_SectionLabelState].
+  final Widget Function(bool revealed, ValueChanged<bool> onFocusChange)?
+  trailingBuilder;
 
   /// Whether [text] is this app's own wording rather than something someone
   /// typed. Chrome takes the uppercase treatment; a category name does not.
@@ -47,39 +48,63 @@ class _SectionLabel extends StatelessWidget {
   final bool chrome;
 
   @override
+  State<_SectionLabel> createState() => _SectionLabelState();
+}
+
+/// Mirrors `ManagedChannelRow`'s own hover/focus reveal for its kebab: a
+/// pointer hovering the header reveals the trailing glyph, a keyboard
+/// reaching it does too, and touch shows it always since a finger has no
+/// hover. The header itself used to always show the glyph on the theory
+/// that "a header has no hover state of its own" - true of the text, not of
+/// the row it sits in, which can carry one exactly like a channel row does.
+class _SectionLabelState extends State<_SectionLabel> {
+  bool _hovered = false;
+  bool _trailingFocused = false;
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    if (text.isEmpty) return const SizedBox.shrink();
+    if (widget.text.isEmpty) return const SizedBox.shrink();
     // Announced in its natural case and as a heading: the uppercase is a
     // visual treatment, and some screen readers spell such a word out.
     final label = Semantics(
       container: true,
       header: true,
-      label: text,
+      label: widget.text,
       child: ExcludeSemantics(
         child: Text(
-          chrome ? text.toUpperCase() : text,
+          widget.chrome ? widget.text.toUpperCase() : widget.text,
           overflow: TextOverflow.ellipsis,
           style: AppText.label.copyWith(color: tokens.textSecondary),
         ),
       ),
     );
-    return Padding(
-      // Mirrors AppListRow's horizontal padding, so header and row text share a left edge.
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.s8,
-        AppRhythm.headingTop,
-        AppSpacing.s8,
-        AppRhythm.headingBottom,
+    final touch = AppTouchTargets.of(context);
+    final revealed = touch || _hovered || _trailingFocused;
+    final trailing = widget.trailingBuilder?.call(
+      revealed,
+      (v) => setState(() => _trailingFocused = v),
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Padding(
+        // Mirrors AppListRow's horizontal padding, so header and row text share a left edge.
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s8,
+          AppRhythm.headingTop,
+          AppSpacing.s8,
+          AppRhythm.headingBottom,
+        ),
+        child: trailing == null
+            ? label
+            : Row(
+                children: [
+                  Expanded(child: label),
+                  trailing,
+                ],
+              ),
       ),
-      child: trailing == null
-          ? label
-          : Row(
-              children: [
-                Expanded(child: label),
-                trailing!,
-              ],
-            ),
     );
   }
 }
@@ -87,20 +112,27 @@ class _SectionLabel extends StatelessWidget {
 /// The `+` on a section header: makes a channel already filed under that
 /// section, so nobody has to create one and immediately drag it.
 ///
-/// Always visible rather than revealed on hover the way a row's kebab is.
-/// A header has no hover state of its own to hang that on, and this is the
-/// only pointer-free way to create a channel in a specific place - a
-/// right-click has no touch equivalent.
+/// Hover-revealed by [_SectionLabel] the same way a row's kebab is; touch
+/// always shows it, since this is the only pointer-free way to create a
+/// channel in a specific place - a right-click has no touch equivalent. The
+/// reveal wraps only the button, inside the alignment [Padding], the same
+/// nesting `ManagedChannelRow`'s own kebab uses - wrapping the padding too
+/// would merge it into the button's own semantics box and throw off the
+/// shared right edge `category_add_channel_test.dart` measures.
 class _AddChannelGlyph extends StatelessWidget {
   const _AddChannelGlyph({
     required this.categoryId,
     required this.categoryName,
+    required this.revealed,
+    required this.onFocusChange,
   });
 
   /// Null for the implicit uncategorised section, which is what the create
   /// route already means by an absent category.
   final String? categoryId;
   final String categoryName;
+  final bool revealed;
+  final ValueChanged<bool> onFocusChange;
 
   @override
   Widget build(BuildContext context) {
@@ -108,14 +140,25 @@ class _AddChannelGlyph extends StatelessWidget {
     final inset = AppTouchTargets.of(context) ? 0.0 : 4.0;
     return Padding(
       padding: EdgeInsets.only(right: inset),
-      child: AppIconButton(
-        icon: AppIcons.add,
-        semanticLabel: 'Create a channel in $categoryName',
-        size: AppIconButtonSize.sm,
-        onPressed: () => showCreateChannelSheet(
-          context,
-          initialKind: 'text',
-          categoryId: categoryId,
+      child: Focus(
+        skipTraversal: true,
+        canRequestFocus: false,
+        onFocusChange: onFocusChange,
+        child: AnimatedOpacity(
+          opacity: revealed ? 1 : 0,
+          duration: AppMotion.reduced(context, AppMotion.fast),
+          // Hidden from the eye is not hidden from a screen reader.
+          alwaysIncludeSemantics: true,
+          child: AppIconButton(
+            icon: AppIcons.add,
+            semanticLabel: 'Create a channel in $categoryName',
+            size: AppIconButtonSize.sm,
+            onPressed: () => showCreateChannelSheet(
+              context,
+              initialKind: 'text',
+              categoryId: categoryId,
+            ),
+          ),
         ),
       ),
     );
@@ -292,15 +335,16 @@ class _ChannelCategorySectionsState
         return const SizedBox.shrink();
       }
       // Any section, the implicit uncategorised one included: it is a real place a channel can live.
-      final add = !canManage
-          ? null
-          : _AddChannelGlyph(
-              categoryId: category?.id,
-              categoryName: category?.name ?? 'Channels',
-            );
       final label = _SectionLabel(
         category?.name ?? 'Channels',
-        trailing: add,
+        trailingBuilder: !canManage
+            ? null
+            : (revealed, onFocusChange) => _AddChannelGlyph(
+                categoryId: category?.id,
+                categoryName: category?.name ?? 'Channels',
+                revealed: revealed,
+                onFocusChange: onFocusChange,
+              ),
         chrome: category == null,
       );
       // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
