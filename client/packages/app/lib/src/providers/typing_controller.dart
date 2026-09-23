@@ -35,10 +35,25 @@ const Duration _refreshEvery = Duration(seconds: _serverTypingTtlSeconds ~/ 2);
 
 /// The set of user ids currently typing in one channel.
 ///
-/// No client-side expiry timer: the server guarantees a `typing.stopped`
-/// for every `typing.started` it ever sent, even for a client that
-/// disconnects mid-typing (`crates/slimm-server/src/typing.rs`), so trusting
-/// that pair is enough rather than re-implementing the same TTL here.
+/// No client-side expiry timer, because the server does not re-announce an
+/// active typist: `typing.started` is published on the transition only, never
+/// on a refresh (`TypingTracker::start`'s `is_new`), so a local TTL would
+/// blank the indicator out from under somebody still typing.
+///
+/// What that leaves is a set that only ever shrinks on a `typing.stopped`.
+/// The server publishes one for every start, including for a client that
+/// vanishes mid-typing - but publishing is not receiving, and a subscriber
+/// that lags past the hub's capacity has its connection closed rather than
+/// being caught up (`hub.rs`). A server restart loses the tracker and its
+/// pending timers outright, since both are in memory. Either way the stop
+/// frame is simply never seen, and typing is ephemeral so there is no REST
+/// path to resync it from.
+///
+/// So the recovery is at the other end: `SyncController.start()` invalidates
+/// this whole family on every (re)connect, beside the same clear it already
+/// does for cached names and DM call activity. Every path that can lose a
+/// stop frame closes the socket, so a fresh connect is exactly the moment
+/// this state is known to be untrustworthy.
 class TypingController extends StateNotifier<Set<String>> {
   TypingController(this._ref, this._channelId) : super(const {}) {
     _sub = _ref.read(liveEventsProvider).listen((event) {
