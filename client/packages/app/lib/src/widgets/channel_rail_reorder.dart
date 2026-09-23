@@ -86,17 +86,23 @@ import 'rail_drag_lift.dart';
 /// section, which always renders first.
 typedef ChannelSection = (ChannelCategoryRow? category, List<Channel> channels);
 
-sealed class _RailItem {
-  const _RailItem();
+/// Exposed (not library-private) only so `groupsFromRailItems` can be driven
+/// directly from a test without a real drag gesture; nothing outside this
+/// file and its test builds these by hand otherwise.
+@visibleForTesting
+sealed class RailItem {
+  const RailItem();
 }
 
-class _HeaderItem extends _RailItem {
-  const _HeaderItem(this.category);
+@visibleForTesting
+class HeaderRailItem extends RailItem {
+  const HeaderRailItem(this.category);
   final ChannelCategoryRow? category;
 }
 
-class _ChannelItem extends _RailItem {
-  const _ChannelItem(this.channel);
+@visibleForTesting
+class ChannelRailItem extends RailItem {
+  const ChannelRailItem(this.channel);
   final Channel channel;
 }
 
@@ -124,6 +130,8 @@ class ReorderableChannelRows extends StatelessWidget {
     required this.onReorder,
     required this.rowBuilder,
     required this.headerBuilder,
+    this.onDragStart,
+    this.onDragEnd,
   });
 
   final List<ChannelSection> sections;
@@ -132,6 +140,15 @@ class ReorderableChannelRows extends StatelessWidget {
   /// Called with the whole rail's new arrangement, grouped by category, once
   /// a drag settles.
   final ValueChanged<List<ChannelOrderGroup>> onReorder;
+
+  /// A held drag has actually started, or just ended - not whether a menu
+  /// action moved a channel. `headerBuilder` is invoked with the same item
+  /// count either way, so a caller can use these to change what a header
+  /// renders without ever changing how many items this list holds; the
+  /// underlying [SliverReorderableList] cancels the drag outright the moment
+  /// its own item count changes mid-drag.
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDragEnd;
 
   /// Builds one channel's row, told whether *this render* actually wraps it
   /// in a drag listener - false in the plain-[Column] branch, true in the
@@ -150,17 +167,17 @@ class ReorderableChannelRows extends StatelessWidget {
   rowBuilder;
   final Widget Function(ChannelCategoryRow? category) headerBuilder;
 
-  List<_RailItem> get _items => [
+  List<RailItem> get _items => [
     for (final (category, channels) in sections) ...[
-      _HeaderItem(category),
-      for (final channel in channels) _ChannelItem(channel),
+      HeaderRailItem(category),
+      for (final channel in channels) ChannelRailItem(channel),
     ],
   ];
 
   @override
   Widget build(BuildContext context) {
     final items = _items;
-    final channelCount = items.whereType<_ChannelItem>().length;
+    final channelCount = items.whereType<ChannelRailItem>().length;
     // See this file's own doc comment for why fewer than two also bails out.
     if (!canManage || channelCount < 2) {
       return Column(
@@ -169,8 +186,12 @@ class ReorderableChannelRows extends StatelessWidget {
         children: [
           for (final item in items)
             switch (item) {
-              _HeaderItem(:final category) => headerBuilder(category),
-              _ChannelItem(:final channel) => rowBuilder(channel, false, null),
+              HeaderRailItem(:final category) => headerBuilder(category),
+              ChannelRailItem(:final channel) => rowBuilder(
+                channel,
+                false,
+                null,
+              ),
             },
         ],
       );
@@ -182,22 +203,24 @@ class ReorderableChannelRows extends StatelessWidget {
       buildDefaultDragHandles: false,
       proxyDecorator: (child, _, animation) =>
           RailDragLift(animation: animation, child: child),
+      onReorderStart: (_) => onDragStart?.call(),
+      onReorderEnd: (_) => onDragEnd?.call(),
       onReorderItem: (oldIndex, newIndex) {
         final moved = items[oldIndex];
-        if (moved is! _ChannelItem) return;
+        if (moved is! ChannelRailItem) return;
         final rearranged = [...items]
           ..removeAt(oldIndex)
           ..insert(newIndex, moved);
-        onReorder(_groupsFrom(rearranged, sections));
+        onReorder(groupsFromRailItems(rearranged, sections));
       },
       children: [
         for (var i = 0; i < items.length; i++)
           switch (items[i]) {
-            _HeaderItem(:final category) => KeyedSubtree(
+            HeaderRailItem(:final category) => KeyedSubtree(
               key: ValueKey('header-${category?.id}'),
               child: headerBuilder(category),
             ),
-            _ChannelItem(:final channel) =>
+            ChannelRailItem(:final channel) =>
               touch
                   ? KeyedSubtree(
                       key: ValueKey(channel.id),
@@ -217,12 +240,23 @@ class ReorderableChannelRows extends StatelessWidget {
 }
 
 /// Walks [items] in order, attributing every channel to whichever header
-/// last preceded it, and answers one [ChannelOrderGroup] per section named
-/// in [sections] - including one with no channels left, so a drag that
-/// empties a category still tells the server to clear it rather than
+/// last preceded it, and answers one [ChannelOrderGroup] per category that
+/// either still holds a channel or is named in [sections] - a category
+/// [sections] names but that now holds nothing still gets an empty group, so
+/// a drag that empties it still tells the server to clear it rather than
 /// leaving its old contents unmentioned.
-List<ChannelOrderGroup> _groupsFrom(
-  List<_RailItem> items,
+///
+/// Deliberately keyed off the accumulated map rather than filtered by
+/// [sections]: a channel can be attributed to a category (`null` included)
+/// that [sections] does not list at all - dropped above every header, before
+/// the implicit uncategorised section ever became a section in its own
+/// right, is exactly how one reached production - and filtering by
+/// [sections] there would silently drop it from the payload the server then
+/// rejects outright (`ReorderChannelsError::Mismatch`, "Missing live
+/// channel(s)") rather than send a request naming every live channel once.
+@visibleForTesting
+List<ChannelOrderGroup> groupsFromRailItems(
+  List<RailItem> items,
   List<ChannelSection> sections,
 ) {
   final byCategory = <String?, List<String>>{
@@ -231,17 +265,17 @@ List<ChannelOrderGroup> _groupsFrom(
   String? current;
   for (final item in items) {
     switch (item) {
-      case _HeaderItem(:final category):
+      case HeaderRailItem(:final category):
         current = category?.id;
-      case _ChannelItem(:final channel):
+      case ChannelRailItem(:final channel):
         (byCategory[current] ??= []).add(channel.id);
     }
   }
   return [
-    for (final (category, _) in sections)
+    for (final categoryId in byCategory.keys)
       ChannelOrderGroup(
-        categoryId: category?.id,
-        channelIds: byCategory[category?.id] ?? const [],
+        categoryId: categoryId,
+        channelIds: byCategory[categoryId] ?? const [],
       ),
   ];
 }

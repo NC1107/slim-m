@@ -336,4 +336,93 @@ void main() {
       expect(reported!.single.channelIds, isNot(['a', 'b', 'c']));
     },
   );
+
+  test('groupsFromRailItems attributes a channel dropped above every header to '
+      'the uncategorised group even when sections does not list one - the '
+      'exact silent drop behind a real "Missing live channel(s)" server '
+      'rejection', () {
+    final category = ChannelCategoryRow(
+      id: 'cat-1',
+      name: 'General',
+      position: 0,
+    );
+    final items = <RailItem>[
+      ChannelRailItem(_channel('stray')),
+      HeaderRailItem(category),
+      ChannelRailItem(_channel('kept')),
+    ];
+    final sections = <ChannelSection>[
+      (category, [_channel('kept')]),
+    ];
+
+    final groups = groupsFromRailItems(items, sections);
+
+    expect(
+      groups.expand((g) => g.channelIds).toSet(),
+      {'stray', 'kept'},
+      reason:
+          'sections omitting a null entry must never be the reason a '
+          'channel disappears from the payload',
+    );
+    expect(groups.firstWhere((g) => g.categoryId == null).channelIds, [
+      'stray',
+    ]);
+  });
+
+  testWidgets(
+    'dragging a channel above every header still names it in the payload - '
+    'the drag that pulls a channel out of its only category, and the exact '
+    'gesture that produced a real "Missing live channel(s)" server '
+    'rejection when sections held no uncategorised entry',
+    (tester) async {
+      final category = ChannelCategoryRow(
+        id: 'cat-1',
+        name: 'General',
+        position: 0,
+      );
+      final channels = [_channel('a'), _channel('b'), _channel('c')];
+      List<ChannelOrderGroup>? reported;
+      await tester.pumpWidget(
+        _harness(
+          ReorderableChannelRows(
+            sections: [(category, channels)],
+            canManage: true,
+            onReorder: (order) => reported = order,
+            rowBuilder: (channel, longPressDrags, dragHandleIndex) {
+              expect(longPressDrags, isTrue);
+              return SizedBox(height: 48, child: Text(channel.id));
+            },
+            headerBuilder: _header,
+          ),
+        ),
+      );
+
+      // Drag 'a' to the top of the rail: the only category there is, so this pulls it out.
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('a')),
+      );
+      await tester.pump(kLongPressTimeout + kPressTimeout);
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, -20));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pumpAndSettle();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(reported, isNotNull);
+      expect(
+        reported!.expand((g) => g.channelIds).toSet(),
+        {'a', 'b', 'c'},
+        reason:
+            'every channel must still be named exactly once; one silently '
+            'vanished from the payload in production',
+      );
+      expect(
+        reported!.firstWhere((g) => g.categoryId == null).channelIds,
+        contains('a'),
+        reason: 'dragged clear of the only category there is',
+      );
+    },
+  );
 }
