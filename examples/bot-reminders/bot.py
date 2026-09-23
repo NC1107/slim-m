@@ -78,11 +78,11 @@ MAX_BACKOFF_SECONDS = 60
 # urllib's default UA is blocked by a CDN before it ever reaches slim-m.
 USER_AGENT = "slimm-bot-reminders/1.0"
 
-TRIGGER_IN = re.compile(r"^!remind\s+me\s+in\s+(\S+)\s+(.+)$", re.IGNORECASE | re.DOTALL)
-TRIGGER_AT = re.compile(r"^!remind\s+me\s+at\s+(\d{1,2}:\d{2})\s+(.+)$", re.IGNORECASE | re.DOTALL)
+TRIGGER_IN = re.compile(r"^!remind\s+me\s+in\s+(\S+)\s+(\S[\s\S]*)$", re.IGNORECASE)
+TRIGGER_AT = re.compile(r"^!remind\s+me\s+at\s+(\d{1,2}:\d{2})\s+(\S[\s\S]*)$", re.IGNORECASE)
 TRIGGER_LIST = re.compile(r"^!reminders\s*$", re.IGNORECASE)
 TRIGGER_CANCEL = re.compile(r"^!reminders\s+cancel\s+(\d+)\s*$", re.IGNORECASE)
-DURATION_PART = re.compile(r"(\d+)([smhd])")
+DURATION_PART = re.compile(r"(\d{1,6})([smhd])")
 DURATION_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 
 
@@ -268,20 +268,28 @@ def handle_message(conn, me, channel_id, message):
         return
 
     if TRIGGER_LIST.match(content):
-        rows = pending_for_user(conn, channel_id, author_id)
-        if not rows:
-            send(channel_id, "you have no pending reminders here", reply_to_id=request_message_id)
-            return
-        lines = [f"{i}. {format_due(due_at)} - {text}" for i, (_, due_at, text) in enumerate(rows, 1)]
-        send(channel_id, "\n".join(lines), reply_to_id=request_message_id)
+        _reply_with_pending(conn, channel_id, author_id, request_message_id)
         return
 
     if match := TRIGGER_CANCEL.match(content):
-        n = int(match.group(1))
-        ok = cancel_nth(conn, channel_id, author_id, n)
-        reply = f"cancelled reminder {n}" if ok else f"no reminder {n}"
-        send(channel_id, reply, reply_to_id=request_message_id)
+        _reply_with_cancel(conn, channel_id, author_id, request_message_id, int(match.group(1)))
+
+
+def _reply_with_pending(conn, channel_id, author_id, request_message_id):
+    """Answers `!reminders` with this member's own pending list, or says there is none."""
+    rows = pending_for_user(conn, channel_id, author_id)
+    if not rows:
+        send(channel_id, "you have no pending reminders here", reply_to_id=request_message_id)
         return
+    lines = [f"{i}. {format_due(due_at)} - {text}" for i, (_, due_at, text) in enumerate(rows, 1)]
+    send(channel_id, "\n".join(lines), reply_to_id=request_message_id)
+
+
+def _reply_with_cancel(conn, channel_id, author_id, request_message_id, n):
+    """Cancels this member's nth pending reminder, and says so either way."""
+    ok = cancel_nth(conn, channel_id, author_id, n)
+    reply = f"cancelled reminder {n}" if ok else f"no reminder {n}"
+    send(channel_id, reply, reply_to_id=request_message_id)
 
 
 def _create_and_ack(conn, channel_id, author_id, request_message_id, due_at, text):
