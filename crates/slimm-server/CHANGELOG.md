@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.70.0](https://github.com/NC1107/slim-m/compare/server-v0.69.0...server-v0.70.0) (2026-09-23)
+
+
+### Features
+
+* **server:** incoming webhooks, stages 1-2 (mint, revoke, delivery) ([#1290](https://github.com/NC1107/slim-m/issues/1290)) ([87567ea](https://github.com/NC1107/slim-m/commit/87567ea6be64e0368f04a793e39f77fa9616aa92))
+
+
+### Bug Fixes
+
+* **server:** revive a bot's token when its removal is undone ([#1301](https://github.com/NC1107/slim-m/issues/1301)) ([1791889](https://github.com/NC1107/slim-m/commit/1791889dbe2b6043d064eb6b1508b33deefcd593))
+
 ## [0.69.0](https://github.com/NC1107/slim-m/compare/server-v0.68.0...server-v0.69.0) (2026-09-23)
 
 
