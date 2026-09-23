@@ -41,12 +41,8 @@ class UpdateAvailableBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Forces UpdateWatcher into existence for as long as this stays mounted.
     ref.watch(updateWatcherProvider);
-    final update = ref.watch(inSessionUpdateProvider);
-    if (update == null) return const SizedBox.shrink();
-    // Dismissal hides this banner; it does not forget the update.
-    if (ref.watch(dismissedBannerVersionProvider) == update.version) {
-      return const SizedBox.shrink();
-    }
+    if (!ref.watch(bannerVisibleProvider)) return const SizedBox.shrink();
+    final update = ref.watch(inSessionUpdateProvider)!;
 
     // A sideloaded apk never re-runs the splash, so a restart gets it nothing.
     final restartApplies = this.restartApplies ?? !isAndroidHost;
