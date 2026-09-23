@@ -109,14 +109,6 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             compactRoute: Routes.adminInvites,
             builder: (_) => const InvitesPane(),
           ),
-        if (canManageServer)
-          SettingsPane(
-            id: 'bots',
-            label: 'Bots',
-            icon: AppIcons.code,
-            compactRoute: Routes.adminBots,
-            builder: (_) => const BotsPane(),
-          ),
         // ADMINISTRATOR, matching the route it opens; see AccountRecoveryPane.
         if (canIssueResetCodes)
           SettingsPane(
@@ -196,6 +188,12 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             compactRoute: Routes.adminServerMetrics,
             builder: (_) => const ServerMetricsPane(),
           ),
+      ],
+    ),
+    // Both extend the Space from outside it, rather than configuring it.
+    SettingsPaneGroup(
+      label: 'Addons',
+      panes: [
         if (canManageServer)
           SettingsPane(
             id: 'dock',
@@ -203,6 +201,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.dock,
             compactRoute: Routes.adminDock,
             builder: (_) => const DockPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'bots',
+            label: 'Bots',
+            icon: AppIcons.code,
+            compactRoute: Routes.adminBots,
+            builder: (_) => const BotsPane(),
           ),
       ],
     ),
