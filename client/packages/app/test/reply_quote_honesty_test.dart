@@ -236,9 +236,8 @@ void main() {
       ],
     );
 
-    // m1's own body is an exact match; the quote's echo now merges the author label and snippet, so it is a substring match.
-    expect(find.text('original'), findsOneWidget);
-    expect(find.textContaining('original'), findsNWidgets(2));
+    // m1's own body, plus the quote's own snippet Text beside its author label.
+    expect(find.text('original'), findsNWidgets(2));
     expect(find.text('Message unavailable'), findsNothing);
 
     // A delete, own or a live `message.deleted` frame, always lands as `MessageStore.discard`.

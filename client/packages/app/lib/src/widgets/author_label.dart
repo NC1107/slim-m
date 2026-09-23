@@ -7,7 +7,9 @@
 /// author" rule and none of them ever refreshed it.
 library;
 
+import 'package:flutter/widgets.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_design_system/design_system.dart';
 
 /// [authorId]'s name as of the last time [profiles] was asked about them.
 ///
@@ -61,4 +63,114 @@ String _label({
   if (authorId == null) return 'Deleted user';
   if (present) return profile?.displayName ?? 'Deleted user';
   return cachedDisplayName ?? 'Unknown';
+}
+
+/// The Bot/Webhook badge chips for [profile], meant to sit directly after a
+/// name in a `Row`, as a plain (non-`Flexible`) sibling.
+///
+/// `docs/decisions/0030-incoming-webhooks.md` calls the always-visible
+/// `Webhook` badge the entire mitigation for a webhook's caller-chosen
+/// `username`: nothing else tells a reader that a claimed name is not a
+/// person, so the badge must never be squeezable off the line by a narrow
+/// layout, a theme, or a long name. Giving it fixed, non-flexible size next
+/// to a `Flexible` name - the shape `message_row_identity.dart`'s
+/// `MessageRowHeader` already uses - means the name shrinks under an
+/// ellipsis first and the badge always renders at full size. Every surface
+/// that draws a message author's name outside that row - a reply quote, a
+/// thread parent card, a forwarded message, a search hit, a pinned or saved
+/// entry, a thread-list row, a command-palette hit - draws its badge from
+/// here rather than re-deriving the two flags.
+List<Widget> authorBadges(api.UserProfile? profile) {
+  final isWebhook = profile?.isWebhook ?? false;
+  final isBot = profile?.isBot ?? false;
+  return [
+    if (isWebhook) ...[
+      const SizedBox(width: AppSpacing.s4),
+      const AppBadge(variant: AppBadgeVariant.tag, label: 'Webhook'),
+    ],
+    if (isBot) ...[
+      const SizedBox(width: AppSpacing.s4),
+      const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot'),
+    ],
+  ];
+}
+
+/// A resolved author [name], its [authorBadges], and an optional [secondary]
+/// bit of text after it (a message snippet, a channel label), all on one
+/// row that ellipsizes [name] and [secondary] independently around the
+/// badge - never the badge itself.
+///
+/// This is the shape every dense list row that names a message's author
+/// needs and none of them had: a reply quote, a thread parent card, a
+/// forwarded message, a search hit, a pinned or saved entry, a thread-list
+/// row, and a command-palette hit each used to draw a plain `Text(name)`
+/// with nothing beside it for a badge to attach to, which is exactly the
+/// suppression `docs/decisions/0030-incoming-webhooks.md` warns against: a
+/// webhook's caller-chosen `username` is safe only because the `Webhook`
+/// badge sits unconditionally next to it, and a badge that can be crowded
+/// off a dense line by a long name is no badge at all.
+///
+/// [name] is [Flexible] and may ellipsize under a long or hostile value;
+/// the badge is a plain sibling laid out at its natural size before either
+/// [Flexible] gets a share of what is left, so it renders in full
+/// regardless of how long [name] or [secondary] are - `RenderFlex` sizes
+/// non-flexible children first. `MainAxisSize.min` keeps this row from
+/// claiming more width than its own content when a caller places something
+/// else after it in the same row (`ForwardedMessageCard`'s timestamp).
+class AuthorNameLine extends StatelessWidget {
+  const AuthorNameLine({
+    super.key,
+    required this.name,
+    required this.profile,
+    this.style,
+    this.secondary,
+    this.secondaryStyle,
+    this.secondaryFlex = 2,
+    this.mainAxisSize = MainAxisSize.min,
+  });
+
+  final String name;
+  final api.UserProfile? profile;
+  final TextStyle? style;
+
+  /// Shares the line's remaining space with [name] once the badge has taken
+  /// its own; null when a surface has nothing to say after the name.
+  final String? secondary;
+  final TextStyle? secondaryStyle;
+
+  /// [secondary]'s flex against [name]'s fixed 1, for a caller whose own
+  /// secondary text usually runs longer than the name beside it.
+  final int secondaryFlex;
+  final MainAxisSize mainAxisSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondary = this.secondary;
+    return Row(
+      mainAxisSize: mainAxisSize,
+      children: [
+        Flexible(
+          child: Text(
+            name,
+            style: style,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        ...authorBadges(profile),
+        if (secondary != null) ...[
+          const SizedBox(width: AppSpacing.s8),
+          Flexible(
+            flex: secondaryFlex,
+            child: Text(
+              secondary,
+              style: secondaryStyle ?? style,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }

@@ -89,14 +89,15 @@ class ThreadParentCard extends ConsumerWidget {
       );
       semanticLabel = 'Thread on a message that was deleted';
     } else {
+      final resolution = ref.watch(
+        batchProfilesControllerProvider.select(
+          (m) => authorResolution(m, parent.parentAuthorId ?? ''),
+        ),
+      );
       final name = authorLabelResolved(
         authorId: parent.parentAuthorId,
         cachedDisplayName: parent.parentAuthorDisplayName,
-        resolution: ref.watch(
-          batchProfilesControllerProvider.select(
-            (m) => authorResolution(m, parent.parentAuthorId ?? ''),
-          ),
-        ),
+        resolution: resolution,
       );
       final snippet = _snippet(parent.parentContent ?? '');
       body = Row(
@@ -113,9 +114,9 @@ class ThreadParentCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  name,
-                  overflow: TextOverflow.ellipsis,
+                AuthorNameLine(
+                  name: name,
+                  profile: resolution.profile,
                   style: AppText.caption.copyWith(
                     color: tokens.textPrimary,
                     fontWeight: AppWeights.semi,

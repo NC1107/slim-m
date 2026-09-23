@@ -144,14 +144,15 @@ class _SavedMessageRowState extends ConsumerState<SavedMessageRow>
   Widget build(BuildContext context) {
     final message = widget.saved.message;
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, message.authorId ?? ''),
+      ),
+    );
     final name = authorLabelResolved(
       authorId: message.authorId,
       cachedDisplayName: message.authorDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, message.authorId ?? ''),
-        ),
-      ),
+      resolution: resolution,
     );
     // The channel it came from; always held locally, since the server only lists what the reader can see.
     final channel = ref
@@ -188,10 +189,10 @@ class _SavedMessageRowState extends ConsumerState<SavedMessageRow>
             name: name,
             size: AppSizes.icon28,
           ),
-          title: Text(
-            where == null ? name : '$name  ·  $where',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          title: AuthorNameLine(
+            name: name,
+            profile: resolution.profile,
+            secondary: where == null ? null : '·  $where',
           ),
           subtitle: Text(
             message.content,

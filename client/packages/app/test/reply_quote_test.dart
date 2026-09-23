@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/user_profiles.dart';
 import 'package:slimm_app/src/widgets/reply_quote.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -34,7 +36,7 @@ void main() {
       ),
     );
 
-    // One merged Text.rich now, not two Text widgets - see reply_quote.dart.
+    // Author label and snippet are two separate Text widgets now, not one merged Text.rich.
     expect(find.textContaining('Priya'), findsOneWidget);
     expect(find.textContaining('the original text'), findsOneWidget);
     expect(find.text('Message unavailable'), findsNothing);
@@ -95,6 +97,60 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('a quoted webhook keeps its badge, even with its claimed name at '
+      'phone width', (tester) async {
+    late BatchProfilesController controller;
+    final longClaim = 'Definitely A Real Person ' * 8;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          batchProfilesControllerProvider.overrideWith((ref) {
+            controller = BatchProfilesController(ref);
+            return controller;
+          }),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: ReplyQuote(
+                resolved: message(
+                  id: 'parent',
+                  authorId: 'webhook-1',
+                  authorDisplayName: longClaim,
+                  content: 'the disk is nearly full',
+                ),
+                onTap: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.state = {
+      'webhook-1': api.UserProfile(
+        id: 'webhook-1',
+        username: 'alerts',
+        displayName: longClaim,
+        createdAt: 0,
+        isWebhook: true,
+      ),
+    };
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.text('WEBHOOK'),
+      findsOneWidget,
+      reason:
+          'docs/decisions/0030 calls this badge the entire mitigation for '
+          "a webhook's claimed name; a reply quote is the surface this "
+          'card names first',
+    );
+    expect(tester.getRect(find.byType(AppBadge)).width, greaterThan(0));
+  });
 
   testWidgets('tapping the quote calls onTap, resolved or not', (tester) async {
     var tapped = 0;

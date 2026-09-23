@@ -203,14 +203,15 @@ class PinnedMessageRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, pin.message.authorId ?? ''),
+      ),
+    );
     final name = authorLabelResolved(
       authorId: pin.message.authorId,
       cachedDisplayName: pin.message.authorDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, pin.message.authorId ?? ''),
-        ),
-      ),
+      resolution: resolution,
     );
     return ListTile(
       onTap: () {
@@ -229,7 +230,7 @@ class PinnedMessageRow extends ConsumerWidget {
         name: name,
         size: AppSizes.icon28,
       ),
-      title: Text(name),
+      title: AuthorNameLine(name: name, profile: resolution.profile),
       subtitle: Text(
         pin.message.content,
         maxLines: 2,

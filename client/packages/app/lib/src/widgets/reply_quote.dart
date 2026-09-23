@@ -41,16 +41,19 @@ class ReplyQuote extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final resolved = this.resolved;
+    final resolution = resolved == null
+        ? null
+        : ref.watch(
+            batchProfilesControllerProvider.select(
+              (m) => authorResolution(m, resolved.authorId ?? ''),
+            ),
+          );
     final label = resolved == null
         ? null
         : authorLabelResolved(
             authorId: resolved.authorId,
             cachedDisplayName: resolved.authorDisplayName,
-            resolution: ref.watch(
-              batchProfilesControllerProvider.select(
-                (m) => authorResolution(m, resolved.authorId ?? ''),
-              ),
-            ),
+            resolution: resolution!,
           );
     final snippet = resolved == null
         ? 'Message unavailable'
@@ -79,24 +82,26 @@ class ReplyQuote extends ConsumerWidget {
               children: [
                 Icon(AppIcons.reply, size: 13, color: tokens.textSecondary),
                 const SizedBox(width: AppSpacing.s4),
-                // One Flexible for both spans: a long display name alone would overflow the row otherwise.
-                Flexible(
-                  child: Text.rich(
-                    TextSpan(
+                if (label == null)
+                  // A long snippet alone would overflow the row otherwise.
+                  Flexible(
+                    child: Text(
+                      snippet,
                       style: textStyle,
-                      children: [
-                        if (label != null)
-                          TextSpan(
-                            text: '$label  ',
-                            style: const TextStyle(fontWeight: AppWeights.semi),
-                          ),
-                        TextSpan(text: snippet),
-                      ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  )
+                else
+                  Flexible(
+                    child: AuthorNameLine(
+                      name: label,
+                      profile: resolution?.profile,
+                      style: textStyle.copyWith(fontWeight: AppWeights.semi),
+                      secondary: snippet,
+                      secondaryStyle: textStyle,
+                    ),
                   ),
-                ),
               ],
             ),
           ),

@@ -178,14 +178,15 @@ class ThreadRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, thread.parentAuthorId ?? ''),
+      ),
+    );
     final name = authorLabelResolved(
       authorId: thread.parentAuthorId,
       cachedDisplayName: thread.parentAuthorDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, thread.parentAuthorId ?? ''),
-        ),
-      ),
+      resolution: resolution,
     );
     return ListTile(
       onTap: () {
@@ -204,8 +205,9 @@ class ThreadRow extends ConsumerWidget {
         name: name,
         size: AppSizes.icon28,
       ),
-      title: Text(
-        name,
+      title: AuthorNameLine(
+        name: name,
+        profile: resolution.profile,
         style: TextStyle(
           fontWeight: thread.isUnread ? AppWeights.medium : AppWeights.regular,
         ),

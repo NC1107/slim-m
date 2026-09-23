@@ -218,14 +218,15 @@ class SearchResultRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, message.authorId ?? ''),
+      ),
+    );
     final name = authorLabelResolved(
       authorId: message.authorId,
       cachedDisplayName: message.authorDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, message.authorId ?? ''),
-        ),
-      ),
+      resolution: resolution,
     );
     return Semantics(
       button: true,
@@ -245,8 +246,9 @@ class SearchResultRow extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
+                  AuthorNameLine(
+                    name: name,
+                    profile: resolution.profile,
                     style: AppText.ui.copyWith(
                       color: tokens.textPrimary,
                       fontWeight: AppWeights.semi,

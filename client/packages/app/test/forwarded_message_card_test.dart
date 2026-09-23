@@ -12,7 +12,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/channel_by_id_provider.dart';
+import 'package:slimm_app/src/providers/user_profiles.dart';
 import 'package:slimm_app/src/widgets/forwarded_message_card.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -117,6 +119,70 @@ void main() {
       find.bySemanticsLabel(RegExp('Forwarded message from Alice in #general')),
       findsOneWidget,
     );
+  });
+
+  testWidgets("a forwarded webhook post keeps its badge, and its claimed name "
+      'cannot push it off a phone-width row', (tester) async {
+    late BatchProfilesController controller;
+    const longClaim =
+        'Definitely A Real Person Definitely A Real Person '
+        'Definitely A Real Person';
+    const forwardedFromWebhook = ForwardedMessage(
+      messageId: 'm-origin',
+      channelId: 'c-origin',
+      authorId: 'webhook-1',
+      authorDisplayName: longClaim,
+      authorAvatarUpdatedAt: null,
+      createdAt: 0,
+      content: 'the disk is nearly full',
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          channelByIdProvider(
+            'c-origin',
+          ).overrideWith((ref) => Stream.value(_channel(name: 'general'))),
+          batchProfilesControllerProvider.overrideWith((ref) {
+            controller = BatchProfilesController(ref);
+            return controller;
+          }),
+        ],
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              child: ForwardedMessageCard(
+                forwarded: forwardedFromWebhook,
+                body: const Text('the disk is nearly full'),
+                attachments: const [],
+                currentChannelId: 'c-here',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.state = {
+      'webhook-1': const api.UserProfile(
+        id: 'webhook-1',
+        username: 'alerts',
+        displayName: longClaim,
+        createdAt: 0,
+        isWebhook: true,
+      ),
+    };
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.text('WEBHOOK'),
+      findsOneWidget,
+      reason:
+          'docs/decisions/0030 calls this badge the entire mitigation for '
+          "a webhook's claimed name",
+    );
+    expect(tester.getRect(find.byType(AppBadge)).width, greaterThan(0));
   });
 
   testWidgets('what was forwarded stays readable to a screen reader', (
