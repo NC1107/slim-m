@@ -240,9 +240,11 @@ second installed runner could never be reached. The client, not slim,
 normalizes case and resolves a small alias table (`js`/`node` ->
 `javascript`, `py` -> `python`, `sh`/`bash` -> `shell`, `md` ->
 `markdown`) before comparing a block's own fence tag against a runner's
-declared language; a runner with no `language` is a wildcard, matching any
-block, which is what keeps a deployment with a single older runner working
-unmatched. Several matching runners resolve to whichever discovery listed
+declared language; a runner with no `language` matched any block when this
+was written, which is what kept a deployment with a single older runner working
+unmatched.
+**Superseded on 2026-09-16 by #1211**: a runner that declares no `language` now matches nothing, because the wildcard was handing a `python` block to a JavaScript engine.
+Several matching runners resolve to whichever discovery listed
 first - slim has no notion of which runner is "better" for a language, only
 of match or no match.
 
