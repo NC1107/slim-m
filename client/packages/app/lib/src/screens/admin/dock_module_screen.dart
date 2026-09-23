@@ -78,9 +78,14 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     ref.invalidate(codeBlockRunnerProvider);
     ref.invalidate(slashCommandProvider);
     ref.invalidate(appLaunchProvider);
-    // Installed is not usable until somebody is granted it; see that screen's doc.
-    if (!wasInstalled && mounted && manifest.permissions.isNotEmpty) {
-      context.go(Routes.adminDockModuleAccess(manifest.id));
+    if (!wasInstalled && mounted) {
+      // Installed is not usable until somebody is granted it; see that screen's doc.
+      if (manifest.permissions.isNotEmpty) {
+        context.go(Routes.adminDockModuleAccess(manifest.id));
+      } else {
+        // Nothing to grant, so there is no later moment to turn it on at.
+        await _setEnabled(manifest.name, true);
+      }
     }
   }
 

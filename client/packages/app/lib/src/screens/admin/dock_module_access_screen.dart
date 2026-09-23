@@ -77,6 +77,30 @@ class ModuleAccessPane extends ConsumerStatefulWidget {
 class _ModuleAccessPaneState extends ConsumerState<ModuleAccessPane>
     with GuardedActionState<ModuleAccessPane> {
   final Set<String> _pending = {};
+  bool _busy = false;
+
+  /// The module's own on/off switch, mirroring `dock_module_screen.dart`'s.
+  /// Here so somebody who turned it on by granting a role can turn it back
+  /// off without leaving, and so the state is never merely implied.
+  Future<void> _setModuleEnabled(bool enabled) async {
+    setState(() => _busy = true);
+    final client = ref.read(apiProvider);
+    final name = widget.manifest.name;
+    final ok = await guard(
+      whatFailed: enabled ? 'enable $name' : 'disable $name',
+      action: () => enabled
+          ? client.enableDockModule(widget.manifest.id)
+          : client.disableDockModule(widget.manifest.id),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) {
+      ref.invalidate(dockCatalogProvider);
+      ref.invalidate(codeBlockRunnerProvider);
+      ref.invalidate(slashCommandProvider);
+      ref.invalidate(appLaunchProvider);
+    }
+  }
 
   List<String> get _permKeys => [
     for (final p in widget.manifest.permissions) p.key,
@@ -124,7 +148,33 @@ class _ModuleAccessPaneState extends ConsumerState<ModuleAccessPane>
       ref.invalidate(codeBlockRunnerProvider);
       ref.invalidate(slashCommandProvider);
       ref.invalidate(appLaunchProvider);
+      if (value) await _enableIfOff();
     }
+  }
+
+  /// Turns the module on the first time somebody is granted it.
+  ///
+  /// An install lands disabled on purpose (decision 0021: installing is not a
+  /// decision about who may use it), and granting a role is exactly that
+  /// decision, so it is the honest moment to act on it. Without this the
+  /// admin closes this screen with the module installed, granted and still
+  /// off - the same "no reason to guess a step is missing" trap this screen
+  /// exists to close, one step further along.
+  ///
+  /// Only ever on. Revoking the last grant does not disable it, because a
+  /// module that is off and a module nobody holds are different states and
+  /// an admin may be mid-reshuffle.
+  Future<void> _enableIfOff() async {
+    final installed = ref
+        .read(dockCatalogProvider)
+        .valueOrNull
+        ?.installedFor(widget.manifest.id);
+    if (installed == null || installed.enabled) return;
+    final ok = await guard(
+      whatFailed: 'enable ${widget.manifest.name}',
+      action: () => ref.read(apiProvider).enableDockModule(widget.manifest.id),
+    );
+    if (ok) ref.invalidate(dockCatalogProvider);
   }
 
   String _summary() {
@@ -142,6 +192,11 @@ class _ModuleAccessPaneState extends ConsumerState<ModuleAccessPane>
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final roles = ref.watch(rolesProvider);
 
+    final installed = ref
+        .watch(dockCatalogProvider)
+        .valueOrNull
+        ?.installedFor(widget.manifest.id);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -150,6 +205,24 @@ class _ModuleAccessPaneState extends ConsumerState<ModuleAccessPane>
           style: AppText.body.copyWith(color: tokens.textSecondary),
         ),
         const SizedBox(height: AppSpacing.s16),
+        if (installed != null) ...[
+          SettingsSectionCard(
+            children: [
+              SettingsToggleRow(
+                label: widget.manifest.name,
+                description: installed.enabled
+                    ? 'Running in this space.'
+                    : 'Installed but switched off, so nothing it adds appears '
+                          'yet. Granting a role below turns it on.',
+                semanticLabel: 'Run ${widget.manifest.name} in this space',
+                value: installed.enabled,
+                onChanged: _busy ? null : _setModuleEnabled,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          const SettingsSectionHeader('Who can use it'),
+        ],
         AppAsyncView<List<api.Role>>(
           value: AppAsyncState(data: roles.valueOrNull, error: roles.error),
           center: false,
