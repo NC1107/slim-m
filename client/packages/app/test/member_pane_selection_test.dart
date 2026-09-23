@@ -66,7 +66,13 @@ SlimmApi _fakeApi(SessionStore session) => SlimmApi(
 Future<ProviderContainer> _pump(
   WidgetTester tester, {
   required int mine,
+  double? width,
 }) async {
+  if (width != null) {
+    tester.view.physicalSize = Size(width, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  }
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
@@ -117,17 +123,66 @@ void main() {
     expect(find.bySemanticsLabel(_selectLabel), findsOneWidget);
   });
 
-  testWidgets('entering the mode shows the bar with nobody selected', (
-    tester,
-  ) async {
-    final container = await _pump(tester, mine: Perm.banMembers);
-    await tester.tap(find.bySemanticsLabel(_selectLabel));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'entering the mode shows the bar naming what a viewer holding only '
+    'BAN_MEMBERS can do with a selection',
+    (tester) async {
+      final container = await _pump(tester, mine: Perm.banMembers);
+      await tester.tap(find.bySemanticsLabel(_selectLabel));
+      await tester.pumpAndSettle();
 
-    expect(container.read(memberSelectionProvider).active, isTrue);
-    expect(container.read(memberSelectionProvider).count, 0);
-    expect(find.text('Nobody selected yet'), findsOneWidget);
-  });
+      expect(container.read(memberSelectionProvider).active, isTrue);
+      expect(container.read(memberSelectionProvider).count, 0);
+      expect(find.text('Tap members to remove'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a viewer holding only KICK_MEMBERS is told the mode is for timing out',
+    (tester) async {
+      await _pump(tester, mine: Perm.kickMembers);
+      await tester.tap(find.bySemanticsLabel(_selectLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tap members to time out'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a viewer holding both bits is told the mode covers either verb',
+    (tester) async {
+      await _pump(tester, mine: Perm.kickMembers | Perm.banMembers);
+      await tester.tap(find.bySemanticsLabel(_selectLabel));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tap members to time out or remove'), findsOneWidget);
+    },
+  );
+
+  // The owner: rows looked identical to normal with no "tap to select" affordance. Proven at a phone and a desktop width.
+  for (final width in [390.0, 1000.0]) {
+    testWidgets(
+      'at ${width.toInt()}px, an unselected row carries a visible pick '
+      'affordance once the mode is on',
+      (tester) async {
+        await _pump(tester, mine: Perm.banMembers, width: width);
+        expect(find.byType(AppListRow), findsNWidgets(2));
+
+        final before = tester.getTopLeft(find.text('Priya'));
+        await tester.tap(find.bySemanticsLabel(_selectLabel));
+        await tester.pumpAndSettle();
+
+        final after = tester.getTopLeft(find.text('Priya'));
+        expect(
+          after.dx,
+          greaterThan(before.dx),
+          reason:
+              'a pick affordance in front of the row must push its label '
+              'right, or the mode looks unchanged',
+        );
+      },
+    );
+  }
 
   testWidgets('a row picks rather than opens while the mode is on', (
     tester,

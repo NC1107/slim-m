@@ -131,6 +131,13 @@ class MemberRow extends ConsumerWidget {
     void toggle() =>
         ref.read(memberSelectionProvider.notifier).toggle(profile.id);
 
+    final tick = selecting
+        ? Padding(
+            padding: const EdgeInsets.only(left: AppSpacing.s8),
+            child: _SelectionTick(selected: selected, enabled: selectable),
+          )
+        : null;
+
     final row = AppListRow(
       // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
       height: 36,
@@ -166,7 +173,50 @@ class MemberRow extends ConsumerWidget {
 
     return GestureDetector(
       onSecondaryTapDown: selecting ? null : (_) => open(),
-      child: row,
+      child: tick == null
+          ? row
+          : Row(
+              children: [
+                tick,
+                Expanded(child: row),
+              ],
+            ),
+    );
+  }
+}
+
+/// The pick/not-picked mark shown once selection mode is on, so an unselected
+/// row states its own affordance instead of looking identical to a normal
+/// browsing row - the member-pane analogue of `message_selectable.dart`'s own
+/// tick for the transcript. Dimmed and non-interactive on its own for the
+/// viewer's own row, which selection mode never offers.
+class _SelectionTick extends StatelessWidget {
+  const _SelectionTick({required this.selected, required this.enabled});
+
+  final bool selected;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return ExcludeSemantics(
+      child: Opacity(
+        opacity: enabled ? 1 : 0.4,
+        child: Container(
+          width: AppSizes.icon16,
+          height: AppSizes.icon16,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: selected ? tokens.accentFill : Colors.transparent,
+            border: Border.all(
+              color: selected ? tokens.accentFill : tokens.borderStrong,
+            ),
+          ),
+          child: selected
+              ? Icon(AppIcons.check, size: 11, color: tokens.accentOn)
+              : null,
+        ),
+      ),
     );
   }
 }
