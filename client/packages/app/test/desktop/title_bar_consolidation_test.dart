@@ -1,0 +1,120 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// The title bar's name line used to be the static literal `slim-m`,
+/// whatever deployment was actually open. It now shows the Space's real
+/// name, a connection dot, and this build's own version - the three things
+/// `RailHeader` already carries below it in the routed content.
+library;
+
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/desktop/close_behavior.dart';
+import 'package:slimm_app/src/desktop/title_bar.dart';
+import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/widgets/channel_rail_frame.dart'
+    show SpaceConnectionDot;
+import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
+
+import 'support/fake_desktop_window_port.dart';
+
+Future<void> _pump(
+  WidgetTester tester, {
+  http.Response? versionResponse,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+        apiProvider.overrideWith((ref) {
+          final client = api.SlimmApi(
+            baseUrl: Uri.parse('http://localhost:8080'),
+            session: ref.watch(sessionProvider),
+            httpClient: MockClient(
+              (_) async => versionResponse ?? http.Response('', 404),
+            ),
+          );
+          ref.onDispose(client.close);
+          return client;
+        }),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: Column(
+            children: [
+              TitleBar(
+                port: FakeDesktopWindowPort(),
+                platform: DesktopPlatform.linux,
+                onRequestClose: () async {},
+              ),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  await tester.pump();
+}
+
+void main() {
+  setUpAll(() {
+    PackageInfo.setMockInitialValues(
+      appName: 'slim-m',
+      packageName: 'top.npcserver.slimm',
+      version: '1.2.3',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+  });
+
+  testWidgets(
+    'the Space name and this build\'s version replace the static label once '
+    'the server answers',
+    (tester) async {
+      await _pump(
+        tester,
+        versionResponse: http.Response(
+          jsonEncode({
+            'name': 'My Deployment',
+            'version': '0.9.0',
+            'protocol': 1,
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+
+      expect(find.text('My Deployment'), findsOneWidget);
+      expect(find.textContaining('1.2.3'), findsOneWidget);
+      expect(
+        find.text('slim-m'),
+        findsNothing,
+        reason: 'the real name replaces the static fallback once known',
+      );
+    },
+  );
+
+  testWidgets('falls back to the literal slim-m before the server answers', (
+    tester,
+  ) async {
+    await _pump(tester);
+
+    expect(find.text('slim-m'), findsOneWidget);
+  });
+
+  testWidgets('carries the same connection dot RailHeader shows the Space '
+      'name beside', (tester) async {
+    await _pump(tester);
+
+    expect(find.byType(SpaceConnectionDot), findsOneWidget);
+  });
+}
