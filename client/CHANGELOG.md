@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.83.0](https://github.com/NC1107/slim-m/compare/client-v0.82.0...client-v0.83.0) (2026-09-24)
+
+
+### Features
+
+* **client:** consolidate the desktop title bar's name line ([#1314](https://github.com/NC1107/slim-m/issues/1314)) ([11ff586](https://github.com/NC1107/slim-m/commit/11ff586e02aa20d831bb4f5963353cd3d015df0b))
+* **client:** reveal a section header's add glyph on hover ([#1312](https://github.com/NC1107/slim-m/issues/1312)) ([85c9a55](https://github.com/NC1107/slim-m/commit/85c9a55cab565d0c03a0334be5ee232a00f3629e))
+* **client:** show DM presence dots and a typed status in the rail footer ([#1311](https://github.com/NC1107/slim-m/issues/1311)) ([7b9abb9](https://github.com/NC1107/slim-m/commit/7b9abb9f1f8e072f04c829c345b92d053a793694))
+* **client:** show voice occupancy as named rows, not a strip of faces ([#1313](https://github.com/NC1107/slim-m/issues/1313)) ([63fe7e7](https://github.com/NC1107/slim-m/commit/63fe7e7cbfce36906df01d9116aa934858b3a3b0))
+* **server:** incoming webhooks, stages 1-2 (mint, revoke, delivery) ([#1290](https://github.com/NC1107/slim-m/issues/1290)) ([87567ea](https://github.com/NC1107/slim-m/commit/87567ea6be64e0368f04a793e39f77fa9616aa92))
+
+
+### Bug Fixes
+
+* **client:** badge a quoted bot or webhook's name on every surface that draws it ([#1319](https://github.com/NC1107/slim-m/issues/1319)) ([349e5a4](https://github.com/NC1107/slim-m/commit/349e5a473786ef0a231b4628051847a8aa7b2aa2))
+* **client:** clear a hand-marked-unread channel when it is opened ([#1300](https://github.com/NC1107/slim-m/issues/1300)) ([62f4848](https://github.com/NC1107/slim-m/commit/62f484820df402a270a2feac9ef75c5b75b40601))
+* **client:** drop the row menu's remove-from-category, reveal the drop target during a drag instead ([#1304](https://github.com/NC1107/slim-m/issues/1304)) ([ff040cb](https://github.com/NC1107/slim-m/commit/ff040cb5873e7681b76a298b74e01e88cdb276f7))
+* **client:** flip the member profile popover above its anchor when it does not fit below ([#1302](https://github.com/NC1107/slim-m/issues/1302)) ([b7793ac](https://github.com/NC1107/slim-m/commit/b7793ac3bf32567ee6c818f4c32e65d45a8642bd))
+* **client:** give a mention its own dot shape, not just its own colour ([#1292](https://github.com/NC1107/slim-m/issues/1292)) ([f5f16c5](https://github.com/NC1107/slim-m/commit/f5f16c5ee41f6749abe21595738aef0fa46f6043))
+* **client:** keep the gutter timestamp on one line ([#1289](https://github.com/NC1107/slim-m/issues/1289)) ([a5d10f2](https://github.com/NC1107/slim-m/commit/a5d10f2f419010f8c8ae8f60c7b465a8a689533e))
+* **client:** match an app by identity before display name ([#1298](https://github.com/NC1107/slim-m/issues/1298)) ([648e49d](https://github.com/NC1107/slim-m/commit/648e49dd851d7186c6f1143542c80b524968a8ee))
+* **client:** polish the channel rail, roles popover and selection bar ([#1310](https://github.com/NC1107/slim-m/issues/1310)) ([b8ff46f](https://github.com/NC1107/slim-m/commit/b8ff46f3aee8b4c151cdf127fa379dea1ca3f909))
+* **client:** render delete account as a danger button, not a nav row ([#1293](https://github.com/NC1107/slim-m/issues/1293)) ([b4857db](https://github.com/NC1107/slim-m/commit/b4857dbd3c8dbf581e1ae92a3333b957a27cacfc))
+* **client:** show what an edit changed, not just two versions to compare ([#1318](https://github.com/NC1107/slim-m/issues/1318)) ([1ec4e00](https://github.com/NC1107/slim-m/commit/1ec4e00fee8bfd4ae4b745b7ee72d8cd2191d85e))
+* **client:** size the settings nav icon to match its label ([#1291](https://github.com/NC1107/slim-m/issues/1291)) ([8b21b7b](https://github.com/NC1107/slim-m/commit/8b21b7bc0b4a49aac47ec00d8796a80ad03b580a))
+* **client:** stop the mobile boot splash flickering on every retry ([#1320](https://github.com/NC1107/slim-m/issues/1320)) ([dc24676](https://github.com/NC1107/slim-m/commit/dc24676ff82210cea6771686c8ac060127e7ac58))
+* **server:** clear a message's code-run output when it is edited ([#1305](https://github.com/NC1107/slim-m/issues/1305)) ([8638fa3](https://github.com/NC1107/slim-m/commit/8638fa353c0107726eef4003fd2f387f7d790b96))
+* **server:** drop a bot from the default list once it leaves the Space ([#1309](https://github.com/NC1107/slim-m/issues/1309)) ([135d74e](https://github.com/NC1107/slim-m/commit/135d74e9d9e3e4667dd2778c936aa713fce284e2))
+
 ## [0.82.0](https://github.com/NC1107/slim-m/compare/client-v0.81.0...client-v0.82.0) (2026-09-23)
 
 
