@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO message_embed_fields\n                        (message_id, position, field_index, name, value, inline)\n                     VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "95c7584ad6c9c3b1c625bef62e3670027955f280200c8e7af37561fae0c139fd"
+}

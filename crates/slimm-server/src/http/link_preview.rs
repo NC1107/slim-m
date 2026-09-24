@@ -117,6 +117,30 @@ impl LinkPreviews {
             .as_deref()
             .ok_or(ApiError::NotConfigured("link previews are not enabled"))
     }
+
+    /// Resolves a caller-supplied embed image URL (`http::embeds`) to a
+    /// redeemable token at the same `GET /link-preview/image/{token}` an
+    /// ordinary pasted link's preview already uses - no new fetcher, no new
+    /// proxy route, exactly `docs/decisions/0030-incoming-webhooks.md`'s
+    /// "Where embeds live" requires.
+    ///
+    /// Never fetches: only the cheap, synchronous half of the guard
+    /// (`ssrf::validate`) runs here, so this never blocks a message read on
+    /// an outbound request. The deeper DNS-resolution-time check still runs,
+    /// lazily, the first time a client actually redeems the token - so a
+    /// host that only resolves to a blocked address later still ends up
+    /// refused, just at render time instead of enrichment time, which
+    /// matters not at all here: either way the embed already posted.
+    ///
+    /// Returns `None` - never an error - when this deployment has not
+    /// opted into outbound fetching at all (`SLIMM_LINK_PREVIEWS`), or when
+    /// the URL fails the same pre-check `preview` runs. Both degrade
+    /// identically: the embed renders with no image, not an error surface.
+    pub(crate) fn embed_image_token(&self, url: &str) -> Option<String> {
+        let service = self.inner.as_deref()?;
+        validate(url, service.allow_private).ok()?;
+        Some(service.cache.image_token_for(url))
+    }
 }
 
 #[derive(Deserialize)]

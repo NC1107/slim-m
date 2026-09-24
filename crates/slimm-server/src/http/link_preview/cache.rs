@@ -45,6 +45,11 @@ struct CachedImage {
 pub(super) struct Cache {
     previews: Mutex<HashMap<String, CachedPreview>>,
     images: Mutex<HashMap<String, CachedImage>>,
+    /// The reverse of `images`: an upstream URL to the token already minted
+    /// for it, so repeatedly enriching the same embed (a channel scrolled
+    /// past twice) reuses one token instead of minting a fresh cache entry
+    /// on every read.
+    image_tokens_by_url: Mutex<HashMap<String, (String, i64)>>,
 }
 
 impl Cache {
@@ -52,7 +57,43 @@ impl Cache {
         Self {
             previews: Mutex::new(HashMap::new()),
             images: Mutex::new(HashMap::new()),
+            image_tokens_by_url: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// The redeemable image token for [url], reusing an already-minted one
+    /// while it is still fresh, else minting and recording a new one. Used
+    /// only by an embed's image/thumbnail, which - unlike an ordinary link
+    /// preview's image - has no [`Preview`] wrapping it to mint a token
+    /// through [`Self::insert`] instead.
+    pub(super) fn image_token_for(&self, url: &str) -> String {
+        let now = now_ms();
+        {
+            let by_url = lock(&self.image_tokens_by_url);
+            if let Some((token, inserted_at)) = by_url.get(url)
+                && now - inserted_at < CACHE_TTL_MS
+                && lock(&self.images).contains_key(token)
+            {
+                return token.clone();
+            }
+        }
+        let token = Uuid::now_v7().to_string();
+        {
+            let mut images = lock(&self.images);
+            sweep(&mut images, |c| c.inserted_at, now);
+            images.insert(
+                token.clone(),
+                CachedImage {
+                    url: url.to_owned(),
+                    bytes: None,
+                    inserted_at: now,
+                },
+            );
+        }
+        let mut by_url = lock(&self.image_tokens_by_url);
+        sweep(&mut by_url, |(_, at)| *at, now);
+        by_url.insert(url.to_owned(), (token.clone(), now));
+        token
     }
 
     /// The cached preview for [url], if still fresh.
@@ -194,6 +235,35 @@ mod tests {
         let (bytes, ctype) = cache.image_bytes(&token).unwrap();
         assert_eq!(bytes, vec![1, 2, 3]);
         assert_eq!(ctype, "image/png");
+    }
+
+    #[test]
+    fn image_token_for_mints_a_redeemable_token() {
+        let cache = Cache::new();
+        let token = cache.image_token_for("https://cdn.example.com/embed.png");
+        assert_eq!(
+            cache.image_url(&token).as_deref(),
+            Some("https://cdn.example.com/embed.png")
+        );
+    }
+
+    #[test]
+    fn image_token_for_reuses_the_same_token_for_the_same_url() {
+        let cache = Cache::new();
+        let first = cache.image_token_for("https://cdn.example.com/embed.png");
+        let second = cache.image_token_for("https://cdn.example.com/embed.png");
+        assert_eq!(
+            first, second,
+            "re-enriching the same embed must not churn the cache"
+        );
+    }
+
+    #[test]
+    fn image_token_for_mints_distinct_tokens_for_distinct_urls() {
+        let cache = Cache::new();
+        let a = cache.image_token_for("https://cdn.example.com/a.png");
+        let b = cache.image_token_for("https://cdn.example.com/b.png");
+        assert_ne!(a, b);
     }
 
     #[test]

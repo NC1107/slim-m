@@ -8795,6 +8795,103 @@ components:
             that permission. Per-viewer exactly like `reacted`, and always
             false on the sender's own send or edit response: an author is
             never resolved as mentioning themselves.
+        embeds:
+          type: array
+          description: >-
+            Structured, machine-authored content attached by a webhook
+            (`deliverWebhook`) or a bot sending through `sendMessage`. Always
+            present, empty when there are none - same convention as
+            `reactions`. Fixed once a message exists: nothing edits an
+            embed, so `editMessage` always echoes the same array a message
+            was sent with. See docs/decisions/0030-incoming-webhooks.md's
+            "Where embeds live".
+          items:
+            $ref: "#/components/schemas/Embed"
+
+    Embed:
+      type: object
+      description: >-
+        The useful core of Discord's own embed shape, capped to Discord's
+        own published limits so a caller's tool is never bitten by a
+        slim-m-specific ceiling: at most 10 embeds per message, a 256-
+        character title, a 4096-character description, at most 25 fields
+        (256-character name, 1024-character value each), a 2048-character
+        footer, a 256-character author name, and a 6000-character total
+        across every title/description/author-name/footer/field on the
+        whole message. `deliverWebhook` and `sendMessage` share one
+        implementation of every cap (`http::embeds` on the server), so the
+        two routes cannot silently drift apart.
+
+        Two fields Discord's own embed has are deliberately absent:
+        `author.icon_url` and `footer.icon_url`. Each is a small
+        avatar-shaped image beside a name, which is exactly the
+        identity-spoofing objection this project already gives for
+        dropping `avatar_url` outright (see IncomingWebhookPayload), so
+        they get the same answer rather than reopening it for two more
+        image fields.
+      properties:
+        title:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        url:
+          type: [string, "null"]
+          description: Where the embed's title links, if anywhere.
+        accent:
+          type: [string, "null"]
+          enum: [red, orange, yellow, green, blue, purple, null]
+          description: >-
+            The caller's colour, reduced to one of six pre-tuned swatches -
+            never a raw hex fill. slim-m's design system keeps its one
+            accent hue closed to seven unrelated chrome roles (decision
+            0004) and this is not that accent: it is a second, separate
+            closed palette that exists only so a caller can tell one
+            embed's kind from another at a glance. The client paints it as
+            a border stripe and a soft tint only, never as text, so no
+            caller input can land on a contrast failure. Null when the
+            caller sent no colour, or sent one too close to black, white or
+            grey to read as a hue.
+        author_name:
+          type: [string, "null"]
+        author_url:
+          type: [string, "null"]
+        fields:
+          type: array
+          description: Always present, empty when the caller sent none.
+          items:
+            $ref: "#/components/schemas/EmbedField"
+        footer_text:
+          type: [string, "null"]
+        timestamp:
+          type: [integer, "null"]
+          format: int64
+        image_token:
+          type: [string, "null"]
+          description: >-
+            Redeemable at `getLinkPreviewImage`, exactly like an ordinary
+            pasted link's preview image - never the raw upstream URL. Null
+            when the caller sent no image, the URL failed the same SSRF
+            guard decision 0019 already runs for link previews, or this
+            deployment has not opted into outbound image fetching at all
+            (`SLIMM_LINK_PREVIEWS`). Every one of those degrades identically:
+            the embed still posts, with no image.
+        thumbnail_token:
+          type: [string, "null"]
+          description: Same treatment as image_token, for the smaller slot.
+
+    EmbedField:
+      type: object
+      required: [name, value, inline]
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        inline:
+          type: boolean
+          description: >-
+            Whether this field may sit beside its neighbors rather than
+            taking the embed's full width - Discord's own field shape.
 
     SavedMessage:
       allOf:
