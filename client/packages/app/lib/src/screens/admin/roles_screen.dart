@@ -113,6 +113,8 @@ class _RoleRowState extends ConsumerState<_RoleRow>
       headline: role.name,
       badge: role.isEveryone
           ? const AppBadge(variant: AppBadgeVariant.tag, label: 'Everyone')
+          : role.isManagedByBot
+          ? const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot')
           : null,
       details: [
         SettingsEntityDetail(

@@ -15,6 +15,7 @@ class Role {
     required this.isEveryone,
     this.mentionable = false,
     required this.createdAt,
+    this.managedBotId,
   });
 
   final String id;
@@ -36,6 +37,13 @@ class Role {
   /// Unix milliseconds.
   final int createdAt;
 
+  /// Informational: the bot this role was minted for, if any. An ordinary,
+  /// freely editable role otherwise. See `docs/decisions/0028-bot-accounts.md`.
+  final String? managedBotId;
+
+  /// Whether to show the "Bot" badge.
+  bool get isManagedByBot => managedBotId != null;
+
   factory Role.fromJson(Map<String, dynamic> json) => Role(
         id: json['id'] as String,
         name: json['name'] as String,
@@ -43,6 +51,7 @@ class Role {
         isEveryone: json['is_everyone'] as bool,
         mentionable: json['mentionable'] as bool? ?? false,
         createdAt: json['created_at'] as int,
+        managedBotId: json['managed_bot_id'] as String?,
       );
 }
 

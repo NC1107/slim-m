@@ -410,6 +410,83 @@ async fn a_moderator_who_can_view_the_parent_sees_a_resolved_thread_report() {
     );
 }
 
+/// `VIEW_MODERATION_HISTORY` clears this gate on its own, and - unlike
+/// `MANAGE_MESSAGES` - skips `hidden_channels`'s per-channel filter: the
+/// modlog bot (0028's addendum) holds no per-channel `MANAGE_MESSAGES` grant
+/// anywhere for that filter to find. So a resolved report about a channel
+/// this caller cannot moderate must still appear, alongside a deployment-wide
+/// audit entry.
+#[tokio::test]
+async fn view_moderation_history_bit_reads_without_manage_messages_or_channel_scoping() {
+    let (store, _guard) = new_store("slimm-reports-history-view-only").await;
+    let app = app(store.clone());
+    let (admin_token, admin_id) = register(&store, "alice").await;
+    let (bob_token, _bob_id) = register(&store, "bob").await;
+    let (carol_token, _carol_id) = register(&store, "carol").await;
+    let channel_id = general_channel_id(&store).await;
+    let admin = UserId(Uuid::parse_str(&admin_id).unwrap());
+
+    let reader = store
+        .create_account("modlog", "modlog", "not-a-real-hash")
+        .await
+        .unwrap();
+    let reader_tokens = store.open_session(reader.id, "cli").await.unwrap();
+    let reader_role = store
+        .create_role("reader", Permissions::VIEW_MODERATION_HISTORY, false)
+        .await
+        .unwrap();
+    store.assign_role(reader.id, reader_role).await.unwrap();
+
+    // A deployment-wide audit entry, with no channel at all.
+    store
+        .set_member_timeout(admin, now_ms() + 3_600_000, Some("cool off"), admin)
+        .await
+        .unwrap();
+
+    // `reader` holds no MANAGE_MESSAGES anywhere; see this test's own doc.
+    let resolved_id =
+        file_a_report(&app, &channel_id, &bob_token, &carol_token, "resolved one").await;
+    let resolve = app
+        .clone()
+        .oneshot(request(
+            "PATCH",
+            &format!("/reports/{resolved_id}"),
+            Some(&admin_token),
+            Some(json!({ "resolution": "resolved" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resolve.status(), StatusCode::NO_CONTENT);
+
+    let reader_token = reader_tokens.access_token.as_str();
+    let response = app
+        .clone()
+        .oneshot(request("GET", "/reports/history", Some(reader_token), None))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let items = json_body(response).await;
+    let items = items.as_array().unwrap();
+
+    let is_timeout = |i: &Value| i["kind"] == "audit_log" && i["action"] == "timeout";
+    assert!(
+        items.iter().any(is_timeout),
+        "the deployment-wide audit entry must be visible: {items:?}"
+    );
+    assert!(
+        items.iter().any(|i| i["id"] == resolved_id),
+        "a resolved report in an unmoderated channel must still show: {items:?}"
+    );
+
+    // The live queue still needs MANAGE_MESSAGES; this bit does not open it.
+    let queue = app
+        .clone()
+        .oneshot(request("GET", "/reports", Some(reader_token), None))
+        .await
+        .unwrap();
+    assert_eq!(queue.status(), StatusCode::FORBIDDEN);
+}
+
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()

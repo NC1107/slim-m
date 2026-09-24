@@ -6,7 +6,8 @@
 //! snapshot of the reported content (see [`crate::store::Report`]), so this
 //! surface must never answer to anyone below that bar; every moderation
 //! handler here checks it before touching the store, the same as the rest of
-//! this file's sibling admin surfaces do.
+//! this file's sibling admin surfaces do. [`history`] alone also accepts the
+//! read-only `VIEW_MODERATION_HISTORY`; see that handler's own doc.
 //!
 //! [`super::reports_mine::my_report_status`] is the one exception, split into
 //! its own file rather than added here, and deliberately so: it is not a
@@ -288,16 +289,14 @@ impl From<ModerationHistoryItem> for ModerationHistoryItemDto {
 /// Lists one page of the moderation-history feed: resolved reports and
 /// `moderation_audit_log` rows, merged and ordered newest first.
 ///
-/// Gated on the same `MANAGE_MESSAGES` bar as [`list`], and applies the same
-/// per-channel exclusion to the resolved-report side, since a resolved report
-/// still carries the reported content snapshot. An audit row is
-/// deployment-wide and needs no such exclusion.
+/// Gated on `MANAGE_MESSAGES` or `VIEW_MODERATION_HISTORY`, unlike [`list`];
+/// see `docs/decisions/0028-bot-accounts.md`.
 async fn history(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     Query(params): Query<HistoryListParams>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ModerationHistoryItemDto>>, ApiError> {
-    require_manage_messages(&state, ctx.user_id).await?;
+    let base = require_history_access(&state, ctx.user_id).await?;
     let after = match (
         params.after,
         params.after_kind.as_deref(),
@@ -315,8 +314,12 @@ async fn history(
     };
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
 
-    let report_channel_ids = state.store.report_channel_ids_including_resolved().await?;
-    let hidden = hidden_channels(&state, ctx.user_id, &report_channel_ids).await?;
+    let hidden = if base.contains(Permissions::VIEW_MODERATION_HISTORY) {
+        Vec::new()
+    } else {
+        let report_channel_ids = state.store.report_channel_ids_including_resolved().await?;
+        hidden_channels(&state, ctx.user_id, &report_channel_ids).await?
+    };
     let items = state
         .store
         .moderation_history(after, &hidden, limit)
@@ -453,6 +456,18 @@ async fn require_manage_messages(state: &AppState, user_id: UserId) -> Result<()
         return Err(ApiError::Forbidden);
     }
     Ok(())
+}
+
+/// The bar for [`history`]: either bit clears it.
+async fn require_history_access(
+    state: &AppState,
+    user_id: UserId,
+) -> Result<Permissions, ApiError> {
+    let base = state.store.base_permissions(user_id).await?;
+    if !base.intersects(Permissions::MANAGE_MESSAGES.union(Permissions::VIEW_MODERATION_HISTORY)) {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(base)
 }
 
 /// Whether a base-level moderator may see or act on a report in this channel.

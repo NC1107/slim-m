@@ -21,6 +21,9 @@
 //! [`super::escalation::escalation_guard`] call, before revoking rather than
 //! granting - and `update`/`delete` run it against the role's own current
 //! bits, since a role has no user to check instead.
+//!
+//! A bot is a role holder like any other; see
+//! `docs/decisions/0028-bot-accounts.md`.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -69,6 +72,8 @@ struct RoleDto {
     /// permission of their own; see `crate::store::Role::mentionable`.
     mentionable: bool,
     created_at: i64,
+    /// See [`Role::managed_bot_id`].
+    managed_bot_id: Option<String>,
 }
 
 impl From<Role> for RoleDto {
@@ -80,6 +85,7 @@ impl From<Role> for RoleDto {
             is_everyone: role.is_everyone,
             mentionable: role.mentionable,
             created_at: role.created_at,
+            managed_bot_id: role.managed_bot_id.map(|id| id.to_string()),
         }
     }
 }
@@ -330,7 +336,9 @@ async fn caller_granted(state: &AppState, user_id: UserId) -> Result<Permissions
 /// to hand out a permission the caller lacks. An administrator's `caller`
 /// already resolves to [`Permissions::ALL`], so this is also where that
 /// bypass takes effect.
-fn grantable(caller: Permissions, bits: i64) -> Result<Permissions, ApiError> {
+///
+/// `pub(super)`: [`super::bots`] reuses this for a bot's managed role.
+pub(super) fn grantable(caller: Permissions, bits: i64) -> Result<Permissions, ApiError> {
     let requested = Permissions::from_bits(bits);
     if !Permissions::ALL.contains(requested) {
         return Err(ApiError::BadRequest("unknown permission bits"));

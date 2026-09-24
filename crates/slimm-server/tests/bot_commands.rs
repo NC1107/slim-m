@@ -12,6 +12,7 @@ use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
 use slimm_server::ids::UserId;
+use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -88,7 +89,7 @@ async fn register(store: &Store, username: &str) -> (UserId, String) {
 /// baseline.
 async fn bot(store: &Store, created_by: UserId, username: &str) -> (UserId, String) {
     let new_bot = store
-        .create_bot(username, username, created_by)
+        .create_bot(username, username, Permissions::NONE, created_by)
         .await
         .unwrap();
     (new_bot.bot.user_id, new_bot.token)

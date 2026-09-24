@@ -33,6 +33,9 @@ pub struct Role {
     /// cover under `Permissions::MENTION_EVERYONE`.
     pub mentionable: bool,
     pub created_at: i64,
+    /// The bot this role was minted for, if any - informational only. See
+    /// `docs/decisions/0028-bot-accounts.md`.
+    pub managed_bot_id: Option<UserId>,
 }
 
 /// Why a role mutation was refused.
@@ -207,7 +210,8 @@ impl Store {
             r#"SELECT id AS "id!: RoleId", name AS "name!",
                       permissions AS "permissions!: Permissions",
                       is_everyone AS "is_everyone!: bool",
-                      mentionable AS "mentionable!: bool", created_at AS "created_at!"
+                      mentionable AS "mentionable!: bool", created_at AS "created_at!",
+                      managed_bot_id AS "managed_bot_id: UserId"
                FROM roles ORDER BY position DESC, created_at"#
         )
         .fetch_all(&self.pool)
@@ -222,7 +226,8 @@ impl Store {
             r#"SELECT id AS "id!: RoleId", name AS "name!",
                       permissions AS "permissions!: Permissions",
                       is_everyone AS "is_everyone!: bool",
-                      mentionable AS "mentionable!: bool", created_at AS "created_at!"
+                      mentionable AS "mentionable!: bool", created_at AS "created_at!",
+                      managed_bot_id AS "managed_bot_id: UserId"
                FROM roles WHERE id = ?"#,
             role_id
         )
@@ -230,6 +235,8 @@ impl Store {
         .await?;
         Ok(row)
     }
+
+    // Bot-managed-role reads live in `role_bots.rs`; see that file's own doc.
 
     /// Who holds a role, for a caller that has to notify them about something
     /// their membership decides.
