@@ -1405,6 +1405,42 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/bot-commands:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listChannelBotCommands
+      tags: [channels]
+      summary: Bot commands the caller may currently be offered in this channel.
+      description: >-
+        The composer's own discovery list, across every bot: a command is
+        listed only while its bot's token is live and it is still a member of
+        the Space (so a revoked or Space-removed bot's commands vanish here
+        immediately, with no separate cleanup step) and the bot itself
+        currently holds VIEW_CHANNEL in this channel - a bot with no access to
+        a channel never advertises itself there. A command that declares a
+        `permission` is left out on its own, not the whole bot, when the
+        caller lacks that bit here; this is a composer hint only, never
+        enforced against the plain message a bot goes on to receive. Masked
+        to an empty list whenever the caller itself lacks VIEW_CHANNEL, the
+        same "refuse identically" rule `getChannelPermissions` documents, so
+        this can never become a channel-existence oracle.
+      responses:
+        "200":
+          description: The bot commands currently on offer here, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelBotCommand"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/thread-parent:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -5187,6 +5223,92 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /bots/commands:
+    put:
+      operationId: setBotCommands
+      tags: [bots]
+      summary: Bulk-overwrite the caller's own registered prefix and commands.
+      description: >-
+        Advertisement, not interactions (decision
+        0031-bot-command-registration): registering a command never gives the
+        server anything to run. It only lets the composer offer `/name` as a
+        row that inserts the bot's own prefix and keyword as plain text,
+        exactly the message the bot's own process already parses today - the
+        server never checks a caller's identity or permissions before
+        delivering that message, and a declared `permission` only hides the
+        row in the composer for a caller who lacks it, so the bot must still
+        verify who sent it. Refused for a caller that is not itself a bot.
+
+        Replaces the caller's *entire* prior registration - prefix and every
+        command - in one transaction, all or nothing: a set that fails
+        validation leaves the previous registration untouched rather than
+        partially applying. A bot is expected to re-register its complete set
+        on every connect, the same bulk-overwrite shape Discord's own
+        application-command registration uses, so a command dropped from its
+        own source actually disappears rather than lingering as a stale
+        advertisement.
+
+        Caps: at most 50 commands; a prefix is 1 to 16 characters, has no
+        whitespace, and must not be one of the composer's own reserved
+        triggers `/`, `@`, `:`; a command name is 1 to 32 characters of
+        letters, digits, `-` and `_` and must be unique (case-insensitively)
+        within the set; a description is 1 to 100 characters; a `usage` hint
+        is at most 80 characters; a `permission` is exactly one bit from
+        `Permissions`, the same bitmask `getChannelPermissions` returns.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetBotCommandsRequest"
+      responses:
+        "204":
+          description: Registered.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /bots/{botId}/commands:
+    parameters:
+      - name: botId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The bot's user id.
+    get:
+      operationId: getBotCommands
+      tags: [bots]
+      summary: A bot's whole registered prefix and command list.
+      description: >-
+        Unfiltered by any viewer's own channel or permissions - what a
+        profile popover shows about the bot itself, not what one particular
+        caller may currently be offered in one particular channel (see
+        `listChannelBotCommands` for that). `prefix` is absent and `commands`
+        is empty for a bot that has never registered anything, including for
+        an id that does not name a bot at all - the same clean-no-op shape
+        `listSlashCommands` gives an empty deployment, rather than a 404 that
+        would let a caller probe which ids exist.
+      responses:
+        "200":
+          description: The bot's registration, possibly empty.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotCommandRegistration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /webhooks/{webhookId}/{token}:
     parameters:
       - name: webhookId
@@ -7624,6 +7746,86 @@ components:
           description: >-
             Shown once and never again. Prefixed so a presented credential can
             be routed without a second lookup.
+    BotCommandInput:
+      type: object
+      required: [name, description]
+      description: >-
+        One command in a `setBotCommands` request. See that route's own
+        description for the caps on each field.
+      properties:
+        name:
+          type: string
+          description: >-
+            The bare keyword the composer offers after the bot's own prefix,
+            e.g. `ping` for a bot whose prefix is `!` offering `!ping`. Never
+            includes the prefix itself.
+        description:
+          type: string
+        usage:
+          type: [string, "null"]
+          description: An optional short example of the command's arguments.
+        permission:
+          type: [integer, "null"]
+          format: int64
+          description: >-
+            A single bit from `Permissions`. Hides this command in the
+            composer for a caller who lacks it in the current channel; never
+            checked against the message the bot itself goes on to receive.
+    SetBotCommandsRequest:
+      type: object
+      required: [prefix]
+      properties:
+        prefix:
+          type: string
+          description: >-
+            What this bot answers to, e.g. `!`, `?` or `$`. Must not be one of
+            the composer's own reserved triggers `/`, `@`, `:`.
+        commands:
+          type: array
+          default: []
+          items:
+            $ref: "#/components/schemas/BotCommandInput"
+    RegisteredBotCommand:
+      type: object
+      required: [name, description]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        usage:
+          type: [string, "null"]
+    BotCommandRegistration:
+      type: object
+      required: [commands]
+      properties:
+        prefix:
+          type: [string, "null"]
+          description: Absent for a bot that has never registered anything.
+        commands:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegisteredBotCommand"
+    ChannelBotCommand:
+      type: object
+      required:
+        [bot_user_id, bot_username, bot_display_name, prefix, name, description]
+      properties:
+        bot_user_id:
+          type: string
+          format: uuid
+        bot_username:
+          type: string
+        bot_display_name:
+          type: string
+        prefix:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        usage:
+          type: [string, "null"]
     IncomingWebhookPayload:
       type: object
       description: >-

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM bot_command_registrations WHERE bot_user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "4b4bf2321ee8d20160ec9cf180e981eefdbb4004287b23c6e639f679c28ae871"
+}

@@ -287,6 +287,16 @@ impl Store {
         sqlx::query!("DELETE FROM bot_tokens WHERE bot_user_id = ?", user_id)
             .execute(&mut *tx)
             .await?;
+        // A deleted bot's own registration: its own data, nobody else's, purged with it.
+        sqlx::query!("DELETE FROM bot_commands WHERE bot_user_id = ?", user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query!(
+            "DELETE FROM bot_command_registrations WHERE bot_user_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // Same shape as bot_tokens.bot_user_id above: its own data, purged with it.
         sqlx::query!("DELETE FROM webhooks WHERE user_id = ?", user_id)
             .execute(&mut *tx)

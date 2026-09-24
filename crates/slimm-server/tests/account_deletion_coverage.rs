@@ -56,6 +56,8 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
     ),
     ("app_surfaces", "created_by", OnDelete::Anonymize),
     ("attachment_uploaders", "uploaded_by", OnDelete::Purge),
+    ("bot_command_registrations", "bot_user_id", OnDelete::Purge),
+    ("bot_commands", "bot_user_id", OnDelete::Purge),
     ("bot_tokens", "bot_user_id", OnDelete::Purge),
     ("bot_tokens", "created_by", OnDelete::Anonymize),
     ("call_records", "caller_id", OnDelete::Anonymize),
