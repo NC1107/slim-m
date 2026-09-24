@@ -155,8 +155,17 @@ impl Store {
         })
     }
 
-    /// Every bot in the deployment, newest first. No secrets.
-    pub async fn list_bots(&self) -> anyhow::Result<Vec<Bot>> {
+    /// Bots in the deployment, newest first. No secrets.
+    ///
+    /// A bot removed from the Space is left out unless `include_removed` is
+    /// set: it is gone from `GET /members` already, so keeping it here
+    /// forever would answer "every bot ever minted" to a question that means
+    /// "what has a credential on my deployment". A bot that is still a
+    /// member is always included, even revoked, because it stays on the
+    /// roster everywhere else and its authorship may still matter to
+    /// whoever is reading this list. See `docs/decisions/0028-bot-accounts.md`.
+    pub async fn list_bots(&self, include_removed: bool) -> anyhow::Result<Vec<Bot>> {
+        let include_removed = i64::from(include_removed);
         let rows = sqlx::query!(
             r#"SELECT u.id AS "user_id!: UserId", u.username, u.display_name,
                       u.created_at,
@@ -165,7 +174,11 @@ impl Store {
                LEFT JOIN bot_tokens t
                  ON t.bot_user_id = u.id AND t.revoked_at IS NULL
                WHERE u.is_bot = 1 AND u.deleted_at IS NULL
-               ORDER BY u.created_at DESC"#
+                 AND (? = 1 OR NOT EXISTS (
+                   SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id
+                 ))
+               ORDER BY u.created_at DESC"#,
+            include_removed
         )
         .fetch_all(&self.pool)
         .await?;
