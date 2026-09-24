@@ -27,7 +27,9 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/channel_by_id_provider.dart';
 import '../providers/display_preferences.dart' show watchUse24Hour;
+import '../providers/user_profiles.dart';
 import 'attachment_view.dart';
+import 'author_label.dart';
 import 'channel_label.dart';
 import 'message_jump.dart';
 import 'message_row_identity.dart' show formatMessageTime;
@@ -70,6 +72,15 @@ class ForwardedMessageCard extends ConsumerWidget {
     final use24Hour = watchUse24Hour(ref, context);
     final name = forwarded.authorDisplayName ?? 'Unknown user';
     final time = formatMessageTime(forwarded.createdAt, use24Hour: use24Hour);
+    // Live-resolved: isBot/isWebhook are not on the ForwardedMessage snapshot.
+    resolveAuthorProfiles(ref, [forwarded.authorId]);
+    final authorProfile = ref
+        .watch(
+          batchProfilesControllerProvider.select(
+            (m) => authorResolution(m, forwarded.authorId ?? ''),
+          ),
+        )
+        .profile;
     final origin = ref.watch(channelByIdProvider(forwarded.channelId));
     final originLabel = channelDisplayLabel(origin.valueOrNull);
     // On tap, not on build: eager lookup would demand a router from every surface a message renders on.
@@ -102,6 +113,7 @@ class ForwardedMessageCard extends ConsumerWidget {
               child: _Header(
                 forwarded: forwarded,
                 name: name,
+                authorProfile: authorProfile,
                 time: time,
                 originLabel: originLabel,
                 jumpable: onJump != null,
@@ -154,6 +166,7 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.forwarded,
     required this.name,
+    required this.authorProfile,
     required this.time,
     required this.originLabel,
     required this.jumpable,
@@ -161,6 +174,7 @@ class _Header extends StatelessWidget {
 
   final ForwardedMessage forwarded;
   final String name;
+  final api.UserProfile? authorProfile;
   final String time;
   final String? originLabel;
   final bool jumpable;
@@ -213,9 +227,9 @@ class _Header extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.s8),
             Flexible(
-              child: Text(
-                name,
-                overflow: TextOverflow.ellipsis,
+              child: AuthorNameLine(
+                name: name,
+                profile: authorProfile,
                 style: AppText.caption.copyWith(
                   color: tokens.textPrimary,
                   fontWeight: AppWeights.semi,

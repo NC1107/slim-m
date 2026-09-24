@@ -58,12 +58,23 @@ http.Response _emptyJsonList() => http.Response(
 /// would otherwise overwrite the parent's own cached display name.
 const _knownAuthors = {'alice': 'Alice'};
 
+/// Author ids that resolve as a webhook, over and above [_knownAuthors].
+const _knownWebhooks = {'webhook-1'};
+
 http.Response _usersJson(Uri url) {
   final ids = url.queryParameters['ids']?.split(',') ?? const [];
   final profiles = [
     for (final id in ids)
       if (_knownAuthors[id] case final name?)
-        {'id': id, 'username': id, 'display_name': name, 'created_at': 0},
+        {'id': id, 'username': id, 'display_name': name, 'created_at': 0}
+      else if (_knownWebhooks.contains(id))
+        {
+          'id': id,
+          'username': id,
+          'display_name': id,
+          'created_at': 0,
+          'is_webhook': true,
+        },
   ];
   return http.Response(
     jsonEncode(profiles),
@@ -219,6 +230,36 @@ void main() {
 
     await _settle(tester);
   });
+
+  testWidgets(
+    'a thread whose parent is a webhook post shows its badge, at phone '
+    'width',
+    (tester) async {
+      await _pumpThread(
+        tester,
+        const Size(360, 800),
+        threadParentResponse: _threadParentJson(
+          parentChannelId: 'parent-channel',
+          parentChannelName: 'general',
+          parentMessageId: 'parent-1',
+          parentContent: 'the disk is nearly full',
+          parentAuthorId: 'webhook-1',
+          parentAuthorDisplayName: 'Definitely A Real Person ' * 8,
+        ),
+      );
+
+      expect(
+        find.text('WEBHOOK'),
+        findsOneWidget,
+        reason:
+            'docs/decisions/0030 calls this badge the entire mitigation for '
+            "a webhook's claimed name",
+      );
+      expect(tester.getRect(find.byType(AppBadge)).width, greaterThan(0));
+
+      await _settle(tester);
+    },
+  );
 
   /// The parent message can be soft-deleted while its thread stays open -
   /// the two are unrelated deletes - so the card must say so rather than

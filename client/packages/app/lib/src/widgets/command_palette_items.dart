@@ -185,21 +185,32 @@ class PaletteMessageAuthor extends ConsumerWidget {
   final String? authorId;
   final String? cachedDisplayName;
 
+  /// Bounds the name so a long or claimed one cannot grow into the row's
+  /// message-content column instead of ellipsizing in its own trailing
+  /// slot - `AppMenuItem`'s own `trailing` sits in a `Row` with
+  /// `MainAxisSize.min`, so nothing here shrinks it for free.
+  static const double _maxWidth = 140;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final resolution = ref.watch(
+      batchProfilesControllerProvider.select(
+        (m) => authorResolution(m, authorId ?? ''),
+      ),
+    );
     final name = authorLabelResolved(
       authorId: authorId,
       cachedDisplayName: cachedDisplayName,
-      resolution: ref.watch(
-        batchProfilesControllerProvider.select(
-          (m) => authorResolution(m, authorId ?? ''),
-        ),
-      ),
+      resolution: resolution,
     );
-    return Text(
-      name,
-      style: AppText.micro.copyWith(color: tokens.textSecondary),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: _maxWidth),
+      child: AuthorNameLine(
+        name: name,
+        profile: resolution.profile,
+        style: AppText.micro.copyWith(color: tokens.textSecondary),
+      ),
     );
   }
 }
