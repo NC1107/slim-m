@@ -9,12 +9,14 @@
 //! for its own fresh-per-event store read.
 
 use super::super::apps::AppSurfaceDto;
+use super::super::embeds;
+use super::super::link_preview::LinkPreviews;
 use super::super::message_dto::{CallDto, CodeRunDto};
 use super::super::polls::PollDto;
 use super::{AttachmentDto, MessageDto, frames::ServerFrame};
 use crate::ids::UserId;
 use crate::store::{
-    AppSurface, AttachmentSummary, CodeRunSummary, ForwardSummary, Message, Poll, Store,
+    AppSurface, AttachmentSummary, CodeRunSummary, Embed, ForwardSummary, Message, Poll, Store,
 };
 
 /// Everything about a freshly created message that the bare row cannot
@@ -29,6 +31,8 @@ pub(super) struct MessageExtras {
     pub app_surface: Option<AppSurface>,
     pub code_run: Option<CodeRunSummary>,
     pub poll: Option<Poll>,
+    /// Raw; image tokens resolve here, per connection.
+    pub embeds: Vec<Embed>,
 }
 
 /// The frame for a freshly sent message, with `mentions_me` resolved by one
@@ -37,6 +41,7 @@ pub(super) struct MessageExtras {
 /// instead read this off the broadcast event.
 pub(super) async fn created(
     store: &Store,
+    link_previews: &LinkPreviews,
     viewer: UserId,
     message: Message,
     extras: MessageExtras,
@@ -54,6 +59,7 @@ pub(super) async fn created(
     // Without these an app or a poll arrives blank until the next cold read.
     dto.app_surface = extras.app_surface.map(AppSurfaceDto::from);
     dto.poll = extras.poll.map(PollDto::from);
+    dto.embeds = embeds::dtos_from_stored(link_previews, extras.embeds);
     if let Some(run) = extras.code_run {
         dto.code_runs = vec![CodeRunDto {
             block_index: run.block_index,

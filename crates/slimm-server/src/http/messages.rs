@@ -22,6 +22,7 @@ use uuid::Uuid;
 use super::AppState;
 use super::attachment_ids::parse_attachment_ids;
 use super::channel_slow_mode::enforce_slow_mode;
+use super::embeds;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::message_history::history;
@@ -82,6 +83,9 @@ struct SendRequest {
     /// be empty.
     #[serde(default)]
     forwarded_from_id: Option<String>,
+    /// Structured content, honoured only from a bot; see [`send`].
+    #[serde(default)]
+    embeds: Vec<embeds::RawEmbed>,
 }
 
 #[derive(Deserialize)]
@@ -123,6 +127,7 @@ struct ListParams {
 /// `channel_slow_mode::enforce_slow_mode`), gated on the same `stored_already`
 /// this function already computes for the forward check: a retry of a send
 /// that already landed must never be refused for arriving "too soon".
+/// `embeds` is honoured only from a bot, discarded otherwise.
 async fn send(
     Authed(ctx): Authed,
     Path(channel_id): Path<String>,
@@ -153,6 +158,7 @@ async fn send(
     let carries_more = !attachment_ids.is_empty() || req.forwarded_from_id.is_some();
     let content = validate_content(&req.content, carries_more)?;
     let id = MessageId(parse_uuid(&req.id)?);
+    let embeds = embeds::honored_for_send(&state, ctx.user_id, req.embeds).await?;
     let reply_to_id = req
         .reply_to_id
         .as_deref()
@@ -207,6 +213,8 @@ async fn send(
         .next()
         .map(|(_, summary)| summary);
 
+    let stored_embeds = embeds::store_and_reload(&state, id, sent.fresh, &embeds).await?;
+
     // An idempotent retry must not fan out or push again; see the note on
     // this function.
     if sent.fresh {
@@ -227,6 +235,7 @@ async fn send(
             app_surface: None,
             code_run: None,
             poll: None,
+            embeds: Arc::new(stored_embeds.clone()),
         });
 
         // Cheap in-memory decision only, real work detached; see the note on
@@ -249,6 +258,7 @@ async fn send(
     let mut dto: MessageDto = sent.message.into();
     dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
     dto.forwarded = forwarded.map(Into::into);
+    dto.embeds = embeds::dtos_from_stored(&state.link_previews, stored_embeds);
     Ok(Json(dto))
 }
 

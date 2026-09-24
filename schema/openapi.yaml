@@ -7832,8 +7832,8 @@ components:
         A Discord incoming-webhook body. The promise is acceptance, not
         fidelity: an unrecognised field never refuses the request, since the
         caller here is somebody else's program and a loud refusal would hide
-        their bug rather than ours. Only `content` and `username` are
-        honoured; every other property below is accepted and silently
+        their bug rather than ours. Only `content`, `username` and `embeds`
+        are honoured; every other property below is accepted and silently
         discarded, field by field, rather than refused.
       properties:
         content:
@@ -7856,7 +7856,20 @@ components:
             name and is never mentionable. Never written to the webhook's own
             account name and never returned as a message's own author name.
         embeds:
-          description: Accepted and discarded in this build; a later stage renders these.
+          description: >-
+            Honoured, in the same shape and with the same caps
+            `SendMessageRequest.embeds` documents in full (see the
+            `RequestEmbed` schema there) - one implementation
+            (`http::embeds::build_embeds`) shared by both routes so a
+            webhook and a bot cannot drift onto different ceilings. Left
+            untyped here rather than given its own schema, the same as
+            every other property on this object: this payload is
+            member-supplied and additive-only by design, and a formal type
+            on a field that was accepted-and-discarded until this change is
+            exactly the kind of narrowing the breaking-change gate exists to
+            catch. Unlike `SendMessageRequest.embeds` there is no `is_bot`
+            gate: every webhook post is somebody else's program by
+            construction, so this is unconditional.
         avatar_url:
           description: >-
             Accepted and discarded, permanently. Honouring it would mean
@@ -9346,6 +9359,100 @@ components:
             account's. A target that does not exist, or that you cannot see,
             is refused identically so this cannot probe for private
             messages.
+        embeds:
+          type: array
+          description: >-
+            Structured, machine-authored content, honoured only when the
+            sender is a bot account (`is_bot`) - a person's composer has no
+            embed UI, so the route itself enforces that rather than only the
+            client happening to respect it. From anyone else this field is
+            accepted and silently discarded, never a 400: neither a bot nor
+            a webhook is a person typing by hand, and
+            docs/decisions/0030-incoming-webhooks.md already gives a
+            webhook's own body that same accept-not-refuse treatment.
+
+            At most 10 embeds per message. Per embed: a 256-character title,
+            a 4096-character description, a 256-character author name, a
+            2048-character footer, at most 25 fields (a 256-character name
+            and a 1024-character value each), and a 6000-character total
+            across every title/description/author-name/footer/field-text on
+            the whole message - Discord's own published limits, shared with
+            `deliverWebhook`'s own `embeds` by one implementation
+            (`http::embeds::build_embeds`) so the two routes cannot drift
+            onto different ceilings. Any of those overrun 400s naming how far
+            over.
+
+            `image`/`thumbnail` are the one exception: a URL that fails the
+            same SSRF guard `getLinkPreview` already runs (decision 0019), or
+            is sent while this deployment has not opted into outbound
+            fetching at all (`SLIMM_LINK_PREVIEWS`), is silently dropped
+            rather than refused - the image is never the reason the message
+            exists. See the `Embed` schema for what a caller gets back.
+          items:
+            $ref: "#/components/schemas/RequestEmbed"
+
+    RequestEmbed:
+      type: object
+      description: >-
+        What a caller sends to attach one embed - see `embeds` on
+        SendMessageRequest and `embeds` on IncomingWebhookPayload for the
+        caps both share. `author`/`footer`/`image`/`thumbnail` are Discord's
+        own nested shape, so a tool already speaking Discord's contract needs
+        no translation for the fields this honours.
+      properties:
+        title:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        url:
+          type: [string, "null"]
+        color:
+          type: [integer, "null"]
+          description: >-
+            A 24-bit RGB integer (Discord's own shape). Out of that range is
+            dropped, not refused: see the `Embed` schema's `accent` for what
+            this becomes on the way back out.
+        author:
+          type: [object, "null"]
+          properties:
+            name:
+              type: string
+            url:
+              type: [string, "null"]
+          required: [name]
+        fields:
+          type: array
+          items:
+            type: object
+            required: [name, value]
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+              inline:
+                type: boolean
+        footer:
+          type: [object, "null"]
+          properties:
+            text:
+              type: string
+          required: [text]
+        timestamp:
+          type: [integer, "null"]
+          format: int64
+        image:
+          type: [object, "null"]
+          properties:
+            url:
+              type: string
+          required: [url]
+        thumbnail:
+          type: [object, "null"]
+          properties:
+            url:
+              type: string
+          required: [url]
 
     EditMessageRequest:
       type: object

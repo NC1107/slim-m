@@ -233,6 +233,7 @@ async fn create(
             app_surface: None,
             code_run: None,
             poll: poll_for_event.map(Arc::new),
+            embeds: Arc::new(Vec::new()),
         });
         state.push.notify_message(
             state.store.clone(),

@@ -197,6 +197,7 @@ async fn create(
             app_surface: surface.map(Arc::new),
             code_run: block_zero.map(Arc::new),
             poll: None,
+            embeds: Arc::new(Vec::new()),
         });
         state.push.notify_message(
             state.store.clone(),

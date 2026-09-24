@@ -12,7 +12,7 @@ use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
 use crate::store::{
-    AppSurface, AttachmentSummary, CanvasObject, Channel, CodeRunSummary, ForwardSummary,
+    AppSurface, AttachmentSummary, CanvasObject, Channel, CodeRunSummary, Embed, ForwardSummary,
     MediaSlotKind, Message, Poll,
 };
 use crate::voice::CallRingOutcome;
@@ -52,6 +52,8 @@ pub enum Event {
         /// `None` here: nobody can have voted before this message, which is
         /// the poll's own creation, exists.
         poll: Option<Arc<Poll>>,
+        /// Raw, like `attachments`; image tokens resolve per connection.
+        embeds: Arc<Vec<Embed>>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,
     /// a different sequence from the message's own `seq`, which an edit does
