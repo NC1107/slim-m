@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/providers/dms.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/channel_header.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -247,8 +248,9 @@ void main() {
     );
   });
 
-  /// UX5: the personal space is a self-DM named "You", but it is not a person -
-  /// it keeps the rail's notebook glyph rather than a "YO" initials avatar.
+  /// UX5: the personal space is a self-DM named "Notes", but it is not a
+  /// person - it keeps the rail's notebook glyph rather than a "NO" initials
+  /// avatar.
   testWidgets('the personal space keeps its notebook glyph, not an avatar', (
     tester,
   ) async {
@@ -263,7 +265,7 @@ void main() {
           home: Scaffold(
             body: ChannelHeader(
               channelId: 'c1',
-              name: 'You',
+              name: personalSpaceName,
               isVoice: false,
               isDm: true,
               isPersonalSpace: true,

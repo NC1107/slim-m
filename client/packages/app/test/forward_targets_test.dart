@@ -219,7 +219,7 @@ void main() {
     expect(targets, isEmpty);
   });
 
-  test('the caller\'s own personal space is labelled "You"', () async {
+  test('the caller\'s own personal space is labelled "Notes"', () async {
     final container = _containerWith(
       channels: const [],
       dms: [_dmJson(channelId: 'dm-self', userId: 'self', displayName: 'Self')],
@@ -232,7 +232,7 @@ void main() {
       )).future,
     );
 
-    expect(targets.single.label, 'You');
+    expect(targets.single.label, 'Notes');
   });
 
   test(

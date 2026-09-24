@@ -22,15 +22,26 @@ const String dmChannelKind = 'dm';
 /// private notes that still sync across every signed-in device the way any
 /// other channel does.
 ///
-/// `You`, not `Me`: the app already uses the second person for the caller's
-/// own identity everywhere else this comes up - a voice participant tile
-/// names the local user `$name (you)`, and the personal settings screen's own
-/// section group is labelled `You` - so this reads as one more instance of an
-/// established convention rather than a new word to learn. It also composes
-/// better with this string's one other job, the composer's placeholder
-/// (`Message #$personalSpaceName`): "Message You" parses as an instruction
-/// directed at the reader, where "Message Me" reads as the app talking about
-/// itself.
+/// `Notes`, not `You`: reversed at the owner's direction after this string
+/// shipped as `You` for a while. The earlier reasoning leaned on two
+/// pillars - it matched the second-person convention used for the caller
+/// elsewhere (a voice tile's `$name (you)`, the personal settings screen's
+/// own `You` section group), and it composed with the composer placeholder
+/// so `Message #$personalSpaceName` read as an instruction rather than the
+/// app talking about itself. Both still describe `You`'s trade-offs
+/// accurately; they were outweighed, not wrong. `Notes` names what the row
+/// is *for* rather than who it belongs to, which is the more useful fact
+/// once a caller has more than a couple of DMs: `You` looks like a person in
+/// a list of people, `Notes` reads immediately as the one row that is not a
+/// conversation. It also matches the notebook glyph [PersonalSpaceRow]
+/// already gives this row - a label finally naming what the icon has been
+/// saying - and `Message #Notes` composes at least as well as `Message You`
+/// did, describing an action ("jot something down") instead of asking the
+/// reader to parse a pronoun. `You`'s alignment with the settings group's
+/// own label does not carry over, but that pairing was never load-bearing:
+/// the settings group names *your account settings*, this row names *a
+/// notes channel*, and losing an accidental echo between two different
+/// things does not resurrect the case for the pronoun.
 ///
 /// Purely cosmetic - another member can set this exact string as their own
 /// display name, and a DM with them would render the same label.
@@ -40,7 +51,7 @@ const String dmChannelKind = 'dm';
 /// `command_palette_items.dart`'s `channelMatchesQuery` matches a personal
 /// space against the caller's own display name too, which is also the one
 /// way back once its rail row has been removed via "Remove from list".
-const String personalSpaceName = 'You';
+const String personalSpaceName = 'Notes';
 
 /// Turns a DM listing into the same [api.Channel] shape an ordinary channel
 /// arrives as. The server stores a DM channel's own `name` as empty (a DM
