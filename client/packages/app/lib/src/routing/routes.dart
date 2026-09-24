@@ -18,6 +18,12 @@ abstract final class Routes {
   static const adminReports = '/settings/reports';
   static const adminInvites = '/settings/invites';
   static const adminRoles = '/settings/roles';
+
+  /// One role's own Permissions/Members/Display tabs, drilled into from
+  /// [adminRoles] on a phone width - the compact half of the roles pane's
+  /// two-pane layout, a real route rather than a second app bar stacked
+  /// inside the first.
+  static String adminRole(String roleId) => '$adminRoles/$roleId';
   static const adminRemovedMembers = '/settings/removed-members';
   static const adminOverwrites = '/settings/permissions';
   static const channelSettings = '/settings/channel';

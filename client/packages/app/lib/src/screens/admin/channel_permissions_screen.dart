@@ -102,11 +102,9 @@ class _ChannelPermissionsPaneState
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!widget.lockChannel)
-          Padding(
+    final header = widget.lockChannel
+        ? null
+        : Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.s16,
               AppSpacing.s12,
@@ -132,10 +130,21 @@ class _ChannelPermissionsPaneState
                 ),
               ],
             ),
-          ),
-        // Not Expanded: an unbounded ambient height breaks it; see the grid's own LayoutBuilder doc.
-        ChannelPermissionsGrid(key: ValueKey(channel.id), channel: channel),
-      ],
+          );
+    final grid = ChannelPermissionsGrid(
+      key: ValueKey(channel.id),
+      channel: channel,
+    );
+
+    // A Column never tells a plain (non-Expanded) child how much height it actually has, so a genuinely bounded ambient (the modal panel, a phone screen) still reached the grid's own MediaQuery-based guess and overflowed a shorter modal; see channel_permissions_grid.dart's own LayoutBuilder for that guess. Expanded restores the real number here, and only here, where this LayoutBuilder can see the ambient is actually bounded; the Space settings pane's own scrolling embed stays unbounded and keeps the guess.
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (header != null) header,
+          constraints.hasBoundedHeight ? Expanded(child: grid) : grid,
+        ],
+      ),
     );
   }
 }

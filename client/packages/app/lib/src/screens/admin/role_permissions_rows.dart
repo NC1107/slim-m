@@ -124,26 +124,25 @@ class PermissionListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final label = Row(
-      mainAxisSize: MainAxisSize.min,
+    // Wrap, not Row: a fixed-width badge beside a label that can't shrink below its own text overflows a Row at a narrow enough width; wrapping it to its own line never does.
+    final label = Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.s8,
       children: [
-        Flexible(
-          child: Text(
-            spec.label,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.ui.copyWith(
-              color: allowed ? tokens.textPrimary : tokens.textSecondary,
-            ),
+        Text(
+          spec.label,
+          style: AppText.ui.copyWith(
+            color: allowed ? tokens.textPrimary : tokens.textSecondary,
           ),
         ),
-        if (spec.elevated) ...[
-          const SizedBox(width: AppSpacing.s8),
+        if (spec.elevated)
           const AppBadge(variant: AppBadgeVariant.warn, label: 'elevated'),
-        ],
       ],
     );
     final description = Text(
       spec.description,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: AppText.caption.copyWith(color: tokens.textSecondary),
     );
     final hint = allowed

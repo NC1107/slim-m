@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
+import '../../widgets/bot_avatar_placeholder.dart';
 import '../../widgets/run_guarded.dart';
 
 /// A group past this size collapses to this many rows plus a "+N more"
@@ -124,6 +125,9 @@ class _RoleMembersTabState extends ConsumerState<RoleMembersTab>
                   shape: candidate.isBot
                       ? AppAvatarShape.square
                       : AppAvatarShape.circle,
+                  placeholder: candidate.isBot
+                      ? botAvatarPlaceholder(context, candidate.displayName)
+                      : null,
                 ),
                 label: candidate.displayName,
                 meta: '@${candidate.username}',
@@ -211,13 +215,17 @@ class _HolderGroup extends StatelessWidget {
                 shape: holder.isBot
                     ? AppAvatarShape.square
                     : AppAvatarShape.circle,
+                placeholder: holder.isBot
+                    ? botAvatarPlaceholder(context, holder.displayName)
+                    : null,
               ),
               label: holder.displayName,
               meta: '@${holder.username}',
-              trailing: AppIconButton(
-                icon: AppIcons.delete,
+              trailing: AppButton(
+                label: 'Remove',
                 semanticLabel: 'Remove ${holder.displayName}',
-                variant: AppIconButtonVariant.danger,
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
                 onPressed: () => onRemove(holder),
               ),
             ),

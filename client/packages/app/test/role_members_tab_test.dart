@@ -77,6 +77,33 @@ void main() {
     expect(find.text('Kiki'), findsOneWidget);
   });
 
+  testWidgets(
+    'a bot holder with no picture shows initials, not a blank square',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap([_member('b1', 'sample_bot', isBot: true)]),
+      );
+      await tester.pumpAndSettle();
+
+      // initialsFor strips symbols and uppercases the first two characters.
+      expect(find.text('SA'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a bot search candidate with no picture shows initials too', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap([_member('b1', 'sample_bot', isBot: true, holds: false)]),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'sample');
+    await tester.pumpAndSettle();
+
+    expect(find.text('SA'), findsOneWidget);
+  });
+
   testWidgets('the empty group shows its message', (tester) async {
     await tester.pumpWidget(_wrap([_member('b1', 'sample_bot', isBot: true)]));
     await tester.pumpAndSettle();

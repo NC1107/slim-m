@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../widgets/bot_avatar_placeholder.dart';
+
 /// One grid column: the role or member it targets, resolved for display.
 class GridColumn {
   const GridColumn({
@@ -146,6 +148,9 @@ class _HeaderCell extends StatelessWidget {
                     shape: column.isBot
                         ? AppAvatarShape.square
                         : AppAvatarShape.circle,
+                    placeholder: column.isBot
+                        ? botAvatarPlaceholder(context, column.label)
+                        : null,
                   ),
             const SizedBox(height: AppSpacing.s4),
             Text(

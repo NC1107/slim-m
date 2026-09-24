@@ -28,6 +28,7 @@ import '../screens/admin/invites_screen.dart';
 import '../screens/admin/performance_screen.dart';
 import '../screens/admin/reports_screen.dart';
 import '../screens/admin/removed_members_screen.dart';
+import '../screens/admin/role_detail_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
@@ -142,6 +143,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.adminRoles,
         pageBuilder: (context, state) =>
             modalPage(context, const RolesScreen()),
+      ),
+      GoRoute(
+        path: '${Routes.adminRoles}/:roleId',
+        pageBuilder: (context, state) => modalPage(
+          context,
+          RoleDetailScreen(roleId: state.pathParameters['roleId']!),
+        ),
       ),
       GoRoute(
         path: Routes.adminBots,

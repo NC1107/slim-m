@@ -16,6 +16,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
@@ -79,23 +80,24 @@ class _RolesPaneState extends ConsumerState<RolesPane> {
       data: (context, list) => LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= kRolesPaneTwoPaneWidth;
-          final selected = (wide
-              ? (_select(list) ?? list.firstOrNull)
-              : _select(list));
 
-          if (!wide && selected != null) {
-            return _NarrowDetail(
-              role: selected,
-              onBack: () => setState(() => _selectedId = null),
+          // Narrow: the list only; a role's tabs are a real pushed route (Routes.adminRole), not a second app bar under this pane's own.
+          if (!wide) {
+            return _RoleNav(
+              roles: list,
+              selectedId: null,
+              showSelection: false,
+              onSelect: (id) => context.push(Routes.adminRole(id)),
             );
           }
+
+          final selected = _select(list) ?? list.firstOrNull;
           final nav = _RoleNav(
             roles: list,
             selectedId: selected?.id,
-            showSelection: wide,
+            showSelection: true,
             onSelect: (id) => setState(() => _selectedId = id),
           );
-          if (!wide) return nav;
 
           final tokens = Theme.of(context).extension<AppTokens>()!;
           return Row(
@@ -126,26 +128,6 @@ class _RolesPaneState extends ConsumerState<RolesPane> {
 
   api.Role? _select(List<api.Role> roles) =>
       roles.where((r) => r.id == _selectedId).firstOrNull;
-}
-
-class _NarrowDetail extends StatelessWidget {
-  const _NarrowDetail({required this.role, required this.onBack});
-
-  final api.Role role;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(role.name),
-      leading: IconButton(
-        icon: const Icon(AppIcons.back),
-        tooltip: 'Back to roles',
-        onPressed: onBack,
-      ),
-    ),
-    body: SafeArea(top: false, child: RoleDetail(role: role)),
-  );
 }
 
 /// The role list: highest position first, a colour dot, member count, and a
@@ -306,6 +288,10 @@ class _RoleNavState extends ConsumerState<_RoleNav>
     meta: '${role.memberCount}',
     height: 34,
     selected: widget.showSelection && role.id == widget.selectedId,
+    // Still fully editable and reorderable like any role; the tag only says who owns it (bots are full principals).
+    trailing: role.isManagedByBot
+        ? const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot')
+        : null,
     trailingExtra: dragIndex == null
         ? null
         : ReorderableDragStartListener(

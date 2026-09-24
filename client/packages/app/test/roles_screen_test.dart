@@ -7,12 +7,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/screens/admin/role_detail_screen.dart';
 import 'package:slimm_app/src/screens/admin/roles_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -73,9 +76,22 @@ Future<void> _pump(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(
+      child: MaterialApp.router(
         theme: buildTheme(Brightness.light, AppTokens.light),
-        home: const RolesScreen(),
+        routerConfig: GoRouter(
+          initialLocation: Routes.adminRoles,
+          routes: [
+            GoRoute(
+              path: Routes.adminRoles,
+              builder: (context, state) => const RolesScreen(),
+            ),
+            GoRoute(
+              path: '${Routes.adminRoles}/:roleId',
+              builder: (context, state) =>
+                  RoleDetailScreen(roleId: state.pathParameters['roleId']!),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -136,6 +152,22 @@ void main() {
 
     expect(find.text('mod'), findsOneWidget);
     expect(find.text('Permissions'), findsNothing);
+  });
+
+  testWidgets('exactly one back button shows at compact width, before and '
+      'after drilling into a role', (tester) async {
+    await _pump(tester, [
+      _role('role-everyone', 'everyone', everyone: true, memberCount: 12),
+      _role('role-mod', 'mod', memberCount: 3),
+    ], size: const Size(375, 800));
+
+    expect(find.byIcon(AppIcons.back), findsOneWidget);
+
+    await tester.tap(find.text('mod'));
+    await tester.pumpAndSettle();
+
+    // Drilled into the role: still exactly one back button, not two stacked app bars each with their own.
+    expect(find.byIcon(AppIcons.back), findsOneWidget);
   });
 
   testWidgets('selecting a different role starts back on the Permissions tab', (

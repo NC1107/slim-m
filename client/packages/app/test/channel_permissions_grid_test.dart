@@ -55,13 +55,14 @@ Widget _wrap({
   List<api.ChannelOverwrite> overwrites = const [],
   int myPermissions = 0,
   MockClient? client,
+  List<api.UserProfile> members = const [],
 }) {
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
       sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
       rolesProvider.overrideWith((ref) async => [_everyone]),
-      membersProvider.overrideWith((ref) async => const []),
+      membersProvider.overrideWith((ref) async => members),
       channelOverwritesProvider(
         _channel.id,
       ).overrideWith((ref) async => overwrites),
@@ -111,6 +112,37 @@ void main() {
     expect(find.text('Deny'), findsOneWidget);
     expect(find.text('everyone'), findsOneWidget);
   });
+
+  testWidgets(
+    'a bot column with no picture shows initials, not a blank square',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          overwrites: [
+            const api.ChannelOverwrite(
+              kind: api.OverwriteTarget.member,
+              id: 'bot-1',
+              allow: 0,
+              deny: 0,
+            ),
+          ],
+          members: [
+            api.UserProfile(
+              id: 'bot-1',
+              username: 'sample_bot',
+              displayName: 'sample_bot',
+              createdAt: 0,
+              isBot: true,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // initialsFor strips symbols and uppercases the first two characters.
+      expect(find.text('SA'), findsOneWidget);
+    },
+  );
 
   testWidgets('a grantable cell cycles inherit -> allow -> deny -> inherit', (
     tester,
