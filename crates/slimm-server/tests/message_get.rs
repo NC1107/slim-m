@@ -116,8 +116,7 @@ async fn get_message_matches_list_enrichment() {
         .unwrap();
     assert_eq!(sent.status(), StatusCode::OK);
 
-    // React to it, so the enrichment this route must carry has something in
-    // it beyond the bare row - the same batched lookup list uses.
+    // React too, so there is real enrichment beyond the bare row to compare.
     let reacted = app
         .clone()
         .oneshot(request(
