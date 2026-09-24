@@ -169,16 +169,21 @@ pub(crate) async fn execute_command(
         return Err(ApiError::Forbidden);
     }
 
-    let Some((sha256, wasm)) = state.store.module_artifact(module_id).await? else {
+    let Some((stored_sha256, wasm)) = state.store.module_artifact(module_id).await? else {
         return Err(ApiError::Conflict(
             "module has no stored artifact; reinstall it from the Dock",
         ));
     };
+    if stored_sha256 != module.artifact_sha256 {
+        return Err(ApiError::Conflict(
+            "module's stored artifact does not match its approved version; reinstall it from the Dock",
+        ));
+    }
     let limits = RunLimits::from(&module.runtime_limits);
     let request_json = serde_json::to_vec(&ModuleWireRequest { command, input })
         .map_err(|_| ApiError::Internal)?;
 
-    let outcome = match ModuleHost::run(wasm, sha256, limits, request_json).await {
+    let outcome = match ModuleHost::run(wasm, module.artifact_sha256, limits, request_json).await {
         Ok(bytes) => match serde_json::from_slice::<ModuleWireResponse>(&bytes) {
             Ok(wire) if wire.ok && wire.output.is_some() => CommandOutcome {
                 ok: true,
