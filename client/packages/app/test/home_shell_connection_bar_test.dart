@@ -33,13 +33,16 @@ class _FixedSyncController extends SyncController {
 
 Future<({ProviderContainer container, SlimmDatabase db})> _pumpOffline(
   WidgetTester tester,
-  Size size,
-) async {
+  Size size, {
+  SyncStatus status = SyncStatus.offline,
+  bool hasFailedSinceLive = false,
+}) async {
   final fixture = await fixtureContainer(
     extraOverrides: [
       syncControllerProvider.overrideWith(
-        (ref) => _FixedSyncController(ref, SyncStatus.offline),
+        (ref) => _FixedSyncController(ref, status),
       ),
+      hasFailedSinceLiveProvider.overrideWith((ref) => hasFailedSinceLive),
     ],
   );
   tester.view.physicalSize = size;
@@ -85,6 +88,23 @@ void main() {
       expect(find.byType(RailConnectionBar), findsNothing);
       expect(find.byType(SpaceConnectionDot), findsOneWidget);
       expect(find.byTooltip('Offline, retrying'), findsOneWidget);
+
+      await teardownFixture(tester, fixture.container, fixture.db);
+    },
+  );
+
+  testWidgets(
+    'a retry attempt after a real failure still reads Offline, not Connecting',
+    (tester) async {
+      final fixture = await _pumpOffline(
+        tester,
+        const Size(390, 844),
+        status: SyncStatus.connecting,
+        hasFailedSinceLive: true,
+      );
+
+      expect(find.text('Offline, retrying'), findsOneWidget);
+      expect(find.text('Connecting'), findsNothing);
 
       await teardownFixture(tester, fixture.container, fixture.db);
     },

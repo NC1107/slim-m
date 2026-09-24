@@ -55,7 +55,11 @@ class RailHeader extends ConsumerWidget {
     final server = ref.watch(serverInfoProvider);
     final members = ref.watch(membersProvider);
     final version = ref.watch(appInfoProvider).valueOrNull?.version ?? '';
-    final syncStatus = ref.watch(syncControllerProvider);
+    // Latched past the first failure, so a retry loop does not flip this dot.
+    final syncStatus = displaySyncStatus(
+      ref.watch(syncControllerProvider),
+      ref.watch(hasFailedSinceLiveProvider),
+    );
     // The decoration bleeds to the screen edge while [SafeArea] insets only
     // the content, so the rail's own colour fills the status-bar strip.
     return Container(
@@ -196,7 +200,11 @@ class RailConnectionBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(syncControllerProvider);
+    // Latched past the first failure, so a retry loop does not flip this bar.
+    final status = displaySyncStatus(
+      ref.watch(syncControllerProvider),
+      ref.watch(hasFailedSinceLiveProvider),
+    );
     final tokens = Theme.of(context).extension<AppTokens>()!;
     // Offline (messages have stopped) carries the warn tone; connecting is transient and stays neutral.
     final (label, icon, color) = switch (status) {

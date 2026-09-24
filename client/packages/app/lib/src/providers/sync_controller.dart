@@ -44,6 +44,29 @@ enum SyncStatus { offline, connecting, live }
 /// un-confirm it.
 final initialSyncCompleteProvider = StateProvider<bool>((ref) => false);
 
+/// Whether this session has had a connect attempt actually fail since it was
+/// last [SyncStatus.live]: latched true the moment [start]'s catch block
+/// gives up on one, cleared the moment the socket attaches.
+///
+/// Read by [MobileBootGate] so a phone's retry loop only ever covers the app
+/// with the boot splash for the genuine first attempt, and by
+/// [SpaceConnectionDot]/[RailConnectionBar] (through [displaySyncStatus]) so
+/// their reading of the connection does not itself flip between "Connecting"
+/// and "Offline" on every retry - once a session has genuinely failed to
+/// connect, the reader has already seen that, and re-announcing it every
+/// backoff cycle tells them nothing new.
+final hasFailedSinceLiveProvider = StateProvider<bool>((ref) => false);
+
+/// The [SyncStatus] to actually show, collapsing a retry's
+/// [SyncStatus.connecting] attempt into [SyncStatus.offline] once
+/// [hasFailedSinceLiveProvider] has latched: a session that has already
+/// failed once is not made newly "connecting" by trying again on the same
+/// backoff loop.
+SyncStatus displaySyncStatus(SyncStatus status, bool hasFailedSinceLive) {
+  if (status == SyncStatus.live || !hasFailedSinceLive) return status;
+  return SyncStatus.offline;
+}
+
 /// Drives synchronisation.
 ///
 /// The order matters and is the whole point: on every (re)connect it catches up
@@ -183,6 +206,7 @@ class SyncController extends StateNotifier<SyncStatus> {
 
       _backoff.reset();
       state = SyncStatus.live;
+      _ref.read(hasFailedSinceLiveProvider.notifier).state = false;
       // A DB read failure here must not read as this connect itself having failed; retryMessage's own catch already covers a failed resend.
       unawaited(
         retryFailedSends(
@@ -195,6 +219,7 @@ class SyncController extends StateNotifier<SyncStatus> {
       if (generation != _generation) return;
       // A connectivity or auth problem here: both mean show offline and retry with backoff.
       state = SyncStatus.offline;
+      _ref.read(hasFailedSinceLiveProvider.notifier).state = true;
       _scheduleRetry();
     }
   }
@@ -423,6 +448,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.invalidate(channelHistoryProvider);
     _ref.invalidate(meProvider);
     _ref.invalidate(initialSyncCompleteProvider);
+    _ref.invalidate(hasFailedSinceLiveProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     _ref.read(dmCallActivityProvider.notifier).clear();
