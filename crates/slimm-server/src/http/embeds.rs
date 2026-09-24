@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Embeds: the colour-to-accent mapping and the wire DTO, read side only.
-//! See `docs/decisions/0030-incoming-webhooks.md`.
+//! Embeds: the colour-to-accent mapping and the wire DTO. The write half is
+//! [`build`]. See `docs/decisions/0030-incoming-webhooks.md`.
+
+mod build;
+
+pub(crate) use build::{RawEmbed, build_embeds};
 
 use serde::Serialize;
 
-use crate::store::Embed as StoreEmbed;
+use super::AppState;
+use super::error::ApiError;
+use super::link_preview::LinkPreviews;
+use crate::ids::{MessageId, UserId};
+use crate::store::{Embed as StoreEmbed, NewEmbed};
 
 /// A caller-supplied colour, reduced to one of a small closed set of
 /// pre-tuned swatches - never a raw hex fill. See decision 0030.
@@ -117,6 +125,55 @@ pub(crate) fn to_dto(
 /// `(image_url, thumbnail_url)` to resolve before [`to_dto`].
 pub(crate) fn image_urls(embed: &StoreEmbed) -> (Option<&str>, Option<&str>) {
     (embed.image_url.as_deref(), embed.thumbnail_url.as_deref())
+}
+
+/// Resolves every stored embed's images and builds the wire shape.
+pub(crate) fn dtos_from_stored(
+    link_previews: &LinkPreviews,
+    stored: Vec<StoreEmbed>,
+) -> Vec<EmbedDto> {
+    stored
+        .into_iter()
+        .map(|embed| {
+            let (image_url, thumbnail_url) = image_urls(&embed);
+            let image_token = image_url.and_then(|url| link_previews.embed_image_token(url));
+            let thumbnail_token =
+                thumbnail_url.and_then(|url| link_previews.embed_image_token(url));
+            to_dto(embed, image_token, thumbnail_token)
+        })
+        .collect()
+}
+
+/// `raw` built into embeds, only when `caller` is a bot.
+pub(crate) async fn honored_for_send(
+    state: &AppState,
+    caller: UserId,
+    raw: Vec<RawEmbed>,
+) -> Result<Vec<NewEmbed>, ApiError> {
+    if raw.is_empty() || !state.store.is_bot(caller).await? {
+        return Ok(Vec::new());
+    }
+    build_embeds(raw, &state.link_previews)
+}
+
+/// Stores `embeds` when `fresh`, then reads back whatever actually landed.
+pub(crate) async fn store_and_reload(
+    state: &AppState,
+    message_id: MessageId,
+    fresh: bool,
+    embeds: &[NewEmbed],
+) -> anyhow::Result<Vec<StoreEmbed>> {
+    if fresh && !embeds.is_empty() {
+        state.store.set_message_embeds(message_id, embeds).await?;
+    }
+    Ok(state
+        .store
+        .embeds_for_messages(&[message_id])
+        .await?
+        .into_iter()
+        .next()
+        .map(|(_, stored)| stored)
+        .unwrap_or_default())
 }
 
 #[cfg(test)]

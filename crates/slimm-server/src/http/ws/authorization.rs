@@ -12,6 +12,7 @@ use super::ChannelDto;
 use super::frames::{PollOptionCountDto, ReactionCountDto, ServerFrame};
 use super::permission_cache::PermissionCache;
 use super::signals;
+use crate::http::link_preview::LinkPreviews;
 use crate::hub::{Event, Hub};
 use crate::permissions::Permissions;
 use crate::store::{SessionContext, Store};
@@ -108,6 +109,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
 pub(super) async fn authorize(
     store: &Store,
     hub: &Hub,
+    link_previews: &LinkPreviews,
     ctx: &SessionContext,
     cache: &mut PermissionCache,
     event: Event,
@@ -306,8 +308,10 @@ pub(super) async fn authorize(
             app_surface,
             code_run,
             poll,
+            embeds,
         } => match super::message_frames::created(
             store,
+            link_previews,
             ctx.user_id,
             // Cloned only here, past every filter above; see `Event::MessageCreated`'s own doc.
             (*message).clone(),
@@ -317,6 +321,7 @@ pub(super) async fn authorize(
                 app_surface: app_surface.map(|s| (*s).clone()),
                 code_run: code_run.map(|c| (*c).clone()),
                 poll: poll.map(|p| (*p).clone()),
+                embeds: (*embeds).clone(),
             },
         )
         .await

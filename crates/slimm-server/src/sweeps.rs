@@ -377,6 +377,7 @@ async fn record_timed_out_call(
                 app_surface: None,
                 code_run: None,
                 poll: None,
+                embeds: std::sync::Arc::new(Vec::new()),
             });
         }
         Err(err) => tracing::warn!(

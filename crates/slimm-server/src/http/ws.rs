@@ -205,7 +205,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                         }
                     }
                     Ok(event) => {
-                        match authorize(&state.store, &state.hub, &ctx, &mut cache, event).await {
+                        match authorize(&state.store, &state.hub, &state.link_previews, &ctx, &mut cache, event).await {
                             Authorization::Deliver(frame) => {
                                 if send_frame(&mut sink, &frame).await.is_err() {
                                     break;
@@ -237,7 +237,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
             ephemeral_event = ephemeral_events.recv() => {
                 match ephemeral_event {
                     Ok(event) => {
-                        match authorize(&state.store, &state.hub, &ctx, &mut cache, event).await {
+                        match authorize(&state.store, &state.hub, &state.link_previews, &ctx, &mut cache, event).await {
                             Authorization::Deliver(frame) => {
                                 if send_frame(&mut sink, &frame).await.is_err() {
                                     break;

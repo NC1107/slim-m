@@ -125,6 +125,14 @@ impl LinkPreviews {
         validate(url, service.allow_private).ok()?;
         Some(service.cache.image_token_for(url))
     }
+
+    /// The write-time check for [`Self::embed_image_token`], with no cache
+    /// side effect.
+    pub(crate) fn allows_embed_image(&self, url: &str) -> bool {
+        self.inner
+            .as_deref()
+            .is_some_and(|service| validate(url, service.allow_private).is_ok())
+    }
 }
 
 #[derive(Deserialize)]

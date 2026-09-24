@@ -36,6 +36,7 @@ use uuid::Uuid;
 
 use super::AppState;
 use super::channel_slow_mode::enforce_slow_mode;
+use super::embeds;
 use super::error::ApiError;
 use super::extract::{Json, Query, enforce};
 use super::messages::{parse_uuid, validate_content};
@@ -46,8 +47,8 @@ use crate::store::NewMessage;
 
 /// Same ceiling as an ordinary send's body limit
 /// (`messages::MESSAGE_BODY_LIMIT`); a Discord-shaped payload with an
-/// honoured `content` and a discarded `embeds` block is not meaningfully
-/// larger than a plain send.
+/// honoured `content`, `username` and `embeds` is not meaningfully larger
+/// than a plain send.
 const BODY_LIMIT: usize = 64 * 1024;
 
 pub fn routes() -> Router<AppState> {
@@ -62,9 +63,9 @@ pub fn routes() -> Router<AppState> {
 /// gets ordinary at-least-once behaviour (a duplicate on a retry).
 const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
 
-/// A Discord-shaped incoming-webhook body. Only `content` and `username` are
-/// read; every other field Discord defines (`embeds`, `avatar_url`, `tts`,
-/// `flags`, `components`, `thread_name`, `poll`, `attachments`,
+/// A Discord-shaped incoming-webhook body. Only `content`, `username` and
+/// `embeds` are read; every other field Discord defines (`avatar_url`,
+/// `tts`, `flags`, `components`, `thread_name`, `poll`, `attachments`,
 /// `allowed_mentions`) - and anything neither this shape nor Discord's ever
 /// named - is accepted and silently discarded, never a 400. See this file's
 /// own doc for why no `deny_unknown_fields` is the whole mechanism.
@@ -80,6 +81,9 @@ struct DeliverRequest {
     /// now it is accepted and validated but not yet rendered anywhere.
     #[serde(default)]
     username: Option<String>,
+    /// Structured content; caps are shared with the ordinary send route.
+    #[serde(default)]
+    embeds: Vec<embeds::RawEmbed>,
 }
 
 #[derive(Deserialize)]
@@ -153,6 +157,7 @@ async fn deliver(
         }
         _ => None,
     };
+    let embeds = embeds::build_embeds(body.embeds, &state.link_previews)?;
 
     let id = idempotent_message_id(&parts, webhook_id);
     let channel_id = context.channel_id;
@@ -178,6 +183,8 @@ async fn deliver(
                 .set_webhook_message_username(sent.message.id, username)
                 .await?;
         }
+        let stored_embeds =
+            embeds::store_and_reload(&state, sent.message.id, true, &embeds).await?;
         super::message_mentions::resolve_and_store(
             &state,
             channel_id,
@@ -193,6 +200,7 @@ async fn deliver(
             app_surface: None,
             code_run: None,
             poll: None,
+            embeds: std::sync::Arc::new(stored_embeds),
         });
         state.push.notify_message(
             state.store.clone(),
