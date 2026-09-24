@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The channel, role and member picker sheets [ChannelOverwritesScreen]
-/// opens, split out purely to keep that file under the line budget.
+/// Shared picker sheets: [ChannelPickerSheet] for `channel_permissions_screen.dart`'s
+/// channel choice, [RolePickerSheet] and [MemberPickerSheet] for adding a
+/// grid column and for `account_recovery_screen.dart`'s member search alike.
 ///
 /// The role and member sheets watch their provider from inside the sheet
 /// rather than being handed a pre-read list: an autoDispose `FutureProvider`

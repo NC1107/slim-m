@@ -32,7 +32,6 @@ client/packages/app/lib/src/routing/router.dart 5
 client/packages/app/lib/src/screens/admin/emoji_screen.dart 1
 client/packages/app/lib/src/screens/admin/emoji_upload_card.dart 2
 client/packages/app/lib/src/screens/admin/invite_role_grant_picker.dart 1
-client/packages/app/lib/src/screens/admin/permission_overwrite_row.dart 2
 client/packages/app/lib/src/screens/admin/roles_screen.dart 2
 client/packages/app/lib/src/screens/channel_screen.dart 6
 client/packages/app/lib/src/screens/home_shell.dart 6

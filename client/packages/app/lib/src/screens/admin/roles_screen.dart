@@ -1,24 +1,33 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Role management: `GET /roles`, `DELETE /roles/{id}`, plus the editor and
-/// assignment sheets this screen opens. Requires MANAGE_ROLES.
+/// The roles pane: a role list beside the selected role's detail, replacing
+/// the old flat "Edit role" modal and separate "Assign" sheet with one
+/// surface for "what may a role do, and who holds it" - see the 2026-09
+/// design review's "06 Roles and permissions" section.
+///
+/// Two-pane on a wide enough embedding ([kRolesPaneTwoPaneWidth], checked
+/// against this widget's own `LayoutBuilder` constraints rather than the
+/// window - see that constant's doc), a role list that drills into the
+/// detail on a narrower one. Desktop-vs-mobile rule 5 (a place with its own
+/// nav you return to) and the translation table's "side pane -> drill-in
+/// route with back".
 library;
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
-import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
+import '../../routing/breakpoints.dart';
 import '../../routing/routes.dart';
-import '../settings_screen_scaffold.dart';
-import '../../widgets/confirm_dialog.dart';
+import '../../widgets/role_color.dart';
 import '../../widgets/run_guarded.dart';
-import '../../widgets/settings_entity_row.dart';
-import '../../widgets/settings_section_header.dart';
-import 'role_assign_sheet.dart';
-import 'role_editor_sheet.dart';
+import '../settings_screen_scaffold.dart';
+import 'role_create_sheet.dart';
+import 'role_detail.dart';
 
 class RolesScreen extends StatelessWidget {
   const RolesScreen({super.key});
@@ -28,7 +37,7 @@ class RolesScreen extends StatelessWidget {
     title: 'Roles',
     backTooltip: 'Back to Space settings',
     backFallback: Routes.spaceSettings,
-    // Stays a scaffold action: the card only renders once loaded, and creating a role must stay reachable meanwhile.
+    scrollable: false,
     actions: [rolesPaneCreateAction(context)],
     child: const RolesPane(),
   );
@@ -39,16 +48,24 @@ class RolesScreen extends StatelessWidget {
 Widget rolesPaneCreateAction(BuildContext context) => IconButton(
   icon: const Icon(AppIcons.add),
   tooltip: 'New role',
-  onPressed: () => showRoleEditorSheet(context),
+  onPressed: () => showCreateRoleSheet(context),
 );
 
-/// The role list itself, embeddable as a Space settings pane as well as
-/// routed.
-class RolesPane extends ConsumerWidget {
+/// The role list and detail, embeddable as a Space settings pane as well as
+/// routed. Owns which role is selected; wide layouts show both panes at
+/// once, narrow ones show whichever is current.
+class RolesPane extends ConsumerStatefulWidget {
   const RolesPane({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RolesPane> createState() => _RolesPaneState();
+}
+
+class _RolesPaneState extends ConsumerState<RolesPane> {
+  String? _selectedId;
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(roleChangeWatcherProvider);
     final roles = ref.watch(rolesProvider);
 
@@ -59,102 +76,246 @@ class RolesPane extends ConsumerWidget {
       onRetry: () => ref.invalidate(rolesProvider),
       isEmpty: (list) => list.isEmpty,
       emptyMessage: 'No roles yet. Create one with the + above.',
-      // No section title: this screen is one group, so a header here would
-      // only restate the app bar above it.
-      data: (context, list) => SettingsSectionCard(
-        children: [for (final role in list) _RoleRow(role: role)],
+      data: (context, list) => LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= kRolesPaneTwoPaneWidth;
+          final selected = (wide
+              ? (_select(list) ?? list.firstOrNull)
+              : _select(list));
+
+          if (!wide && selected != null) {
+            return _NarrowDetail(
+              role: selected,
+              onBack: () => setState(() => _selectedId = null),
+            );
+          }
+          final nav = _RoleNav(
+            roles: list,
+            selectedId: selected?.id,
+            showSelection: wide,
+            onSelect: (id) => setState(() => _selectedId = id),
+          );
+          if (!wide) return nav;
+
+          final tokens = Theme.of(context).extension<AppTokens>()!;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 240,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(color: tokens.borderSubtle),
+                    ),
+                  ),
+                  child: nav,
+                ),
+              ),
+              Expanded(
+                child: selected == null
+                    ? const SizedBox.shrink()
+                    : RoleDetail(key: ValueKey(selected.id), role: selected),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
+
+  api.Role? _select(List<api.Role> roles) =>
+      roles.where((r) => r.id == _selectedId).firstOrNull;
 }
 
-class _RoleRow extends ConsumerStatefulWidget {
-  const _RoleRow({required this.role});
+class _NarrowDetail extends StatelessWidget {
+  const _NarrowDetail({required this.role, required this.onBack});
 
   final api.Role role;
+  final VoidCallback onBack;
 
   @override
-  ConsumerState<_RoleRow> createState() => _RoleRowState();
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(role.name),
+      leading: IconButton(
+        icon: const Icon(AppIcons.back),
+        tooltip: 'Back to roles',
+        onPressed: onBack,
+      ),
+    ),
+    body: SafeArea(top: false, child: RoleDetail(role: role)),
+  );
 }
 
-class _RoleRowState extends ConsumerState<_RoleRow>
-    with GuardedActionState<_RoleRow> {
-  bool _busy = false;
+/// The role list: highest position first, a colour dot, member count, and a
+/// drag handle once there are at least two non-`@everyone` roles to reorder.
+class _RoleNav extends ConsumerStatefulWidget {
+  const _RoleNav({
+    required this.roles,
+    required this.selectedId,
+    required this.showSelection,
+    required this.onSelect,
+  });
 
-  Future<void> _delete() async {
-    final confirmed = await confirmDangerousAction(
-      context,
-      title: 'Delete "${widget.role.name}"?',
-      message:
-          'Members holding this role lose whatever it grants '
-          'immediately. This cannot be undone.',
-      confirmLabel: 'Delete',
+  final List<api.Role> roles;
+  final String? selectedId;
+  final bool showSelection;
+  final ValueChanged<String> onSelect;
+
+  @override
+  ConsumerState<_RoleNav> createState() => _RoleNavState();
+}
+
+class _RoleNavState extends ConsumerState<_RoleNav>
+    with GuardedActionState<_RoleNav> {
+  /// The arrangement a drag just produced, shown at once rather than waiting
+  /// on the round trip - `category_reorder.dart`'s identical shape for the
+  /// same reason: a drag that visibly snapped back while the request was
+  /// still in flight would read as broken.
+  List<String>? _pendingOrder;
+
+  List<api.Role> get _ordered {
+    final pending = _pendingOrder;
+    if (pending == null) return widget.roles;
+    final byId = {for (final r in widget.roles) r.id: r};
+    final named = [
+      for (final id in pending)
+        if (byId[id] case final r?) r,
+    ];
+    final namedIds = named.map((r) => r.id).toSet();
+    return [
+      ...named,
+      for (final r in widget.roles)
+        if (!namedIds.contains(r.id)) r,
+    ];
+  }
+
+  Future<void> _reorder(List<String> reorderableIds) async {
+    setState(
+      () => _pendingOrder = [
+        ...reorderableIds,
+        for (final r in widget.roles)
+          if (r.isEveryone) r.id,
+      ],
     );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _busy = true);
     final ok = await guard(
-      whatFailed: 'delete the role',
-      action: () => ref.read(apiProvider).deleteRole(widget.role.id),
+      whatFailed: 'reorder roles',
+      action: () => ref.read(apiProvider).reorderRoles(reorderableIds),
     );
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() => _pendingOrder = null);
     if (ok) ref.invalidate(rolesProvider);
   }
 
   @override
   Widget build(BuildContext context) {
-    final role = widget.role;
-    final count = Perm.editable
-        .where((e) => role.permissions.hasPermission(e.$1))
-        .length;
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final ordered = _ordered;
+    final reorderable = ordered.where((r) => !r.isEveryone).toList();
 
-    return SettingsEntityRow(
-      headline: role.name,
-      badge: role.isEveryone
-          ? const AppBadge(variant: AppBadgeVariant.tag, label: 'Everyone')
-          : role.isManagedByBot
-          ? const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot')
-          : null,
-      details: [
-        SettingsEntityDetail(
-          // Named, not counted: "1 permission"/"0" on the two counts that read as bugs otherwise.
-          role.permissions.hasPermission(Perm.administrator)
-              ? 'Administrator, full access'
-              : count == 0
-              ? 'No permissions yet, edit to add some'
-              : count == 1
-              ? '1 permission'
-              : '$count permissions',
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, AppSpacing.s12, 10, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'ROLES',
+                  style: AppText.label.copyWith(color: tokens.textSecondary),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(AppIcons.add, size: AppSizes.icon16),
+                tooltip: 'New role',
+                onPressed: () => showCreateRoleSheet(context),
+              ),
+            ],
+          ),
+        ),
+        if (actionError case final error?)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s8,
+              vertical: AppSpacing.s4,
+            ),
+            child: AppErrorState(message: error, onDismiss: clearActionError),
+          ),
+        Expanded(
+          child: reorderable.length < 2
+              ? ListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8,
+                  ),
+                  children: [for (final role in ordered) _roleRow(role, null)],
+                )
+              : ReorderableListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8,
+                  ),
+                  buildDefaultDragHandles: false,
+                  onReorderItem: (oldIndex, newIndex) {
+                    final ids = [for (final r in reorderable) r.id];
+                    ids.insert(newIndex, ids.removeAt(oldIndex));
+                    unawaited(_reorder(ids));
+                  },
+                  footer: Column(
+                    children: [
+                      for (final role in ordered)
+                        if (role.isEveryone) _roleRow(role, null),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          8,
+                          AppSpacing.s8,
+                          8,
+                          0,
+                        ),
+                        child: Text(
+                          'Drag to reorder.',
+                          style: AppText.caption.copyWith(
+                            color: tokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  children: [
+                    for (var i = 0; i < reorderable.length; i++)
+                      KeyedSubtree(
+                        key: ValueKey(reorderable[i].id),
+                        child: _roleRow(reorderable[i], i),
+                      ),
+                  ],
+                ),
         ),
       ],
-      // @everyone can't be assigned or deleted; nulls reserve those slots so edit still lands at a shared x.
-      actions: [
-        if (!role.isEveryone)
-          AppIconButton(
-            icon: AppIcons.assignRole,
-            semanticLabel: 'Assign ${role.name} to members',
-            onPressed: () => showRoleAssignSheet(context, role),
-          )
-        else
-          null,
-        AppIconButton(
-          icon: AppIcons.edit,
-          semanticLabel: 'Edit ${role.name}',
-          onPressed: () => showRoleEditorSheet(context, role: role),
-        ),
-        if (!role.isEveryone)
-          AppIconButton(
-            icon: AppIcons.delete,
-            semanticLabel: 'Delete ${role.name}',
-            variant: AppIconButtonVariant.danger,
-            onPressed: _busy ? null : _delete,
-          )
-        else
-          null,
-      ],
-      error: actionError,
-      onErrorDismiss: clearActionError,
     );
   }
+
+  Widget _roleRow(api.Role role, int? dragIndex) => AppListRow(
+    key: dragIndex == null ? ValueKey(role.id) : null,
+    leading: DecoratedBox(
+      decoration: BoxDecoration(
+        color: roleColor(role.id),
+        shape: BoxShape.circle,
+      ),
+      child: const SizedBox(width: 10, height: 10),
+    ),
+    label: role.name,
+    meta: '${role.memberCount}',
+    height: 34,
+    selected: widget.showSelection && role.id == widget.selectedId,
+    trailingExtra: dragIndex == null
+        ? null
+        : ReorderableDragStartListener(
+            index: dragIndex,
+            child: Icon(
+              AppIcons.dragHandle,
+              size: AppSizes.icon16,
+              color: Theme.of(context).extension<AppTokens>()!.textSecondary,
+            ),
+          ),
+    onTap: () => widget.onSelect(role.id),
+  );
 }

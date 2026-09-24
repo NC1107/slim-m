@@ -52,11 +52,10 @@ final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),
 );
 
-/// Every permission overwrite currently set on one channel: the read
-/// [ChannelOverwritesPane] never had until now, so it can show what a target
-/// already carries instead of opening every editor at "Inherit" sight
-/// unseen. Invalidated below alongside [channelPermissionsProvider] whenever
-/// an [api.OverwriteChanged] names this channel.
+/// Every permission overwrite currently set on one channel: what the
+/// permissions grid renders as tri-state cells. Invalidated below alongside
+/// [channelPermissionsProvider] whenever an [api.OverwriteChanged] names
+/// this channel.
 final channelOverwritesProvider = FutureProvider.autoDispose
     .family<List<api.ChannelOverwrite>, String>(
       (ref, channelId) =>

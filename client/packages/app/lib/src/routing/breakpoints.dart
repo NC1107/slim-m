@@ -77,3 +77,14 @@ const double kThreadPaneWidth = 360;
 /// transcript. Named here beside [kCompactWidth] so the app's width thresholds
 /// live in one place rather than as a literal buried in the settings widget.
 const double kSettingsTwoPaneWidth = 800;
+
+/// The width at which the roles pane shows its role list beside the selected
+/// role's detail rather than drilling in. Compared against the pane's own
+/// available width (a `LayoutBuilder` constraint), not the window's, unlike
+/// every other constant here: the roles pane nests inside
+/// [kSettingsTwoPaneWidth]'s own embedded slot when reached from Space
+/// settings on a wide window, and that slot's width is capped by the modal
+/// panel's own `kModalMaxWidth` regardless of how wide the window actually
+/// is, so a window-width comparison at this nesting depth would never
+/// reflect what space is really left for it.
+const double kRolesPaneTwoPaneWidth = 560;

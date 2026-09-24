@@ -14,7 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/screens/admin/overwrite_target_picker_sheets.dart';
-import 'package:slimm_app/src/screens/admin/role_editor_sheet.dart';
+import 'package:slimm_app/src/screens/admin/role_create_sheet.dart';
 import 'package:slimm_app/src/whats_new/whats_new_content.dart';
 import 'package:slimm_app/src/widgets/avatar_crop_sheet.dart';
 import 'package:slimm_app/src/widgets/camera_source_sheet.dart';
@@ -105,7 +105,7 @@ final overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
       showPollComposerSheet(context, 'c-general'),
   'member-roles-sheet': (context, ref) =>
       showMemberRolesSheet(context, 'user-long-name'),
-  'role-editor-sheet': (context, ref) => showRoleEditorSheet(context),
+  'create-role-sheet': (context, ref) => showCreateRoleSheet(context),
   'avatar-crop-sheet': (context, ref) => showAvatarCropSheet(context, _png),
   'whats-new-sheet': (context, ref) =>
       showWhatsNewSheet(context, whatsNewEntries),
@@ -133,7 +133,7 @@ final overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
       showEmojiPickerSheet(context, onSelect: (_) {}),
   'space-emoji-sheet': (context, ref) =>
       showSpaceEmojiSheet(context, onSelect: (_) {}),
-  // The three ChannelOverwritesScreen picker sheets, spot-checked before.
+  // The three channel permissions grid picker sheets, spot-checked before.
   'channel-picker-sheet': (context, ref) => showAppSheet<Channel>(
     context,
     builder: (context) => ChannelPickerSheet(channels: [_localChannel]),

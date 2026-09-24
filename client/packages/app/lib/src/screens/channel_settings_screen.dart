@@ -2,7 +2,7 @@
 /// Channel settings: one place for a channel's name, topic, permission
 /// overwrites, and deletion, replacing the two disconnected surfaces the
 /// kebab used to open separately - a "manage channel" sheet (name, topic,
-/// delete) and a picker-first route into [ChannelOverwritesPane]. Reached
+/// delete) and a picker-first route into [ChannelPermissionsPane]. Reached
 /// only through the channel row's own kebab/context menu
 /// (`channel_row_menu.dart`), which now offers a single "Channel
 /// settings..." entry gated on holding either MANAGE_CHANNELS or
@@ -22,7 +22,7 @@ import '../permissions.dart';
 import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
 import '../widgets/settings_notice.dart';
-import 'admin/channel_overwrites_screen.dart';
+import 'admin/channel_permissions_screen.dart';
 import 'channel_settings_danger_zone.dart';
 import 'channel_settings_general_section.dart';
 import 'channel_settings_slow_mode_section.dart';
@@ -115,7 +115,7 @@ class ChannelSettingsPane extends ConsumerWidget {
         if (canManageChannels && canManageRoles)
           const SizedBox(height: AppSpacing.s16),
         if (canManageRoles)
-          ChannelOverwritesPane(initialChannel: channel, lockChannel: true),
+          ChannelPermissionsPane(initialChannel: channel, lockChannel: true),
         if (canManageChannels) ...[
           const SizedBox(height: AppSpacing.s20),
           ChannelDangerZoneSection(channel: channel, wasOpen: wasOpen),

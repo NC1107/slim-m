@@ -68,6 +68,145 @@ abstract final class Perm {
   /// per-channel overwrite can never change anything in either direction.
   static final List<(int bit, String label)> channelOverwriteEditable =
       List.unmodifiable(editable.where((p) => p.$1 != administrator));
+
+  /// [groups] flattened, in the same order - the channel permissions grid's
+  /// row list, since a grid has no room for group headers of its own and
+  /// [administrator] never applies to a per-channel overwrite (see
+  /// [channelOverwriteEditable]).
+  static final List<PermSpec> gridRows = List.unmodifiable([
+    for (final group in groups) ...group.permissions,
+  ]);
+
+  /// Every grantable permission but [administrator], grouped and described
+  /// the way the roles pane's Permissions tab lists them. Administrator is
+  /// its own special row above every group, not a member of one, since it
+  /// is not "one permission among others" - it grants all of them.
+  static const List<PermGroup> groups = [
+    PermGroup('Messages', [
+      PermSpec(
+        sendMessages,
+        'Send messages',
+        'Post in text channels this role can see.',
+      ),
+      PermSpec(
+        manageMessages,
+        'Manage messages',
+        "Delete and pin other people's messages.",
+      ),
+      PermSpec(attachFiles, 'Attach files', 'Upload images and files.'),
+      PermSpec(addReactions, 'Add reactions', 'React to messages with emoji.'),
+    ]),
+    PermGroup('Moderation', [
+      PermSpec(
+        manageRoles,
+        'Manage roles',
+        'Edit and assign roles below this one.',
+        elevated: true,
+      ),
+      PermSpec(
+        kickMembers,
+        'Kick members',
+        'Remove someone; they can rejoin with an invite.',
+        elevated: true,
+      ),
+      PermSpec(
+        banMembers,
+        'Ban members',
+        'Remove someone and block them from rejoining.',
+        elevated: true,
+      ),
+      PermSpec(
+        viewModerationHistory,
+        'View moderation history',
+        'Read past moderation actions, without the power to take new ones.',
+      ),
+    ]),
+    PermGroup('Voice & canvas', [
+      PermSpec(connect, 'Join voice channels', 'Connect to a voice channel.'),
+      PermSpec(
+        speak,
+        'Speak in voice channels',
+        'Transmit audio after joining.',
+      ),
+      PermSpec(
+        useCanvas,
+        'Use the voice canvas',
+        'Draw and place objects during a call.',
+      ),
+      PermSpec(
+        manageCanvas,
+        'Manage the voice canvas',
+        'Clear or reset the canvas for everyone in the call.',
+      ),
+    ]),
+    PermGroup('Channels & invites', [
+      PermSpec(
+        viewChannel,
+        'View channels',
+        'See a channel this role is not otherwise denied.',
+      ),
+      PermSpec(
+        manageChannels,
+        'Manage channels',
+        'Create, rename, reorder and delete channels.',
+        elevated: true,
+      ),
+      PermSpec(
+        createInvite,
+        'Create invites',
+        'Generate invite links to this Space.',
+      ),
+    ]),
+    PermGroup('Space', [
+      PermSpec(
+        manageServer,
+        'Manage Space settings',
+        'Change deployment-wide settings for everyone.',
+        elevated: true,
+      ),
+      PermSpec(
+        mentionEveryone,
+        'Mention @everyone and @here',
+        'Wake every member with a mention.',
+        elevated: true,
+      ),
+    ]),
+    PermGroup('Extensions', [
+      PermSpec(
+        runCode,
+        'Run code blocks',
+        "Execute a fenced code block through this deployment's configured runner.",
+      ),
+    ]),
+  ];
+}
+
+/// One permission's display metadata: the label and one-line description the
+/// roles pane's Permissions tab and the channel permissions grid both read
+/// off, plus whether it is tagged `elevated` - a permission that can act on
+/// other members or the whole deployment, called out the same way the design
+/// review does, not a bit the server treats specially.
+class PermSpec {
+  const PermSpec(
+    this.bit,
+    this.label,
+    this.description, {
+    this.elevated = false,
+  });
+
+  final int bit;
+  final String label;
+  final String description;
+  final bool elevated;
+}
+
+/// A named run of [PermSpec]s, the roles pane's group headers
+/// (`MESSAGES`, `MODERATION`, ...).
+class PermGroup {
+  const PermGroup(this.title, this.permissions);
+
+  final String title;
+  final List<PermSpec> permissions;
 }
 
 /// Whether a raw permission bitmask contains every bit in [required].

@@ -19,7 +19,7 @@ import '../screens/admin/categories_screen.dart';
 
 import 'package:slimm_data/data.dart' show Channel;
 
-import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/channel_permissions_screen.dart';
 import '../screens/admin/dock_module_access_screen.dart';
 import '../screens/admin/dock_module_screen.dart';
 import '../screens/admin/dock_screen.dart';
@@ -162,7 +162,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         // `extra` pre-selects a channel when opened from its own menu; absent from Space settings, where the picker leads.
         pageBuilder: (context, state) => modalPage(
           context,
-          ChannelOverwritesScreen(initialChannel: state.extra as Channel?),
+          ChannelPermissionsScreen(initialChannel: state.extra as Channel?),
         ),
       ),
       GoRoute(

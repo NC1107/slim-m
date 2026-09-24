@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Fix for the desktop-sheets audit: `whats_new_sheet.dart` and
-/// `role_assign_sheet.dart` used to force a fixed fraction (0.6/0.7) of the
-/// full window height inside `showAppSheet`'s dialog, leaving most of a
-/// desktop dialog empty for genuinely short content. `pinned_messages_sheet`
-/// and `threads_sheet` already have their own equivalent coverage
-/// (`pinnedMessagesBodyBoxKey`/`threadsBodyBoxKey`); `member_roles_sheet`
-/// already had its own last test for the same bug in the sibling sheet this
-/// one mirrors.
+/// Fix for the desktop-sheets audit: `whats_new_sheet.dart` used to force a
+/// fixed fraction (0.6) of the full window height inside `showAppSheet`'s
+/// dialog, leaving most of a desktop dialog empty for genuinely short
+/// content. `pinned_messages_sheet` and `threads_sheet` already have their
+/// own equivalent coverage (`pinnedMessagesBodyBoxKey`/`threadsBodyBoxKey`);
+/// `member_roles_sheet` already had its own last test for the same bug in
+/// the sibling sheet this one used to mirror (the role-assign sheet the
+/// roles pane's Members tab replaced).
 ///
 /// Each sheet is checked at a compact width (bottom sheet) and a desktop
 /// width (dialog): short content must not be forced to the old fixed height
@@ -16,13 +16,7 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slimm_api/api.dart' as api;
-import 'package:slimm_app/src/permissions.dart';
-import 'package:slimm_app/src/providers/admin_providers.dart';
-import 'package:slimm_app/src/providers/member_presence.dart';
-import 'package:slimm_app/src/screens/admin/role_assign_sheet.dart';
 import 'package:slimm_app/src/whats_new/whats_new_content.dart';
 import 'package:slimm_app/src/widgets/whats_new_sheet.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -73,77 +67,6 @@ void main() {
               '60% of window height',
         );
       });
-    }
-  });
-
-  group('role assign sheet', () {
-    api.Role role() => const api.Role(
-      id: 'role-mod',
-      name: 'mod',
-      permissions: 0,
-      isEveryone: false,
-      createdAt: 0,
-    );
-
-    api.UserProfile member() => const api.UserProfile(
-      id: 'u1',
-      username: 'maya',
-      displayName: 'maya',
-      createdAt: 0,
-    );
-
-    for (final width in [_compactWidth, _desktopWidth]) {
-      testWidgets(
-        'one member at width $width does not force the old 70% of window '
-        'height',
-        (tester) async {
-          tester.view.physicalSize = Size(width, _windowHeight);
-          tester.view.devicePixelRatio = 1.0;
-          addTearDown(tester.view.reset);
-
-          await tester.pumpWidget(
-            ProviderScope(
-              overrides: [
-                myPermissionsProvider.overrideWithValue(Perm.manageRoles),
-                membersProvider.overrideWith((ref) async => [member()]),
-              ],
-              child: MaterialApp(
-                theme: buildTheme(Brightness.light, AppTokens.light),
-                home: Scaffold(
-                  body: Builder(
-                    builder: (context) => TextButton(
-                      onPressed: () => showRoleAssignSheet(context, role()),
-                      child: const Text('open'),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-          await tester.tap(find.text('open'));
-          await tester.pumpAndSettle();
-
-          final height = tester
-              .getSize(find.byKey(roleAssignBodyBoxKey))
-              .height;
-          expect(
-            height,
-            lessThan(_windowHeight * 0.5),
-            reason:
-                'one member row must not be forced to the old fixed 70% of '
-                'window height',
-          );
-
-          final list = tester.widget<ListView>(find.byType(ListView));
-          expect(
-            list.shrinkWrap,
-            isTrue,
-            reason:
-                'without this the list always claims its full maxHeight '
-                'ceiling regardless of how few rows it holds',
-          );
-        },
-      );
     }
   });
 }

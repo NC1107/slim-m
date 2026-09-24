@@ -30,6 +30,16 @@
 /// production path: `appChromeBuilder` is what turns that choice into the
 /// `MediaQuery` override every widget under test actually reads, the same
 /// route a real viewer's own Personal-settings choice takes.
+///
+/// One more zero-duration pump follows the 5ms one, before the check: a
+/// provider resolving for the first time while an `AppAsyncView`'s own
+/// `LayoutBuilder` is mid-layout - true of the roles pane's first paint,
+/// new to this route's coverage - schedules one deferred rebuild frame
+/// through `LayoutBuilder`'s own re-entrant-layout guard, which reads as a
+/// running animation to `hasRunningAnimations` even though nothing is
+/// animating. A zero-duration pump flushes exactly that one callback
+/// without moving the fake clock, so a real reduce-motion violation, which
+/// needs elapsed virtual time to still be mid-flight, is still caught.
 library;
 
 import 'dart:async';
@@ -89,6 +99,8 @@ Future<void> _renderReduced(WidgetTester tester, String route) async {
   await tester.pump();
   // See this file's own library doc for why 5ms, not zero and not a settle.
   await tester.pump(const Duration(milliseconds: 5));
+  // See the library doc's "one more zero-duration pump" paragraph.
+  await tester.pump();
 
   expect(
     tester.hasRunningAnimations,
