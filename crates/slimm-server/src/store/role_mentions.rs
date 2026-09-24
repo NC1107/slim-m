@@ -28,7 +28,7 @@ impl Store {
 
         let mut builder = QueryBuilder::new(
             "SELECT id, name, permissions, is_everyone, mentionable, created_at, \
-                    managed_bot_id \
+                    managed_bot_id, position \
              FROM roles WHERE is_everyone = 0 AND LOWER(name) IN (",
         );
         let mut separated = builder.separated(", ");
@@ -48,6 +48,7 @@ impl Store {
                     mentionable: row.try_get::<i64, _>("mentionable")? != 0,
                     created_at: row.try_get("created_at")?,
                     managed_bot_id: row.try_get("managed_bot_id")?,
+                    position: row.try_get("position")?,
                 })
             })
             .collect::<Result<Vec<_>, sqlx::Error>>()

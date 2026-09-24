@@ -42,7 +42,7 @@ use crate::hub::Event;
 use crate::ids::{RoleId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{Role, RoleGuardError};
+use crate::store::{Role, RoleGuardError, RoleWithCount};
 
 const BODY_LIMIT: usize = 4 * 1024;
 
@@ -60,8 +60,10 @@ pub fn routes() -> Router<AppState> {
 
 // --- Wire types ---
 
+/// `pub(super)`: [`super::role_reorder`] returns this same shape from its own
+/// endpoint, and reuses [`RoleWithCount`]'s conversion below to build it.
 #[derive(Serialize)]
-struct RoleDto {
+pub(super) struct RoleDto {
     id: String,
     name: String,
     /// The raw permission bitmask; see `crate::permissions::Permissions` for
@@ -74,10 +76,18 @@ struct RoleDto {
     created_at: i64,
     /// See [`Role::managed_bot_id`].
     managed_bot_id: Option<String>,
+    /// Hierarchy order: higher sorts first, matching the order this list
+    /// already comes back in. `@everyone` always sits last; see
+    /// [`Role::position`].
+    position: i64,
+    /// How many members currently hold this role; `@everyone`'s reads the
+    /// whole deployment's member count. See
+    /// [`crate::store::Store::list_roles_with_member_counts`].
+    member_count: i64,
 }
 
-impl From<Role> for RoleDto {
-    fn from(role: Role) -> Self {
+impl RoleDto {
+    fn new(role: Role, member_count: i64) -> Self {
         Self {
             id: role.id.to_string(),
             name: role.name,
@@ -86,7 +96,15 @@ impl From<Role> for RoleDto {
             mentionable: role.mentionable,
             created_at: role.created_at,
             managed_bot_id: role.managed_bot_id.map(|id| id.to_string()),
+            position: role.position,
+            member_count,
         }
+    }
+}
+
+impl From<RoleWithCount> for RoleDto {
+    fn from(with_count: RoleWithCount) -> Self {
+        RoleDto::new(with_count.role, with_count.member_count)
     }
 }
 
@@ -116,7 +134,7 @@ async fn list(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<RoleDto>>, ApiError> {
     require_manage_roles(&state, ctx.user_id).await?;
-    let roles = state.store.list_roles().await?;
+    let roles = state.store.list_roles_with_member_counts().await?;
     Ok(Json(roles.into_iter().map(RoleDto::from).collect()))
 }
 
@@ -167,7 +185,8 @@ async fn create(
             role_id: created.id,
         });
     }
-    Ok(Json(role.into()))
+    // A role this endpoint just created has no holders yet; see the doc above.
+    Ok(Json(RoleDto::new(role, 0)))
 }
 
 async fn update(
@@ -205,7 +224,8 @@ async fn update(
     {
         Ok(Some(role)) => {
             state.hub.publish(Event::RoleChanged { role_id });
-            Ok(Json(role.into()))
+            let member_count = state.store.member_count_for_role(&role).await?;
+            Ok(Json(RoleDto::new(role, member_count)))
         }
         Ok(None) => Err(ApiError::NotFound("role not found")),
         Err(guard_err) => Err(role_guard_error(guard_err)),
@@ -327,7 +347,13 @@ async fn unassign(
 /// would be identical today, since nothing in `TIMEOUT_DENY` touches a
 /// role-management bit - and would silently become a hole the moment something
 /// did.
-async fn caller_granted(state: &AppState, user_id: UserId) -> Result<Permissions, ApiError> {
+///
+/// `pub(super)`: [`super::role_reorder`] reuses this for its own
+/// position-hierarchy guard's administrator bypass.
+pub(super) async fn caller_granted(
+    state: &AppState,
+    user_id: UserId,
+) -> Result<Permissions, ApiError> {
     Ok(state.store.granted_base_permissions(user_id).await?)
 }
 

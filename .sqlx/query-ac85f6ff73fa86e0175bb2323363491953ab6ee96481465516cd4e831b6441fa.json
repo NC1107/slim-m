@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT role_id AS \"role_id!: RoleId\", COUNT(*) AS \"count!: i64\"\n               FROM member_roles GROUP BY role_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "role_id!: RoleId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "count!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ac85f6ff73fa86e0175bb2323363491953ab6ee96481465516cd4e831b6441fa"
+}

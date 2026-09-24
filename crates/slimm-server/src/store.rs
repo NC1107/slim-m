@@ -62,6 +62,7 @@ mod module_artifacts;
 mod module_permissions;
 mod modules;
 mod notifications;
+mod overwrites_batch;
 mod permissions;
 mod permissions_batch;
 mod permissions_resolve;
@@ -77,7 +78,9 @@ mod refresh_rotation;
 mod removals;
 mod reports;
 mod role_bots;
+mod role_hierarchy;
 mod role_mentions;
+mod role_reorder;
 mod roles;
 mod safety;
 mod saved_messages;
@@ -140,6 +143,7 @@ pub use modules::{
     InstallModuleRequest, InstalledModule, ModuleExtensionPoint, ModuleExtensionPointSpec,
     ModulePermissionSpec, ModuleRuntimeLimits,
 };
+pub use overwrites_batch::OverwriteBatchEntry;
 pub use permissions::ChannelOverwrite;
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};
 pub use polls::{
@@ -152,6 +156,8 @@ pub use recovery::{ConsumeResetError, IssueResetError};
 pub use refresh_rotation::RefreshOutcome;
 pub use removals::{RemoveMemberError, SpaceRemoval};
 pub use reports::{FiledReport, Report, ReportError, ReportSubject, ReporterOwnReport};
+pub use role_hierarchy::RoleWithCount;
+pub use role_reorder::{ReorderRolesError, RoleReorderOutcome};
 pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};
 pub use safety::Device;
 pub use saved_messages::{MAX_SAVED_MESSAGES, SaveError, SavedMessage};

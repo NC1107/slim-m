@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT MAX(r.position) AS \"position: i64\" FROM member_roles mr\n               JOIN roles r ON r.id = mr.role_id WHERE mr.user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "position: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "11ad20d06664ef9c971e68faa3f0c499fd1c36530db5f0d3f6ed3f474463672d"
+}
