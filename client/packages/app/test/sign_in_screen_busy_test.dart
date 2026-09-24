@@ -17,6 +17,8 @@ import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/mock_app_version.dart';
+
 /// Pumps [SignInScreen] whose `/auth/login` hangs on [gate] - long enough for
 /// a test to inspect the button mid-submit - then answers with a refusal, no
 /// success path needed for what this file checks.
@@ -69,6 +71,8 @@ Future<void> _pump(
 }
 
 void main() {
+  setUpAll(mockAppVersion);
+
   testWidgets(
     'submitting cross-fades the label to a spinner rather than snapping',
     (tester) async {

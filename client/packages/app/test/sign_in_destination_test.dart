@@ -27,6 +27,8 @@ import 'package:slimm_app/src/widgets/server_identity_confirmation.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/mock_app_version.dart';
+
 const _tokens = TokenPair(
   userId: 'user-1',
   accessToken: 'access-1',
@@ -137,6 +139,8 @@ Future<void> _signIn(WidgetTester tester) async {
 }
 
 void main() {
+  setUpAll(mockAppVersion);
+
   testWidgets('the official server names its host with no address field', (
     tester,
   ) async {

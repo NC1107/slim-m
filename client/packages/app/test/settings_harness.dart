@@ -26,7 +26,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/screens/personal_settings_screen.dart';
@@ -35,22 +34,12 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+export 'support/mock_app_version.dart';
+
 /// Every permission bit the client knows how to name, which is what the
 /// server sends a real administrator: `evaluate()`'s ADMINISTRATOR bypass is
 /// resolved before `/me` answers, so the wire value already has them all.
 int get allPermissionBits => Perm.editable.fold(0, (acc, p) => acc | p.$1);
-
-/// The build identity `AppInfoSection` reads. Called from `setUpAll`, since
-/// `PackageInfo` otherwise throws on a test binding with no host platform.
-void mockAppVersion() {
-  PackageInfo.setMockInitialValues(
-    appName: 'slim-m',
-    packageName: 'top.npcserver.slimm',
-    version: '0.1.0',
-    buildNumber: '1',
-    buildSignature: '',
-  );
-}
 
 /// A container with `/me` reporting [permissions] and empty device and block
 /// lists, wired the way the running app wires them.

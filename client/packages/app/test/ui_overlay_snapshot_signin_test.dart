@@ -24,6 +24,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
 import 'support/mid_flight_capture.dart';
+import 'support/mock_app_version.dart';
 import 'support/onboarding_error_strings.dart';
 import 'ui_snapshot_support.dart';
 
@@ -134,6 +135,7 @@ http.Response _jsonResponse(Map<String, Object?> body, int status) =>
 
 void main() {
   setUpAll(loadRealFonts);
+  setUpAll(mockAppVersion);
 
   group('probe notices', () {
     testWidgets('creating an account shows the extra display-name field '
