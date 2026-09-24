@@ -1,19 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Bot provisioning and command registration, in call order: create, list,
-//! register commands as the bot itself, read them back both ways, revoke.
-//!
-//! Order matters for the same reason it does in `read_state.rs`. `listBots`
-//! runs after `createBot` so its answer is a non-empty list, which is the only
-//! version of that response worth validating - an empty array would satisfy the
-//! schema while proving nothing about the fields. `setBotCommands` has to run
-//! before `revokeBot`, since a revoked bot's own token can no longer call
-//! anything; `listChannelBotCommands` runs while the registration is still
-//! live so its answer is non-empty too. `revokeBot` runs last because it
-//! needs a bot to revoke.
-//!
-//! Runs near the end of the script, after the member-facing cases, because
-//! creating a bot adds a member and nothing earlier should have to account for
-//! it.
+//! register as the bot itself, read both ways, revoke - order matters since
+//! a revoked token can no longer call `setBotCommands`.
 
 use serde_json::json;
 

@@ -1,22 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Bot command registration: advertisement, not interactions. See
+//! Bot command registration routes: register, read one bot's set, and the
+//! composer's channel-scoped discovery list. See
 //! docs/decisions/0031-bot-command-registration.md.
-//!
-//! `PUT /bots/commands` is a bot registering its own prefix and command list,
-//! authenticated as itself - never an admin route, and never usable for a
-//! second bot, per decision 0028's "a bot acts only as itself". `GET
-//! /bots/{botId}/commands` is the unfiltered registration a profile popover
-//! reads. `GET /channels/{channelId}/bot-commands` is the composer's own
-//! discovery list: every command a caller may currently be offered in that
-//! channel, across every bot that can see it, permission-hint-filtered and
-//! with a revoked or removed bot's commands already gone.
-//!
-//! Nothing here ever runs a command. Picking a row is text substitution, the
-//! same as a built-in `/shrug` - the composer sends an ordinary message and
-//! the bot's own process is what recognizes and answers it, exactly as it
-//! does today with no registration at all. A declared `permission` only hides
-//! a row from a composer that lacks it; the server never checks it before
-//! delivering the message, so a bot must still verify the sender itself.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -75,8 +60,7 @@ struct SetBotCommandsRequest {
     commands: Vec<BotCommandDto>,
 }
 
-/// A registered bot with its full command list, as its own profile shows it -
-/// unfiltered by any viewer's own channel or permissions.
+/// A bot's own registered set, unfiltered by any viewer's channel.
 #[derive(Serialize)]
 struct BotCommandRegistrationDto {
     /// Absent for a bot that has never registered anything.
@@ -92,10 +76,7 @@ struct RegisteredCommandDto {
     usage: Option<String>,
 }
 
-/// Bulk-overwrites the caller's own registration. Refused for anyone who is
-/// not a bot: a human account has no commands to register, and there is no
-/// route for setting another bot's, mirroring `bots::create`'s own
-/// `require_human` in reverse.
+/// Bulk-overwrites the caller's own registration; refused for a non-bot.
 async fn set_commands(
     State(state): State<AppState>,
     parts: Parts,
@@ -123,10 +104,7 @@ async fn set_commands(
     }
 }
 
-/// A bot's whole registration, for a profile popover. `None` reads as "never
-/// registered", including for a non-bot or unknown id - the same clean-no-op
-/// shape `GET /modules/slash-commands` gives an empty deployment, rather than
-/// a 404 that would let a caller probe which ids exist.
+/// A bot's whole registration; empty for one that never registered.
 async fn get_commands(
     AuthedLimited(_ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,
@@ -180,13 +158,8 @@ impl From<VisibleBotCommand> for ChannelBotCommandDto {
     }
 }
 
-/// Every bot command a caller may currently be offered in this channel - the
-/// composer's own discovery list. A caller who cannot view the channel at all
-/// gets an empty list, exactly what a nonexistent channel also answers, so
-/// this never becomes a channel-existence oracle the way
-/// `channel_permissions::get_permissions` already goes out of its way to
-/// avoid: without this, an ungated command (no `permission` of its own) would
-/// otherwise still show for somebody who cannot see the channel it lives in.
+/// The composer's discovery list; masked to empty for a caller lacking
+/// VIEW_CHANNEL, the same rule `getChannelPermissions` uses.
 async fn list_channel_commands(
     AuthedLimited(ctx): AuthedLimited<AUTHED_READ>,
     State(state): State<AppState>,

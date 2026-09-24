@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! `GET /channels/{channelId}/bot-commands`: what the composer's discovery
-//! list is allowed to leak. See docs/decisions/0031-bot-command-registration.md.
-//!
-//! The two cases that matter most are the ones a regression would not
-//! otherwise be caught by: a revoked or Space-removed bot's commands must
-//! vanish with no separate cleanup path, and a bot with no view of a channel
-//! must not advertise itself there.
-//!
-//! Registration itself (`PUT /bots/commands`, `GET /bots/{botId}/commands`,
-//! the caps) is `tests/bot_commands.rs` - split here rather than growing that
-//! file past the file budget.
+//! `GET /channels/{channelId}/bot-commands`: visibility, lifecycle and
+//! permission gating. Registration itself is `tests/bot_commands.rs`. See
+//! decision 0031.
 
 use axum::Router;
 use axum::body::Body;
@@ -184,9 +176,8 @@ async fn a_registered_command_is_offered_in_a_channel_the_bot_can_see() {
     );
 }
 
-/// Requirement 4 of the brief: a bot with no view of a channel must not
-/// advertise itself there, even though it holds a live token and is a member
-/// of the Space.
+/// A bot with no view of a channel must not advertise itself there, even
+/// with a live token and Space membership.
 #[tokio::test]
 async fn a_bot_with_no_view_of_the_channel_does_not_advertise_there() {
     let (store, _guard) = new_store("slimm-botcmds-no-view").await;
@@ -227,8 +218,7 @@ async fn a_bot_with_no_view_of_the_channel_does_not_advertise_there() {
     );
 }
 
-/// The mutation-critical case: revoking a bot's token must make its commands
-/// vanish from discovery immediately, with no separate cleanup step.
+/// Revoking a bot's token must make its commands vanish immediately.
 #[tokio::test]
 async fn a_revoked_bots_commands_vanish_from_discovery() {
     let (store, _guard) = new_store("slimm-botcmds-revoked").await;
@@ -264,8 +254,7 @@ async fn a_revoked_bots_commands_vanish_from_discovery() {
     );
 }
 
-/// The other mutation-critical case: removing a bot from the Space (kicking
-/// it) must also make its commands vanish, independently of revocation.
+/// Removing a bot from the Space must also make its commands vanish.
 #[tokio::test]
 async fn a_bot_removed_from_the_space_no_longer_advertises() {
     let (store, _guard) = new_store("slimm-botcmds-removed").await;
@@ -367,9 +356,8 @@ async fn a_gated_command_is_hidden_from_a_caller_without_the_permission() {
     let _ = bot_id;
 }
 
-/// The masking rule `GET /channels/{id}/permissions` already establishes:
-/// a caller who cannot view the channel at all must not learn anything
-/// about it, including an otherwise-ungated bot command living there.
+/// A caller who cannot view the channel must learn nothing about it,
+/// including an otherwise-ungated bot command living there.
 #[tokio::test]
 async fn a_caller_without_view_channel_sees_no_commands() {
     let (store, _guard) = new_store("slimm-botcmds-caller-blind").await;

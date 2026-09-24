@@ -1,18 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! A bot's own registered prefix and command palette: advertisement, not
-//! interactions. See docs/decisions/0031-bot-command-registration.md.
-//!
-//! The server never runs a bot command - a bot registers what it answers to,
-//! the composer offers it in the `/` menu, and picking a row inserts the
-//! bot's own prefix and keyword as plain text, the exact message a bot's own
-//! process already parses today. Nothing here is an execution path; it is
-//! only what a client reads to decide what to offer, and what a bot's own
-//! profile shows about it.
-//!
-//! [`Store::set_bot_commands`] is a bulk overwrite, on purpose: a bot
-//! re-registers its complete set on every connect (Discord's own shape), so
-//! a command dropped from its own source actually disappears rather than
-//! lingering as a stale advertisement nobody will ever answer.
+//! A bot's own registered prefix and command palette. See
+//! docs/decisions/0031-bot-command-registration.md.
 
 use std::collections::HashMap;
 
@@ -29,11 +17,7 @@ pub const MAX_BOT_COMMAND_NAME_LEN: usize = 32;
 pub const MAX_BOT_COMMAND_DESCRIPTION_LEN: usize = 100;
 pub const MAX_BOT_COMMAND_USAGE_LEN: usize = 80;
 
-/// Trigger characters the composer already assigns meaning to (module/app
-/// commands and mentions, role mentions, emoji shortcodes), so a bot may
-/// never claim one as its own prefix - a bot answering to `/` could shadow a
-/// module's own `/name` command at send time, since only the module list is
-/// ever intercepted before a message posts.
+/// Composer triggers a bot prefix may not claim; see decision 0031.
 pub const RESERVED_BOT_PREFIXES: [&str; 3] = ["/", "@", ":"];
 
 /// One command a bot advertises.
@@ -42,11 +26,7 @@ pub struct BotCommand {
     pub name: String,
     pub description: String,
     pub usage: Option<String>,
-    /// A single [`Permissions`] bit, same encoding as `GET
-    /// /channels/{channelId}/permissions`. A hint the composer uses to hide
-    /// this row from a caller who lacks it in the current channel - never
-    /// enforced against the plain message the bot goes on to receive, so the
-    /// bot must still check independently before acting on it.
+    /// A single [`Permissions`] bit; a composer hint only, never enforced.
     pub permission: Option<i64>,
 }
 
@@ -73,9 +53,8 @@ impl From<sqlx::Error> for SetBotCommandsError {
     }
 }
 
-/// One command a viewer of a particular channel may currently be offered,
-/// with the bot that registered it - the composer's own row shape, before the
-/// client turns it into an [`crate::store::Store`]-agnostic suggestion.
+/// One command a viewer of a channel may currently be offered, with the bot
+/// that registered it.
 #[derive(Debug, Clone)]
 pub struct VisibleBotCommand {
     pub bot_user_id: UserId,
@@ -135,11 +114,8 @@ fn validate_bot_command(command: &BotCommand) -> Result<(), &'static str> {
 }
 
 impl Store {
-    /// Replaces a bot's whole registration - its prefix and its full command
-    /// list - in one transaction. Rejects the set outright rather than
-    /// partially applying it: a bot that fixes one bad command and resends
-    /// gets the same all-or-nothing bulk overwrite Discord's own registration
-    /// gives, so it never ends up with half its old set and half its new one.
+    /// Replaces a bot's whole registration in one transaction, all or
+    /// nothing on a validation failure.
     pub async fn set_bot_commands(
         &self,
         bot_user_id: UserId,
@@ -197,12 +173,8 @@ impl Store {
         Ok(())
     }
 
-    /// A bot's whole current registration, unfiltered by channel or by any
-    /// caller's own permissions - what a profile popover shows about the bot
-    /// itself, not what one particular viewer may currently be offered in one
-    /// particular channel (see [`Store::visible_bot_commands`] for that).
-    /// `None` when the bot has never registered anything, including for a
-    /// non-bot or unknown id.
+    /// A bot's whole current registration, unfiltered - see
+    /// [`Store::visible_bot_commands`] for the filtered discovery list.
     pub async fn bot_commands(
         &self,
         bot_user_id: UserId,
@@ -237,19 +209,9 @@ impl Store {
         }))
     }
 
-    /// Every command a caller may currently be offered in `channel_id`,
-    /// across every bot - the discovery list behind the `/` menu's bot half.
-    ///
-    /// A bot's whole registration is left out unless its token is live and it
-    /// is still a member of the Space (so a revoked or removed bot's commands
-    /// vanish here with no separate cleanup path, the same live-query answer
-    /// [`Store::list_bots`] already gives) and it itself currently holds
-    /// VIEW_CHANNEL in this channel - a bot with no access to a channel must
-    /// not advertise itself there any more than a person would be shown
-    /// mentioning someone who cannot read it. A single command whose declared
-    /// `permission` bit is missing from `caller_permissions` is left out on
-    /// its own, not the whole bot, since one bot can mix gated and open
-    /// commands.
+    /// The composer's discovery list: every command a caller may currently
+    /// be offered in `channel_id`. See decision 0031 for the visibility and
+    /// permission rules this applies.
     pub async fn visible_bot_commands(
         &self,
         channel_id: ChannelId,
