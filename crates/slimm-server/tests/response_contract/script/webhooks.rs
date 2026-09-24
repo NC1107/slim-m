@@ -1,26 +1,32 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Incoming webhook delivery, the one route decision 0030 ships in this
-//! stage. Minted directly through the store rather than through an admin
-//! route, because there is none yet (stage 4): the one thing this route
-//! needs, a live `(webhook_id, token)` pair, cannot be reached any other way.
+//! Webhook admin surface and delivery, in call order: mint through the real
+//! `POST /webhooks` route, list, deliver both documented success shapes,
+//! rename, revoke. Minting through the HTTP route rather than the store
+//! directly, unlike this file's stage-4 predecessor, now that the admin
+//! surface exists.
 
 use serde_json::json;
-use slimm_server::ids::ChannelId;
-use uuid::Uuid;
 
 use crate::world::{Contract, Payload};
 
-/// Drives both documented success shapes: a plain delivery (204, no body)
-/// and a `?wait=true` one (200, the minimal acknowledgement DTO), plus a
+use super::text;
+
+/// Drives create, list, both delivery shapes, rename and revoke, plus a
 /// Discord-shaped `embeds` block that must never turn into a 400.
-pub(crate) async fn webhook_calls(c: &mut Contract, channel: &str) {
-    let channel_id = ChannelId(Uuid::parse_str(channel).expect("a valid channel id"));
-    let minted = c
-        .store()
-        .create_webhook(channel_id, "contract-test-webhook")
-        .await
-        .expect("minting a webhook directly through the store");
-    let path = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);
+pub(crate) async fn webhook_calls(c: &mut Contract, root: &str, channel: &str) {
+    let created = c
+        .json(
+            "createWebhook",
+            "POST",
+            "/webhooks",
+            root,
+            json!({ "channel_id": channel, "label": "alerts" }),
+        )
+        .await;
+    c.get("listWebhooks", "/webhooks", root).await;
+
+    let webhook_id = text(&created["webhook"], "id");
+    let path = text(&created, "delivery_path");
 
     c.call(
         "deliverWebhook",
@@ -40,6 +46,22 @@ pub(crate) async fn webhook_calls(c: &mut Contract, channel: &str) {
         &format!("{path}?wait=true"),
         None,
         Payload::Json(json!({ "content": "another alert", "username": "monitor" })),
+    )
+    .await;
+
+    c.json(
+        "renameWebhook",
+        "PATCH",
+        &format!("/webhooks/{webhook_id}"),
+        root,
+        json!({ "label": "renamed-alerts" }),
+    )
+    .await;
+    c.bare(
+        "revokeWebhook",
+        "POST",
+        &format!("/webhooks/{webhook_id}/revoke"),
+        root,
     )
     .await;
 }

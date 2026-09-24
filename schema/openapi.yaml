@@ -84,10 +84,10 @@ tags:
       not itself be a bot.
   - name: webhooks
     description: >
-      Delivering an incoming webhook post. Unauthenticated by anything but
-      the token in the URL; see docs/decisions/0030-incoming-webhooks.md.
-      Minting, listing, and revoking a webhook are not documented here yet -
-      there is no admin route for them in this build.
+      Delivering an incoming webhook post, unauthenticated by anything but
+      the token in the URL, and the MANAGE_SERVER admin surface that mints,
+      lists, renames and revokes one; see
+      docs/decisions/0030-incoming-webhooks.md.
   - name: invites
     description: Creating, listing, checking, and redeeming invite codes.
   - name: channels
@@ -5573,6 +5573,133 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /webhooks:
+    get:
+      operationId: listWebhooks
+      tags: [webhooks]
+      summary: Webhooks in the deployment, newest first.
+      description: >-
+        Carries no credential. See docs/decisions/0030-incoming-webhooks.md's
+        admin-surface addendum for why the list, not the response body, is
+        where an operator learns which webhooks exist.
+      responses:
+        "200":
+          description: The webhooks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Webhook"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    post:
+      operationId: createWebhook
+      tags: [webhooks]
+      summary: Mint a webhook and its delivery path.
+      description: >-
+        The only response that ever carries the delivery path with its token
+        legible; it is stored hashed and cannot be read back. Fixed to
+        `channel_id` at mint, never editable - see the decision record for
+        why re-pointing an already-pasted URL is refused rather than offered.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWebhookRequest"
+      responses:
+        "201":
+          description: The webhook, and its delivery path once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewWebhook"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /webhooks/{webhookId}:
+    parameters:
+      - name: webhookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The webhook's own id.
+    patch:
+      operationId: renameWebhook
+      tags: [webhooks]
+      summary: Rename a webhook's admin-facing label.
+      description: >-
+        Updates the label shown in the admin surface and the webhook
+        principal's own display name together, the same pair
+        `createWebhook` sets in one step.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameWebhookRequest"
+      responses:
+        "200":
+          description: The renamed webhook.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /webhooks/{webhookId}/revoke:
+    parameters:
+      - name: webhookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The webhook's own id.
+    post:
+      operationId: revokeWebhook
+      tags: [webhooks]
+      summary: Revoke a webhook.
+      description: >-
+        Its delivery path 404s on its very next attempt. There is no session
+        and no socket to also close, so the row going away is the whole of
+        it. Whatever it already posted stays attributed to it.
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /space/analytics:
     get:
       operationId: getSpaceAnalytics
@@ -8132,6 +8259,70 @@ components:
         created_at:
           type: integer
           format: int64
+    Webhook:
+      type: object
+      required: [id, channel_id, label, created_at]
+      description: >-
+        A webhook, as the admin surface lists it. Carries no credential; see
+        NewWebhook for the one response that does.
+      properties:
+        id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        last_delivery_at:
+          type: [integer, "null"]
+          format: int64
+          description: Absent if this webhook has never delivered.
+        created_by_display_name:
+          type: [string, "null"]
+          description: >-
+            Who minted this webhook. Absent if that admin's own account has
+            since been deleted; the webhook itself keeps working either way.
+    CreateWebhookRequest:
+      type: object
+      required: [channel_id, label]
+      properties:
+        channel_id:
+          type: string
+          format: uuid
+          description: >-
+            Fixed at mint and never editable - see
+            docs/decisions/0030-incoming-webhooks.md for why re-pointing an
+            already-pasted URL is refused rather than offered.
+        label:
+          type: string
+          description: >-
+            1 to 64 characters, the admin-facing name shown in the listing
+            and, until renamed, the webhook principal's own display name.
+    RenameWebhookRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
+          description: Same rule as CreateWebhookRequest.label.
+    NewWebhook:
+      type: object
+      required: [webhook, delivery_path]
+      properties:
+        webhook:
+          $ref: "#/components/schemas/Webhook"
+        delivery_path:
+          type: string
+          description: >-
+            `/webhooks/{id}/{token}`, shown once and never again - the server
+            stores only a hash of the token. Not a full URL: the server has
+            no notion of its own externally reachable origin, so the client
+            joins this path to the address it already talks to this
+            deployment on.
     Channel:
       type: object
       required: [id, name, kind, created_at]

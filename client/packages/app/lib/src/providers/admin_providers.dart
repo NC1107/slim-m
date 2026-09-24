@@ -47,6 +47,11 @@ final botsProvider = FutureProvider.autoDispose<List<api.Bot>>(
   (ref) => ref.watch(apiProvider).listBots(),
 );
 
+/// Every webhook in the deployment, newest first.
+final webhooksProvider = FutureProvider.autoDispose<List<api.Webhook>>(
+  (ref) => ref.watch(apiProvider).listWebhooks(),
+);
+
 /// Every role.
 final rolesProvider = FutureProvider.autoDispose<List<api.Role>>(
   (ref) => ref.watch(apiProvider).listRoles(),

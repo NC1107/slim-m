@@ -11,7 +11,7 @@ use slimm_server::db;
 use slimm_server::http::link_preview::LinkPreviews;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
-use slimm_server::ids::ChannelId;
+use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -73,7 +73,7 @@ async fn json_body(response: axum::response::Response) -> Value {
 }
 
 /// A live administrator and a channel to point a webhook at.
-async fn fixture(store: &Store, name: &str) -> (String, ChannelId) {
+async fn fixture(store: &Store, name: &str) -> (String, ChannelId, UserId) {
     let account = store
         .create_account(name, name, "not-a-real-hash")
         .await
@@ -85,7 +85,7 @@ async fn fixture(store: &Store, name: &str) -> (String, ChannelId) {
         .unwrap()
         .access_token;
     let channel = store.create_channel("general", "text").await.unwrap();
-    (token, channel.id)
+    (token, channel.id, account.id)
 }
 
 fn one_embed() -> Value {
@@ -100,8 +100,11 @@ fn one_embed() -> Value {
 #[tokio::test]
 async fn a_webhook_can_post_an_embed_and_it_renders() {
     let (store, _guard) = new_store("slimm-webhook-embeds-post").await;
-    let (viewer_token, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (viewer_token, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store, LinkPreviews::disabled());
 
     let path = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);
@@ -134,8 +137,11 @@ async fn a_webhook_can_post_an_embed_and_it_renders() {
 #[tokio::test]
 async fn a_webhooks_embed_image_pointed_at_a_blocked_address_is_dropped() {
     let (store, _guard) = new_store("slimm-webhook-embeds-blocked-image").await;
-    let (viewer_token, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (viewer_token, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let enabled_with_guard = LinkPreviews::new(&Config {
         link_previews: true,
         ..Config::default()
@@ -174,8 +180,11 @@ async fn a_webhooks_embed_image_pointed_at_a_blocked_address_is_dropped() {
 #[tokio::test]
 async fn too_many_embeds_from_a_webhook_is_a_400() {
     let (store, _guard) = new_store("slimm-webhook-embeds-cap").await;
-    let (_viewer_token, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (_viewer_token, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store, LinkPreviews::disabled());
 
     let path = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);

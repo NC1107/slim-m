@@ -71,7 +71,10 @@ async fn a_webhook_refuses_eleven_embeds() {
         .unwrap();
     store.bootstrap_deployment(account.id).await.unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let minted = store.create_webhook(channel.id, "alerts").await.unwrap();
+    let minted = store
+        .create_webhook(channel.id, "alerts", account.id)
+        .await
+        .unwrap();
     let app = app(store);
 
     let response = app

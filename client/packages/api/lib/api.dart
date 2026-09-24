@@ -25,12 +25,14 @@ export 'src/client.dart'
         DbPoolStats,
         MemberAttachmentUsage,
         NewBot,
+        NewWebhook,
         RequestClassCount,
         RouteMetric,
         ServerMetrics,
         SpaceAnalytics,
         SpaceStorage,
         SweepStatus,
+        Webhook,
         SlimmApiAdmin,
         SlimmApiAttachments,
         SlimmApiAuth,
@@ -56,6 +58,7 @@ export 'src/client.dart'
         SlimmApiThreads,
         SlimmApiUsers,
         SlimmApiVoice,
+        SlimmApiWebhooks,
         JoinPolicy;
 export 'src/events.dart'
     show

@@ -23,6 +23,7 @@
 use crate::auth::{generate_secret, hash_secret};
 use crate::ids::{ChannelId, MessageId, UserId, WebhookId};
 
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::{Store, now_ms};
 
 /// A webhook, as an operator will see it once the admin surface exists.
@@ -39,6 +40,11 @@ pub struct Webhook {
     pub label: String,
     pub created_at: i64,
     pub last_delivery_at: Option<i64>,
+    /// Who minted this webhook, for the admin surface's listing. `None` if
+    /// that admin's own account has since been deleted; the webhook itself
+    /// keeps working either way.
+    pub created_by: Option<UserId>,
+    pub created_by_display_name: Option<String>,
 }
 
 /// A newly minted webhook and the one time its token is ever legible.
@@ -68,6 +74,7 @@ impl Store {
         &self,
         channel_id: ChannelId,
         label: &str,
+        created_by: UserId,
     ) -> anyhow::Result<NewWebhook> {
         let webhook_id = WebhookId::generate();
         let user_id = UserId::generate();
@@ -88,17 +95,34 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         sqlx::query!(
-            "INSERT INTO webhooks (id, user_id, channel_id, token_hash, label, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO webhooks (id, user_id, channel_id, token_hash, label, created_at, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             webhook_id,
             user_id,
             channel_id,
             token_hash,
             label,
-            now
+            now,
+            created_by
         )
         .execute(&mut *tx)
         .await?;
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: created_by,
+                subject_id: user_id,
+                action: "webhook_create",
+                reason: None,
+                until: None,
+                created_at: now,
+            },
+        )
+        .await?;
+        let created_by_display_name =
+            sqlx::query_scalar!("SELECT display_name FROM users WHERE id = ?", created_by)
+                .fetch_optional(&mut *tx)
+                .await?;
         tx.commit().await?;
 
         Ok(NewWebhook {
@@ -109,9 +133,106 @@ impl Store {
                 label: label.to_owned(),
                 created_at: now,
                 last_delivery_at: None,
+                created_by: Some(created_by),
+                created_by_display_name,
             },
             token,
         })
+    }
+
+    /// Webhooks in the deployment, newest first. Carries no secret. See
+    /// [`Webhook::created_by`] for why `created_by_display_name` can be
+    /// absent even for a webhook that has one.
+    pub async fn list_webhooks(&self) -> anyhow::Result<Vec<Webhook>> {
+        let rows = sqlx::query!(
+            r#"SELECT w.id AS "id!: WebhookId", w.user_id AS "user_id!: UserId",
+                      w.channel_id AS "channel_id!: ChannelId", w.label,
+                      w.created_at, w.last_delivery_at,
+                      w.created_by AS "created_by?: UserId",
+                      creator.display_name AS "created_by_display_name?"
+               FROM webhooks w
+               LEFT JOIN users creator ON creator.id = w.created_by
+               ORDER BY w.created_at DESC"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| Webhook {
+                id: r.id,
+                principal_id: r.user_id,
+                channel_id: r.channel_id,
+                label: r.label,
+                created_at: r.created_at,
+                last_delivery_at: r.last_delivery_at,
+                created_by: r.created_by,
+                created_by_display_name: r.created_by_display_name,
+            })
+            .collect())
+    }
+
+    /// Renames a webhook, updating both the admin-facing label and the
+    /// principal's `display_name` so the two stay in the same
+    /// correspondence [`Store::create_webhook`] established. Returns `None`
+    /// if no webhook by that id exists.
+    pub async fn rename_webhook(
+        &self,
+        webhook_id: WebhookId,
+        label: &str,
+    ) -> anyhow::Result<Option<Webhook>> {
+        let mut tx = self.pool.begin().await?;
+        let user_id = sqlx::query_scalar!(
+            r#"SELECT user_id AS "user_id!: UserId" FROM webhooks WHERE id = ?"#,
+            webhook_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(user_id) = user_id else {
+            return Ok(None);
+        };
+        sqlx::query!(
+            "UPDATE webhooks SET label = ? WHERE id = ?",
+            label,
+            webhook_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE users SET display_name = ? WHERE id = ?",
+            label,
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        self.webhook_by_id(webhook_id).await
+    }
+
+    /// A single webhook by id, in the shape [`Store::list_webhooks`] returns.
+    async fn webhook_by_id(&self, webhook_id: WebhookId) -> anyhow::Result<Option<Webhook>> {
+        let row = sqlx::query!(
+            r#"SELECT w.id AS "id!: WebhookId", w.user_id AS "user_id!: UserId",
+                      w.channel_id AS "channel_id!: ChannelId", w.label,
+                      w.created_at, w.last_delivery_at,
+                      w.created_by AS "created_by?: UserId",
+                      creator.display_name AS "created_by_display_name?"
+               FROM webhooks w
+               LEFT JOIN users creator ON creator.id = w.created_by
+               WHERE w.id = ?"#,
+            webhook_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| Webhook {
+            id: r.id,
+            principal_id: r.user_id,
+            channel_id: r.channel_id,
+            label: r.label,
+            created_at: r.created_at,
+            last_delivery_at: r.last_delivery_at,
+            created_by: r.created_by,
+            created_by_display_name: r.created_by_display_name,
+        }))
     }
 
     /// Resolves a presented `(webhook_id, token)` pair, or `None` if the id
@@ -197,11 +318,37 @@ impl Store {
     /// it - simpler than [`Store::revoke_bot`], and immediate the same way.
     /// The principal's `users` row survives, so anything it already posted
     /// stays attributed. Returns `false` if no webhook by that id exists.
-    pub async fn revoke_webhook(&self, webhook_id: WebhookId) -> anyhow::Result<bool> {
-        let affected = sqlx::query!("DELETE FROM webhooks WHERE id = ?", webhook_id)
-            .execute(&self.pool)
-            .await?
-            .rows_affected();
-        Ok(affected > 0)
+    pub async fn revoke_webhook(
+        &self,
+        webhook_id: WebhookId,
+        revoked_by: UserId,
+    ) -> anyhow::Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        let user_id = sqlx::query_scalar!(
+            r#"SELECT user_id AS "user_id!: UserId" FROM webhooks WHERE id = ?"#,
+            webhook_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(user_id) = user_id else {
+            return Ok(false);
+        };
+        sqlx::query!("DELETE FROM webhooks WHERE id = ?", webhook_id)
+            .execute(&mut *tx)
+            .await?;
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: revoked_by,
+                subject_id: user_id,
+                action: "webhook_revoke",
+                reason: None,
+                until: None,
+                created_at: now_ms(),
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(true)
     }
 }
