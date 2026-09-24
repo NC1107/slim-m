@@ -330,9 +330,7 @@ jobs:
   # CONTINUOUS_TESTFLIGHT=false leaves iOS to release.yml alone; a hand-run dispatch still builds.
   ios-testflight:
     needs: [changes]
-    if: >-
-      needs.changes.outputs.client == 'true' &&
-      (github.event_name == 'workflow_dispatch' || vars.CONTINUOUS_TESTFLIGHT != 'false')
+    if: needs.changes.outputs.client == 'true' && (github.event_name == 'workflow_dispatch' || vars.CONTINUOUS_TESTFLIGHT != 'false')
     runs-on: macos-latest
     permissions:
       contents: read
