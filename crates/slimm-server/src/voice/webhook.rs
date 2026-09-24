@@ -151,9 +151,11 @@ pub fn verify_and_parse(
     if claims.iss != api_key {
         return Err(WebhookError::BadSignature);
     }
-    if let Some(exp) = claims.exp
-        && exp < unix_secs()
-    {
+    // No exp is not "never expires": LiveKit's signer always sets one.
+    let Some(exp) = claims.exp else {
+        return Err(WebhookError::Malformed);
+    };
+    if exp < unix_secs() {
         return Err(WebhookError::Expired);
     }
 
@@ -241,6 +243,31 @@ mod tests {
         assert!(matches!(
             verify_and_parse(body, Some(&token), API_KEY, API_SECRET),
             Err(WebhookError::Expired)
+        ));
+    }
+
+    /// A correctly signed token that simply omits `exp` altogether, the one
+    /// shape `sign` above cannot produce. LiveKit's own signer always sets
+    /// it; a token missing it must not be treated as never expiring.
+    fn sign_without_exp(body: &[u8], api_key: &str, api_secret: &str) -> String {
+        let header = BASE64URL.encode(r#"{"alg":"HS256","typ":"JWT"}"#);
+        let sha256 = BASE64STD.encode(Sha256::digest(body));
+        let claims = serde_json::json!({ "iss": api_key, "sha256": sha256 });
+        let payload = BASE64URL.encode(serde_json::to_vec(&claims).unwrap());
+        let signing_input = format!("{header}.{payload}");
+        let mut mac = <Hmac<Sha256>>::new_from_slice(api_secret.as_bytes()).unwrap();
+        mac.update(signing_input.as_bytes());
+        let signature = BASE64URL.encode(mac.finalize().into_bytes());
+        format!("{signing_input}.{signature}")
+    }
+
+    #[test]
+    fn a_validly_signed_token_with_no_exp_at_all_is_refused() {
+        let body = br#"{"event":"participant_left"}"#;
+        let token = sign_without_exp(body, API_KEY, API_SECRET);
+        assert!(matches!(
+            verify_and_parse(body, Some(&token), API_KEY, API_SECRET),
+            Err(WebhookError::Malformed)
         ));
     }
 
