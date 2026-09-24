@@ -73,3 +73,22 @@ String? _hostNameOrNull() {
     return null;
   }
 }
+
+/// The coarse client kind sent alongside [deviceDisplayName] at sign-in, for
+/// the devices list to name a session by more than its free-text device
+/// name. Three buckets rather than five platforms: the desktop targets share
+/// one build and one settings surface, so a device list distinguishing
+/// "Linux" from "Windows" here would promise a difference nothing else in the
+/// app draws.
+String get deviceClientKind {
+  if (kIsWeb) return 'web';
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.iOS => 'ios',
+    TargetPlatform.android => 'android',
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.linux ||
+    TargetPlatform.fuchsia =>
+      'desktop',
+  };
+}

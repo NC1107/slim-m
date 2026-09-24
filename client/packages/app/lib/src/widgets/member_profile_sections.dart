@@ -43,8 +43,15 @@ class MemberProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final badge = profile.roles.isEmpty ? null : profile.roles.first;
     final timedOut = profile.timedOutUntil != null;
+
+    final handleLine = Text(
+      profile.pronouns == null
+          ? '@${profile.username}'
+          : '@${profile.username} · ${profile.pronouns}',
+      overflow: TextOverflow.ellipsis,
+      style: AppText.caption.copyWith(color: tokens.textSecondary),
+    );
 
     final subtitle = inCallTogether
         ? Row(
@@ -92,6 +99,8 @@ class MemberProfileHeader extends StatelessWidget {
               size: 44,
               // The ring here means "in a call with you", so the name says that.
               speaking: inCallTogether,
+              // The profile colour; absent on an older server reads as no ring.
+              ringColor: inCallTogether ? null : profileRingColor(profile),
               semanticLabel: inCallTogether
                   ? '${profile.displayName}, in a call with you'
                   : null,
@@ -103,24 +112,15 @@ class MemberProfileHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        profile.displayName,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.body.copyWith(
-                          color: tokens.textPrimary,
-                          fontWeight: AppWeights.semi,
-                        ),
-                      ),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: AppSpacing.s8),
-                      AppBadge(variant: AppBadgeVariant.role, label: badge),
-                    ],
-                  ],
+                Text(
+                  profile.displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body.copyWith(
+                    color: tokens.textPrimary,
+                    fontWeight: AppWeights.semi,
+                  ),
                 ),
+                handleLine,
                 const SizedBox(height: 2),
                 subtitle,
               ],
@@ -130,6 +130,17 @@ class MemberProfileHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The member card's own avatar ring, from an index into the design system's
+/// closed categorical colour set - reused rather than a new palette, per the
+/// "no new hue family" spirit of decision 0004. Null when the server has not
+/// sent a colour at all (an older deployment), which is unknown, not zero.
+Color? profileRingColor(api.UserProfile profile) {
+  final index = profile.profileColor;
+  if (index == null) return null;
+  final cursors = AppCanvasColors.cursors;
+  return cursors[index % cursors.length];
 }
 
 String presenceWord(AppPresence status) => switch (status) {

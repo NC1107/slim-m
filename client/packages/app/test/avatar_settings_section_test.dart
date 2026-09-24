@@ -84,7 +84,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.bySemanticsLabel(_cameraLabel), findsOneWidget);
-    expect(find.text('Remove'), findsNothing);
+    expect(find.text('Remove photo'), findsNothing);
   });
 
   /// The name and handle used to sit above the settings nav as their own
@@ -207,13 +207,13 @@ void main() {
       await tester.pumpWidget(_harness(container));
       await tester.pumpAndSettle();
 
-      expect(find.text('Remove'), findsOneWidget);
+      expect(find.text('Remove photo'), findsOneWidget);
 
-      await tester.tap(find.text('Remove'));
+      await tester.tap(find.text('Remove photo'));
       await tester.pumpAndSettle();
 
       expect(requests, contains('DELETE /me/avatar'));
-      expect(find.text('Remove'), findsNothing);
+      expect(find.text('Remove photo'), findsNothing);
     },
   );
 
@@ -260,11 +260,11 @@ void main() {
       await tester.pumpWidget(_harness(container));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Remove'));
+      await tester.tap(find.text('Remove photo'));
       await tester.pumpAndSettle();
 
       // Still offering removal: the failed request changed nothing.
-      expect(find.text('Remove'), findsOneWidget);
+      expect(find.text('Remove photo'), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.byType(AppErrorState), findsOneWidget);
     },

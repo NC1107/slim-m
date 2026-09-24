@@ -53,6 +53,7 @@ const _other = api.UserProfile(
       sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
       myPermissionsProvider.overrideWithValue(basePermissions),
       membersProvider.overrideWith((ref) async => [_other]),
+      rolesProvider.overrideWith((ref) async => const <api.Role>[]),
       apiProvider.overrideWith((ref) {
         final client = api.SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
@@ -147,6 +148,8 @@ void main() {
       );
       await tester.pumpWidget(_harness(wired.container));
       await _joinShared(tester, wired.container, wired.session);
+      await tester.tap(find.text('Moderate...'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Eject from call...'), findsOneWidget);
       // Base grants nothing, so the deployment-wide siblings stay absent.
@@ -167,6 +170,8 @@ void main() {
       );
       await tester.pumpWidget(_harness(wired.container));
       await _joinShared(tester, wired.container, wired.session);
+      await tester.tap(find.text('Moderate...'));
+      await tester.pumpAndSettle();
 
       // Base holds it, so both deployment-wide actions render.
       expect(find.text('Time out for...'), findsOneWidget);

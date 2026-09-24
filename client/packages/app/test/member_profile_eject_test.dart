@@ -58,6 +58,7 @@ _wire({int permissions = 0, api.Me? selfProfile}) {
       sessionProvider.overrideWithValue(api.SessionStore(tokens: tokens)),
       myPermissionsProvider.overrideWithValue(permissions),
       membersProvider.overrideWith((ref) async => [_other]),
+      rolesProvider.overrideWith((ref) async => const <api.Role>[]),
       if (selfProfile != null)
         meProvider.overrideWith((ref) async => selfProfile),
       apiProvider.overrideWith((ref) {
@@ -190,6 +191,9 @@ void main() {
       reducedMotionApp(container: wired.container, child: _body()),
     );
     await tester.pump();
+    // KICK_MEMBERS alone still offers Moderate, for the timeout chips.
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Eject from call...'), findsNothing);
   });
@@ -223,6 +227,8 @@ void main() {
       reducedMotionApp(container: wired.container, child: _body()),
     );
     await _joinShared(tester, wired.container, wired.session);
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Eject from call...'), findsOneWidget);
     await wired.container.read(voiceControllerProvider.notifier).leave();
@@ -237,6 +243,8 @@ void main() {
       reducedMotionApp(container: wired.container, child: _body()),
     );
     await _joinShared(tester, wired.container, wired.session);
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Eject from call...'));
     await tester.pumpAndSettle();
@@ -264,6 +272,8 @@ void main() {
       reducedMotionApp(container: wired.container, child: _body()),
     );
     await _joinShared(tester, wired.container, wired.session);
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Eject from call...'));
     await tester.pumpAndSettle();
@@ -334,6 +344,9 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Moderate...'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Eject from call...'));

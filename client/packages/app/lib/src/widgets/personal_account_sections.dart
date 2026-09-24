@@ -163,12 +163,16 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
   Widget build(BuildContext context) {
     return SettingsSectionCard(
       title: 'Account',
-      description: 'Deleting your account is permanent and cannot be undone.',
+      description:
+          'Removes you from this Space and signs out every device. '
+          'Cannot be undone.',
       children: [
         // Matches channel_settings_danger_zone.dart's own "Delete channel":
         // an irreversible action reads as a button, not a navigation row.
+        // The ellipsis says a confirmation follows, the same convention
+        // every other destructive action in this app uses.
         AppButton(
-          label: 'Delete account',
+          label: 'Delete account...',
           variant: AppButtonVariant.danger,
           full: true,
           onPressed: () => _confirmDeletion(context, ref),

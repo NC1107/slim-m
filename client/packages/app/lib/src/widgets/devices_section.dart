@@ -81,16 +81,15 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
         for (final device in list)
           _DeviceRow(key: ValueKey(device.id), device: device),
         if (others.isNotEmpty) ...[
-          AppListRow(
-            leading: Icon(
-              AppIcons.signOut,
-              size: AppSizes.icon16,
-              color: tokens.dangerText,
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.s8),
+            child: AppButton(
+              label: 'Sign out all other devices',
+              variant: AppButtonVariant.danger,
+              full: true,
+              disabled: _signingOutAll,
+              onPressed: () => _confirmSignOutAllOthers(context, others),
             ),
-            label: 'Sign out all other devices',
-            onTap: _signingOutAll
-                ? null
-                : () => _confirmSignOutAllOthers(context, others),
           ),
           if (_bulkError case final error?)
             Padding(
@@ -175,6 +174,33 @@ String lastUsed(int? lastSeenAt) {
   return 'Last used ${delta ~/ (24 * 60 * 60 * 1000)}d ago';
 }
 
+/// Names a device by its platform rather than the raw string it registered
+/// with: "iOS (localhost)" reads as "iOS · localhost" - the hostname
+/// demoted to a detail beside the platform instead of buried inside one
+/// unbroken label. A name with no parenthetical (an older device, or a
+/// platform this build could not read a hostname for) passes through as-is.
+String devicePlatformLabel(String name) {
+  final match = RegExp(r'^(.+) \((.+)\)$').firstMatch(name);
+  if (match == null) return name;
+  return '${match.group(1)} · ${match.group(2)}';
+}
+
+/// The mono detail line: client, version and last active, in that order.
+/// Absent (returns null) when the server carries no client kind or version -
+/// a session opened before migration 0076, which falls back to [label]'s own
+/// plain name and this row's plain, single-line shape.
+String? deviceDetailLine(api.Device device) {
+  final kind = device.clientKind;
+  final version = device.clientVersion;
+  if (kind == null && version == null) return null;
+  final client = [
+    if (kind != null) kind,
+    if (version != null) version,
+  ].join(' ');
+  final active = lastUsed(device.lastSeenAt).replaceFirst('Last used ', '');
+  return '$client · $active';
+}
+
 /// One signed-in device, with its own "sign out" failure: a revoke that
 /// cannot reach the server must say so on the row it was for, not vanish.
 ///
@@ -236,10 +262,13 @@ class _DeviceRowState extends ConsumerState<_DeviceRow>
           onExit: (_) => setState(() => _hovered = false),
           child: AppListRow(
             leading: Icon(deviceIcon(device.name)),
-            label: device.name,
+            label: devicePlatformLabel(device.name),
+            subtitle: deviceDetailLine(device),
             meta: device.isCurrent
                 ? 'This device'
-                : lastUsed(device.lastSeenAt),
+                : (deviceDetailLine(device) == null
+                      ? lastUsed(device.lastSeenAt)
+                      : null),
             trailing: device.isCurrent
                 ? null
                 : Focus(

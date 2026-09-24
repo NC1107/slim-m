@@ -24,7 +24,6 @@ import 'package:slimm_app/src/widgets/confirm_dialog.dart';
 import 'package:slimm_app/src/widgets/create_channel_sheet.dart';
 import 'package:slimm_app/src/widgets/emoji_picker.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
-import 'package:slimm_app/src/widgets/member_roles_sheet.dart';
 import 'package:slimm_app/src/widgets/pinned_messages_sheet.dart';
 import 'package:slimm_app/src/widgets/poll_composer_sheet.dart';
 import 'package:slimm_app/src/widgets/report_dialog.dart';
@@ -103,8 +102,6 @@ final overlays = <String, FutureOr<void> Function(BuildContext, WidgetRef)>{
       showPinnedMessagesSheet(context, 'c-general'),
   'poll-composer-sheet': (context, ref) =>
       showPollComposerSheet(context, 'c-general'),
-  'member-roles-sheet': (context, ref) =>
-      showMemberRolesSheet(context, 'user-long-name'),
   'create-role-sheet': (context, ref) => showCreateRoleSheet(context),
   'avatar-crop-sheet': (context, ref) => showAvatarCropSheet(context, _png),
   'whats-new-sheet': (context, ref) =>

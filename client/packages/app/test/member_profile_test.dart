@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The profile popover's composition rule: a section you have no rights or
+/// The profile card's composition rule: a section you have no rights or
 /// context for is *absent*, never present-and-disabled. That is what keeps a
-/// plain member's popover to a couple of verbs instead of a wall of greyed
+/// plain member's card to a couple of verbs instead of a wall of greyed
 /// rows, and it is the rule most likely to erode as sections are added.
+///
+/// Moderate's own content (the roles checklist, timeout chips, reset code,
+/// remove button) is `member_moderate_view_test.dart`'s concern; this file
+/// only checks that the single "Moderate..." row appears exactly when at
+/// least one of those rights is held.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
@@ -45,10 +51,12 @@ Widget _harness(
   overrides: [
     myPermissionsProvider.overrideWithValue(permissions),
     membersProvider.overrideWith((ref) async => members),
+    rolesProvider.overrideWith((ref) async => const <api.Role>[]),
   ],
   child: MaterialApp(
     theme: buildTheme(Brightness.light, AppTokens.light),
-    home: Scaffold(body: child),
+    // A real popover scrolls; this harness needs the same allowance.
+    home: Scaffold(body: SingleChildScrollView(child: child)),
   ),
 );
 
@@ -69,9 +77,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('maya'), findsOneWidget);
+    expect(find.text('@maya'), findsOneWidget);
     expect(find.text('online'), findsOneWidget);
     expect(find.text('Message'), findsOneWidget);
     expect(find.text('Block'), findsOneWidget);
+    expect(find.text('Add a private note'), findsOneWidget);
 
     // No call in progress, so nothing about hearing them.
     expect(
@@ -79,38 +89,94 @@ void main() {
       findsNothing,
       reason: 'the call section belongs to a shared call, not to a person',
     );
-    // No rights, so no section at all - not even its label.
-    expect(find.text('MODERATION'), findsNothing);
-    expect(find.text('Roles...'), findsNothing);
-    expect(find.text('Remove from Space...'), findsNothing);
-    expect(find.text('Time out for...'), findsNothing);
-    expect(find.text('Password reset code...'), findsNothing);
+    // No rights, so no way into Moderate at all.
+    expect(find.text('Moderate...'), findsNothing);
   });
 
-  testWidgets('only an administrator can issue a password reset code', (
+  testWidgets('the profile composes before any action row', (tester) async {
+    await tester.pumpWidget(_harness(_body(_other)));
+    await tester.pump();
+
+    final name = tester.getTopLeft(find.text('maya'));
+    final handle = tester.getTopLeft(find.text('@maya'));
+    final message = tester.getTopLeft(find.text('Message'));
+    expect(handle.dy, greaterThan(name.dy));
+    expect(message.dy, greaterThan(handle.dy));
+  });
+
+  testWidgets('roles show as chips, beside the join date, for everyone', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_harness(_body(_other)));
+    await tester.pump();
+
+    expect(find.text('mod'), findsOneWidget);
+    expect(find.textContaining('joined'), findsOneWidget);
+  });
+
+  testWidgets('a Moderate row opens only with a moderation right', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_harness(_body(_other)));
+    await tester.pump();
+    expect(find.text('Moderate...'), findsNothing);
+
+    for (final perm in [
+      Perm.kickMembers,
+      Perm.banMembers,
+      Perm.manageRoles,
+      Perm.administrator,
+    ]) {
+      await tester.pumpWidget(_harness(_body(_other), permissions: perm));
+      await tester.pump();
+      expect(find.text('Moderate...'), findsOneWidget, reason: '$perm');
+    }
+  });
+
+  testWidgets('tapping Moderate pushes its own view, with a way back', (
     tester,
   ) async {
     await tester.pumpWidget(
-      _harness(_body(_other), permissions: Perm.banMembers | Perm.kickMembers),
+      _harness(_body(_other), permissions: Perm.banMembers),
     );
     await tester.pump();
 
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Moderate maya'), findsOneWidget);
     expect(
-      find.text('Password reset code...'),
+      find.text('maya'),
       findsNothing,
-      reason:
-          'issuing a code sets somebody else password and signs them out '
-          'everywhere; the server gates it on ADMINISTRATOR alone, and a '
-          'moderator who can remove members still must not see it',
+      reason: 'the profile view is replaced, not stacked underneath',
     );
-    expect(find.text('Remove from Space...'), findsOneWidget);
 
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Moderate maya'), findsNothing);
+    expect(find.text('maya'), findsOneWidget);
+  });
+
+  testWidgets('Esc steps back out of Moderate before closing the card', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      _harness(_body(_other), permissions: Perm.administrator),
+      _harness(_body(_other), permissions: Perm.banMembers),
     );
     await tester.pump();
 
-    expect(find.text('Password reset code...'), findsOneWidget);
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
+    expect(find.text('Moderate maya'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Moderate maya'),
+      findsNothing,
+      reason: 'the first Esc returns to the profile, not the caller',
+    );
+    expect(find.text('maya'), findsOneWidget);
   });
 
   testWidgets('the mention row names its channel, and is absent without one', (
@@ -176,52 +242,6 @@ void main() {
     expect(find.text('Block'), findsOneWidget);
   });
 
-  group('moderation', () {
-    testWidgets('each row appears only with the bit its route requires', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _harness(_body(_other), permissions: Perm.kickMembers),
-      );
-      await tester.pump();
-      expect(find.text('MODERATION'), findsOneWidget);
-      expect(find.text('Time out for...'), findsOneWidget);
-      expect(
-        find.text('Remove from Space...'),
-        findsNothing,
-        reason: 'removing needs BAN_MEMBERS, which this caller lacks',
-      );
-      expect(find.text('Roles...'), findsNothing);
-
-      await tester.pumpWidget(
-        _harness(_body(_other), permissions: Perm.banMembers),
-      );
-      await tester.pump();
-      expect(find.text('Remove from Space...'), findsOneWidget);
-      expect(find.text('Time out for...'), findsNothing);
-
-      await tester.pumpWidget(
-        _harness(_body(_other), permissions: Perm.manageRoles),
-      );
-      await tester.pump();
-      expect(find.text('Roles...'), findsOneWidget);
-      expect(find.text('Time out for...'), findsNothing);
-    });
-
-    testWidgets('the durations are inline, so timing out is one tap', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _harness(_body(_other), permissions: Perm.kickMembers),
-      );
-      await tester.pump();
-
-      for (final label in ['5m', '1h', '24h', '7d']) {
-        expect(find.text(label), findsOneWidget, reason: label);
-      }
-    });
-  });
-
   group('the timed-out badge', () {
     testWidgets(
       'names exactly what is restricted, for anyone who can see them',
@@ -254,35 +274,6 @@ void main() {
       await tester.pump();
       expect(find.text('Lift'), findsOneWidget);
     });
-
-    testWidgets(
-      'replaces the duration chips rather than sitting beside them, and '
-      'the section itself is absent once that is the only row it would '
-      'have carried',
-      (tester) async {
-        await tester.pumpWidget(
-          _harness(_body(_timedOut), permissions: Perm.kickMembers),
-        );
-        await tester.pump();
-
-        expect(
-          find.text('Time out for...'),
-          findsNothing,
-          reason:
-              'the badge carries the countdown and its own undo; a second '
-              'control would be two places to look for one fact',
-        );
-        expect(
-          find.text('MODERATION'),
-          findsNothing,
-          reason:
-              'KICK_MEMBERS alone offers only the now-suppressed chips row, '
-              'so the section has nothing left to introduce - a bare '
-              'header here was the bug shell.md and moderation.md both '
-              'found independently',
-        );
-      },
-    );
 
     testWidgets('is absent for a member who is not timed out', (tester) async {
       await tester.pumpWidget(

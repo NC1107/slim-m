@@ -56,8 +56,10 @@ import '../widgets/performance_settings_section.dart';
 import '../widgets/avatar_settings_section.dart';
 import '../widgets/personal_account_sections.dart';
 import '../widgets/personal_status_sections.dart';
+import '../widgets/profile_fields_section.dart';
 import '../widgets/report_status_section.dart';
 import '../widgets/settings_panes.dart';
+import '../widgets/settings_profile_preview.dart';
 import 'voice_settings_screen.dart';
 
 class PersonalSettingsScreen extends StatelessWidget {
@@ -80,7 +82,13 @@ class PersonalSettingsScreen extends StatelessWidget {
               label: 'Profile',
               icon: AppIcons.account,
               // No presence rows: the rail footer's own status menu already sets both the state and the status text.
-              builder: (context) => const AvatarSettingsSection(),
+              builder: (context) => const Column(
+                children: [
+                  AvatarSettingsSection(),
+                  ProfileFieldsSection(),
+                  SettingsProfilePreview(),
+                ],
+              ),
             ),
             SettingsPane(
               id: 'account-devices',

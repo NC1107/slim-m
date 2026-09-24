@@ -22,6 +22,8 @@ extension SlimmApiAuth on SlimmApi {
     required String password,
     required String deviceName,
     String? inviteCode,
+    String? clientKind,
+    String? clientVersion,
   }) async {
     final json = await _send(
       'POST',
@@ -33,6 +35,8 @@ extension SlimmApiAuth on SlimmApi {
         'password': password,
         'device_name': deviceName,
         if (inviteCode != null) 'invite_code': inviteCode,
+        if (clientKind != null) 'client_kind': clientKind,
+        if (clientVersion != null) 'client_version': clientVersion,
       },
     );
     final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
@@ -44,6 +48,8 @@ extension SlimmApiAuth on SlimmApi {
     required String username,
     required String password,
     required String deviceName,
+    String? clientKind,
+    String? clientVersion,
   }) async {
     final json = await _send(
       'POST',
@@ -53,6 +59,8 @@ extension SlimmApiAuth on SlimmApi {
         'username': username,
         'password': password,
         'device_name': deviceName,
+        if (clientKind != null) 'client_kind': clientKind,
+        if (clientVersion != null) 'client_version': clientVersion,
       },
     );
     final tokens = TokenPair.fromJson(json as Map<String, dynamic>);
