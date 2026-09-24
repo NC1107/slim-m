@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Bot provisioning, in call order: create, list, revoke.
-//!
-//! Order matters for the same reason it does in `read_state.rs`. `listBots`
-//! runs after `createBot` so its answer is a non-empty list, which is the only
-//! version of that response worth validating - an empty array would satisfy the
-//! schema while proving nothing about the fields. `revokeBot` runs last because
-//! it needs a bot to revoke.
-//!
-//! Runs near the end of the script, after the member-facing cases, because
-//! creating a bot adds a member and nothing earlier should have to account for
-//! it.
+//! Bot provisioning and command registration, in call order: create, list,
+//! register as the bot itself, read both ways, revoke - order matters since
+//! a revoked token can no longer call `setBotCommands`.
 
 use serde_json::json;
 
@@ -17,7 +9,7 @@ use crate::world::Contract;
 
 use super::text;
 
-pub(crate) async fn bot_calls(c: &mut Contract, root: &str) {
+pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     let created = c
         .json(
             "createBot",
@@ -30,6 +22,28 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str) {
     c.get("listBots", "/bots", root).await;
 
     let bot_id = text(&created["bot"], "user_id");
+    let bot_token = text(&created, "token");
+
+    c.json(
+        "setBotCommands",
+        "PUT",
+        "/bots/commands",
+        &bot_token,
+        json!({
+            "prefix": "!",
+            "commands": [{ "name": "ping", "description": "check if I'm alive" }]
+        }),
+    )
+    .await;
+    c.get("getBotCommands", &format!("/bots/{bot_id}/commands"), root)
+        .await;
+    c.get(
+        "listChannelBotCommands",
+        &format!("/channels/{channel}/bot-commands"),
+        root,
+    )
+    .await;
+
     c.bare("revokeBot", "POST", &format!("/bots/{bot_id}/revoke"), root)
         .await;
 }

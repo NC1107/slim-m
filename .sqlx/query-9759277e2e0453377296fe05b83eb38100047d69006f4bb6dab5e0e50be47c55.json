@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT prefix FROM bot_command_registrations WHERE bot_user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "prefix",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9759277e2e0453377296fe05b83eb38100047d69006f4bb6dab5e0e50be47c55"
+}

@@ -73,6 +73,41 @@ The `id` is yours, and it makes the send idempotent within the channel: retrying
 So a retry after a timeout is safe.
 Never vary the content between attempts under one id - the server replays what it first stored, whatever the retry carried.
 
+## Registering your commands
+
+Call this once you are connected, and again every time you reconnect:
+
+```
+PUT /bots/commands
+{
+  "prefix": "!",
+  "commands": [
+    { "name": "ping", "description": "check if I'm alive" },
+    { "name": "roll", "description": "roll dice", "usage": "<sides>" }
+  ]
+}
+```
+
+This is a **bulk overwrite**, not an add: whatever you send replaces your whole prior registration, prefix included.
+Send your complete set every time, even the commands that did not change - a command you leave out this time is gone, which is exactly what you want when you retire one.
+
+Registering does not make the server run anything.
+It only tells the composer what to offer: typing `/` lists your commands alongside everyone else's, and picking one inserts your own prefix and keyword - `!ping`, not `/ping` - as plain text.
+That message arrives at your bot exactly the way `!ping` always has, whether or not you ever call this route.
+**If you never register, your bot keeps working exactly as before** - this is additive, not a requirement.
+
+A command can name a `permission` - one bit from the same set `GET /channels/{channelId}/permissions` returns.
+**This only hides the row from someone who lacks it.** The server does not check it before your bot receives the message - anyone who can type in the channel can still send the raw text by hand.
+If a command should really be restricted, check the sender's own permissions yourself before acting, the same as you always have.
+
+Caps: at most 50 commands; a prefix is 1-16 characters with no whitespace, and cannot be `/`, `@` or `:` since the composer already uses those; a name is 1-32 characters of letters, digits, `-` and `_`, with no leading punctuation - the prefix supplies that; a description is 1-100 characters; `usage` is at most 80.
+A registration that breaks any of these is refused whole - nothing partially applies.
+
+Your commands disappear from discovery the moment your token is revoked or your bot is removed from the Space, with nothing else to do on your end.
+They keep showing while you are offline: a live token is what discovery checks, not a live connection, the same way you can still `@mention` someone who is not online.
+
+See `docs/decisions/0031-bot-command-registration.md` for the reasoning, including why this is advertisement rather than Discord's own interaction model.
+
 ## Answering yourself
 
 A bot that posts in a channel it also listens to will see its own message arrive as an event.

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO bot_command_registrations (bot_user_id, prefix, updated_at)\n             VALUES (?, ?, ?)\n             ON CONFLICT (bot_user_id) DO UPDATE SET prefix = excluded.prefix, updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "59ef261aa408a5d03740b8d577ea113705878524b8059ec9c6573d7cca47ed57"
+}

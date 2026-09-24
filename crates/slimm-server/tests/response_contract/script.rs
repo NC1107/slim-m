@@ -491,6 +491,6 @@ async fn farewell_calls(c: &mut Contract, root: &str, bob_id: &str, code: &str, 
     member_account::member_account_calls(c, root, code).await;
 
     recovery_calls(c, root, bob_id).await;
-    bot_calls(c, root).await;
+    bot_calls(c, root, channel).await;
     webhook_calls(c, channel).await;
 }

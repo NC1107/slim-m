@@ -21,6 +21,7 @@ mod analytics;
 mod apps;
 mod attachments;
 mod bootstrap;
+mod bot_commands;
 mod bots;
 mod calls;
 mod canvas;
@@ -95,6 +96,11 @@ pub use analytics::{
 pub use apps::{AppSurface, CreateAppSurfaceError};
 pub use attachments::{AttachmentSummary, LinkError, MAX_ATTACHMENTS_PER_MESSAGE};
 pub use bootstrap::Bootstrap;
+pub use bot_commands::{
+    BotCommand, BotCommandRegistration, MAX_BOT_COMMAND_DESCRIPTION_LEN, MAX_BOT_COMMAND_NAME_LEN,
+    MAX_BOT_COMMAND_USAGE_LEN, MAX_BOT_COMMANDS, MAX_BOT_PREFIX_LEN, RESERVED_BOT_PREFIXES,
+    SetBotCommandsError, VisibleBotCommand,
+};
 pub use bots::{BOT_TOKEN_PREFIX, Bot, CreateBotError, NewBot};
 pub use calls::CallRecord;
 pub use canvas::{
