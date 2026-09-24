@@ -2628,6 +2628,32 @@ paths:
         schema:
           type: string
           format: uuid
+    get:
+      operationId: getMessage
+      tags: [messages]
+      summary: Fetch one message.
+      description: >-
+        The same enriched shape `listMessages` returns for a page - embeds,
+        attachments, reactions, thread info - just over a single id, for a
+        caller that only saw a reaction or a reply for a message it never
+        cached. Authorized like listing this channel, but answers 404 rather
+        than 403 when the caller cannot view it: naming one specific id makes
+        a 403 an existence oracle in a way a page listing never is, so
+        `no such channel`, `not permitted here` and `no such message` all
+        answer identically.
+      responses:
+        "200":
+          description: The message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     patch:
       operationId: editMessage
       tags: [messages]

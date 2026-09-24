@@ -15,7 +15,7 @@ use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::{get, patch};
+use axum::routing::get;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -25,6 +25,7 @@ use super::channel_slow_mode::enforce_slow_mode;
 use super::embeds;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
+use super::message_get::get_message;
 use super::message_history::history;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
@@ -48,7 +49,7 @@ pub fn routes() -> Router<AppState> {
         .route("/channels/{channel_id}/messages", get(list).post(send))
         .route(
             "/channels/{channel_id}/messages/{message_id}",
-            patch(edit).delete(delete),
+            get(get_message).patch(edit).delete(delete),
         )
         .route(
             "/channels/{channel_id}/messages/{message_id}/history",

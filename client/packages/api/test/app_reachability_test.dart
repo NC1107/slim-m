@@ -56,6 +56,12 @@ const Map<String, String> _allowlist = {
       'the batch route now, even for one changed column, so this binding has '
       'no in-app caller. The server route stays for any caller that wants to '
       'set exactly one overwrite without touching the rest',
+  'getMessage': 'message_jump.dart\'s jumpTo pages channel_history.dart '
+      'backwards and only ever renders a message once it lands in the local '
+      'drift store, so a cold single-message fetch has nowhere to be shown '
+      'yet - the transcript has no path for a row outside its loaded, '
+      'seq-paged window. Wiring this in is a real change to that mechanism, '
+      'not a caller swap, so it is tracked as its own follow-up (2026-09-24)',
 };
 
 /// Names that are not API surface, so their absence proves nothing.
