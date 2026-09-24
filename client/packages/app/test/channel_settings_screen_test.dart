@@ -17,6 +17,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/screens/admin/channel_permissions_grid.dart';
 import 'package:slimm_app/src/screens/channel_settings_screen.dart';
 import 'package:slimm_data/data.dart' show Channel, MessageStore, SlimmDatabase;
 import 'package:slimm_design_system/design_system.dart';
@@ -79,6 +80,14 @@ Widget _harness(int permissions) => UncontrolledProviderScope(
                 headers: {'content-type': 'application/json'},
               );
             }
+            if (request.url.path == '/roles' ||
+                request.url.path == '/members') {
+              return http.Response(
+                jsonEncode(const <Object>[]),
+                200,
+                headers: {'content-type': 'application/json'},
+              );
+            }
             return http.Response('{}', 200);
           }),
         );
@@ -100,11 +109,6 @@ Widget _harness(int permissions) => UncontrolledProviderScope(
   ),
 );
 
-/// A phrase from `ChannelOverwritesPane`'s own always-shown callout, unique
-/// to the permissions section, used as this suite's marker for "the
-/// permissions pane rendered" without depending on its internal structure.
-const _permissionsMarker = 'Picking a target pre-fills what it already has set';
-
 void main() {
   testWidgets(
     'MANAGE_CHANNELS alone shows General and Danger zone, not permissions',
@@ -115,7 +119,7 @@ void main() {
       expect(find.text('General'), findsOneWidget);
       expect(find.text('Danger zone'), findsOneWidget);
       expect(find.text('Delete channel'), findsOneWidget);
-      expect(find.textContaining(_permissionsMarker), findsNothing);
+      expect(find.byType(ChannelPermissionsGrid), findsNothing);
     },
   );
 
@@ -127,7 +131,7 @@ void main() {
 
       expect(find.text('General'), findsNothing);
       expect(find.text('Danger zone'), findsNothing);
-      expect(find.textContaining(_permissionsMarker), findsOneWidget);
+      expect(find.byType(ChannelPermissionsGrid), findsOneWidget);
     },
   );
 
@@ -137,7 +141,7 @@ void main() {
 
     expect(find.text('General'), findsOneWidget);
     expect(find.text('Danger zone'), findsOneWidget);
-    expect(find.textContaining(_permissionsMarker), findsOneWidget);
+    expect(find.byType(ChannelPermissionsGrid), findsOneWidget);
   });
 
   testWidgets('neither bit shows a stated reason, not an empty screen', (
@@ -148,7 +152,7 @@ void main() {
 
     expect(find.text('General'), findsNothing);
     expect(find.text('Danger zone'), findsNothing);
-    expect(find.textContaining(_permissionsMarker), findsNothing);
+    expect(find.byType(ChannelPermissionsGrid), findsNothing);
     expect(find.textContaining("this channel's settings"), findsOneWidget);
   });
 

@@ -31,7 +31,7 @@ import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
 import '../screens/admin/categories_screen.dart';
-import '../screens/admin/channel_overwrites_screen.dart';
+import '../screens/admin/channel_permissions_screen.dart';
 import '../screens/admin/dock_screen.dart';
 import '../screens/admin/emoji_screen.dart';
 import '../screens/admin/invites_screen.dart';
@@ -146,7 +146,7 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             label: 'Channel permissions',
             icon: AppIcons.permissions,
             compactRoute: Routes.adminOverwrites,
-            builder: (_) => const ChannelOverwritesPane(),
+            builder: (_) => const ChannelPermissionsPane(),
           ),
         if (canManageChannels)
           SettingsPane(

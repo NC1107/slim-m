@@ -37,7 +37,7 @@ import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/screens/admin/categories_screen.dart';
-import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
+import 'package:slimm_app/src/screens/admin/channel_permissions_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/screens/admin/performance_screen.dart';
@@ -258,7 +258,7 @@ GoRouter fixtureRouter(String location) => GoRouter(
     GoRoute(
       path: '/settings/permissions',
       pageBuilder: (context, state) =>
-          modalPage(context, const ChannelOverwritesScreen()),
+          modalPage(context, const ChannelPermissionsScreen()),
     ),
     GoRoute(
       path: '/settings/emoji',

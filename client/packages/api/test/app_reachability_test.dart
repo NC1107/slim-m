@@ -51,13 +51,11 @@ const Map<String, String> _allowlist = {
       '"delete this author\'s recent messages" as a single action yet. Same '
       'shape bulkDeleteMessages itself carried in this allowlist until MOD13 '
       'built the multi-select that finally called it',
-  'reorderRoles': 'the roles screen redesign that drags to reorder is a '
-      'separate, client-only PR landing right after this one; until it '
-      'merges this binding has no caller. Remove this entry along with that '
-      'PR, which adds the real one',
-  'batchSetChannelOverwrites': 'same as reorderRoles above: the permissions '
-      'grid that saves through this route is the client-only follow-up PR. '
-      'Remove this entry once it merges',
+  'setChannelOverwrite': 'the single-target sibling of '
+      'batchSetChannelOverwrites: the permissions grid always saves through '
+      'the batch route now, even for one changed column, so this binding has '
+      'no in-app caller. The server route stays for any caller that wants to '
+      'set exactly one overwrite without touching the rest',
 };
 
 /// Names that are not API surface, so their absence proves nothing.

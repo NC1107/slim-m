@@ -89,7 +89,10 @@ class AppBadge extends StatelessWidget {
           Icon(icon, size: AppSizes.icon16, color: foreground),
           const SizedBox(width: AppSpacing.s4),
         ],
-        Text(text, style: textStyle),
+        // Flexible, not a bare Text: a caller squeezing this beside other content down to a sliver (a permission row's label column, sharing space with a "you can't grant this" hint) must not overflow.
+        Flexible(
+          child: Text(text, style: textStyle, overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
 

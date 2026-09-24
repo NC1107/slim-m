@@ -22,7 +22,7 @@ import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_roster.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
-import 'package:slimm_app/src/screens/admin/channel_overwrites_screen.dart';
+import 'package:slimm_app/src/screens/admin/channel_permissions_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/screens/admin/reports_screen.dart';
@@ -332,9 +332,14 @@ void main() {
   testWidgets('the roles list is inset even when it is empty', (tester) async {
     await _pump(tester, const RolesScreen());
 
-    // Roles now shares the invites/emoji screens' default scrollable frame,
-    // so it is the outer ListView reporting the inset, empty list or not.
-    _expectClearOfIndicator(tester, find.byType(ListView), 'the roles list');
+    // The pane is `scrollable: false` and its empty state is not centred
+    // (`center: false`), so the bottom-most content is the empty message
+    // itself, not an outer ListView or Center.
+    _expectClearOfIndicator(
+      tester,
+      find.text('No roles yet. Create one with the + above.'),
+      'the roles empty state',
+    );
   });
 
   testWidgets('the reports body is inset even when the queue is empty', (
@@ -362,13 +367,16 @@ void main() {
     _expectClearOfIndicator(tester, find.byType(ListView), 'the emoji list');
   });
 
-  testWidgets('the channel overwrites list is inset', (tester) async {
-    await _pump(tester, const ChannelOverwritesScreen());
+  testWidgets('the channel permissions picker is inset', (tester) async {
+    await _pump(tester, const ChannelPermissionsScreen());
 
+    // No channel chosen yet: the pane is a plain "Choose a channel" row, not
+    // a ListView - `ChannelPermissionsPane` is `scrollable: false` and the
+    // grid itself only mounts once a channel is picked.
     _expectClearOfIndicator(
       tester,
-      find.byType(ListView),
-      'the overwrites form',
+      find.byType(AppListRow),
+      'the channel picker',
     );
   });
 
