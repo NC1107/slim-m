@@ -410,15 +410,6 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
                 run((container) => blockMember(host, container, profile)),
           ),
       ],
-
-      if (actionError != null)
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.s8),
-          child: AppErrorState(
-            message: actionError!,
-            onDismiss: clearActionError,
-          ),
-        ),
     ];
 
     final content = _moderating
@@ -465,6 +456,15 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         },
         child: content,
       ),
+      // Below the pushed view, not inside it: a Moderate refusal must show without switching views.
+      if (actionError != null)
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.s8),
+          child: AppErrorState(
+            message: actionError!,
+            onDismiss: clearActionError,
+          ),
+        ),
     ];
 
     if (widget.compact) {

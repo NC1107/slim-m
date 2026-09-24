@@ -107,7 +107,10 @@ class _RoleChip extends StatelessWidget {
         widthFactor: 1,
         child: Text(
           label,
-          style: AppText.code.copyWith(color: tokens.textSecondary, fontSize: 10),
+          style: AppText.code.copyWith(
+            color: tokens.textSecondary,
+            fontSize: 10,
+          ),
         ),
       ),
     );
