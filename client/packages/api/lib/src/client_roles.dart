@@ -75,6 +75,22 @@ extension SlimmApiRoles on SlimmApi {
   Future<void> unassignRole({required String userId, required String roleId}) =>
       _send('DELETE', '/members/$userId/roles/$roleId', expectNoContent: true);
 
+  /// Sets the deployment's role order. Requires MANAGE_ROLES. [roleIds] must
+  /// name exactly the live non-`@everyone` roles, top to bottom; `@everyone`
+  /// never reorders. Refused unless every role that would actually move sits
+  /// below the caller's own highest held role - an administrator bypasses
+  /// this.
+  Future<List<Role>> reorderRoles(List<String> roleIds) async {
+    final json = await _send(
+      'PATCH',
+      '/roles/reorder',
+      body: {'role_ids': roleIds},
+    );
+    return (json as List<dynamic>)
+        .map((r) => Role.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   /// Sets (or replaces) a channel permission overwrite for a role or member.
   /// Requires MANAGE_ROLES in this channel specifically. [allow] must be a
   /// subset of the caller's own effective permissions in this channel;
@@ -116,6 +132,36 @@ extension SlimmApiRoles on SlimmApi {
     String channelId,
   ) async {
     final json = await _send('GET', '/channels/$channelId/overwrites');
+    return ((json as Map<String, dynamic>)['overwrites'] as List<dynamic>)
+        .map((o) => ChannelOverwrite.fromJson(o as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Applies several targets' overwrites in one request, atomically: the
+  /// permissions grid's save, batching a pending set of cell changes across
+  /// every column rather than one [setChannelOverwrite] call per column.
+  /// Same checks as [setChannelOverwrite], run per entry before any of them
+  /// land - one entry failing refuses the whole batch. Requires MANAGE_ROLES
+  /// in this channel.
+  Future<List<ChannelOverwrite>> batchSetChannelOverwrites({
+    required String channelId,
+    required List<ChannelOverwriteEdit> overwrites,
+  }) async {
+    final json = await _send(
+      'PUT',
+      '/channels/$channelId/overwrites',
+      body: {
+        'overwrites': [
+          for (final edit in overwrites)
+            {
+              'kind': edit.kind.wire,
+              'id': edit.id,
+              'allow': edit.allow,
+              'deny': edit.deny,
+            },
+        ],
+      },
+    );
     return ((json as Map<String, dynamic>)['overwrites'] as List<dynamic>)
         .map((o) => ChannelOverwrite.fromJson(o as Map<String, dynamic>))
         .toList(growable: false);

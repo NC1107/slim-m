@@ -16,6 +16,8 @@ class Role {
     this.mentionable = false,
     required this.createdAt,
     this.managedBotId,
+    this.position = 0,
+    this.memberCount = 0,
   });
 
   final String id;
@@ -41,6 +43,14 @@ class Role {
   /// freely editable role otherwise. See `docs/decisions/0028-bot-accounts.md`.
   final String? managedBotId;
 
+  /// Hierarchy order: higher sorts first, matching the order `listRoles`
+  /// already returns them in. `@everyone` always sorts last.
+  final int position;
+
+  /// How many members currently hold this role; `@everyone`'s counts the
+  /// whole deployment.
+  final int memberCount;
+
   /// Whether to show the "Bot" badge.
   bool get isManagedByBot => managedBotId != null;
 
@@ -52,6 +62,8 @@ class Role {
         mentionable: json['mentionable'] as bool? ?? false,
         createdAt: json['created_at'] as int,
         managedBotId: json['managed_bot_id'] as String?,
+        position: json['position'] as int? ?? 0,
+        memberCount: json['member_count'] as int? ?? 0,
       );
 }
 
@@ -101,6 +113,23 @@ class ChannelOverwrite {
         allow: json['allow'] as int,
         deny: json['deny'] as int,
       );
+}
+
+/// One target's full allow/deny replacement, as
+/// [SlimmApiRoles.batchSetChannelOverwrites] sends it - the write-side
+/// mirror of [ChannelOverwrite], which is read-only.
+class ChannelOverwriteEdit {
+  const ChannelOverwriteEdit({
+    required this.kind,
+    required this.id,
+    this.allow = 0,
+    this.deny = 0,
+  });
+
+  final OverwriteTarget kind;
+  final String id;
+  final int allow;
+  final int deny;
 }
 
 /// A grantable module-scoped permission, registered by the Dock's install
