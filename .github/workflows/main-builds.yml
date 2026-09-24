@@ -49,8 +49,10 @@ on:
       - ".github/workflows/main-builds.yml"
       # A spec fix must be able to trigger the job that builds the rpm it fixes.
       - "packaging/**"
+      # A client release PR's own bump files, or release.yml and this would each ship a TestFlight build.
       - "!client/CHANGELOG.md"
       - "!client/pubspec.yaml"
+      - "!client/packages/app/pubspec.yaml"
   # By hand, for the one thing a push cannot recover from: a run cancelled by a
   # later push, where that later push changed nothing this side builds. See
   # docs/ci.md's concurrency section for the day that happened.
@@ -325,9 +327,10 @@ jobs:
           if-no-files-found: error
 
   # Signed ipa straight to TestFlight; inert without its six secrets, the same gate release.yml uses.
+  # CONTINUOUS_TESTFLIGHT=false leaves iOS to release.yml alone; a hand-run dispatch still builds.
   ios-testflight:
     needs: [changes]
-    if: needs.changes.outputs.client == 'true'
+    if: needs.changes.outputs.client == 'true' && (github.event_name == 'workflow_dispatch' || vars.CONTINUOUS_TESTFLIGHT != 'false')
     runs-on: macos-latest
     permissions:
       contents: read
