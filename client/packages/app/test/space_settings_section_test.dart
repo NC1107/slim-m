@@ -116,7 +116,6 @@ void main() {
       'Invites',
       'Roles',
       'Channel permissions',
-      'Channel categories',
       'Emoji',
       'Performance',
       'Analytics',
@@ -158,11 +157,7 @@ void main() {
       }
       expect(find.text('CONFIGURATION'), findsOneWidget);
       expect(find.text('Emoji'), findsWidgets);
-      for (final label in [
-        'Roles',
-        'Channel permissions',
-        'Channel categories',
-      ]) {
+      for (final label in ['Roles', 'Channel permissions']) {
         expect(
           find.text(label),
           findsNothing,
@@ -211,7 +206,7 @@ void main() {
     expect(
       find.text('CONFIGURATION'),
       findsNothing,
-      reason: 'Roles, permissions, categories and emoji are all hidden',
+      reason: 'Roles, permissions and emoji are all hidden',
     );
   });
 
