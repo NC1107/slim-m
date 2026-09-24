@@ -15,7 +15,6 @@ import '../providers/threads.dart';
 import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
-import '../screens/admin/categories_screen.dart';
 
 import 'package:slimm_data/data.dart' show Channel;
 
@@ -186,11 +185,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           context,
           ChannelSettingsScreen(args: state.extra as ChannelSettingsRouteArgs?),
         ),
-      ),
-      GoRoute(
-        path: Routes.adminCategories,
-        pageBuilder: (context, state) =>
-            modalPage(context, const CategoriesScreen()),
       ),
       GoRoute(
         path: Routes.adminEmoji,

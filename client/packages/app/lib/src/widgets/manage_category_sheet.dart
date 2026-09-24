@@ -17,6 +17,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
+import '../providers/channel_order_controller.dart';
 import '../providers/providers.dart';
 import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
@@ -76,6 +77,38 @@ Future<void> confirmAndDeleteCategory(
     action: () => deleteCategoryAndForget(ref, category),
   );
   if (failure != null && context.mounted) showAppSnackbar(context, failure);
+}
+
+/// Swaps [category] with its neighbour [delta] steps away (-1 up, 1 down) in
+/// [ordered], the rail header menu's own reorder path. Not a drag: a category
+/// header dragged through the rail's flat, single-list channel rows would
+/// risk silently reassigning the channels it passed over on the way, since
+/// that list attributes every channel to whichever header precedes it. A
+/// menu step can only ever mean "these two categories, swapped."
+///
+/// Reports a failure the same way [confirmAndDeleteCategory] does: the menu
+/// has already closed by the time the request answers, so a snackbar carries
+/// it rather than an inline [AppErrorState] with nowhere left to sit.
+Future<void> moveCategoryAndReport(
+  BuildContext context,
+  WidgetRef ref,
+  List<ChannelCategoryRow> ordered,
+  ChannelCategoryRow category,
+  int delta,
+) async {
+  final index = ordered.indexWhere((c) => c.id == category.id);
+  final target = index + delta;
+  if (index < 0 || target < 0 || target >= ordered.length) return;
+
+  final ids = [for (final c in ordered) c.id];
+  ids.insert(target, ids.removeAt(index));
+  final controller = ref.read(categoryOrderControllerProvider.notifier);
+  await controller.reorder(ids);
+
+  final error = ref.read(categoryOrderControllerProvider).error;
+  if (error == null) return;
+  controller.dismiss();
+  if (context.mounted) showAppSnackbar(context, error);
 }
 
 /// The server's own ceiling (`CATEGORY_NAME_MAX_CHARS` in

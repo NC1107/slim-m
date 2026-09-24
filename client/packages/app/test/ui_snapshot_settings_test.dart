@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The four admin screens `ui_snapshot_test.dart`'s own `_surfaces` map never
-/// carried at all (`admin-categories`, `admin-analytics`,
-/// `admin-removed-members`, `debug-log`), plus the permission-gated shapes
+/// The admin screens `ui_snapshot_test.dart`'s own `_surfaces` map never
+/// carried at all (`admin-analytics`, `admin-removed-members`, `debug-log`),
+/// plus the permission-gated shapes
 /// of `SpaceSettingsSection` nothing renders for a caller holding fewer than
 /// every bit.
 ///
@@ -33,11 +33,6 @@ import 'ui_snapshot_support.dart';
 /// from the surfaces harness entirely before this file. Each renders the
 /// fixture's default answer for its own reads.
 const _surfaces = <String, ({String route, List<String> viewports})>{
-  // Reads drift directly, seeded by fixtureContainer: no HTTP wiring needed.
-  'admin-categories': (
-    route: '/settings/categories',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
   // No entries yet this session is the honest default for a fresh render.
   'debug-log': (
     route: '/settings/debug-log',

@@ -106,10 +106,6 @@ const snapshotSurfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/emoji',
     viewports: [...phoneAndDesktop, ...compactBracket],
   ),
-  'admin-categories': (
-    route: '/settings/categories',
-    viewports: [...phoneAndDesktop, ...compactBracket],
-  ),
   'admin-removed-members': (
     route: '/settings/removed-members',
     viewports: [...phoneAndDesktop, ...compactBracket],

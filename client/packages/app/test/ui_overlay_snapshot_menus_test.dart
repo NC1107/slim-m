@@ -218,10 +218,6 @@ Future<void> _pumpSpaceMenu(WidgetTester tester, Size window) async {
         path: Routes.spaceSettings,
         builder: (context, state) => const Scaffold(),
       ),
-      GoRoute(
-        path: Routes.adminCategories,
-        builder: (context, state) => const Scaffold(),
-      ),
     ],
   );
   await tester.pumpWidget(

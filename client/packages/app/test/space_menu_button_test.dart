@@ -90,11 +90,6 @@ GoRouter _router() => GoRouter(
           const Scaffold(body: Text('space-settings-screen')),
     ),
     GoRoute(
-      path: Routes.adminCategories,
-      builder: (context, state) =>
-          const Scaffold(body: Text('categories-screen')),
-    ),
-    GoRoute(
       path: Routes.channelPattern,
       builder: (context, state) =>
           Scaffold(body: Text('channel:${state.pathParameters['channelId']}')),
@@ -191,16 +186,43 @@ void main() {
     expect(find.text('channel:new-1'), findsOneWidget);
   });
 
-  testWidgets('Add category reaches the categories screen', (tester) async {
-    final container = _setup(Perm.manageChannels);
-    addTearDown(container.dispose);
-    await _pump(tester, container);
+  testWidgets(
+    'Add category opens the create sheet directly, which posts the name',
+    (tester) async {
+      final requests = <http.Request>[];
+      final container = _setup(
+        Perm.manageChannels,
+        handler: (request) {
+          requests.add(request);
+          return http.Response(
+            jsonEncode({
+              'id': 'cat-1',
+              'name': 'dev',
+              'position': 0,
+              'created_at': 1,
+            }),
+            200,
+          );
+        },
+      );
+      addTearDown(container.dispose);
+      await _pump(tester, container);
 
-    await tester.tap(find.bySemanticsLabel('Space menu'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add category'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Space menu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add category'));
+      await tester.pumpAndSettle();
+      expect(find.text('Create a category'), findsOneWidget);
 
-    expect(find.text('categories-screen'), findsOneWidget);
-  });
+      await tester.enterText(find.byType(TextField).first, 'dev');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(AppButton, 'Create category'));
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1));
+      expect(requests.single.method, 'POST');
+      expect(requests.single.url.path, '/categories');
+      expect(jsonDecode(requests.single.body), {'name': 'dev'});
+    },
+  );
 }
