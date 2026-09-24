@@ -48,6 +48,7 @@ mod channels;
 mod code_runs;
 mod dms;
 pub mod dock;
+mod embeds;
 mod emoji;
 mod error;
 mod escalation;

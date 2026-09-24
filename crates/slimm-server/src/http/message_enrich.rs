@@ -11,6 +11,7 @@
 //! for that same reason.
 
 use super::AppState;
+use super::embeds;
 use super::message_dto::{CallDto, CodeRunDto};
 use super::messages::{AttachmentDto, MessageDto, ReactionDto};
 use crate::ids::{ChannelId, MessageId, UserId};
@@ -33,6 +34,7 @@ pub(crate) async fn with_reactions(
     let mut forwards_by_message = super::message_forwards::for_messages(state, &ids).await?;
     let mut code_runs_by_message = state.store.code_runs_for_messages(&ids).await?;
     let mut calls_by_message = state.store.calls_for_messages(&ids).await?;
+    let mut embeds_by_message = state.store.embeds_for_messages(&ids).await?;
     let mentioned = state.store.mentioned_messages_for(viewer, &ids).await?;
     // One more batched query; empty when no message on this page has a thread, which is the common case.
     let thread_channel_ids: Vec<ChannelId> = threads_by_message
@@ -100,6 +102,20 @@ pub(crate) async fn with_reactions(
         }
         dto.forwarded = forwards_by_message.remove(&id);
         dto.mentions_me = mentioned.contains(&id);
+        if let Some(pos) = embeds_by_message.iter().position(|(mid, _)| *mid == id) {
+            let (_, stored) = embeds_by_message.swap_remove(pos);
+            dto.embeds = stored
+                .into_iter()
+                .map(|embed| {
+                    let (image_url, thumbnail_url) = embeds::image_urls(&embed);
+                    let image_token =
+                        image_url.and_then(|url| state.link_previews.embed_image_token(url));
+                    let thumbnail_token =
+                        thumbnail_url.and_then(|url| state.link_previews.embed_image_token(url));
+                    embeds::to_dto(embed, image_token, thumbnail_token)
+                })
+                .collect();
+        }
         dtos.push(dto);
     }
     // Paired positionally: the loop above pushes one `dtos` entry per `ids` entry.

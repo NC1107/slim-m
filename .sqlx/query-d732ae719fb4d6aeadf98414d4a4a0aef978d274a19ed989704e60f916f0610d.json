@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO message_embeds\n                    (message_id, position, title, description, url, color,\n                     author_name, author_url, footer_text, embed_timestamp,\n                     image_url, thumbnail_url)\n                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "d732ae719fb4d6aeadf98414d4a4a0aef978d274a19ed989704e60f916f0610d"
+}

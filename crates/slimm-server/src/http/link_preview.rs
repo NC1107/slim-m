@@ -117,6 +117,14 @@ impl LinkPreviews {
             .as_deref()
             .ok_or(ApiError::NotConfigured("link previews are not enabled"))
     }
+
+    /// Resolves an embed image URL to a redeemable token, reusing the
+    /// existing preview guard and cache - see decision 0030.
+    pub(crate) fn embed_image_token(&self, url: &str) -> Option<String> {
+        let service = self.inner.as_deref()?;
+        validate(url, service.allow_private).ok()?;
+        Some(service.cache.image_token_for(url))
+    }
 }
 
 #[derive(Deserialize)]

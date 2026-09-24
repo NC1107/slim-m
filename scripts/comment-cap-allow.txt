@@ -165,6 +165,7 @@ crates/slimm-server/src/http/auth.rs 7
 crates/slimm-server/src/http/canvas.rs 4
 crates/slimm-server/src/http/channels.rs 2
 crates/slimm-server/src/http/dms.rs 1
+crates/slimm-server/src/http/embeds.rs 1 # #[derive(...)] directly above #[serde(rename_all = ...)] on EmbedAccent reads as a 2-line # comment run, the same false positive push/envelope.rs is already allowlisted for
 crates/slimm-server/src/http/error.rs 1
 crates/slimm-server/src/http/invites.rs 1
 crates/slimm-server/src/http/messages.rs 8

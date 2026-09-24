@@ -165,6 +165,19 @@ Embed images are caller-supplied URLs and get 0019's treatment exactly, with no 
 An image the guard refuses is **dropped, and the rest of the embed still posts.**
 This matters more than it sounds: a Grafana panel snapshot commonly sits on an internal host, so the guard refusing it is the expected case, and failing the whole delivery over it would mean the alert text never arrives either.
 
+### An embed's colour becomes a closed accent, never a raw fill
+
+Discord's embed takes an arbitrary 24-bit colour and paints it as a solid left border.
+slim-m's design system keeps its one accent hue closed to seven unrelated chrome roles (decision 0004) and has no general mechanism for an arbitrary caller-supplied colour to reach a themed surface without risking contrast failure in one theme or the other.
+
+The server reduces a caller's colour to one of six named buckets (red, orange, yellow, green, blue, purple) by hue, dropping it to no accent when the input is absent, out of range, or too close to grey, black or white to read as a colour at all.
+The wire carries only the bucket name, never the raw integer, so the client cannot reintroduce an arbitrary fill even if it wanted to.
+Each bucket maps to one pre-tuned swatch (`AppEmbedAccents`), painted only as a border stripe and a soft tint - never as text - so no caller input can land on a contrast failure regardless of theme.
+This is a second, separate closed palette from the seven accent roles, the same closed-role treatment the canvas's own note/shape colours already get: it exists so a caller can tell one embed's kind from another at a glance, not to extend the chrome accent's own meaning.
+
+**Rejected: passing the raw hex to the client and letting it render a fill.**
+The client has no way to know whether an arbitrary caller colour is legible against either theme's card surface, and a webhook author has no reason to test against slim-m's own themes.
+
 ## Threat model
 
 A webhook URL is a bearer credential, in plaintext, that posts into a channel, held in somebody else's configuration file.

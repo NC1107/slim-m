@@ -8,6 +8,7 @@
 use serde::Serialize;
 
 use super::apps::AppSurfaceDto;
+use super::embeds::EmbedDto;
 use super::message_forwards::ForwardedDto;
 use super::polls::PollDto;
 use crate::store::{AttachmentSummary, CallRecord as StoreCallRecord, Message, MessageRevision};
@@ -123,6 +124,10 @@ pub(crate) struct MessageDto {
     /// frames. Always `false` on a caller's own send or edit response: the
     /// resolver that fills this in never mentions its own author.
     pub(crate) mentions_me: bool,
+    /// Structured content attached by a webhook or a bot; see decision 0030.
+    /// Fixed once a message exists, like `attachments`.
+    #[serde(default)]
+    pub(crate) embeds: Vec<EmbedDto>,
 }
 
 /// One attachment as it appears on a message.
@@ -194,10 +199,23 @@ pub(crate) struct CodeRunDto {
 
 impl MessageDto {
     /// Roughly what this row costs a `/sync` response, for the shared byte
-    /// budget. The body dominates; the fixed addend stands in for the ids and
-    /// timestamps around it rather than pretending to be exact.
+    /// budget - content plus every embed's own text.
     pub(super) fn wire_cost(&self) -> usize {
-        self.content.len() + 128
+        let embeds: usize = self
+            .embeds
+            .iter()
+            .map(|e| {
+                e.title.as_deref().map_or(0, str::len)
+                    + e.description.as_deref().map_or(0, str::len)
+                    + e.author_name.as_deref().map_or(0, str::len)
+                    + e.footer_text.as_deref().map_or(0, str::len)
+                    + e.fields
+                        .iter()
+                        .map(|f| f.name.len() + f.value.len())
+                        .sum::<usize>()
+            })
+            .sum();
+        self.content.len() + embeds + 128
     }
 }
 
@@ -225,6 +243,7 @@ impl From<Message> for MessageDto {
             attachments: Vec::new(),
             code_runs: Vec::new(),
             mentions_me: false,
+            embeds: Vec::new(),
         }
     }
 }
