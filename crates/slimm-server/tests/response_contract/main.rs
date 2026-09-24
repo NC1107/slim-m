@@ -87,6 +87,14 @@ const UNCOVERED: &[(&str, &str)] = &[
          tests/metrics.rs, which stands up a real (and a deliberately closed) HTTP \
          listener instead.",
     ),
+    (
+        "receiveLiveKitWebhook",
+        "authenticated by a signed JWT this fixture's script has no LiveKit key pair to \
+         mint, never a session - see docs/decisions/0032-voice-participant-webhooks.md. \
+         Its 204/403/501 shapes, the real signature verification, and the fan-out it \
+         triggers are covered end to end by tests/live_voice_participant_events.rs and \
+         tests/live_voice_screen_share_events.rs against the real handler.",
+    ),
 ];
 
 #[tokio::test]

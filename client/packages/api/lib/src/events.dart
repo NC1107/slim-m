@@ -36,8 +36,9 @@ sealed class ServerEvent {
     final message = decoded['message'];
     return switch (decoded['type']) {
       'hello' => HelloEvent(protocol: decoded['protocol'] as int? ?? 0),
-      'message.created' when message is Map<String, dynamic> =>
-        MessageCreated(Message.fromJson(message)),
+      'message.created' when message is Map<String, dynamic> => MessageCreated(
+          Message.fromJson(message),
+        ),
       'message.edited' when message is Map<String, dynamic> => MessageEdited(
           Message.fromJson(message),
           opSeq: decoded['op_seq'] as int?,
@@ -131,12 +132,15 @@ sealed class ServerEvent {
           // Absent and null both mean "no timeout", which is what a lift sends.
           until: decoded['until'] as int?,
         ),
-      'member.removed' when decoded['user_id'] is String =>
-        MemberRemoved(userId: decoded['user_id'] as String),
-      'member.restored' when decoded['user_id'] is String =>
-        MemberRestored(userId: decoded['user_id'] as String),
-      'profile.changed' when decoded['user_id'] is String =>
-        ProfileChanged(userId: decoded['user_id'] as String),
+      'member.removed' when decoded['user_id'] is String => MemberRemoved(
+          userId: decoded['user_id'] as String,
+        ),
+      'member.restored' when decoded['user_id'] is String => MemberRestored(
+          userId: decoded['user_id'] as String,
+        ),
+      'profile.changed' when decoded['user_id'] is String => ProfileChanged(
+          userId: decoded['user_id'] as String,
+        ),
       'typing.started'
           when decoded['channel_id'] is String &&
               decoded['user_id'] is String =>
@@ -151,8 +155,9 @@ sealed class ServerEvent {
           channelId: decoded['channel_id'] as String,
           userId: decoded['user_id'] as String,
         ),
-      'role.changed' when decoded['role_id'] is String =>
-        RoleChanged(roleId: decoded['role_id'] as String),
+      'role.changed' when decoded['role_id'] is String => RoleChanged(
+          roleId: decoded['role_id'] as String,
+        ),
       'member.role_changed'
           when decoded['user_id'] is String && decoded['role_id'] is String =>
         MemberRoleChanged(
@@ -167,13 +172,37 @@ sealed class ServerEvent {
         ChannelUpdated(
           Channel.fromJson(decoded['channel'] as Map<String, dynamic>),
         ),
-      'channel.deleted' when decoded['channel_id'] is String =>
-        ChannelDeleted(channelId: decoded['channel_id'] as String),
+      'channel.deleted' when decoded['channel_id'] is String => ChannelDeleted(
+          channelId: decoded['channel_id'] as String,
+        ),
       'overwrite.changed' when decoded['channel_id'] is String =>
         OverwriteChanged(channelId: decoded['channel_id'] as String),
       'category.changed' => const CategoryChanged(),
       'voice.activity' when decoded['channel_id'] is String =>
         VoiceActivityChanged(channelId: decoded['channel_id'] as String),
+      'voice.participant_joined'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String =>
+        VoiceParticipantJoined(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+        ),
+      'voice.participant_left'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String =>
+        VoiceParticipantLeft(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+        ),
+      'voice.screen_share_changed'
+          when decoded['channel_id'] is String &&
+              decoded['user_id'] is String &&
+              decoded['is_sharing_screen'] is bool =>
+        VoiceScreenShareChanged(
+          channelId: decoded['channel_id'] as String,
+          userId: decoded['user_id'] as String,
+          isSharingScreen: decoded['is_sharing_screen'] as bool,
+        ),
       'call.ringing'
           when decoded['channel_id'] is String &&
               decoded['ring_id'] is String &&
@@ -407,8 +436,11 @@ class EventConnection {
     await channel.ready.timeout(timeout);
 
     final events = channel.stream
-        .map((raw) => ServerEvent.parse(
-            raw is String ? raw : utf8.decode(raw as List<int>)))
+        .map(
+          (raw) => ServerEvent.parse(
+            raw is String ? raw : utf8.decode(raw as List<int>),
+          ),
+        )
         .where((event) => event != null)
         .cast<ServerEvent>()
         .asBroadcastStream();
@@ -417,8 +449,11 @@ class EventConnection {
     // half-open connection.
     final handshake = events.first.timeout(timeout);
     channel.sink.add(
-      jsonEncode(
-          {'type': 'hello', 'ticket': ticket, 'protocol': protocolVersion}),
+      jsonEncode({
+        'type': 'hello',
+        'ticket': ticket,
+        'protocol': protocolVersion,
+      }),
     );
 
     final ServerEvent first;
@@ -427,7 +462,8 @@ class EventConnection {
     } on TimeoutException {
       await channel.sink.close();
       throw const EventConnectionRefused(
-          'the server did not answer the handshake');
+        'the server did not answer the handshake',
+      );
     }
 
     switch (first) {
@@ -444,7 +480,8 @@ class EventConnection {
       default:
         await channel.sink.close();
         throw const EventConnectionRefused(
-            'the server did not open with a hello');
+          'the server did not open with a hello',
+        );
     }
   }
 
@@ -458,8 +495,9 @@ class EventConnection {
   /// on somebody else's screen. Call this repeatedly while the user types.
   /// Over-sending is safe - the server rate-limits it and drops the excess
   /// silently rather than erroring or closing the socket.
-  void typing(String channelId) => _channel.sink
-      .add(jsonEncode({'type': 'typing', 'channel_id': channelId}));
+  void typing(String channelId) => _channel.sink.add(
+        jsonEncode({'type': 'typing', 'channel_id': channelId}),
+      );
 
   /// Reports this user's pointer position on a channel's canvas.
   ///

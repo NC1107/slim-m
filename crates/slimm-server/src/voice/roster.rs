@@ -10,6 +10,7 @@
 
 use crate::ids::{ChannelId, UserId};
 
+use super::webhook::is_screen_share_source;
 use super::{VoiceError, VoiceService, room_for_channel};
 
 /// One participant the SFU reports as currently connected to a room.
@@ -19,6 +20,15 @@ pub struct RoomParticipant {
     pub user_id: UserId,
     /// The token's `name`, as it was when this participant joined.
     pub display_name: String,
+    /// Whether any of this participant's published tracks is screen-share
+    /// sourced. Read straight off this same `ListParticipants` response, so
+    /// it stays correct even on a deployment with no LiveKit webhook
+    /// configured; see `docs/decisions/0032-voice-participant-webhooks.md`.
+    pub is_sharing_screen: bool,
+    /// Whether any of this participant's published tracks is video, camera
+    /// or screen share alike - free from the same response as
+    /// `is_sharing_screen`.
+    pub has_video: bool,
 }
 
 /// The shape of a LiveKit `ListParticipants` twirp response; only the fields
@@ -34,6 +44,16 @@ struct ParticipantInfo {
     identity: String,
     #[serde(default)]
     name: Option<String>,
+    #[serde(default)]
+    tracks: Vec<TrackInfo>,
+}
+
+#[derive(serde::Deserialize)]
+struct TrackInfo {
+    #[serde(default)]
+    source: String,
+    #[serde(rename = "type", default)]
+    track_type: String,
 }
 
 impl VoiceService {
@@ -86,9 +106,13 @@ impl VoiceService {
             .filter_map(|p| {
                 // Parsed back rather than trusted: mint() set it to this user's id.
                 let user_id = UserId(p.identity.parse().ok()?);
+                let is_sharing_screen = p.tracks.iter().any(|t| is_screen_share_source(&t.source));
+                let has_video = p.tracks.iter().any(|t| t.track_type == "VIDEO");
                 Some(RoomParticipant {
                     user_id,
                     display_name: p.name.unwrap_or_default(),
+                    is_sharing_screen,
+                    has_video,
                 })
             })
             .collect())
@@ -161,8 +185,70 @@ mod tests {
             vec![RoomParticipant {
                 user_id: alice,
                 display_name: "Alice".to_owned(),
+                is_sharing_screen: false,
+                has_video: false,
             }]
         );
+    }
+
+    #[tokio::test]
+    async fn a_screen_share_track_sets_is_sharing_screen_and_has_video() {
+        let alice = UserId::generate();
+        let url = spawn_room_service(
+            axum::http::StatusCode::OK,
+            json!({
+                "participants": [
+                    {
+                        "identity": alice.to_string(),
+                        "name": "Alice",
+                        "tracks": [
+                            { "type": "VIDEO", "source": "SCREEN_SHARE" },
+                            { "type": "AUDIO", "source": "SCREEN_SHARE_AUDIO" },
+                        ],
+                    },
+                ]
+            }),
+        )
+        .await;
+
+        let participants = service_at(&url)
+            .list_participants(ChannelId::generate())
+            .await
+            .expect("the mock room service answered");
+        assert_eq!(
+            participants,
+            vec![RoomParticipant {
+                user_id: alice,
+                display_name: "Alice".to_owned(),
+                is_sharing_screen: true,
+                has_video: true,
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_camera_track_sets_has_video_without_screen_sharing() {
+        let alice = UserId::generate();
+        let url = spawn_room_service(
+            axum::http::StatusCode::OK,
+            json!({
+                "participants": [
+                    {
+                        "identity": alice.to_string(),
+                        "name": "Alice",
+                        "tracks": [{ "type": "VIDEO", "source": "CAMERA" }],
+                    },
+                ]
+            }),
+        )
+        .await;
+
+        let participants = service_at(&url)
+            .list_participants(ChannelId::generate())
+            .await
+            .expect("the mock room service answered");
+        assert!(participants[0].has_video);
+        assert!(!participants[0].is_sharing_screen);
     }
 
     #[tokio::test]

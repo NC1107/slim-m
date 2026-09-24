@@ -105,6 +105,9 @@ export 'src/events.dart'
         TypingStarted,
         TypingStopped,
         VoiceActivityChanged,
+        VoiceParticipantJoined,
+        VoiceParticipantLeft,
+        VoiceScreenShareChanged,
         protocolVersion;
 export 'src/exceptions.dart';
 export 'src/limits.dart'

@@ -290,6 +290,8 @@ async fn forget_heartbeat(
 struct RosterParticipantDto {
     user_id: String,
     display_name: String,
+    is_sharing_screen: bool,
+    has_video: bool,
 }
 
 #[derive(Serialize)]
@@ -376,6 +378,8 @@ async fn roster(
         participants.push(RosterParticipantDto {
             user_id: participant.user_id.to_string(),
             display_name: participant.display_name,
+            is_sharing_screen: participant.is_sharing_screen,
+            has_video: participant.has_video,
         });
     }
 

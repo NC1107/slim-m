@@ -5070,6 +5070,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /voice/webhook:
+    post:
+      operationId: receiveLiveKitWebhook
+      tags: [voice]
+      security: []
+      summary: Internal - LiveKit's own webhook, never called by this repo's client.
+      description: >
+        Not part of the client-facing wire contract; documented here only
+        because every route the router serves must appear in this file. The
+        only caller is the configured LiveKit deployment itself, and the only
+        client of what it publishes is `hub::Event` - see
+        docs/decisions/0032-voice-participant-webhooks.md.
+
+
+        Authenticated by the request's own `Authorization: <JWT>` header,
+        verified against the deployment's configured LiveKit API key and
+        secret (the same trio `SLIMM_LIVEKIT_URL`/`_API_KEY`/`_API_SECRET`
+        voice already requires), never a session. A `403` means the
+        signature did not verify; a `501` means this deployment has no SFU
+        configured at all, so there is no secret to verify against.
+
+
+        Always `204` once the signature verifies, including for an event
+        this server takes no action on - LiveKit retries any non-2xx
+        response, and an event this server deliberately ignores
+        (`room_started`, egress events, a non-screen-share track) is not a
+        delivery failure.
+      requestBody:
+        required: true
+        content:
+          application/webhook+json:
+            schema:
+              $ref: "#/components/schemas/LiveKitWebhookEvent"
+      responses:
+        "204":
+          description: The signature verified; the event was applied or deliberately ignored.
+        "403":
+          description: The signature did not verify.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "501":
+          description: This deployment has no voice configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /channels/{channelId}/voice/ring:
     post:
       operationId: ringDmCall
@@ -9381,6 +9433,39 @@ components:
             How long the server waits for an answer before giving up on this
             ring on its own; a client renders its own countdown from this
             value rather than a hard-coded duration.
+
+    LiveKitWebhookEvent:
+      type: object
+      required: [event]
+      description: >-
+        LiveKit's own webhook payload, trimmed to the fields this server
+        reads. See docs/decisions/0032-voice-participant-webhooks.md; the
+        full shape is LiveKit's, not documented here field by field.
+      properties:
+        event:
+          type: string
+          description: >-
+            One of LiveKit's event names, for example participant_joined,
+            participant_left, track_published or track_unpublished. Anything
+            else is accepted and ignored.
+        room:
+          type: object
+          properties:
+            name:
+              type: string
+        participant:
+          type: object
+          properties:
+            identity:
+              type: string
+        track:
+          type: object
+          properties:
+            sid:
+              type: string
+            source:
+              type: string
+
     VoiceRoster:
       type: object
       required: [participants]
@@ -9401,6 +9486,17 @@ components:
           description: >-
             As it was when this participant joined the room, not necessarily
             their current profile name.
+        is_sharing_screen:
+          type: boolean
+          description: >-
+            Whether any of this participant's published tracks is
+            screen-share sourced, read directly off the same LiveKit
+            response as the rest of this roster entry.
+        has_video:
+          type: boolean
+          description: >-
+            Whether any of this participant's published tracks is video,
+            camera or screen share alike.
 
     ReactionSummary:
       type: object
@@ -10211,6 +10307,9 @@ components:
         - $ref: "#/components/schemas/OverwriteChanged"
         - $ref: "#/components/schemas/CategoryChanged"
         - $ref: "#/components/schemas/VoiceActivityChanged"
+        - $ref: "#/components/schemas/VoiceParticipantJoined"
+        - $ref: "#/components/schemas/VoiceParticipantLeft"
+        - $ref: "#/components/schemas/VoiceScreenShareChanged"
         - $ref: "#/components/schemas/CallRinging"
         - $ref: "#/components/schemas/CallRingEnded"
         - $ref: "#/components/schemas/CanvasObjectPlaced"
@@ -11086,6 +11185,65 @@ components:
         channel_id:
           type: string
           format: uuid
+
+    VoiceParticipantJoined:
+      type: object
+      required: [type, channel_id, user_id]
+      description: >
+        Someone joined a channel's voice room, per a LiveKit webhook. Unlike
+        VoiceActivityChanged this names the participant, safe only because it
+        is gated on the joiner's own presence visibility the same way
+        `GET .../voice/roster` already is - a viewer who has that user
+        hidden from them receives nothing. See
+        docs/decisions/0032-voice-participant-webhooks.md. Only fires when
+        the deployment's LiveKit is configured with a webhook pointed at
+        this server; VoiceActivityChanged still fires either way.
+      properties:
+        type:
+          type: string
+          enum: [voice.participant_joined]
+        channel_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+
+    VoiceParticipantLeft:
+      type: object
+      required: [type, channel_id, user_id]
+      description: >
+        The webhook-sourced counterpart to VoiceParticipantJoined, for a
+        participant leaving.
+      properties:
+        type:
+          type: string
+          enum: [voice.participant_left]
+        channel_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+
+    VoiceScreenShareChanged:
+      type: object
+      required: [type, channel_id, user_id, is_sharing_screen]
+      description: >
+        A participant started or stopped sharing their screen, per LiveKit's
+        track_published/track_unpublished webhooks. Gated the same way
+        VoiceParticipantJoined is. See
+        docs/decisions/0032-voice-participant-webhooks.md.
+      properties:
+        type:
+          type: string
+          enum: [voice.screen_share_changed]
+        channel_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        is_sharing_screen:
+          type: boolean
+
     CallRinging:
       type: object
       required: [type, channel_id, ring_id, caller_id]

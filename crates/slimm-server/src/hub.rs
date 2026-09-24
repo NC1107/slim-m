@@ -139,6 +139,9 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::SessionRevoked(_)
         // Who is on a call changes no permission's answer.
         | Event::VoiceActivityChanged { .. }
+        | Event::VoiceParticipantJoined { .. }
+        | Event::VoiceParticipantLeft { .. }
+        | Event::VoiceScreenShareChanged { .. }
         // Ringing, and how a ring ended, changes no permission's answer either.
         | Event::CallRinging { .. }
         | Event::CallRingEnded { .. }
@@ -207,6 +210,9 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::CanvasMediaSlotChanged { .. }
         | Event::SessionRevoked(_)
         | Event::VoiceActivityChanged { .. }
+        | Event::VoiceParticipantJoined { .. }
+        | Event::VoiceParticipantLeft { .. }
+        | Event::VoiceScreenShareChanged { .. }
         | Event::CallRinging { .. }
         | Event::CallRingEnded { .. }
         | Event::ReportsChanged => false,

@@ -43,17 +43,30 @@ class VoiceToken {
 /// their current profile name; a participant who chose to appear offline is
 /// never sent to any viewer but themselves, so absence from the list is not
 /// distinguishable from never having joined.
+///
+/// [isSharingScreen] and [hasVideo] read straight off the server's own
+/// `ListParticipants` call to LiveKit, so they are accurate even when the
+/// deployment has no webhook configured for `VoiceScreenShareChanged` (see
+/// `docs/decisions/0032-voice-participant-webhooks.md`).
 class VoiceRosterParticipant {
-  const VoiceRosterParticipant(
-      {required this.userId, required this.displayName});
+  const VoiceRosterParticipant({
+    required this.userId,
+    required this.displayName,
+    this.isSharingScreen = false,
+    this.hasVideo = false,
+  });
 
   final String userId;
   final String displayName;
+  final bool isSharingScreen;
+  final bool hasVideo;
 
   factory VoiceRosterParticipant.fromJson(Map<String, dynamic> json) =>
       VoiceRosterParticipant(
         userId: json['user_id'] as String,
         displayName: json['display_name'] as String,
+        isSharingScreen: json['is_sharing_screen'] as bool? ?? false,
+        hasVideo: json['has_video'] as bool? ?? false,
       );
 }
 

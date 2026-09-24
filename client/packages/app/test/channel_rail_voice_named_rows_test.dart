@@ -4,6 +4,8 @@
 /// way a member pane does.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -156,6 +158,56 @@ void main() {
 
       expect(find.byType(AuthorAvatar), findsNWidgets(8));
       expect(find.text('+2 more'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a sharing participant in the unjoined roster preview carries the '
+    'share glyph too, not just the joined live roster',
+    (tester) async {
+      final apiClient = api.SlimmApi(
+        baseUrl: Uri.parse('http://localhost:8080'),
+        session: api.SessionStore(tokens: _tokens),
+        httpClient: MockClient((request) async {
+          if (!request.url.path.endsWith('/voice/roster')) {
+            return http.Response('', 404);
+          }
+          return http.Response(
+            jsonEncode({
+              'participants': [
+                {
+                  'user_id': 'u-priya',
+                  'display_name': 'Priya',
+                  'is_sharing_screen': true,
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+      addTearDown(apiClient.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiProvider.overrideWithValue(apiClient),
+            voiceControllerProvider.overrideWith(
+              (ref) => FixedVoiceController(ref, const VoiceState()),
+            ),
+          ],
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: Scaffold(
+              body: VoiceChannelRow(channel: _channel, selected: false),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Priya'), findsOneWidget);
+      expect(find.byIcon(AppIcons.screenShare), findsOneWidget);
     },
   );
 }

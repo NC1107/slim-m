@@ -68,6 +68,12 @@ const persistentRosterFailureThreshold = 3;
 /// to [voiceRosterPollInterval] later. It names no participant - see the
 /// event's own doc comment - so this is a nudge to re-ask, exactly what a
 /// stray or duplicate frame already costs nothing extra to trigger.
+///
+/// `voice.participant_joined`/`_left`/`screen_share_changed` nudge the same
+/// way, on deployments with LiveKit's webhook configured (see
+/// docs/decisions/0032-voice-participant-webhooks.md); a re-poll rather than
+/// a targeted merge, since it is the one code path that already has to
+/// handle the appear-offline filter and the persistent-failure state above.
 final voiceRosterProvider = StreamProvider.autoDispose
     .family<List<api.VoiceRosterParticipant>, String>((ref, channelId) {
       final client = ref.watch(apiProvider);
@@ -101,9 +107,14 @@ final voiceRosterProvider = StreamProvider.autoDispose
       unawaited(tick(timer));
 
       final liveSub = ref.read(liveEventsProvider).listen((event) {
-        if (event case api.VoiceActivityChanged(
-          channelId: final eventChannelId,
-        ) when eventChannelId == channelId) {
+        final eventChannelId = switch (event) {
+          api.VoiceActivityChanged(:final channelId) => channelId,
+          api.VoiceParticipantJoined(:final channelId) => channelId,
+          api.VoiceParticipantLeft(:final channelId) => channelId,
+          api.VoiceScreenShareChanged(:final channelId) => channelId,
+          _ => null,
+        };
+        if (eventChannelId == channelId) {
           unawaited(tick(timer));
         }
       });

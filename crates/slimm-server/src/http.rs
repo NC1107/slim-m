@@ -97,6 +97,7 @@ mod user_status;
 mod users;
 mod voice;
 mod voice_ring;
+mod voice_webhook;
 mod webhooks;
 mod ws;
 
@@ -211,6 +212,7 @@ pub fn router(state: AppState) -> Router {
         .merge(bot_commands::routes())
         .merge(voice::routes())
         .merge(voice_ring::routes())
+        .merge(voice_webhook::routes())
         .merge(webhooks::routes())
         .merge(polls::routes())
         .merge(users::routes())

@@ -334,6 +334,29 @@ pub enum Event {
     /// receiving connection re-fetches the roster, which already applies
     /// that per-viewer filtering, instead of being told who moved.
     VoiceActivityChanged { channel_id: ChannelId },
+    /// A LiveKit webhook reported someone joined a channel's voice room.
+    /// See `docs/decisions/0032-voice-participant-webhooks.md` for why this
+    /// names the participant where `VoiceActivityChanged` deliberately does
+    /// not: authorized per subscriber on the joiner's own presence
+    /// visibility, the same guarantee the roster route already gives.
+    VoiceParticipantJoined {
+        channel_id: ChannelId,
+        user_id: UserId,
+    },
+    /// The same webhook-sourced signal as [`Event::VoiceParticipantJoined`],
+    /// for a participant leaving.
+    VoiceParticipantLeft {
+        channel_id: ChannelId,
+        user_id: UserId,
+    },
+    /// A participant started or stopped sharing their screen, per LiveKit's
+    /// `track_published`/`track_unpublished` webhooks. See
+    /// `docs/decisions/0032-voice-participant-webhooks.md`.
+    VoiceScreenShareChanged {
+        channel_id: ChannelId,
+        user_id: UserId,
+        is_sharing_screen: bool,
+    },
     /// Ringing was started for a DM call: `caller_id` is calling whoever the
     /// other side of the `channel_id` DM is. `ring_id` names this specific
     /// attempt so a receiving client can tell it apart from an immediate
