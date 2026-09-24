@@ -977,20 +977,30 @@ paths:
       tags: [moderation]
       summary: >
         One page of the moderation-history feed: resolved reports and
-        moderation_audit_log entries, newest first. Requires MANAGE_MESSAGES.
+        moderation_audit_log entries, newest first. Requires
+        MANAGE_MESSAGES or VIEW_MODERATION_HISTORY.
       description: >
         Resolved reports and audit-log entries (a removal, a restore, a
-        timeout, a timeout lift, or a bulk message delete) merged into one
-        time-ordered feed. An open (unresolved) report never appears here;
-        see `listOpenReports` for those.
+        timeout, a timeout lift, a bulk message delete, or a bot lifecycle
+        act) merged into one time-ordered feed. An open (unresolved) report
+        never appears here; see `listOpenReports` for those.
 
 
         A resolved report still carries the reported content snapshot, so
         the resolved-report side of the feed is filtered per channel exactly
-        as `listOpenReports` filters the open queue. An audit-log entry has
-        no channel at all - member moderation is deployment-wide - so
-        nothing is filtered from that side beyond the route's own
-        MANAGE_MESSAGES gate.
+        as `listOpenReports` filters the open queue, for a caller admitted by
+        MANAGE_MESSAGES. An audit-log entry has no channel at all - member
+        moderation is deployment-wide - so nothing is filtered from that side
+        beyond the route's own gate.
+
+
+        A caller admitted only by VIEW_MODERATION_HISTORY (a read-only bit
+        with none of MANAGE_MESSAGES's power to act on a report or delete a
+        message) skips the per-channel filter on the resolved-report side
+        entirely: that filter is keyed to MANAGE_MESSAGES, and a caller
+        holding only the read-only bit would otherwise see almost nothing.
+        See the server's own doc on `Permissions::VIEW_MODERATION_HISTORY`
+        and docs/decisions/0028-bot-accounts.md.
 
 
         Paged backward from `after` by event time (a resolved report's
@@ -2014,7 +2024,8 @@ paths:
       description: >
         Idempotent. Refused if the role carries a permission the caller does
         not themselves hold, since granting a role is granting whatever it
-        carries.
+        carries. A bot is a role holder like any other, ADMINISTRATOR
+        included; see docs/decisions/0028-bot-accounts.md.
       responses:
         "204":
           description: The role is assigned.
@@ -5167,10 +5178,10 @@ paths:
       summary: Create a bot and issue its token.
       description: >-
         The only response that ever carries the token; it is stored hashed and
-        cannot be read back. A bot is created with no roles, so it holds
-        whatever everyone holds and nothing more. Refused for a caller that is
-        itself a bot, so one compromised credential cannot mint another that
-        survives revoking it.
+        cannot be read back. A managed role is created alongside the bot,
+        holding the requested `permissions` (default none). Refused for a
+        caller that is itself a bot, so one compromised credential cannot
+        mint another that survives revoking it.
       requestBody:
         required: true
         content:
@@ -5209,8 +5220,9 @@ paths:
       tags: [bots]
       summary: Revoke a bot's token and session.
       description: >-
-        Stops the bot on its next request. The account stays, so what it wrote
-        stays attributed to it, exactly as revoking a person's session does.
+        Stops the bot on its next request. The account and its roles stay, so
+        what it wrote stays attributed to it, exactly as revoking a person's
+        session does.
       responses:
         "204":
           description: Revoked.
@@ -5306,6 +5318,49 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /bots/{botId}/permissions:
+    parameters:
+      - name: botId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The bot's user id.
+    patch:
+      operationId: setBotPermissions
+      tags: [bots]
+      summary: Change what a bot's managed role grants.
+      description: >-
+        A convenience shortcut for editing the managed role's permissions
+        directly, guarded exactly like a human role edit: every bit must
+        already be held by the caller, and the role's *current* bits must not
+        already exceed what the caller holds. See
+        docs/decisions/0028-bot-accounts.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetBotPermissionsRequest"
+      responses:
+        "200":
+          description: The bot, with its updated permissions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -7702,7 +7757,7 @@ components:
 
     Bot:
       type: object
-      required: [user_id, username, display_name, created_at]
+      required: [user_id, username, display_name, created_at, permissions]
       properties:
         user_id:
           type: string
@@ -7723,6 +7778,16 @@ components:
           description: >-
             Written at most once a minute, so it is a recency hint rather than
             an exact last-call time.
+        role_id:
+          type: [string, "null"]
+          format: uuid
+          description: The bot's managed role; see docs/decisions/0028-bot-accounts.md.
+        permissions:
+          type: integer
+          format: int64
+          description: >-
+            What the managed role currently grants. Change it with `PATCH
+            /bots/{botId}/permissions`, or by editing the role directly.
     CreateBotRequest:
       type: object
       required: [username]
@@ -7735,6 +7800,26 @@ components:
         display_name:
           type: [string, "null"]
           description: Defaults to the username.
+        permissions:
+          type: integer
+          format: int64
+          default: 0
+          description: >-
+            The permission bits to grant the bot's managed role. Defaults to
+            none. Every bit must already be held by the caller, the same
+            no-escalation check a human-assigned role goes through; a bot may
+            hold any bit a human role could, including ADMINISTRATOR. See
+            docs/decisions/0028-bot-accounts.md.
+    SetBotPermissionsRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: integer
+          format: int64
+          description: >-
+            Replaces what the bot's managed role grants. Same guards as
+            `CreateBotRequest.permissions`.
     NewBot:
       type: object
       required: [bot, token]
@@ -8209,6 +8294,13 @@ components:
           type: integer
           format: int64
           description: Unix milliseconds.
+        managed_bot_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            Informational: the bot this role was minted for, if any. An
+            ordinary, freely editable role otherwise; see
+            docs/decisions/0028-bot-accounts.md.
 
     ModulePermission:
       type: object

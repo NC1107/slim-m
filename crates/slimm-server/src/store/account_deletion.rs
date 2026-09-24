@@ -297,6 +297,13 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // The role itself stays; it may be shared with a human.
+        sqlx::query!(
+            "UPDATE roles SET managed_bot_id = NULL WHERE managed_bot_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         // Same shape as bot_tokens.bot_user_id above: its own data, purged with it.
         sqlx::query!("DELETE FROM webhooks WHERE user_id = ?", user_id)
             .execute(&mut *tx)

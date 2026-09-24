@@ -20,10 +20,15 @@
 //! pair and nobody to sign in again when a response is lost. Rotation would
 //! turn every dropped response into a dead bot. The mitigation for a
 //! long-lived credential is revocation and audit, not a short TTL.
+//!
+//! A third thing lives here now: **a bot's managed role**. See
+//! `docs/decisions/0028-bot-accounts.md`.
 
 use crate::auth::{generate_secret, hash_secret};
-use crate::ids::{DeviceId, SessionId, UserId};
+use crate::ids::{DeviceId, RoleId, SessionId, UserId};
+use crate::permissions::Permissions;
 
+use super::moderation_audit::{ModerationAudit, record_moderation_audit};
 use super::sessions::SessionContext;
 use super::{Store, now_ms};
 
@@ -50,6 +55,9 @@ pub struct Bot {
     /// bot can currently do anything at all.
     pub token_name: Option<String>,
     pub token_last_used_at: Option<i64>,
+    /// The bot's managed role and its permissions. `NONE` once revoked.
+    pub role_id: Option<RoleId>,
+    pub permissions: Permissions,
 }
 
 /// A newly created bot and the one time its token is ever legible.
@@ -71,21 +79,35 @@ impl From<sqlx::Error> for CreateBotError {
     }
 }
 
+/// Why changing a bot's permissions failed.
+#[derive(Debug)]
+pub enum UpdateBotPermissionsError {
+    /// No live bot by that id, or it has been revoked and has no managed
+    /// role left to change.
+    NoSuchBot,
+    Internal(anyhow::Error),
+}
+
+impl From<sqlx::Error> for UpdateBotPermissionsError {
+    fn from(err: sqlx::Error) -> Self {
+        UpdateBotPermissionsError::Internal(err.into())
+    }
+}
+
 impl Store {
-    /// Creates a bot and issues its first token, in one transaction.
-    ///
-    /// The two are one step because a bot with no token can do nothing and is
-    /// not a state worth being able to reach; the token is returned once here
-    /// and is unrecoverable afterwards.
+    /// Creates a bot, its managed role, and its first token, in one
+    /// transaction. `permissions` is trusted, already validated by `http::bots`.
     pub async fn create_bot(
         &self,
         username: &str,
         display_name: &str,
+        permissions: Permissions,
         created_by: UserId,
     ) -> Result<NewBot, CreateBotError> {
         let user_id = UserId::generate();
         let device_id = DeviceId::generate();
         let session_id = SessionId::generate();
+        let role_id = RoleId::generate();
         let token = format!("{BOT_TOKEN_PREFIX}{}", generate_secret());
         let token_hash = hash_secret(&token);
         let now = now_ms();
@@ -140,6 +162,41 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+
+        let permission_bits = permissions.bits();
+        sqlx::query!(
+            "INSERT INTO roles (id, name, permissions, is_everyone, created_at, managed_bot_id)
+             VALUES (?, ?, ?, 0, ?, ?)",
+            role_id,
+            display_name,
+            permission_bits,
+            now,
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO member_roles (user_id, role_id) VALUES (?, ?)",
+            user_id,
+            role_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: created_by,
+                subject_id: user_id,
+                action: "bot_create",
+                reason: Some(&format!(
+                    "role {role_id} created with permissions {permission_bits}"
+                )),
+                until: None,
+                created_at: now,
+            },
+        )
+        .await?;
+
         tx.commit().await?;
 
         Ok(NewBot {
@@ -150,6 +207,8 @@ impl Store {
                 created_at: now,
                 token_name: Some(display_name.to_owned()),
                 token_last_used_at: None,
+                role_id: Some(role_id),
+                permissions,
             },
             token,
         })
@@ -169,10 +228,12 @@ impl Store {
         let rows = sqlx::query!(
             r#"SELECT u.id AS "user_id!: UserId", u.username, u.display_name,
                       u.created_at,
-                      t.name AS token_name, t.last_used_at
+                      t.name AS token_name, t.last_used_at,
+                      r.id AS "role_id: RoleId", r.permissions AS "permissions: Permissions"
                FROM users u
                LEFT JOIN bot_tokens t
                  ON t.bot_user_id = u.id AND t.revoked_at IS NULL
+               LEFT JOIN roles r ON r.managed_bot_id = u.id
                WHERE u.is_bot = 1 AND u.deleted_at IS NULL
                  AND (? = 1 OR NOT EXISTS (
                    SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id
@@ -191,6 +252,8 @@ impl Store {
                 created_at: r.created_at,
                 token_name: r.token_name,
                 token_last_used_at: r.last_used_at,
+                role_id: r.role_id,
+                permissions: r.permissions.unwrap_or(Permissions::NONE),
             })
             .collect())
     }
@@ -243,6 +306,72 @@ impl Store {
         }))
     }
 
+    /// Changes what a bot's managed role grants; `permissions` is already
+    /// validated by `http::bots`. `NoSuchBot` covers a revoked bot too, since
+    /// revocation deletes the managed role this looks up.
+    pub async fn update_bot_permissions(
+        &self,
+        bot_user_id: UserId,
+        actor_id: UserId,
+        permissions: Permissions,
+    ) -> Result<Bot, UpdateBotPermissionsError> {
+        let mut tx = self.pool.begin().await?;
+        let role_id = sqlx::query_scalar!(
+            r#"SELECT id AS "id!: RoleId" FROM roles WHERE managed_bot_id = ?"#,
+            bot_user_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(role_id) = role_id else {
+            return Err(UpdateBotPermissionsError::NoSuchBot);
+        };
+
+        let bits = permissions.bits();
+        sqlx::query!(
+            "UPDATE roles SET permissions = ? WHERE id = ?",
+            bits,
+            role_id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        let now = now_ms();
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id,
+                subject_id: bot_user_id,
+                action: "bot_permission_grant",
+                reason: Some(&format!("role {role_id} permissions now {bits}")),
+                until: None,
+                created_at: now,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+
+        let bot = sqlx::query!(
+            r#"SELECT u.id AS "user_id!: UserId", u.username, u.display_name, u.created_at,
+                      t.name AS "token_name?", t.last_used_at AS "last_used_at?"
+               FROM users u
+               LEFT JOIN bot_tokens t ON t.bot_user_id = u.id AND t.revoked_at IS NULL
+               WHERE u.id = ?"#,
+            bot_user_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(Bot {
+            user_id: bot.user_id,
+            username: bot.username,
+            display_name: bot.display_name,
+            created_at: bot.created_at,
+            token_name: bot.token_name,
+            token_last_used_at: bot.last_used_at,
+            role_id: Some(role_id),
+            permissions,
+        })
+    }
+
     /// Whether this user is a bot, for the badge the interface draws.
     pub async fn is_bot(&self, user_id: UserId) -> anyhow::Result<bool> {
         let row = sqlx::query!(
@@ -254,17 +383,17 @@ impl Store {
         Ok(row.map(|r| r.is_bot != 0).unwrap_or(false))
     }
 
-    /// Revokes a bot's token and its session, so it stops resolving on the very
-    /// next request. The account stays, so its authorship survives - the same
-    /// treatment revoking any session gives.
+    /// Revokes a bot's token and session. The account and its roles stay, so
+    /// a role shared with a human is unaffected.
     ///
-    /// Returns `None` if no bot by that id exists, so the caller can answer 404
-    /// rather than pretending, and otherwise the sessions it revoked - possibly
-    /// empty, for a bot whose token was already spent. The caller must publish
-    /// [`crate::hub::Event::SessionRevoked`] for each: revoking the row stops
-    /// the next request, but an already-open socket is only closed by the
-    /// event, and a leaked token's socket is the thing revocation exists to cut.
-    pub async fn revoke_bot(&self, bot_user_id: UserId) -> anyhow::Result<Option<Vec<SessionId>>> {
+    /// Returns `None` if no bot by that id exists, and otherwise the sessions
+    /// it revoked. The caller must publish
+    /// [`crate::hub::Event::SessionRevoked`] for each.
+    pub async fn revoke_bot(
+        &self,
+        bot_user_id: UserId,
+        revoked_by: UserId,
+    ) -> anyhow::Result<Option<Vec<SessionId>>> {
         let now = now_ms();
         let sessions = sqlx::query!(
             r#"SELECT session_id AS "session_id!: SessionId"
@@ -276,13 +405,29 @@ impl Store {
         if sessions.is_empty() {
             return Ok(self.is_bot(bot_user_id).await?.then(Vec::new));
         }
+
+        let mut tx = self.pool.begin().await?;
         sqlx::query!(
             "UPDATE bot_tokens SET revoked_at = ? WHERE bot_user_id = ? AND revoked_at IS NULL",
             now,
             bot_user_id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: revoked_by,
+                subject_id: bot_user_id,
+                action: "bot_revoke",
+                reason: None,
+                until: None,
+                created_at: now,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+
         let mut revoked = Vec::with_capacity(sessions.len());
         for row in sessions {
             self.revoke_session(row.session_id).await?;

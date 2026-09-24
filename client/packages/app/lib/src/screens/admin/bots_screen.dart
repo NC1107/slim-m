@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Provisioning bots: making one, seeing what exists, and stopping one.
+/// Provisioning bots and their permission grant. See
+/// `docs/decisions/0028-bot-accounts.md`.
 ///
-/// A bot is a member like any other, so this screen deliberately does not
-/// manage what a bot may *do* - that is the roles screen, through the same
-/// rows a person's permissions go through. All this owns is the credential.
-/// See `docs/decisions/0028-bot-accounts.md`.
-///
-/// The token is shown once, here, immediately after creation, and is
-/// unrecoverable afterwards because the server keeps only a hash. That is why
-/// the reveal is a persistent card the operator dismisses rather than a toast:
-/// a credential that vanishes on a timer is a credential somebody loses.
+/// The token is shown once, here, and unrecoverable afterwards.
 library;
 
 import 'package:flutter/material.dart';
@@ -18,10 +11,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../../api_failure.dart';
+import '../../permissions.dart';
 import '../../providers/admin_providers.dart';
 import '../../providers/providers.dart';
 import '../../routing/routes.dart';
 import '../../widgets/labeled_field.dart';
+import '../../widgets/permission_row.dart';
 import '../../widgets/run_guarded.dart';
 import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_notice.dart';
@@ -52,6 +48,9 @@ class _BotsPaneState extends ConsumerState<BotsPane>
   final _username = TextEditingController();
   bool _busy = false;
 
+  /// The bot's managed-role grant. Defaults to none.
+  int _permissions = 0;
+
   /// The one and only time this token is legible. Held in state rather than
   /// pushed into a toast, so it stays on screen until it is dismissed.
   api.NewBot? _justCreated;
@@ -70,7 +69,9 @@ class _BotsPaneState extends ConsumerState<BotsPane>
     final ok = await guard(
       whatFailed: 'create the bot',
       action: () async {
-        created = await ref.read(apiProvider).createBot(username);
+        created = await ref
+            .read(apiProvider)
+            .createBot(username, permissions: _permissions);
       },
     );
     if (!mounted) return;
@@ -79,6 +80,7 @@ class _BotsPaneState extends ConsumerState<BotsPane>
       if (ok) {
         _justCreated = created;
         _username.clear();
+        _permissions = 0;
       }
     });
     if (ok) ref.invalidate(botsProvider);
@@ -87,6 +89,8 @@ class _BotsPaneState extends ConsumerState<BotsPane>
   @override
   Widget build(BuildContext context) {
     final bots = ref.watch(botsProvider);
+    final myPermissions = ref.watch(myPermissionsProvider);
+    final tokens = Theme.of(context).extension<AppTokens>()!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,6 +118,34 @@ class _BotsPaneState extends ConsumerState<BotsPane>
                 onSubmitted: (_) => _busy ? null : _create(),
               ),
             ),
+            const SizedBox(height: AppSpacing.s16),
+            Text(
+              'Permissions',
+              style: AppText.label.copyWith(color: tokens.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              'Grant only what the bot documents needing. You can never '
+              'grant more than you hold yourself.',
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            for (final (bit, label) in Perm.editable)
+              PermissionRow(
+                label: label,
+                dimmed: !myPermissions.hasPermission(bit),
+                control: AppToggle(
+                  value: _permissions.hasPermission(bit),
+                  semanticLabel: label,
+                  onChanged: myPermissions.hasPermission(bit)
+                      ? (v) => setState(() {
+                          _permissions = v
+                              ? (_permissions | bit)
+                              : (_permissions & ~bit);
+                        })
+                      : null,
+                ),
+              ),
             const SizedBox(height: AppSpacing.s12),
             AppButton(
               label: 'Create bot',
@@ -222,6 +254,9 @@ class _BotRowState extends ConsumerState<_BotRow>
   @override
   Widget build(BuildContext context) {
     final bot = widget.bot;
+    final count = Perm.editable
+        .where((e) => bot.permissions.hasPermission(e.$1))
+        .length;
 
     return SettingsEntityRow(
       headline: bot.displayName,
@@ -233,8 +268,23 @@ class _BotRowState extends ConsumerState<_BotRow>
           const SettingsAbsentValue('Never used yet.')
         else
           const SettingsEntityDetail('Token active.'),
+        if (!bot.isRevoked)
+          SettingsEntityDetail(
+            count == 0
+                ? 'No permissions granted yet'
+                : count == 1
+                ? '1 permission granted'
+                : '$count permissions granted',
+          ),
       ],
       actions: [
+        if (!bot.isRevoked)
+          AppButton(
+            label: 'Permissions',
+            variant: AppButtonVariant.secondary,
+            size: AppButtonSize.sm,
+            onPressed: () => showBotPermissionsSheet(context, bot),
+          ),
         if (!bot.isRevoked)
           AppButton(
             label: 'Revoke',
@@ -245,6 +295,139 @@ class _BotRowState extends ConsumerState<_BotRow>
       ],
       error: actionError,
       onErrorDismiss: clearActionError,
+    );
+  }
+}
+
+/// Opens the permission editor for one bot's managed role.
+Future<void> showBotPermissionsSheet(BuildContext context, api.Bot bot) {
+  return showAppSheet<void>(
+    context,
+    scrolls: true,
+    builder: (context) => _BotPermissionsSheet(bot: bot),
+  );
+}
+
+class _BotPermissionsSheet extends ConsumerStatefulWidget {
+  const _BotPermissionsSheet({required this.bot});
+
+  final api.Bot bot;
+
+  @override
+  ConsumerState<_BotPermissionsSheet> createState() =>
+      _BotPermissionsSheetState();
+}
+
+class _BotPermissionsSheetState extends ConsumerState<_BotPermissionsSheet> {
+  late int _permissions = widget.bot.permissions;
+  bool _submitting = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(apiProvider)
+          .setBotPermissions(widget.bot.userId, _permissions);
+      if (context.mounted) ref.invalidate(botsProvider);
+      if (mounted) Navigator.of(context).pop();
+    } on api.ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = describeApiFailure(
+          "save ${widget.bot.displayName}'s permissions",
+          e,
+        );
+        _submitting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final myPermissions = ref.watch(myPermissionsProvider);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.s16,
+        0,
+        AppSpacing.s16,
+        MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "${widget.bot.displayName}'s permissions",
+                  style: AppText.heading.copyWith(
+                    color: tokens.textPrimary,
+                    fontWeight: AppWeights.semi,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(AppIcons.dismiss, color: tokens.textSecondary),
+                tooltip: 'Close',
+              ),
+            ],
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(
+                    'You can never grant more than you hold yourself.',
+                    style: AppText.caption.copyWith(
+                      color: tokens.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  for (final (bit, label) in Perm.editable)
+                    PermissionRow(
+                      label: label,
+                      dimmed: !myPermissions.hasPermission(bit),
+                      control: AppToggle(
+                        value: _permissions.hasPermission(bit),
+                        semanticLabel: label,
+                        onChanged: myPermissions.hasPermission(bit)
+                            ? (v) => setState(() {
+                                _permissions = v
+                                    ? (_permissions | bit)
+                                    : (_permissions & ~bit);
+                              })
+                            : null,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppErrorState(message: _error!),
+          ],
+          const SizedBox(height: AppSpacing.s12),
+          AppButton(
+            label: _submitting ? 'Saving...' : 'Save changes',
+            variant: AppButtonVariant.primary,
+            full: true,
+            disabled: _submitting,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     );
   }
 }

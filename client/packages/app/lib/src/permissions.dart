@@ -36,6 +36,9 @@ abstract final class Perm {
   /// this bit for why.
   static const int runCode = 1 << 17;
 
+  /// Read moderation history without `manageMessages`'s write power.
+  static const int viewModerationHistory = 1 << 18;
+
   /// Every bit that has a name, in the fixed order the editor lists them.
   static const List<(int bit, String label)> editable = [
     (administrator, 'Administrator'),
@@ -56,6 +59,7 @@ abstract final class Perm {
     (manageServer, 'Manage Space settings'),
     (mentionEveryone, 'Mention @everyone and @here'),
     (runCode, 'Run code blocks'),
+    (viewModerationHistory, 'View moderation history'),
   ];
 
   /// [editable] minus [administrator]: the server's evaluator returns every

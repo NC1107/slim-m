@@ -291,6 +291,15 @@ pub(crate) async fn require_manage_roles(
     require_base_permission(state, user_id, Permissions::MANAGE_ROLES).await
 }
 
+/// Refuses a bot principal outright. Used by `http::bots` so a bot cannot
+/// provision another bot; see `docs/decisions/0028-bot-accounts.md`.
+pub(crate) async fn require_human(state: &AppState, user_id: UserId) -> Result<(), ApiError> {
+    if state.store.is_bot(user_id).await? {
+        return Err(ApiError::Forbidden);
+    }
+    Ok(())
+}
+
 async fn require_base_permission(
     state: &AppState,
     user_id: UserId,

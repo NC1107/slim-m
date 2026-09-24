@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE roles SET managed_bot_id = NULL WHERE managed_bot_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7f59b28a8f86da3f60dc4628e63f777c2690481ef30ba379c0dbdb9367fe8d14"
+}

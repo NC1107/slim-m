@@ -115,7 +115,7 @@ async fn everyone_role_id(store: &Store) -> RoleId {
 /// baseline.
 async fn bot(store: &Store, created_by: UserId, username: &str) -> (UserId, String) {
     let new_bot = store
-        .create_bot(username, username, created_by)
+        .create_bot(username, username, Permissions::NONE, created_by)
         .await
         .unwrap();
     (new_bot.bot.user_id, new_bot.token)
@@ -245,7 +245,7 @@ async fn a_revoked_bots_commands_vanish_from_discovery() {
         json!([])
     );
 
-    store.revoke_bot(bot_id).await.unwrap();
+    store.revoke_bot(bot_id, admin_id).await.unwrap();
 
     assert_eq!(
         channel_commands(&router, channel, &admin_token).await,

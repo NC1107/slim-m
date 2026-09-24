@@ -1,38 +1,29 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Provisioning bots, gated on MANAGE_SERVER.
+//! Provisioning bots, gated on MANAGE_SERVER, plus their managed role and
+//! permission declaration. See `docs/decisions/0028-bot-accounts.md`.
 //!
-//! Three routes and no authorization logic of its own, which is the point: a
-//! bot is a user-shaped principal, so what a bot may *do* is decided by its
-//! roles through the same checks every other action uses. This file only
-//! decides who may create and revoke one. See
-//! `docs/decisions/0028-bot-accounts.md`.
-//!
-//! The token is returned exactly once, by [`create`], and is unrecoverable
-//! afterwards - the same one-time-reveal shape the admin reset codes use,
-//! because a credential a server can re-read is a credential a stolen database
-//! hands over.
-//!
-//! Deliberately absent: any route a bot could use to provision another bot.
-//! Creation requires MANAGE_SERVER held by the caller, and a compromised bot
-//! holding that bit still cannot mint a second credential that would survive
-//! revoking the first, because `require_human` refuses it.
+//! The token is returned exactly once, by [`create`], and unrecoverable
+//! afterwards.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::{get, post};
+use axum::routing::{get, patch, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::auth::{validate_label, validate_username};
 use super::error::ApiError;
-use super::extract::{Authed, Json, Query, enforce, require_manage_server};
+use super::escalation::escalation_guard;
+use super::extract::{Authed, Json, Query, enforce, require_human, require_manage_server};
 use super::messages::parse_uuid;
+use super::roles::grantable;
 use crate::hub::Event;
 use crate::ids::UserId;
+use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{Bot, CreateBotError};
+use crate::store::{Bot, CreateBotError, UpdateBotPermissionsError};
 
 const BODY_LIMIT: usize = 1024;
 
@@ -40,6 +31,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/bots", get(list).post(create))
         .route("/bots/{bot_id}/revoke", post(revoke))
+        .route("/bots/{bot_id}/permissions", patch(set_permissions))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -47,6 +39,14 @@ pub fn routes() -> Router<AppState> {
 struct CreateBotDto {
     username: String,
     display_name: Option<String>,
+    /// The bot's managed-role grant. Defaults to none.
+    #[serde(default)]
+    permissions: i64,
+}
+
+#[derive(Deserialize)]
+struct SetBotPermissionsRequest {
+    permissions: i64,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +65,10 @@ struct BotDto {
     /// no longer act.
     token_name: Option<String>,
     token_last_used_at: Option<i64>,
+    /// The bot's managed role. `None` once revoked.
+    role_id: Option<String>,
+    /// What that role currently grants; `0` once revoked.
+    permissions: i64,
 }
 
 impl From<Bot> for BotDto {
@@ -76,6 +80,8 @@ impl From<Bot> for BotDto {
             created_at: bot.created_at,
             token_name: bot.token_name,
             token_last_used_at: bot.token_last_used_at,
+            role_id: bot.role_id.map(|id| id.to_string()),
+            permissions: bot.permissions.bits(),
         }
     }
 }
@@ -87,16 +93,8 @@ struct NewBotDto {
     token: String,
 }
 
-/// Refuses a bot acting as the provisioner.
-///
-/// Without this, a bot granted MANAGE_SERVER could create a second bot, and
-/// revoking the first would leave the second behind - so a single compromise
-/// would outlive the response to it. Creation is a human act.
-async fn require_human(state: &AppState, user_id: UserId) -> Result<(), ApiError> {
-    if state.store.is_bot(user_id).await? {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(())
+async fn caller_granted(state: &AppState, user_id: UserId) -> Result<Permissions, ApiError> {
+    Ok(state.store.granted_base_permissions(user_id).await?)
 }
 
 async fn list(
@@ -137,9 +135,13 @@ async fn create(
         .unwrap_or(username);
     validate_label(display_name, "display_name must be 1 to 64 characters")?;
 
+    // Effective, like `http::roles::create`'s identical read; see this file's own doc.
+    let caller_effective = state.store.base_permissions(ctx.user_id).await?;
+    let permissions = grantable(caller_effective, body.permissions)?;
+
     match state
         .store
-        .create_bot(username, display_name, ctx.user_id)
+        .create_bot(username, display_name, permissions, ctx.user_id)
         .await
     {
         Ok(new_bot) => Ok((
@@ -154,12 +156,7 @@ async fn create(
     }
 }
 
-/// Revokes a bot's token and session. The account stays, so what it wrote stays
-/// attributed to it - the same thing revoking anyone's session does.
-///
-/// Publishes `SessionRevoked` per revoked session, the same as every other
-/// revocation path. Without it the row is dead but an already-open socket keeps
-/// streaming, so a leaked token survived the response to its own leak.
+/// Revokes a bot's token and session. The account and its roles stay.
 async fn revoke(
     State(state): State<AppState>,
     parts: Parts,
@@ -169,11 +166,54 @@ async fn revoke(
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     require_manage_server(&state, ctx.user_id).await?;
     let bot_id = UserId(parse_uuid(&bot_id)?);
-    let Some(revoked) = state.store.revoke_bot(bot_id).await? else {
+    let Some(revoked) = state.store.revoke_bot(bot_id, ctx.user_id).await? else {
         return Err(ApiError::NotFound("no such bot"));
     };
     for session_id in revoked {
         state.hub.publish(Event::SessionRevoked(session_id));
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Changes what a bot's managed role grants; see
+/// `docs/decisions/0028-bot-accounts.md`.
+async fn set_permissions(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+    Path(bot_id): Path<String>,
+    Json(req): Json<SetBotPermissionsRequest>,
+) -> Result<Json<BotDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    require_manage_server(&state, ctx.user_id).await?;
+    require_human(&state, ctx.user_id).await?;
+    let bot_id = UserId(parse_uuid(&bot_id)?);
+
+    let current = state
+        .store
+        .role_for_bot(bot_id)
+        .await?
+        .ok_or(ApiError::NotFound("no such bot"))?;
+    escalation_guard(
+        caller_granted(&state, ctx.user_id).await?,
+        current.permissions,
+    )?;
+
+    let caller_effective = state.store.base_permissions(ctx.user_id).await?;
+    let permissions = grantable(caller_effective, req.permissions)?;
+
+    match state
+        .store
+        .update_bot_permissions(bot_id, ctx.user_id, permissions)
+        .await
+    {
+        Ok(bot) => {
+            state.hub.publish(Event::RoleChanged {
+                role_id: current.id,
+            });
+            Ok(Json(bot.into()))
+        }
+        Err(UpdateBotPermissionsError::NoSuchBot) => Err(ApiError::NotFound("no such bot")),
+        Err(UpdateBotPermissionsError::Internal(err)) => Err(err.into()),
+    }
 }

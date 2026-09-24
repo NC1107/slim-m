@@ -1,6 +1,6 @@
 # 0028 - Bot accounts
 
-Status: proposed (design; the server surface is built in stages after this record)
+Status: accepted, implemented (see the 2026-09-24 amendment for declared permissions, the managed role, ADMINISTRATOR, and the audit trail)
 Date: 2026-09-19
 
 ## The ask
@@ -114,4 +114,60 @@ Promoting the example into a repo of its own is a decision to make once there is
 
 - Whether a bot may be installed from some registry, or only provisioned by hand. Hand-provisioned, for now, because there is no registry.
 - Slash commands owned by a bot. The module system already owns that extension point (decision 0021); whether a bot may register one is a later, additive question.
-- Whether bots may hold `ADMINISTRATOR`. The permission system has no special cases and this record adds none, so the bit is grantable; whether that should be refused outright is a product call, and the audit trail is what makes it visible in the meantime.
+
+## Amended 2026-09-24: declared permissions, a managed role, and full permission parity with a human
+
+An audit pass on 2026-09-21 found three things this record left as gaps between "a bot is a role like any other" and what an operator could actually do with that model:
+
+- **No declared permissions.** A bot declared nothing at mint time, so an admin guessed at what role to hand-build. Discord's bot install flow states a permission integer up front and the admin approves it.
+- **No managed role.** Discord creates a role named after the bot, holding exactly what was approved, auto-assigned. Here an admin hand-built one by hand, every time.
+- **The audit trail claim was false.** This record's own §"Authentication" said "every creation and revocation goes on the moderation-audit trail (decision 0015)." `record_moderation_audit` had exactly five callers, all in member-moderation code; `http/bots.rs` and `store/bots.rs` were not among them.
+
+Two live bots on the owner's deployment were blocked by exactly this gap, not by any permission being too coarse in the sense of missing a finer bit: the **roles** bot could not be handed even a zero-permission `tester` role to grant, because nothing could grant *it* `MANAGE_ROLES` in the first place; the **modlog** bot needed `/reports/history` and the only bit that reached it, `MANAGE_MESSAGES`, also grants deleting anyone's message. The roles bot's case was an honest-grant-flow problem, fixed below by giving bots a real grant path. The modlog bot's case was a genuine finer-grained-permission problem - unlike Discord's "Manage Messages", slim had no read-only sibling for its moderation history - so this record adds one: `Permissions::VIEW_MODERATION_HISTORY`, deliberately deployment-wide rather than per-channel, matching Discord's own "View Audit Log" being a guild permission rather than a channel one. See that bit's own doc comment in `permissions.rs`.
+
+### Declared permissions and the managed role
+
+A bot cannot negotiate anything over the wire before it holds a credential, so there is no handshake to build - the parallel to Discord's OAuth consent screen does not exist here, and this record does not invent one. Instead, `POST /bots` takes a `permissions` bitmask, the same shape `POST /roles` already takes, and the admin sets it informed by whatever the bot's own documentation says it needs. `PATCH /bots/{botId}/permissions` changes it later, a convenience shortcut for editing the same role.
+
+Both routes create or update the bot's **managed role**: a normal row in `roles`, carrying a new `managed_bot_id` column (informational only), auto-assigned to the bot at creation, and evaluated by exactly the same `permissions_in_channel`/`evaluate` path every other role goes through - the central claim this record opened with, still true and still enforced by construction rather than by a second code path.
+
+### The escalation guard is the only permission-side safeguard
+
+`http::roles::grantable` - the check that a role's requested bits are a subset of what the caller already holds - is reused as-is by `http::bots`, unmodified, for both `POST /bots` and `PATCH /bots/{botId}/permissions`. `PATCH /bots/{botId}/permissions` also runs `escalation_guard` against the role's *current* bits before applying the edit, mirroring `http::roles::update`'s identical double check against a human role: a caller must already dominate what a role holds before touching it at all, not only the bits they are about to add.
+
+This is the one safeguard on what a bot may hold, and it is not bot-specific: it is the same rule that already stops one human handing another a role above their own.
+
+### ADMINISTRATOR: a bot may hold it, exactly like a human
+
+An interim draft of this amendment refused ADMINISTRATOR to a bot outright, reasoning that a long-lived, non-rotating token is a worse credential to leak than a human session. The owner overruled that call directly: "why should bots not be able to manage roles, they are effectively just robot users, they should have permissions same as users or roles, and should be able to be admin." Bots are robot users; a bot's power comes entirely from the roles an admin gives it, exactly like a person's, and the platform adds no special case for what a role may contain depending on who holds it.
+
+So: no bot-specific permission cap of any kind. `grantable`, `assign`, `update`, and `administrator_count` treat a bot exactly like a human throughout - none of them inspect `is_bot`. `require_human` still exists, but only for what it always guarded: a bot may not provision or repermission another bot (§"What a bot may never do"), a lifecycle safeguard against a compromised credential forking itself, unrelated to what permissions a bot may hold once it exists. An ADMINISTRATOR bot reaches every route ADMINISTRATOR reaches, human-credential routes (`POST /admin/users/{userId}/reset-code`, `DELETE /members/{userId}/account`) included - see `crates/slimm-server/tests/bot_permissioning/grants.rs`'s parity test.
+
+The safeguards that remain, all principal-neutral: the escalation guard above (nobody grants a role above their own), the audit trail below (who did what), and revocation (a compromised credential is cut off, not merely capped).
+
+### The managed role is a convenience, not a ceiling
+
+An earlier draft also had `http::roles` refuse to edit, delete, assign or unassign a bot's managed role directly, and had `store::revoke_bot` delete it on revoke. Both are gone. The managed role is an ordinary row: an admin can rename it, change its permissions, assign it to a human, or delete it through the plain `/roles` routes with no special case at all. Revoking a bot leaves the role in place - deleting it would have been a silent permission change for any human who came to share it, which is exactly the kind of second answer this record's central claim warns against. Hard-deleting a bot's account (`store::account_deletion`) detaches `managed_bot_id` (sets it to `NULL`) rather than deleting the role, for the same reason; see `tests/account_deletion_coverage.rs`'s entry for that column.
+
+### The audit trail, actually wired
+
+`moderation_audit_log`'s `action` CHECK constraint is widened (migration `0077`, a rebuild per SQLite's own limits, following `0049`'s template, plus the `created_at` index `0068` added since) to add `bot_create`, `bot_revoke` and `bot_permission_grant`. All three are written in the same transaction as the state change they record:
+
+- `store::create_bot` writes `bot_create` alongside the managed role's creation.
+- `store::update_bot_permissions` (the store side of `PATCH /bots/{botId}/permissions`) writes `bot_permission_grant`.
+- `store::revoke_bot` writes `bot_revoke`.
+
+The acting human is always the recorded actor, never the bot itself, matching every other row in this table. `crates/slimm-server/tests/bot_permissioning/lifecycle.rs` drives all three through HTTP and reads the trail back directly, the same way `tests/moderation_audit.rs` already does for member moderation.
+
+Module lifecycle (install/enable/grant) is a separate, real gap of the same shape - decision 0021 made the identical false claim about its own audit coverage, corrected in the same change that landed this addendum. It is not fixed here: an install/enable/grant has no single subject user the way a bot create/revoke does, and that is a shape question worth its own review rather than a rider on a bot-focused change.
+
+### Where this departs from Discord, and why
+
+Discord installs a bot per-guild through OAuth, with the bot's owner choosing the permission integer in a URL and the installing admin approving it in a consent screen. slim is one deployment per community (`CLAUDE.md`), so there is no cross-server install flow to mirror and no bot-owner-hosted consent screen to redirect through - the bot has no identity in this system until an admin mints its token, so the admin is necessarily the one declaring its permissions too, informed by the bot's own documentation rather than a wire-level request. The managed-role shape (auto-created, auto-assigned) is kept, purely as a convenience: it is good bot-lifecycle hygiene independent of the cross-server install flow it is normally bundled with, and it is never a ceiling here the way Discord's own permission-integer cap effectively becomes one.
+
+### What the roles and modlog bots need, concretely
+
+Neither is granted anything by this change; granting bits on the live deployment is a separate, deliberate admin action, not something this record or its code performs. Once available:
+
+- The **roles** bot needs `MANAGE_ROLES` granted to its own managed role, exactly like any other bit, through `PATCH /bots/{botId}/permissions`. Once held, it can grant a role to a member as long as the role's own bits are a subset of what it holds - a zero-permission `tester` role always qualifies.
+- The **modlog** bot needs `VIEW_MODERATION_HISTORY` granted the same way, which reaches `GET /reports/history` without also reaching `MANAGE_MESSAGES`'s message-deletion power.

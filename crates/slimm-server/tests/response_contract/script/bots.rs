@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Bot provisioning and command registration, in call order: create, list,
-//! register as the bot itself, read both ways, revoke - order matters since
-//! a revoked token can no longer call `setBotCommands`.
+//! Bot provisioning, command registration and permissioning, in call order:
+//! create, list, register commands as the bot itself, read both ways,
+//! repermission, revoke - order matters since a revoked token can no longer
+//! call `setBotCommands`, and `setBotPermissions`/`revokeBot` both need a
+//! live bot.
+//!
+//! Runs near the end of the script, after the member-facing cases, because
+//! creating a bot adds a member and nothing earlier should have to account for
+//! it.
 
 use serde_json::json;
 
@@ -44,6 +50,14 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     )
     .await;
 
+    c.json(
+        "setBotPermissions",
+        "PATCH",
+        &format!("/bots/{bot_id}/permissions"),
+        root,
+        json!({ "permissions": 0 }),
+    )
+    .await;
     c.bare("revokeBot", "POST", &format!("/bots/{bot_id}/revoke"), root)
         .await;
 }

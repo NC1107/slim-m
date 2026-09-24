@@ -362,7 +362,10 @@ async fn restoring_a_removed_bot_revives_its_token() {
     let (s, _guard) = store().await;
     let (admin, _member) = deployment(&s).await;
 
-    let new_bot = s.create_bot("modbot", "Modbot", admin.id).await.unwrap();
+    let new_bot = s
+        .create_bot("modbot", "Modbot", Permissions::NONE, admin.id)
+        .await
+        .unwrap();
     let bot_id = new_bot.bot.user_id;
     let token = new_bot.token;
     assert!(s.authenticate_bot(&token).await.unwrap().is_some());
@@ -426,13 +429,13 @@ async fn restoring_a_bot_does_not_revive_a_token_already_revoked_before_removal(
     let (admin, _member) = deployment(&s).await;
 
     let new_bot = s
-        .create_bot("watchbot", "Watchbot", admin.id)
+        .create_bot("watchbot", "Watchbot", Permissions::NONE, admin.id)
         .await
         .unwrap();
     let bot_id = new_bot.bot.user_id;
     let token = new_bot.token;
 
-    s.revoke_bot(bot_id).await.unwrap();
+    s.revoke_bot(bot_id, admin.id).await.unwrap();
     s.remove_from_space(bot_id, admin.id, None).await.unwrap();
     assert!(s.restore_to_space(bot_id, admin.id).await.unwrap());
 

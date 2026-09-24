@@ -79,6 +79,10 @@ impl Permissions {
     /// the base (guild) level for the two routes with no channel of their
     /// own - see `http::module_commands`'s own doc.
     pub const RUN_CODE: Self = Self(1 << 17);
+    /// Read `/reports/history` without `MANAGE_MESSAGES`'s power to act on a
+    /// report or delete a message. Deployment-wide, not per-channel; see
+    /// `docs/decisions/0028-bot-accounts.md`.
+    pub const VIEW_MODERATION_HISTORY: Self = Self(1 << 18);
 
     /// The union of every defined permission. What administrator resolves to.
     pub const ALL: Self = Self(
@@ -99,7 +103,8 @@ impl Permissions {
             | Self::MANAGE_CANVAS.0
             | Self::MANAGE_SERVER.0
             | Self::MENTION_EVERYONE.0
-            | Self::RUN_CODE.0,
+            | Self::RUN_CODE.0
+            | Self::VIEW_MODERATION_HISTORY.0,
     );
 
     /// Wraps a raw bitmask, for example one loaded from the database.
@@ -326,6 +331,7 @@ mod tests {
             Permissions::MANAGE_SERVER,
             Permissions::MENTION_EVERYONE,
             Permissions::RUN_CODE,
+            Permissions::VIEW_MODERATION_HISTORY,
         ];
         let union = named
             .into_iter()

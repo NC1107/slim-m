@@ -8,8 +8,10 @@ class Bot {
     required this.username,
     required this.displayName,
     required this.createdAt,
+    required this.permissions,
     this.tokenName,
     this.tokenLastUsedAt,
+    this.roleId,
   });
 
   factory Bot.fromJson(Map<String, dynamic> json) => Bot(
@@ -19,6 +21,8 @@ class Bot {
         createdAt: json['created_at'] as int,
         tokenName: json['token_name'] as String?,
         tokenLastUsedAt: json['token_last_used_at'] as int?,
+        roleId: json['role_id'] as String?,
+        permissions: json['permissions'] as int,
       );
 
   final String userId;
@@ -33,6 +37,12 @@ class Bot {
   /// Written at most once a minute server-side, so it is a recency hint and
   /// not an exact last-call time.
   final int? tokenLastUsedAt;
+
+  /// The bot's managed role.
+  final String? roleId;
+
+  /// What the managed role currently grants.
+  final int permissions;
 
   bool get isRevoked => tokenName == null;
 }
@@ -72,24 +82,35 @@ extension SlimmApiBots on SlimmApi {
         .toList(growable: false);
   }
 
-  /// Creates a bot and returns it with its token.
-  ///
-  /// The token is in this response and nowhere else, ever, so a caller that
-  /// discards it has to revoke the bot and make another.
-  Future<NewBot> createBot(String username, {String? displayName}) async {
+  /// Creates a bot and returns it with its token, shown only this once.
+  Future<NewBot> createBot(
+    String username, {
+    String? displayName,
+    int permissions = 0,
+  }) async {
     final json = await _send(
       'POST',
       '/bots',
       body: {
         'username': username,
         if (displayName != null) 'display_name': displayName,
+        'permissions': permissions,
       },
     );
     return NewBot.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Revokes a bot's token and session, stopping it on its next request. The
-  /// account stays, so what it wrote stays attributed to it.
+  /// Revokes a bot's token and session, stopping it on its next request.
   Future<void> revokeBot(String botUserId) =>
       _send('POST', '/bots/$botUserId/revoke', expectNoContent: true);
+
+  /// Replaces what a bot's managed role grants.
+  Future<Bot> setBotPermissions(String botUserId, int permissions) async {
+    final json = await _send(
+      'PATCH',
+      '/bots/$botUserId/permissions',
+      body: {'permissions': permissions},
+    );
+    return Bot.fromJson(json as Map<String, dynamic>);
+  }
 }

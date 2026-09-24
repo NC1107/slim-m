@@ -35,6 +35,7 @@ String _botJson(
   String username, {
   String? tokenName = 'Helper',
   int? lastUsed,
+  int permissions = 0,
 }) => jsonEncode({
   'user_id': 'bot-$username',
   'username': username,
@@ -42,12 +43,19 @@ String _botJson(
   'created_at': 0,
   'token_name': tokenName,
   'token_last_used_at': lastUsed,
+  'role_id': tokenName == null ? null : 'role-$username',
+  'permissions': permissions,
 });
 
 Future<void> _pump(
   WidgetTester tester,
   http.Response Function(http.Request) handler,
 ) async {
+  // Taller than 600px default: the permission list pushes buttons off-screen.
+  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
   final container = ProviderContainer(
     overrides: [
       keyStoreProvider.overrideWithValue(InMemoryKeyStore()),

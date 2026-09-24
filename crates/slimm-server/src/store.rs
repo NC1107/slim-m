@@ -76,6 +76,7 @@ mod recovery;
 mod refresh_rotation;
 mod removals;
 mod reports;
+mod role_bots;
 mod role_mentions;
 mod roles;
 mod safety;
@@ -102,7 +103,7 @@ pub use bot_commands::{
     MAX_BOT_COMMAND_USAGE_LEN, MAX_BOT_COMMANDS, MAX_BOT_PREFIX_LEN, RESERVED_BOT_PREFIXES,
     SetBotCommandsError, VisibleBotCommand,
 };
-pub use bots::{BOT_TOKEN_PREFIX, Bot, CreateBotError, NewBot};
+pub use bots::{BOT_TOKEN_PREFIX, Bot, CreateBotError, NewBot, UpdateBotPermissionsError};
 pub use calls::CallRecord;
 pub use canvas::{
     CanvasObject, MAX_CANVAS_OBJECT_CAP, MAX_OBJECT_EXTENT, MAX_OBJECTS_PER_CHANNEL,

@@ -101,7 +101,11 @@ Code from a repository running inside a space is the whole risk, so isolation is
 - **The fetch itself is guarded.** The Dock reaches GitHub over a host-allowlisted client (raw.githubusercontent.com / api.github.com for the one repo), the same posture as decision 0019's SSRF defense, so the marketplace cannot be pointed at an internal address.
 - **No ambient authority.** A module gets exactly the host capabilities its manifest declared and the admin approved, nothing else. Network egress from a module is default-deny.
 - **The runtime is sandboxed** (see below). A module cannot touch slim's process memory, the database, the host filesystem, or the network except through granted, mediated host calls.
-- **Everything is per space and reversible.** Off by default, install is an explicit admin act, uninstall is clean, and every install/enable/grant is auditable through the existing moderation-audit trail (decision 0015).
+- **Everything is per space and reversible.** Off by default, install is an explicit admin act, and uninstall is clean.
+  **Correction, 2026-09-24:** this line originally claimed every install/enable/grant was "auditable through the existing moderation-audit trail (decision 0015)."
+  That was never true at HEAD: `record_moderation_audit` had no caller anywhere in `store/modules.rs` or `http/dock.rs`, and this record's own Phase 5 list below already carried "audit surfacing" as not-yet-built, contradicting the claim in the same document.
+  An audit pass on 2026-09-21 found the contradiction; decision 0028's bot-lifecycle work (2026-09-24) fixed the identical gap for bots and widened `moderation_audit_log`'s action set, but left module lifecycle unwired deliberately - it is a separate surface with its own shape questions (an install/enable/grant has no single subject user the way a bot does), and bundling it into a bot-focused change would have shipped it without the same scrutiny.
+  Module lifecycle auditing remains real, tracked work, not yet done.
 
 ## Runtime backends
 
