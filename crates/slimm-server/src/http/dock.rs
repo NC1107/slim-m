@@ -285,20 +285,19 @@ async fn install(
     };
     let installed = state
         .store
-        .install_module(InstallModuleRequest {
-            id: &manifest.id,
-            name: &manifest.name,
-            version: &manifest.version,
-            artifact_sha256: &manifest.artifact.sha256,
-            approved_capabilities: &manifest.capabilities,
-            runtime_limits: &runtime_limits,
-            permissions: &permissions,
-            extension_points: &extension_points,
-        })
-        .await?;
-    state
-        .store
-        .store_module_artifact(&manifest.id, &manifest.artifact.sha256, &artifact)
+        .install_module_with_artifact(
+            InstallModuleRequest {
+                id: &manifest.id,
+                name: &manifest.name,
+                version: &manifest.version,
+                artifact_sha256: &manifest.artifact.sha256,
+                approved_capabilities: &manifest.capabilities,
+                runtime_limits: &runtime_limits,
+                permissions: &permissions,
+                extension_points: &extension_points,
+            },
+            &artifact,
+        )
         .await?;
     Ok(Json(InstalledModuleDto::from(installed)))
 }
