@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Read-side enrichment for `message_embeds`: stage 3 of
-//! `docs/decisions/0030-incoming-webhooks.md`, store and enrichment first.
-//! Nothing here posts an embed through an HTTP route yet - that is the
-//! webhook delivery and bot send paths' own job - so every embed below is
-//! written straight through the store, the same way a future caller's
-//! validated input eventually will be, and read back through the ordinary
-//! `GET /channels/{id}/messages` route to prove `http::message_enrich`
-//! actually attaches what the store holds.
+//! Read-side enrichment for `message_embeds`. No HTTP route can create an
+//! embed yet, so every one here is written straight through the store.
 
 use axum::Router;
 use axum::body::Body;
@@ -112,10 +106,7 @@ async fn messages_in(app: &Router, channel_id: &str, token: &str) -> Vec<Value> 
     json_body(response).await.as_array().unwrap().clone()
 }
 
-/// The deliverable: an embed the store holds against a message shows up on
-/// that message's `embeds` array, in order, with its field and its colour
-/// already reduced to a closed accent - never a raw hex - by the time it
-/// reaches the wire.
+/// A stored embed shows up on its message, colour already an accent.
 #[tokio::test]
 async fn a_stored_embed_is_enriched_onto_its_message() {
     let h = harness(LinkPreviews::disabled()).await;
@@ -162,9 +153,7 @@ async fn a_stored_embed_is_enriched_onto_its_message() {
     assert!(embeds[0]["image_token"].is_null(), "no image was ever set");
 }
 
-/// An ordinary message with no embed carries an empty array, not a missing
-/// key or a null - the same "always present" convention `reactions` and
-/// `attachments` already follow.
+/// No embed means an empty array, never a missing key or null.
 #[tokio::test]
 async fn a_message_with_no_embed_has_an_empty_embeds_array() {
     let h = harness(LinkPreviews::disabled()).await;
@@ -185,9 +174,7 @@ async fn a_message_with_no_embed_has_an_empty_embeds_array() {
     assert_eq!(messages[0]["embeds"], serde_json::json!([]));
 }
 
-/// An embed image resolves to a redeemable token, exactly like an ordinary
-/// pasted link's preview image - never the raw upstream URL - and only when
-/// this deployment has opted into outbound fetching at all.
+/// An embed image resolves to a redeemable token, never the raw URL.
 #[tokio::test]
 async fn an_embed_image_resolves_to_a_redeemable_token_when_previews_are_enabled() {
     let h = harness(LinkPreviews::for_test()).await;
@@ -222,23 +209,15 @@ async fn an_embed_image_resolves_to_a_redeemable_token_when_previews_are_enabled
         token_value.is_string(),
         "an enabled deployment must mint a token for a valid image url"
     );
-    // Two reads of the same message must not churn the cache into minting a
-    // fresh token every time the channel is scrolled past - see
-    // `Cache::image_token_for`'s own doc.
+    // Re-reading must reuse the token, not mint a fresh one.
     let again = messages_in(&h.app, &channel.id.to_string(), &token).await;
     assert_eq!(again[0]["embeds"][0]["image_token"], *token_value);
 }
 
-/// A literal blocked address (the `is_blocked` guard's own cheap, synchronous
-/// half) never even reaches the cache: the image is absent from the moment
-/// it is enriched, exactly like the disabled-deployment case below.
+/// A blocked address never reaches the cache; built from `Config` directly
+/// since `for_test()` would wave the address through instead of refusing it.
 #[tokio::test]
 async fn an_embed_image_pointed_at_a_blocked_address_is_dropped() {
-    // `for_test()` sets `allow_private: true` so a test upstream's own
-    // loopback is reachable, which would also wave through the very address
-    // this test means to prove is refused - so this needs the production
-    // guard (`allow_private: false`) with previews merely turned on, built
-    // straight from `Config` rather than through `for_test()`.
     let enabled_with_guard = LinkPreviews::new(&Config {
         link_previews: true,
         ..Config::default()
@@ -262,8 +241,6 @@ async fn an_embed_image_pointed_at_a_blocked_address_is_dropped() {
             sent.message.id,
             &[NewEmbed {
                 title: Some("Internal panel".to_owned()),
-                // A Grafana-style internal-network snapshot - the case
-                // decision 0030 names by name: the alert must still arrive.
                 image_url: Some("http://169.254.169.254/panel.png".to_owned()),
                 ..NewEmbed::default()
             }],
@@ -279,9 +256,7 @@ async fn an_embed_image_pointed_at_a_blocked_address_is_dropped() {
     );
 }
 
-/// The other half of the same guard: a deployment that has not turned on
-/// outbound fetching at all must still post the embed, just with no image -
-/// never an error, and never a raw URL leaking to the client instead.
+/// Previews disabled: the embed still posts, just with no image.
 #[tokio::test]
 async fn an_embed_image_is_silently_absent_when_link_previews_are_disabled() {
     let h = harness(LinkPreviews::disabled()).await;

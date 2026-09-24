@@ -45,10 +45,7 @@ struct CachedImage {
 pub(super) struct Cache {
     previews: Mutex<HashMap<String, CachedPreview>>,
     images: Mutex<HashMap<String, CachedImage>>,
-    /// The reverse of `images`: an upstream URL to the token already minted
-    /// for it, so repeatedly enriching the same embed (a channel scrolled
-    /// past twice) reuses one token instead of minting a fresh cache entry
-    /// on every read.
+    /// Reverse of `images`, so re-enriching the same embed reuses one token.
     image_tokens_by_url: Mutex<HashMap<String, (String, i64)>>,
 }
 
@@ -61,11 +58,7 @@ impl Cache {
         }
     }
 
-    /// The redeemable image token for [url], reusing an already-minted one
-    /// while it is still fresh, else minting and recording a new one. Used
-    /// only by an embed's image/thumbnail, which - unlike an ordinary link
-    /// preview's image - has no [`Preview`] wrapping it to mint a token
-    /// through [`Self::insert`] instead.
+    /// The redeemable image token for [url], reusing a fresh one if minted.
     pub(super) fn image_token_for(&self, url: &str) -> String {
         let now = now_ms();
         {

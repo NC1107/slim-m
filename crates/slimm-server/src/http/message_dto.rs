@@ -124,15 +124,8 @@ pub(crate) struct MessageDto {
     /// frames. Always `false` on a caller's own send or edit response: the
     /// resolver that fills this in never mentions its own author.
     pub(crate) mentions_me: bool,
-    /// Structured, machine-authored content attached by a webhook or a bot -
-    /// see `docs/decisions/0030-incoming-webhooks.md`'s "Where embeds live".
-    /// Always present, empty when there are none - same convention as
-    /// `reactions` and `attachments`. Fixed once a message exists, exactly
-    /// like `attachments`: nothing in this codebase ever edits an embed
-    /// (`http::messages::edit`'s own doc), so unlike `reactions` this never
-    /// needs a "may only add" merge rule on the client. Set by
-    /// [`super::message_enrich::with_reactions`]'s batch lookup, never by
-    /// this conversion, since a bare `Message` has nowhere to read one from.
+    /// Structured content attached by a webhook or a bot; see decision 0030.
+    /// Fixed once a message exists, like `attachments`.
     #[serde(default)]
     pub(crate) embeds: Vec<EmbedDto>,
 }
@@ -206,11 +199,7 @@ pub(crate) struct CodeRunDto {
 
 impl MessageDto {
     /// Roughly what this row costs a `/sync` response, for the shared byte
-    /// budget. The body dominates; the fixed addend stands in for the ids and
-    /// timestamps around it rather than pretending to be exact. Embeds are
-    /// added by their own text (title, description, footer, author name,
-    /// and every field's name and value) so a message carrying one does not
-    /// look free to the same budget its content already counts against.
+    /// budget - content plus every embed's own text.
     pub(super) fn wire_cost(&self) -> usize {
         let embeds: usize = self
             .embeds

@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Embeds: structured, machine-authored content attached to a message.
-//!
-//! A side table enriched onto the message DTO on read
-//! (`http::message_enrich`), never a column on [`super::Message`] - see
-//! migration `0075_message_embeds.sql`'s own doc and
-//! `docs/decisions/0030-incoming-webhooks.md`'s "Where embeds live". Caps,
-//! validation, and the colour-to-accent mapping all live in
-//! `http::embeds`, shared by the webhook delivery route and the ordinary
-//! send route so the two cannot drift apart; this module only ever persists
-//! and reads back what that layer has already validated.
-//!
-//! Written once, right after a fresh send, the same way
-//! [`super::Store::set_webhook_message_username`] attaches its own side
-//! table - never inside [`super::Store::send_message`]'s own transaction,
-//! so that transaction stays unaware embeds exist at all.
+//! Embeds: a side table, never a column on [`super::Message`]. See
+//! `docs/decisions/0030-incoming-webhooks.md`.
 
 use crate::ids::MessageId;
 
@@ -27,22 +14,19 @@ pub struct NewEmbedField {
     pub inline: bool,
 }
 
-/// One embed, already validated and capped by `http::embeds` - this type
-/// carries nothing this module still has to check.
+/// One embed, already validated and capped by `http::embeds`.
 #[derive(Debug, Clone, Default)]
 pub struct NewEmbed {
     pub title: Option<String>,
     pub description: Option<String>,
     pub url: Option<String>,
-    /// The caller's raw 24-bit RGB integer, kept only to reproduce the same
-    /// closed accent bucket on every read - see `http::embeds::accent_for`.
+    /// Raw 24-bit RGB; see `http::embeds::accent_for`.
     pub color: Option<i64>,
     pub author_name: Option<String>,
     pub author_url: Option<String>,
     pub footer_text: Option<String>,
     pub timestamp: Option<i64>,
-    /// Already passed `http::link_preview::ssrf::validate` - see this
-    /// module's own doc and the migration's.
+    /// Already passed `http::link_preview::ssrf::validate`.
     pub image_url: Option<String>,
     pub thumbnail_url: Option<String>,
     pub fields: Vec<NewEmbedField>,
@@ -73,11 +57,8 @@ pub struct Embed {
 }
 
 impl Store {
-    /// Stores `embeds`, in order, against `message_id`. Called at most once
-    /// per message - right after a fresh send - so this always inserts,
-    /// never updates: an edit leaves a message's embeds untouched (see
-    /// `http::messages::edit`'s own doc for why), and nothing else ever
-    /// calls this a second time for the same message.
+    /// Stores `embeds`, in order, against `message_id` - insert only, called
+    /// at most once per message; an edit never touches them.
     pub async fn set_message_embeds(
         &self,
         message_id: MessageId,
@@ -132,9 +113,8 @@ impl Store {
         Ok(())
     }
 
-    /// Every embed for each of `message_ids`, ordered by position, batched in
-    /// two queries rather than one round trip per message - the same shape
-    /// [`super::attachments_for_messages`] uses for the identical reason.
+    /// Every embed for each of `message_ids`, ordered by position, batched
+    /// like [`super::attachments_for_messages`].
     pub async fn embeds_for_messages(
         &self,
         message_ids: &[MessageId],
@@ -169,8 +149,7 @@ impl Store {
         fields_builder.push(") ORDER BY message_id, position, field_index ASC");
         let field_rows = fields_builder.build().fetch_all(&self.pool).await?;
 
-        // Keyed by (message_id, position) so each embed's fields land on the
-        // right embed even though the two queries are independent.
+        // Keyed by (message_id, position) so a field lands on the right embed despite two separate queries.
         let mut fields_by_embed: std::collections::HashMap<(MessageId, i64), Vec<EmbedField>> =
             std::collections::HashMap::new();
         for row in field_rows {
