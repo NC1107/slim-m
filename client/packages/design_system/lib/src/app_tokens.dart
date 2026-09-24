@@ -452,3 +452,14 @@ abstract final class AppCanvasColors {
     Color(0xFFC96FB8),
   ];
 }
+
+/// A webhook or bot embed's colour, reduced server-side to one of six
+/// swatches - painted only as a border stripe, never as text.
+abstract final class AppEmbedAccents {
+  static const Color red = Color(0xFFE0685C);
+  static const Color orange = Color(0xFFD98A3F);
+  static const Color yellow = Color(0xFFD9B23F);
+  static const Color green = Color(0xFF6FBF73);
+  static const Color blue = Color(0xFF5B8FD6);
+  static const Color purple = Color(0xFF8C6FE0);
+}

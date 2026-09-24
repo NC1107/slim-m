@@ -393,6 +393,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                   onVote: (option) => widget.onVote(message, option),
                   reactions: extras.reactions,
                   attachments: extras.attachments,
+                  embeds: extras.embeds,
                   poll: extras.poll,
                   appSurface: extras.appSurface,
                   call: extras.call,
