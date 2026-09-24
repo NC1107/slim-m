@@ -35,13 +35,17 @@ class _StubSyncController extends SyncController {
   Future<void> start() async {}
 }
 
-ProviderContainer _setup(SyncStatus status) => ProviderContainer(
+ProviderContainer _setup(
+  SyncStatus status, {
+  bool hasFailedSinceLive = false,
+}) => ProviderContainer(
   overrides: [
     keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
     sessionProvider.overrideWithValue(api.SessionStore(tokens: _tokens)),
     syncControllerProvider.overrideWith(
       (ref) => _StubSyncController(ref, status),
     ),
+    hasFailedSinceLiveProvider.overrideWith((ref) => hasFailedSinceLive),
     apiProvider.overrideWith((ref) {
       final client = api.SlimmApi(
         baseUrl: Uri.parse('http://localhost:8080'),
@@ -147,4 +151,18 @@ void main() {
     // AppStatusDot's own baked-in label would instead say "Offline" here.
     expect(find.bySemanticsLabel('Offline'), findsNothing);
   });
+
+  testWidgets(
+    'once a session has failed since live, a retry attempt reads as offline, not connecting',
+    (tester) async {
+      // Before this latch, the dot cross-faded to "Connecting" on every retry's brief connecting half.
+      final setup = _setup(SyncStatus.connecting, hasFailedSinceLive: true);
+      addTearDown(setup.dispose);
+      await _pumpHeader(tester, setup);
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Offline, retrying'), findsOneWidget);
+      expect(find.byTooltip('Connecting to the server'), findsNothing);
+    },
+  );
 }
