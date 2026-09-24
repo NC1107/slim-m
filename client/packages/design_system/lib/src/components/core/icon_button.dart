@@ -205,7 +205,12 @@ class _AppIconButtonState extends State<AppIconButton> {
     );
 
     if (widget.tooltip != null) {
-      control = Tooltip(message: widget.tooltip!, child: control);
+      // An included Tooltip's message joins the label in the accessible name, so a tooltip that only repeats the label doubled up what assistive tech announced; excluded only in that case, a genuinely different tooltip still reaches it.
+      control = Tooltip(
+        message: widget.tooltip!,
+        excludeFromSemantics: widget.tooltip == widget.semanticLabel,
+        child: control,
+      );
     }
 
     return control;
