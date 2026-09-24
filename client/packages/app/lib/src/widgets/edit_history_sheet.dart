@@ -2,6 +2,11 @@
 /// The sheet the "(edited)" marker opens: every version a message has held,
 /// oldest first, ending with its current content, each labelled with when it
 /// became the message's text.
+///
+/// Each entry after the first shows a word-level diff against the version
+/// immediately before it, not against the original - see `edit_history_diff.dart`
+/// for why consecutive steps, not original-vs-current, are the pair worth
+/// showing once there are three or more edits.
 library;
 
 import 'package:flutter/material.dart';
@@ -11,6 +16,8 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/display_preferences.dart';
 import '../providers/edit_history_provider.dart';
+import 'edit_history_diff.dart';
+import 'message_code_lexer.dart';
 import 'message_row_identity.dart' show formatMessageDay, formatMessageTime;
 
 /// Sizes the sheet body, so a test measures it directly rather than inferring
@@ -121,7 +128,9 @@ class _Versions extends ConsumerWidget {
       separatorBuilder: (_, __) => const Divider(height: AppSpacing.s24),
       itemBuilder: (context, i) => _VersionTile(
         version: versions[i],
+        previous: i == 0 ? null : versions[i - 1],
         label: _label(i, versions.length),
+        ordinal: _ordinal(i, versions.length),
         use24Hour: use24Hour,
       ),
     );
@@ -133,17 +142,31 @@ class _Versions extends ConsumerWidget {
     if (index == 0) return 'Original';
     return 'Edited';
   }
+
+  /// Only shown once there is real order to lose: with two versions,
+  /// "Original" and "Current" already say which is which, and a third badge
+  /// is noise. With three or more, the middle rows are all "Edited" and this
+  /// is the only thing distinguishing them.
+  static String? _ordinal(int index, int count) =>
+      count > 2 ? '${index + 1} of $count' : null;
 }
 
 class _VersionTile extends StatelessWidget {
   const _VersionTile({
     required this.version,
+    required this.previous,
     required this.label,
+    required this.ordinal,
     required this.use24Hour,
   });
 
   final api.MessageRevision version;
+
+  /// The version immediately before this one, or null for the first entry -
+  /// which then renders plainly, with nothing yet to diff against.
+  final api.MessageRevision? previous;
   final String label;
+  final String? ordinal;
   final bool use24Hour;
 
   @override
@@ -152,6 +175,10 @@ class _VersionTile extends StatelessWidget {
     final when =
         '${formatMessageDay(version.at)} at '
         '${formatMessageTime(version.at, use24Hour: use24Hour)}';
+    final blocks = previous == null
+        ? plainBlocks(version.content)
+        : diffMessage(previous!.content, version.content);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -159,25 +186,127 @@ class _VersionTile extends StatelessWidget {
           children: [
             Text(
               label,
-              style: AppText.micro.copyWith(
-                color: tokens.textSecondary,
+              style: AppText.caption.copyWith(
+                color: tokens.textPrimary,
                 fontWeight: AppWeights.semi,
               ),
             ),
+            if (ordinal != null) ...[
+              const SizedBox(width: AppSpacing.s8),
+              Text(
+                ordinal!,
+                style: AppText.micro.copyWith(color: tokens.textSecondary),
+              ),
+            ],
             const SizedBox(width: AppSpacing.s8),
             Expanded(
-              child: Text(
-                when,
-                style: AppText.micro.copyWith(color: tokens.textSecondary),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  when,
+                  style: AppText.micro.copyWith(color: tokens.textSecondary),
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.s4),
-        SelectableText(
-          version.content,
-          style: AppText.body.copyWith(color: tokens.textPrimary),
+        const SizedBox(height: AppSpacing.s8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          decoration: BoxDecoration(
+            color: tokens.surfaceSunken,
+            border: Border.all(color: tokens.borderSubtle),
+            borderRadius: BorderRadius.circular(AppRadii.card),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < blocks.length; i++) ...[
+                if (i > 0) const SizedBox(height: AppSpacing.s4),
+                _buildDiffBlock(blocks[i], tokens),
+              ],
+            ],
+          ),
         ),
+      ],
+    );
+  }
+}
+
+Widget _buildDiffBlock(DiffBlock block, AppTokens tokens) => switch (block) {
+  DiffTextBlock() => _DiffText(block: block, tokens: tokens),
+  DiffCodeBlock() => _DiffCode(block: block, tokens: tokens),
+};
+
+class _DiffText extends StatelessWidget {
+  const _DiffText({required this.block, required this.tokens});
+
+  final DiffTextBlock block;
+  final AppTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return SelectableText.rich(
+      TextSpan(
+        children: [
+          for (final span in block.spans)
+            TextSpan(text: span.text, style: _spanStyle(span.kind, tokens)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Additions and removals are marked by decoration and weight, not colour
+/// alone: strikethrough versus underline is a shape difference that survives
+/// full desaturation, the same rule `#1292` pinned for the rail's mention dot.
+/// Colour only reinforces the two states here, it never carries them alone.
+TextStyle _spanStyle(DiffKind kind, AppTokens tokens) => switch (kind) {
+  DiffKind.equal => AppText.body.copyWith(color: tokens.textPrimary),
+  DiffKind.added => AppText.body.copyWith(
+    color: tokens.textPrimary,
+    fontWeight: AppWeights.semi,
+    decoration: TextDecoration.underline,
+    decorationColor: tokens.textPrimary,
+  ),
+  DiffKind.removed => AppText.body.copyWith(
+    color: tokens.textSecondary,
+    decoration: TextDecoration.lineThrough,
+    decorationColor: tokens.textSecondary,
+  ),
+};
+
+class _DiffCode extends StatelessWidget {
+  const _DiffCode({required this.block, required this.tokens});
+
+  final DiffCodeBlock block;
+  final AppTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    final rendered = AppCodeBlock(
+      lines: lexCodeBlock(block.code, block.language),
+      language: block.language,
+    );
+    if (block.kind == DiffKind.equal) return rendered;
+
+    final removed = block.kind == DiffKind.removed;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          removed ? 'Removed' : 'Added',
+          style: AppText.micro.copyWith(
+            color: removed ? tokens.textSecondary : tokens.textPrimary,
+            fontWeight: AppWeights.semi,
+            decoration: removed
+                ? TextDecoration.lineThrough
+                : TextDecoration.underline,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        Opacity(opacity: removed ? 0.7 : 1, child: rendered),
       ],
     );
   }
