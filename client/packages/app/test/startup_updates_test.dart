@@ -62,10 +62,12 @@ class _Dnf implements RpmUpdater {
   final bool ok;
   final String detail;
   var applied = false;
+  String? lastCurrentVersion;
 
   @override
-  Future<RpmUpdateResult> apply() async {
+  Future<RpmUpdateResult> apply({String? currentVersion}) async {
     applied = true;
+    lastCurrentVersion = currentVersion;
     return RpmUpdateResult(ok: ok, detail: detail);
   }
 
@@ -192,6 +194,13 @@ void main() {
     sub.close();
 
     expect(dnf.applied, isTrue);
+    expect(
+      dnf.lastCurrentVersion,
+      '1.0.0',
+      reason:
+          'apply needs the running version to tell "already installed, '
+          'just restart" apart from "genuinely nothing newer"',
+    );
     expect(relaunched, isTrue);
     expect(
       prompts.whereType<StartupPrompt>(),

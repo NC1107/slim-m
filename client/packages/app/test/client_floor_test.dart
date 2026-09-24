@@ -28,7 +28,7 @@ class _Dnf implements RpmUpdater {
   var applied = false;
 
   @override
-  Future<RpmUpdateResult> apply() async {
+  Future<RpmUpdateResult> apply({String? currentVersion}) async {
     applied = true;
     return RpmUpdateResult(ok: ok, detail: detail);
   }

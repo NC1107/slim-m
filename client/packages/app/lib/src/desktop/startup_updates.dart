@@ -74,7 +74,7 @@ Future<void> runStartupUpdates(
     if (update == null) return;
 
     if (update.format == InstallFormat.rpm) {
-      await _installWithDnf(container, update, rpm, relaunch);
+      await _installWithDnf(container, version, update, rpm, relaunch);
       return;
     }
     await _offerManually(container, update);
@@ -118,13 +118,14 @@ Future<bool> _askToEnable(
 /// replaced on disk.
 Future<void> _installWithDnf(
   ProviderContainer container,
+  String currentVersion,
   ClientUpdate update,
   RpmUpdater rpm,
   Relaunch relaunch,
 ) async {
   container.read(startupStatusProvider.notifier).state =
       'Installing ${update.version}';
-  final result = await rpm.apply();
+  final result = await rpm.apply(currentVersion: currentVersion);
   if (!result.ok) {
     container
         .read(debugLogProvider.notifier)

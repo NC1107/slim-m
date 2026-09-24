@@ -12,6 +12,8 @@ library;
 
 import 'dart:io';
 
+import 'update_check.dart' show isNewer;
+
 /// How dnf is run, so a test can script exit codes and output.
 typedef ProcessRunner =
     Future<ProcessResult> Function(String executable, List<String> arguments);
@@ -85,13 +87,26 @@ class RpmUpdater {
   /// measured on the owner's own box, where `check-upgrade` saw 0.73.0 while
   /// COPR had 0.75.0 built and waiting.
   ///
-  /// Success is the installed version actually changing, not dnf's exit
-  /// code. A release whose COPR build has not finished publishing yet is a
-  /// real and ordinary case - GitHub has the tag minutes before the rpm
-  /// exists - and `dnf upgrade -y` exits 0 having done nothing at all for
-  /// it. Reporting that as an installed update would offer a restart into
-  /// the very same build.
-  Future<RpmUpdateResult> apply() async {
+  /// Success is the installed version actually changing across this call, or
+  /// having already changed before it - not dnf's exit code. Two different
+  /// cases both leave dnf reporting "nothing to do" (`before == after`):
+  ///
+  /// - The COPR build genuinely has not finished publishing yet - GitHub has
+  ///   the tag minutes before the rpm exists - and [currentVersion] is still
+  ///   what is installed too. Reporting that as installed would offer a
+  ///   restart into the very same build, so this is the one real failure.
+  /// - An earlier attempt (this session or a previous one) already
+  ///   installed the update, but the process was never restarted into it -
+  ///   `rpm -q` and [currentVersion] disagree. There is nothing left to
+  ///   download, only a restart, which is success, not the error it used to
+  ///   report ("dnf had nothing newer... may still be building") on a
+  ///   package that had, in fact, already arrived.
+  ///
+  /// [currentVersion] is the running build's own version
+  /// ([appInfoProvider]/`PackageInfo`), not the version being offered: what
+  /// matters is whether dnf has already gotten this install past what is
+  /// actually running, regardless of which release triggered the check.
+  Future<RpmUpdateResult> apply({String? currentVersion}) async {
     if (!await repoEnabled()) {
       final enabled = await _privileged([
         'dnf',
@@ -115,6 +130,12 @@ class RpmUpdater {
 
     final after = await installedVersion();
     if (before != null && after != null && before == after) {
+      if (currentVersion != null && isNewer(after, currentVersion)) {
+        return RpmUpdateResult(
+          ok: true,
+          detail: '$after is already installed; restart to use it.',
+        );
+      }
       return RpmUpdateResult(
         ok: false,
         detail:
