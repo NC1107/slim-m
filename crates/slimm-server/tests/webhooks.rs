@@ -19,7 +19,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
-use slimm_server::ids::ChannelId;
+use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
@@ -82,7 +82,7 @@ async fn json_body(response: axum::response::Response) -> Value {
 
 /// A live administrator, the deployment they claimed, and a channel to point
 /// webhooks at.
-async fn fixture(store: &Store, name: &str) -> (String, ChannelId) {
+async fn fixture(store: &Store, name: &str) -> (String, ChannelId, UserId) {
     let account = store
         .create_account(name, name, "not-a-real-hash")
         .await
@@ -94,14 +94,17 @@ async fn fixture(store: &Store, name: &str) -> (String, ChannelId) {
         .unwrap()
         .access_token;
     let channel = store.create_channel("general", "text").await.unwrap();
-    (token, channel.id)
+    (token, channel.id, account.id)
 }
 
 #[tokio::test]
 async fn a_webhook_can_be_minted_used_to_post_and_revoked() {
     let (store, _guard) = new_store("slimm-webhooks-lifecycle").await;
-    let (_root, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (_root, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store.clone());
 
     let path = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);
@@ -113,7 +116,10 @@ async fn a_webhook_can_be_minted_used_to_post_and_revoked() {
     assert_eq!(posted.status(), StatusCode::NO_CONTENT);
 
     assert!(
-        store.revoke_webhook(minted.webhook.id).await.unwrap(),
+        store
+            .revoke_webhook(minted.webhook.id, admin_id)
+            .await
+            .unwrap(),
         "revoking a webhook that exists reports it existed"
     );
 
@@ -132,8 +138,11 @@ async fn a_webhook_can_be_minted_used_to_post_and_revoked() {
 #[tokio::test]
 async fn wait_true_answers_the_minimal_acknowledgement() {
     let (store, _guard) = new_store("slimm-webhooks-wait").await;
-    let (_root, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (_root, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store);
 
     let path = format!("/webhooks/{}/{}?wait=true", minted.webhook.id, minted.token);
@@ -152,14 +161,20 @@ async fn wait_true_answers_the_minimal_acknowledgement() {
 #[tokio::test]
 async fn missing_wrong_and_revoked_all_answer_the_identical_404() {
     let (store, _guard) = new_store("slimm-webhooks-uniform-404").await;
-    let (_root, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (_root, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store.clone());
 
     let never_existed = format!("/webhooks/{}/{}", uuid::Uuid::now_v7(), "not-a-real-token");
     let wrong_token = format!("/webhooks/{}/wrong-token", minted.webhook.id);
 
-    store.revoke_webhook(minted.webhook.id).await.unwrap();
+    store
+        .revoke_webhook(minted.webhook.id, admin_id)
+        .await
+        .unwrap();
     let revoked = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);
 
     for path in [
@@ -183,8 +198,11 @@ async fn missing_wrong_and_revoked_all_answer_the_identical_404() {
 #[tokio::test]
 async fn an_unknown_payload_field_is_accepted_and_discarded() {
     let (store, _guard) = new_store("slimm-webhooks-accept-discard").await;
-    let (_root, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (_root, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store);
 
     let path = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);
@@ -211,8 +229,11 @@ async fn an_unknown_payload_field_is_accepted_and_discarded() {
 #[tokio::test]
 async fn a_repeated_idempotency_key_lands_on_the_same_message() {
     let (store, _guard) = new_store("slimm-webhooks-idempotency").await;
-    let (_root, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (_root, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store.clone());
 
     let path = format!("/webhooks/{}/{}?wait=true", minted.webhook.id, minted.token);
@@ -262,8 +283,11 @@ async fn a_repeated_idempotency_key_lands_on_the_same_message() {
 #[tokio::test]
 async fn a_webhook_post_is_reportable_and_moderator_deletable_with_no_new_code() {
     let (store, _guard) = new_store("slimm-webhooks-attribution").await;
-    let (root, channel_id) = fixture(&store, "root").await;
-    let minted = store.create_webhook(channel_id, "alerts").await.unwrap();
+    let (root, channel_id, admin_id) = fixture(&store, "root").await;
+    let minted = store
+        .create_webhook(channel_id, "alerts", admin_id)
+        .await
+        .unwrap();
     let app = app(store.clone());
 
     let path = format!("/webhooks/{}/{}?wait=true", minted.webhook.id, minted.token);

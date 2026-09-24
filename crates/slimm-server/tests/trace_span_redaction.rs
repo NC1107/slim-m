@@ -95,7 +95,10 @@ async fn a_webhook_delivery_span_never_carries_the_token() {
         .unwrap();
     store.bootstrap_deployment(admin.id).await.unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let minted = store.create_webhook(channel.id, "alerts").await.unwrap();
+    let minted = store
+        .create_webhook(channel.id, "alerts", admin.id)
+        .await
+        .unwrap();
 
     let captured = CapturedSpanFields::default();
     let subscriber = Registry::default().with(captured.clone());

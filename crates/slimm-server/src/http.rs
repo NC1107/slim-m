@@ -99,6 +99,7 @@ mod voice;
 mod voice_ring;
 mod voice_webhook;
 mod webhooks;
+mod webhooks_admin;
 mod ws;
 
 /// The wire-protocol envelope version a client negotiates on connect. Bumped
@@ -214,6 +215,7 @@ pub fn router(state: AppState) -> Router {
         .merge(voice_ring::routes())
         .merge(voice_webhook::routes())
         .merge(webhooks::routes())
+        .merge(webhooks_admin::routes())
         .merge(polls::routes())
         .merge(users::routes())
         .merge(user_notes::routes())

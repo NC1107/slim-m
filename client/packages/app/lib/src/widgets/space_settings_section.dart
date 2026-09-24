@@ -41,6 +41,7 @@ import '../screens/admin/reports_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
+import '../screens/admin/webhooks_screen.dart';
 import 'settings_panes.dart';
 
 /// Whether [permissions] carries any of the bits that gate a pane here.
@@ -222,6 +223,14 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.code,
             compactRoute: Routes.adminBots,
             builder: (_) => const BotsPane(),
+          ),
+        if (canManageServer)
+          SettingsPane(
+            id: 'webhooks',
+            label: 'Webhooks',
+            icon: AppIcons.webhook,
+            compactRoute: Routes.adminWebhooks,
+            builder: (_) => const WebhooksPane(),
           ),
       ],
     ),

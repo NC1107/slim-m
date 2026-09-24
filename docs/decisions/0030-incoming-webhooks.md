@@ -350,3 +350,26 @@ They are recorded here rather than left open, so the implementation has no decis
 - **`MANAGE_SERVER` to mint, no new permission bit.**
   A nineteenth bit was considered and declined for now: on a one-community deployment it is a new row in the role editor and a new thing to get wrong, for a problem nobody has yet.
   It stays addable later without changing anything else here.
+
+## Addendum, 2026-09-24: the admin surface (stage 4)
+
+What "mint, list, rename, revoke" actually shipped as, filling in the shape this record left to the implementation.
+
+**The mint response carries a path, not a URL.**
+`NewWebhook.delivery_path` is `/webhooks/{id}/{token}`, never a scheme-and-host URL.
+The server has no configured notion of its own externally reachable origin - it may sit behind a reverse proxy at any hostname, and nothing upstream of this record ever gave it one to read.
+The client already knows the address it is talking to this deployment on, so it joins the two to show a pasteable URL.
+A server-side `public_base_url` setting was considered and rejected: it would be one more thing an operator has to get right and keep in sync with whatever `deploy/Caddyfile` actually serves, to save one string concatenation the client can already do for free.
+
+**The list carries who minted it, by display name, not by id.**
+`webhooks.created_by` is nullable (`ON DELETE SET NULL`), the same shape a message's `author_id` survives its author's deletion: the admin who minted a webhook can delete their own account later and the webhook keeps working, showing no minter rather than a dangling reference.
+This is one field `Bot` does not carry - a bot's own username already identifies it, where a webhook's `users.username` is a generated `webhook-{uuid}` nobody is meant to read.
+
+**Rename exists**, PATCH-ing both the admin-facing label and the principal's `display_name` together, the same pair `create` sets in one step.
+It carries no moderation-audit action of its own, matching bot lifecycle: 0077 audits `bot_create` and `bot_revoke` but not a bot's username or display name changing, because a label is cosmetic and the audit trail is for acts that change what a principal may do or whether it exists at all.
+
+**`webhook_create` and `webhook_revoke` join the moderation audit log**, migration 0078, the same rebuild-a-CHECK-constraint shape 0077 used for the equivalent bot actions.
+`actor_id` is the admin who acted; `subject_id` is the webhook's own principal id, so the trail reads the same way a bot's does.
+
+**Admin routes live in `http/webhooks_admin.rs`, not `http/webhooks.rs`.**
+Delivery and administration are different threat surfaces with almost no shared code - delivery has no `Authed`, no permission check, and a permissive body; admin is an ordinary `MANAGE_SERVER`-gated CRUD surface - and combining them into one file would have pushed it well past the file-budget review threshold for no shared benefit. `store/webhooks.rs` stayed one file: the store methods are small and the module doc already explains the whole shape in one place.

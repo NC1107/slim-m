@@ -121,7 +121,10 @@ async fn a_live_webhook_token_is_refused_as_a_bearer_token() {
         .unwrap();
     store.bootstrap_deployment(admin.id).await.unwrap();
     let channel = store.create_channel("general", "text").await.unwrap();
-    let minted = store.create_webhook(channel.id, "alerts").await.unwrap();
+    let minted = store
+        .create_webhook(channel.id, "alerts", admin.id)
+        .await
+        .unwrap();
 
     let response = app(store)
         .oneshot(

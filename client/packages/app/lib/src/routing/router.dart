@@ -31,6 +31,7 @@ import '../screens/admin/removed_members_screen.dart';
 import '../screens/admin/roles_screen.dart';
 import '../screens/admin/server_metrics_screen.dart';
 import '../screens/admin/storage_screen.dart';
+import '../screens/admin/webhooks_screen.dart';
 import '../screens/channel_settings_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/debug_log_screen.dart';
@@ -146,6 +147,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.adminBots,
         pageBuilder: (context, state) => modalPage(context, const BotsScreen()),
+      ),
+      GoRoute(
+        path: Routes.adminWebhooks,
+        pageBuilder: (context, state) =>
+            modalPage(context, const WebhooksScreen()),
       ),
       GoRoute(
         path: Routes.adminAccountRecovery,
