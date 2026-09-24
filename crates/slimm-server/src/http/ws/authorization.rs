@@ -82,6 +82,9 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::OverwriteChanged { .. }
         // The same VIEW_CHANNEL gate the roster read route itself uses.
         | Event::VoiceActivityChanged { .. }
+        | Event::VoiceParticipantJoined { .. }
+        | Event::VoiceParticipantLeft { .. }
+        | Event::VoiceScreenShareChanged { .. }
         // Same again: a DM's own VIEW_CHANNEL already limits this to the pair.
         | Event::CallRinging { .. }
         | Event::CallRingEnded { .. }
@@ -215,6 +218,9 @@ pub(super) async fn authorize(
             Event::ChannelCreated(channel) | Event::ChannelUpdated(channel) => channel.id,
             Event::OverwriteChanged { channel_id, .. } => *channel_id,
             Event::VoiceActivityChanged { channel_id } => *channel_id,
+            Event::VoiceParticipantJoined { channel_id, .. } => *channel_id,
+            Event::VoiceParticipantLeft { channel_id, .. } => *channel_id,
+            Event::VoiceScreenShareChanged { channel_id, .. } => *channel_id,
             Event::CallRinging { channel_id, .. } => *channel_id,
             Event::CallRingEnded { channel_id, .. } => *channel_id,
             // canvas_frames::channel_id already answered Some for any of these.
@@ -292,6 +298,21 @@ pub(super) async fn authorize(
             Ok(Some(status)) if status != crate::presence::Status::Offline
         );
         if !confirmed_visible {
+            return Authorization::Withhold;
+        }
+    }
+
+    // Gated on chosen VISIBILITY, not live connection; see decision 0032.
+    if let Event::VoiceParticipantJoined { user_id, .. }
+    | Event::VoiceParticipantLeft { user_id, .. }
+    | Event::VoiceScreenShareChanged { user_id, .. } = event
+        && user_id != ctx.user_id
+    {
+        let hidden = matches!(
+            store.presence_visibility(user_id).await,
+            Ok(Some(crate::presence::Visibility::Hidden))
+        );
+        if hidden {
             return Authorization::Withhold;
         }
     }
@@ -485,6 +506,29 @@ pub(super) async fn authorize(
         },
         Event::VoiceActivityChanged { channel_id } => ServerFrame::VoiceActivityChanged {
             channel_id: channel_id.to_string(),
+        },
+        Event::VoiceParticipantJoined {
+            channel_id,
+            user_id,
+        } => ServerFrame::VoiceParticipantJoined {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        },
+        Event::VoiceParticipantLeft {
+            channel_id,
+            user_id,
+        } => ServerFrame::VoiceParticipantLeft {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        },
+        Event::VoiceScreenShareChanged {
+            channel_id,
+            user_id,
+            is_sharing_screen,
+        } => ServerFrame::VoiceScreenShareChanged {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+            is_sharing_screen,
         },
         Event::CallRinging {
             channel_id,

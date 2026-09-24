@@ -62,6 +62,24 @@ You only receive what your permissions allow - fan-out is authorized per connect
 A frame you do not recognise should be ignored, not treated as an error.
 New event types are added over time, and a bot that dies on one it has never heard of breaks on somebody else's upgrade.
 
+## Voice events
+
+Three frames tell you who is on a voice call, live, without polling `GET /channels/{channelId}/voice/roster`:
+
+```json
+{ "type": "voice.participant_joined", "channel_id": "...", "user_id": "..." }
+{ "type": "voice.participant_left", "channel_id": "...", "user_id": "..." }
+{ "type": "voice.screen_share_changed", "channel_id": "...", "user_id": "...", "is_sharing_screen": true }
+```
+
+Authorized exactly like any other channel event: you only see one for a channel you can view, and never for a member who has chosen to appear offline.
+
+**These only fire if the deployment's LiveKit is configured with a webhook pointed at the server** - see `docs/decisions/0032-voice-participant-webhooks.md`. A deployment that has not set that up sends none of the three; poll the roster instead if you need to work on both. `voice.activity` (a bare "something changed, go re-fetch" nudge with no `user_id`) keeps firing either way, so it is still the one signal every deployment gives you.
+
+A "who is on this call right now" snapshot at any time - not just at connect - is still `GET /channels/{channelId}/voice/roster`, whose entries also carry `is_sharing_screen` and `has_video`.
+
+If you are using a bot framework, this is the natural place for it to expose `on_voice_join` / `on_voice_leave` / `on_screen_share` callbacks built on top of these three frames; slim-m itself only guarantees the wire shape above.
+
 ## Sending a message
 
 ```

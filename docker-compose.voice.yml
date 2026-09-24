@@ -101,3 +101,14 @@ services:
           relay_range_end: ${LIVEKIT_TURN_RELAY_PORT_END:-30100}
           # TURN/TLS is off: its listener needs a certificate of its own and
           # cannot borrow Caddy's. The four keys to add: deploy/README.md.
+        # Lets the server learn joins, leaves and screen shares the instant
+        # LiveKit sees them rather than by polling; see
+        # docs/decisions/0032-voice-participant-webhooks.md. "server" is this
+        # compose project's own service name, reachable from the livekit
+        # container on the default compose network without publishing
+        # anything new. Verified by the same API key/secret pair above, so
+        # there is nothing extra to generate.
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set in .env, see deploy/README.md}
+          urls:
+            - http://server:8080/voice/webhook

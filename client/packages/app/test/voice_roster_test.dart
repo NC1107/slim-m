@@ -227,6 +227,47 @@ void main() {
     });
   });
 
+  test('the named webhook-sourced voice events also refetch immediately', () {
+    fakeAsync((async) {
+      var calls = 0;
+      final events = StreamController<api.ServerEvent>.broadcast();
+      addTearDown(events.close);
+      final container = _containerWith(
+        MockClient((_) async {
+          calls++;
+          return _roster(const []);
+        }),
+        liveEvents: events.stream,
+      );
+      final sub = container.listen(voiceRosterProvider('general'), (_, __) {});
+      async.flushMicrotasks();
+      expect(calls, 1);
+
+      events.add(
+        const api.VoiceParticipantJoined(channelId: 'general', userId: 'u1'),
+      );
+      async.flushMicrotasks();
+      expect(calls, 2, reason: 'voice.participant_joined refetches too');
+
+      events.add(
+        const api.VoiceParticipantLeft(channelId: 'general', userId: 'u1'),
+      );
+      async.flushMicrotasks();
+      expect(calls, 3, reason: 'voice.participant_left refetches too');
+
+      events.add(
+        const api.VoiceScreenShareChanged(
+          channelId: 'general',
+          userId: 'u1',
+          isSharingScreen: true,
+        ),
+      );
+      async.flushMicrotasks();
+      expect(calls, 4, reason: 'voice.screen_share_changed refetches too');
+      sub.close();
+    });
+  });
+
   test('a short run of failures stays quiet, matching the transient case', () {
     fakeAsync((async) {
       final container = _containerWith(

@@ -121,6 +121,17 @@ pub(super) enum ServerFrame {
     CategoryChanged,
     #[serde(rename = "voice.activity")]
     VoiceActivityChanged { channel_id: String },
+    /// See `docs/decisions/0032-voice-participant-webhooks.md`.
+    #[serde(rename = "voice.participant_joined")]
+    VoiceParticipantJoined { channel_id: String, user_id: String },
+    #[serde(rename = "voice.participant_left")]
+    VoiceParticipantLeft { channel_id: String, user_id: String },
+    #[serde(rename = "voice.screen_share_changed")]
+    VoiceScreenShareChanged {
+        channel_id: String,
+        user_id: String,
+        is_sharing_screen: bool,
+    },
     /// A DM call ring started; see [`crate::hub::Event::CallRinging`].
     #[serde(rename = "call.ringing")]
     CallRinging {

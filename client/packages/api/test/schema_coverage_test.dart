@@ -71,6 +71,10 @@ const Map<String, String> _allowlist = {
       'HTTP from its own process, never from this client - the same shape '
       'as POST /webhooks/{}/{} above. See '
       'docs/decisions/0031-bot-command-registration.md',
+  'POST /voice/webhook': 'called only by the configured LiveKit deployment '
+      'itself, verified by its own JWT signature rather than a session - '
+      'the same "no client binding by design" shape as POST /webhooks/{}/{} '
+      'above. See docs/decisions/0032-voice-participant-webhooks.md',
 };
 
 const _httpMethods = {
@@ -87,8 +91,9 @@ const _httpMethods = {
 void main() {
   final repoRoot = _findRepoRoot(Directory.current);
   final schemaFile = File('${repoRoot.path}/schema/openapi.yaml');
-  final clientSrcDir =
-      Directory('${repoRoot.path}/client/packages/api/lib/src');
+  final clientSrcDir = Directory(
+    '${repoRoot.path}/client/packages/api/lib/src',
+  );
 
   test('the schema and client route extractors both find something', () {
     // A gate that can silently see zero routes on either side would pass
@@ -294,8 +299,11 @@ String _placeholderInterpolations(String path) => path
 /// genuinely different path still fails.
 String _normalize(String path) => path
     .split('/')
-    .map((segment) =>
-        segment.startsWith('{') && segment.endsWith('}') && segment.length >= 2
-            ? '{}'
-            : segment)
+    .map(
+      (segment) => segment.startsWith('{') &&
+              segment.endsWith('}') &&
+              segment.length >= 2
+          ? '{}'
+          : segment,
+    )
     .join('/');

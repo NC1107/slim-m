@@ -320,6 +320,41 @@ class VoiceActivityChanged extends ServerEvent {
   final String channelId;
 }
 
+/// A LiveKit webhook reported someone joined [channelId]'s voice room. Only
+/// arrives when the deployment has that webhook configured; see
+/// docs/decisions/0032-voice-participant-webhooks.md. Gated the same way
+/// [VoiceActivityChanged] is, plus the joiner's own presence visibility.
+class VoiceParticipantJoined extends ServerEvent {
+  const VoiceParticipantJoined({required this.channelId, required this.userId});
+
+  final String channelId;
+  final String userId;
+}
+
+/// The webhook-sourced counterpart to [VoiceParticipantJoined], for someone
+/// leaving.
+class VoiceParticipantLeft extends ServerEvent {
+  const VoiceParticipantLeft({required this.channelId, required this.userId});
+
+  final String channelId;
+  final String userId;
+}
+
+/// [userId] started or stopped sharing their screen in [channelId]'s voice
+/// room, per LiveKit's track_published/track_unpublished webhooks. Gated the
+/// same way [VoiceParticipantJoined] is.
+class VoiceScreenShareChanged extends ServerEvent {
+  const VoiceScreenShareChanged({
+    required this.channelId,
+    required this.userId,
+    required this.isSharingScreen,
+  });
+
+  final String channelId;
+  final String userId;
+  final bool isSharingScreen;
+}
+
 /// A DM call ring started. [callerId] is who is calling; the receiving
 /// account is always the other participant of [channelId]'s DM, so this
 /// reaches only the two of them.

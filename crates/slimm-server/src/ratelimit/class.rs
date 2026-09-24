@@ -256,6 +256,17 @@ pub enum Class {
     /// are real - a flapping monitor retrying, or an importer that lands
     /// thirty episodes at once.
     Webhook,
+    /// Receiving a LiveKit webhook (`POST /voice/webhook`), verified by its
+    /// own JWT signature rather than a session. Address-keyed, since there
+    /// is exactly one legitimate caller: the configured LiveKit deployment.
+    ///
+    /// Sized well above [`Class::Webhook`]: a busy multi-channel voice
+    /// deployment can fan out several joins, leaves and track events within
+    /// the same second, and each one only republishes to a hub already
+    /// idempotent-checked (`voice::live_state`), so admitting a real burst
+    /// costs nothing this budget needs to protect against. See
+    /// `docs/decisions/0032-voice-participant-webhooks.md`.
+    LiveKitWebhook,
 }
 
 impl Class {
@@ -289,6 +300,8 @@ impl Class {
             Class::CodeRunner => (10.0, 1.0),
             // See this variant's own doc comment for how these were sized.
             Class::Webhook => (30.0, 1.0 / 3.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::LiveKitWebhook => (120.0, 20.0),
         }
     }
 
@@ -297,7 +310,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 19] = [
+    pub const ALL: [Class; 20] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -317,6 +330,7 @@ impl Class {
         Class::Module,
         Class::CodeRunner,
         Class::Webhook,
+        Class::LiveKitWebhook,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -342,6 +356,7 @@ impl Class {
             Class::Module => "module",
             Class::CodeRunner => "code_runner",
             Class::Webhook => "webhook",
+            Class::LiveKitWebhook => "livekit_webhook",
         }
     }
 }

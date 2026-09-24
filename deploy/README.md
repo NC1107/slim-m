@@ -273,6 +273,26 @@ Ubuntu and Fedora run systemd-resolved, whose `/etc/resolv.conf` names a `127.0.
 The `dns:` block on the livekit service is there for this; point it at whichever resolvers you prefer.
 Nothing else in the container uses them: that one STUN lookup is all they serve, and its target is a public Google host either way.
 
+### Voice events for bots
+
+`docker-compose.voice.yml` points LiveKit's own webhook at `http://server:8080/voice/webhook`, the server's compose-internal address, using the same `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` pair voice already needs.
+This is what lets a bot see a join, a leave or a screen share the instant it happens instead of polling the roster; see `docs/decisions/0032-voice-participant-webhooks.md`.
+
+Nothing to generate and nothing to open at your firewall: the whole exchange stays on the compose network.
+The one thing to know is that LiveKit only reads `LIVEKIT_CONFIG` when its container starts, not on a signal or a hot reload.
+Upgrading past the release that added this line needs `docker compose up -d` to actually recreate the `livekit` service, not merely the `server` one - `docker compose up -d` after a `git pull` does this on its own, but a deploy script that only restarts `server` will not pick it up until `livekit` is next recreated some other way.
+
+If you run LiveKit anywhere other than this compose file - a separate host, a different orchestrator - add the block yourself to your own `livekit.yaml`:
+
+```yaml
+webhook:
+  api_key: your-livekit-api-key
+  urls:
+    - https://your-server-host/voice/webhook
+```
+
+Until this is configured and reachable, nothing breaks. The roster (`GET .../voice/roster`, including its `is_sharing_screen`/`has_video` fields) keeps working exactly as before, `voice.activity` keeps firing, and the three named events (`voice.participant_joined`, `voice.participant_left`, `voice.screen_share_changed`) simply never do.
+
 ## Monitoring
 
 `docker compose ps` is the first line of defense: server, Caddy and LiveKit all carry a real `HEALTHCHECK` now, so a crashlooping service shows `unhealthy` there rather than sitting behind a container that merely started.

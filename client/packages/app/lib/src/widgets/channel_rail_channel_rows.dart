@@ -249,8 +249,10 @@ class VoiceChannelRow extends ConsumerWidget {
   }
 }
 
-/// A roster snapshot carries no live speaking or screen-share signal, only
-/// who is connected, so every derived flag here is false rather than guessed.
+/// A roster snapshot carries no live speaking or mute signal, so those two
+/// flags are false rather than guessed; `isSharingScreen`/`hasVideo` are
+/// read straight off the roster entry (see
+/// docs/decisions/0032-voice-participant-webhooks.md).
 VoiceParticipant _asVoiceParticipant(api.VoiceRosterParticipant p) =>
     VoiceParticipant(
       identity: p.userId,
@@ -258,7 +260,8 @@ VoiceParticipant _asVoiceParticipant(api.VoiceRosterParticipant p) =>
       isSpeaking: false,
       isMuted: false,
       isLocal: false,
-      isScreenSharing: false,
+      isScreenSharing: p.isSharingScreen,
+      isCameraOn: p.hasVideo,
     );
 
 /// Who is in a voice channel: real-time for the one the caller has joined,

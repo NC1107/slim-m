@@ -33,8 +33,6 @@
 //! arriving is what the sweep, run from `lib.rs`, treats as gone. See
 //! `voice::heartbeat` for the bound this actually gives.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64URL;
 use hmac::{Hmac, Mac};
@@ -46,12 +44,18 @@ use crate::ids::{ChannelId, UserId};
 use crate::permissions::Permissions;
 
 mod heartbeat;
+mod live_state;
 mod ring;
 mod room_lifecycle;
 mod roster;
+mod token;
+mod webhook;
 use heartbeat::{CallHeartbeats, STALE_AFTER as HEARTBEAT_STALE_AFTER};
+pub use live_state::RoomLiveState;
 pub use ring::{CallRingOutcome, CallRings, RING_TIMEOUT};
 pub use roster::RoomParticipant;
+use token::{Claims, VideoGrant, http_url_for, unix_secs};
+pub use webhook::{WebhookError, WebhookEvent, channel_for_room, is_screen_share_source};
 
 /// How long a join token is good for.
 ///
@@ -120,6 +124,8 @@ pub struct VoiceService {
     /// Ephemeral, the same independence from `inner` [`Self::heartbeats`] has;
     /// see `voice::ring`'s own module doc.
     rings: CallRings,
+    /// Ephemeral like its siblings above; see `voice::live_state`'s own doc.
+    live_state: RoomLiveState,
 }
 
 struct Enabled {
@@ -164,6 +170,7 @@ impl VoiceService {
             inner,
             heartbeats: CallHeartbeats::new(),
             rings: CallRings::new(),
+            live_state: RoomLiveState::new(),
         })
     }
 
@@ -173,6 +180,7 @@ impl VoiceService {
             inner: None,
             heartbeats: CallHeartbeats::new(),
             rings: CallRings::new(),
+            live_state: RoomLiveState::new(),
         }
     }
 
@@ -189,6 +197,7 @@ impl VoiceService {
             })),
             heartbeats: CallHeartbeats::new(),
             rings: CallRings::new(),
+            live_state: RoomLiveState::new(),
         }
     }
 
@@ -437,59 +446,6 @@ impl VoiceService {
 
         Ok(format!("{signing_input}.{signature}"))
     }
-}
-
-/// The LiveKit JWT claim set. Field names are LiveKit's, not ours.
-#[derive(Serialize)]
-struct Claims<'a> {
-    iss: &'a str,
-    sub: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<&'a str>,
-    nbf: u64,
-    exp: u64,
-    video: VideoGrant,
-}
-
-#[derive(Serialize)]
-struct VideoGrant {
-    room: String,
-    #[serde(rename = "roomJoin")]
-    room_join: bool,
-    #[serde(rename = "roomAdmin")]
-    room_admin: bool,
-    #[serde(rename = "canSubscribe")]
-    can_subscribe: bool,
-    #[serde(rename = "canPublish")]
-    can_publish: bool,
-    #[serde(rename = "canPublishData")]
-    can_publish_data: bool,
-    #[serde(rename = "canUpdateOwnMetadata")]
-    can_update_own_metadata: bool,
-}
-
-fn unix_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
-/// The room service address for a client-facing LiveKit URL.
-///
-/// LiveKit serves signaling and the room service on the same host, so this is
-/// a scheme swap rather than a second setting an operator could get wrong.
-fn http_url_for(url: &str) -> anyhow::Result<String> {
-    let trimmed = url.trim_end_matches('/');
-    let swapped = match trimmed.split_once("://") {
-        Some(("wss", rest)) => format!("https://{rest}"),
-        Some(("ws", rest)) => format!("http://{rest}"),
-        Some(("https", _)) | Some(("http", _)) => trimmed.to_owned(),
-        _ => anyhow::bail!(
-            "SLIMM_LIVEKIT_URL ({url}) must start with wss://, ws://, https:// or http://"
-        ),
-    };
-    Ok(swapped)
 }
 
 #[cfg(test)]
