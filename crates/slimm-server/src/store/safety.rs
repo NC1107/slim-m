@@ -22,6 +22,14 @@ pub struct Device {
     pub name: String,
     pub created_at: i64,
     pub last_seen_at: Option<i64>,
+    /// A coarse client kind ("ios", "android", "desktop", "web"), or `None`
+    /// for a session opened before migration 0076. Named by the client at
+    /// sign-in, the same "the client says who it is" trust `name` already
+    /// carries.
+    pub client_kind: Option<String>,
+    /// The app version that opened this session, or `None` for the same
+    /// reason as `client_kind`.
+    pub client_version: Option<String>,
     /// True for the device making the request, so the UI can label it and can
     /// warn before someone signs themselves out.
     pub is_current: bool,
@@ -65,7 +73,8 @@ impl Store {
         let now = now_ms();
         let rows = sqlx::query!(
             r#"SELECT d.id AS "id!: DeviceId", d.name AS "name!",
-                      d.created_at AS "created_at!", d.last_seen_at
+                      d.created_at AS "created_at!", d.last_seen_at,
+                      d.client_kind, d.client_version
                FROM devices d
                WHERE d.user_id = ?
                  AND EXISTS (
@@ -91,6 +100,8 @@ impl Store {
                 name: r.name,
                 created_at: r.created_at,
                 last_seen_at: r.last_seen_at,
+                client_kind: r.client_kind,
+                client_version: r.client_version,
             })
             .collect())
     }

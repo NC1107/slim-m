@@ -150,6 +150,54 @@ async fn devices_list_and_sign_out_only_your_own() {
     );
 }
 
+/// A device opened with a client kind and version reports both on the list;
+/// one opened the plain way (every existing test fixture, and any session
+/// from before migration 0076) reports neither rather than failing.
+#[tokio::test]
+async fn devices_list_reports_client_kind_and_version_when_known() {
+    let (store, _guard) = new_store().await;
+    let auth = Auth::new(2).unwrap();
+    let hash = auth
+        .hash_password("hunter2hunter2".to_owned())
+        .await
+        .unwrap();
+    let alice = store.create_account("alice", "Alice", &hash).await.unwrap();
+
+    let desktop = store
+        .open_session_as(alice.id, "Linux (fedora)", Some("desktop"), Some("0.83.0"))
+        .await
+        .unwrap();
+    let plain = store.open_session(alice.id, "an old client").await.unwrap();
+    let app = app(store.clone());
+
+    let devices = json_body(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                "/devices",
+                Some(&desktop.access_token),
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let devices = devices.as_array().unwrap();
+    let known = devices
+        .iter()
+        .find(|d| d["id"] == desktop.device_id.to_string())
+        .unwrap();
+    assert_eq!(known["client_kind"], "desktop");
+    assert_eq!(known["client_version"], "0.83.0");
+
+    let unknown = devices
+        .iter()
+        .find(|d| d["id"] == plain.device_id.to_string())
+        .unwrap();
+    assert!(unknown["client_kind"].is_null());
+    assert!(unknown["client_version"].is_null());
+}
+
 /// Every sign-in mints a fresh device row and nothing ever deletes one on an
 /// ordinary logout (only the explicit "remove this device" action does), so
 /// the list must filter live sessions out from under it rather than showing

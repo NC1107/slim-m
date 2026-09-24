@@ -46,6 +46,7 @@ mod channel_permissions;
 mod channel_slow_mode;
 mod channels;
 mod code_runs;
+mod device_client_info;
 mod dms;
 pub mod dock;
 mod embeds;

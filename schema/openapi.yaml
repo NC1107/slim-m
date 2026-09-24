@@ -6926,6 +6926,19 @@ components:
             where the first account is the one that claims it and there is
             nobody to have issued a code yet. A blank or whitespace-only value
             counts as absent.
+        client_kind:
+          type: string
+          nullable: true
+          maxLength: 16
+          description: >
+            A coarse client kind ("ios", "android", "desktop", "web"), for the
+            devices list to name a session by more than its free-text device
+            name. Optional; absent on a client older than this field.
+        client_version:
+          type: string
+          nullable: true
+          maxLength: 32
+          description: The app version opening this session; same absence rule as `client_kind`.
 
     LoginRequest:
       type: object
@@ -6937,6 +6950,16 @@ components:
           type: string
         device_name:
           type: string
+        client_kind:
+          type: string
+          nullable: true
+          maxLength: 16
+          description: See `RegisterRequest.client_kind`.
+        client_version:
+          type: string
+          nullable: true
+          maxLength: 32
+          description: See `RegisterRequest.client_version`.
 
     RefreshRequest:
       type: object
@@ -7010,6 +7033,29 @@ components:
             null for none. Shown in the member pane under the name. Absent
             on servers older than this field, which a client must treat as
             unknown rather than "no status".
+        pronouns:
+          type: [string, "null"]
+          maxLength: 40
+          description: >
+            A short self-described pronoun set ("she/her"), or null if unset.
+            Shown on the member card beside the `@handle`. Absent on servers
+            older than this field, which a client must treat as unknown
+            rather than "no pronouns".
+        about:
+          type: [string, "null"]
+          maxLength: 190
+          description: >
+            A short "about" line, or null if unset. Shown on the member card
+            under the status line. Absent on servers older than this field,
+            which a client must treat as unknown rather than "no about".
+        profile_color:
+          type: integer
+          description: >
+            An index into the design system's closed categorical colour set
+            (six hues). Always present: an account that never chose one reads
+            a stable default derived from its id, so a card is never
+            colourless. Absent on servers older than this field, which a
+            client must treat as unknown rather than defaulting to zero.
         is_bot:
           type: boolean
           description: >
@@ -7115,14 +7161,25 @@ components:
           type: [string, "null"]
           maxLength: 80
           description: The caller's own status line; see `UserProfile.status_text`.
+        pronouns:
+          type: [string, "null"]
+          maxLength: 40
+          description: The caller's own pronouns; see `UserProfile.pronouns`.
+        about:
+          type: [string, "null"]
+          maxLength: 190
+          description: The caller's own about line; see `UserProfile.about`.
+        profile_color:
+          type: integer
+          description: The caller's own profile colour index; see `UserProfile.profile_color`.
 
     UpdateMeRequest:
       type: object
       description: >
-        Both fields are optional, absence meaning "leave it as it is" - the
+        Every field is optional, absence meaning "leave it as it is" - the
         same "at least one, absent means untouched" convention
         `UpdateChannelRequest` uses for its own name and topic. A request
-        naming neither is a 400.
+        naming none of them is a 400.
       properties:
         display_name:
           type: string
@@ -7138,6 +7195,25 @@ components:
             A blank or whitespace-only value clears the status back to null
             rather than storing an empty string, the same convention
             `UpdateChannelRequest.topic` uses.
+        pronouns:
+          type: string
+          maxLength: 40
+          description: >
+            A blank or whitespace-only value clears it back to null, the same
+            convention `status_text` uses.
+        about:
+          type: string
+          maxLength: 190
+          description: >
+            A blank or whitespace-only value clears it back to null, the same
+            convention `status_text` uses.
+        profile_color:
+          type: integer
+          description: >
+            An index into the design system's closed categorical colour set.
+            There is no clearing this back to unset: every account always has
+            one, defaulting to a stable value derived from its id. An index
+            outside the set is a 400.
 
     SpaceSettings:
       type: object
@@ -7705,6 +7781,16 @@ components:
         last_seen_at:
           type: [integer, "null"]
           format: int64
+        client_kind:
+          type: [string, "null"]
+          description: >
+            A coarse client kind ("ios", "android", "desktop", "web"), or null
+            for a session opened before this field existed.
+        client_version:
+          type: [string, "null"]
+          description: >
+            The app version that opened this session, or null; same absence
+            rule as `client_kind`.
         is_current:
           type: boolean
           description: Whether this is the device making the request.

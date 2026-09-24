@@ -12,6 +12,26 @@ use uuid::Uuid;
 use super::{Store, User};
 use crate::ids::{ChannelId, UserId};
 
+/// The fields [`Store::update_profile`] may change, one entry per column. A
+/// struct rather than five positional parameters, so a caller passing only
+/// `about` cannot mis-order it against `pronouns`.
+///
+/// Every field is `Option<Option<_>>`: a bare `None` leaves the column as it
+/// was, `Some(None)` clears it, and `Some(Some(value))` writes it - see
+/// [`Store::update_profile`]'s own doc for why.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ProfileUpdate<'a> {
+    pub display_name: Option<&'a str>,
+    pub status_text: Option<Option<&'a str>>,
+    pub pronouns: Option<Option<&'a str>>,
+    pub about: Option<Option<&'a str>>,
+    /// Absent leaves the colour untouched. There is no clear-to-null case:
+    /// every account always has one, defaulting deterministically when unset
+    /// (see `http/users.rs::to_dtos`), so unlike the text fields above there
+    /// is nothing meaningful to clear back to.
+    pub profile_color: Option<i64>,
+}
+
 impl Store {
     /// A user's public profile: id, username, display name, and creation
     /// time. Nothing from the auth tables (password hash, sessions, tokens)
@@ -24,7 +44,8 @@ impl Store {
         let row = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at, status_text, is_bot AS "is_bot!",
+                      avatar_updated_at, status_text, pronouns, about,
+                      profile_color, is_bot AS "is_bot!",
                       is_webhook AS "is_webhook!"
                FROM users WHERE id = ? AND deleted_at IS NULL"#,
             id
@@ -38,6 +59,9 @@ impl Store {
             created_at: r.created_at,
             avatar_updated_at: r.avatar_updated_at,
             status_text: r.status_text,
+            pronouns: r.pronouns,
+            about: r.about,
+            profile_color: r.profile_color,
             is_bot: r.is_bot != 0,
             is_webhook: r.is_webhook != 0,
         }))
@@ -58,7 +82,8 @@ impl Store {
             // length and SQLite has no array binding.
             let mut builder = QueryBuilder::new(
                 "SELECT id, username, display_name, created_at, avatar_updated_at, status_text, \
-                 is_bot, is_webhook FROM users WHERE deleted_at IS NULL AND id IN (",
+                 pronouns, about, profile_color, is_bot, is_webhook FROM users \
+                 WHERE deleted_at IS NULL AND id IN (",
             );
             let mut separated = builder.separated(", ");
             for id in chunk {
@@ -74,6 +99,9 @@ impl Store {
                     created_at: row.try_get("created_at")?,
                     avatar_updated_at: row.try_get("avatar_updated_at")?,
                     status_text: row.try_get("status_text")?,
+                    pronouns: row.try_get("pronouns")?,
+                    about: row.try_get("about")?,
+                    profile_color: row.try_get("profile_color")?,
                     is_bot: row.try_get::<i64, _>("is_bot")? != 0,
                     is_webhook: row.try_get::<i64, _>("is_webhook")? != 0,
                 });
@@ -121,15 +149,16 @@ impl Store {
         Ok(ids)
     }
 
-    /// Updates the caller's own display name and/or status text - the same
-    /// "absent leaves it untouched" shape [`Store::update_channel`] uses for
-    /// a channel's name and topic, `status_text` carrying the identical
-    /// clear-to-`NULL` convention `topic` does there: `Some(None)` writes
-    /// `NULL`, `Some(Some(text))` writes `text`, and a bare `None` leaves the
-    /// column exactly as it was. Username is not updatable here: it backs
-    /// the live per-account uniqueness index (`users_username_live`), and
-    /// changing it needs a dedicated flow that can handle the resulting
-    /// collision, not a field silently accepted (or silently ignored) here.
+    /// Updates the caller's own profile fields - a struct rather than five
+    /// positional parameters, one per column. Every field is `Option<Option<_>>`:
+    /// a bare `None` leaves the column exactly as it was, `Some(None)` clears
+    /// it to `NULL`, and `Some(Some(value))` writes it - the same
+    /// "absent leaves it untouched, present-and-empty clears it" convention
+    /// [`Store::update_channel`] uses for a channel's topic. Username is not
+    /// updatable here: it backs the live per-account uniqueness index
+    /// (`users_username_live`), and changing it needs a dedicated flow that
+    /// can handle the resulting collision, not a field silently accepted (or
+    /// silently ignored) here.
     ///
     /// Returns `None` if the account is gone: the same tiny window
     /// documented on [`Store::delete_account`], where a write already in
@@ -138,45 +167,48 @@ impl Store {
     pub async fn update_profile(
         &self,
         user_id: UserId,
-        display_name: Option<&str>,
-        status_text: Option<Option<&str>>,
+        update: ProfileUpdate<'_>,
     ) -> anyhow::Result<Option<User>> {
-        let affected = match (display_name, status_text) {
-            (Some(display_name), Some(status_text)) => sqlx::query!(
-                "UPDATE users SET display_name = ?, status_text = ? \
-                 WHERE id = ? AND deleted_at IS NULL",
-                display_name,
-                status_text,
+        let mut builder = QueryBuilder::new("UPDATE users SET ");
+        let mut sets = builder.separated(", ");
+        let mut touched = false;
+        if let Some(display_name) = update.display_name {
+            sets.push("display_name = ")
+                .push_bind_unseparated(display_name);
+            touched = true;
+        }
+        if let Some(status_text) = update.status_text {
+            sets.push("status_text = ")
+                .push_bind_unseparated(status_text);
+            touched = true;
+        }
+        if let Some(pronouns) = update.pronouns {
+            sets.push("pronouns = ").push_bind_unseparated(pronouns);
+            touched = true;
+        }
+        if let Some(about) = update.about {
+            sets.push("about = ").push_bind_unseparated(about);
+            touched = true;
+        }
+        if let Some(profile_color) = update.profile_color {
+            sets.push("profile_color = ")
+                .push_bind_unseparated(profile_color);
+            touched = true;
+        }
+
+        let affected = if touched {
+            builder.push(" WHERE id = ");
+            builder.push_bind(user_id);
+            builder.push(" AND deleted_at IS NULL");
+            builder.build().execute(&self.pool).await?.rows_affected()
+        } else {
+            let exists = sqlx::query_scalar!(
+                r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
                 user_id
             )
-            .execute(&self.pool)
-            .await?
-            .rows_affected(),
-            (Some(display_name), None) => sqlx::query!(
-                "UPDATE users SET display_name = ? WHERE id = ? AND deleted_at IS NULL",
-                display_name,
-                user_id
-            )
-            .execute(&self.pool)
-            .await?
-            .rows_affected(),
-            (None, Some(status_text)) => sqlx::query!(
-                "UPDATE users SET status_text = ? WHERE id = ? AND deleted_at IS NULL",
-                status_text,
-                user_id
-            )
-            .execute(&self.pool)
-            .await?
-            .rows_affected(),
-            (None, None) => {
-                let exists = sqlx::query_scalar!(
-                    r#"SELECT 1 AS "one!: i64" FROM users WHERE id = ? AND deleted_at IS NULL"#,
-                    user_id
-                )
-                .fetch_optional(&self.pool)
-                .await?;
-                u64::from(exists.is_some())
-            }
+            .fetch_optional(&self.pool)
+            .await?;
+            u64::from(exists.is_some())
         };
         if affected == 0 {
             return Ok(None);
@@ -244,7 +276,8 @@ impl Store {
         let rows = sqlx::query!(
             r#"SELECT id AS "id!: UserId", username AS "username!",
                       display_name AS "display_name!", created_at AS "created_at!",
-                      avatar_updated_at, status_text, is_bot AS "is_bot!",
+                      avatar_updated_at, status_text, pronouns, about,
+                      profile_color, is_bot AS "is_bot!",
                       is_webhook AS "is_webhook!"
                FROM users WHERE deleted_at IS NULL AND is_webhook = 0 AND id > ?
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)
@@ -263,6 +296,9 @@ impl Store {
                 created_at: r.created_at,
                 avatar_updated_at: r.avatar_updated_at,
                 status_text: r.status_text,
+                pronouns: r.pronouns,
+                about: r.about,
+                profile_color: r.profile_color,
                 is_bot: r.is_bot != 0,
                 is_webhook: r.is_webhook != 0,
             })

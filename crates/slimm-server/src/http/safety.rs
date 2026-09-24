@@ -72,6 +72,12 @@ struct DeviceDto {
     name: String,
     created_at: i64,
     last_seen_at: Option<i64>,
+    /// A coarse client kind ("ios", "android", "desktop", "web"), or `null`
+    /// for a session opened before this field existed.
+    client_kind: Option<String>,
+    /// The app version that opened this session, or `null`; same absence
+    /// rule as `client_kind`.
+    client_version: Option<String>,
     is_current: bool,
 }
 
@@ -82,6 +88,8 @@ impl From<Device> for DeviceDto {
             name: device.name,
             created_at: device.created_at,
             last_seen_at: device.last_seen_at,
+            client_kind: device.client_kind,
+            client_version: device.client_version,
             is_current: device.is_current,
         }
     }
