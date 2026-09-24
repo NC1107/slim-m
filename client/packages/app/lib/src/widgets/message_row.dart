@@ -31,6 +31,7 @@ import '../routing/breakpoints.dart';
 
 import 'app_surface_view.dart';
 import 'attachment_view.dart';
+import 'embed_card.dart';
 import 'emoji_picker.dart';
 import 'forwarded_message_card.dart';
 import 'hover_reveal.dart';
@@ -74,6 +75,7 @@ class MessageRow extends StatelessWidget {
     this.customEmoji = const {},
     this.reactions = const [],
     this.attachments = const [],
+    this.embeds = const [],
     this.poll,
     this.appSurface,
     this.call,
@@ -157,6 +159,9 @@ class MessageRow extends StatelessWidget {
 
   /// Attachments riding on this message, in display order.
   final List<api.Attachment> attachments;
+
+  /// Structured content a webhook or a bot attached; see decision 0030.
+  final List<api.Embed> embeds;
 
   /// The poll this message carries, if it is a poll message.
   final api.Poll? poll;
@@ -317,6 +322,8 @@ class MessageRow extends StatelessWidget {
                                         message.content,
                                       ),
                                     ),
+                                  if (!editing && embeds.isNotEmpty)
+                                    EmbedList(embeds: embeds),
                                   if (message.forwarded case final forwarded?)
                                     Padding(
                                       padding: const EdgeInsets.only(

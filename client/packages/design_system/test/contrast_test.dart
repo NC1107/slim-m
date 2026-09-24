@@ -235,4 +235,17 @@ void main() {
     expect(cursors, hasLength(6));
     expect(cursors.toSet(), hasLength(6), reason: 'no duplicate cursor hues');
   });
+
+  test('embed accent swatches are a closed set of six distinct values', () {
+    // Never text, so distinctness is what matters, not a WCAG ratio.
+    final swatches = [
+      AppEmbedAccents.red,
+      AppEmbedAccents.orange,
+      AppEmbedAccents.yellow,
+      AppEmbedAccents.green,
+      AppEmbedAccents.blue,
+      AppEmbedAccents.purple,
+    ];
+    expect(swatches.toSet(), hasLength(6), reason: 'no duplicate accent hues');
+  });
 }

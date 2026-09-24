@@ -68,6 +68,7 @@ class MessageExtras {
     this.poll,
     this.appSurface,
     this.call,
+    this.embeds = const [],
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
@@ -76,6 +77,9 @@ class MessageExtras {
 
   final List<api.ReactionSummary> reactions;
   final List<api.Attachment> attachments;
+
+  /// Fixed once a message exists, like [attachments]; see decision 0030.
+  final List<api.Embed> embeds;
 
   /// The shared result of each fenced code block run in this message, one
   /// entry per block, ordered by block index. Follows [reactions]' merge
@@ -121,6 +125,7 @@ class MessageExtras {
     poll: poll ?? this.poll,
     appSurface: appSurface ?? this.appSurface,
     call: call ?? this.call,
+    embeds: embeds,
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
@@ -237,6 +242,9 @@ class MessageExtrasController
     poll: message.poll ?? existing?.poll,
     appSurface: message.appSurface ?? existing?.appSurface,
     call: message.call ?? existing?.call,
+    embeds: message.embeds.isNotEmpty
+        ? message.embeds
+        : existing?.embeds ?? const [],
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
     threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,
@@ -307,6 +315,7 @@ class MessageExtrasController
         attachments: existing.attachments,
         codeRuns: existing.codeRuns,
         poll: existing.poll,
+        embeds: existing.embeds,
         threadChannelId: threadChannelId,
         threadReplyCount: replyCount,
         threadLastReplyAt: lastReplyAt,

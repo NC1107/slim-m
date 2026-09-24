@@ -19,6 +19,7 @@ export 'models_voice.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_dock.dart';
+export 'models_embeds.dart';
 export 'models_emoji.dart';
 export 'models_forwards.dart';
 export 'models_gifs.dart';
@@ -51,6 +52,7 @@ import 'models_app_surface.dart';
 import 'models_call_record.dart';
 import 'models_attachments.dart';
 import 'models_code_runs.dart';
+import 'models_embeds.dart';
 import 'models_forwards.dart';
 import 'models_message_ops.dart';
 import 'models_polls.dart';
@@ -137,6 +139,7 @@ class Message {
     this.call,
     this.forwarded,
     this.mentionsMe = false,
+    this.embeds = const [],
   });
 
   final String id;
@@ -231,6 +234,10 @@ class Message {
   /// `MessageStore.applyMessage`.
   final bool mentionsMe;
 
+  /// Structured content a webhook or a bot attached; fixed once the message
+  /// exists, like [attachments]. Always present, empty when there is none.
+  final List<Embed> embeds;
+
   bool get isEdited => editedAt != null;
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -277,6 +284,10 @@ class Message {
                 json['forwarded'] as Map<String, dynamic>),
         // Not in the schema's `required` list either, the same tolerance `reactions` above already needs.
         mentionsMe: json['mentions_me'] as bool? ?? false,
+        embeds: (json['embeds'] as List<dynamic>?)
+                ?.map((e) => Embed.fromJson(e as Map<String, dynamic>))
+                .toList(growable: false) ??
+            const [],
       );
 }
 
