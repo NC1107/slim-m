@@ -98,14 +98,17 @@ class _RoleChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
       height: 20,
-      alignment: Alignment.center,
+      // No Container.alignment: with no explicit width it expands to fill the parent.
       decoration: BoxDecoration(
         border: Border.all(color: tokens.borderSubtle),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
-      child: Text(
-        label,
-        style: AppText.code.copyWith(color: tokens.textSecondary, fontSize: 10),
+      child: Center(
+        widthFactor: 1,
+        child: Text(
+          label,
+          style: AppText.code.copyWith(color: tokens.textSecondary, fontSize: 10),
+        ),
       ),
     );
   }
