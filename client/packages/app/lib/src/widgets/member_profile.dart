@@ -46,6 +46,7 @@ import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_note_sheet.dart';
 import 'reset_code_sheet.dart';
+import 'member_profile_bot_commands.dart';
 import 'member_profile_popover.dart';
 import 'member_profile_sections.dart';
 import 'member_roles_sheet.dart';
@@ -320,6 +321,8 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
           until: profile.timedOutUntil!,
           onLift: canTimeOut ? _liftTimeout : null,
         ),
+
+      if (profile.isBot) MemberProfileBotCommands(botId: profile.id),
 
       const AppMenuDivider(),
 

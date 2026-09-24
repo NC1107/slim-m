@@ -71,12 +71,6 @@ const Map<String, String> _allowlist = {
       'HTTP from its own process, never from this client - the same shape '
       'as POST /webhooks/{}/{} above. See '
       'docs/decisions/0031-bot-command-registration.md',
-  'GET /bots/{}/commands': 'lands with the profile popover that calls it, '
-      'in a follow-up PR to this server-and-contract one, per '
-      'docs/decisions/0031-bot-command-registration.md\'s staged rollout',
-  'GET /channels/{}/bot-commands': 'lands with the composer that calls it, '
-      'in a follow-up PR to this server-and-contract one, per '
-      'docs/decisions/0031-bot-command-registration.md\'s staged rollout',
 };
 
 const _httpMethods = {

@@ -44,12 +44,28 @@ List<AutocompleteSuggestion> _for(
   String? selfId,
   List<api.CustomEmoji> custom = const [],
   bool canMentionEveryone = false,
+  List<api.ChannelBotCommand> botCommands = const [],
 }) => autocompleteSuggestions(
   query: _q(kind, term),
   custom: custom,
   members: members,
   selfId: selfId,
   canMentionEveryone: canMentionEveryone,
+  botCommands: botCommands,
+);
+
+api.ChannelBotCommand _botCommand(
+  String botId,
+  String botName,
+  String prefix,
+  String name,
+) => api.ChannelBotCommand(
+  botUserId: botId,
+  botUsername: botName,
+  botDisplayName: botName,
+  prefix: prefix,
+  name: name,
+  description: 'does $name things',
 );
 
 void main() {
@@ -186,6 +202,50 @@ void main() {
 
     test('an unknown command offers nothing rather than everything', () {
       expect(_for(AutocompleteKind.command, 'nope'), isEmpty);
+    });
+  });
+
+  group('bot commands', () {
+    test('inserts the bots own prefix, not a slash', () {
+      final row = _for(
+        AutocompleteKind.command,
+        'ping',
+        botCommands: [_botCommand('b1', 'Helper', '!', 'ping')],
+      ).first;
+      expect(row.label, '!ping');
+      expect(row.insert, '!ping ');
+    });
+
+    test('matches on the bare name, never the prefix', () {
+      final rows = _for(
+        AutocompleteKind.command,
+        'ping',
+        botCommands: [_botCommand('b1', 'Helper', '!', 'ping')],
+      );
+      expect(rows, hasLength(1));
+    });
+
+    test('detail names the bot, so two bots are told apart', () {
+      final row = _for(
+        AutocompleteKind.command,
+        'ping',
+        botCommands: [_botCommand('b1', 'Helper', '!', 'ping')],
+      ).first;
+      expect(row.detail, contains('Helper'));
+    });
+
+    test('two bots sharing a prefix and name both stay', () {
+      final rows = _for(
+        AutocompleteKind.command,
+        'ping',
+        botCommands: [
+          _botCommand('b1', 'Helper', '!', 'ping'),
+          _botCommand('b2', 'Watcher', '!', 'ping'),
+        ],
+      );
+      expect(rows, hasLength(2));
+      expect(rows.any((r) => r.detail!.contains('Helper')), isTrue);
+      expect(rows.any((r) => r.detail!.contains('Watcher')), isTrue);
     });
   });
 }
