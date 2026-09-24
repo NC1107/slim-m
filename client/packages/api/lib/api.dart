@@ -34,6 +34,7 @@ export 'src/client.dart'
         SlimmApiAdmin,
         SlimmApiAttachments,
         SlimmApiAuth,
+        SlimmApiBotCommands,
         SlimmApiBots,
         SlimmApiCanvas,
         SlimmApiChannelAdmin,

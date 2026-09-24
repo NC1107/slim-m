@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
+import '../providers/bot_commands.dart';
 import '../providers/channel_permissions.dart';
 import '../providers/composer_attachment_drop.dart';
 import '../providers/composer_focus.dart';
@@ -33,6 +34,8 @@ import 'composer_attachments.dart';
 import 'composer_autocomplete.dart';
 import 'composer_autocomplete_items.dart';
 import 'composer_autocomplete_query.dart';
+import 'composer_bot_mention_help.dart';
+import 'composer_bot_mentions.dart';
 import 'composer_clipboard_image.dart';
 import 'composer_clipboard_paste.dart';
 import 'composer_extras.dart';
@@ -134,6 +137,12 @@ class _ComposerState extends ConsumerState<Composer> {
   List<AutocompleteSuggestion> _suggestions = const [];
   List<SlashCommand> _slashCommands = const [];
   List<App> _apps = const [];
+  List<ChannelBotCommand> _botCommands = const [];
+
+  /// Bot usernames whose mention-help card has been shown or dismissed this
+  /// message, so retyping the same `@mention` never re-triggers it.
+  final Set<String> _mentionHelpSeen = {};
+  final List<String> _visibleMentionHelp = [];
   String? _commandError;
   int _selected = 0;
 
@@ -269,7 +278,11 @@ class _ComposerState extends ConsumerState<Composer> {
         query != _query ||
         overBy != _overBy ||
         (countMatters && charCount != _charCount);
-    if (!changed) return;
+    final newlyMentioned = mentionedBotUsernames(
+      widget.controller.text,
+      _botCommands.map((c) => c.botUsername),
+    ).difference(_mentionHelpSeen).toList();
+    if (!changed && newlyMentioned.isEmpty) return;
     setState(() {
       _hasText = hasText;
       _hasSendableText = sendable;
@@ -279,6 +292,10 @@ class _ComposerState extends ConsumerState<Composer> {
         _query = query;
         // Back to row one, so Enter takes whatever now ranks first.
         _selected = 0;
+      }
+      if (newlyMentioned.isNotEmpty) {
+        _mentionHelpSeen.addAll(newlyMentioned);
+        _visibleMentionHelp.addAll(newlyMentioned);
       }
     });
   }
@@ -298,6 +315,7 @@ class _ComposerState extends ConsumerState<Composer> {
           .hasPermission(Perm.mentionEveryone),
       slashCommands: _slashCommands,
       apps: _apps,
+      botCommands: _botCommands,
     );
   }
 
@@ -562,8 +580,17 @@ class _ComposerState extends ConsumerState<Composer> {
     if (handled) return;
     final ids = _attachments.readyIds;
     await widget.onSend(ids);
-    if (mounted) _attachments.clear();
+    if (mounted) {
+      _attachments.clear();
+      setState(() {
+        _mentionHelpSeen.clear();
+        _visibleMentionHelp.clear();
+      });
+    }
   }
+
+  void _dismissMentionHelp(String username) =>
+      setState(() => _visibleMentionHelp.remove(username));
 
   @override
   Widget build(BuildContext context) {
@@ -571,6 +598,9 @@ class _ComposerState extends ConsumerState<Composer> {
     // In build because both sources are watched and can arrive late.
     _slashCommands = ref.watch(slashCommandProvider).valueOrNull ?? const [];
     _apps = ref.watch(appLaunchProvider).valueOrNull ?? const [];
+    _botCommands =
+        ref.watch(channelBotCommandsProvider(widget.channelId)).valueOrNull ??
+        const [];
     _suggestions = _buildSuggestions();
     _gifSearchEnabled =
         ref.watch(serverInfoProvider).valueOrNull?.gifSearchEnabled ?? false;
@@ -594,6 +624,11 @@ class _ComposerState extends ConsumerState<Composer> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            ComposerBotMentionHelpList(
+              visibleUsernames: _visibleMentionHelp,
+              allBotCommands: _botCommands,
+              onDismiss: _dismissMentionHelp,
+            ),
             ComposerBanners(
               attachmentError: _attachmentError,
               onDismissAttachmentError: () =>

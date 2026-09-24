@@ -70,6 +70,34 @@ Stated in prose in `schema/openapi.yaml`'s `setBotCommands` description, since t
 
 A registration that violates any of these is refused outright (400), not truncated or partially applied.
 
+## The registration API, exactly
+
+For a bot library building against this (e.g. a discord.py-shaped framework calling this automatically from `@bot.command`):
+
+```
+PUT /bots/commands
+Authorization: Bearer <the bot's own token>
+Content-Type: application/json
+
+{
+  "prefix": "!",
+  "commands": [
+    { "name": "ping", "description": "check if I'm alive" },
+    { "name": "roll", "description": "roll dice", "usage": "<sides>", "permission": null }
+  ]
+}
+```
+
+- `prefix` (string, required): what this bot answers to. Caps above.
+- `commands` (array, optional, defaults to `[]`): the bot's **entire** command set - this call replaces whatever was registered before, in full. Each entry:
+  - `name` (string, required)
+  - `description` (string, required)
+  - `usage` (string, optional)
+  - `permission` (integer, optional): a single `Permissions` bit (the same encoding `GET /channels/{channelId}/permissions` returns), or omit/null for open to anyone who can see the bot.
+- Response: `204 No Content` on success, `400` naming the violated cap, `403` if the caller is not a bot.
+- **Call this once per connect, with the bot's complete current set.** There is no add/remove-one-command call. A library wrapping this should collect every `@bot.command`-registered command at startup (or whenever the set changes) and re-PUT the whole list.
+- Reading it back: `GET /bots/{botId}/commands` returns `{ "prefix": string | null, "commands": [{name, description, usage}] }` (no `permission` echoed back, and no auth requirement beyond being signed in - any member can read any bot's registration, the same visibility a profile has).
+
 ## The prefix/profile/mention-card follow-up
 
 Landed as its own PR, after the core registration surface, per the coordinating agent's instruction not to hold up the base PRs:

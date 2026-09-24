@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
+import 'package:slimm_app/src/providers/bot_commands.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/widgets/member_profile.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -28,25 +29,46 @@ const _other = api.UserProfile(
   createdAt: 0,
 );
 
+const _bot = api.UserProfile(
+  id: 'user-helper-bot',
+  username: 'helper',
+  displayName: 'Helper',
+  createdAt: 0,
+  isBot: true,
+);
+
 // Every moderation row on, so the popover is as tall as the screenshot's.
 const _fullModeration =
     Perm.kickMembers | Perm.banMembers | Perm.manageRoles | Perm.administrator;
 
-Widget _harness(Widget child) => ProviderScope(
-  overrides: [
-    myPermissionsProvider.overrideWithValue(_fullModeration),
-    membersProvider.overrideWith((ref) async => [_other]),
-  ],
-  child: MaterialApp(
-    theme: buildTheme(Brightness.light, AppTokens.light),
-    home: Scaffold(body: child),
-  ),
-);
+Widget _harness(Widget child, {api.UserProfile profile = _other}) =>
+    ProviderScope(
+      overrides: [
+        myPermissionsProvider.overrideWithValue(_fullModeration),
+        membersProvider.overrideWith((ref) async => [profile]),
+        botCommandRegistrationProvider(_bot.id).overrideWith(
+          (ref) async => api.BotCommandRegistration(
+            prefix: '!',
+            commands: [
+              for (var i = 0; i < 20; i++)
+                api.RegisteredBotCommand(
+                  name: 'cmd$i',
+                  description: 'does thing number $i, in a bit more detail',
+                ),
+            ],
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.light, AppTokens.light),
+        home: Scaffold(body: child),
+      ),
+    );
 
 /// A small anchor row, positioned at [top], that opens the real popover
 /// through [showMemberProfile] - the same call a member row's context menu
 /// makes - so this exercises the production positioning code exactly.
-Widget _anchorRow(double top) => Positioned(
+Widget _anchorRow(double top, api.UserProfile profile) => Positioned(
   left: 20,
   top: top,
   child: SizedBox(
@@ -57,7 +79,7 @@ Widget _anchorRow(double top) => Positioned(
         onPressed: () => showMemberProfile(
           context,
           ref,
-          profile: _other,
+          profile: profile,
           status: AppPresence.online,
         ),
         child: const Text('open'),
@@ -70,12 +92,18 @@ Future<Rect> _openAt(
   WidgetTester tester, {
   required Size window,
   required double anchorTop,
+  api.UserProfile profile = _other,
 }) async {
   tester.view.physicalSize = window;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
-  await tester.pumpWidget(_harness(Stack(children: [_anchorRow(anchorTop)])));
+  await tester.pumpWidget(
+    _harness(
+      Stack(children: [_anchorRow(anchorTop, profile)]),
+      profile: profile,
+    ),
+  );
   await tester.pump();
 
   await tester.tap(find.text('open'));
@@ -121,6 +149,30 @@ void main() {
             'to the top edge, not slide past it',
       );
       expect(lastItem.bottom, lessThanOrEqualTo(window.height));
+    },
+  );
+
+  testWidgets(
+    "a bot with many commands does not push the popover's own rows off "
+    'the bottom edge',
+    (tester) async {
+      const window = Size(900, 700);
+      final lastItem = await _openAt(
+        tester,
+        window: window,
+        anchorTop: 640,
+        profile: _bot,
+      );
+
+      expect(find.textContaining('answers to'), findsOneWidget);
+      expect(
+        lastItem.bottom,
+        lessThanOrEqualTo(window.height),
+        reason:
+            'a long command list is one more section stacked above the '
+            'moderation rows; it must not defeat the flip-above measurement',
+      );
+      expect(lastItem.top, greaterThanOrEqualTo(0));
     },
   );
 }

@@ -13,6 +13,7 @@ library;
 // still surfaces every model, as if they had all been written in one place.
 export 'models_admin.dart';
 export 'models_app_surface.dart';
+export 'models_bot_commands.dart';
 export 'models_call_record.dart';
 export 'models_voice.dart';
 export 'models_attachments.dart';

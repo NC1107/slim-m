@@ -15,6 +15,7 @@ import 'models.dart';
 part 'client_admin.dart';
 part 'client_attachments.dart';
 part 'client_auth.dart';
+part 'client_bot_commands.dart';
 part 'client_channel_admin.dart';
 part 'client_canvas.dart';
 part 'client_dms.dart';

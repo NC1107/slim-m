@@ -90,6 +90,7 @@ List<AutocompleteSuggestion> autocompleteSuggestions({
   bool canMentionEveryone = false,
   List<api.SlashCommand> slashCommands = const [],
   List<api.App> apps = const [],
+  List<api.ChannelBotCommand> botCommands = const [],
 }) => switch (query.kind) {
   AutocompleteKind.emoji => _emoji(query.term, custom),
   AutocompleteKind.mention => _mentions(
@@ -98,7 +99,12 @@ List<AutocompleteSuggestion> autocompleteSuggestions({
     selfId,
     canMentionEveryone: canMentionEveryone,
   ),
-  AutocompleteKind.command => _commandRows(query.term, slashCommands, apps),
+  AutocompleteKind.command => _commandRows(
+    query.term,
+    slashCommands,
+    apps,
+    botCommands,
+  ),
 };
 
 List<AutocompleteSuggestion> _emoji(
@@ -224,14 +230,14 @@ List<AutocompleteSuggestion> _roleSuggestions(
   ];
 }
 
-/// Built-in text commands first, then module slash commands. A built-in
-/// inserts its substitution text (it is finished on pick); a module command
-/// inserts `/name ` so the caret lands after the keyword ready for arguments,
-/// and running it is the composer's job on send, not this list's.
+/// Built-ins, then module slash commands, then apps, then bot commands. A
+/// bot command inserts its own registered prefix and keyword (`!ping`, not
+/// `/ping`) and is never run - see docs/decisions/0031.
 List<AutocompleteSuggestion> _commandRows(
   String term,
   List<api.SlashCommand> slashCommands,
   List<api.App> apps,
+  List<api.ChannelBotCommand> botCommands,
 ) => [
   for (final (name, text, detail) in _commands)
     if (term.isEmpty || name.startsWith(term))
@@ -250,5 +256,13 @@ List<AutocompleteSuggestion> _commandRows(
         insert: '/${app.moduleId}',
         label: '/${app.moduleId}',
         detail: app.name,
+      ),
+  // Two bots sharing a prefix and name both stay, disambiguated by `detail`.
+  for (final command in botCommands)
+    if (term.isEmpty || command.name.toLowerCase().startsWith(term))
+      AutocompleteSuggestion(
+        insert: '${command.prefix}${command.name} ',
+        label: '${command.prefix}${command.name}',
+        detail: '${command.description} · ${command.botDisplayName}',
       ),
 ].take(maxAutocompleteRows).toList(growable: false);
