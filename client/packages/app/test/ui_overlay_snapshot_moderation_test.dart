@@ -360,6 +360,8 @@ void main() {
     );
     await tester.pump();
     // The row renders exactly as it would for a target the caller can moderate.
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('5m'));
     await tester.pumpAndSettle();
 
