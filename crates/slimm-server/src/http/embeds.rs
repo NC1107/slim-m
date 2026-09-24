@@ -7,8 +7,7 @@ use serde::Serialize;
 use crate::store::Embed as StoreEmbed;
 
 /// A caller-supplied colour, reduced to one of a small closed set of
-/// pre-tuned swatches - never a raw hex fill. See
-/// `docs/design/design-language.md`.
+/// pre-tuned swatches - never a raw hex fill. See decision 0030.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EmbedAccent {
