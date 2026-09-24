@@ -67,6 +67,16 @@ const Map<String, String> _allowlist = {
       'pasted into somebody else\'s program, never sent by this client - see '
       'docs/decisions/0030-incoming-webhooks.md, which calls out that this '
       'route has no client binding by design',
+  'PUT /bots/commands': 'a bot registers its own commands directly over '
+      'HTTP from its own process, never from this client - the same shape '
+      'as POST /webhooks/{}/{} above. See '
+      'docs/decisions/0031-bot-command-registration.md',
+  'GET /bots/{}/commands': 'lands with the profile popover that calls it, '
+      'in a follow-up PR to this server-and-contract one, per '
+      'docs/decisions/0031-bot-command-registration.md\'s staged rollout',
+  'GET /channels/{}/bot-commands': 'lands with the composer that calls it, '
+      'in a follow-up PR to this server-and-contract one, per '
+      'docs/decisions/0031-bot-command-registration.md\'s staged rollout',
 };
 
 const _httpMethods = {
