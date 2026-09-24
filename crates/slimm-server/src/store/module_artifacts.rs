@@ -18,6 +18,10 @@ impl Store {
     /// Callers that already hold a transaction (an install, which writes this
     /// alongside `installed_modules`) should use [`store_module_artifact_tx`]
     /// instead, so the two rows commit or roll back together.
+    ///
+    /// Writes only the artifact half of an install; a caller installing a
+    /// module must use [`Store::install_module_with_artifact`] instead, or
+    /// the two rows can diverge.
     pub async fn store_module_artifact(
         &self,
         module_id: &str,

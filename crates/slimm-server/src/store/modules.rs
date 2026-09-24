@@ -140,6 +140,10 @@ impl Store {
     /// dropped is deleted, cascading its grants with it. Delete-then-reinsert
     /// for every key would cascade away every grant on every reinstall, even
     /// when nothing about that permission changed.
+    ///
+    /// Writes only the metadata half of an install; a caller installing a
+    /// module must use [`Store::install_module_with_artifact`] instead, or
+    /// the two rows can diverge.
     pub async fn install_module(
         &self,
         req: InstallModuleRequest<'_>,
