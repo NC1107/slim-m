@@ -5,11 +5,10 @@
 //! whole messages return a fully populated one rather than a bare text row.
 
 use serde_json::json;
-use slimm_server::permissions::Permissions;
 use uuid::Uuid;
 
 use super::read_state::read_state;
-use super::{PNG, THUMBS_UP, media_slot_calls, text};
+use super::{PNG, THUMBS_UP, media_slot_calls, overwrite_calls, role_calls, text};
 use crate::world::{Contract, Payload};
 
 /// Builds the channel the message calls run in, plus the role, overwrite and
@@ -127,41 +126,7 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     )
     .await;
 
-    c.get("listRoles", "/roles", root).await;
-    let role = c
-        .json(
-            "createRole",
-            "POST",
-            "/roles",
-            root,
-            json!({ "name": "mods", "permissions": Permissions::VIEW_CHANNEL.bits() }),
-        )
-        .await;
-    let role = text(&role, "id");
-    c.json(
-        "updateRole",
-        "PATCH",
-        &format!("/roles/{role}"),
-        root,
-        json!({ "name": "moderators" }),
-    )
-    .await;
-    c.bare(
-        "assignRole",
-        "PUT",
-        &format!("/members/{bob_id}/roles/{role}"),
-        root,
-    )
-    .await;
-    c.bare(
-        "unassignRole",
-        "DELETE",
-        &format!("/members/{bob_id}/roles/{role}"),
-        root,
-    )
-    .await;
-    c.bare("deleteRole", "DELETE", &format!("/roles/{role}"), root)
-        .await;
+    role_calls(c, root, bob_id).await;
 
     let first_stroke = c
         .json(
@@ -289,23 +254,7 @@ pub(super) async fn channel_calls(c: &mut Contract, root: &str, bob_id: &str) ->
     .await;
     media_slot_calls(c, root, &channel, bob_id).await;
 
-    let overwrite = format!("/channels/{channel}/overwrites/member/{bob_id}");
-    c.json(
-        "setChannelOverwrite",
-        "PUT",
-        &overwrite,
-        root,
-        json!({ "allow": Permissions::VIEW_CHANNEL.bits(), "deny": 0 }),
-    )
-    .await;
-    c.get(
-        "getChannelOverwrites",
-        &format!("/channels/{channel}/overwrites"),
-        root,
-    )
-    .await;
-    c.bare("deleteChannelOverwrite", "DELETE", &overwrite, root)
-        .await;
+    overwrite_calls(c, root, bob_id, &channel).await;
 
     (channel, dm_channel)
 }

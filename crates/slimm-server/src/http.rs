@@ -80,6 +80,7 @@ mod recovery;
 mod reports;
 mod reports_cursor;
 mod reports_mine;
+mod role_reorder;
 mod roles;
 mod route_timing;
 mod safety;
@@ -198,6 +199,7 @@ pub fn router(state: AppState) -> Router {
         .merge(recovery::routes())
         .merge(reports::routes())
         .merge(roles::routes())
+        .merge(role_reorder::routes())
         .merge(safety::routes())
         .merge(dms::routes())
         .merge(search::routes())

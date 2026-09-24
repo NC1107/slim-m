@@ -18,7 +18,8 @@ impl Store {
                       permissions AS "permissions!: Permissions",
                       is_everyone AS "is_everyone!: bool",
                       mentionable AS "mentionable!: bool", created_at AS "created_at!",
-                      managed_bot_id AS "managed_bot_id: UserId"
+                      managed_bot_id AS "managed_bot_id: UserId",
+                      position AS "position!: i64"
                FROM roles WHERE managed_bot_id = ?"#,
             bot_user_id
         )

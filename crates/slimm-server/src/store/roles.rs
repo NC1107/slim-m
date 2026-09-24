@@ -36,6 +36,13 @@ pub struct Role {
     /// The bot this role was minted for, if any - informational only. See
     /// `docs/decisions/0028-bot-accounts.md`.
     pub managed_bot_id: Option<UserId>,
+    /// Hierarchy order: higher sorts first in [`Store::list_roles`] and is
+    /// the value `store::role_reorder`'s escalation guard compares a caller's
+    /// own highest role against. `@everyone` stays at its bootstrap default
+    /// (0) forever - it is never a member of `member_roles`, so nothing ever
+    /// reorders it - and every other role's position only ever comes from an
+    /// explicit reorder or the column's own `DEFAULT 0` at creation.
+    pub position: i64,
 }
 
 /// Why a role mutation was refused.
@@ -211,7 +218,8 @@ impl Store {
                       permissions AS "permissions!: Permissions",
                       is_everyone AS "is_everyone!: bool",
                       mentionable AS "mentionable!: bool", created_at AS "created_at!",
-                      managed_bot_id AS "managed_bot_id: UserId"
+                      managed_bot_id AS "managed_bot_id: UserId",
+                      position AS "position!: i64"
                FROM roles ORDER BY position DESC, created_at"#
         )
         .fetch_all(&self.pool)
@@ -227,7 +235,8 @@ impl Store {
                       permissions AS "permissions!: Permissions",
                       is_everyone AS "is_everyone!: bool",
                       mentionable AS "mentionable!: bool", created_at AS "created_at!",
-                      managed_bot_id AS "managed_bot_id: UserId"
+                      managed_bot_id AS "managed_bot_id: UserId",
+                      position AS "position!: i64"
                FROM roles WHERE id = ?"#,
             role_id
         )

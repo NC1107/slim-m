@@ -16,6 +16,13 @@
 //! does not themselves hold is exactly the escalation this project treats as
 //! a real vulnerability class. `deny` is a restriction, not a grant, and is
 //! never gated on top of already requiring MANAGE_ROLES here.
+//!
+//! [`batch_set`] applies several targets' overwrites in one request rather
+//! than one `PUT` per target: the permissions grid batches a pending set of
+//! cell changes across several columns and wants to save them atomically, not
+//! as a sequence of independent round trips a partial failure could leave
+//! half-applied. Same checks as [`set`], run per entry before any of them
+//! write.
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Path, State};
@@ -32,14 +39,20 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
+use crate::store::OverwriteBatchEntry;
 
-/// Nothing here carries more than two integers; keep the cap tight.
-const BODY_LIMIT: usize = 1024;
+/// A single-target request carries little more than two integers; a batch
+/// carries one such pair per principal in the grid, so this stays generous
+/// rather than tight the way the old single-target cap was.
+const BODY_LIMIT: usize = 16 * 1024;
 
 /// The channel overwrite routes, mounted by [`super::router`].
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/channels/{channel_id}/overwrites", get(list))
+        .route(
+            "/channels/{channel_id}/overwrites",
+            get(list).put(batch_set),
+        )
         .route(
             "/channels/{channel_id}/overwrites/{kind}/{id}",
             put(set).delete(clear),
@@ -198,6 +211,125 @@ async fn set(
         previously_visible_to,
     });
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// One entry of a [`batch_set`] request: same shape as [`SetOverwriteRequest`]
+/// with the target folded in, since a batch names several.
+#[derive(Deserialize)]
+struct BatchOverwriteEntry {
+    kind: String,
+    id: String,
+    #[serde(default)]
+    allow: i64,
+    #[serde(default)]
+    deny: i64,
+}
+
+#[derive(Deserialize)]
+struct BatchSetRequest {
+    overwrites: Vec<BatchOverwriteEntry>,
+}
+
+/// A grid has one column per principal shown on a channel, and a deployment
+/// with more than this many roles and members combined has bigger problems
+/// than this cap; kept well inside [`BODY_LIMIT`] regardless.
+const MAX_BATCH_ENTRIES: usize = 64;
+
+/// Applies every entry of [`BatchSetRequest::overwrites`] in one request:
+/// the permissions grid's save button, batching a pending set of cell
+/// changes across every column into one atomic write rather than one `PUT`
+/// per changed target. Every entry is checked - unknown bits, target
+/// existence, and the same escalation math [`set`] applies - before any of
+/// them writes, so a batch either lands in full or is refused in full.
+async fn batch_set(
+    Authed(ctx): Authed,
+    parts: Parts,
+    Path(channel_id): Path<String>,
+    State(state): State<AppState>,
+    Json(req): Json<BatchSetRequest>,
+) -> Result<Json<OverwritesDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    let channel_id = ChannelId(parse_uuid(&channel_id)?);
+    let caller_permissions = require_manage_roles_here(&state, ctx.user_id, channel_id).await?;
+
+    if req.overwrites.len() > MAX_BATCH_ENTRIES {
+        return Err(ApiError::BadRequest("too many overwrites in one batch"));
+    }
+
+    let mut entries = Vec::with_capacity(req.overwrites.len());
+    let mut targets = Vec::with_capacity(req.overwrites.len());
+    for item in &req.overwrites {
+        let target = parse_target(&item.kind, &item.id)?;
+        let allow = Permissions::from_bits(item.allow);
+        let deny = Permissions::from_bits(item.deny);
+        if !Permissions::ALL.contains(allow) || !Permissions::ALL.contains(deny) {
+            return Err(ApiError::BadRequest("unknown permission bits"));
+        }
+
+        let (target_type, target_id): (&'static str, uuid::Uuid) = match target {
+            Target::Role(role_id) => ("role", role_id.0),
+            Target::Member(user_id) => ("member", user_id.0),
+        };
+        match target {
+            Target::Role(role_id) if state.store.role(role_id).await?.is_none() => {
+                return Err(ApiError::NotFound("role not found"));
+            }
+            Target::Member(user_id) if state.store.user_profile(user_id).await?.is_none() => {
+                return Err(ApiError::NotFound("user not found"));
+            }
+            _ => {}
+        }
+
+        // Compares against what the write really grants, denies included; see `set`.
+        let (old_allow, old_deny) = state
+            .store
+            .overwrite_for(channel_id, target_type, target_id)
+            .await?
+            .unwrap_or((Permissions::NONE, Permissions::NONE));
+        let granted = allow.remove(old_allow).union(old_deny.remove(deny));
+        if !caller_permissions.contains(granted) {
+            return Err(ApiError::Forbidden);
+        }
+
+        targets.push(target);
+        entries.push(OverwriteBatchEntry {
+            target_type,
+            target_id,
+            allow,
+            deny,
+        });
+    }
+
+    // Resolved before the write, per target then deduplicated; see `previously_visible_to`.
+    let mut previously_visible_to_all = Vec::new();
+    for target in &targets {
+        previously_visible_to_all.extend(previously_visible_to(&state, channel_id, *target).await?);
+    }
+    previously_visible_to_all.sort();
+    previously_visible_to_all.dedup();
+
+    state
+        .store
+        .set_channel_overwrites_batch(channel_id, &entries)
+        .await?;
+    state.hub.publish(Event::OverwriteChanged {
+        channel_id,
+        previously_visible_to: previously_visible_to_all,
+    });
+
+    let overwrites = state
+        .store
+        .channel_overwrites(channel_id)
+        .await?
+        .into_iter()
+        .map(|o| OverwriteDto {
+            kind: o.target_type,
+            id: o.target_id.to_string(),
+            allow: o.allow.bits(),
+            deny: o.deny.bits(),
+        })
+        .collect();
+    Ok(Json(OverwritesDto { overwrites }))
 }
 
 /// Clears an overwrite. Idempotent: clearing one that is not set still

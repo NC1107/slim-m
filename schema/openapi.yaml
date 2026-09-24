@@ -1832,6 +1832,48 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /roles/reorder:
+    patch:
+      operationId: reorderRoles
+      tags: [roles]
+      summary: Set the deployment's role order. Requires MANAGE_ROLES.
+      description: >
+        `role_ids` must name exactly the live non-`@everyone` roles, top to
+        bottom - no id missing, repeated, unknown, or naming `@everyone`
+        itself, which never reorders. The first id gets the highest
+        position and the last gets 1, so a reordered role always outranks
+        `@everyone`'s bootstrap default of 0.
+
+
+        A second guard beyond MANAGE_ROLES: a caller may only touch a role
+        whose old or new position sits strictly below the highest position
+        among roles they themselves hold - the position-hierarchy sibling of
+        the bit-based escalation check every other role route already
+        applies. An administrator bypasses it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderRolesRequest"
+      responses:
+        "200":
+          description: Every role, in its new order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /roles/{roleId}:
     parameters:
       - name: roleId
@@ -2398,6 +2440,41 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    put:
+      operationId: batchSetChannelOverwrites
+      tags: [roles]
+      summary: Apply several channel permission overwrites in one request.
+      description: >
+        The permissions grid's save: several targets' allow/deny pairs
+        applied atomically, rather than one setChannelOverwrite call per
+        changed column. Every entry is checked the same way setChannelOverwrite
+        checks its one - unknown bits, target existence, and the escalation
+        math on what the write actually grants - before any of them writes,
+        so one entry failing refuses the whole request rather than partially
+        applying it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchSetOverwritesRequest"
+      responses:
+        "200":
+          description: Every overwrite now set on the channel, after the batch applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelOverwrites"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
@@ -8301,6 +8378,19 @@ components:
             Informational: the bot this role was minted for, if any. An
             ordinary, freely editable role otherwise; see
             docs/decisions/0028-bot-accounts.md.
+        position:
+          type: integer
+          format: int64
+          description: >-
+            Hierarchy order: higher sorts first, matching the order this
+            list already comes back in. `@everyone` always sorts last. Set
+            by reorderRoles.
+        member_count:
+          type: integer
+          format: int64
+          description: >-
+            How many members currently hold this role; `@everyone`'s counts
+            the whole deployment.
 
     ModulePermission:
       type: object
@@ -8367,6 +8457,19 @@ components:
         mentionable:
           type: boolean
 
+    ReorderRolesRequest:
+      type: object
+      required: [role_ids]
+      properties:
+        role_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: >-
+            Every non-`@everyone` role id, top to bottom. See reorderRoles's
+            own description for the exact-set and hierarchy rules.
+
     SetOverwriteRequest:
       type: object
       properties:
@@ -8382,6 +8485,38 @@ components:
           format: int64
           default: 0
           description: Bits to force off.
+
+    BatchOverwriteEntry:
+      type: object
+      required: [kind, id]
+      properties:
+        kind:
+          type: string
+          enum: [role, member]
+        id:
+          type: string
+          format: uuid
+          description: The role's or member's UUID, matching `kind`.
+        allow:
+          type: integer
+          format: int64
+          default: 0
+          description: Same as `SetOverwriteRequest.allow`, checked per entry.
+        deny:
+          type: integer
+          format: int64
+          default: 0
+          description: Same as `SetOverwriteRequest.deny`.
+
+    BatchSetOverwritesRequest:
+      type: object
+      required: [overwrites]
+      properties:
+        overwrites:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/BatchOverwriteEntry"
 
     CanvasObject:
       type: object
