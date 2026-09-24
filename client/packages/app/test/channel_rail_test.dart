@@ -19,7 +19,6 @@ import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
-import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
@@ -369,9 +368,10 @@ void main() {
     expect(find.bySemanticsLabel('Space menu'), findsNothing);
   });
 
-  // Must be the same source Personal settings reads, never a second call.
-  testWidgets('the header names this build\'s version, from the real '
-      'PackageInfo source', (tester) async {
+  // A version is not a property of the Space; it duplicated the desktop title bar's own copy.
+  testWidgets('the subtitle never repeats this build\'s version', (
+    tester,
+  ) async {
     PackageInfo.setMockInitialValues(
       appName: 'slim-m',
       packageName: 'top.npcserver.slimm',
@@ -385,59 +385,24 @@ void main() {
 
     expect(
       find.byWidgetPredicate(
-        (widget) =>
-            widget is Text && (widget.data?.contains('v9.9.9') ?? false),
+        (widget) => widget is Text && (widget.data?.contains('9.9.9') ?? false),
       ),
-      findsOneWidget,
-      reason: 'must show this install\'s real build, not a hardcoded string',
+      findsNothing,
+      reason:
+          'a version shown here as well as in the title bar reads as a '
+          'typo, not agreement',
     );
   });
 
-  // Covers both an error and the empty string a failed web fetch answers with.
-  testWidgets('an unavailable version renders nothing, never a placeholder', (
-    tester,
-  ) async {
-    for (final override in [
-      appInfoProvider.overrideWith((ref) => Future<PackageInfo>.error('boom')),
-      appInfoProvider.overrideWith(
-        (ref) => Future.value(
-          PackageInfo(
-            appName: 'slim-m',
-            packageName: 'top.npcserver.slimm',
-            version: '',
-            buildNumber: '',
-          ),
-        ),
-      ),
-    ]) {
-      final setup = _setup(SyncStatus.live, extraOverrides: [override]);
-      await _pumpHeader(tester, setup.container);
-
-      expect(find.textContaining(' · v'), findsNothing);
-      expect(find.textContaining('unknown'), findsNothing);
-      expect(find.textContaining('0.0.0'), findsNothing);
-      setup.container.dispose();
-    }
-  });
-
-  // The rail is a fixed width; a long name plus a full subtitle must fit it.
+  // The rail is a fixed width; a long name must still fit it.
   testWidgets('the header does not overflow at the rail\'s narrowest width '
-      'with a long Space name and a full subtitle', (tester) async {
+      'with a long Space name', (tester) async {
     PackageInfo.setMockInitialValues(
       appName: 'slim-m',
       packageName: 'top.npcserver.slimm',
       version: '0.25.0',
       buildNumber: '1',
       buildSignature: '',
-    );
-    final members = List.generate(
-      12345,
-      (i) => api.UserProfile(
-        id: 'user-$i',
-        username: 'user$i',
-        displayName: 'User Number $i',
-        createdAt: 0,
-      ),
     );
     final setup = _setup(
       SyncStatus.live,
@@ -451,7 +416,6 @@ void main() {
             ),
           ),
         ),
-        membersProvider.overrideWith((ref) => Future.value(members)),
       ],
     );
     addTearDown(setup.container.dispose);
@@ -481,7 +445,7 @@ void main() {
       ChannelRail.mediumWidth,
       reason:
           'the header must stay inside the rail\'s fixed width rather than '
-          'a long name or a full subtitle pushing it wider',
+          'a long name pushing it wider',
     );
   });
 
