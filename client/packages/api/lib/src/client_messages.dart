@@ -28,6 +28,18 @@ extension SlimmApiMessages on SlimmApi {
         .toList(growable: false);
   }
 
+  /// Fetches one message, enriched exactly like a page from [listMessages] -
+  /// for a message outside the currently loaded window, such as jumping to a
+  /// reply or a search result. A channel the caller cannot see answers 404,
+  /// the same as a message that never existed.
+  Future<Message> getMessage({
+    required String channelId,
+    required String messageId,
+  }) async {
+    final json = await _send('GET', '/channels/$channelId/messages/$messageId');
+    return Message.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Sends a message. [id] must be a client-generated UUIDv7 and makes the send
   /// idempotent, so retrying an uncertain send is always safe. [attachmentIds]
   /// are hex sha256 ids already uploaded through [SlimmApi.uploadAttachment],
