@@ -63,6 +63,12 @@ class ContextMenuRegion extends StatefulWidget {
   /// Builds the menu's items given a callback that closes it. Called fresh
   /// every time the menu opens, so an item reflecting live state (a block
   /// flag, a permission) is never stale from an earlier open.
+  ///
+  /// The context handed over is this region's own, not the menu overlay's or
+  /// the sheet's: those die with the menu the moment `close` runs, so an item
+  /// that closed first and then opened a popover from that context opened it
+  /// against a torn-down box - or nowhere. This one stays mounted and anchors
+  /// to [child], which is where a member card or a submenu should land.
   final List<Widget> Function(BuildContext context, VoidCallback close)
   itemsBuilder;
 
@@ -168,7 +174,7 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
         top: false,
         child: AppSheetMenu(
           children: widget.itemsBuilder(
-            sheetContext,
+            context,
             () => Navigator.of(sheetContext).pop(),
           ),
         ),
@@ -208,12 +214,12 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
   Widget build(BuildContext context) {
     return OverlayPortal(
       controller: _controller.portal,
-      overlayChildBuilder: (context) => Positioned.fill(
+      overlayChildBuilder: (overlayContext) => Positioned.fill(
         child: CustomSingleChildLayout(
           delegate: MessageMenuLayout(
             anchor: _anchor,
             padding:
-                MediaQuery.paddingOf(context) +
+                MediaQuery.paddingOf(overlayContext) +
                 const EdgeInsets.all(menuScreenMargin),
           ),
           child: AnimatedMenuSurface(

@@ -386,8 +386,8 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       onHide: () => widget.overrides.setHidden(key, true),
       participantItemsBuilder: widget.participantMenuItemsBuilder == null
           ? null
-          : (close) => widget.participantMenuItemsBuilder!(
-              context,
+          : (tileContext, close) => widget.participantMenuItemsBuilder!(
+              tileContext,
               participant,
               close,
             ),
