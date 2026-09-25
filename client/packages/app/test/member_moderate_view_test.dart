@@ -41,6 +41,14 @@ const _ungrantable = api.Role(
   isEveryone: false,
   createdAt: 0,
 );
+const _botManaged = api.Role(
+  id: 'role-bot',
+  name: 'Echo Bot',
+  permissions: 0,
+  isEveryone: false,
+  createdAt: 0,
+  managedBotId: 'user-echo-bot',
+);
 
 const _profile = api.UserProfile(
   id: 'user-maya',
@@ -56,7 +64,7 @@ Widget _harness({required Widget child, int permissions = Perm.sendMessages}) =>
         myPermissionsProvider.overrideWithValue(permissions),
         membersProvider.overrideWith((ref) async => [_profile]),
         rolesProvider.overrideWith(
-          (ref) async => [_everyone, _grantable, _ungrantable],
+          (ref) async => [_everyone, _grantable, _ungrantable, _botManaged],
         ),
       ],
       child: MaterialApp(
@@ -115,6 +123,13 @@ void main() {
       isNull,
       reason: 'nothing here can ever change who holds @everyone',
     );
+    expect(
+      toggle.locked,
+      isTrue,
+      reason:
+          'on and unchangeable reads as locked, not as an ordinary '
+          'disabled switch',
+    );
   });
 
   testWidgets('a role the caller cannot grant is shown, disabled, not hidden', (
@@ -138,7 +153,32 @@ void main() {
       find.descendant(of: row, matching: find.byType(AppToggle)),
     );
     expect(toggle.onChanged, isNull);
+    expect(
+      toggle.locked,
+      isFalse,
+      reason: 'ungrantable is disabled, not the always-on locked style',
+    );
   });
+
+  testWidgets(
+    'a bot-managed role carries the same Bot tag the roles screen uses',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(child: Builder(builder: (context) => _view(context))),
+      );
+      await tester.pump();
+
+      final row = find.ancestor(
+        of: find.text('Echo Bot'),
+        matching: find.byType(AppListRow),
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('BOT')),
+        findsOneWidget,
+        reason: 'AppBadge renders its label uppercased',
+      );
+    },
+  );
 
   testWidgets(
     'a grantable role toggles by calling the shared assign/unassign routes',
