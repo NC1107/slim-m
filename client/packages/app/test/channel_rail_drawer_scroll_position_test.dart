@@ -62,10 +62,7 @@ Future<void> _dragFromLeftEdge(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-// .first: the reorderable-managed branch nests a second Scrollable of its
-// own (a NeverScrollableScrollPhysics ReorderableListView) inside the rail's
-// outer SingleChildScrollView; depth-first traversal reaches the outer one
-// first.
+// .first: the managed branch nests a second (never-scrollable) Scrollable inside the rail's outer one.
 double _railScrollOffset(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
@@ -116,9 +113,7 @@ void main() {
   testWidgets(
     'opening the drawer on a channel far down the list scrolls it into view',
     (tester) async {
-      // The route already points at a channel near the end of a long list,
-      // with no prior scroll from this drawer to fall back on - the
-      // deep-link/notification case, not a scroll the drawer itself made.
+      // No prior scroll from this drawer to fall back on - the deep-link/notification case.
       final fixture = await _pumpAtWidth(
         tester,
         390,
