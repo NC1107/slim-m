@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/call_recap.dart';
@@ -205,6 +206,11 @@ class VoiceRejoinScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // Whether the plain "You left this call." fallback, not the error or CallRecapCard, is next.
+    final showsPlainLeftNotice =
+        errorMessage == null && (recap == null || !recap!.isWorthShowing);
+    final rosterAsync = ref.watch(voiceRosterProvider(channelId));
+    final rosterConfirmedEmpty = rosterAsync.valueOrNull?.isEmpty ?? false;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         child: ConstrainedBox(
@@ -235,7 +241,10 @@ class VoiceRejoinScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.s16),
-                    _WhoIsHere(channelId: channelId),
+                    _WhoIsHere(
+                      rosterAsync: rosterAsync,
+                      mergeLeftNotice: showsPlainLeftNotice,
+                    ),
                     const SizedBox(height: AppSpacing.s16),
                     if (errorMessage != null)
                       Padding(
@@ -247,7 +256,8 @@ class VoiceRejoinScreen extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
                         child: CallRecapCard(recap: recap),
                       )
-                    else
+                    else if (!rosterConfirmedEmpty)
+                      // An empty roster already folded this into _WhoIsHere above.
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
                         child: Text(
@@ -307,15 +317,20 @@ class VoiceRejoinScreen extends ConsumerWidget {
 /// [persistentRosterFailureThreshold]) gets a third, distinct sentence
 /// rather than staying indistinguishable from a poll that simply has not
 /// answered yet.
-class _WhoIsHere extends ConsumerWidget {
-  const _WhoIsHere({required this.channelId});
+///
+/// [mergeLeftNotice] is true when the plain "You left this call." fallback
+/// would otherwise render directly below this: an empty roster then folds
+/// into one sentence with it, rather than sitting as two independently-true
+/// but contradictory-sounding lines (nobody is here / you just were here).
+class _WhoIsHere extends StatelessWidget {
+  const _WhoIsHere({required this.rosterAsync, required this.mergeLeftNotice});
 
-  final String channelId;
+  final AsyncValue<List<api.VoiceRosterParticipant>> rosterAsync;
+  final bool mergeLeftNotice;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final rosterAsync = ref.watch(voiceRosterProvider(channelId));
     final roster = rosterAsync.valueOrNull;
     if (roster == null) {
       return Text(
@@ -328,6 +343,13 @@ class _WhoIsHere extends ConsumerWidget {
     }
 
     if (roster.isEmpty) {
+      if (mergeLeftNotice) {
+        return Text(
+          'You left this call. Nobody else is here.',
+          textAlign: TextAlign.center,
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        );
+      }
       return Text(
         'Nobody is in this call yet.',
         textAlign: TextAlign.center,
