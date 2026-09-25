@@ -40,6 +40,7 @@ reqwest.workspace = true
 url.workspace = true
 ed25519-dalek.workspace = true
 wasmi.workspace = true
+jiff.workspace = true
 # `util` for ServiceExt::oneshot, which asks the router what it serves
 # (http/capability.rs); `limit` for the router's concurrency bound. Both named
 # explicitly rather than relied on through feature unification: `timeout` is

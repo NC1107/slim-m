@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO notification_schedule_allowed_users (user_id, allowed_user_id)\n             VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8f4f69d6f2b5ffa8e7566d372153d0b344caa0b9e49c97c2a30df967cf76ae38"
+}

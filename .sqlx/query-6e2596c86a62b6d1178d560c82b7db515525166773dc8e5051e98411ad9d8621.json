@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM notification_schedule_allowed_users WHERE user_id = ? OR allowed_user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6e2596c86a62b6d1178d560c82b7db515525166773dc8e5051e98411ad9d8621"
+}

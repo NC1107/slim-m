@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT allowed_user_id AS \"id: UserId\" FROM notification_schedule_allowed_users WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c853f8a39b1b377170439e79d324b16afef6753a2b666d439285dbae361a2212"
+}

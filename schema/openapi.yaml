@@ -4367,6 +4367,191 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /notifications/schedule:
+    get:
+      operationId: getNotificationSchedule
+      tags: [push]
+      summary: Read the caller's own notification schedule.
+      description: >
+        `null` means never configured, distinct from a schedule with every
+        weekday empty - see docs/decisions/0033-notification-schedule.md.
+        `/push/quiet-hours` is untouched and still readable; this is the
+        schedule that actually gates push (`push::recipients`).
+      responses:
+        "200":
+          description: The schedule now in effect, or `null` if never configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationScheduleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    put:
+      operationId: setNotificationSchedule
+      tags: [push]
+      summary: Replace the caller's own timezone, off-hours mode and weekly windows.
+      description: >
+        `timezone` must be a resolvable IANA name. Each day in `days` is
+        0 (Monday) to 6 (Sunday) and may appear at most once; `end_minute`
+        may be less than `start_minute` for a window crossing midnight into
+        the next weekday. Never touches `snooze_until` or either allow-list.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetNotificationScheduleRequest"
+      responses:
+        "200":
+          description: The schedule now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationScheduleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: clearNotificationSchedule
+      tags: [push]
+      summary: Turn the schedule off entirely, back to never configured.
+      description: >
+        Removes the weekly windows, both allow-lists and any active snooze
+        together - a real `DELETE`, not a tombstone, so the cascade genuinely
+        fires.
+      responses:
+        "204":
+          description: The schedule is now unconfigured.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /notifications/schedule/allowed-users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: addNotificationScheduleAllowedUser
+      tags: [push]
+      summary: Notify me about this person even off hours.
+      description: >
+        The member card's off-hours action. A DM or mention from `userId`
+        still notifies during off hours even in `nothing` mode, floored at
+        mentions-shaped, never raised to `everything`. Works with no
+        schedule configured yet; it is inert until there is an off-hours
+        window for it to break through.
+      responses:
+        "204":
+          description: userId is now on the caller's off-hours people allow-list.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: removeNotificationScheduleAllowedUser
+      tags: [push]
+      summary: Remove a person from the off-hours allow-list.
+      responses:
+        "204":
+          description: userId is no longer on the caller's off-hours people allow-list.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /notifications/schedule/allowed-channels/{channelId}:
+    parameters:
+      - name: channelId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: addNotificationScheduleAllowedChannel
+      tags: [push]
+      summary: Notify me off hours in this channel.
+      description: >
+        The channel menu's off-hours action. `channelId` notifies exactly as
+        it would in hours during an off-hours window, bypassing off-hours
+        narrowing entirely rather than floored at mentions. Requires
+        `VIEW_CHANNEL`, the same bar muting a channel already sets.
+      responses:
+        "204":
+          description: channelId is now on the caller's off-hours channel allow-list.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: removeNotificationScheduleAllowedChannel
+      tags: [push]
+      summary: Remove a channel from the off-hours allow-list.
+      responses:
+        "204":
+          description: channelId is no longer on the caller's off-hours channel allow-list.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /notifications/schedule/snooze:
+    put:
+      operationId: setNotificationSnooze
+      tags: [push]
+      summary: Pause notifications until a deadline (Slack's 30m / 1h / until tomorrow).
+      description: >
+        `until_ms` is an absolute epoch-millisecond deadline the client
+        computes for whichever option was chosen - only the client knows the
+        account's own local midnight for "until tomorrow". Must be in the
+        future and no more than a week out. While active, the schedule reads
+        as off hours in `nothing` mode regardless of the configured window
+        or mode, still subject to both allow-lists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSnoozeRequest"
+      responses:
+        "200":
+          description: The snooze now in effect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnoozeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: clearNotificationSnooze
+      tags: [push]
+      summary: End an active snooze early.
+      responses:
+        "204":
+          description: The snooze is cleared; the ordinary schedule applies again.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /channels/{channelId}/read:
     parameters:
       - $ref: "#/components/parameters/ChannelId"
@@ -10188,6 +10373,112 @@ components:
             Always present as a key: null means quiet hours are disabled,
             the same convention `Message.poll` follows for "genuinely none"
             versus omitted.
+
+    NotificationScheduleDay:
+      type: object
+      required: [weekday, start_minute, end_minute]
+      properties:
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = Monday .. 6 = Sunday.
+        start_minute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          description: Minutes since midnight, in the schedule's own timezone, that this weekday's on-hours window opens.
+        end_minute:
+          type: integer
+          minimum: 0
+          maximum: 1439
+          description: >
+            Minutes since midnight that the window closes, exclusive. May be
+            less than `start_minute` for a window that starts this weekday
+            and crosses midnight into the next one; must not equal
+            `start_minute`.
+
+    NotificationSchedule:
+      type: object
+      required: [timezone, days, off_hours_mode, snooze_until, allowed_user_ids, allowed_channel_ids]
+      properties:
+        timezone:
+          type: string
+          description: An IANA time zone name, for example "America/New_York".
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationScheduleDay"
+          description: A weekday absent here has no on-hours window at all - the whole day is off hours.
+        off_hours_mode:
+          type: string
+          enum: [mentions, nothing]
+          description: >
+            `mentions` lets mentions and DMs through off hours (today's
+            quiet-hours behaviour, and the default). `nothing` silences
+            everything off hours, including a mention, unless an allow-list
+            says otherwise.
+        snooze_until:
+          oneOf:
+            - type: integer
+              format: int64
+            - type: "null"
+          description: Epoch-millisecond deadline; while in the future the schedule reads as off hours in `nothing` mode regardless of the window or mode.
+        allowed_user_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        allowed_channel_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    NotificationScheduleResponse:
+      type: object
+      required: [schedule]
+      properties:
+        schedule:
+          oneOf:
+            - $ref: "#/components/schemas/NotificationSchedule"
+            - type: "null"
+          description: >-
+            Always present as a key: null means never configured, distinct
+            from a schedule with every weekday empty.
+
+    SetNotificationScheduleRequest:
+      type: object
+      required: [timezone, days, off_hours_mode]
+      properties:
+        timezone:
+          type: string
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationScheduleDay"
+        off_hours_mode:
+          type: string
+          enum: [mentions, nothing]
+
+    SetSnoozeRequest:
+      type: object
+      required: [until_ms]
+      properties:
+        until_ms:
+          type: integer
+          format: int64
+          description: Epoch-millisecond deadline, in the future and no more than a week out.
+
+    SnoozeResponse:
+      type: object
+      required: [snooze_until]
+      properties:
+        snooze_until:
+          oneOf:
+            - type: integer
+              format: int64
+            - type: "null"
 
     ChannelNotificationOverrideRequest:
       type: object

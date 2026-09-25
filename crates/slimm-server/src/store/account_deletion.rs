@@ -274,6 +274,27 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        // A real DELETE, so notification_schedule_days genuinely cascades from it.
+        sqlx::query!(
+            "DELETE FROM notification_schedules WHERE user_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        // Both directions, like user_blocks above.
+        sqlx::query!(
+            "DELETE FROM notification_schedule_allowed_users WHERE user_id = ? OR allowed_user_id = ?",
+            user_id,
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
+            "DELETE FROM notification_schedule_allowed_channels WHERE user_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
         sqlx::query!(
             "DELETE FROM channel_notification_prefs WHERE user_id = ?",
             user_id

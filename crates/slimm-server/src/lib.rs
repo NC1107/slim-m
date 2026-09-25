@@ -18,6 +18,7 @@ pub mod media;
 pub mod mentions;
 pub mod module_runtime;
 mod net_guard;
+pub mod notification_schedule;
 pub mod notifications;
 pub mod permissions;
 pub mod presence;

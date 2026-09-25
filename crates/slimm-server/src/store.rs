@@ -61,6 +61,7 @@ mod moderation_history;
 mod module_artifacts;
 mod module_permissions;
 mod modules;
+mod notification_schedule;
 mod notifications;
 mod overwrites_batch;
 mod permissions;
@@ -143,6 +144,7 @@ pub use modules::{
     InstallModuleRequest, InstalledModule, ModuleExtensionPoint, ModuleExtensionPointSpec,
     ModulePermissionSpec, ModuleRuntimeLimits,
 };
+pub use notification_schedule::{DaySetting, NotificationScheduleDetail};
 pub use overwrites_batch::OverwriteBatchEntry;
 pub use permissions::ChannelOverwrite;
 pub use pins::{MAX_PINS_PER_CHANNEL, PinError, PinnedMessage};

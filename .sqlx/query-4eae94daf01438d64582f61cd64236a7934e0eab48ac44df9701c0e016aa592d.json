@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE notification_schedules SET snooze_until = ?, updated_at = ? WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4eae94daf01438d64582f61cd64236a7934e0eab48ac44df9701c0e016aa592d"
+}
