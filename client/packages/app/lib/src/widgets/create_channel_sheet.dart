@@ -50,24 +50,36 @@ const int _nameMaxChars = 64;
 /// here: someone who pressed `+` on a category has already said which one,
 /// and someone who used the Space menu named no category at all. Moving a
 /// channel afterwards is a drag in the rail, which is a better answer than
-/// a picker duplicating it.
+/// a picker duplicating it. [categoryName] is display-only, for the sheet to
+/// say which category that is; a caller with no category to imply (the
+/// Space menu, or the rail's uncategorised `+`) leaves it null and the sheet
+/// says nothing about one.
 Future<void> showCreateChannelSheet(
   BuildContext context, {
   required String initialKind,
   String? categoryId,
+  String? categoryName,
 }) {
   return showAppSheet<void>(
     context,
-    builder: (context) =>
-        _CreateChannelSheet(initialKind: initialKind, categoryId: categoryId),
+    builder: (context) => _CreateChannelSheet(
+      initialKind: initialKind,
+      categoryId: categoryId,
+      categoryName: categoryName,
+    ),
   );
 }
 
 class _CreateChannelSheet extends ConsumerStatefulWidget {
-  const _CreateChannelSheet({required this.initialKind, this.categoryId});
+  const _CreateChannelSheet({
+    required this.initialKind,
+    this.categoryId,
+    this.categoryName,
+  });
 
   final String initialKind;
   final String? categoryId;
+  final String? categoryName;
 
   @override
   ConsumerState<_CreateChannelSheet> createState() =>
@@ -139,11 +151,12 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
     final canRestrict = ref
         .watch(myPermissionsProvider)
         .hasPermission(Perm.manageRoles);
+    final nameLength = _name.text.trim().length;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        0,
+        AppSpacing.s16,
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
@@ -154,12 +167,19 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
           children: [
             Text(
               'Create a channel',
-              style: AppText.body.copyWith(
+              style: AppText.heading.copyWith(
                 color: tokens.textPrimary,
                 fontWeight: AppWeights.semi,
               ),
             ),
-            const SizedBox(height: AppSpacing.s12),
+            if (widget.categoryName != null) ...[
+              const SizedBox(height: AppSpacing.s4),
+              Text(
+                'Adding to ${widget.categoryName}',
+                style: AppText.caption.copyWith(color: tokens.textSecondary),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.s16),
             AppInput(
               controller: _name,
               placeholder: 'Channel name',
@@ -170,7 +190,19 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
               },
               semanticLabel: 'Channel name',
             ),
-            const SizedBox(height: AppSpacing.s12),
+            const SizedBox(height: AppSpacing.s4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$nameLength/$_nameMaxChars',
+                style: AppText.micro.copyWith(
+                  color: nameLength > _nameMaxChars
+                      ? tokens.dangerText
+                      : tokens.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s8),
             AppSegmentedControl.inline(
               semanticLabel: 'Channel kind',
               options: const [
@@ -181,6 +213,14 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
               onSegmentSelected: (i) =>
                   setState(() => _kind = i == 1 ? 'voice' : 'text'),
             ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              _kind == 'voice'
+                  ? 'People join a live call to talk, share video and their screen.'
+                  : 'People post messages, images and files to read at their own pace.',
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.s8),
             if (canRestrict)
               SettingsToggleRow(
                 label: 'Private',

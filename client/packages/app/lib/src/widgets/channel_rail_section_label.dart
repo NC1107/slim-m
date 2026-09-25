@@ -137,6 +137,7 @@ class AddChannelGlyph extends StatelessWidget {
               context,
               initialKind: 'text',
               categoryId: categoryId,
+              categoryName: categoryId == null ? null : categoryName,
             ),
           ),
         ),
