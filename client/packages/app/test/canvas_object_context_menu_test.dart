@@ -61,6 +61,7 @@ class _Harness {
           canManage: canManage,
           selfId: selfId,
           requests: requests,
+          tool: CanvasTool.select,
           onToolChanged: toolChanges.add,
           onBringToFront: bringToFront.add,
           onSendToBack: sendToBack.add,

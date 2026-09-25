@@ -69,16 +69,19 @@
 /// still holds for it unchanged.
 ///
 /// **Deliberately duplicated with the overflow menu's own selection-gated
-/// items, not moved.** Touch has no right-click at all, so the overflow
-/// menu - reachable from the bar on every platform - is the only route a
-/// touch user has to bring-to-front/send-to-back/delete; removing them
-/// there to avoid the overlap would be a real regression for touch, not a
-/// simplification. Teaching a long press to open this same menu was
-/// considered and rejected: the surface's raw `Listener` already reacts to
-/// pointer-down immediately for every tool (starting a stroke draft, an
-/// erase, a placement), so a held touch would draw or place *and* pop a
-/// menu 500ms later, which needs its own design pass this report did not
-/// ask for.
+/// items, not moved.** The overflow menu - reachable from the bar on every
+/// platform - stays a second route to bring-to-front/send-to-back/delete;
+/// removing them there to avoid the overlap would be a real regression for
+/// a user who has not found the long-press path below yet.
+///
+/// **Touch's long-press equivalent (`onLongPressStart`) is gated to the
+/// Select tool.** Every other tool's raw pointer-down starts a stroke
+/// draft, an erase or a placement the instant a finger lands, well before
+/// any long-press timer could fire, so teaching this to open under a
+/// drawing tool would draw or place *and* pop a menu 500ms later. The
+/// Select tool's own pointer-down only calls `onSelectStart`, which a menu
+/// opening on top of moments later changes nothing about - see
+/// `_onLongPressStart`'s own doc.
 ///
 /// **Keyboard and screen-reader route: `CanvasSelectionSemantics`, not a
 /// tab stop of this widget's own.** A canvas object has no focus node to
@@ -144,6 +147,7 @@ class CanvasObjectContextMenu extends StatefulWidget {
     required this.canManage,
     required this.selfId,
     required this.requests,
+    required this.tool,
     required this.onToolChanged,
     required this.onBringToFront,
     required this.onSendToBack,
@@ -161,6 +165,12 @@ class CanvasObjectContextMenu extends StatefulWidget {
   final bool canManage;
   final String? selfId;
   final CanvasObjectMenuRequests requests;
+
+  /// The surface's currently active tool - read only to gate the touch
+  /// long-press path below to the Select tool, where a pointer-down has
+  /// already run [onSelectStart] rather than started an irreversible draw,
+  /// erase or placement the way every other tool's pointer-down does.
+  final CanvasTool tool;
 
   /// Switches the surface to the Move tool once a target resolves, so the
   /// object a right-click just found is immediately draggable and
@@ -244,6 +254,26 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
   /// "nothing here" result that used to end this gesture with no menu at
   /// all - opens the empty-space one instead.
   void _onSecondaryTapUp(TapUpDetails details) {
+    final world = _toWorld(details.localPosition);
+    final id = _hitTest(world);
+    if (id != null) {
+      _openFor(id, pointerGlobal: details.globalPosition);
+    } else {
+      _openEmptySpace(world, details.globalPosition);
+    }
+  }
+
+  /// The touch equivalent of [_onSecondaryTapUp] - desktop-vs-mobile rule 3.
+  /// Gated to the Select tool, not to a particular pointer kind: every
+  /// other tool's own raw pointer-down already committed a draw, erase or
+  /// placement before this timer could ever fire, exactly the collision
+  /// this file's own library doc names as the reason a long press was
+  /// rejected before. The Select tool's pointer-down only selects, which a
+  /// menu opening on top of moments later changes nothing about, and a real
+  /// mouse drag-select cancels this recognizer at the first move past slop
+  /// the same way any long press does.
+  void _onLongPressStart(LongPressStartDetails details) {
+    if (widget.tool != CanvasTool.select) return;
     final world = _toWorld(details.localPosition);
     final id = _hitTest(world);
     if (id != null) {
@@ -365,6 +395,7 @@ class _CanvasObjectContextMenuState extends State<CanvasObjectContextMenu> {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onSecondaryTapUp: _onSecondaryTapUp,
+        onLongPressStart: _onLongPressStart,
         // Load-bearing, not tidiness - see this file's own library doc.
         excludeFromSemantics: true,
         child: const SizedBox.expand(),
