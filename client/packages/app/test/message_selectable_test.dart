@@ -11,6 +11,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/message_selection.dart';
@@ -22,6 +23,7 @@ const _channel = 'c1';
 Future<ProviderContainer> _pump(
   WidgetTester tester, {
   required VoidCallback onRowTapped,
+  List<String> ids = const ['m1', 'm2'],
 }) async {
   final container = ProviderContainer();
   addTearDown(container.dispose);
@@ -33,10 +35,11 @@ Future<ProviderContainer> _pump(
         home: Scaffold(
           body: Column(
             children: [
-              for (final id in ['m1', 'm2'])
+              for (final id in ids)
                 MessageSelectable(
                   channelId: _channel,
                   messageId: id,
+                  order: ids,
                   child: GestureDetector(
                     onTap: onRowTapped,
                     child: SizedBox(height: 40, width: 200, child: Text(id)),
@@ -135,5 +138,48 @@ void main() {
           'the wrapper returns its child untouched, so a normal transcript '
           'carries none of this',
     );
+  });
+
+  testWidgets('a shift-tap picks every row between the last plain tap and it', (
+    tester,
+  ) async {
+    final container = await _pump(
+      tester,
+      onRowTapped: () {},
+      ids: const ['m1', 'm2', 'm3', 'm4'],
+    );
+    container.read(messageSelectionProvider(_channel).notifier).start('m1');
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.tap(find.text('m4'));
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(messageSelectionProvider(_channel)).ids,
+      {'m1', 'm2', 'm3', 'm4'},
+      reason: 'm2 and m3 were never tapped; the held shift is what picked them',
+    );
+  });
+
+  testWidgets('the same tap without shift picks only the row it landed on', (
+    tester,
+  ) async {
+    final container = await _pump(
+      tester,
+      onRowTapped: () {},
+      ids: const ['m1', 'm2', 'm3', 'm4'],
+    );
+    container.read(messageSelectionProvider(_channel).notifier).start('m1');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('m4'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(messageSelectionProvider(_channel)).ids, {
+      'm1',
+      'm4',
+    });
   });
 }

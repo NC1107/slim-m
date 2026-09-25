@@ -118,4 +118,61 @@ void main() {
       reason: 'a widget holding the old value must not see it change under it',
     );
   });
+
+  group('extending with shift', () {
+    const order = ['m1', 'm2', 'm3', 'm4', 'm5'];
+
+    test('a shift-tap selects everything from the anchor to the target', () {
+      final c = controller()..start('m2');
+      c.extendTo('m4', order);
+      expect(c.state.ids, {'m2', 'm3', 'm4'});
+    });
+
+    test('and works upwards just as well', () {
+      final c = controller()..start('m4');
+      c.extendTo('m2', order);
+      expect(c.state.ids, {'m2', 'm3', 'm4'});
+    });
+
+    test('it extends an unrelated selection, never replaces it', () {
+      final c = controller()..start('m5');
+      c.toggle('m1');
+      c.extendTo('m3', order);
+      expect(c.state.ids, {'m1', 'm2', 'm3', 'm5'});
+    });
+
+    test('the anchor is the last plain tap, and a shift-tap keeps it', () {
+      final c = controller()..start('m1');
+      c.toggle('m3');
+      expect(c.state.anchor, 'm3');
+      c.extendTo('m5', order);
+      expect(
+        c.state.anchor,
+        'm3',
+        reason: 'a second shift-tap re-extends from the same place',
+      );
+      c.extendTo('m2', order);
+      expect(c.state.ids, {'m1', 'm2', 'm3', 'm4', 'm5'});
+    });
+
+    test('with no anchor in the transcript a shift-tap is a plain tap', () {
+      final c = controller()..start('elsewhere');
+      c.extendTo('m2', order);
+      expect(c.state.ids, {'elsewhere', 'm2'});
+    });
+
+    test('the cap fills from the anchor outward and leaves no gap', () {
+      final wide = [for (var i = 0; i < 100; i++) 'm$i'];
+      final c = controller()..start('m0');
+      c.extendTo('m99', wide);
+      expect(c.state.count, maxBulkDeleteIds);
+      expect(c.state.ids, wide.take(maxBulkDeleteIds).toSet());
+    });
+
+    test('nothing happens while the mode is off', () {
+      final c = controller()..extendTo('m2', order);
+      expect(c.state.active, isFalse);
+      expect(c.state.count, 0);
+    });
+  });
 }

@@ -17,6 +17,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -27,12 +28,18 @@ class MessageSelectable extends ConsumerWidget {
     required this.channelId,
     required this.messageId,
     required this.child,
+    this.order = const [],
     super.key,
   });
 
   final String channelId;
   final String messageId;
   final Widget child;
+
+  /// The transcript's message ids, oldest first, for a shift-tap to extend
+  /// the selection along (see [MessageSelectionController.extendTo]). Shift
+  /// is a keyboard concept, so touch keeps its tap-per-message flow untouched.
+  final List<String> order;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,11 +57,7 @@ class MessageSelectable extends ConsumerWidget {
       label: selected ? 'Selected, tap to deselect' : 'Tap to select',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: refuses
-            ? null
-            : () => ref
-                  .read(messageSelectionProvider(channelId).notifier)
-                  .toggle(messageId),
+        onTap: refuses ? null : () => _pick(ref),
         child: ColoredBox(
           color: selected ? tokens.accentSoft : Colors.transparent,
           child: Opacity(
@@ -76,6 +79,15 @@ class MessageSelectable extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _pick(WidgetRef ref) {
+    final controller = ref.read(messageSelectionProvider(channelId).notifier);
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      controller.extendTo(messageId, order);
+    } else {
+      controller.toggle(messageId);
+    }
   }
 }
 

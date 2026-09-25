@@ -38,10 +38,17 @@ const int maxBulkDeleteIds = 64;
 /// explicit cancel, or a completed delete, ends the mode.
 @immutable
 class MessageSelection {
-  const MessageSelection({this.ids = const {}, this.active = false});
+  const MessageSelection({
+    this.ids = const {},
+    this.active = false,
+    this.anchor,
+  });
 
   final Set<String> ids;
   final bool active;
+
+  /// The message last picked by a plain tap: where a shift-tap extends from.
+  final String? anchor;
 
   int get count => ids.length;
   bool contains(String id) => ids.contains(id);
@@ -55,7 +62,8 @@ class MessageSelectionController extends StateNotifier<MessageSelection> {
 
   /// Turns selection on with [id] already picked, which is how the transcript
   /// enters the mode: the message whose menu was used is the first selected.
-  void start(String id) => state = MessageSelection(ids: {id}, active: true);
+  void start(String id) =>
+      state = MessageSelection(ids: {id}, active: true, anchor: id);
 
   /// Adds [id], or removes it if it is already selected.
   ///
@@ -69,7 +77,31 @@ class MessageSelectionController extends StateNotifier<MessageSelection> {
       if (state.atCap) return;
       next.add(id);
     }
-    state = MessageSelection(ids: next, active: true);
+    state = MessageSelection(ids: next, active: true, anchor: id);
+  }
+
+  /// A shift-tap: selects every message from the anchor to [id] inclusive,
+  /// along [order] (the transcript's ids, oldest first), in either direction.
+  ///
+  /// Extends rather than replaces, so a selection made elsewhere in the
+  /// transcript survives, and the anchor stays put so a second shift-tap
+  /// re-extends from the same message - the way a file manager behaves.
+  /// Filled from the anchor outward, so hitting the cap leaves a contiguous
+  /// run rather than a gap. With no anchor in [order] this is a plain
+  /// [toggle].
+  void extendTo(String id, List<String> order) {
+    if (!state.active) return;
+    final anchor = state.anchor;
+    final from = anchor == null ? -1 : order.indexOf(anchor);
+    final to = order.indexOf(id);
+    if (from < 0 || to < 0) return toggle(id);
+    final next = {...state.ids};
+    final step = to >= from ? 1 : -1;
+    for (var i = from; i != to + step; i += step) {
+      if (next.length >= maxBulkDeleteIds && !next.contains(order[i])) break;
+      next.add(order[i]);
+    }
+    state = MessageSelection(ids: next, active: true, anchor: anchor);
   }
 
   /// Ends selection mode and forgets everything picked.
