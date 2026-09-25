@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rows inside [NotificationsSection] (`personal_status_sections.dart`)
 /// that are each their own genuine round trip to the server, rather than a
-/// bare toggle backed by local state: the lock-screen preview switch, the
-/// account-wide notification preference, and the quiet-hours window.
+/// bare toggle backed by local state: the lock-screen preview switch and the
+/// account-wide notification preference. The notification schedule that used
+/// to live here as `QuietHoursRow` is `notification_schedule_section.dart`
+/// now - see `docs/decisions/0033-notification-schedule.md`.
 ///
 /// Split out of personal_status_sections.dart purely to stay under this
 /// repo's line budget.
@@ -20,7 +22,6 @@ import '../providers/notification_preference_controller.dart';
 import '../providers/providers.dart';
 import '../providers/push_content_preview_settings.dart';
 import '../providers/push_controller.dart';
-import '../providers/quiet_hours_controller.dart';
 import 'run_guarded.dart';
 import 'settings_select_row.dart';
 import 'settings_toggle_row.dart';
@@ -141,140 +142,6 @@ class _NotificationPreferenceRowState
             child: AppErrorState(
               message: 'Could not load your notification preference.',
               onRetry: () => ref.invalidate(notificationPreferenceProvider),
-            ),
-          ),
-        if (actionError != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s8,
-              0,
-              AppSpacing.s8,
-              AppSpacing.s8,
-            ),
-            child: AppErrorState(
-              message: actionError!,
-              onDismiss: clearActionError,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// The default window offered the first time this account turns quiet hours
-/// on: 23:00-08:00, the motivating case named in the feature's own design
-/// note, not an arbitrary placeholder.
-const _defaultQuietHoursStart = TimeOfDay(hour: 23, minute: 0);
-const _defaultQuietHoursEnd = TimeOfDay(hour: 8, minute: 0);
-
-/// The "do not wake me for ordinary chatter overnight" row inside
-/// `NotificationsSection`, beside [NotificationPreferenceRow].
-///
-/// A window in effect narrows [api.NotificationPreference.everything] to
-/// [api.NotificationPreference.mentions] for its own duration
-/// (`push::recipients::narrow_for_notification_preference`) - never to
-/// [api.NotificationPreference.nothing], so a real mention still wakes a
-/// device overnight. Times are entered and shown in this device's local
-/// clock; [utcMinutesFromLocalTimeOfDay] converts before every write, and
-/// [localTimeOfDayFromUtcMinutes] converts back for display, so the server
-/// only ever sees UTC.
-class QuietHoursRow extends ConsumerStatefulWidget {
-  const QuietHoursRow({super.key});
-
-  @override
-  ConsumerState<QuietHoursRow> createState() => _QuietHoursRowState();
-}
-
-class _QuietHoursRowState extends ConsumerState<QuietHoursRow>
-    with GuardedActionState<QuietHoursRow> {
-  Future<void> _apply(TimeOfDay start, TimeOfDay end) async {
-    final ok = await guard(
-      whatFailed: 'update your quiet hours',
-      action: () => ref
-          .read(apiProvider)
-          .setQuietHours(
-            api.QuietHours(
-              startMinute: utcMinutesFromLocalTimeOfDay(start),
-              endMinute: utcMinutesFromLocalTimeOfDay(end),
-            ),
-          ),
-    );
-    if (ok) ref.invalidate(quietHoursProvider);
-  }
-
-  Future<void> _toggle(bool enabled) async {
-    if (!enabled) {
-      final ok = await guard(
-        whatFailed: 'turn off quiet hours',
-        action: () => ref.read(apiProvider).clearQuietHours(),
-      );
-      if (ok) ref.invalidate(quietHoursProvider);
-      return;
-    }
-    await _apply(_defaultQuietHoursStart, _defaultQuietHoursEnd);
-  }
-
-  Future<void> _pickStart(TimeOfDay start, TimeOfDay end) async {
-    final picked = await showTimePicker(context: context, initialTime: start);
-    if (picked != null) await _apply(picked, end);
-  }
-
-  Future<void> _pickEnd(TimeOfDay start, TimeOfDay end) async {
-    final picked = await showTimePicker(context: context, initialTime: end);
-    if (picked != null) await _apply(start, picked);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final quietHours = ref.watch(quietHoursProvider);
-    if (quietHours.hasError && quietHours.error is api.NotFoundException) {
-      return const SizedBox.shrink();
-    }
-    final loadFailed = quietHours.hasError && quietHours.valueOrNull == null;
-    final window = quietHours.valueOrNull;
-    final enabled = window != null;
-    final start = window == null
-        ? _defaultQuietHoursStart
-        : localTimeOfDayFromUtcMinutes(window.startMinute);
-    final end = window == null
-        ? _defaultQuietHoursEnd
-        : localTimeOfDayFromUtcMinutes(window.endMinute);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SettingsToggleRow(
-          label: 'Quiet hours',
-          description:
-              'Narrows notifications to mentions and direct messages during '
-              'this window each day. A mention still wakes a device.',
-          value: enabled,
-          onChanged: quietHours.isLoading ? null : _toggle,
-          semanticLabel: 'Quiet hours',
-        ),
-        if (enabled) ...[
-          AppListRow(
-            label: 'Starts',
-            trailing: Text(start.format(context)),
-            onTap: () => _pickStart(start, end),
-          ),
-          AppListRow(
-            label: 'Ends',
-            trailing: Text(end.format(context)),
-            onTap: () => _pickEnd(start, end),
-          ),
-        ],
-        if (loadFailed)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s8,
-              0,
-              AppSpacing.s8,
-              AppSpacing.s8,
-            ),
-            child: AppErrorState(
-              message: 'Could not load your quiet hours.',
-              onRetry: () => ref.invalidate(quietHoursProvider),
             ),
           ),
         if (actionError != null)

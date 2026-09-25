@@ -31,6 +31,9 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_riverpod: ^2.5.0
+  # The device's own IANA zone name for the notification schedule; see
+  # docs/dependencies.md. Covers Android, iOS, macOS, Windows and Linux.
+  flutter_timezone: ^5.1.0
   go_router: ^14.0.0
   # Inline video playback: the only cross-platform player covering desktop
   # Linux (`video_player` stops at Android/iOS/macOS/web). `media_kit_video`

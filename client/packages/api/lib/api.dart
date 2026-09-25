@@ -51,6 +51,7 @@ export 'src/client.dart'
         SlimmApiModeration,
         SlimmApiModuleCommands,
         SlimmApiModulePermissions,
+        SlimmApiNotificationSchedule,
         SlimmApiPresence,
         SlimmApiPush,
         SlimmApiRoles,

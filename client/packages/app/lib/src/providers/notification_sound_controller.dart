@@ -40,6 +40,8 @@ import 'blocks_controller.dart';
 import 'channel_notification_overrides_controller.dart';
 import 'dm_call_ring_controller.dart';
 import 'live_events.dart';
+import 'notification_schedule_controller.dart';
+import 'notification_schedule_rules.dart';
 import 'notification_sound_rules.dart';
 import 'notification_sound_settings.dart';
 import 'providers.dart';
@@ -130,6 +132,19 @@ class NotificationSoundController {
         .overrideFor(message.channelId);
     if (!channelEarnsASound(
       channelOverride: channelOverride,
+      isDm: isDm,
+      mentionsSelf: mentionsSelf,
+    )) {
+      return;
+    }
+
+    final schedule = _ref.read(notificationScheduleProvider).valueOrNull;
+    if (!scheduleEarnsASound(
+      state: evaluateNotificationSchedule(schedule),
+      channelAllowed:
+          schedule?.allowedChannelIds.contains(message.channelId) ?? false,
+      authorAllowed:
+          schedule?.allowedUserIds.contains(message.authorId) ?? false,
       isDm: isDm,
       mentionsSelf: mentionsSelf,
     )) {
