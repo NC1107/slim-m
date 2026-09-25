@@ -220,6 +220,21 @@ pub enum Event {
     /// without it a remove-then-restore leaves the member invisible in every
     /// already-open client until an unrelated refetch.
     MemberRestored(UserId),
+    /// Somebody actually joined the Space: registration, or an existing
+    /// account spending an invite code (`Store::redeem_invite`). Not
+    /// published for a restore from removal, which already has
+    /// [`Event::MemberRestored`] and is not a new member.
+    ///
+    /// Carries only the id, the shape [`Event::MemberRemoved`] already uses:
+    /// a receiving connection re-fetches the member from `GET /members` for
+    /// anything more than that, the same reason a greeter bot resolves the
+    /// rest of a profile over REST rather than this event carrying it.
+    ///
+    /// Does not move `hub::moves_permissions`: unlike a restore, a new
+    /// member's arrival changes no other connection's already-cached answer
+    /// for any channel it holds, since nobody was ever told "no" for this
+    /// user first.
+    MemberJoined(UserId),
     /// A user changed their display name. Carries only the id, the shape
     /// [`Event::MemberRemoved`] already uses: the name itself lives in
     /// exactly one place, `users.display_name`, and a receiving connection

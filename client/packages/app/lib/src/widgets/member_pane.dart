@@ -78,9 +78,7 @@ class AppMemberPane extends ConsumerWidget {
         : ref.watch(channelMembersProvider(channelId));
     // Purely to start the seed fetch; statuses come back through presenceControllerProvider below.
     ref.watch(presenceSeedProvider(channelId));
-    // Purely a side-effect subscription: no value of its own, only a possible invalidate on membersProvider.
-    ref.watch(memberRosterKeepAliveProvider(channelId));
-    // Same shape: a timeout or a removal makes a row on screen wrong.
+    // Purely a side-effect subscription: a join, a timeout or a moderation event makes a row on screen wrong.
     ref.watch(memberModerationWatcherProvider);
     // Scoped watch: see the class doc comment above for why.
     ref.watch(presenceControllerProvider.select(reachablePresenceKey));

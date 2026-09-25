@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Regression tests for two roster bugs found together: `membersProvider`
-/// fetched with no `limit`, so the server's own default of 50 silently
-/// truncated any roster past that; and the keep-alive guard that infers a
-/// join from a live event had no real bound, so a member id that could
-/// never appear (removed, anonymized, or a race) re-invalidated on every
-/// one of their later events forever.
+/// Regression tests for `membersProvider` fetching with no `limit`, so the
+/// server's own default of 50 silently truncated any roster past that, plus
+/// `memberModerationWatcherProvider`'s roster refetch on a real
+/// [api.MemberJoined] event.
+///
+/// That refetch used to be a keep-alive guard that inferred a join from a
+/// presence frame or a first message, with its own debounce and a one-refetch
+/// bound for an id that could never appear; `Event::MemberJoined` on the
+/// server replaced all of that, so the second group below now also checks
+/// the inference is gone, not just that the real event works.
 library;
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -185,60 +188,39 @@ void main() {
     expect(find.textContaining('MEMBERS · 60'), findsOneWidget);
   });
 
-  group('member roster keep-alive bound', () {
-    test('an id genuinely absent from the roster earns exactly one refetch, '
-        'not one per event naming it', () {
-      fakeAsync((async) {
-        var fetchCount = 0;
-        final events = StreamController<api.ServerEvent>.broadcast();
-        addTearDown(events.close);
-        final container = _containerWith(
-          httpClient: MockClient((request) async {
-            fetchCount++;
-            // 'ghost' never actually exists, unlike a real late join.
-            return _membersPage(request, [_id(1)], serverMaxLimit: 200);
-          }),
-          liveEvents: events.stream,
-        );
-        final membersSub = container.listen(membersProvider, (_, __) {});
-        final keepAliveSub = container.listen(
-          memberRosterKeepAliveProvider(null),
-          (_, __) {},
-        );
-        async.flushMicrotasks();
-        expect(fetchCount, 1);
+  group('member roster refetch on a real join', () {
+    test('a MemberJoined event refetches the roster', () async {
+      var fetchCount = 0;
+      final events = StreamController<api.ServerEvent>.broadcast();
+      addTearDown(events.close);
+      final container = _containerWith(
+        httpClient: MockClient((request) async {
+          fetchCount++;
+          return _membersPage(request, [_id(1)], serverMaxLimit: 200);
+        }),
+        liveEvents: events.stream,
+      );
+      final watcherSub = container.listen(
+        memberModerationWatcherProvider,
+        (_, __) {},
+      );
+      final membersSub = container.listen(membersProvider, (_, __) {});
+      await container.read(membersProvider.future);
+      expect(fetchCount, 1);
 
-        events.add(
-          const api.PresenceChanged(
-            userId: 'ghost',
-            status: api.PresenceState.online,
-          ),
-        );
-        async.elapse(const Duration(milliseconds: 500));
-        expect(fetchCount, 2, reason: 'the unknown id earns one refetch');
+      events.add(const api.MemberJoined(userId: 'u002'));
+      await Future<void>.delayed(Duration.zero);
+      // Re-read, or an unread invalidation passes; see the library doc.
+      await container.read(membersProvider.future);
+      expect(fetchCount, 2, reason: 'a real join must refetch the roster');
 
-        events.add(
-          const api.PresenceChanged(
-            userId: 'ghost',
-            status: api.PresenceState.online,
-          ),
-        );
-        async.elapse(const Duration(milliseconds: 500));
-        expect(
-          fetchCount,
-          2,
-          reason:
-              'the same id having already earned a refetch must not earn '
-              'a second one just because it is still absent',
-        );
-
-        membersSub.close();
-        keepAliveSub.close();
-      });
+      watcherSub.close();
+      membersSub.close();
     });
 
-    test('an id already on the roster triggers no refetch', () {
-      fakeAsync((async) {
+    test(
+      'a presence change alone no longer refetches; only MemberJoined does',
+      () async {
         var fetchCount = 0;
         final events = StreamController<api.ServerEvent>.broadcast();
         addTearDown(events.close);
@@ -249,31 +231,33 @@ void main() {
           }),
           liveEvents: events.stream,
         );
-        final membersSub = container.listen(membersProvider, (_, __) {});
-        final keepAliveSub = container.listen(
-          memberRosterKeepAliveProvider(null),
+        final watcherSub = container.listen(
+          memberModerationWatcherProvider,
           (_, __) {},
         );
-        async.flushMicrotasks();
+        final membersSub = container.listen(membersProvider, (_, __) {});
+        await container.read(membersProvider.future);
         expect(fetchCount, 1);
 
         events.add(
           const api.PresenceChanged(
-            userId: 'u001',
+            userId: 'ghost',
             status: api.PresenceState.online,
           ),
         );
-        async.elapse(const Duration(milliseconds: 500));
-
+        await Future<void>.delayed(Duration.zero);
+        await container.read(membersProvider.future);
         expect(
           fetchCount,
           1,
-          reason: 'a known member changing presence is not a roster gap',
+          reason:
+              'a presence frame is no longer read as an inferred join now '
+              'that the server sends a real MemberJoined event',
         );
 
+        watcherSub.close();
         membersSub.close();
-        keepAliveSub.close();
-      });
-    });
+      },
+    );
   });
 }

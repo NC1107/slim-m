@@ -80,6 +80,21 @@ A "who is on this call right now" snapshot at any time - not just at connect - i
 
 If you are using a bot framework, this is the natural place for it to expose `on_voice_join` / `on_voice_leave` / `on_screen_share` callbacks built on top of these three frames; slim-m itself only guarantees the wire shape above.
 
+## Member join events
+
+```json
+{ "type": "member.joined", "user_id": "..." }
+```
+
+Fires on every real join: registration, and an existing account spending an invite code.
+It does not fire when a removed member is let back in - that is `member.restored` instead, since they are not new.
+
+This is deployment-wide, not gated on `VIEW_CHANNEL`: every connected session receives it, the same as `member.removed` and `member.restored`.
+It carries only the id; call `GET /members` (or wait for your own roster cache to catch up) for the display name before you greet them.
+
+This is the event a greeter bot listens for.
+Post your welcome message from the handler rather than inferring a join from someone's first message or a presence frame - see `examples/bot-greeter` in [slim-bots](https://github.com/NC1107/slim-bots).
+
 ## Sending a message
 
 ```

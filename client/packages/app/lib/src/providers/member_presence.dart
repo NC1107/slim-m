@@ -96,72 +96,21 @@ final presenceSeedProvider = FutureProvider.autoDispose.family<void, String?>((
       .refresh(members.map((m) => m.id));
 });
 
-/// Coalesces a burst of joins (or one join's presence-then-message pair)
-/// into a single refetch rather than one per event.
-const _rosterKeepAliveDebounce = Duration(milliseconds: 500);
-
-/// There is no `MemberJoined` event (`hub.rs` has no such `Event` variant),
-/// so [membersProvider] never notices a new member on its own. This infers
-/// a join from what one already produces on the live socket - a presence
-/// frame, or, failing that, the author id on a first message - and
-/// invalidates the cached roster so the pane catches up without a reload.
-/// The roster pages to completion, so an id truly absent from it is either
-/// someone who just joined or someone who never will be there (removed,
-/// anonymized, a race before their account commits, or - once the pane is
-/// channel-scoped - somebody who simply cannot view it); `refetchedIds`
-/// bounds it to one refetch per id so none of those re-invalidate forever on
-/// their own later activity.
+/// Refetches the roster when an event says one of its rows is now wrong:
+/// somebody joined (`api.MemberJoined`, on registration or an invite
+/// redemption - never a restore, which is its own event below), was timed
+/// out (their badge belongs on screen), had a timeout lifted, was removed
+/// (they belong off it), was restored (they belong back on it), or had a
+/// role granted or revoked (their role badges are wrong until refetched).
 ///
-/// Keyed on the same channel as the pane so it reads and invalidates the one
-/// roster the pane is showing. Reading a different one meant reading a
-/// provider nothing had warmed, whose `valueOrNull` is null, which returned
-/// early every time and quietly stopped refetching at all.
-final memberRosterKeepAliveProvider = Provider.autoDispose
-    .family<void, String?>((ref, channelId) {
-      final roster = channelId == null
-          ? membersProvider
-          : channelMembersProvider(channelId);
-      Timer? debounce;
-      final refetchedIds = <String>{};
-      final sub = ref.read(liveEventsProvider).listen((event) {
-        final candidateId = switch (event) {
-          api.PresenceChanged(:final userId) => userId,
-          api.MessageCreated(:final message) => message.authorId,
-          _ => null,
-        };
-        if (candidateId == null) return;
-
-        final members = ref.read(roster).valueOrNull;
-        if (members == null) return;
-        if (members.any((m) => m.id == candidateId)) return;
-        if (!refetchedIds.add(candidateId)) return;
-
-        debounce?.cancel();
-        debounce = Timer(
-          _rosterKeepAliveDebounce,
-          () => ref.invalidate(roster),
-        );
-      });
-      ref.onDispose(() {
-        debounce?.cancel();
-        unawaited(sub.cancel());
-      });
-    });
-
-/// Refetches the roster when a moderation event says one of its rows is now
-/// wrong: somebody was timed out (their badge belongs on screen), had a
-/// timeout lifted, was removed (they belong off it), was restored (they
-/// belong back on it), or had a role granted
-/// or revoked (their role badges are wrong until refetched).
-///
-/// Its own provider rather than another branch in
-/// [memberRosterKeepAliveProvider], because that one exists to *infer* a join
-/// nothing announces and is hedged accordingly - it gives up on a full page
-/// and debounces bursts. These events are explicit and exact, so neither
-/// hedge applies, and folding them in would inherit both.
+/// One provider for all of these because every one of them is explicit and
+/// exact: unlike the join this used to infer from a presence frame or a
+/// first message before `Event::MemberJoined` existed on the wire, there is
+/// nothing here to hedge with a debounce or a per-id refetch bound.
 final memberModerationWatcherProvider = Provider.autoDispose<void>((ref) {
   final sub = ref.read(liveEventsProvider).listen((event) {
-    if (event is api.MemberTimeoutChanged ||
+    if (event is api.MemberJoined ||
+        event is api.MemberTimeoutChanged ||
         event is api.MemberRemoved ||
         event is api.MemberRestored ||
         event is api.MemberRoleChanged) {

@@ -137,6 +137,8 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::CanvasObjectReordered { .. }
         | Event::CanvasMediaSlotChanged { .. }
         | Event::SessionRevoked(_)
+        // A join changes nobody's existing cached answer; see the variant's own doc.
+        | Event::MemberJoined(_)
         // Who is on a call changes no permission's answer.
         | Event::VoiceActivityChanged { .. }
         | Event::VoiceParticipantJoined { .. }
@@ -196,6 +198,7 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::MemberTimeoutChanged { .. }
         | Event::MemberRemoved(_)
         | Event::MemberRestored(_)
+        | Event::MemberJoined(_)
         | Event::OverwriteChanged { .. }
         | Event::ChannelCreated(_)
         | Event::ChannelUpdated(_)
@@ -432,6 +435,7 @@ mod epoch_tests {
         hub.publish(Event::VoiceActivityChanged {
             channel_id: ChannelId::generate(),
         });
+        hub.publish(Event::MemberJoined(UserId::generate()));
         hub.publish(Event::CanvasCursorMoved {
             channel_id: ChannelId::generate(),
             user_id: UserId::generate(),

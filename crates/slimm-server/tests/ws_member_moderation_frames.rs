@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! The three deployment-wide moderation events reach a connected client as
-//! frames. `authorize` delivers them to every session with nothing per-viewer
-//! to resolve, and cargo-mutants showed no test held it to that: deleting any
-//! of the three match arms let the event fall through to the channel-scoped
-//! path and vanish, with the suite still green. A client that never hears a
-//! timeout, removal or restore keeps showing the member as it was.
+//! The deployment-wide moderation events reach a connected client as frames.
+//! `authorize` delivers them to every session with nothing per-viewer to
+//! resolve, and cargo-mutants showed no test held it to that: deleting any of
+//! the match arms let the event fall through to the channel-scoped path and
+//! vanish, with the suite still green. A client that never hears a timeout,
+//! removal, restore or join keeps showing the member list as it was.
+//!
+//! `MemberJoined` is not a moderation event, but it is authorized the same
+//! deployment-wide way (see `hub/event.rs`'s own doc comment for why it does
+//! not also fire on a restore), so it is covered here rather than starting a
+//! third near-identical harness.
 //!
 //! Its own binary rather than another case in `tests/ws.rs`, which sits at the
 //! file-budget ceiling; the connect and read helpers are the same ones.
@@ -154,5 +159,10 @@ async fn a_timeout_a_removal_and_a_restore_each_reach_a_connected_client() {
     state.hub.publish(Event::MemberRestored(alice));
     let frame = next_frame(&mut bob_ws).await;
     assert_eq!(frame["type"], "member.restored");
+    assert_eq!(frame["user_id"], alice.to_string());
+
+    state.hub.publish(Event::MemberJoined(alice));
+    let frame = next_frame(&mut bob_ws).await;
+    assert_eq!(frame["type"], "member.joined");
     assert_eq!(frame["user_id"], alice.to_string());
 }

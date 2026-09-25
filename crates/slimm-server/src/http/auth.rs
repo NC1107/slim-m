@@ -184,6 +184,7 @@ async fn register(
     if let Bootstrap::Claimed = state.store.bootstrap_deployment(account.id).await? {
         tracing::info!(user_id = %account.id, "deployment claimed by its first account");
     }
+    state.hub.publish(Event::MemberJoined(account.id));
 
     let tokens = state
         .store

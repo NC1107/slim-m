@@ -82,6 +82,7 @@ export 'src/events.dart'
         EventConnectionRefused,
         ErrorEvent,
         HelloEvent,
+        MemberJoined,
         MemberRemoved,
         MemberRestored,
         MemberRoleChanged,
