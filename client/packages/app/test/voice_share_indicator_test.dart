@@ -163,11 +163,11 @@ void main() {
         ]);
         await tester.pump();
 
-        // The stage's own "Your screen" caption already says you are
-        // sharing; the banner would only repeat it.
+        // The stage's own caption already says you are sharing; the
+        // banner would only repeat it.
         expect(find.text('You are sharing your screen.'), findsNothing);
         expect(find.byKey(const Key('fake-share-view-me')), findsOneWidget);
-        expect(find.text('Your screen'), findsOneWidget);
+        expect(find.text('You are sharing your screen'), findsOneWidget);
         await controller.leave();
       },
     );
