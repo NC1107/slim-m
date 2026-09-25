@@ -59,6 +59,21 @@ Widget _wrap(Widget child) => ProviderScope(
   ),
 );
 
+/// Unlike [_wrap], the roster resolves to a genuinely checked, empty room
+/// rather than staying unknown - the combination this file's merge test
+/// needs.
+Widget _wrapWithEmptyRoster(Widget child) => ProviderScope(
+  overrides: [
+    voiceRosterProvider.overrideWith(
+      (ref, channelId) => Stream.value(const <VoiceRosterParticipant>[]),
+    ),
+  ],
+  child: MaterialApp(
+    theme: buildTheme(Brightness.light, AppTokens.light),
+    home: Scaffold(body: child),
+  ),
+);
+
 void main() {
   group('recapForChannel', () {
     test("returns the recap when it belongs to this screen's channel", () {
@@ -210,5 +225,40 @@ void main() {
       expect(find.byType(CallRecapCard), findsNothing);
       expect(find.text('You left this call.'), findsOneWidget);
     });
+
+    testWidgets(
+      'merges the empty room and left-call facts into one sentence for a '
+      'short or solo call with a confirmed-empty roster',
+      (tester) async {
+        final recap = _recap(
+          channelId: 'channel-1',
+          duration: const Duration(seconds: 4),
+        );
+
+        await tester.pumpWidget(
+          _wrapWithEmptyRoster(
+            VoiceRejoinScreen(
+              channelId: 'channel-1',
+              isDm: false,
+              canRetry: true,
+              onRetry: () {},
+              recap: recap,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('You left this call. Nobody else is here.'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Nobody is in this call yet.'),
+          findsNothing,
+          reason: 'the two facts must read as one sentence, not two',
+        );
+        expect(find.text('You left this call.'), findsNothing);
+      },
+    );
   });
 }
