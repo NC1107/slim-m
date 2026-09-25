@@ -19,6 +19,7 @@ import '../providers/module_sound_settings.dart';
 import '../providers/notification_sound_settings.dart';
 import '../providers/push_controller.dart';
 import '../providers/toasts.dart';
+import 'notification_schedule_section.dart';
 import 'notification_settings_rows.dart';
 import 'settings_section_header.dart';
 import 'settings_toggle_row.dart';
@@ -71,7 +72,7 @@ class NotificationsSection extends ConsumerWidget {
         ),
         const PushContentPreviewRow(),
         const NotificationPreferenceRow(),
-        const QuietHoursRow(),
+        const NotificationScheduleSection(),
         // Only where a local notification actually displays (Android, Linux desktop); a pipe test via the same LocalNotifications.show path a real alert uses.
         if (isAndroidHost || isLinuxHost) const _TestNotificationRow(),
       ],

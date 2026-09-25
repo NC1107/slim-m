@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO notification_schedules (user_id, timezone, off_hours_mode, snooze_until, updated_at)\n             VALUES (?, ?, ?, NULL, ?)\n             ON CONFLICT(user_id) DO UPDATE SET\n                timezone = excluded.timezone,\n                off_hours_mode = excluded.off_hours_mode,\n                updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "61abe4ce4ba4d51041295c7cb80912e932b6febbc87e27236d57c13a758cdff3"
+}

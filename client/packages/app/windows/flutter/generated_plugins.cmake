@@ -9,6 +9,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   firebase_core
   flutter_secure_storage_windows
+  flutter_timezone
   flutter_webrtc
   livekit_client
   local_auth_windows

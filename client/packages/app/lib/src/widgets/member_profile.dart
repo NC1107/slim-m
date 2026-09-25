@@ -46,6 +46,7 @@ import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_moderate_view.dart';
+import 'member_notify_off_hours_item.dart';
 import 'member_profile_bot_commands.dart';
 import 'member_profile_identity.dart';
 import 'member_profile_note_field.dart';
@@ -377,6 +378,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             },
           ),
         MemberProfileNoteField(subjectId: profile.id),
+        MemberNotifyOffHoursItem(host: host, profile: profile, run: run),
         if (showModeration) ...[
           const AppMenuDivider(),
           AppMenuItem(

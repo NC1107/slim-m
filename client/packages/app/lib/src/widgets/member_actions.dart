@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import '../providers/member_presence.dart' show membersProvider;
+import '../providers/notification_schedule_controller.dart';
 import '../providers/providers.dart';
 import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
@@ -52,6 +53,39 @@ Future<void> unblockMember(
   ProviderContainer container,
   api.UserProfile profile,
 ) => unblockUser(context, container, profile.id);
+
+/// Toggles [profile] on or off the caller's own off-hours notification
+/// schedule allow-list (`docs/decisions/0033-notification-schedule.md`) -
+/// the member card's "notify me about this person off-hours" shortcut.
+/// [currentlyAllowed] is read from the card at tap time rather than
+/// re-fetched here, the same "decide from what the popover already knew"
+/// shape [blockMember]/[unblockMember] split into two callers for; this one
+/// stays a single toggle since there is only ever one menu row for it.
+Future<void> toggleNotificationScheduleAllowedUser(
+  BuildContext context,
+  ProviderContainer container,
+  api.UserProfile profile,
+  bool currentlyAllowed,
+) async {
+  final client = container.read(apiProvider);
+  final failure = await runGuarded(
+    whatFailed: currentlyAllowed
+        ? 'stop notifying you about this person off hours'
+        : 'notify you about this person off hours',
+    action: () => currentlyAllowed
+        ? client.removeNotificationScheduleAllowedUser(profile.id)
+        : client.addNotificationScheduleAllowedUser(profile.id),
+  );
+  if (failure == null) container.invalidate(notificationScheduleProvider);
+  if (!context.mounted) return;
+  showAppSnackbar(
+    context,
+    failure ??
+        (currentlyAllowed
+            ? 'Off hours now follow your usual schedule for this person.'
+            : 'You will always be notified about this person, even off hours.'),
+  );
+}
 
 /// Removes a member from the Space, from the row's context menu.
 ///

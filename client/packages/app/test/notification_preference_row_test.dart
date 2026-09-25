@@ -133,10 +133,10 @@ void main() {
   testWidgets(
     'a genuine fetch failure shows a retryable error, not a silent Unknown',
     (tester) async {
-      // Only /push/preference fails; /push/quiet-hours succeeds so its own error state stays out of this test.
+      // Only /push/preference fails; /notifications/schedule succeeds so its own error state stays out of this test.
       final container = _containerWith((request) async {
-        if (request.url.path == '/push/quiet-hours') {
-          return _json({'quiet_hours': null});
+        if (request.url.path == '/notifications/schedule') {
+          return _json({'schedule': null});
         }
         return http.Response('', 500);
       });

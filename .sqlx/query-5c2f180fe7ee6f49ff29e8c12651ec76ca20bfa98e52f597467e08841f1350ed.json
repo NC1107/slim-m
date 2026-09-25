@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT timezone, off_hours_mode, snooze_until AS \"snooze_until: i64\"\n               FROM notification_schedules WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "timezone",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "off_hours_mode",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "snooze_until: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "5c2f180fe7ee6f49ff29e8c12651ec76ca20bfa98e52f597467e08841f1350ed"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO notification_schedule_days (user_id, weekday, start_minute, end_minute)\n                     VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "88861c32b9f4fb6eb8442b5a9e81a9ff8a49c29ca39de11b8d1e304d12930ac9"
+}

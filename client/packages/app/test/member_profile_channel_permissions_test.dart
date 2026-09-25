@@ -117,11 +117,12 @@ Future<void> _joinShared(
 }
 
 /// The default test window (800x600) is shorter than the call section plus
-/// the moderation section plus the private-note row can fit without
-/// scrolling; a real desktop window is taller, and `AnchoredMemberPopover`
-/// clamps and scrolls its own content, so this is a test-harness fix rather
-/// than production behavior changing. `_harness` pumps `MemberProfileBody`
-/// directly, bypassing that popover, so it needs the room itself.
+/// the moderation section plus the private-note row plus the off-hours
+/// notification row can fit without scrolling; a real desktop window is
+/// taller, and `AnchoredMemberPopover` clamps and scrolls its own content,
+/// so this is a test-harness fix rather than production behavior changing.
+/// `_harness` pumps `MemberProfileBody` directly, bypassing that popover, so
+/// it needs the room itself.
 void _giveDesktopMenuRoom(WidgetTester tester) {
   tester.view.physicalSize = const Size(800, 1400);
   tester.view.devicePixelRatio = 1;
@@ -142,6 +143,7 @@ void main() {
   testWidgets(
     'a channel overwrite alone is enough for eject, with no base bit at all',
     (tester) async {
+      _giveDesktopMenuRoom(tester);
       final wired = _wire(
         basePermissions: 0,
         channelPermissions: Perm.kickMembers,

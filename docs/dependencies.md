@@ -47,6 +47,13 @@ Nothing here signs anything yet, and deriving the keypair then storing the publi
 It is held at 2.x rather than the freshly cut 3.0.0.
 3.0.0 depends on curve25519-dalek's stable 5.0.0, which cargo cannot resolve alongside `crypto_box`'s pinned 5.0.0-pre.1 in the same tree, because a pre-release satisfies nothing outside its own pre-release line.
 
+## jiff
+
+The notification schedule (`docs/decisions/0033-notification-schedule.md`) needs a real IANA time zone database to evaluate a per-weekday window correctly across a daylight-saving transition; a fixed UTC offset, which is all quiet hours ever stored, is exactly the bug that decision replaces.
+
+Built with `default-features = false` plus `std`, `tzdb-bundle-always` and `serde`: `tzdb-bundle-always` compiles the whole IANA database into the binary, since the release image (`gcr.io/distroless/static-debian12`) ships no `/usr/share/zoneinfo` for a runtime `TZDIR` lookup to find.
+`chrono-tz` was the obvious alternative and was rejected only because this project has no existing `chrono` dependency to piggyback on; see the decision record for the full comparison.
+
 ## The release profile
 
 `opt-level = "z"`, LTO, one codegen unit, stripped, and `panic = "abort"`.
@@ -153,3 +160,13 @@ Constrained to `^3.0.1`, resolving to `3.0.2` at the time this landed; `3.x` was
 Its own platform list is android, ios, macos and windows - there is no Linux implementation and no web implementation at all, so `supportsBiometricLock` in `biometric_auth_channel.dart` is what the settings toggle checks before the control is ever shown, matching the project's own "no dead control" rule for a platform gap like this (see `install_format.dart`'s treatment of desktop packaging for the same pattern).
 
 License is BSD-3-Clause (the `flutter/packages` monorepo's own license), already on `deny.toml`'s allowlist, so no exception was needed.
+
+### `flutter_timezone`, for the notification schedule's own device zone
+
+The notification schedule (`docs/decisions/0033-notification-schedule.md`) needs the device's own IANA time zone name (`"America/New_York"`, not a raw UTC offset) so the server can evaluate the schedule correctly across a daylight-saving transition.
+
+Flutter has no built-in way to ask the platform for this: `DateTime.now().timeZoneName` gives an abbreviation (`"PDT"`), not an IANA identifier, and there is no cross-platform API for the real one.
+`flutter_timezone` (`tjarvstrand/flutter_timezone`, a maintained fork of the archived `flutter_native_timezone`, verified publisher on pub.dev) is a thin platform-channel wrapper reading the native zone: `TimeZone.getDefault().getID()` on Android, `NSTimeZone.local.identifier` on iOS/macOS, and the Linux/Windows equivalents.
+Its own platform list covers Android, iOS, macOS, Windows, Linux and web, matching every platform this client ships to.
+
+License is Apache-2.0, already on `deny.toml`'s allowlist.

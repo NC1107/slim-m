@@ -75,6 +75,12 @@ const Map<String, String> _allowlist = {
       'itself, verified by its own JWT signature rather than a session - '
       'the same "no client binding by design" shape as POST /webhooks/{}/{} '
       'above. See docs/decisions/0032-voice-participant-webhooks.md',
+  'GET /push/quiet-hours': 'superseded by GET /notifications/schedule; kept '
+      'server-side for back-compat but no longer called by this client - see '
+      'docs/decisions/0033-notification-schedule.md (2026-09-25)',
+  'PUT /push/quiet-hours': 'same as GET /push/quiet-hours above (2026-09-25)',
+  'DELETE /push/quiet-hours':
+      'same as GET /push/quiet-hours above (2026-09-25)',
 };
 
 const _httpMethods = {

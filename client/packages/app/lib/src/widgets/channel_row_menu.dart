@@ -28,6 +28,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../permissions.dart';
 import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/notification_schedule_controller.dart';
 import '../providers/providers.dart';
 import '../routing/routes.dart';
 import '../screens/channel_settings_screen.dart';
@@ -78,6 +79,25 @@ List<Widget> channelRowMenuItems(
     );
   }
 
+  final allowedOffHours =
+      container
+          .read(notificationScheduleProvider)
+          .valueOrNull
+          ?.allowedChannelIds
+          .contains(channel.id) ??
+      false;
+
+  void toggleOffHours() {
+    close();
+    final client = container.read(apiProvider);
+    unawaited(
+      (allowedOffHours
+              ? client.removeNotificationScheduleAllowedChannel(channel.id)
+              : client.addNotificationScheduleAllowedChannel(channel.id))
+          .then((_) => container.invalidate(notificationScheduleProvider)),
+    );
+  }
+
   return [
     AppMenuItem(
       label: 'Open channel',
@@ -107,6 +127,12 @@ List<Widget> channelRowMenuItems(
       leading: AppIcons.mentions,
       selected: current == api.NotificationPreference.mentions,
       onTap: () => toggle(api.NotificationPreference.mentions),
+    ),
+    AppMenuItem(
+      label: 'Notify me off hours here',
+      leading: AppIcons.notificationsOn,
+      selected: allowedOffHours,
+      onTap: toggleOffHours,
     ),
     if (canManage || canManageRoles) ...[
       const AppMenuDivider(),
