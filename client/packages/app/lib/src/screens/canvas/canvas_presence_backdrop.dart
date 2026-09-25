@@ -155,6 +155,8 @@ class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
           ? CanvasScreenShareBubble(
               participant: participant,
               view: widget.screenShareViewFor(identity),
+              // This subtree is IgnorePointer-wrapped end to end, so a hover can never reach it to reveal the badge - keep it always-on.
+              interactive: false,
             )
           : CanvasPresenceBubble(
               participant: participant,
