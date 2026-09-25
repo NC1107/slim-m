@@ -103,6 +103,7 @@ class _CanvasPresenceBackdropState extends State<CanvasPresenceBackdrop> {
       overrides: widget.overrides,
       byIdentity: byIdentity,
       hideSelfCamera: widget.hideSelfCamera,
+      viewport: widget.document.viewport,
     );
     if (onCanvas.isEmpty) return const SizedBox.shrink();
     // The full onCanvas map, not a pre-filtered one - the two widgets' separate CanvasPresenceVisibility instances would drift apart otherwise.

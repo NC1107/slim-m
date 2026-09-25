@@ -7,6 +7,8 @@
 /// layout default.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_presence_geometry.dart';
@@ -90,5 +92,92 @@ void main() {
     );
 
     expect(rects[key], overrides.stateFor(key).rect);
+  });
+
+  test('a viewport big enough for every untouched tile keeps the layout\'s '
+      'own margin-anchored default, unchanged', () {
+    final camera = _p('camera-user');
+    final sharing = VoiceParticipant(
+      identity: 'screen-user',
+      name: 'screen-user',
+      isSpeaking: false,
+      isMuted: false,
+      isLocal: false,
+      isScreenSharing: true,
+    );
+    final keys = presenceTileKeys([camera, sharing]);
+    final byIdentity = {'camera-user': camera, 'screen-user': sharing};
+
+    final rects = presenceOnCanvasRects(
+      keys: keys,
+      layout: layout,
+      overrides: CanvasPresenceTileOverrides(),
+      byIdentity: byIdentity,
+      hideSelfCamera: false,
+      viewport: const Size(1200, 800),
+    );
+
+    // A screen-sharer keeps a camera tile too: camera, sharer's camera, share.
+    expect(rects, hasLength(3));
+    final values = rects.values.toList();
+    for (var i = 0; i < values.length; i++) {
+      for (var j = i + 1; j < values.length; j++) {
+        expect(values[i].overlaps(values[j]), isFalse);
+      }
+    }
+    expect(values.map((r) => r.left).reduce(math.min), 24);
+  });
+
+  test('a pane too narrow for every untouched tile shifts the whole block '
+      'left so the block stops running past the pane edge', () {
+    final sharing = VoiceParticipant(
+      identity: 'screen-user',
+      name: 'screen-user',
+      isSpeaking: false,
+      isMuted: false,
+      isLocal: false,
+      isScreenSharing: true,
+    );
+    // One sharer: a 140-wide camera tile plus a 360-wide screen tile, a 548-wide block, wider than the 530-wide pane below.
+    final keys = presenceTileKeys([sharing]);
+    final byIdentity = {'screen-user': sharing};
+
+    final rects = presenceOnCanvasRects(
+      keys: keys,
+      layout: layout,
+      overrides: CanvasPresenceTileOverrides(),
+      byIdentity: byIdentity,
+      hideSelfCamera: false,
+      viewport: const Size(530, 800),
+    );
+
+    expect(rects, hasLength(2));
+    final values = rects.values.toList();
+    expect(values[0].overlaps(values[1]), isFalse);
+    for (final rect in values) {
+      expect(
+        rect.right,
+        lessThanOrEqualTo(530),
+        reason: 'shifted left so nothing still runs past the pane edge',
+      );
+    }
+  });
+
+  test('an empty or not-yet-measured viewport falls back to the layout '
+      'default rather than collapsing every tile onto itself', () {
+    final me = _p('me');
+    final keys = presenceTileKeys([me]);
+    final byIdentity = {'me': me};
+
+    final rects = presenceOnCanvasRects(
+      keys: keys,
+      layout: layout,
+      overrides: CanvasPresenceTileOverrides(),
+      byIdentity: byIdentity,
+      hideSelfCamera: false,
+      viewport: Size.zero,
+    );
+
+    expect(rects[keys.single]!.topLeft, const Offset(24, 24));
   });
 }
