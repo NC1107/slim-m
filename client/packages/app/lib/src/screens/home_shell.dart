@@ -156,8 +156,9 @@ class HomeShell extends ConsumerWidget {
           voiceChannelId != selected;
       // Compact: the conversation replaces the list, with a way back.
       final replacesHeader = canvasOpen || dmCallOpen;
+      // Only the canvas (a drawing surface of its own) also claims the rail; see DmCallPane's own doc for why a DM call keeps it.
+      final hidesRailAccess = canvasOpen;
       final channelId = selected;
-      // Withheld, not just its own button - a Drawer's default edge-swipe would still reach it.
       Widget compactScaffold(bool isDm) {
         final compactBody = Column(
           children: [
@@ -176,8 +177,8 @@ class HomeShell extends ConsumerWidget {
                 ),
           // Only the start drawer's own drag; DrawerEdgeSwipe replaces it.
           drawerEnableOpenDragGesture: false,
-          // Withheld with the back button above: the open pane claims the edge.
-          drawer: replacesHeader
+          // Withheld only where the pane above also claims the edge itself.
+          drawer: hidesRailAccess
               ? null
               : CompactChannelRailDrawer(selectedChannelId: channelId),
           onEndDrawerChanged: (open) => endSelectionOnDrawerClose(ref, open),
@@ -192,7 +193,7 @@ class HomeShell extends ConsumerWidget {
           // No rail here, so the connection bar mounts under the app bar; one SafeArea wraps the whole column, so no child insets itself and opens a gap or a dead band.
           body: SafeArea(
             // Withheld the same way as the drawer above: nothing to swipe open.
-            child: replacesHeader
+            child: hidesRailAccess
                 ? compactBody
                 : DrawerEdgeSwipe(child: compactBody),
           ),
