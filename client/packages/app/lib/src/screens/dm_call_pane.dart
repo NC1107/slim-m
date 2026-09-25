@@ -17,13 +17,24 @@
 /// canvas without hanging up first (`voice_call_dock.dart` covers why its
 /// floating in-call toggle stays off for a DM call instead of duplicating
 /// this).
+///
+/// At compact width `HomeShell` keeps the channel rail's drawer attached
+/// behind this bar (unlike the canvas, which claims the edge outright), and
+/// `_DmCallBar` carries its own leading back button to the channel list -
+/// `CompactChannelAppBar`'s own affordance, since this bar replaces that one
+/// rather than sitting under it. Closing the call pane is one way out, back
+/// to a different channel entirely is another, and neither one hangs up a
+/// call already joined.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/dm_call.dart';
+import '../routing/breakpoints.dart';
+import '../routing/routes.dart';
 import '../widgets/voice_strip_indicator.dart' show CallChannelName;
 import 'canvas/canvas_open_button.dart';
 import 'voice_screen.dart';
@@ -66,6 +77,8 @@ class _DmCallBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    // Wide keeps the rail visible beside this pane already; see this class's own doc comment.
+    final compact = !LayoutClass.of(context).showsBothPanes;
     return Container(
       height: AppSizes.headerBar,
       padding: const EdgeInsets.symmetric(horizontal: AppSizes.paneGutter),
@@ -74,6 +87,14 @@ class _DmCallBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (compact) ...[
+            IconButton(
+              icon: const Icon(AppIcons.back),
+              tooltip: 'Back to channels',
+              onPressed: () => context.go(Routes.channels),
+            ),
+            const SizedBox(width: AppSpacing.s4),
+          ],
           Icon(
             AppIcons.startCall,
             size: AppSizes.icon16,
