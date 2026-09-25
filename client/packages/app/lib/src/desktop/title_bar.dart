@@ -231,7 +231,7 @@ class _WindowControlsState extends State<_WindowControls> {
         icon: AppIcons.windowClose,
         semanticLabel: 'Close',
         size: AppIconButtonSize.sm,
-        variant: AppIconButtonVariant.danger,
+        variant: AppIconButtonVariant.dangerGhost,
         onPressed: widget.onRequestClose,
       ),
       const SizedBox(width: AppSpacing.s4),

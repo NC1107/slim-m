@@ -147,5 +147,12 @@ void main() {
       closeTo(shortGap, 0.5),
       reason: 'the controls must stay flush right regardless of name length',
     );
+
+    // Equal gaps would also hold if both were stranded mid-bar, as rereported.
+    expect(
+      shortGap,
+      lessThan(AppSpacing.s24),
+      reason: 'flush right means at the edge, not merely consistently inset',
+    );
   });
 }
