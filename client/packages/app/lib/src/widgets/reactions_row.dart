@@ -48,6 +48,9 @@ const double _reactionChipSpacing =
 /// whatever short string it is given, so one of the deployment's own emoji
 /// rides there as its `:shortcode:` and is drawn here through [customEmoji],
 /// the same index a message body resolves against.
+/// Opts out of the transcript's `SelectionArea`: inside it a chip's emoji and
+/// count were selectable text, so hovering showed the I-beam over a button and
+/// a drag selected the emoji. A chip is a control, not prose.
 class ReactionsRow extends StatefulWidget {
   const ReactionsRow({
     super.key,
@@ -151,7 +154,6 @@ class _ReactionsRowState extends State<ReactionsRow> {
     if (live.isEmpty && _exiting.isEmpty) return const SizedBox.shrink();
 
     // See the negative-inset note on this class's own doc comment above.
-    // Inside the transcript's SelectionArea a chip's text painted the I-beam and selected as text; a chip is a button.
     return SelectionContainer.disabled(
       child: Transform.translate(
         offset: const Offset(0, -AppSpacing.s4),
