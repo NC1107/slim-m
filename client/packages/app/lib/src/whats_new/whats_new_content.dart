@@ -195,6 +195,30 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.86.0',
+    headline: 'Quiet hours, volume per person, and a tidier call',
+    points: [
+      WhatsNewPoint(
+        'Notifications now follow a schedule you set per weekday. Outside '
+        'your hours you choose what still gets through - everything, only '
+        'mentions, or nothing - and you can let named people or channels '
+        'past it. Snooze quiets everything until tomorrow.',
+      ),
+      WhatsNewPoint(
+        'Right-click a person in a call, or their bubble on the canvas, for '
+        'volume, mute for me, their profile and moderation in one menu. '
+        'Volume is yours alone: it changes what you hear, not what anyone '
+        'else does, and it holds if they leave and rejoin.',
+      ),
+      WhatsNewPoint(
+        'A voice channel with its chat open has one header instead of two, '
+        'a shared screen names its owner on hover rather than all the time, '
+        'a call tile opens its card beside the tile, and bots sit in their '
+        'own group at the foot of the member list.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
