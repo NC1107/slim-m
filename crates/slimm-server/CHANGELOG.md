@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.71.0](https://github.com/NC1107/slim-m/compare/server-v0.70.0...server-v0.71.0) (2026-09-25)
+
+
+### Features
+
+* **server,client:** mint, list, rename and revoke webhooks ([#1332](https://github.com/NC1107/slim-m/issues/1332)) ([ca3028a](https://github.com/NC1107/slim-m/commit/ca3028a30ada1a22c041dbbc85258eba8b9e8103))
+* **server:** accept embeds on the webhook and bot send routes ([#1326](https://github.com/NC1107/slim-m/issues/1326)) ([9972dbe](https://github.com/NC1107/slim-m/commit/9972dbe30f5c9bece882eab718953b9e59203cd0))
+* **server:** add GET for a single message ([#1336](https://github.com/NC1107/slim-m/issues/1336)) ([6683797](https://github.com/NC1107/slim-m/commit/668379785816181d116518c828f91fc1c99368a6))
+* **server:** add pronouns, about, profile colour and named devices ([#1330](https://github.com/NC1107/slim-m/issues/1330)) ([ef33d78](https://github.com/NC1107/slim-m/commit/ef33d7827e03c74222e61322fec67bdc126e6c90))
+* **server:** bot command registration (decision 0031) ([#1325](https://github.com/NC1107/slim-m/issues/1325)) ([017666c](https://github.com/NC1107/slim-m/commit/017666c1e547d22d423add4d56a57d06c5e869db))
+* **server:** declared bot permissions, a managed role, and a real audit trail ([#1328](https://github.com/NC1107/slim-m/issues/1328)) ([8ec694c](https://github.com/NC1107/slim-m/commit/8ec694c2894e84c5784813958333a7b7421d9342))
+* **server:** live join/leave/screen-share voice events from LiveKit webhooks ([#1334](https://github.com/NC1107/slim-m/issues/1334)) ([34ca037](https://github.com/NC1107/slim-m/commit/34ca03787a403e6d1a161dfc9ca36dffc126b2f2))
+* **server:** role reordering, per-role member counts, and batch channel overwrites ([#1331](https://github.com/NC1107/slim-m/issues/1331)) ([6514c3f](https://github.com/NC1107/slim-m/commit/6514c3f89825b4a2d9bb72f33dd6f57a5caeab5d))
+* **server:** store and enrich message embeds (stage 3, read side) ([#1323](https://github.com/NC1107/slim-m/issues/1323)) ([df65334](https://github.com/NC1107/slim-m/commit/df6533472b62a0ea9a7ab4ad8c32ba02955c9023))
+
+
+### Bug Fixes
+
+* **server:** drop a bot from the default list once it leaves the Space ([#1309](https://github.com/NC1107/slim-m/issues/1309)) ([135d74e](https://github.com/NC1107/slim-m/commit/135d74e9d9e3e4667dd2778c936aa713fce284e2))
+* **server:** gate a code run against the message's own app surface ([#1317](https://github.com/NC1107/slim-m/issues/1317)) ([ac628cd](https://github.com/NC1107/slim-m/commit/ac628cde2d94e14cbc754abeca1baf336ae95562))
+* **server:** make module install atomic and verify the approved sha at run time ([#1321](https://github.com/NC1107/slim-m/issues/1321)) ([6c8b1e0](https://github.com/NC1107/slim-m/commit/6c8b1e0aa455c181f84b1efd0f545d9ae7e6c5d7))
+
 ## [0.70.0](https://github.com/NC1107/slim-m/compare/server-v0.69.0...server-v0.70.0) (2026-09-23)
 
 
