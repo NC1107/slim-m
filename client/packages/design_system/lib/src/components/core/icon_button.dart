@@ -11,7 +11,12 @@ import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../touch_targets.dart';
 
-enum AppIconButtonVariant { ghost, outline, danger }
+/// `danger` states the consequence at rest, for a destructive action sitting
+/// among ordinary ones. `dangerGhost` withholds it until hover, for the case
+/// where the button's position already says what it does and a standing red
+/// outline would only be noise - a title bar's close button being the one
+/// that prompted it.
+enum AppIconButtonVariant { ghost, outline, danger, dangerGhost }
 
 /// Visual diameter. `sm`/`lg`/`touch` land exactly on [AppSizes.controlSm]/
 /// [AppSizes.controlMd]/[AppSizes.controlLg] (26/34/38); `md`, the default,
@@ -124,6 +129,10 @@ class _AppIconButtonState extends State<AppIconButton> {
         ink = tokens.dangerText;
         fill = Colors.transparent;
         border = tokens.dangerBorder;
+      case AppIconButtonVariant.dangerGhost:
+        ink = _hovered && enabled ? tokens.dangerText : tokens.textSecondary;
+        fill = Colors.transparent;
+        border = null;
     }
 
     if (_hovered && enabled && !widget.active && !widget.suppressOwnHoverFill) {
