@@ -48,6 +48,7 @@ Widget _wrap({
               canManage: false,
               selfId: 'me',
               requests: requests,
+              tool: CanvasTool.select,
               onToolChanged: (_) {},
               onBringToFront: (_) {},
               onSendToBack: (_) {},

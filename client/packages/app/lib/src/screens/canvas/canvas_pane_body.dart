@@ -425,6 +425,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           canManage: widget.canManage,
           selfId: widget.selfId,
           requests: _menuRequests,
+          tool: widget.tool,
           onToolChanged: widget.onToolChanged,
           onBringToFront: widget.onBringToFront,
           onSendToBack: widget.onSendToBack,
