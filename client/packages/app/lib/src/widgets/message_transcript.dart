@@ -338,6 +338,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
 
     // A reply's parent, built from the same already-filtered list this transcript renders; see `reply_quote.dart`.
     final byId = {for (final m in messages) m.id: m};
+    final order = [for (final m in messages) m.id];
 
     // Reversed so a short conversation sits against the composer; the start header rides one past the oldest message, which reverse puts at the top.
     return TranscriptSelection(
@@ -367,6 +368,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
               builder: (extras, editing) => MessageSelectable(
                 channelId: widget.channelId,
                 messageId: message.id,
+                order: order,
                 child: MessageRow(
                   message: message,
                   // A new day breaks a group so a continuation across midnight regains its avatar and header.
