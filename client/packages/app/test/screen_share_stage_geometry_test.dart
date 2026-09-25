@@ -13,8 +13,11 @@
 /// not from this widget's layout.
 library;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/widgets/media_label.dart';
 import 'package:slimm_app/src/widgets/screen_share_stage.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -75,5 +78,84 @@ void main() {
     final videoRect = tester.getRect(find.byKey(const Key('video')));
 
     expect(videoRect, containerRect);
+  });
+
+  testWidgets(
+    "the sharer label sits inside the stage's own clip, not below it",
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      await tester.pumpWidget(
+        _harness(
+          ScreenShareStage(
+            sharerName: 'Jellyfin',
+            child: Container(key: const Key('video'), color: Colors.blue),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final stage = tester.getRect(find.byType(ClipRRect));
+      final label = tester.getRect(find.byType(MediaLabelChip));
+
+      // The reported bug: the caption used to be a sibling below the clip.
+      expect(
+        stage.contains(label.topLeft) && stage.contains(label.bottomRight),
+        isTrue,
+        reason:
+            'the label overhung the rounded container when it sat in the '
+            'layout flow beneath it, reading as the video escaping its box',
+      );
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  testWidgets('with a mouse connected the label waits for a hover', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    // Centred and small, so the pointer's starting corner is genuinely off the stage.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 300,
+              height: 200,
+              child: ScreenShareStage(
+                sharerName: 'Jellyfin',
+                child: Container(key: const Key('video'), color: Colors.blue),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await tester.pumpAndSettle();
+
+    double opacity() => tester
+        .widget<AnimatedOpacity>(
+          find.ancestor(
+            of: find.byType(MediaLabelChip),
+            matching: find.byType(AnimatedOpacity),
+          ),
+        )
+        .opacity;
+
+    expect(opacity(), 0, reason: 'hidden until asked for');
+
+    await gesture.moveTo(tester.getCenter(find.byType(ClipRRect)));
+    await tester.pumpAndSettle();
+    expect(
+      opacity(),
+      1,
+      reason: 'hovering anywhere on the stage reveals it, not just the label',
+    );
+
+    debugDefaultTargetPlatformOverride = null;
   });
 }
