@@ -423,3 +423,5 @@ async fn another_members_status_text_is_visible_on_their_public_profile() {
     let body = json_body(response).await;
     assert_eq!(body["status_text"], "on holiday");
 }
+
+// `pronouns`/`about`/`profile_color` tests live in me_profile_fields.rs.

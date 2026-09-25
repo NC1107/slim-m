@@ -22,7 +22,10 @@ use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
 use super::messages::parse_uuid;
 use super::user_avatars::{delete_avatar, get_avatar, upload_avatar};
-use super::user_status::validate_status_text;
+use super::user_status::{
+    PROFILE_COLOR_COUNT, validate_about, validate_profile_color, validate_pronouns,
+    validate_status_text,
+};
 use crate::hub::Event;
 use crate::ids::{ChannelId, RoleId, UserId};
 use crate::permissions::Permissions;
@@ -103,6 +106,17 @@ pub(super) struct UserDto {
     /// `null` for none. Shown in the member pane under the name; see
     /// migration 0044.
     status_text: Option<String>,
+    /// A short self-described pronoun set ("she/her"), or `null` if unset.
+    /// Shown on the member card beside the `@handle`; see migration 0075.
+    pronouns: Option<String>,
+    /// A short "about" line (190 characters), or `null` if unset. Shown on
+    /// the member card under the status line; see migration 0075.
+    about: Option<String>,
+    /// An index into the design system's closed categorical colour set.
+    /// Always present: an account that never chose one reads a stable
+    /// default derived from its id, so a card is never colourless. See
+    /// [`default_profile_color`] and `ProfileUpdate::profile_color`.
+    profile_color: i64,
     /// The invite this member registered through, or `null` if they had
     /// none. Absent from the response entirely for a caller who does not
     /// hold BAN_MEMBERS, so it is only ever populated on the `GET /members`
@@ -127,6 +141,15 @@ pub(super) struct UserDto {
     /// `GET /members` at all (it is not a participant), so this is only ever
     /// seen by resolving a message's own author id.
     is_webhook: bool,
+}
+
+/// The colour a card shows before its owner ever picks one: a stable index
+/// into the closed set, derived from the account id rather than random, so a
+/// member's card does not change colour on every reload before they choose
+/// one for themselves.
+fn default_profile_color(id: UserId) -> i64 {
+    let bytes = id.0.as_bytes();
+    (i64::from(bytes[bytes.len() - 1])).rem_euclid(PROFILE_COLOR_COUNT)
 }
 
 /// Builds one profile DTO, including this user's non-`@everyone` role names.
@@ -161,6 +184,11 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
                 role_ids: held.iter().map(|(id, _)| id.to_string()).collect(),
                 timed_out_until: timed_out.get(&user.id).copied(),
                 status_text: user.status_text,
+                pronouns: user.pronouns,
+                about: user.about,
+                profile_color: user
+                    .profile_color
+                    .unwrap_or_else(|| default_profile_color(user.id)),
                 invite_code: None,
                 is_bot: user.is_bot,
                 is_webhook: user.is_webhook,
@@ -197,6 +225,13 @@ struct MeDto {
     timeout_reason: Option<String>,
     /// The caller's own status line, or `null`; see [`UserDto::status_text`].
     status_text: Option<String>,
+    /// The caller's own pronouns, or `null`; see [`UserDto::pronouns`].
+    pronouns: Option<String>,
+    /// The caller's own about line, or `null`; see [`UserDto::about`].
+    about: Option<String>,
+    /// The caller's own profile colour index, or `null`; see
+    /// [`UserDto::profile_color`].
+    profile_color: i64,
 }
 
 /// The editable half of a profile.
@@ -206,11 +241,11 @@ struct MeDto {
 /// flow that can handle the resulting collision. That is why it is absent
 /// rather than accepted and quietly ignored.
 ///
-/// Both fields are optional, absence meaning "leave it as it is" - the same
+/// Every field is optional, absence meaning "leave it as it is" - the same
 /// "at least one, absent means untouched" convention
 /// `channels::UpdateChannelRequest` uses for its own name and topic, so a
-/// caller changing only the status never has to resend the current display
-/// name to satisfy a field this route no longer requires.
+/// caller changing only one field never has to resend the rest to satisfy
+/// fields this route no longer requires. At least one must be present.
 #[derive(Deserialize)]
 struct UpdateMeRequest {
     #[serde(default)]
@@ -220,6 +255,21 @@ struct UpdateMeRequest {
     /// [`validate_status_text`].
     #[serde(default)]
     status_text: Option<String>,
+    /// Same "present, even blank, replaces it" shape as `status_text`; see
+    /// [`validate_pronouns`].
+    #[serde(default)]
+    pronouns: Option<String>,
+    /// Same "present, even blank, replaces it" shape as `status_text`; see
+    /// [`validate_about`].
+    #[serde(default)]
+    about: Option<String>,
+    /// Absent leaves the colour as it is. There is no "clear" here: every
+    /// account always has one, defaulting to an index derived from the
+    /// account id (see `to_dtos`), so there is nothing meaningful to clear
+    /// back to. An index outside the closed colour set is a 400 rather than
+    /// clamped, per [`validate_profile_color`].
+    #[serde(default)]
+    profile_color: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -258,6 +308,11 @@ async fn get_me(
         timed_out_until: timeout.as_ref().map(|t| t.until),
         timeout_reason: timeout.and_then(|t| t.reason),
         status_text: user.status_text,
+        pronouns: user.pronouns,
+        about: user.about,
+        profile_color: user
+            .profile_color
+            .unwrap_or_else(|| default_profile_color(user.id)),
     }))
 }
 
@@ -277,7 +332,15 @@ async fn update_me(
         .as_deref()
         .map(validate_status_text)
         .transpose()?;
-    if req.display_name.is_none() && status_text.is_none() {
+    let pronouns = req.pronouns.as_deref().map(validate_pronouns).transpose()?;
+    let about = req.about.as_deref().map(validate_about).transpose()?;
+    let profile_color = req.profile_color.map(validate_profile_color).transpose()?;
+    if req.display_name.is_none()
+        && status_text.is_none()
+        && pronouns.is_none()
+        && about.is_none()
+        && profile_color.is_none()
+    {
         return Err(ApiError::BadRequest("nothing to update"));
     }
 
@@ -285,8 +348,13 @@ async fn update_me(
         .store
         .update_profile(
             ctx.user_id,
-            req.display_name.as_deref(),
-            status_text.as_ref().map(|s| s.as_deref()),
+            crate::store::ProfileUpdate {
+                display_name: req.display_name.as_deref(),
+                status_text: status_text.as_ref().map(|s| s.as_deref()),
+                pronouns: pronouns.as_ref().map(|s| s.as_deref()),
+                about: about.as_ref().map(|s| s.as_deref()),
+                profile_color,
+            },
         )
         .await?
         .ok_or(ApiError::Unauthorized)?;

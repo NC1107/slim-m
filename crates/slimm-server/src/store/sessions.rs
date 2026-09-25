@@ -360,6 +360,15 @@ impl Store {
         Ok(row.and_then(|r| r.password_hash.map(|hash| (r.id, hash))))
     }
 
+    /// [`Self::open_session_as`] with no client to report.
+    pub async fn open_session(
+        &self,
+        user_id: UserId,
+        device_name: &str,
+    ) -> Result<IssuedTokens, OpenError> {
+        self.open_session_as(user_id, device_name, None, None).await
+    }
+
     /// Opens a session for a user: a new device, a session, a refresh token in a
     /// fresh family, and the first access token, all in one transaction.
     ///
@@ -368,10 +377,12 @@ impl Store {
     /// login that races an account deletion cannot mint a session for a
     /// tombstoned account: whichever of the two commits first wins, and a loser
     /// login gets [`OpenError::AccountGone`].
-    pub async fn open_session(
+    pub async fn open_session_as(
         &self,
         user_id: UserId,
         device_name: &str,
+        client_kind: Option<&str>,
+        client_version: Option<&str>,
     ) -> Result<IssuedTokens, OpenError> {
         let device_id = DeviceId::generate();
         let session_id = SessionId::generate();
@@ -388,15 +399,10 @@ impl Store {
 
         let mut tx = self.pool.begin().await?;
         let created = sqlx::query!(
-            "INSERT INTO devices (id, user_id, name, created_at)
-             SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
+            "INSERT INTO devices (id, user_id, name, created_at, client_kind, client_version)
+             SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND deleted_at IS NULL)
                AND NOT EXISTS (SELECT 1 FROM space_removals WHERE user_id = ?)",
-            device_id,
-            user_id,
-            device_name,
-            now,
-            user_id,
-            user_id
+            device_id, user_id, device_name, now, client_kind, client_version, user_id, user_id
         )
         .execute(&mut *tx)
         .await?

@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!: UserId\", username AS \"username!\",\n                      display_name AS \"display_name!\", created_at AS \"created_at!\",\n                      avatar_updated_at, status_text, pronouns, about,\n                      profile_color, is_bot AS \"is_bot!\",\n                      is_webhook AS \"is_webhook!\"\n               FROM users WHERE deleted_at IS NULL AND is_webhook = 0 AND id > ?\n               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = users.id)\n               ORDER BY id ASC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "username!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "avatar_updated_at",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "status_text",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "pronouns",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "about",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "profile_color",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "is_bot!",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "is_webhook!",
+        "ordinal": 10,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f652f0837ea9e3e58b0d5e7880b01947953dee0baa143444d6f18c3b33a001df"
+}

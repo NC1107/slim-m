@@ -212,7 +212,13 @@ async fn a_note_survives_the_subjects_rename() {
 
     put_note(&app, &alice_token, &bob_id, "prefers they/them").await;
     store
-        .update_profile(bob_user_id, Some("Bobby"), None)
+        .update_profile(
+            bob_user_id,
+            slimm_server::store::ProfileUpdate {
+                display_name: Some("Bobby"),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 

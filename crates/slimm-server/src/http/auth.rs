@@ -13,6 +13,7 @@ use axum::routing::{delete, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
+use super::device_client_info::validate_client_info;
 use super::error::ApiError;
 use super::extract::{Authed, AuthedLimited, Json, PASSWORD, REFRESH, RateLimited, WRITE, enforce};
 use crate::hub::Event;
@@ -53,6 +54,12 @@ struct RegisterRequest {
     /// to have issued a code yet.
     #[serde(default)]
     invite_code: Option<String>,
+    /// Coarse client kind ("ios"/"android"/"desktop"/"web") and app version,
+    /// for the devices list; both absent on a client older than this field.
+    #[serde(default)]
+    client_kind: Option<String>,
+    #[serde(default)]
+    client_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -60,6 +67,11 @@ struct LoginRequest {
     username: String,
     password: String,
     device_name: String,
+    /// See `RegisterRequest::client_kind`/`client_version`.
+    #[serde(default)]
+    client_kind: Option<String>,
+    #[serde(default)]
+    client_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -79,6 +91,24 @@ struct TokenResponse {
 struct TicketResponse {
     ticket: String,
     expires_at: i64,
+}
+
+/// Validates the `client_kind`/`client_version` pair register and login both
+/// accept, so neither handler repeats the same two `validate_client_info`
+/// calls.
+fn parse_client_info(
+    kind: Option<&str>,
+    version: Option<&str>,
+) -> Result<(Option<String>, Option<String>), ApiError> {
+    Ok((
+        kind.map(|v| validate_client_info(v, 16))
+            .transpose()?
+            .flatten(),
+        version
+            .map(|v| validate_client_info(v, 32))
+            .transpose()?
+            .flatten(),
+    ))
 }
 
 fn token_response(tokens: &IssuedTokens) -> TokenResponse {
@@ -112,6 +142,8 @@ async fn register(
     validate_password(&req.password)?;
     validate_label(&req.display_name, "display_name must be 1 to 64 characters")?;
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
+    let (client_kind, client_version) =
+        parse_client_info(req.client_kind.as_deref(), req.client_version.as_deref())?;
 
     let invite_code = req
         .invite_code
@@ -155,7 +187,12 @@ async fn register(
 
     let tokens = state
         .store
-        .open_session(account.id, &req.device_name)
+        .open_session_as(
+            account.id,
+            &req.device_name,
+            client_kind.as_deref(),
+            client_version.as_deref(),
+        )
         .await?;
     Ok(Json(token_response(&tokens)))
 }
@@ -168,6 +205,8 @@ async fn login(
     validate_username(&req.username)?;
     validate_password(&req.password)?;
     validate_label(&req.device_name, "device_name must be 1 to 64 characters")?;
+    let (client_kind, client_version) =
+        parse_client_info(req.client_kind.as_deref(), req.client_version.as_deref())?;
 
     let credentials = state.store.find_credentials(&req.username).await?;
     let verified = match &credentials {
@@ -192,7 +231,15 @@ async fn login(
         return Err(ApiError::Unauthorized);
     }
 
-    let tokens = state.store.open_session(user_id, &req.device_name).await?;
+    let tokens = state
+        .store
+        .open_session_as(
+            user_id,
+            &req.device_name,
+            client_kind.as_deref(),
+            client_version.as_deref(),
+        )
+        .await?;
     Ok(Json(token_response(&tokens)))
 }
 
