@@ -124,7 +124,10 @@ class _MemberProfileNoteFieldState
                 maxLines: null,
                 style: AppText.caption.copyWith(color: tokens.textPrimary),
                 decoration: const InputDecoration(
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   isDense: true,
                   counterText: '',
                   hintText: 'Add a private note',
