@@ -26,6 +26,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import 'module_scene.dart';
+import 'module_scene_busy.dart';
 import 'module_scene_images.dart';
 import 'module_scene_inputs.dart';
 import 'module_scene_controls.dart';
@@ -479,6 +480,11 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
                   scene: _scene,
                   size: size,
                   onSubmit: _enqueue,
+                ),
+                Positioned(
+                  top: AppSpacing.s8,
+                  right: AppSpacing.s8,
+                  child: SceneBusyIndicator(busy: _busy, tokens: tokens),
                 ),
               ],
             ),
