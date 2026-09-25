@@ -433,4 +433,52 @@ void main() {
       reason: 'the name must give up space last, not the topic',
     );
   });
+
+  Future<void> pumpVoiceHeader(
+    WidgetTester tester, {
+    VoidCallback? onToggleTextChat,
+  }) async {
+    final container = _containerWithPins([]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: Scaffold(
+            body: ChannelHeader(
+              channelId: 'v1',
+              name: 'voice',
+              isVoice: true,
+              searchOpen: false,
+              onToggleSearch: () {},
+              textChatOpen: true,
+              onToggleTextChat: onToggleTextChat,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('no text-chat toggle unless the shell offers one', (
+    tester,
+  ) async {
+    await pumpVoiceHeader(tester);
+    expect(find.bySemanticsLabel('Toggle text chat'), findsNothing);
+  });
+
+  testWidgets('the text-chat toggle is a chat glyph and fires the callback', (
+    tester,
+  ) async {
+    var toggled = 0;
+    await pumpVoiceHeader(tester, onToggleTextChat: () => toggled++);
+    expect(find.bySemanticsLabel('Toggle text chat'), findsOneWidget);
+    expect(find.byIcon(AppIcons.chat), findsOneWidget);
+    expect(find.byIcon(AppIcons.hash), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Toggle text chat'));
+    await tester.pumpAndSettle();
+    expect(toggled, 1);
+  });
 }

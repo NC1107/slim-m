@@ -287,6 +287,7 @@ abstract final class AppIcons {
 
   // Moderation and administration: the reports queue, invite management,
   // roles, and channel permission overwrites.
+  static const IconData chat = LucideIcons.messageSquare300;
   static const IconData report = LucideIcons.messageSquareWarning300;
   static const IconData invite = LucideIcons.mailPlus300;
   static const IconData shield = LucideIcons.shield300;
