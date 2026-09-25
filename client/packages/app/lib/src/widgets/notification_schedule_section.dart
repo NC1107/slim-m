@@ -200,15 +200,18 @@ class _NotificationScheduleSectionState
               horizontal: AppSpacing.s16,
               vertical: AppSpacing.s8,
             ),
+            // Expanded, not a fixed width: seven 44pt targets overflow a phone-width card, so this divides the space evenly instead of clipping Sunday.
             child: Row(
               children: [
                 for (var weekday = 0; weekday < 7; weekday++) ...[
-                  if (weekday > 0) const SizedBox(width: AppSpacing.s8),
-                  _DayToggle(
-                    label: _dayLabels[weekday],
-                    semanticLabel: _dayFullNames[weekday],
-                    active: activeWeekdays.contains(weekday),
-                    onTap: () => _toggleDay(weekday, current, start, end),
+                  if (weekday > 0) const SizedBox(width: AppSpacing.s4),
+                  Expanded(
+                    child: _DayToggle(
+                      label: _dayLabels[weekday],
+                      semanticLabel: _dayFullNames[weekday],
+                      active: activeWeekdays.contains(weekday),
+                      onTap: () => _toggleDay(weekday, current, start, end),
+                    ),
                   ),
                 ],
               ],
