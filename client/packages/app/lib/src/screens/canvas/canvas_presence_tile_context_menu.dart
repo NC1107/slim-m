@@ -143,6 +143,8 @@ class _CanvasPresenceTileContextMenuState
     AppMenuItem(
       label: 'Hide on your canvas',
       leading: AppIcons.tileHide,
+      semanticLabel:
+          'Hide this tile on your canvas; other participants still see it',
       onTap: () => _run(widget.onHide),
     ),
   ];
