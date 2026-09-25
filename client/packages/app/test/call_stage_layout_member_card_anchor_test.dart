@@ -182,9 +182,6 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
       await harness.container.read(membersProvider.future);
-      // autoDispose: the roster holds this in the app; hold it here or the menu reads it unloaded.
-      final members = harness.container.listen(membersProvider, (_, _) {});
-      addTearDown(members.close);
 
       final tile = find.ancestor(
         of: find.text('Bob'),
@@ -199,6 +196,8 @@ void main() {
       await tester.pump(kPressTimeout + const Duration(milliseconds: 20));
       await gesture.up();
       await tester.pumpAndSettle();
+      // Nothing in this harness holds membersProvider; the call view must.
+      expect(find.text('View profile'), findsOneWidget);
       expect(find.text('Moderate...'), findsOneWidget);
       await tester.tap(find.text('Moderate...'));
       await tester.pumpAndSettle();
