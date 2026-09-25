@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/app_lifecycle.dart';
 import '../providers/attachment_bytes.dart';
 import '../providers/attachment_preview_quality.dart';
 import '../providers/media_preferences.dart';
@@ -109,6 +110,9 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
   /// one tap and stay revealed for the life of this row.
   bool _revealed = false;
 
+  /// A pointer resting on a held gif plays it for as long as it stays.
+  bool _hovered = false;
+
   api.Attachment get attachment => widget.attachment;
 
   bool get _isImage => isInlineImage(attachment.contentType);
@@ -131,8 +135,18 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
     final gifAutoplay = ref.watch(gifAutoplayControllerProvider);
     final downloadGated =
         autoDownload == MediaAutoDownload.manual && !_revealed;
-    final playGated =
+    final hoverPlays =
         _isGif && gifAutoplay == GifAutoplay.tapToPlay && !_revealed;
+    final playGated = hoverPlays;
+    // Whatever the setting, a gif nobody is looking at holds its first frame.
+    final still = _isGif && !ref.watch(appFocusedProvider);
+    Widget hoverToPlay(Widget child) => hoverPlays
+        ? MouseRegion(
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: child,
+          )
+        : child;
     final caption =
         '${attachment.filename} · ${formatByteSize(attachment.size)}';
 
@@ -169,15 +183,29 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
         ),
       ),
       data: (bytes) {
-        // A gif held from autoplay shows its first frame, animating on tap.
+        // A gif held from autoplay shows its first frame, animating on hover or tap.
         if (playGated) {
-          return AttachmentRevealTile(
-            caption: caption,
-            maxEdge: kInlineImageMax,
-            onReveal: () => setState(() => _revealed = true),
-            preview: AttachmentFirstFrame(
-              bytes: bytes,
-              cacheWidth: decodeWidth,
+          return hoverToPlay(
+            AttachmentRevealTile(
+              caption: caption,
+              maxEdge: kInlineImageMax,
+              onReveal: () => setState(() => _revealed = true),
+              // The first frame stays mounted under the pointer's playing copy: remounting it re-decodes and resizes the tile.
+              showBadge: !_hovered,
+              preview: Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  AttachmentFirstFrame(bytes: bytes, cacheWidth: decodeWidth),
+                  if (_hovered)
+                    Positioned.fill(
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.contain,
+                        cacheWidth: decodeWidth,
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         }
@@ -219,20 +247,26 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
                         maxHeight: kInlineImageMax,
                       ),
                       // Never decodes wider than the transcript can draw it.
-                      child: Image.memory(
-                        bytes,
-                        fit: BoxFit.contain,
-                        semanticLabel: attachment.filename,
-                        cacheWidth: decodeWidth,
-                        // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
-                        errorBuilder: (context, error, stackTrace) =>
-                            _FailureBox(
-                              tokens: tokens,
-                              message: 'Could not open ${attachment.filename}.',
-                              width: kInlineImageMax,
-                              height: 168,
+                      child: still
+                          ? AttachmentFirstFrame(
+                              bytes: bytes,
+                              cacheWidth: decodeWidth,
+                            )
+                          : Image.memory(
+                              bytes,
+                              fit: BoxFit.contain,
+                              semanticLabel: attachment.filename,
+                              cacheWidth: decodeWidth,
+                              // Bytes can decode-fail after a successful fetch; without this it paints as Flutter's raw error box.
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _FailureBox(
+                                    tokens: tokens,
+                                    message:
+                                        'Could not open ${attachment.filename}.',
+                                    width: kInlineImageMax,
+                                    height: 168,
+                                  ),
                             ),
-                      ),
                     ),
                   ),
                 ),

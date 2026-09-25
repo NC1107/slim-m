@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two media-performance gates on an inline attachment: with auto-download
-/// off nothing is fetched until the tap, and with autoplay off a gif holds
-/// under a play badge and only reveals on the tap. Both defaults leave the
-/// attachment loading and animating on its own, which the plain
-/// attachment_view_test already covers.
+/// off nothing is fetched until the tap, and a gif - held by default - waits
+/// under a play badge for a hover or a tap. Whatever the setting, a gif holds
+/// its first frame while the window is unfocused, since an animation nobody
+/// is looking at is pure cost.
 library;
 
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/attachment_bytes.dart';
 import 'package:slimm_app/src/providers/media_preferences.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/widgets/attachment_reveal.dart';
 import 'package:slimm_app/src/widgets/attachment_view.dart';
 import 'package:slimm_design_system/design_system.dart';
 
@@ -71,6 +73,17 @@ Future<void> _pump(
   await tester.pumpAndSettle();
 }
 
+/// Whether the play badge is visible: it keeps its space while hidden, so
+/// presence in the tree says nothing and the Visibility flag is the answer.
+bool _badgeShown(WidgetTester tester) => tester
+    .widget<Visibility>(
+      find.ancestor(
+        of: find.byIcon(AppIcons.play),
+        matching: find.byType(Visibility),
+      ),
+    )
+    .visible;
+
 void main() {
   testWidgets('auto-download off fetches nothing until the tap', (
     tester,
@@ -98,15 +111,12 @@ void main() {
     expect(find.text('Tap to load'), findsNothing);
   });
 
-  testWidgets('autoplay off holds a gif under a play badge until the tap', (
+  testWidgets('by default a gif holds under a play badge until the tap', (
     tester,
   ) async {
     final container = _container([
       attachmentBytesProvider(_gif.id).overrideWith((ref) async => _gifBytes),
     ]);
-    await container
-        .read(gifAutoplayControllerProvider.notifier)
-        .select(GifAutoplay.tapToPlay);
 
     await _pump(tester, container, _gif);
 
@@ -120,5 +130,87 @@ void main() {
     // Revealed: the badge is gone and the animating Image is in the tree.
     expect(find.byIcon(AppIcons.play), findsNothing);
     expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('a pointer resting on a held gif plays it, and leaving holds it '
+      'again', (tester) async {
+    final container = _container([
+      attachmentBytesProvider(_gif.id).overrideWith((ref) async => _gifBytes),
+    ]);
+    await _pump(tester, container, _gif);
+    expect(find.byType(Image), findsNothing);
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(find.byIcon(AppIcons.play)));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(Image),
+      findsOneWidget,
+      reason: 'hover is the pointer path to seeing it',
+    );
+    expect(
+      _badgeShown(tester),
+      isFalse,
+      reason: 'the badge hides while it plays, keeping its space',
+    );
+
+    // Well clear of the tile, which starts at the body's top-left corner.
+    await mouse.moveTo(const Offset(780, 580));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(Image),
+      findsNothing,
+      reason: 'not revealed: it only played while pointed at',
+    );
+    expect(_badgeShown(tester), isTrue);
+  });
+
+  testWidgets('a gif set to always still holds while the window is unfocused', (
+    tester,
+  ) async {
+    final container = _container([
+      attachmentBytesProvider(_gif.id).overrideWith((ref) async => _gifBytes),
+    ]);
+    await container
+        .read(gifAutoplayControllerProvider.notifier)
+        .select(GifAutoplay.autoplay);
+    final binding = TestWidgetsFlutterBinding.instance;
+    addTearDown(
+      () => binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed),
+    );
+    await _pump(tester, container, _gif);
+    expect(find.byType(Image), findsOneWidget);
+
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(Image),
+      findsNothing,
+      reason: 'unfocused: nobody is watching it loop',
+    );
+    expect(
+      find.byType(AttachmentFirstFrame),
+      findsOneWidget,
+      reason: 'the first frame, not a blank',
+    );
+    expect(
+      find.byIcon(AppIcons.play),
+      findsNothing,
+      reason: 'not a gate: nothing to tap',
+    );
+
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(Image),
+      findsOneWidget,
+      reason: 'focus back, animation back',
+    );
   });
 }

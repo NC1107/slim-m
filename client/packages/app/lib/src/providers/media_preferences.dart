@@ -5,10 +5,12 @@
 /// [MediaAutoDownload] decides whether an image fetches the moment it scrolls
 /// into view or waits to be tapped - the data lever, for a metered connection.
 /// [GifAutoplay] decides whether a gif animates on its own or holds on its
-/// first frame until tapped - the battery-and-CPU lever, since animating gifs
-/// decode every frame forever. Both default to what this app has always done,
-/// so leaving them alone changes nothing. Opening an attachment always shows it
-/// fully regardless.
+/// first frame until hovered or tapped - the battery-and-CPU lever, since
+/// animating gifs decode every frame forever. Downloading defaults to what
+/// this app has always done; gifs default to held, at the owner's request,
+/// since a busy channel full of looping gifs is the distracting case and a
+/// hover or tap is all it takes to see one. Opening an attachment always
+/// shows it fully regardless.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,7 +20,7 @@ import 'providers.dart';
 /// Whether an inline image downloads on sight or waits for a tap.
 enum MediaAutoDownload { always, manual }
 
-/// Whether a gif animates on its own or waits for a tap.
+/// Whether a gif animates on its own or waits for a hover or a tap.
 enum GifAutoplay { autoplay, tapToPlay }
 
 extension MediaAutoDownloadX on MediaAutoDownload {
@@ -30,8 +32,8 @@ extension MediaAutoDownloadX on MediaAutoDownload {
 
 extension GifAutoplayX on GifAutoplay {
   String get label => switch (this) {
-    GifAutoplay.autoplay => 'On (default)',
-    GifAutoplay.tapToPlay => 'Tap to play',
+    GifAutoplay.autoplay => 'Always',
+    GifAutoplay.tapToPlay => 'On hover or tap (default)',
   };
 }
 
@@ -39,7 +41,7 @@ const mediaAutoDownloadKey = 'slimm.performance.media_autodownload';
 const gifAutoplayKey = 'slimm.performance.gif_autoplay';
 
 const defaultMediaAutoDownload = MediaAutoDownload.always;
-const defaultGifAutoplay = GifAutoplay.autoplay;
+const defaultGifAutoplay = GifAutoplay.tapToPlay;
 
 class MediaAutoDownloadController extends StateNotifier<MediaAutoDownload> {
   MediaAutoDownloadController(this._ref) : super(defaultMediaAutoDownload);
@@ -84,7 +86,7 @@ class GifAutoplayController extends StateNotifier<GifAutoplay> {
         }
       }
     } catch (_) {
-      // Not worth failing a launch over; the default autoplays.
+      // Not worth failing a launch over; the default holds gifs.
     }
   }
 
