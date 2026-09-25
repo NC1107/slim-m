@@ -5,6 +5,7 @@
 /// something to look at instead.
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -13,6 +14,43 @@ import 'canvas_pane_harness.dart';
 import 'voice_controller_harness.dart';
 
 void main() {
+  testWidgets(
+    'a phone-width canvas gets touch-first pan/zoom wording, since nothing '
+    'else in the UI ever states the pinch/two-finger gestures',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final fixture = CanvasPaneFixture();
+      final container = fixture.container();
+      addTearDown(container.dispose);
+      addTearDown(fixture.events.close);
+
+      await pumpCanvasPane(tester, container);
+
+      expect(
+        find.textContaining('Drag with two fingers to pan'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('a desktop-width canvas gets pointer-first pan/zoom wording', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final fixture = CanvasPaneFixture();
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+
+    await pumpCanvasPane(tester, container);
+
+    expect(find.textContaining('Scroll to pan'), findsOneWidget);
+  });
+
   testWidgets('a fresh canvas invites a first mark', (tester) async {
     final fixture = CanvasPaneFixture();
     final container = fixture.container();

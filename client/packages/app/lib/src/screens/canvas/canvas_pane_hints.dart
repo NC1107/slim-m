@@ -9,6 +9,16 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+/// The one thing this pane's own onboarding copy never said: how to move
+/// around it at all. Width-branched per `docs/design/desktop-vs-mobile.md`
+/// rule 1 (window width, never platform) - the same compact-width proxy
+/// for a touch-first surface `CanvasEmptyHint`'s sibling widgets already
+/// use throughout this package.
+String panZoomHint(double width) => width < kCompactWidth
+    ? 'Drag with two fingers to pan, pinch to zoom'
+    : 'Scroll to pan, hold Ctrl and scroll to zoom, or drag with the '
+          'middle mouse button';
+
 /// The signature feature's first impression used to be a flat rectangle
 /// with nothing on it while loading - pixel-identical, to a sighted user,
 /// to a broken or blank canvas. `Semantics`' own `loading` label already
@@ -80,6 +90,12 @@ class CanvasEmptyHint extends StatelessWidget {
                 Text(
                   'Draw with the pen, drop a note or a shape, or paste an '
                   'image from "More canvas actions"',
+                  style: AppText.caption.copyWith(color: tokens.textDisabled),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.s4),
+                Text(
+                  panZoomHint(MediaQuery.sizeOf(context).width),
                   style: AppText.caption.copyWith(color: tokens.textDisabled),
                   textAlign: TextAlign.center,
                 ),
