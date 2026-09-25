@@ -52,7 +52,7 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
       child: OverlayPortal(
         controller: _controller.portal,
         // Positioned so the follower sizes to its content, not the whole screen a Column would otherwise fill it against.
-        overlayChildBuilder: (context) => Positioned(
+        overlayChildBuilder: (_) => Positioned(
           left: 0,
           top: 0,
           child: CompositedTransformFollower(
