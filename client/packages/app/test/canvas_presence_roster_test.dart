@@ -96,6 +96,27 @@ void main() {
   });
 
   testWidgets(
+    'the face-pile carries a tooltip explaining it, for a sighted user '
+    'hovering rather than reading assistive tech',
+    (tester) async {
+      final cursors = CanvasCursors();
+      addTearDown(cursors.dispose);
+      cursors.upsert(id: 'u2', x: 0, y: 0, label: 'Priya', colorIndex: 0);
+
+      await tester.pumpWidget(
+        _wrap(
+          CanvasPresenceRoster(callParticipants: const [], cursors: cursors),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tooltip = tester.widget<Tooltip>(find.byType(Tooltip));
+      expect(tooltip.message, 'On this canvas: Priya');
+      expect(tooltip.excludeFromSemantics, isTrue);
+    },
+  );
+
+  testWidgets(
     'a live cursor whose id is also on this call is excluded - the call '
     'roster wins, since that id already has a canvas tile',
     (tester) async {

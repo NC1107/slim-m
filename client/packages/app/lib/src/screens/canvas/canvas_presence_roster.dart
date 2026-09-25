@@ -180,61 +180,67 @@ class _FacePile extends StatelessWidget {
     final stackWidth = shown.isEmpty
         ? 0.0
         : _avatarSize + (shown.length - 1) * _stride;
+    final label = 'On this canvas: ${present.map((p) => p.name).join(', ')}';
     return Semantics(
       container: true,
-      label: 'On this canvas: ${present.map((p) => p.name).join(', ')}',
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.s4),
-        decoration: BoxDecoration(
-          color: tokens.surfaceRaised,
-          borderRadius: BorderRadius.circular(AppRadii.full),
-          border: Border.all(color: tokens.borderSubtle),
-        ),
-        child: ExcludeSemantics(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: stackWidth,
-                height: _avatarSize,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    for (var i = 0; i < shown.length; i++)
-                      Positioned(
-                        left: i * _stride,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: tokens.surfaceRaised,
-                              width: 2,
+      label: label,
+      // excludeFromSemantics avoids doubling the Semantics label above for assistive tech.
+      child: Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.s4),
+          decoration: BoxDecoration(
+            color: tokens.surfaceRaised,
+            borderRadius: BorderRadius.circular(AppRadii.full),
+            border: Border.all(color: tokens.borderSubtle),
+          ),
+          child: ExcludeSemantics(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: stackWidth,
+                  height: _avatarSize,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      for (var i = 0; i < shown.length; i++)
+                        Positioned(
+                          left: i * _stride,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: tokens.surfaceRaised,
+                                width: 2,
+                              ),
+                            ),
+                            child: AuthorAvatar(
+                              name: shown[i].name,
+                              userId: shown[i].id,
+                              size: _avatarSize,
                             ),
                           ),
-                          child: AuthorAvatar(
-                            name: shown[i].name,
-                            userId: shown[i].id,
-                            size: _avatarSize,
-                          ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              if (overflow > 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s4,
+                    ],
                   ),
-                  child: Text(
-                    '+$overflow',
-                    style: AppText.caption.copyWith(
-                      color: tokens.textSecondary,
-                      fontWeight: AppWeights.medium,
+                ),
+                if (overflow > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s4,
+                    ),
+                    child: Text(
+                      '+$overflow',
+                      style: AppText.caption.copyWith(
+                        color: tokens.textSecondary,
+                        fontWeight: AppWeights.medium,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
