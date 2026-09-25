@@ -146,14 +146,23 @@ bool isReachablePresence(AppPresence status) =>
 /// Splits and sorts [members] by presence. A member absent from [statusOf]
 /// counts as offline, which is the only honest default when presence is
 /// unknown rather than assumed online.
-({List<api.UserProfile> online, List<api.UserProfile> offline})
+({
+  List<api.UserProfile> online,
+  List<api.UserProfile> offline,
+  List<api.UserProfile> bots,
+})
 groupMembersByPresence(
   List<api.UserProfile> members,
   Map<String, AppPresence> statusOf,
 ) {
   final online = <api.UserProfile>[];
   final offline = <api.UserProfile>[];
+  final bots = <api.UserProfile>[];
   for (final member in members) {
+    if (member.isBot) {
+      bots.add(member);
+      continue;
+    }
     final status = statusOf[member.id];
     final isOnlineGroup = status != null && isReachablePresence(status);
     (isOnlineGroup ? online : offline).add(member);
@@ -162,7 +171,8 @@ groupMembersByPresence(
       a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
   online.sort(byName);
   offline.sort(byName);
-  return (online: online, offline: offline);
+  bots.sort(byName);
+  return (online: online, offline: offline, bots: bots);
 }
 
 /// One row of the member pane's roster: a group heading or a member.
@@ -185,7 +195,12 @@ final class RosterMember extends RosterEntry {
 /// lazy list can build only the rows on screen rather than a widget per
 /// member of a possibly large roster.
 List<RosterEntry> rosterEntries(
-  ({List<api.UserProfile> online, List<api.UserProfile> offline}) grouped,
+  ({
+    List<api.UserProfile> online,
+    List<api.UserProfile> offline,
+    List<api.UserProfile> bots,
+  })
+  grouped,
 ) => [
   if (grouped.online.isNotEmpty) ...[
     RosterGroupLabel('Online · ${grouped.online.length}'),
@@ -194,6 +209,11 @@ List<RosterEntry> rosterEntries(
   if (grouped.offline.isNotEmpty) ...[
     RosterGroupLabel('Offline · ${grouped.offline.length}'),
     for (final m in grouped.offline) RosterMember(m),
+  ],
+  // Bots last, whatever their presence: they are not who a person scans the roster for.
+  if (grouped.bots.isNotEmpty) ...[
+    RosterGroupLabel('Bots · ${grouped.bots.length}'),
+    for (final m in grouped.bots) RosterMember(m),
   ],
 ];
 
