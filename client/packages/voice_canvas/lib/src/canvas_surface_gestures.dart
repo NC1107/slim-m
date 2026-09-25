@@ -168,8 +168,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
         if (_draft.isEmpty) return;
         final screen = _draft.take();
         widget.onDraftEnded?.call();
-        // A single point still commits: see canvas_document.dart's own
-        // moveTo/lineTo pair for how it paints as a dot, not nothing.
+        // A single point still commits: it paints as a dot, not nothing.
         widget.onStroke(screen.map(_toWorld).toList(growable: false));
     }
   }
