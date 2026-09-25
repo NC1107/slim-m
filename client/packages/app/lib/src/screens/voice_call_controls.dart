@@ -44,6 +44,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 
 import '../providers/providers.dart' show apiProvider;
 import '../providers/voice_controller.dart';
@@ -123,19 +124,25 @@ class _CallControlsState extends ConsumerState<CallControls> {
     // mainAxisSize.min: this row sizes to its own content now that it has no
     // full-width bar to fill, so whatever floating card embeds it - alone or
     // beside a canvas's own controls - can size itself to match.
-    return Row(
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         CallDockButton(
           icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
-          tooltip: voice.microphoneEnabled ? 'Mute' : 'Unmute',
+          tooltip: _withShortcut(
+            voice.microphoneEnabled ? 'Mute' : 'Unmute',
+            AppAction.toggleMuteCall,
+          ),
           active: voice.microphoneEnabled,
           onPressed: widget.controller.toggleMicrophone,
         ),
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
           icon: voice.cameraEnabled ? AppIcons.camera : AppIcons.cameraOff,
-          tooltip: voice.cameraEnabled ? 'Turn off camera' : 'Turn on camera',
+          tooltip: _withShortcut(
+            voice.cameraEnabled ? 'Turn off camera' : 'Turn on camera',
+            AppAction.toggleCameraCall,
+          ),
           active: voice.cameraEnabled,
           onPressed: () => unawaited(widget.controller.toggleCamera()),
         ),
@@ -179,28 +186,66 @@ class _CallControlsState extends ConsumerState<CallControls> {
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
           icon: AppIcons.leaveCall,
-          tooltip: 'Leave call',
+          tooltip: _withShortcut('Leave call', AppAction.leaveCall),
           active: false,
           destructive: true,
           onPressed: widget.controller.leave,
         ),
       ],
     );
+    if (!isDesktopHost) return row;
+    // CallbackShortcuts is the ancestor: key handling walks up from whoever holds focus, so autofocus goes inside it.
+    return CallbackShortcuts(
+      bindings: _shortcutBindings(context),
+      child: Focus(autofocus: true, child: row),
+    );
+  }
+
+  /// Mirrors each button's own [onPressed]/[onLongPress] above, so a
+  /// shortcut can never do something the matching button could not.
+  Map<ShortcutActivator, VoidCallback> _shortcutBindings(BuildContext context) {
+    final muteKey = activatorFor(AppAction.toggleMuteCall);
+    final cameraKey = activatorFor(AppAction.toggleCameraCall);
+    final shareKey = activatorFor(AppAction.toggleShareCall);
+    final leaveKey = activatorFor(AppAction.leaveCall);
+    return {
+      if (muteKey != null) muteKey: widget.controller.toggleMicrophone,
+      if (cameraKey != null)
+        cameraKey: () => unawaited(widget.controller.toggleCamera()),
+      if (shareKey != null)
+        shareKey: () {
+          if (_shareRequestInFlight) return;
+          unawaited(_share(context));
+        },
+      if (leaveKey != null) leaveKey: widget.controller.leave,
+    };
   }
 
   /// [canSwitch] names the long-press route while sharing: a hidden gesture
   /// nobody is told about is not a way to change source.
   static String _shareTooltip(VoiceFlags voice, {required bool canSwitch}) {
+    final shortcut = _shortcutSuffix(AppAction.toggleShareCall);
     if (voice.screenSharing) {
       return canSwitch
-          ? 'Stop sharing (hold to change source)'
-          : 'Stop sharing';
+          ? 'Stop sharing (hold to change source$shortcut)'
+          : 'Stop sharing$shortcut';
     }
     if (voice.awaitingBroadcast) {
       return 'Waiting for you to start the broadcast. Tap to cancel.';
     }
-    return 'Share a screen';
+    return 'Share a screen$shortcut';
   }
+
+  /// `' (Ctrl+Shift+S)'`, or empty on mobile/touch or once unbound - a hint
+  /// naming a shortcut that cannot fire here would be worse than none.
+  static String _shortcutSuffix(AppAction action) {
+    if (!isDesktopHost) return '';
+    final keys = describeAppAction(action);
+    return keys.isEmpty ? '' : ' (${keys.join('+')})';
+  }
+
+  static String _withShortcut(String label, AppAction action) =>
+      '$label${_shortcutSuffix(action)}';
 
   Future<void> _share(BuildContext context) async {
     final voice = widget.voice;

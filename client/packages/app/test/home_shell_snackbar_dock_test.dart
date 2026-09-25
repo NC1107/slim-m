@@ -63,7 +63,9 @@ void main() {
             'the dock must actually be showing a call for this to mean anything',
       );
       final dockRect = tester.getRect(find.byType(CanvasCallDock));
-      final leaveRect = tester.getRect(find.bySemanticsLabel('Leave call'));
+      final leaveRect = tester.getRect(
+        find.bySemanticsLabel(RegExp(r'^Leave call')),
+      );
 
       const message = 'Overwrite set for that role.';
       showAppSnackbar(tester.element(find.byType(CanvasCallDock)), message);

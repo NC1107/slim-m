@@ -205,8 +205,15 @@ class InertSession implements VoiceSession {
     bool cameraEnabled = false,
   }) async {}
 
+  /// How many times [leave] was actually reached, so a test can assert a
+  /// control (or a shortcut standing in for one) reached the session rather
+  /// than only that the button existed.
+  int leaveCalls = 0;
+
   @override
-  Future<void> leave() async {}
+  Future<void> leave() async {
+    leaveCalls += 1;
+  }
 
   @override
   Future<bool> setMicrophoneEnabled(bool enabled) async => true;
