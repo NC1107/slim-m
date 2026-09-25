@@ -81,6 +81,79 @@ void main() {
     );
   });
 
+  testWidgets('a non-square scene is letterboxed, not stretched', (
+    tester,
+  ) async {
+    // 7x6, connect-four's own shape: the reported case, tall in a phone viewport whose own aspect is nothing like the board's.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: ModuleSceneFullscreen(
+          initial: _scene(cols: 7, rows: 6),
+          runCommand: _run,
+          title: 'connect-four',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final board = tester.getRect(
+      find.descendant(
+        of: find.byType(ModuleSceneFrame),
+        matching: find.byType(Container),
+      ),
+    );
+    expect(
+      board.width / board.height,
+      closeTo(7 / 6, 0.01),
+      reason:
+          'the scene declared a 7x6 board; stretched to the viewport it '
+          'would fill the whole (much taller) frame instead',
+    );
+  });
+
+  testWidgets('a tap in full screen still lands on the cell it was drawn on', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    String? sentAction;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        home: ModuleSceneFullscreen(
+          initial: _scene(cols: 7, rows: 6),
+          runCommand: (input) async {
+            sentAction = jsonDecode(input)['action'] as String;
+            return const api.RunModuleCommandResult(ok: true, output: 'x');
+          },
+          title: 'connect-four',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final paint = find.descendant(
+      of: find.byType(ModuleSceneFrame),
+      matching: find.byType(CustomPaint),
+    );
+    final topLeft = tester.getTopLeft(paint.last);
+    final size = tester.getSize(paint.last);
+    // The last column of the last row: the corner farthest from the origin, so a stretched or misaligned box would miss it in either axis.
+    final cellW = size.width / 7;
+    final cellH = size.height / 6;
+    await tester.tapAt(
+      topLeft + Offset(cellW * 6 + cellW / 2, cellH * 5 + cellH / 2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(sentAction, 'c:5,6');
+  });
+
   testWidgets('nothing is left to lose a vertical drag to', (tester) async {
     await _pumpFullscreen(tester);
 
