@@ -49,7 +49,11 @@ class VoiceController extends StateNotifier<VoiceState>
     DateTime Function()? now,
   }) : _session = session ?? VoiceSession(),
        _callLifecycle = callLifecycle ?? CallLifecycleChannel(),
-       _heartbeat = VoiceCallHeartbeat(_ref, interval: voiceHeartbeatInterval),
+       _heartbeat = VoiceCallHeartbeat(
+         _ref,
+         interval: voiceHeartbeatInterval,
+         now: now,
+       ),
        _autoRejoin = VoiceAutoRejoin(delays: autoRejoinDelays),
        _now = now ?? DateTime.now,
        _activity = CallActivityTracker(now: now ?? DateTime.now),
@@ -60,8 +64,15 @@ class VoiceController extends StateNotifier<VoiceState>
     _states = _session.states.listen((s) {
       reportCallLifecycle(_callLifecycle, s, channelId: state.channelId);
       // A drop the SFU decided on: the reason is the only thing that can tell
-      // "you joined elsewhere" from "your network went".
-      final dropped = _session.lastDisconnect;
+      // "you joined elsewhere" from "your network went". A `removed` that
+      // arrives while this client's own heartbeat has been failing is far
+      // more likely the server's stale-heartbeat sweep than a moderator, so
+      // it is reclassified before anything downstream reads it.
+      final rawDropped = _session.lastDisconnect;
+      final dropped =
+          rawDropped == VoiceDisconnect.removed && _heartbeat.isLagging
+          ? VoiceDisconnect.heartbeatLagEviction
+          : rawDropped;
       if (s == VoiceSessionState.failed && dropped != null) {
         _heartbeat.stop();
         _log('Call ended: ${dropped.name}', detail: dropped.message);

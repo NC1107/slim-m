@@ -371,15 +371,23 @@ class FakeSession implements VoiceSession {
 /// mock layered on top. The whole request, not just the url: a POST
 /// heartbeat and the DELETE that forgets one on a clean leave share a path,
 /// and only the method tells them apart.
+/// [failHeartbeat] models a heartbeat that cannot reach the server while the
+/// media transport stays up entirely, the case
+/// `voice_call_heartbeat_test.dart`'s lag tests need: a POST failure with no
+/// change to how `/voice/token` answers.
 http.Client voiceApi({
   int status = 200,
   bool canPublish = true,
   String sfuUrl = 'wss://sfu.example.com',
+  bool failHeartbeat = false,
   void Function(http.Request request)? onRequest,
 }) {
   return MockClient((request) async {
     onRequest?.call(request);
     if (request.url.path.endsWith('/voice/heartbeat')) {
+      if (failHeartbeat && request.method == 'POST') {
+        return http.Response('', 503);
+      }
       return http.Response('', 204);
     }
     if (!request.url.path.endsWith('/voice/token')) {
