@@ -312,8 +312,39 @@ void main() {
       return (container: container, events: events);
     }
 
-    testWidgets('a live presence event for an unknown id refetches the roster '
-        'after the debounce, so a new member appears without a reload', (
+    testWidgets('a MemberJoined event refetches the roster, so a new member '
+        'appears without a reload', (tester) async {
+      var members = [_profile('1', 'Priya')];
+      var fetchCount = 0;
+      final built = buildKeepAliveContainer(() => members, () => fetchCount++);
+      addTearDown(built.events.close);
+      addTearDown(built.container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: built.container,
+          child: MaterialApp(
+            theme: buildTheme(Brightness.light, AppTokens.light),
+            home: const Scaffold(body: AppMemberPane(channelId: 'c1')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetchCount, 1);
+      expect(find.textContaining('MEMBERS · 1'), findsOneWidget);
+
+      // Bob registers and connects: the real join event, not an inference.
+      members = [_profile('1', 'Priya'), _profile('2', 'Bob')];
+      built.events.add(const MemberJoined(userId: '2'));
+      await tester.pumpAndSettle();
+
+      expect(fetchCount, 2);
+      expect(find.textContaining('MEMBERS · 2'), findsOneWidget);
+      expect(find.text('Bob'), findsOneWidget);
+    });
+
+    testWidgets('two separate MemberJoined events each refetch the roster, '
+        'with no one-shot bound the way the old inference needed', (
       tester,
     ) async {
       var members = [_profile('1', 'Priya')];
@@ -333,32 +364,26 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(fetchCount, 1);
-      expect(find.textContaining('MEMBERS · 1'), findsOneWidget);
 
-      // Bob registers and connects: there is no MemberJoined event, so his
-      // presence frame is the first trace of him Alice's client sees.
       members = [_profile('1', 'Priya'), _profile('2', 'Bob')];
-      built.events.add(
-        const PresenceChanged(userId: '2', status: PresenceState.online),
-      );
-
-      // Before the debounce elapses the stale roster is still showing.
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(fetchCount, 1);
-      expect(find.textContaining('MEMBERS · 1'), findsOneWidget);
-
-      await tester.pump(const Duration(milliseconds: 500));
+      built.events.add(const MemberJoined(userId: '2'));
       await tester.pumpAndSettle();
-
       expect(fetchCount, 2);
-      expect(find.textContaining('MEMBERS · 2'), findsOneWidget);
-      expect(find.text('Bob'), findsOneWidget);
+
+      members = [
+        _profile('1', 'Priya'),
+        _profile('2', 'Bob'),
+        _profile('3', 'Cass'),
+      ];
+      built.events.add(const MemberJoined(userId: '3'));
+      await tester.pumpAndSettle();
+      expect(fetchCount, 3);
     });
 
-    testWidgets('a burst of unknown ids within the debounce window yields one '
-        'refetch, not one per event', (tester) async {
-      var members = [_profile('1', 'Priya')];
+    testWidgets('a presence change for an unknown id no longer refetches the '
+        'roster', (tester) async {
       var fetchCount = 0;
+      final members = [_profile('1', 'Priya')];
       final built = buildKeepAliveContainer(() => members, () => fetchCount++);
       addTearDown(built.events.close);
       addTearDown(built.container.dispose);
@@ -375,31 +400,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(fetchCount, 1);
 
-      members = [
-        _profile('1', 'Priya'),
-        _profile('2', 'Bob'),
-        _profile('3', 'Cass'),
-      ];
       built.events.add(
         const PresenceChanged(userId: '2', status: PresenceState.online),
       );
-      await tester.pump(const Duration(milliseconds: 200));
-      built.events.add(
-        const PresenceChanged(userId: '3', status: PresenceState.online),
-      );
-      await tester.pump(const Duration(milliseconds: 600));
       await tester.pumpAndSettle();
 
       expect(
         fetchCount,
-        2,
+        1,
         reason:
-            'two unknown ids close together must still coalesce '
-            'into a single refetch',
+            'a presence frame is no longer read as an inferred join now '
+            'that the server sends a real MemberJoined event',
       );
     });
 
-    testWidgets('a message from an already-known author does not refetch the '
+    testWidgets('a message from an unknown author no longer refetches the '
         'roster', (tester) async {
       var fetchCount = 0;
       final members = [_profile('1', 'Priya')];
@@ -424,8 +439,8 @@ void main() {
           Message(
             id: 'm1',
             channelId: 'c1',
-            authorId: '1',
-            authorDisplayName: 'Priya',
+            authorId: '2',
+            authorDisplayName: 'Bob',
             seq: 1,
             content: 'hello',
             createdAt: 0,
@@ -433,15 +448,14 @@ void main() {
           ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 600));
       await tester.pumpAndSettle();
 
       expect(
         fetchCount,
         1,
         reason:
-            'the author is already on the roster, so nothing is '
-            'stale',
+            'a first message is no longer read as an inferred join now '
+            'that the server sends a real MemberJoined event',
       );
     });
   });
