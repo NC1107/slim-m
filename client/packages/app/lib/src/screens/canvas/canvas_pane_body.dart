@@ -246,7 +246,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         child: Column(
           children: [
             // Identity only, never a control: fullscreen can drop it whole without taking an action with it.
-            if (!widget.fullscreen) const CanvasBar(),
+            if (!widget.fullscreen) CanvasBar(channelId: widget.channelId),
             if (widget.error != null)
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s12),
