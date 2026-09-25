@@ -64,18 +64,18 @@ void main() {
   });
 
   testWidgets(
-    'onDraftEnded fires exactly once even for a single-point gesture that never commits a stroke',
+    'onDraftEnded fires exactly once, and a single-point gesture still commits a one-point stroke',
     (tester) async {
       final document = CanvasDocument();
       addTearDown(document.dispose);
       var ended = 0;
-      var strokes = 0;
+      final strokes = <List<Offset>>[];
       await tester.pumpWidget(
         MaterialApp(
           home: CanvasSurface(
             document: document,
             ink: const Color(0xFFE86A5C),
-            onStroke: (_) => strokes++,
+            onStroke: strokes.add,
             onDraftEnded: () => ended++,
           ),
         ),
@@ -86,7 +86,13 @@ void main() {
       await gesture.up();
       await tester.pump();
 
-      expect(strokes, 0, reason: 'a single point is too short to commit');
+      expect(
+        strokes,
+        [
+          [const Offset(20, 20)],
+        ],
+        reason: 'a tap with no move must still leave a dot',
+      );
       expect(
         ended,
         1,
