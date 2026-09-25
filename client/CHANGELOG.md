@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.85.0](https://github.com/NC1107/slim-m/compare/client-v0.84.0...client-v0.85.0) (2026-09-25)
+
+
+### Features
+
+* **client:** calm waiting hint and canvas mention for a solo caller ([#1340](https://github.com/NC1107/slim-m/issues/1340)) ([97419cb](https://github.com/NC1107/slim-m/commit/97419cbba29bfb8ed699f2115ddc962afef974d3))
+* **client:** in-call quick toggle for the audio output device ([#1353](https://github.com/NC1107/slim-m/issues/1353)) ([8932854](https://github.com/NC1107/slim-m/commit/8932854b4923a33302eaaa8228fec58dc882a89e))
+* **client:** keyboard shortcuts for mute, camera, share and leave ([#1351](https://github.com/NC1107/slim-m/issues/1351)) ([5d50783](https://github.com/NC1107/slim-m/commit/5d507837a655d4c91d60bd776b5dc4ff931f0956))
+* **client:** profile-first member card, Moderate view, and profile settings ([#1335](https://github.com/NC1107/slim-m/issues/1335)) ([26851cf](https://github.com/NC1107/slim-m/commit/26851cf22efed0ca114598daf06e7379b3981b6d))
+* **server,client:** add a member.joined event so a bot can greet a new member ([#1357](https://github.com/NC1107/slim-m/issues/1357)) ([2487aa7](https://github.com/NC1107/slim-m/commit/2487aa79bca6bf901d371e6e2cdda8f1754d7c80))
+
+
+### Bug Fixes
+
+* **canvas:** stop naming a call participant twice on the canvas ([#1366](https://github.com/NC1107/slim-m/issues/1366)) ([c9366f9](https://github.com/NC1107/slim-m/commit/c9366f9d962c64f56961d9cb90850ba208955641))
+* **client:** add a touch long-press equivalent to the canvas object menu ([#1360](https://github.com/NC1107/slim-m/issues/1360)) ([6b57d1e](https://github.com/NC1107/slim-m/commit/6b57d1eeb2258d0e047027f642f4ebd113fdb5a0))
+* **client:** attach a failed channel reorder's error to the list, not the top of the rail ([#1359](https://github.com/NC1107/slim-m/issues/1359)) ([36a253d](https://github.com/NC1107/slim-m/commit/36a253d1fa90c293178559a1ecd1c3e94aa6da00))
+* **client:** auto-rejoin a voice call swept for heartbeat lag ([#1344](https://github.com/NC1107/slim-m/issues/1344)) ([36abee7](https://github.com/NC1107/slim-m/commit/36abee79c852585ff7a24217a2200d8abe05eb4a))
+* **client:** clamp untouched canvas presence tiles to the pane edge ([#1358](https://github.com/NC1107/slim-m/issues/1358)) ([bf680c0](https://github.com/NC1107/slim-m/commit/bf680c092f4fca0421be743def29990fa55702b3))
+* **client:** distinguish loading from empty in the apps launcher sheet ([#1350](https://github.com/NC1107/slim-m/issues/1350)) ([988a4cf](https://github.com/NC1107/slim-m/commit/988a4cf04b5bce472ced80a36a2501064bcd1fb7))
+* **client:** group a module's commands instead of stacking them unbounded ([#1355](https://github.com/NC1107/slim-m/issues/1355)) ([363d710](https://github.com/NC1107/slim-m/commit/363d710453f715dddd88f90eea9d3e17eadcb041))
+* **client:** keep a call reachable behind a phone-width settings screen ([#1345](https://github.com/NC1107/slim-m/issues/1345)) ([59a4333](https://github.com/NC1107/slim-m/commit/59a433345def2162d97ce10100728b47c6c302b5))
+* **client:** keep a DM call's compact screen reachable without hanging up ([#1356](https://github.com/NC1107/slim-m/issues/1356)) ([a3424c4](https://github.com/NC1107/slim-m/commit/a3424c44b8f2d9b332952d1b8c36a653fe5cbeec))
+* **client:** keep the channel rail's scroll position across the compact drawer ([#1339](https://github.com/NC1107/slim-m/issues/1339)) ([899cf19](https://github.com/NC1107/slim-m/commit/899cf19586e014756799d4cb206277a6090a3f1a))
+* **client:** make canvas Hide say others still see the tile ([#1365](https://github.com/NC1107/slim-m/issues/1365)) ([7e9176c](https://github.com/NC1107/slim-m/commit/7e9176c4b9dbea143b0449abd216ec64519a34a4))
+* **client:** make canvas Recenter fit content instead of the world origin ([#1361](https://github.com/NC1107/slim-m/issues/1361)) ([49d9156](https://github.com/NC1107/slim-m/commit/49d9156d9eb097fe4efc25cddb62a0c4c6ea8f04))
+* **client:** mention panning and zooming in the canvas empty-state hint ([#1362](https://github.com/NC1107/slim-m/issues/1362)) ([a47e2fb](https://github.com/NC1107/slim-m/commit/a47e2fb4da8f293ac30c6e6dab46a47e95c9e8b7))
+* **client:** merge the left-call and empty-room copy on the rejoin screen ([#1338](https://github.com/NC1107/slim-m/issues/1338)) ([62f136d](https://github.com/NC1107/slim-m/commit/62f136d7904e061d4e38ff4677c4bab349a91645))
+* **client:** name the channel in the canvas header ([#1346](https://github.com/NC1107/slim-m/issues/1346)) ([56997cb](https://github.com/NC1107/slim-m/commit/56997cb595628813a1f4b90967a0eab7f106d0b6))
+* **client:** replace the stuck screen-share placeholder with loading dots ([#1341](https://github.com/NC1107/slim-m/issues/1341)) ([aac7bbd](https://github.com/NC1107/slim-m/commit/aac7bbd3b07f4d9dbc892c7f4c658cf8fa12cb7f))
+* **client:** scope the apps launcher's empty state to what a viewer can do ([#1348](https://github.com/NC1107/slim-m/issues/1348)) ([accbed7](https://github.com/NC1107/slim-m/commit/accbed7c690e02e48f813048ccd8a14885bb3ba3))
+* **client:** sentence-case rail chrome, mute suppresses the unread lift, footer shows presence and status together ([#1364](https://github.com/NC1107/slim-m/issues/1364)) ([e963ba4](https://github.com/NC1107/slim-m/commit/e963ba458f9a690fc0a39e9354403bc74c5e5a55))
+* **client:** show a brief edge glow when a pan or drag hits worldLimit ([#1363](https://github.com/NC1107/slim-m/issues/1363)) ([f763a2c](https://github.com/NC1107/slim-m/commit/f763a2c0adcc31341efa4b74a5b7f9f4fe28ab55))
+* **client:** show a busy indicator while a module scene action is in flight ([#1352](https://github.com/NC1107/slim-m/issues/1352)) ([16e543f](https://github.com/NC1107/slim-m/commit/16e543f6780f62727eca5be3aa3aa2ac9e2842b8))
+* **client:** show reconnect overlay over the call stage, not a blank screen ([#1347](https://github.com/NC1107/slim-m/issues/1347)) ([fe2dd57](https://github.com/NC1107/slim-m/commit/fe2dd5707ccbfc729e74dd6a6796913a4bbd7c83))
+* **client:** split CallDockButton out of voice_call_controls.dart ([#1368](https://github.com/NC1107/slim-m/issues/1368)) ([1efd9c4](https://github.com/NC1107/slim-m/commit/1efd9c41e90f7a7ce3513214b2c70418134f8c17))
+* **client:** stop stacking the sharing banner on top of the mirrored stage ([#1343](https://github.com/NC1107/slim-m/issues/1343)) ([2978ea5](https://github.com/NC1107/slim-m/commit/2978ea51d81f3fd49a3bf7cd036769316cce732e))
+* **client:** title bar drift, rpm update reporting, categories in the rail ([#1337](https://github.com/NC1107/slim-m/issues/1337)) ([106e9ce](https://github.com/NC1107/slim-m/commit/106e9ce71451aa456468ca92e36d922111d35e16))
+
 ## [0.84.0](https://github.com/NC1107/slim-m/compare/client-v0.83.0...client-v0.84.0) (2026-09-25)
 
 
