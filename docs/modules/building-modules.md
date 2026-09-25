@@ -488,3 +488,14 @@ The contracts here are versioned, and each grows additively (see decision 0022):
 - The manifest envelope (`schema`) and the ABI (`v1`) are the two things a breaking change would bump; everything else grows within them.
 
 Build against the contract, not against a particular client's current rendering, and your module keeps working as slim grows.
+
+### Grid data is not re-strided when cols or rows are clamped
+
+The client clamps `cols` and `rows` to 128, but it does not re-stride `data`.
+A 200x200 grid therefore does not render as a cropped 128x128; its cells scatter along a repeating diagonal.
+Lay `data` out at the stride you actually declare, and keep both within the clamp.
+
+### An over-ceiling scene is refused, not cut
+
+Plain-text output is truncated at the shared output ceiling with a marker.
+A scene is JSON, so it cannot be truncated without becoming unparseable; a scene over the ceiling is refused as a failed run with a message saying so.
