@@ -10,11 +10,9 @@
 /// or reset is a fresh call carrying that state back. `play` is the only
 /// client-side control - a timer that keeps asking the module to `step` until
 /// the scene reports it can no longer change ([ModuleScene.live]) or the
-/// viewer pauses.
-///
-/// It takes [runCommand] rather than reaching for the API itself, so it is
-/// decoupled from how a scene gets run (a code block, the Dock panel) and can
-/// be driven directly in a test.
+/// viewer pauses. It takes [runCommand] rather than reaching for the API
+/// itself, so it is decoupled from how a scene gets run (a code block, the
+/// Dock panel) and can be driven directly in a test.
 library;
 
 import 'dart:async';
@@ -31,6 +29,7 @@ import 'module_scene_images.dart';
 import 'module_scene_inputs.dart';
 import 'module_scene_controls.dart';
 import 'module_scene_frame.dart';
+import 'module_scene_keyboard.dart';
 import 'module_scene_pacing.dart';
 import 'module_scene_painter.dart';
 
@@ -153,12 +152,10 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     setState(() => _scene = widget.initial);
   }
 
-  /// Whether a scene arriving from above is this view's own, rather than a new
-  /// run to reset for.
-  ///
-  /// A call in flight or a queue still draining is the answer on its own: the
-  /// broadcast can beat this view's own response back, so the state would not
-  /// be in [_ownStates] yet even though it is ours.
+  /// Whether a scene arriving from above is this view's own, rather than a
+  /// new run to reset for. A call in flight or a queue still draining is the
+  /// answer on its own: the broadcast can beat this view's own response back,
+  /// so the state would not be in [_ownStates] yet even though it is ours.
   bool _isOwnWork(String? state) =>
       _busy ||
       _queue.isNotEmpty ||
@@ -295,13 +292,12 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     _playing = false;
   }
 
-  /// Stops, and repaints the control that says so.
-  ///
-  /// Pressing pause used to call [_stop] directly, which left `_playing` false
-  /// while the button still drew a pause glyph and its active highlight. The
-  /// animation really had stopped, so the only feedback was the board going
-  /// still, and pressing the button again started it while the icon still said
-  /// pause - a control whose state was the opposite of what it showed.
+  /// Stops, and repaints the control that says so. Pressing pause used to
+  /// call [_stop] directly, which left `_playing` false while the button
+  /// still drew a pause glyph and its active highlight. The animation really
+  /// had stopped, so the only feedback was the board going still, and
+  /// pressing the button again started it while the icon still said pause -
+  /// a control whose state was the opposite of what it showed.
   void _stopAndRepaint() {
     if (!mounted) {
       _stop();
@@ -459,34 +455,39 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
     child: LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        return Listener(
-          onPointerDown: _handlePointerDown,
-          child: GestureDetector(
-            onTapUp: (d) => _handleTapUp(d, size),
-            onPanStart: (d) => _handlePanStart(d, size),
-            onPanUpdate: (d) => _handlePanUpdate(d, size),
-            child: Stack(
-              children: [
-                CustomPaint(
-                  painter: ModuleScenePainter(
-                    scene: _scene,
-                    tokens: tokens,
-                    images: _images.snapshot(_scene),
+        return SceneKeyboardGrid(
+          scene: _scene,
+          size: size,
+          onActivate: _enqueue,
+          child: Listener(
+            onPointerDown: _handlePointerDown,
+            child: GestureDetector(
+              onTapUp: (d) => _handleTapUp(d, size),
+              onPanStart: (d) => _handlePanStart(d, size),
+              onPanUpdate: (d) => _handlePanUpdate(d, size),
+              child: Stack(
+                children: [
+                  CustomPaint(
+                    painter: ModuleScenePainter(
+                      scene: _scene,
+                      tokens: tokens,
+                      images: _images.snapshot(_scene),
+                    ),
+                    size: size,
                   ),
-                  size: size,
-                ),
-                // Above the paint: a tap for a field must not also fall through.
-                SceneInputOverlay(
-                  scene: _scene,
-                  size: size,
-                  onSubmit: _enqueue,
-                ),
-                Positioned(
-                  top: AppSpacing.s8,
-                  right: AppSpacing.s8,
-                  child: SceneBusyIndicator(busy: _busy, tokens: tokens),
-                ),
-              ],
+                  // Above the paint: a tap for a field must not also fall through.
+                  SceneInputOverlay(
+                    scene: _scene,
+                    size: size,
+                    onSubmit: _enqueue,
+                  ),
+                  Positioned(
+                    top: AppSpacing.s8,
+                    right: AppSpacing.s8,
+                    child: SceneBusyIndicator(busy: _busy, tokens: tokens),
+                  ),
+                ],
+              ),
             ),
           ),
         );
