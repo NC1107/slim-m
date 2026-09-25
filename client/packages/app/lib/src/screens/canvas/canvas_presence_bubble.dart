@@ -13,6 +13,7 @@ import 'package:flutter/rendering.dart' show RendererBinding;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../../widgets/media_label.dart';
 import '../../widgets/user_avatar.dart';
 
 /// One participant's camera tile: their live camera when it is on, or -
@@ -47,11 +48,12 @@ class CanvasPresenceBubble extends StatelessWidget {
         decoration: const BoxDecoration(color: Color(0xFF000000)),
         child: cameraView,
       ),
-      badge: _NameBadge(
-        name: participant.isLocal
+      badge: MediaLabelChip(
+        label: participant.isLocal
             ? '${participant.name} (you)'
             : participant.name,
-        muted: participant.isMuted,
+        icon: participant.isMuted ? AppIcons.micOff : AppIcons.mic,
+        iconColor: participant.isMuted ? tokens.textSecondary : tokens.accent,
       ),
     );
   }
@@ -75,7 +77,7 @@ const canvasAvatarMarkerSize = Size(112, 96);
 /// The one thing this still needs from the tile chrome it replaces is a
 /// name - unlike a member-list row, a canvas can hold several of these at
 /// once with nothing else on screen saying whose avatar is whose. That name
-/// sits on a translucent pill, matching `_NameBadge`'s own background: a
+/// sits on a translucent pill, matching [MediaLabelChip]'s own background: a
 /// marker can land over anything on the canvas, ink included, and a plain
 /// drop shadow tuned for the empty background loses to a light note fill
 /// directly underneath it.
@@ -185,56 +187,27 @@ class CanvasScreenShareBubble extends StatefulWidget {
 }
 
 class _CanvasScreenShareBubbleState extends State<CanvasScreenShareBubble> {
-  bool _hovering = false;
-  late bool _mouseConnected =
-      RendererBinding.instance.mouseTracker.mouseIsConnected;
-
-  void _onMouseTrackerChanged() {
-    final connected = RendererBinding.instance.mouseTracker.mouseIsConnected;
-    if (connected == _mouseConnected) return;
-    setState(() => _mouseConnected = connected);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    RendererBinding.instance.mouseTracker.addListener(_onMouseTrackerChanged);
-  }
-
-  @override
-  void dispose() {
-    RendererBinding.instance.mouseTracker.removeListener(
-      _onMouseTrackerChanged,
-    );
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final revealed = !widget.interactive || !_mouseConnected || _hovering;
-    final chrome = _TileChrome(
-      tokens: tokens,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(color: Color(0xFF000000)),
-        child: widget.view,
-      ),
-      badge: AnimatedOpacity(
-        opacity: revealed ? 1 : 0,
-        duration: AppMotion.reduced(context, AppMotion.fast),
-        child: _NameBadge(
-          name: widget.participant.isLocal
-              ? 'Your screen'
-              : "${widget.participant.name}'s screen",
-          icon: AppIcons.screenShare,
+    return PointerRevealed(
+      interactive: widget.interactive,
+      builder: (context, revealed) => _TileChrome(
+        tokens: tokens,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(color: Color(0xFF000000)),
+          child: widget.view,
+        ),
+        badge: RevealFade(
+          revealed: revealed,
+          child: MediaLabelChip(
+            icon: AppIcons.screenShare,
+            label: widget.participant.isLocal
+                ? 'Your screen'
+                : "${widget.participant.name}'s screen",
+          ),
         ),
       ),
-    );
-    if (!widget.interactive) return chrome;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: chrome,
     );
   }
 }
@@ -270,44 +243,4 @@ class _TileChrome extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _NameBadge extends StatelessWidget {
-  const _NameBadge({required this.name, this.muted, this.icon});
-
-  final String name;
-  final bool? muted;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s8,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: tokens.surfaceBase.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(AppRadii.full),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon ?? (muted == true ? AppIcons.micOff : AppIcons.mic),
-            size: 12,
-            color: muted == true ? tokens.textSecondary : tokens.accent,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppText.caption.copyWith(color: tokens.textPrimary),
-          ),
-        ],
-      ),
-    );
-  }
 }

@@ -11,13 +11,20 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'fullscreen_video_overlay.dart';
+import 'media_label.dart';
 
-/// A dark stage with the share inside and the sharer's name below it.
+/// A dark stage with the share inside it, labelled on hover.
 ///
 /// Black behind the video on purpose, in both themes: a shared screen is
 /// arbitrary content, and any chrome tone bleeding around its letterbox reads
-/// as part of the screen. The name line says whose screen it is, because two
+/// as part of the screen. The label says whose screen it is, because two
 /// people can share in turn and a bare rectangle does not say which.
+///
+/// That label used to sit in the layout flow underneath the stage, which put
+/// it outside the rounded container and left it permanently on. It is now a
+/// [MediaLabelChip] inside the clip, revealed by [PointerRevealed] on the same
+/// terms as the canvas tile's own - hiding it in place instead would reflow
+/// the video every time a pointer crossed it.
 ///
 /// The local caption reads as a full sentence ("You are sharing your
 /// screen") rather than a bare label ("Your screen"): it is what is left to
@@ -48,57 +55,53 @@ class ScreenShareStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF000000),
-                      border: Border.all(color: tokens.borderSubtle),
-                      borderRadius: BorderRadius.circular(AppRadii.card),
-                    ),
-                    child: child,
+    return PointerRevealed(
+      builder: (context, revealed) => ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF000000),
+                  border: Border.all(color: tokens.borderSubtle),
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                ),
+                child: child,
+              ),
+            ),
+            if (onExpand != null)
+              Positioned(
+                left: 4,
+                top: 4,
+                child: ExpandVideoButton(
+                  label: isLocal
+                      ? 'View your screen full screen'
+                      : "View $sharerName's screen full screen",
+                  onTap: onExpand!,
+                ),
+              ),
+            Positioned(
+              left: 6,
+              bottom: 6,
+              right: 6,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: RevealFade(
+                  revealed: revealed,
+                  child: MediaLabelChip(
+                    icon: AppIcons.screenShare,
+                    label: isLocal
+                        ? 'You are sharing your screen'
+                        : "$sharerName's screen",
                   ),
                 ),
-                if (onExpand != null)
-                  Positioned(
-                    left: 4,
-                    top: 4,
-                    child: ExpandVideoButton(
-                      label: isLocal
-                          ? 'View your screen full screen'
-                          : "View $sharerName's screen full screen",
-                      onTap: onExpand!,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Row(
-          children: [
-            Icon(AppIcons.screenShare, size: 14, color: tokens.textSecondary),
-            const SizedBox(width: AppSpacing.s8),
-            Expanded(
-              child: Text(
-                isLocal
-                    ? 'You are sharing your screen'
-                    : "$sharerName's screen",
-                overflow: TextOverflow.ellipsis,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
