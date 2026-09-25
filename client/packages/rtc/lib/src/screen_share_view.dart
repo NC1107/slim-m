@@ -18,6 +18,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
@@ -141,13 +142,13 @@ class _ScreenShareViewState extends State<ScreenShareView> {
     }());
     final track = _shareTrack();
     // Honest about the beat between "sharing" and the track arriving.
-    if (track == null) return _waitingForScreen;
+    if (track == null) return _placeholder;
     // And the further beat between the track arriving and a real frame.
     final owned = _ownedRenderer;
-    if (owned == null) return _waitingForScreen;
+    if (owned == null) return _placeholder;
     return FirstFrameReveal(
       tracker: owned.tracker,
-      placeholder: _waitingForScreen,
+      placeholder: _placeholder,
       child: lk.VideoTrackRenderer(
         track,
         fit: lk.VideoViewFit.contain,
@@ -157,10 +158,87 @@ class _ScreenShareViewState extends State<ScreenShareView> {
     );
   }
 
-  static const _waitingForScreen = Center(
-    child: Text(
-      'Waiting for the shared screen...',
-      style: TextStyle(color: Color(0xFF9AA4AD), fontSize: 13),
-    ),
+  static const _placeholder = ScreenSharePlaceholder();
+}
+
+/// Three staggered pulsing dots, in place of a "waiting" sentence that read
+/// as stalled rather than loading. Not `AppTypingDots`: this package takes
+/// no dependency on `design_system` (the two sit side by side in the
+/// layering, `docs/BRIEF.md`'s code map), so the same pulse is reproduced
+/// locally with the placeholder's own plain color rather than a token.
+/// Public, with its state, only so a widget test can drive the animation and
+/// the reduced-motion branch directly - `ScreenShareView` never exposes it.
+@visibleForTesting
+class ScreenSharePlaceholder extends StatefulWidget {
+  const ScreenSharePlaceholder();
+
+  @override
+  State<ScreenSharePlaceholder> createState() => ScreenSharePlaceholderState();
+}
+
+class ScreenSharePlaceholderState extends State<ScreenSharePlaceholder>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _t = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
   );
+
+  bool get _reduced =>
+      MediaQuery.disableAnimationsOf(context) ||
+      MediaQuery.accessibleNavigationOf(context);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_reduced) {
+      _t.stop();
+      _t.value = 0;
+    } else if (!_t.isAnimating) {
+      _t.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _t.dispose();
+    super.dispose();
+  }
+
+  /// Each dot's pulse trails the one before it by a fifth of the loop, so the
+  /// three read as a wave rather than blinking in unison - see the identical
+  /// shape in `design_system`'s own `AppTypingDots`.
+  double _opacityFor(int index, double t) {
+    if (_reduced) return 1;
+    final phase = (t - index * 0.2) * 2 * math.pi;
+    return 0.35 + 0.5 * (0.5 + 0.5 * math.sin(phase));
+  }
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Semantics(
+          label: 'Loading screen share',
+          child: AnimatedBuilder(
+            animation: _t,
+            builder: (context, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < 3; i++)
+                  Padding(
+                    padding: EdgeInsets.only(left: i == 0 ? 0 : 4),
+                    child: Opacity(
+                      opacity: _opacityFor(i, _t.value),
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xFF9AA4AD),
+                          shape: BoxShape.circle,
+                        ),
+                        child: SizedBox.square(dimension: 6),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
