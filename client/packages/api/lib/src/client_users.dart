@@ -10,21 +10,30 @@ extension SlimmApiUsers on SlimmApi {
     return Me.fromJson(json as Map<String, dynamic>);
   }
 
-  /// Updates the caller's own display name and/or status line. Both are
-  /// optional, null meaning "leave it as it is" - a call naming neither
-  /// throws a 400. Pass an empty string for [statusText] to clear it back to
-  /// none, the same "blank clears it" convention `updateChannel`'s `topic`
-  /// uses. The username is not editable here: it backs the live per-account
-  /// uniqueness index, so changing it needs a dedicated flow that can handle
-  /// the resulting collision.
-  Future<UserProfile> updateMe(
-      {String? displayName, String? statusText}) async {
+  /// Updates the caller's own profile fields. Every field is optional, null
+  /// meaning "leave it as it is" - a call naming none of them throws a 400.
+  /// Pass an empty string for [statusText]/[pronouns]/[about] to clear it
+  /// back to none, the same "blank clears it" convention `updateChannel`'s
+  /// `topic` uses. [profileColor] has no clearing case: every account always
+  /// has one. The username is not editable here: it backs the live
+  /// per-account uniqueness index, so changing it needs a dedicated flow that
+  /// can handle the resulting collision.
+  Future<UserProfile> updateMe({
+    String? displayName,
+    String? statusText,
+    String? pronouns,
+    String? about,
+    int? profileColor,
+  }) async {
     final json = await _send(
       'PATCH',
       '/me',
       body: {
         if (displayName != null) 'display_name': displayName,
         if (statusText != null) 'status_text': statusText,
+        if (pronouns != null) 'pronouns': pronouns,
+        if (about != null) 'about': about,
+        if (profileColor != null) 'profile_color': profileColor,
       },
     );
     return UserProfile.fromJson(json as Map<String, dynamic>);

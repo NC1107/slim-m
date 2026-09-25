@@ -44,9 +44,9 @@ Future<void> showResetCodeSheet(
   );
 }
 
-/// The member popover's own row for [showResetCodeSheet], a widget for the
-/// same reason [MemberNoteMenuItem] is one: `member_profile.dart`'s `rows`
-/// list stays one line per entry instead of carrying this `onTap` inline.
+/// The Moderate sub-view's own row for [showResetCodeSheet], a widget so
+/// `member_moderate_view.dart`'s own row list stays one line per entry
+/// instead of carrying this `onTap` inline.
 class ResetCodeMenuItem extends StatelessWidget {
   const ResetCodeMenuItem({
     super.key,

@@ -281,7 +281,7 @@ class _AvatarSettingsSectionState extends ConsumerState<AvatarSettingsSection>
                     const Spacer(),
                   if (hasAvatar)
                     AppButton(
-                      label: 'Remove',
+                      label: 'Remove photo',
                       variant: AppButtonVariant.ghost,
                       size: AppButtonSize.sm,
                       onPressed: enabled ? _remove : null,

@@ -307,6 +307,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
     ref.read(chosenServerProvider.notifier).choose(reduced);
     final api = ref.read(apiProvider);
+    // Best-effort: a version this build cannot report is worth losing, not
+    // worth blocking sign-in over - the same tolerance deviceDisplayName
+    // gives a hostname it cannot read.
+    final clientVersion = await ref
+        .read(appInfoProvider.future)
+        .then<String?>((info) => info.version)
+        .catchError((_) => null);
 
     final invite = ref.read(pendingInviteProvider);
     try {
@@ -319,12 +326,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           password: _password.text,
           deviceName: deviceDisplayName,
           inviteCode: invite,
+          clientKind: deviceClientKind,
+          clientVersion: clientVersion,
         );
       } else {
         await api.login(
           username: _username.text.trim(),
           password: _password.text,
           deviceName: deviceDisplayName,
+          clientKind: deviceClientKind,
+          clientVersion: clientVersion,
         );
         // An existing account can still spend a code, for the role it grants.
         if (invite != null) {

@@ -408,12 +408,22 @@ class Device {
     required this.createdAt,
     required this.lastSeenAt,
     required this.isCurrent,
+    this.clientKind,
+    this.clientVersion,
   });
 
   final String id;
   final String name;
   final int createdAt;
   final int? lastSeenAt;
+
+  /// A coarse client kind ("ios"/"android"/"desktop"/"web"), or null for a
+  /// session opened before this field existed.
+  final String? clientKind;
+
+  /// The app version that opened this session, or null; same absence rule as
+  /// [clientKind].
+  final String? clientVersion;
 
   /// True for the device making the request, so the UI can label it and warn
   /// before someone signs themselves out.
@@ -424,6 +434,8 @@ class Device {
         name: json['name'] as String,
         createdAt: json['created_at'] as int,
         lastSeenAt: json['last_seen_at'] as int?,
+        clientKind: json['client_kind'] as String?,
+        clientVersion: json['client_version'] as String?,
         isCurrent: json['is_current'] as bool,
       );
 }

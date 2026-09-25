@@ -359,7 +359,7 @@ void main() {
         );
         final startsBeforeDelete = syncController.startCalls;
 
-        await tester.tap(find.text('Delete account'));
+        await tester.tap(find.text('Delete account...'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Delete permanently'));
         await tester.pumpAndSettle();

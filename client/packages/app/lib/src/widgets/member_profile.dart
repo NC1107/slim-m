@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// One member, and everything you can do about them.
+/// A profile first, everything you can do about them second.
 ///
 /// Anchored popover on a pointer layout, bottom sheet on a compact one, from
 /// the same content: the member pane, a message author, and the call roster
-/// all open this rather than each growing its own menu.
+/// all open this rather than each growing its own menu. The same body is also
+/// `AvatarSettingsSection`'s own live preview of "what people in this Space
+/// see when they open your card" - see `settings_profile_preview.dart`.
 ///
-/// The sections compose in a fixed order - header, timeout badge, call,
-/// social verbs, moderation, block - and a section you have no rights or
-/// context for is *absent* rather than present-and-disabled, which is what
-/// keeps a plain member's popover to two verbs instead of a wall of greyed
-/// rows. That rule has to be applied per row, not per section: the
-/// moderation section's own timeout-chips row is absent while a timeout is
-/// already in force (the badge above already carries it), and
-/// `showModeration` must agree with that or a caller who can only time out
-/// still sees a MODERATION header sitting over nothing, for an already
-/// timed-out member.
+/// The profile (header, about, roles, join date) composes in a fixed order
+/// and a section you have no content for is *absent*, never present-and-
+/// empty - a member with no about line shows no about row at all. Actions
+/// follow: Message, a private note, "Moderate...", then Report/Block.
+///
+/// Moderation is one row, not a wall of rows: a "Moderate..." row pushes
+/// [MemberModerateView] into the same popover ([_moderating]), rather than
+/// stacking a second dialog. Members without any moderation right never see
+/// that row at all, so their card is profile + Message + note + Report/Block.
 ///
 /// Everything in the call section is local to this listener and never reaches
-/// the room; anything room-visible sits under the MODERATION label, which is
-/// why "Mute for me" is named the way it is and why a timeout is not next to
+/// the room; anything room-visible sits inside Moderate instead, which is why
+/// "Mute for me" is named the way it is and why a timeout chip is not next to
 /// it.
 library;
 
@@ -44,16 +45,17 @@ import '../routing/routes.dart';
 import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
-import 'member_note_sheet.dart';
-import 'reset_code_sheet.dart';
+import 'member_moderate_view.dart';
 import 'member_profile_bot_commands.dart';
+import 'member_profile_identity.dart';
+import 'member_profile_note_field.dart';
 import 'member_profile_popover.dart';
+import 'member_profile_push_transition.dart';
 import 'member_profile_sections.dart';
-import 'member_roles_sheet.dart';
 import 'run_guarded.dart';
 
 /// The popover's width on a pointer layout, from the design.
-const double _popoverWidth = 280;
+const double _popoverWidth = 300;
 
 /// Opens the profile surface for [profile], anchored to [anchor] where there
 /// is a pointer and presented as a sheet where there is not.
@@ -199,6 +201,11 @@ class MemberProfileBody extends ConsumerStatefulWidget {
 
 class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
     with GuardedActionState<MemberProfileBody> {
+  /// Which half of the card is showing. Local UI state, not provider state:
+  /// nothing outside this popover cares which view it is on, and it must
+  /// reset to the profile every time the popover reopens fresh.
+  bool _moderating = false;
+
   api.UserProfile get _profile {
     // Live, so a timeout applied here repaints as the badge without reopening.
     final live = ref
@@ -307,13 +314,19 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
       unawaited(action(container));
     }
 
-    final rows = <Widget>[
+    final profileRows = <Widget>[
       MemberProfileHeader(
         profile: profile,
         status: widget.status,
         isSelf: isSelf,
         inCallTogether: inCallTogether,
         callChannelName: widget.callChannelName,
+      ),
+      if (profile.about case final about? when about.isNotEmpty)
+        MemberProfileAbout(about: about),
+      MemberProfileRolesAndJoin(
+        roles: profile.roles,
+        createdAt: profile.createdAt,
       ),
 
       if (profile.timedOutUntil != null)
@@ -363,68 +376,16 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
                   profile.username;
             },
           ),
-        MemberNoteMenuItem(
-          host: host,
-          subjectId: profile.id,
-          subjectName: profile.displayName,
-          onDone: widget.onDone,
-        ),
-      ],
-
-      if (showModeration) ...[
-        const AppMenuDivider(),
-        const AppMenuLabel('Moderation'),
-        if (canManageRoles)
+        MemberProfileNoteField(subjectId: profile.id),
+        if (showModeration) ...[
+          const AppMenuDivider(),
           AppMenuItem(
-            label: 'Roles...',
+            label: 'Moderate...',
             leading: AppIcons.shield,
             submenu: true,
-            onTap: () {
-              widget.onDone();
-              unawaited(showMemberRolesSheet(host, profile.id));
-            },
+            onTap: () => setState(() => _moderating = true),
           ),
-        // Absent while one is in force: the badge above already carries it.
-        if (canOfferTimeoutChips) TimeoutDurationChips(onChosen: _timeOut),
-        if (canEject)
-          AppMenuItem(
-            label: 'Eject from call...',
-            leading: AppIcons.leaveCall,
-            tone: AppMenuItemTone.danger,
-            onTap: () {
-              final container = ProviderScope.containerOf(
-                context,
-                listen: false,
-              );
-              final channelId = voiceChannelId;
-              widget.onDone();
-              unawaited(_eject(host, container, channelId));
-            },
-          ),
-        if (canRemove)
-          AppMenuItem(
-            label: 'Remove from Space...',
-            leading: AppIcons.signOut,
-            tone: AppMenuItemTone.danger,
-            onTap: () {
-              final container = ProviderScope.containerOf(
-                context,
-                listen: false,
-              );
-              widget.onDone();
-              unawaited(removeMemberFromSpace(host, container, profile));
-            },
-          ),
-        if (canIssueReset)
-          ResetCodeMenuItem(
-            host: host,
-            subjectId: profile.id,
-            subjectName: profile.displayName,
-            onDone: widget.onDone,
-          ),
-      ],
-
-      if (!isSelf) ...[
+        ],
         const AppMenuDivider(),
         AppMenuItem(
           label: 'Report user',
@@ -449,7 +410,57 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
                 run((container) => blockMember(host, container, profile)),
           ),
       ],
+    ];
 
+    final content = _moderating
+        ? MemberModerateView(
+            profile: profile,
+            host: host,
+            canManageRoles: canManageRoles,
+            canOfferTimeoutChips: canOfferTimeoutChips,
+            canIssueReset: canIssueReset,
+            canRemove: canRemove,
+            canEject: canEject,
+            onBack: () => setState(() => _moderating = false),
+            onTimeOut: _timeOut,
+            onEject: () {
+              final container = ProviderScope.containerOf(
+                context,
+                listen: false,
+              );
+              final channelId = voiceChannelId;
+              widget.onDone();
+              unawaited(_eject(host, container, channelId!));
+            },
+            onRemove: () {
+              final container = ProviderScope.containerOf(
+                context,
+                listen: false,
+              );
+              widget.onDone();
+              unawaited(removeMemberFromSpace(host, container, profile));
+            },
+            onDone: widget.onDone,
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: profileRows,
+          );
+
+    final rows = <Widget>[
+      MemberProfilePushTransition(
+        stateKey: _moderating,
+        onEscape: () {
+          if (_moderating) {
+            setState(() => _moderating = false);
+          } else {
+            widget.onDone();
+          }
+        },
+        child: content,
+      ),
+      // Below the pushed view, not inside it: a Moderate refusal must show without switching views.
       if (actionError != null)
         Padding(
           padding: const EdgeInsets.all(AppSpacing.s8),

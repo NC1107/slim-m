@@ -19,6 +19,8 @@ import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/mock_app_version.dart';
+
 const _tokens = TokenPair(
   userId: 'user-1',
   accessToken: 'access-1',
@@ -85,6 +87,8 @@ List<Override> _overridesFor({
 ];
 
 void main() {
+  setUpAll(mockAppVersion);
+
   group('the https rule', () {
     testWidgets('a public http address is refused before it is sent', (
       tester,

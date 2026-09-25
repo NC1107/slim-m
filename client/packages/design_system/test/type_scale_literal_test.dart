@@ -33,6 +33,8 @@ const _exceptions = {
   '../app/lib/src/widgets/module_command_output.dart',
   // FingerprintDisplay's read-aloud hex groups: ported as-is from the source design.
   '../app/lib/src/widgets/server_fingerprint_step.dart',
+  // The member card's role chip: the design review's own spec names 10pt Mono for it.
+  '../app/lib/src/widgets/member_profile_identity.dart',
 };
 
 final _fontSizeLiteral = RegExp(r'fontSize:\s*([0-9]+(?:\.[0-9]+)?)');

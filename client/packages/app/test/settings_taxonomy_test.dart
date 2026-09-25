@@ -126,7 +126,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('permanent and cannot be undone'),
+      find.textContaining('Cannot be undone'),
       findsOneWidget,
       reason:
           'moving this off the row must not drop it: it is the whole warning '
@@ -141,7 +141,7 @@ void main() {
     await tester.tap(find.text('About slim-m'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Delete account'),
+      find.text('Delete account...'),
       findsNothing,
       reason:
           'permanent and irreversible, so it does not hide behind a pane '
@@ -171,7 +171,7 @@ void main() {
 
     // Present without opening anything, and deletion is not beside it.
     expect(find.text('Sign out'), findsOneWidget);
-    expect(find.text('Delete account'), findsNothing);
+    expect(find.text('Delete account...'), findsNothing);
   });
 
   testWidgets('personal settings never shows Space content', (tester) async {

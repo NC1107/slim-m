@@ -127,7 +127,7 @@ void main() {
     expect(find.byType(ListTile), findsNothing);
     expect(find.byType(AppListRow), findsNothing);
     final button = tester.widget<AppButton>(
-      find.widgetWithText(AppButton, 'Delete account'),
+      find.widgetWithText(AppButton, 'Delete account...'),
     );
     expect(button.variant, AppButtonVariant.danger);
   });

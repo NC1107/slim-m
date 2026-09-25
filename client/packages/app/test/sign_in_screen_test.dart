@@ -22,6 +22,8 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 
+import 'support/mock_app_version.dart';
+
 const _tokens = TokenPair(
   userId: 'user-1',
   accessToken: 'access-1',
@@ -30,6 +32,8 @@ const _tokens = TokenPair(
 );
 
 void main() {
+  setUpAll(mockAppVersion);
+
   testWidgets(
     'a successful sign-in starts sync exactly once, not twice racing to '
     'open the socket',

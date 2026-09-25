@@ -19,6 +19,9 @@ class UserProfile {
     this.roleIds = const [],
     this.timedOutUntil,
     this.statusText,
+    this.pronouns,
+    this.about,
+    this.profileColor,
     this.isBot = false,
     this.isWebhook = false,
   });
@@ -62,6 +65,22 @@ class UserProfile {
   /// unknown rather than as "no status".
   final String? statusText;
 
+  /// A short self-described pronoun set ("she/her"), or null if unset. Shown
+  /// on the member card beside the `@handle`. Absent (not just null) on a
+  /// server older than this field.
+  final String? pronouns;
+
+  /// A short "about" line (190 characters), or null if unset. Shown on the
+  /// member card under the status line. Absent on a server older than this
+  /// field.
+  final String? about;
+
+  /// An index into the design system's closed categorical colour set
+  /// (`AppCanvasColors.cursors`), or null on a server older than this field -
+  /// a caller falls back to a locally computed default in that case, the same
+  /// one the server computes for an account that has not chosen one yet.
+  final int? profileColor;
+
   /// Whether this account is a bot rather than a person, which the interface
   /// draws a badge from. False on a server older than this field: an older
   /// deployment has no bots to mistake anyone for, so reading absent as "not a
@@ -93,6 +112,9 @@ class UserProfile {
             (json['role_ids'] as List<dynamic>?)?.cast<String>() ?? const [],
         timedOutUntil: json['timed_out_until'] as int?,
         statusText: json['status_text'] as String?,
+        pronouns: json['pronouns'] as String?,
+        about: json['about'] as String?,
+        profileColor: json['profile_color'] as int?,
         isBot: json['is_bot'] as bool? ?? false,
         isWebhook: json['is_webhook'] as bool? ?? false,
       );
@@ -112,6 +134,9 @@ class UserProfile {
           avatarUpdatedAt == other.avatarUpdatedAt &&
           timedOutUntil == other.timedOutUntil &&
           statusText == other.statusText &&
+          pronouns == other.pronouns &&
+          about == other.about &&
+          profileColor == other.profileColor &&
           _listEquals(roles, other.roles) &&
           _listEquals(roleIds, other.roleIds));
 
@@ -124,6 +149,9 @@ class UserProfile {
         avatarUpdatedAt,
         timedOutUntil,
         statusText,
+        pronouns,
+        about,
+        profileColor,
         Object.hashAll(roles),
         Object.hashAll(roleIds),
       );
@@ -158,6 +186,9 @@ class Me {
     this.timedOutUntil,
     this.timeoutReason,
     this.statusText,
+    this.pronouns,
+    this.about,
+    this.profileColor,
   });
 
   final String id;
@@ -189,6 +220,15 @@ class Me {
   /// The caller's own status line; same meaning as [UserProfile.statusText].
   final String? statusText;
 
+  /// Same meaning as [UserProfile.pronouns].
+  final String? pronouns;
+
+  /// Same meaning as [UserProfile.about].
+  final String? about;
+
+  /// Same meaning as [UserProfile.profileColor].
+  final int? profileColor;
+
   factory Me.fromJson(Map<String, dynamic> json) => Me(
         id: json['id'] as String,
         username: json['username'] as String,
@@ -199,5 +239,8 @@ class Me {
         timedOutUntil: json['timed_out_until'] as int?,
         timeoutReason: json['timeout_reason'] as String?,
         statusText: json['status_text'] as String?,
+        pronouns: json['pronouns'] as String?,
+        about: json['about'] as String?,
+        profileColor: json['profile_color'] as int?,
       );
 }

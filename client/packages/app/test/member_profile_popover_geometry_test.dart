@@ -46,6 +46,7 @@ Widget _harness(Widget child, {api.UserProfile profile = _other}) =>
       overrides: [
         myPermissionsProvider.overrideWithValue(_fullModeration),
         membersProvider.overrideWith((ref) async => [profile]),
+        rolesProvider.overrideWith((ref) async => const <api.Role>[]),
         botCommandRegistrationProvider(_bot.id).overrideWith(
           (ref) async => api.BotCommandRegistration(
             prefix: '!',
@@ -88,11 +89,18 @@ Widget _anchorRow(double top, api.UserProfile profile) => Positioned(
   ),
 );
 
+/// Opens the popover and returns the rect of [lastItemText] - the whole
+/// (pushed) view's own last row, not just its top items, proof the whole
+/// thing laid out. [enterModerate] pushes into Moderate first, for the two
+/// tests whose tallest content lives there; the bot-commands test's tallest
+/// content is on the profile view itself, so it leaves this false.
 Future<Rect> _openAt(
   WidgetTester tester, {
   required Size window,
   required double anchorTop,
   api.UserProfile profile = _other,
+  bool enterModerate = true,
+  String lastItemText = 'Password reset code...',
 }) async {
   tester.view.physicalSize = window;
   tester.view.devicePixelRatio = 1.0;
@@ -110,8 +118,11 @@ Future<Rect> _openAt(
   await tester.pumpAndSettle();
 
   expect(find.byType(AppMenu), findsOneWidget);
-  // The last row: proof the whole menu, not just its top items, laid out.
-  return tester.getRect(find.text('Password reset code...'));
+  if (enterModerate) {
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
+  }
+  return tester.getRect(find.text(lastItemText));
 }
 
 void main() {
@@ -162,6 +173,8 @@ void main() {
         window: window,
         anchorTop: 640,
         profile: _bot,
+        enterModerate: false,
+        lastItemText: 'Block',
       );
 
       expect(find.textContaining('answers to'), findsOneWidget);

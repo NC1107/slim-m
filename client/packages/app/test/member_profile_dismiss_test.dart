@@ -88,6 +88,7 @@ http.Response _json(Object body) => http.Response(
       databaseProvider.overrideWith((ref) async => db),
       myPermissionsProvider.overrideWithValue(permissions),
       membersProvider.overrideWith((ref) async => [_other]),
+      rolesProvider.overrideWith((ref) async => const <api.Role>[]),
       apiProvider.overrideWith((ref) {
         final client = api.SlimmApi(
           baseUrl: Uri.parse('http://localhost:8080'),
@@ -196,6 +197,8 @@ void main() {
     final wired = _wire(permissions: Perm.banMembers);
     await _open(tester, wired.container);
 
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Remove from Space...'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
