@@ -13,10 +13,12 @@
 /// would have passed on the bug as readily as it passes on the fix.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
 import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
@@ -142,6 +144,77 @@ void main() {
             'context happens to resolve to',
       );
 
+      await harness.container.read(voiceControllerProvider.notifier).leave();
+    },
+  );
+
+  testWidgets(
+    "Moderate... from a tile's quick-actions menu opens the moderation view "
+    'anchored beside that tile',
+    (tester) async {
+      const window = Size(1400, 900);
+      tester.view.physicalSize = window;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final harness = VoiceHarness();
+      final session = FakeSession();
+      final controller = harness.controllerWith(
+        session,
+        voiceApi(),
+        extraOverrides: [
+          voiceRosterProvider.overrideWith(
+            (ref, channelId) =>
+                const Stream<List<api.VoiceRosterParticipant>>.empty(),
+          ),
+          membersProvider.overrideWith((ref) async => [_bobProfile]),
+          myPermissionsProvider.overrideWithValue(Perm.kickMembers),
+          liveEventsProvider.overrideWithValue(const Stream.empty()),
+        ],
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(
+        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
+      );
+      await controller.join('channel-1');
+      session.emitState(VoiceSessionState.connected);
+      await tester.pump();
+      session.emitParticipants(const [_me, _bob]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+      await harness.container.read(membersProvider.future);
+      // autoDispose: the roster holds this in the app; hold it here or the menu reads it unloaded.
+      final members = harness.container.listen(membersProvider, (_, _) {});
+      addTearDown(members.close);
+
+      final tile = find.ancestor(
+        of: find.text('Bob'),
+        matching: find.byType(CallParticipantTile),
+      );
+      final tileRect = tester.getRect(tile);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('film-user-bob'))),
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryMouseButton,
+      );
+      await tester.pump(kPressTimeout + const Duration(milliseconds: 20));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.text('Moderate...'), findsOneWidget);
+      await tester.tap(find.text('Moderate...'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppMenu), findsOneWidget, reason: 'the profile card');
+      final popoverRect = tester.getRect(find.byType(AppMenu));
+      final flushTop = (popoverRect.top - tileRect.top).abs() < 1;
+      final flushBottom = (popoverRect.bottom - tileRect.bottom).abs() < 1;
+      expect(
+        flushTop || flushBottom,
+        isTrue,
+        reason:
+            'moderation view at top ${popoverRect.top}/bottom '
+            '${popoverRect.bottom} vs tile ${tileRect.top}/${tileRect.bottom} '
+            '- it must anchor to the tile the menu was opened from',
+      );
       await harness.container.read(voiceControllerProvider.notifier).leave();
     },
   );

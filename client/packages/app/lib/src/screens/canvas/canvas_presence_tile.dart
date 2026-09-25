@@ -175,7 +175,8 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   final Size? fixedRenderSize;
 
   /// Forwarded to `CanvasPresenceTileContextMenu.participantItemsBuilder` - see that field's own doc. Null for this device's own tile.
-  final List<Widget> Function(VoidCallback close)? participantItemsBuilder;
+  final List<Widget> Function(BuildContext tileContext, VoidCallback close)?
+  participantItemsBuilder;
   @override
   State<CanvasPresenceManipulableTile> createState() =>
       _CanvasPresenceManipulableTileState();

@@ -78,7 +78,8 @@ class CanvasPresenceTileContextMenu extends StatefulWidget {
   /// fresh every time this menu opens, the same "never stale" contract
   /// `ContextMenuRegion.itemsBuilder` already documents, and null for this
   /// device's own tile, which has nothing to say about itself here.
-  final List<Widget> Function(VoidCallback close)? participantItemsBuilder;
+  final List<Widget> Function(BuildContext tileContext, VoidCallback close)?
+  participantItemsBuilder;
 
   @override
   State<CanvasPresenceTileContextMenu> createState() =>
@@ -129,8 +130,8 @@ class _CanvasPresenceTileContextMenuState
   }
 
   List<Widget> get _items => [
-    if (widget.participantItemsBuilder?.call(_close) case final participant?
-        when participant.isNotEmpty) ...[
+    if (widget.participantItemsBuilder?.call(context, _close)
+        case final participant? when participant.isNotEmpty) ...[
       ...participant,
       const AppMenuDivider(),
     ],
