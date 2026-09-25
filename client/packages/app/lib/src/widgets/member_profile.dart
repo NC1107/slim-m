@@ -442,7 +442,11 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             },
             onDone: widget.onDone,
           )
-        : Column(mainAxisSize: MainAxisSize.min, children: profileRows);
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: profileRows,
+          );
 
     final rows = <Widget>[
       MemberProfilePushTransition(

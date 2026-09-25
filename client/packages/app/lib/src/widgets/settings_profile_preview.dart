@@ -45,6 +45,7 @@ class SettingsProfilePreview extends ConsumerWidget {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               MemberProfileHeader(
                 profile: profile,
