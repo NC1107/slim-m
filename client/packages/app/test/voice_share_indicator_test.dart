@@ -135,36 +135,109 @@ void main() {
       await controller.leave();
     });
 
-    testWidgets('your own share gets the banner, and the stage too', (
-      tester,
-    ) async {
-      final session = FakeSession();
-      final controller = harness.controllerWith(session, voiceApi());
-      await controller.join('channel-1');
-      session.emitState(VoiceSessionState.connected);
+    testWidgets(
+      'your own share gets the stage, without the banner stacked on top of '
+      'it',
+      (tester) async {
+        final session = FakeSession();
+        final controller = harness.controllerWith(session, voiceApi());
+        await controller.join('channel-1');
+        session.emitState(VoiceSessionState.connected);
 
-      await tester.pumpWidget(
-        _harness(const VoiceScreen(channelId: 'channel-1'), harness.container),
-      );
-      await tester.pump();
-      session.emitParticipants(const [
-        VoiceParticipant(
-          identity: 'me',
-          name: 'Me',
-          isSpeaking: false,
-          isMuted: false,
-          isLocal: true,
-          isScreenSharing: true,
-        ),
-      ]);
-      await tester.pump();
+        await tester.pumpWidget(
+          _harness(
+            const VoiceScreen(channelId: 'channel-1'),
+            harness.container,
+          ),
+        );
+        await tester.pump();
+        session.emitParticipants(const [
+          VoiceParticipant(
+            identity: 'me',
+            name: 'Me',
+            isSpeaking: false,
+            isMuted: false,
+            isLocal: true,
+            isScreenSharing: true,
+          ),
+        ]);
+        await tester.pump();
 
-      // Alone in the call used to show nothing; the stage now falls back to your own share, alongside the banner.
-      expect(find.text('You are sharing your screen.'), findsOneWidget);
-      expect(find.byKey(const Key('fake-share-view-me')), findsOneWidget);
-      expect(find.text('Your screen'), findsOneWidget);
-      await controller.leave();
-    });
+        // The stage's own "Your screen" caption already says you are
+        // sharing; the banner would only repeat it.
+        expect(find.text('You are sharing your screen.'), findsNothing);
+        expect(find.byKey(const Key('fake-share-view-me')), findsOneWidget);
+        expect(find.text('Your screen'), findsOneWidget);
+        await controller.leave();
+      },
+    );
+
+    testWidgets(
+      'the banner still covers the beat before the roster has anyone to '
+      'put on stage',
+      (tester) async {
+        final session = FakeSession();
+        final controller = harness.controllerWith(session, voiceApi());
+        await controller.join('channel-1');
+        session.emitState(VoiceSessionState.connected);
+
+        await tester.pumpWidget(
+          _harness(
+            const VoiceScreen(channelId: 'channel-1'),
+            harness.container,
+          ),
+        );
+        await tester.pump();
+        await controller.setScreenShare(true);
+        await tester.pump();
+
+        expect(find.text('You are sharing your screen.'), findsOneWidget);
+        expect(find.byKey(const Key('fake-share-view-me')), findsNothing);
+        await controller.leave();
+      },
+    );
+
+    testWidgets(
+      'a remote sharer taking the stage over you keeps the banner, since '
+      "the stage's caption is naming someone else",
+      (tester) async {
+        final session = FakeSession();
+        final controller = harness.controllerWith(session, voiceApi());
+        await controller.join('channel-1');
+        session.emitState(VoiceSessionState.connected);
+
+        await tester.pumpWidget(
+          _harness(
+            const VoiceScreen(channelId: 'channel-1'),
+            harness.container,
+          ),
+        );
+        await tester.pump();
+        session.emitParticipants(const [
+          VoiceParticipant(
+            identity: 'me',
+            name: 'Me',
+            isSpeaking: false,
+            isMuted: false,
+            isLocal: true,
+            isScreenSharing: true,
+          ),
+          VoiceParticipant(
+            identity: 'peer-1',
+            name: 'Ada',
+            isSpeaking: false,
+            isMuted: false,
+            isLocal: false,
+            isScreenSharing: true,
+          ),
+        ]);
+        await tester.pump();
+
+        expect(find.text("Ada's screen"), findsOneWidget);
+        expect(find.text('You are sharing your screen.'), findsOneWidget);
+        await controller.leave();
+      },
+    );
   });
 
   group('the camera self preview', () {

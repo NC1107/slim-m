@@ -77,8 +77,8 @@ class CallStageLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _CallHeader(voice: voice),
-          // Pinned above the stage: a per-row glyph is too easy to scroll past.
-          if (voice.screenSharing)
+          // Withheld once the mirrored stage tile already says the same thing via its own caption.
+          if (voice.screenSharing && sharer?.isLocal != true)
             const Padding(
               padding: EdgeInsets.only(top: AppSpacing.s12),
               child: LocalScreenShareBanner(),
