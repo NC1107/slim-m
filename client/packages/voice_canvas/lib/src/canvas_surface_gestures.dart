@@ -90,6 +90,8 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
         _pendingPlacementWorld = _toWorld(event.localPosition);
         _shapeDraft.begin(event.localPosition, widget.shapeKind);
       case CanvasTool.pen:
+        // Pan is the middle button, so a right-press reaches here; it opens the menu, it does not draw.
+        if (event.buttons & kPrimaryButton == 0) return;
         _draft.begin(event.localPosition);
         widget.onDraftPoint?.call(_toWorld(event.localPosition));
     }
@@ -143,7 +145,11 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     widget.onPointerMoved?.call(_toWorld(event.localPosition));
   }
 
+  /// `wasAlone` is read before the decrement below: a second finger a presence
+  /// tile absorbed never reaches [_down], so this is the only place a one-point
+  /// draft can still learn it was never alone.
   void _up(PointerEvent event) {
+    final wasAlone = _totalPointers <= 1;
     _pointers = (_pointers - 1).clamp(0, 10);
     if (_panning.value) {
       // An unrelated pointer lifting (a second finger, say) must not end someone else's grab.
@@ -169,6 +175,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
         final screen = _draft.take();
         widget.onDraftEnded?.call();
         // A single point still commits: it paints as a dot, not nothing.
+        if (screen.length < 2 && !wasAlone) return;
         widget.onStroke(screen.map(_toWorld).toList(growable: false));
     }
   }
