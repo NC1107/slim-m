@@ -68,7 +68,9 @@ class _NotificationScheduleSectionState
     final endMinute = end.hour * 60 + end.minute;
     final ok = await guard(
       whatFailed: 'update your notification schedule',
-      action: () => ref.read(apiProvider).setNotificationSchedule(
+      action: () => ref
+          .read(apiProvider)
+          .setNotificationSchedule(
             timezone: timezone,
             offHoursMode: mode,
             days: [
@@ -122,7 +124,10 @@ class _NotificationScheduleSectionState
     TimeOfDay start,
     TimeOfDay end,
   ) async {
-    final pickedStart = await showTimePicker(context: context, initialTime: start);
+    final pickedStart = await showTimePicker(
+      context: context,
+      initialTime: start,
+    );
     if (pickedStart == null || !mounted) return;
     final pickedEnd = await showTimePicker(context: context, initialTime: end);
     if (pickedEnd == null) return;
@@ -166,11 +171,18 @@ class _NotificationScheduleSectionState
         : null;
     final start = firstDay == null
         ? _defaultStart
-        : TimeOfDay(hour: firstDay.startMinute ~/ 60, minute: firstDay.startMinute % 60);
+        : TimeOfDay(
+            hour: firstDay.startMinute ~/ 60,
+            minute: firstDay.startMinute % 60,
+          );
     final end = firstDay == null
         ? _defaultEnd
-        : TimeOfDay(hour: firstDay.endMinute ~/ 60, minute: firstDay.endMinute % 60);
-    final activeWeekdays = current?.days.map((d) => d.weekday).toSet() ?? const {};
+        : TimeOfDay(
+            hour: firstDay.endMinute ~/ 60,
+            minute: firstDay.endMinute % 60,
+          );
+    final activeWeekdays =
+        current?.days.map((d) => d.weekday).toSet() ?? const {};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,10 +336,8 @@ class _SnoozeRow extends StatelessWidget {
   final api.NotificationSchedule schedule;
   final Guard guard;
 
-  Future<void> _snoozeFor(WidgetRef ref, Duration duration) => _apply(
-        ref,
-        DateTime.now().add(duration).millisecondsSinceEpoch,
-      );
+  Future<void> _snoozeFor(WidgetRef ref, Duration duration) =>
+      _apply(ref, DateTime.now().add(duration).millisecondsSinceEpoch);
 
   Future<void> _snoozeUntilTomorrow(WidgetRef ref) {
     final now = DateTime.now();
@@ -338,7 +348,8 @@ class _SnoozeRow extends StatelessWidget {
   Future<void> _apply(WidgetRef ref, int untilMs) async {
     final ok = await guard(
       whatFailed: 'snooze your notifications',
-      action: () => ref.read(apiProvider).setNotificationSnooze(untilMs).then((_) {}),
+      action: () =>
+          ref.read(apiProvider).setNotificationSnooze(untilMs).then((_) {}),
     );
     if (ok) ref.invalidate(notificationScheduleProvider);
   }

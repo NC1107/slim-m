@@ -123,7 +123,9 @@ void main() {
           putBody = jsonDecode(request.body) as Map<String, dynamic>;
           configured = true;
           return _json({
-            'schedule': _scheduleJson(offHoursMode: putBody!['off_hours_mode'] as String),
+            'schedule': _scheduleJson(
+              offHoursMode: putBody!['off_hours_mode'] as String,
+            ),
           });
         }
         return _json({'schedule': configured ? _scheduleJson() : null});
@@ -131,7 +133,7 @@ void main() {
       return http.Response('', 404);
     });
 
-    await tester.tap(find.text('Notification schedule'));
+    await tester.tap(find.byType(AppToggle));
     await tester.pumpAndSettle();
 
     expect(putBody, isNotNull);
@@ -164,10 +166,7 @@ void main() {
       }
       return http.Response('', 404);
     });
-    await pumpEventQueue();
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.bySemanticsLabel('Monday, on'));
+    await tester.tap(find.text('M').first);
     await tester.pumpAndSettle();
 
     expect(lastPutBody, isNotNull);
@@ -185,7 +184,8 @@ void main() {
       if (request.url.path == '/notifications/schedule') {
         if (request.method == 'PUT') {
           mode =
-              (jsonDecode(request.body) as Map<String, dynamic>)['off_hours_mode']
+              (jsonDecode(request.body)
+                      as Map<String, dynamic>)['off_hours_mode']
                   as String;
         }
         return _json({'schedule': _scheduleJson(offHoursMode: mode)});
@@ -212,9 +212,7 @@ void main() {
         return _json({'snooze_until': snoozeUntil});
       }
       if (request.url.path == '/notifications/schedule') {
-        return _json({
-          'schedule': _scheduleJson(snoozeUntil: snoozeUntil),
-        });
+        return _json({'schedule': _scheduleJson(snoozeUntil: snoozeUntil)});
       }
       return http.Response('', 404);
     });
