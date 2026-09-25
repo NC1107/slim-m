@@ -12,7 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
-import 'dock_command_panel.dart';
+import 'dock_command_panel_group.dart';
 import 'dock_what_it_adds.dart';
 
 /// A module's manifest, plus the lifecycle action appropriate to
@@ -97,9 +97,13 @@ class DockManifestView extends StatelessWidget {
           const SizedBox(height: AppSpacing.s8),
           AppErrorState(message: error!, onDismiss: onErrorDismiss),
         ],
-        for (final ep in _runnableCommands(installed)) ...[
+        if (_runnableCommands(installed) case final commands
+            when commands.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.s16),
-          DockCommandPanel(moduleId: installed!.id, extensionPoint: ep),
+          DockCommandPanelGroup(
+            moduleId: installed!.id,
+            extensionPoints: commands,
+          ),
         ],
       ],
     );
