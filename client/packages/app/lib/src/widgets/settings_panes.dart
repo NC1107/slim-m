@@ -72,7 +72,7 @@ class SettingsPane {
   final List<Widget>? actions;
 }
 
-/// A run of panes, usually under a heading: `YOU`, `SAFETY`.
+/// A run of panes, usually under a heading: `You`, `Safety`.
 class SettingsPaneGroup {
   const SettingsPaneGroup({required this.panes, this.label});
 
@@ -247,6 +247,15 @@ class _PaneBody extends StatelessWidget {
   );
 }
 
+/// One rule for every settings nav (design review note 19, applied here and
+/// to Space settings, which shares this widget): a group label is mono, faint
+/// and sentence case, with a hairline above it, rather than the small-caps
+/// sans label this nav used to borrow from [AppCard]'s own header.
+///
+/// That label was written to sit above a card's body, not beside a 20px pane
+/// icon. At the same size the icon outweighed it, so a caps label on its own
+/// row read as another nav row rather than the heading over the rows; the
+/// hairline and the quieter colour are what separate it now, not its size.
 class _Nav extends StatelessWidget {
   const _Nav({
     required this.groups,
@@ -276,19 +285,23 @@ class _Nav extends StatelessWidget {
             children: [
               for (final group in groups) ...[
                 if (group.label case final label?)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      10,
-                      AppSpacing.s12,
-                      10,
-                      6,
+                  Container(
+                    margin: const EdgeInsets.only(top: AppSpacing.s12),
+                    padding: const EdgeInsets.fromLTRB(10, 14, 10, 6),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: tokens.borderSubtle),
+                      ),
                     ),
                     child: Semantics(
                       header: true,
                       child: Text(
-                        label.toUpperCase(),
-                        style: AppText.label.copyWith(
-                          color: tokens.textSecondary,
+                        label,
+                        style: AppText.code.copyWith(
+                          fontSize: AppText.micro.fontSize,
+                          fontWeight: AppWeights.medium,
+                          letterSpacing: 1,
+                          color: tokens.textDisabled,
                         ),
                       ),
                     ),
