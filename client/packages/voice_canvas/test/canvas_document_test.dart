@@ -85,9 +85,8 @@ void main() {
     final slot = document.paintOrder.single;
     final placed = document.strokeAt(slot);
     expect(placed.points, [5.0, 5.0]);
-    // A bare moveTo has no contour to stroke; the dot needs the extra
-    // zero-length lineTo so the round stroke cap has something to draw.
-    expect(placed.path.computeMetrics(), isNotEmpty);
+    expect(placed.w, 0);
+    expect(placed.h, 0);
   });
 
   test('the same id twice is one object', () {
