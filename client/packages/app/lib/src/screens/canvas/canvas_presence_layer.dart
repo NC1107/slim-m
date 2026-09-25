@@ -117,6 +117,7 @@ class CanvasPresenceLayer extends StatefulWidget {
     this.hideSelfCamera = false,
     this.layout = const CanvasPresenceLayout(),
     this.tool = CanvasTool.select,
+    this.participantMenuItemsBuilder,
   });
 
   final CanvasDocument document;
@@ -165,6 +166,18 @@ class CanvasPresenceLayer extends StatefulWidget {
   /// face, not about whatever this device is sharing.
   final bool hideSelfCamera;
   final CanvasPresenceLayout layout;
+
+  /// This tile's own quick-actions rows - volume, mute for me, view
+  /// profile, moderate - for whichever participant a tile belongs to; null
+  /// renders no extra rows at all, and this device's own tile never gets
+  /// any regardless (`participant_call_menu.dart`'s own
+  /// `participantCallMenuItems` already answers empty for `isLocal`).
+  final List<Widget> Function(
+    BuildContext context,
+    VoiceParticipant participant,
+    VoidCallback close,
+  )?
+  participantMenuItemsBuilder;
 
   @override
   State<CanvasPresenceLayer> createState() => _CanvasPresenceLayerState();
@@ -371,6 +384,13 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
               commit();
             },
       onHide: () => widget.overrides.setHidden(key, true),
+      participantItemsBuilder: widget.participantMenuItemsBuilder == null
+          ? null
+          : (close) => widget.participantMenuItemsBuilder!(
+              context,
+              participant,
+              close,
+            ),
       // A camera tile showing the avatar fallback has no feed to fill a screen with; a screen-share tile always does, since its key only exists while the share is up.
       onExpand: isScreen || participant.isCameraOn
           ? () => unawaited(_expand(key, participant, isScreen))

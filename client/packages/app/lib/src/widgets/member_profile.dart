@@ -30,22 +30,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_rtc/rtc.dart';
 
-import '../permissions.dart';
-import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
-import '../providers/channel_permissions.dart';
 import '../providers/dms.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
-import '../providers/voice_flags.dart';
 import '../routing/routes.dart';
 import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_moderate_view.dart';
+import 'member_moderation_gates.dart';
 import 'member_notify_off_hours_item.dart';
 import 'member_profile_bot_commands.dart';
 import 'member_profile_identity.dart';
@@ -53,6 +49,7 @@ import 'member_profile_note_field.dart';
 import 'member_profile_popover.dart';
 import 'member_profile_push_transition.dart';
 import 'member_profile_sections.dart';
+import 'participant_audio_controls.dart' show MemberLocalAudioSection;
 import 'run_guarded.dart';
 
 /// The popover's width on a pointer layout, from the design.
@@ -78,6 +75,7 @@ Future<void> showMemberProfile(
   required AppPresence status,
   String? mentionChannelName,
   String? callChannelName,
+  bool initiallyModerating = false,
 }) {
   // Read before anything pops: a popped context has no navigator above it.
   final host = Navigator.of(anchor, rootNavigator: true).context;
@@ -104,6 +102,7 @@ Future<void> showMemberProfile(
           compact: true,
           host: host,
           memberPaneScaffold: memberPaneScaffold,
+          initiallyModerating: initiallyModerating,
           onDone: () => Navigator.of(context).pop(),
         ),
       ),
@@ -134,6 +133,7 @@ Future<void> showMemberProfile(
         compact: false,
         host: host,
         memberPaneScaffold: memberPaneScaffold,
+        initiallyModerating: initiallyModerating,
         onDone: () => Navigator.of(context).pop(),
       ),
     ),
@@ -170,10 +170,17 @@ class MemberProfileBody extends ConsumerStatefulWidget {
     this.callChannelName,
     this.host,
     this.memberPaneScaffold,
+    this.initiallyModerating = false,
   });
 
   final api.UserProfile profile;
   final AppPresence status;
+
+  /// Opens straight onto [MemberModerateView] rather than the profile - a
+  /// quick-actions menu's own "Moderate..." row uses this so tapping it does
+  /// not land on a profile the caller already knows, one screen before the
+  /// moderation the row promised.
+  final bool initiallyModerating;
 
   /// Named so "Mention in #general" can say which channel; absent where
   /// there is no channel in view, and the row goes with it.
@@ -205,7 +212,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
   /// Which half of the card is showing. Local UI state, not provider state:
   /// nothing outside this popover cares which view it is on, and it must
   /// reset to the profile every time the popover reopens fresh.
-  bool _moderating = false;
+  late bool _moderating = widget.initiallyModerating;
 
   api.UserProfile get _profile {
     // Live, so a timeout applied here repaints as the badge without reopening.
@@ -269,44 +276,20 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
-    final me = ref.watch(meProvider).valueOrNull;
-    final isSelf = me?.id == profile.id;
-    final mine = ref.watch(myPermissionsProvider);
-    // Narrowed: this popover has no use for mic/camera flags, only state and channel.
-    final (voiceState, voiceChannelId) = ref.watch(
-      voiceFlagsProvider.select((f) => (f.state, f.channelId)),
-    );
-    final participants = ref.watch(voiceParticipantsProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
     final host = widget.host ?? context;
 
-    // The call section exists only while you share a call: it is about your ears in this room, not the person.
-    final inCallTogether =
-        voiceState == VoiceSessionState.connected &&
-        participants.any((p) => p.identity == profile.id && !p.isLocal);
-
-    final canTimeOut = !isSelf && mine.hasPermission(Perm.kickMembers);
-    final canRemove = !isSelf && mine.hasPermission(Perm.banMembers);
-    final canManageRoles = !isSelf && mine.hasPermission(Perm.manageRoles);
-    final canIssueReset = !isSelf && mine.hasPermission(Perm.administrator);
-    // The voice kick handler checks KICK_MEMBERS in this call's own channel, since an overwrite may grant it there alone.
-    final voiceChannelPermissions = voiceChannelId != null
-        ? ref.watch(myChannelPermissionsProvider(voiceChannelId))
-        : 0;
-    // Needs a room to evict them from, not just the bit; the call section above already answers that.
-    final canEject =
-        !isSelf &&
-        inCallTogether &&
-        voiceChannelId != null &&
-        voiceChannelPermissions.hasPermission(Perm.kickMembers);
-    // See the library doc above for why this must agree with showModeration.
-    final canOfferTimeoutChips = canTimeOut && profile.timedOutUntil == null;
-    final showModeration =
-        canOfferTimeoutChips ||
-        canRemove ||
-        canManageRoles ||
-        canEject ||
-        canIssueReset;
+    final gates = memberModerationGates(ref, profile: profile);
+    final isSelf = gates.isSelf;
+    final inCallTogether = gates.inCallTogether;
+    final voiceChannelId = gates.voiceChannelId;
+    final canTimeOut = gates.canTimeOut;
+    final canRemove = gates.canRemove;
+    final canManageRoles = gates.canManageRoles;
+    final canIssueReset = gates.canIssueReset;
+    final canEject = gates.canEject;
+    final canOfferTimeoutChips = gates.canOfferTimeoutChips;
+    final showModeration = gates.showModeration;
 
     // Captured before onDone, whose Navigator.pop disposes this element.
     void run(Future<void> Function(ProviderContainer container) action) {

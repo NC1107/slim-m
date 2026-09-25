@@ -28,6 +28,7 @@ import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
+import '../widgets/participant_call_menu.dart';
 import '../widgets/voice_reconnect_banner.dart';
 import 'voice_call_dock.dart';
 import 'voice_join_preview.dart';
@@ -232,6 +233,13 @@ class _InCall extends ConsumerWidget {
           controller: controller,
           onOpenProfile: (anchor, p) => _openProfile(anchor, ref, p),
           isDm: isDm,
+          menuItemsBuilder: (context, participant, close) =>
+              participantCallMenuItems(
+                context,
+                ref,
+                participant: participant,
+                close: close,
+              ),
         ),
         // A bounded auto-rejoin in progress: see voice_screen.dart's own stage comment.
         if (voice.rejoining)

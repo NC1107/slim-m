@@ -40,6 +40,7 @@ import '../../providers/channel_permissions.dart';
 import '../../providers/providers.dart';
 import '../../providers/voice_controller.dart';
 import '../../providers/voice_flags.dart';
+import '../../widgets/participant_call_menu.dart';
 import 'canvas_activity_log.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_commit_queue.dart';
@@ -244,6 +245,13 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
             ref.read(voiceControllerProvider.notifier),
             widget.channelId,
           ),
+          participantMenuItemsBuilder: (context, participant, close) =>
+              participantCallMenuItems(
+                context,
+                ref,
+                participant: participant,
+                close: close,
+              ),
         ),
       ),
     );

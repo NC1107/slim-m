@@ -21,6 +21,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../format.dart';
+import 'context_menu_region.dart';
 import 'fullscreen_video_overlay.dart';
 import 'user_avatar.dart';
 
@@ -93,6 +94,7 @@ class CallParticipantTile extends StatelessWidget {
     this.cameraView,
     this.onExpand,
     this.width = kCallTileMinWidth,
+    this.contextMenuItemsBuilder,
   });
 
   final VoiceParticipant participant;
@@ -102,9 +104,7 @@ class CallParticipantTile extends StatelessWidget {
   /// pass a size fit to the available room; see [callGridTileWidth].
   final double width;
 
-  /// Opens this participant's profile. The only route to per-participant
-  /// volume that does not go through the member pane, which is the wrong
-  /// place to look for it while you are staring at the person talking.
+  /// Opens this participant's profile.
   ///
   /// Takes this tile's own [BuildContext] - captured here, inside [build],
   /// rather than upstream in whatever list or wrap laid this tile out. A
@@ -112,6 +112,15 @@ class CallParticipantTile extends StatelessWidget {
   /// this tile's box, so a popover anchored from it lands on the wrong
   /// widget entirely.
   final void Function(BuildContext anchor)? onTap;
+
+  /// The volume/mute/profile/moderate rows a right-click or long-press
+  /// opens - `participant_call_menu.dart`'s own `participantCallMenuItems`,
+  /// shared with the canvas bubble's own context menu so the two never
+  /// offer a different set for the same person. Null renders no menu at
+  /// all, leaving a right-click inert - the same "absent, never disabled"
+  /// shape every other optional row in this app follows.
+  final List<Widget> Function(BuildContext, VoidCallback close)?
+  contextMenuItemsBuilder;
 
   /// This participant's live camera feed, from
   /// `VoiceController.cameraViewFor` - null whenever there is nothing to show
@@ -145,7 +154,7 @@ class CallParticipantTile extends StatelessWidget {
     final avatarSize = width * 64 / kCallTileMinWidth;
     // This build's own context, so a popover anchors to this tile - see [onTap]'s doc.
     final onTapHere = onTap == null ? null : () => onTap!(context);
-    return Stack(
+    Widget tile = Stack(
       clipBehavior: Clip.none,
       children: [
         Semantics(
@@ -156,8 +165,6 @@ class CallParticipantTile extends StatelessWidget {
           child: ExcludeSemantics(
             child: GestureDetector(
               onTap: onTapHere,
-              // Right-click reaches the same profile a tap already opens.
-              onSecondaryTapDown: onTapHere == null ? null : (_) => onTapHere(),
               child: AnimatedSize(
                 duration: AppMotion.reduced(context, AppMotion.base),
                 curve: AppMotion.entrance,
@@ -247,6 +254,10 @@ class CallParticipantTile extends StatelessWidget {
           ),
       ],
     );
+    if (contextMenuItemsBuilder case final itemsBuilder?) {
+      tile = ContextMenuRegion(itemsBuilder: itemsBuilder, child: tile);
+    }
+    return tile;
   }
 }
 
