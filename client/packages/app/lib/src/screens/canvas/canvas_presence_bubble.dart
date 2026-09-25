@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RendererBinding;
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
@@ -152,31 +153,88 @@ class _AvatarMarker extends StatelessWidget {
 /// A screen-share tile: no speaking ring or mic glyph, since sharing a
 /// screen carries no audio state of its own worth badging - only whose
 /// screen it is.
-class CanvasScreenShareBubble extends StatelessWidget {
+///
+/// The name badge shows on hover rather than sitting permanently over the
+/// share - report directly from the owner: a permanent chip crowded the
+/// video underneath it. Hover is an input capability, not a width one (this
+/// file otherwise never branches on anything but layout), so it is read from
+/// [RendererBinding.mouseTracker] rather than a platform check: whenever a
+/// hover-capable pointer is connected, the badge stays hidden until this
+/// tile is actually hovered; on a pure touch device, where hover can never
+/// fire, it stays always-on rather than becoming unreachable information -
+/// someone joining mid-call still has to be able to tell whose screen this
+/// is. [interactive] is false for the one context that can never hover at
+/// all: a tile sent to back and painted through `CanvasPresenceBackdrop`,
+/// which is `IgnorePointer`-wrapped end to end, so the badge stays always-on
+/// there too rather than a reveal nothing can ever trigger.
+class CanvasScreenShareBubble extends StatefulWidget {
   const CanvasScreenShareBubble({
     super.key,
     required this.participant,
     required this.view,
+    this.interactive = true,
   });
 
   final VoiceParticipant participant;
   final Widget view;
+  final bool interactive;
+
+  @override
+  State<CanvasScreenShareBubble> createState() =>
+      _CanvasScreenShareBubbleState();
+}
+
+class _CanvasScreenShareBubbleState extends State<CanvasScreenShareBubble> {
+  bool _hovering = false;
+  late bool _mouseConnected =
+      RendererBinding.instance.mouseTracker.mouseIsConnected;
+
+  void _onMouseTrackerChanged() {
+    final connected = RendererBinding.instance.mouseTracker.mouseIsConnected;
+    if (connected == _mouseConnected) return;
+    setState(() => _mouseConnected = connected);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    RendererBinding.instance.mouseTracker.addListener(_onMouseTrackerChanged);
+  }
+
+  @override
+  void dispose() {
+    RendererBinding.instance.mouseTracker.removeListener(
+      _onMouseTrackerChanged,
+    );
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return _TileChrome(
+    final revealed = !widget.interactive || !_mouseConnected || _hovering;
+    final chrome = _TileChrome(
       tokens: tokens,
       body: DecoratedBox(
         decoration: const BoxDecoration(color: Color(0xFF000000)),
-        child: view,
+        child: widget.view,
       ),
-      badge: _NameBadge(
-        name: participant.isLocal
-            ? 'Your screen'
-            : "${participant.name}'s screen",
-        icon: AppIcons.screenShare,
+      badge: AnimatedOpacity(
+        opacity: revealed ? 1 : 0,
+        duration: AppMotion.reduced(context, AppMotion.fast),
+        child: _NameBadge(
+          name: widget.participant.isLocal
+              ? 'Your screen'
+              : "${widget.participant.name}'s screen",
+          icon: AppIcons.screenShare,
+        ),
       ),
+    );
+    if (!widget.interactive) return chrome;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: chrome,
     );
   }
 }

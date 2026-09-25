@@ -55,24 +55,85 @@ void main() {
     expect(find.textContaining('!roll'), findsOneWidget);
   });
 
-  testWidgets('a command list past the cap collapses into a "+N more" line', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        'bot-1',
-        api.BotCommandRegistration(
-          prefix: '!',
-          commands: [
-            for (var i = 0; i < 12; i++)
-              api.RegisteredBotCommand(name: 'cmd$i', description: 'd$i'),
-          ],
+  testWidgets(
+    'a command list past the collapsed count folds into a "Show N more" row '
+    'rather than running the card out to its full length',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          'bot-1',
+          api.BotCommandRegistration(
+            prefix: '!',
+            commands: [
+              for (var i = 0; i < 12; i++)
+                api.RegisteredBotCommand(name: 'cmd$i', description: 'd$i'),
+            ],
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(find.textContaining('+4 more'), findsOneWidget);
-    expect(find.textContaining('!cmd11'), findsNothing);
-  });
+      expect(find.textContaining('Show 9 more'), findsOneWidget);
+      expect(find.textContaining('!cmd2'), findsOneWidget);
+      expect(find.textContaining('!cmd3'), findsNothing);
+      expect(find.textContaining('!cmd11'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'tapping "Show N more" reveals every command, and "Show less" folds '
+    'them back',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          'bot-1',
+          api.BotCommandRegistration(
+            prefix: '!',
+            commands: [
+              for (var i = 0; i < 12; i++)
+                api.RegisteredBotCommand(name: 'cmd$i', description: 'd$i'),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.textContaining('Show 9 more'));
+      await tester.pump();
+
+      expect(
+        find.textContaining('!cmd11'),
+        findsOneWidget,
+        reason: 'every command has to stay reachable once expanded',
+      );
+      expect(find.textContaining('Show less'), findsOneWidget);
+
+      await tester.tap(find.text('Show less'));
+      await tester.pump();
+
+      expect(find.textContaining('!cmd11'), findsNothing);
+      expect(find.textContaining('Show 9 more'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a command list at or under the collapsed count carries no toggle at all',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          'bot-1',
+          const api.BotCommandRegistration(
+            prefix: '!',
+            commands: [
+              api.RegisteredBotCommand(name: 'ping', description: "I'm alive"),
+              api.RegisteredBotCommand(name: 'roll', description: 'roll dice'),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('Show'), findsNothing);
+    },
+  );
 }

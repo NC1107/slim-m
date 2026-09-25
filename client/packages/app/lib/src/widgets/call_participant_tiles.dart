@@ -105,7 +105,13 @@ class CallParticipantTile extends StatelessWidget {
   /// Opens this participant's profile. The only route to per-participant
   /// volume that does not go through the member pane, which is the wrong
   /// place to look for it while you are staring at the person talking.
-  final VoidCallback? onTap;
+  ///
+  /// Takes this tile's own [BuildContext] - captured here, inside [build],
+  /// rather than upstream in whatever list or wrap laid this tile out. A
+  /// caller's own itemBuilder context resolves to the list's sliver, not
+  /// this tile's box, so a popover anchored from it lands on the wrong
+  /// widget entirely.
+  final void Function(BuildContext anchor)? onTap;
 
   /// This participant's live camera feed, from
   /// `VoiceController.cameraViewFor` - null whenever there is nothing to show
@@ -137,6 +143,8 @@ class CallParticipantTile extends StatelessWidget {
     final videoHeight = width * _kCallTileVideoAspect;
     // 64 on the original 112px tile - grows with it, never past what a tile this wide has room for.
     final avatarSize = width * 64 / kCallTileMinWidth;
+    // This build's own context, so a popover anchors to this tile - see [onTap]'s doc.
+    final onTapHere = onTap == null ? null : () => onTap!(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -144,12 +152,12 @@ class CallParticipantTile extends StatelessWidget {
           container: true,
           label: _semanticLabel,
           button: onTap != null,
-          onTap: onTap,
+          onTap: onTapHere,
           child: ExcludeSemantics(
             child: GestureDetector(
-              onTap: onTap,
+              onTap: onTapHere,
               // Right-click reaches the same profile a tap already opens.
-              onSecondaryTapDown: onTap == null ? null : (_) => onTap!(),
+              onSecondaryTapDown: onTapHere == null ? null : (_) => onTapHere(),
               child: AnimatedSize(
                 duration: AppMotion.reduced(context, AppMotion.base),
                 curve: AppMotion.entrance,

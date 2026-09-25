@@ -230,7 +230,7 @@ class _InCall extends ConsumerWidget {
         CallStageLayout(
           voice: voice,
           controller: controller,
-          onOpenProfile: (p) => _openProfile(context, ref, p),
+          onOpenProfile: (anchor, p) => _openProfile(anchor, ref, p),
           isDm: isDm,
         ),
         // A bounded auto-rejoin in progress: see voice_screen.dart's own stage comment.

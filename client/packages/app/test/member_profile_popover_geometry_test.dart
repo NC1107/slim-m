@@ -94,12 +94,17 @@ Widget _anchorRow(double top, api.UserProfile profile) => Positioned(
 /// thing laid out. [enterModerate] pushes into Moderate first, for the two
 /// tests whose tallest content lives there; the bot-commands test's tallest
 /// content is on the profile view itself, so it leaves this false.
+///
+/// [expandBotCommands] taps the collapsed section's own "Show N more" row
+/// first - the bot-commands test's fixture is only genuinely tall once
+/// expanded, now that the section collapses to a handful of rows by default.
 Future<Rect> _openAt(
   WidgetTester tester, {
   required Size window,
   required double anchorTop,
   api.UserProfile profile = _other,
   bool enterModerate = true,
+  bool expandBotCommands = false,
   String lastItemText = 'Password reset code...',
 }) async {
   tester.view.physicalSize = window;
@@ -118,6 +123,10 @@ Future<Rect> _openAt(
   await tester.pumpAndSettle();
 
   expect(find.byType(AppMenu), findsOneWidget);
+  if (expandBotCommands) {
+    await tester.tap(find.textContaining('Show'));
+    await tester.pumpAndSettle();
+  }
   if (enterModerate) {
     await tester.tap(find.text('Moderate...'));
     await tester.pumpAndSettle();
@@ -188,4 +197,30 @@ void main() {
       expect(lastItem.top, greaterThanOrEqualTo(0));
     },
   );
+
+  testWidgets('expanding a bot with many commands grows the popover within the '
+      "window's own scroll fallback rather than overflowing the RenderBox", (
+    tester,
+  ) async {
+    const window = Size(900, 700);
+    await _openAt(
+      tester,
+      window: window,
+      anchorTop: 640,
+      profile: _bot,
+      enterModerate: false,
+      expandBotCommands: true,
+      lastItemText: 'Block',
+    );
+
+    expect(
+      tester.takeException(),
+      isNull,
+      reason:
+          'expanding to every command makes this popover genuinely taller '
+          "than the window - it must scroll within the popover's own "
+          'SingleChildScrollView fallback, never overflow a RenderBox',
+    );
+    expect(find.textContaining('!cmd19'), findsOneWidget);
+  });
 }

@@ -32,7 +32,7 @@ void main() {
           home: Scaffold(
             body: CallParticipantTile(
               participant: _participant,
-              onTap: () => opened++,
+              onTap: (_) => opened++,
             ),
           ),
         ),

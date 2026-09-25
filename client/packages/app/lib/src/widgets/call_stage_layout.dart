@@ -62,7 +62,13 @@ class CallStageLayout extends StatelessWidget {
 
   final VoiceState voice;
   final VoiceController controller;
-  final ValueChanged<VoiceParticipant> onOpenProfile;
+
+  /// [BuildContext] is the tapped tile's own - the anchor a popover opened
+  /// from it has to hang off, not the screen's outer context every tile
+  /// shares. Passing the wrong one pins the popover wherever that outer
+  /// context happens to render instead of beside the tile that was tapped.
+  final void Function(BuildContext anchor, VoiceParticipant participant)
+  onOpenProfile;
 
   /// Needed only for the alone-in-call hint's canvas mention below.
   final bool isDm;
@@ -172,7 +178,8 @@ class _StageWithFilmstrip extends StatelessWidget {
   final VoiceParticipant sharer;
   final List<VoiceParticipant> participants;
   final VoiceController controller;
-  final ValueChanged<VoiceParticipant> onOpenProfile;
+  final void Function(BuildContext anchor, VoiceParticipant participant)
+  onOpenProfile;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -216,7 +223,8 @@ class _Filmstrip extends StatelessWidget {
 
   final List<VoiceParticipant> participants;
   final VoiceController controller;
-  final ValueChanged<VoiceParticipant> onOpenProfile;
+  final void Function(BuildContext anchor, VoiceParticipant participant)
+  onOpenProfile;
 
   @override
   Widget build(BuildContext context) => ListView.separated(
@@ -254,7 +262,8 @@ class _ParticipantGrid extends StatelessWidget {
 
   final List<VoiceParticipant> participants;
   final VoiceController controller;
-  final ValueChanged<VoiceParticipant> onOpenProfile;
+  final void Function(BuildContext anchor, VoiceParticipant participant)
+  onOpenProfile;
   final bool isDm;
 
   @override
@@ -358,14 +367,16 @@ Widget participantTile(
   BuildContext context,
   VoiceParticipant participant,
   VoiceController controller,
-  ValueChanged<VoiceParticipant> onOpenProfile, {
+  void Function(BuildContext anchor, VoiceParticipant participant)
+  onOpenProfile, {
   double width = kCallTileMinWidth,
 }) {
   final showsCamera = participant.isCameraOn;
   return CallParticipantTile(
     participant: participant,
     width: width,
-    onTap: () => onOpenProfile(participant),
+    // CallParticipantTile hands back its own context here - see its own doc.
+    onTap: (anchor) => onOpenProfile(anchor, participant),
     cameraView: showsCamera
         ? controller.cameraViewFor(participant.identity)
         : null,
