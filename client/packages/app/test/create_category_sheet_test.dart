@@ -37,7 +37,44 @@ AppButton _primaryButton(WidgetTester tester) => tester.widget<AppButton>(
   ),
 );
 
+const _compactWidth = 500.0;
+const _desktopWidth = 1100.0;
+const _windowHeight = 900.0;
+
 void main() {
+  for (final width in [_compactWidth, _desktopWidth]) {
+    testWidgets('renders without overflow at width $width', (tester) async {
+      tester.view.physicalSize = Size(width, _windowHeight);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await _openSheet(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Create a category'), findsOneWidget);
+    });
+  }
+
+  testWidgets('the title reads as a heading, not a bolded paragraph', (
+    tester,
+  ) async {
+    await _openSheet(tester);
+
+    final title = tester.widget<Text>(find.text('Create a category'));
+    expect(title.style?.fontSize, AppText.heading.fontSize);
+  });
+
+  testWidgets('the 64-char limit counts down before it is hit', (tester) async {
+    await _openSheet(tester);
+
+    expect(find.text('0/64'), findsOneWidget);
+
+    await tester.enterText(_nameField(), 'Projects');
+    await tester.pump();
+
+    expect(find.text('8/64'), findsOneWidget);
+  });
+
   testWidgets('names what is missing rather than sitting disabled mute', (
     tester,
   ) async {

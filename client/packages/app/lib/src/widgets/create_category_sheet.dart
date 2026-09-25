@@ -90,11 +90,12 @@ class _CreateCategorySheetState extends ConsumerState<_CreateCategorySheet> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final nameLength = _name.text.trim().length;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        0,
+        AppSpacing.s16,
         AppSpacing.s16,
         MediaQuery.viewInsetsOf(context).bottom + AppSpacing.s16,
       ),
@@ -105,12 +106,12 @@ class _CreateCategorySheetState extends ConsumerState<_CreateCategorySheet> {
           children: [
             Text(
               'Create a category',
-              style: AppText.body.copyWith(
+              style: AppText.heading.copyWith(
                 color: tokens.textPrimary,
                 fontWeight: AppWeights.semi,
               ),
             ),
-            const SizedBox(height: AppSpacing.s12),
+            const SizedBox(height: AppSpacing.s16),
             AppInput(
               controller: _name,
               placeholder: 'Category name',
@@ -120,6 +121,18 @@ class _CreateCategorySheetState extends ConsumerState<_CreateCategorySheet> {
                 if (_canSubmit) _submit();
               },
               semanticLabel: 'Category name',
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$nameLength/$_nameMaxChars',
+                style: AppText.micro.copyWith(
+                  color: nameLength > _nameMaxChars
+                      ? tokens.dangerText
+                      : tokens.textSecondary,
+                ),
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),

@@ -19,7 +19,12 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/create_channel_sheet.dart';
 import 'package:slimm_design_system/design_system.dart';
 
-Future<void> _openSheet(WidgetTester tester, {int permissions = 0}) async {
+Future<void> _openSheet(
+  WidgetTester tester, {
+  int permissions = 0,
+  String? categoryId,
+  String? categoryName,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -38,8 +43,12 @@ Future<void> _openSheet(WidgetTester tester, {int permissions = 0}) async {
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
-              onPressed: () =>
-                  showCreateChannelSheet(context, initialKind: 'text'),
+              onPressed: () => showCreateChannelSheet(
+                context,
+                initialKind: 'text',
+                categoryId: categoryId,
+                categoryName: categoryName,
+              ),
               child: const Text('open'),
             ),
           ),
@@ -65,7 +74,83 @@ Finder _privateToggle() => find.byWidgetPredicate(
   (w) => w is AppToggle && w.semanticLabel == 'Make this channel private',
 );
 
+const _compactWidth = 500.0;
+const _desktopWidth = 1100.0;
+const _windowHeight = 900.0;
+
 void main() {
+  for (final width in [_compactWidth, _desktopWidth]) {
+    testWidgets('renders without overflow at width $width', (tester) async {
+      tester.view.physicalSize = Size(width, _windowHeight);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await _openSheet(tester, categoryId: 'cat-1', categoryName: 'Lounge');
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Create a channel'), findsOneWidget);
+    });
+  }
+
+  testWidgets('the title reads as a heading, not a bolded paragraph', (
+    tester,
+  ) async {
+    await _openSheet(tester);
+
+    final title = tester.widget<Text>(find.text('Create a channel'));
+    expect(title.style?.fontSize, AppText.heading.fontSize);
+  });
+
+  testWidgets('the 64-char limit counts down before it is hit', (tester) async {
+    await _openSheet(tester);
+
+    expect(find.text('0/64'), findsOneWidget);
+
+    await tester.enterText(_nameField(), 'announcements');
+    await tester.pump();
+
+    expect(find.text('13/64'), findsOneWidget);
+  });
+
+  testWidgets('the Text/Voice choice says what each kind means', (
+    tester,
+  ) async {
+    await _openSheet(tester);
+
+    expect(
+      find.text(
+        'People post messages, images and files to read at their own pace.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Voice'));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'People join a live call to talk, share video and their screen.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('names the category the channel lands in when one is implied', (
+    tester,
+  ) async {
+    await _openSheet(tester, categoryId: 'cat-1', categoryName: 'Voice chat');
+
+    expect(find.text('Adding to Voice chat'), findsOneWidget);
+  });
+
+  testWidgets('says nothing about a category when none is implied', (
+    tester,
+  ) async {
+    await _openSheet(tester);
+
+    expect(find.textContaining('Adding to'), findsNothing);
+  });
+
   testWidgets('names what is missing rather than sitting disabled mute', (
     tester,
   ) async {
