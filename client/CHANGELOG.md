@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.84.0](https://github.com/NC1107/slim-m/compare/client-v0.83.0...client-v0.84.0) (2026-09-25)
+
+
+### Features
+
+* **client:** bot commands in the composer, profile and mention card ([#1327](https://github.com/NC1107/slim-m/issues/1327)) ([a3848aa](https://github.com/NC1107/slim-m/commit/a3848aacd4c62234b81656ea0cca1ec73744fbb7))
+* **client:** redesign roles and channel permissions into two surfaces ([#1333](https://github.com/NC1107/slim-m/issues/1333)) ([89c264b](https://github.com/NC1107/slim-m/commit/89c264b0cbccf9ffd2a1f12f24a86e6b5f2c27dc))
+* **client:** rename the personal space from You to Notes ([#1316](https://github.com/NC1107/slim-m/issues/1316)) ([7a6f847](https://github.com/NC1107/slim-m/commit/7a6f847871cebb80597a1202bba7ea087326edf5))
+* **client:** render message embeds ([#1329](https://github.com/NC1107/slim-m/issues/1329)) ([f389a1e](https://github.com/NC1107/slim-m/commit/f389a1e1163be690ddcea4f84e7104745d75c276))
+* **server,client:** mint, list, rename and revoke webhooks ([#1332](https://github.com/NC1107/slim-m/issues/1332)) ([ca3028a](https://github.com/NC1107/slim-m/commit/ca3028a30ada1a22c041dbbc85258eba8b9e8103))
+* **server:** add GET for a single message ([#1336](https://github.com/NC1107/slim-m/issues/1336)) ([6683797](https://github.com/NC1107/slim-m/commit/668379785816181d116518c828f91fc1c99368a6))
+* **server:** bot command registration (decision 0031) ([#1325](https://github.com/NC1107/slim-m/issues/1325)) ([017666c](https://github.com/NC1107/slim-m/commit/017666c1e547d22d423add4d56a57d06c5e869db))
+* **server:** declared bot permissions, a managed role, and a real audit trail ([#1328](https://github.com/NC1107/slim-m/issues/1328)) ([8ec694c](https://github.com/NC1107/slim-m/commit/8ec694c2894e84c5784813958333a7b7421d9342))
+* **server:** live join/leave/screen-share voice events from LiveKit webhooks ([#1334](https://github.com/NC1107/slim-m/issues/1334)) ([34ca037](https://github.com/NC1107/slim-m/commit/34ca03787a403e6d1a161dfc9ca36dffc126b2f2))
+* **server:** role reordering, per-role member counts, and batch channel overwrites ([#1331](https://github.com/NC1107/slim-m/issues/1331)) ([6514c3f](https://github.com/NC1107/slim-m/commit/6514c3f89825b4a2d9bb72f33dd6f57a5caeab5d))
+
 ## [0.83.0](https://github.com/NC1107/slim-m/compare/client-v0.82.0...client-v0.83.0) (2026-09-24)
 
 
