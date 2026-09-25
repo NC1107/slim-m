@@ -7,6 +7,8 @@
 /// own doc for why depth needs two widgets at all.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:slimm_rtc/rtc.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
@@ -92,11 +94,13 @@ Map<String, Rect> presenceOnCanvasRects({
   required CanvasPresenceTileOverrides overrides,
   required Map<String, VoiceParticipant> byIdentity,
   required bool hideSelfCamera,
+  Size viewport = Size.zero,
 }) {
-  final defaults = layout.arrange(
+  final raw = layout.arrange(
     keys,
     sizeFor: (key) => presenceTileSize(key, byIdentity),
   );
+  final defaults = _clampedToViewport(raw, viewport);
   final onCanvas = <String, Rect>{};
   for (final key in keys) {
     final state = overrides.stateFor(key);
@@ -109,6 +113,36 @@ Map<String, Rect> presenceOnCanvasRects({
     onCanvas[key] = state.rect ?? defaults[key]!;
   }
   return onCanvas;
+}
+
+/// [defaults] shifted left and/or up just enough that the whole untouched
+/// block stops running past [viewport]'s right or bottom edge - a fix for
+/// several untouched tiles landing partly cut off in a narrow canvas pane,
+/// without moving anything for the common case where the block already
+/// fits (every tile a single-participant test scaffold ever placed at the
+/// layout's own margin, for instance). A block already wider or taller
+/// than the viewport is pinned to the near edge rather than pushed further
+/// negative, since there is nowhere left to show all of it.
+Map<String, Rect> _clampedToViewport(
+  Map<String, Rect> defaults,
+  Size viewport,
+) {
+  if (defaults.isEmpty || viewport.width <= 0 || viewport.height <= 0) {
+    return defaults;
+  }
+  var bounds = defaults.values.first;
+  for (final rect in defaults.values.skip(1)) {
+    bounds = bounds.expandToInclude(rect);
+  }
+  final dx = bounds.right > viewport.width
+      ? math.max(viewport.width - bounds.right, -bounds.left)
+      : 0.0;
+  final dy = bounds.bottom > viewport.height
+      ? math.max(viewport.height - bounds.bottom, -bounds.top)
+      : 0.0;
+  if (dx == 0.0 && dy == 0.0) return defaults;
+  final offset = Offset(dx, dy);
+  return defaults.map((key, rect) => MapEntry(key, rect.shift(offset)));
 }
 
 /// [keys] sorted for paint order. A sent-to-back tile always paints beneath

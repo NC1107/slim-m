@@ -238,6 +238,7 @@ class _CanvasPresenceLayerState extends State<CanvasPresenceLayer> {
       overrides: widget.overrides,
       byIdentity: byIdentity,
       hideSelfCamera: widget.hideSelfCamera,
+      viewport: widget.document.viewport,
     );
     // Ahead of _visibility.update, matching CanvasPresenceBackdrop's own early return exactly, or the two instances' mounted sets drift.
     if (onCanvas.isEmpty) {
