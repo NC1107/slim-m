@@ -18,6 +18,8 @@ import 'message_row_parts.dart' show AttachmentPlaceholder;
 /// or [preview] (a first frame) under a play badge for a held gif. One tap
 /// calls [onReveal]. Captioned like the real preview, so a held row still reads
 /// as a named file. [maxEdge] caps the frozen-frame box on both axes.
+/// [showBadge] false hides the play badge while the preview is already
+/// animating under a pointer, keeping the tile's layout as it was.
 class AttachmentRevealTile extends StatelessWidget {
   const AttachmentRevealTile({
     super.key,
@@ -27,6 +29,7 @@ class AttachmentRevealTile extends StatelessWidget {
     this.icon,
     this.line,
     this.preview,
+    this.showBadge = true,
   });
 
   final String caption;
@@ -35,6 +38,7 @@ class AttachmentRevealTile extends StatelessWidget {
   final IconData? icon;
   final String? line;
   final Widget? preview;
+  final bool showBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +55,17 @@ class AttachmentRevealTile extends StatelessWidget {
               ),
               child: Stack(
                 alignment: Alignment.center,
-                children: [preview!, const _PlayBadge()],
+                children: [
+                  preview!,
+                  // Hidden, not removed: the badge may be what sizes this stack.
+                  Visibility(
+                    visible: showBadge,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: const _PlayBadge(),
+                  ),
+                ],
               ),
             ),
           )

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The two media performance preferences: each defaults to what the app has
-/// always done (download on sight, autoplay gifs), a choice persists and
+/// always done for downloading (on sight) while gifs hold until hovered or
+/// tapped, a choice persists and
 /// restores, an unknown stored value degrades to the default, and only the
 /// default names itself so in the picker.
 library;
@@ -68,35 +69,35 @@ void main() {
   });
 
   group('gif autoplay', () {
-    test('defaults to autoplay, so it is opt-in', () {
+    test('defaults to hover or tap, so autoplay is opt-in', () {
       expect(
         container().read(gifAutoplayControllerProvider),
-        GifAutoplay.autoplay,
+        GifAutoplay.tapToPlay,
       );
-      expect(GifAutoplay.autoplay.label, contains('(default)'));
-      expect(GifAutoplay.tapToPlay.label, isNot(contains('(')));
+      expect(GifAutoplay.tapToPlay.label, contains('(default)'));
+      expect(GifAutoplay.autoplay.label, isNot(contains('(')));
     });
 
     test('selecting persists, and restore reads it back', () async {
       final c = container();
       await c
           .read(gifAutoplayControllerProvider.notifier)
-          .select(GifAutoplay.tapToPlay);
+          .select(GifAutoplay.autoplay);
       expect(
         (await SharedPreferences.getInstance()).getString(gifAutoplayKey),
-        'tapToPlay',
+        'autoplay',
       );
 
       final c2 = container();
       await c2.read(gifAutoplayControllerProvider.notifier).restore();
-      expect(c2.read(gifAutoplayControllerProvider), GifAutoplay.tapToPlay);
+      expect(c2.read(gifAutoplayControllerProvider), GifAutoplay.autoplay);
     });
 
     test('an unknown stored value degrades to the default', () async {
       SharedPreferences.setMockInitialValues({gifAutoplayKey: 'sometimes'});
       final c = container();
       await c.read(gifAutoplayControllerProvider.notifier).restore();
-      expect(c.read(gifAutoplayControllerProvider), GifAutoplay.autoplay);
+      expect(c.read(gifAutoplayControllerProvider), GifAutoplay.tapToPlay);
     });
   });
 }

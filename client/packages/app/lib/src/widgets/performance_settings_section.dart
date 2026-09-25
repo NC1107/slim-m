@@ -56,9 +56,11 @@ class PerformanceSettingsSection extends ConsumerWidget {
               SettingsChoice(value: value, label: value.label),
           ],
           sheetFootnote:
-              'Whether gifs animate on their own. Tap to play holds each on '
-              'its first frame until tapped, which saves battery and CPU since '
-              'an animating gif re-decodes every frame the whole time.',
+              'Whether gifs animate on their own. On hover or tap holds each '
+              'on its first frame until you point at it or tap it, which saves '
+              'battery and CPU since an animating gif re-decodes every frame '
+              'the whole time. Either way, gifs pause while this window is in '
+              'the background.',
           onChanged: (next) =>
               ref.read(gifAutoplayControllerProvider.notifier).select(next),
         ),
