@@ -10,6 +10,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,8 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/screens/channel_screen.dart';
 import 'package:slimm_app/src/widgets/composer.dart';
+import 'package:slimm_app/src/widgets/composer_attachments.dart';
+import 'package:slimm_app/src/widgets/staged_attachment_tile.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
@@ -271,4 +274,38 @@ void main() {
       await _unmount(tester);
     },
   );
+
+  testWidgets('a staged attachment survives switching to another channel and '
+      'back, and never shows up in the other one', (tester) async {
+    final h = await _mount(tester, initial: 'c1');
+    // Already uploaded (a picked gif takes this path), so no upload runs here.
+    h.container
+        .read(attachmentStagingProvider('c1'))
+        .addResolved(
+          const api.Attachment(
+            id: 'a1',
+            filename: 'photo.png',
+            contentType: 'image/png',
+            size: 3,
+          ),
+          Uint8List.fromList(const [1, 2, 3]),
+        );
+    await _flush(tester);
+    expect(find.byType(StagedAttachmentTile), findsOneWidget);
+
+    await _switchTo(tester, h.container, 'c2');
+    expect(
+      find.byType(StagedAttachmentTile),
+      findsNothing,
+      reason: 'c1\'s file must not ride along to be sent in c2 by mistake',
+    );
+
+    await _switchTo(tester, h.container, 'c1');
+    expect(
+      find.byType(StagedAttachmentTile),
+      findsOneWidget,
+      reason: 'the owner\'s report: it went "to the void" on leaving',
+    );
+    await _unmount(tester);
+  });
 }

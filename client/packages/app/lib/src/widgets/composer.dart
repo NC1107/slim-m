@@ -91,7 +91,7 @@ class _ComposerState extends ConsumerState<Composer> {
   /// trimmed, because the send path drops whitespace-only text.
   bool _hasText = false;
   bool _hasSendableText = false;
-  late final AttachmentStagingController _attachments;
+  late AttachmentStagingController _attachments;
 
   /// Shown inline above the action bar: a picker that would not open, or a
   /// clipboard paste that failed. Both are "could not get you an
@@ -162,10 +162,8 @@ class _ComposerState extends ConsumerState<Composer> {
   @override
   void initState() {
     super.initState();
-    _attachments = AttachmentStagingController(
-      upload: (bytes, filename) =>
-          ref.read(apiProvider).uploadAttachment(bytes, filename: filename),
-    )..addListener(_handleAttachmentsChange);
+    _attachments = ref.read(attachmentStagingProvider(widget.channelId))
+      ..addListener(_handleAttachmentsChange);
     _hasText = widget.controller.text.isNotEmpty;
     _hasSendableText = widget.controller.text.trim().isNotEmpty;
     _charCount = widget.controller.text.runes.length;
@@ -185,9 +183,11 @@ class _ComposerState extends ConsumerState<Composer> {
   @override
   void didUpdateWidget(covariant Composer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // See [AttachmentStagingController.resetForChannelSwitch]'s own doc comment.
+    // Each channel keeps its own staging; see attachmentStagingProvider.
     if (oldWidget.channelId != widget.channelId) {
-      _attachments.resetForChannelSwitch();
+      _attachments.removeListener(_handleAttachmentsChange);
+      _attachments = ref.read(attachmentStagingProvider(widget.channelId))
+        ..addListener(_handleAttachmentsChange);
       if (mounted) setState(() => _attachmentError = null);
       _rebindDropTarget();
     }
@@ -235,7 +235,6 @@ class _ComposerState extends ConsumerState<Composer> {
     widget.clipboardPasteStop(_handlePastedImage);
     _focus.dispose();
     _attachments.removeListener(_handleAttachmentsChange);
-    _attachments.dispose();
     super.dispose();
   }
 
