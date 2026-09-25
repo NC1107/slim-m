@@ -32,8 +32,7 @@ Future<void> _open(WidgetTester tester, {required int permissions}) async {
       ),
       GoRoute(
         path: Routes.adminDock,
-        builder: (context, state) =>
-            const Scaffold(body: Text('Dock screen')),
+        builder: (context, state) => const Scaffold(body: Text('Dock screen')),
       ),
     ],
   );
@@ -61,8 +60,10 @@ void main() {
       await _open(tester, permissions: 0);
 
       expect(
-        find.text('No apps installed. Ask an admin to install one from the '
-            'Dock.'),
+        find.text(
+          'No apps installed. Ask an admin to install one from the '
+          'Dock.',
+        ),
         findsOneWidget,
       );
       expect(find.text('Open the Dock'), findsNothing);
