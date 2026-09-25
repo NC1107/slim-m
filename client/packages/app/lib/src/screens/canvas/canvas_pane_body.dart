@@ -28,6 +28,7 @@ import 'canvas_pane_hints.dart';
 import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
 import 'canvas_selection_semantics.dart';
+import 'canvas_world_edge_glow.dart';
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -448,6 +449,12 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onVideoInterest: widget.onVideoInterest,
           hideSelfCamera: widget.selfBubbleHidden,
           tool: widget.tool,
+        ),
+        // Topmost and non-interactive - see its own doc for why a pan or a tile drag stopping at worldLimit otherwise looks like nothing happened.
+        CanvasWorldEdgeGlow(
+          document: widget.document,
+          tileOverrides: widget.tileOverrides,
+          tokens: tokens,
         ),
       ],
     ),

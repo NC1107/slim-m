@@ -65,6 +65,13 @@ class CanvasDocument extends ChangeNotifier {
   Camera _camera = const Camera();
   Size _viewport = Size.zero;
 
+  /// True for exactly as long as [setCamera] is actively pinning the camera
+  /// to `worldLimit` - the only feedback a person gets that panning or
+  /// zooming stopped because the bounded world ended, not because
+  /// something broke. Never flips for [setViewport]'s own re-clamp on a
+  /// resize, which is not a gesture anyone is pushing against.
+  final ValueNotifier<bool> worldEdgeHit = ValueNotifier<bool>(false);
+
   /// Pointers `CanvasSurface` itself never receives a down event for - see
   /// `canvas_external_pointers.dart`'s own doc.
   final externalPointers = CanvasExternalPointers();
@@ -440,6 +447,7 @@ class CanvasDocument extends ChangeNotifier {
   /// not changed.
   void setCamera(Camera next) {
     final clamped = _clamp(next);
+    worldEdgeHit.value = clamped.x != next.x || clamped.y != next.y;
     if (clamped == _camera) return;
     _camera = clamped;
     _reculled();
@@ -485,6 +493,7 @@ class CanvasDocument extends ChangeNotifier {
     objectCount.dispose();
     selectedObjectId.dispose();
     elevatedObjectId.dispose();
+    worldEdgeHit.dispose();
     scene.dispose();
     super.dispose();
   }

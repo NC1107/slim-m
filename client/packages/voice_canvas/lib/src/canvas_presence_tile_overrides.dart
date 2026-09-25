@@ -87,6 +87,12 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
   int _nextZ = 0;
   final Map<String, int> _z = {};
 
+  /// True for exactly as long as [setRect] is actively pinning a dragged
+  /// tile to `worldLimit` - [CanvasDocument.worldEdgeHit]'s own sibling for
+  /// a tile drag rather than a camera pan, feeding the same edge-glow
+  /// overlay.
+  final ValueNotifier<bool> worldEdgeHit = ValueNotifier<bool>(false);
+
   CanvasPresenceTileState stateFor(String key) =>
       _states[key] ?? _defaultTileState;
 
@@ -112,11 +118,8 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
     required bool locked,
     required bool sentToBack,
   }) {
-    _states[key] = stateFor(key).copyWith(
-      rect: rect,
-      locked: locked,
-      sentToBack: sentToBack,
-    );
+    _states[key] = stateFor(key)
+        .copyWith(rect: rect, locked: locked, sentToBack: sentToBack);
     notifyListeners();
   }
 
@@ -131,9 +134,12 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
   /// commit lands. Size is left alone: the widget that calls this already
   /// clamps a resize to `canvasPresenceTileMinSize`/`Max`.
   void setRect(String key, Rect rect) {
+    final clampedLeft = rect.left.clamp(-worldLimit, worldLimit);
+    final clampedTop = rect.top.clamp(-worldLimit, worldLimit);
+    worldEdgeHit.value = clampedLeft != rect.left || clampedTop != rect.top;
     final clamped = Rect.fromLTWH(
-      rect.left.clamp(-worldLimit, worldLimit),
-      rect.top.clamp(-worldLimit, worldLimit),
+      clampedLeft,
+      clampedTop,
       rect.width,
       rect.height,
     );
@@ -188,5 +194,11 @@ class CanvasPresenceTileOverrides extends ChangeNotifier {
     final beforeZ = _z.length;
     _z.removeWhere((key, _) => !present.contains(key));
     if (changed || _z.length != beforeZ) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    worldEdgeHit.dispose();
+    super.dispose();
   }
 }
