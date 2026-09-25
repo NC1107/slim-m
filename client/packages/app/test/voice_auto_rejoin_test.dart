@@ -188,6 +188,83 @@ void main() {
     });
   });
 
+  test(
+    'a removal that arrives after the heartbeat has been failing is rejoined',
+    () {
+      fakeAsync((async) {
+        const heartbeatInterval = Duration(seconds: 15);
+        final epoch = DateTime(2026, 1, 1, 12);
+        final session = _RejoiningSession();
+        final controller = harness.controllerWith(
+          session,
+          voiceApi(failHeartbeat: true),
+          voiceHeartbeatInterval: heartbeatInterval,
+          autoRejoinDelays: delays,
+          // Ties isLagging's clock to the one async.elapse actually drives.
+          now: () => epoch.add(async.elapsed),
+        );
+
+        unawaited(controller.join('channel-1'));
+        async.flushMicrotasks();
+        expect(controller.state.state, VoiceSessionState.connected);
+
+        // Heartbeats fail while the media transport never moves - distinct from the transport-loss scenarios above.
+        async.elapse(heartbeatInterval * 2 + const Duration(seconds: 1));
+        async.flushMicrotasks();
+
+        session.dropWith(VoiceDisconnect.removed);
+        async.flushMicrotasks();
+
+        expect(
+          controller.state.rejoining,
+          isTrue,
+          reason:
+              'a removed reason that arrives on top of a lagging heartbeat '
+              'is the stale-heartbeat sweep, not a moderator, so it must '
+              'auto-rejoin the same way a lost connection does',
+        );
+        expect(
+          controller.state.error,
+          contains('Reconnecting'),
+          reason: 'the copy must not read as a moderator kick',
+        );
+
+        async.elapse(delays.first);
+        async.flushMicrotasks();
+        expect(session.joins, 2);
+      });
+    },
+  );
+
+  test(
+    'a removal with a healthy heartbeat is not rejoined even right after connecting',
+    () {
+      fakeAsync((async) {
+        final session = _RejoiningSession();
+        final controller = harness.controllerWith(
+          session,
+          voiceApi(),
+          autoRejoinDelays: delays,
+        );
+
+        unawaited(controller.join('channel-1'));
+        async.flushMicrotasks();
+        session.dropWith(VoiceDisconnect.removed);
+        async.flushMicrotasks();
+        async.elapse(wholeBudget);
+        async.flushMicrotasks();
+
+        expect(
+          session.joins,
+          1,
+          reason:
+              'a healthy heartbeat means this was a real removal, not the '
+              'sweep, even though the drop landed moments after connecting',
+        );
+      });
+    },
+  );
+
   /// The narrow case `join`'s own `cancelPending` is for.
   ///
   /// A manual rejoin that *succeeds* does not need it: reaching `connected`

@@ -32,12 +32,21 @@ enum VoiceDisconnect {
   /// allows one connection per identity and evicts the older one.
   replacedByOtherDevice,
 
-  /// A moderator removed this participant, the room went away, or the
-  /// server's own liveness sweep decided this connection had gone stale.
-  /// One LiveKit reason covers all three, so the message below must not
-  /// claim it was a moderator specifically - that would be true for a kick
-  /// and false for the other two.
+  /// A moderator removed this participant, or the room went away. LiveKit
+  /// reports the same reason for the server's own liveness sweep, but the
+  /// app layer reclassifies that case as [heartbeatLagEviction] before it
+  /// ever reaches here (see `voice_controller.dart`), using its own record of
+  /// whether this client's heartbeat had recently succeeded. This value is
+  /// left covering only the causes that record could not explain, so the
+  /// message below no longer has to hedge across all three.
   removed,
+
+  /// The SFU reported [removed], but this client's own heartbeat had been
+  /// failing to reach the server when it happened - almost certainly the
+  /// server's stale-heartbeat sweep evicting a connection that was never
+  /// really gone, rather than a moderator's decision. Treated as retryable
+  /// the same way [connectionLost] is.
+  heartbeatLagEviction,
 
   /// The connection dropped and reconnecting did not recover it.
   connectionLost,
@@ -50,6 +59,8 @@ enum VoiceDisconnect {
         replacedByOtherDevice =>
           'You joined this call from another device, so this one left it.',
         removed => "You're no longer in this call.",
+        heartbeatLagEviction =>
+          'The call dropped for a moment. Reconnecting...',
         connectionLost => 'The call disconnected and could not reconnect.',
         unknown => 'The call ended unexpectedly.',
       };

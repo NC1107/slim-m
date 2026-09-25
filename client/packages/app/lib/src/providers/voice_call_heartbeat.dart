@@ -30,11 +30,36 @@ import '../diagnostics/debug_log.dart';
 import 'providers.dart';
 
 class VoiceCallHeartbeat {
-  VoiceCallHeartbeat(this._ref, {required this.interval});
+  VoiceCallHeartbeat(
+    this._ref, {
+    required this.interval,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   final Ref _ref;
   final Duration interval;
+  final DateTime Function() _now;
   Timer? _timer;
+
+  /// When the last heartbeat POST actually succeeded. `null` before the
+  /// first send lands, so [isLagging] cannot misread a call that only just
+  /// started as one whose heartbeat has been failing.
+  DateTime? _lastSuccessAt;
+
+  /// Whether heartbeats have been failing to reach the server for long
+  /// enough that a `removed` drop is more likely this client's own stale
+  /// entry than a moderator's decision. Read by [VoiceController] at the
+  /// moment a drop arrives, since that is the only time the distinction
+  /// matters; see `voice_controller_rejoin.dart`.
+  ///
+  /// Two missed sends, not one: a single dropped request is exactly what
+  /// `STALE_AFTER`'s own margin exists to survive, so flagging on the first
+  /// miss would call an ordinary blip a heartbeat-lag eviction.
+  bool get isLagging {
+    final lastSuccessAt = _lastSuccessAt;
+    return lastSuccessAt != null &&
+        _now().difference(lastSuccessAt) >= interval * 2;
+  }
 
   /// Starts refreshing the server's proof that this call is still live, if
   /// it is not running already. Guarded rather than assumed single-fire: no
@@ -44,6 +69,8 @@ class VoiceCallHeartbeat {
   /// moment it stopped holding.
   void start(String? channelId) {
     if (_timer != null || channelId == null) return;
+    // Optimistic: a call that just connected has not failed anything yet.
+    _lastSuccessAt = _now();
     unawaited(_send(channelId));
     _timer = Timer.periodic(interval, (_) => unawaited(_send(channelId)));
   }
@@ -56,6 +83,7 @@ class VoiceCallHeartbeat {
   Future<void> _send(String channelId) async {
     try {
       await _ref.read(apiProvider).sendVoiceHeartbeat(channelId);
+      _lastSuccessAt = _now();
     } catch (e) {
       // Best-effort, but a run of failures is worth seeing in diagnostics.
       _log('Voice heartbeat failed', detail: e);
