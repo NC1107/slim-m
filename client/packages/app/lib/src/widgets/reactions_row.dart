@@ -151,33 +151,36 @@ class _ReactionsRowState extends State<ReactionsRow> {
     if (live.isEmpty && _exiting.isEmpty) return const SizedBox.shrink();
 
     // See the negative-inset note on this class's own doc comment above.
-    return Transform.translate(
-      offset: const Offset(0, -AppSpacing.s4),
-      child: Wrap(
-        spacing: _reactionChipSpacing,
-        runSpacing: _reactionChipSpacing,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          // Keyed by emoji: an arriving chip pops once, and never replays.
-          for (final emoji in _order)
-            if (live[emoji] case final reaction?)
-              _ChipPop(
-                key: ValueKey('reaction-$emoji'),
-                child: _chip(reaction, exiting: false),
-              )
-            else if (_exiting[emoji] case final reaction?)
-              _ChipExit(
-                key: ValueKey('reaction-exit-$emoji'),
-                onDone: () {
-                  if (!mounted) return;
-                  setState(() {
-                    _exiting.remove(emoji);
-                    _order = [..._order]..remove(emoji);
-                  });
-                },
-                child: _chip(reaction, exiting: true),
-              ),
-        ],
+    // Inside the transcript's SelectionArea a chip's text painted the I-beam and selected as text; a chip is a button.
+    return SelectionContainer.disabled(
+      child: Transform.translate(
+        offset: const Offset(0, -AppSpacing.s4),
+        child: Wrap(
+          spacing: _reactionChipSpacing,
+          runSpacing: _reactionChipSpacing,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            // Keyed by emoji: an arriving chip pops once, and never replays.
+            for (final emoji in _order)
+              if (live[emoji] case final reaction?)
+                _ChipPop(
+                  key: ValueKey('reaction-$emoji'),
+                  child: _chip(reaction, exiting: false),
+                )
+              else if (_exiting[emoji] case final reaction?)
+                _ChipExit(
+                  key: ValueKey('reaction-exit-$emoji'),
+                  onDone: () {
+                    if (!mounted) return;
+                    setState(() {
+                      _exiting.remove(emoji);
+                      _order = [..._order]..remove(emoji);
+                    });
+                  },
+                  child: _chip(reaction, exiting: true),
+                ),
+          ],
+        ),
       ),
     );
   }
