@@ -228,6 +228,7 @@ class _InCall extends ConsumerWidget {
           voice: voice,
           controller: controller,
           onOpenProfile: (p) => _openProfile(context, ref, p),
+          isDm: isDm,
         ),
         Align(
           alignment: Alignment.bottomCenter,

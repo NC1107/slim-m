@@ -57,11 +57,15 @@ class CallStageLayout extends StatelessWidget {
     required this.voice,
     required this.controller,
     required this.onOpenProfile,
+    required this.isDm,
   });
 
   final VoiceState voice;
   final VoiceController controller;
   final ValueChanged<VoiceParticipant> onOpenProfile;
+
+  /// Needed only for the alone-in-call hint's canvas mention below.
+  final bool isDm;
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +113,7 @@ class CallStageLayout extends StatelessWidget {
                       participants: voice.participants,
                       controller: controller,
                       onOpenProfile: onOpenProfile,
+                      isDm: isDm,
                     ),
             ),
           ),
@@ -244,11 +249,13 @@ class _ParticipantGrid extends StatelessWidget {
     required this.participants,
     required this.controller,
     required this.onOpenProfile,
+    required this.isDm,
   });
 
   final List<VoiceParticipant> participants;
   final VoiceController controller;
   final ValueChanged<VoiceParticipant> onOpenProfile;
+  final bool isDm;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -267,17 +274,26 @@ class _ParticipantGrid extends StatelessWidget {
             // Capped like a settings column: a 1:1 call was two small tiles adrift in a full-bleed void, and a bounded room reads as designed.
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: kContentColumnMax),
-              child: AnimatedRosterWrap(
-                participants: participants,
-                spacing: AppSpacing.s16,
-                runSpacing: AppSpacing.s16,
-                tileFor: (context, p) => participantTile(
-                  context,
-                  p,
-                  controller,
-                  onOpenProfile,
-                  width: tileWidth,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedRosterWrap(
+                    participants: participants,
+                    spacing: AppSpacing.s16,
+                    runSpacing: AppSpacing.s16,
+                    tileFor: (context, p) => participantTile(
+                      context,
+                      p,
+                      controller,
+                      onOpenProfile,
+                      width: tileWidth,
+                    ),
+                  ),
+                  if (participants.length == 1) ...[
+                    const SizedBox(height: AppSpacing.s24),
+                    _AloneHint(isDm: isDm),
+                  ],
+                ],
               ),
             ),
           ),
@@ -285,6 +301,53 @@ class _ParticipantGrid extends StatelessWidget {
       );
     },
   );
+}
+
+/// Shown only while nobody else has joined and nobody is sharing: a calm
+/// wait, not a scary empty room, plus a pointer toward the canvas toggle
+/// already in `VoiceCallDock` - a plain hint, not a second interactive
+/// button, so a solo caller never sees two controls that both open the same
+/// canvas. A DM call already names its own canvas button on `_DmCallBar` at
+/// every width, so the hint here is scoped to a real voice channel.
+class _AloneHint extends StatelessWidget {
+  const _AloneHint({required this.isDm});
+
+  final bool isDm;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Waiting for others to join.',
+          textAlign: TextAlign.center,
+          style: AppText.caption.copyWith(color: tokens.textSecondary),
+        ),
+        if (!isDm) ...[
+          const SizedBox(height: AppSpacing.s8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                AppIcons.canvas,
+                size: AppSizes.icon16,
+                color: tokens.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.s4),
+              Flexible(
+                child: Text(
+                  'Open the canvas below while you wait',
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 /// One participant's tile, shared by the grid and the filmstrip: their live
