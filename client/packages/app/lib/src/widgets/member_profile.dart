@@ -38,7 +38,6 @@ import '../providers/blocks_controller.dart';
 import '../providers/channel_permissions.dart';
 import '../providers/dms.dart';
 import '../providers/member_presence.dart' show membersProvider;
-import '../providers/notification_schedule_controller.dart';
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
@@ -47,6 +46,7 @@ import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_moderate_view.dart';
+import 'member_notify_off_hours_item.dart';
 import 'member_profile_bot_commands.dart';
 import 'member_profile_identity.dart';
 import 'member_profile_note_field.dart';
@@ -307,13 +307,6 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
         canManageRoles ||
         canEject ||
         canIssueReset;
-    final allowedOffHours =
-        ref
-            .watch(notificationScheduleProvider)
-            .valueOrNull
-            ?.allowedUserIds
-            .contains(profile.id) ??
-        false;
 
     // Captured before onDone, whose Navigator.pop disposes this element.
     void run(Future<void> Function(ProviderContainer container) action) {
@@ -385,22 +378,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
             },
           ),
         MemberProfileNoteField(subjectId: profile.id),
-        AppMenuItem(
-          label: allowedOffHours
-              ? 'Stop notifying me off hours for this person'
-              : 'Notify me about this person off hours',
-          leading: allowedOffHours
-              ? AppIcons.notificationsOff
-              : AppIcons.notificationsOn,
-          onTap: () => run(
-            (container) => toggleNotificationScheduleAllowedUser(
-              host,
-              container,
-              profile,
-              allowedOffHours,
-            ),
-          ),
-        ),
+        MemberNotifyOffHoursItem(host: host, profile: profile, run: run),
         if (showModeration) ...[
           const AppMenuDivider(),
           AppMenuItem(

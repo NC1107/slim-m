@@ -163,9 +163,7 @@ class _NotificationScheduleSectionState
     final current = schedule.valueOrNull;
     final enabled = current != null;
 
-    // The window shown for editing: the first configured day's, or the
-    // default for a schedule with every day off (still a real state; see
-    // `store/notification_schedule.rs`'s own doc comment).
+    // The window shown for editing: the first configured day's, or the default for a schedule with every day off.
     final firstDay = current?.days.isNotEmpty ?? false
         ? current!.days.first
         : null;
