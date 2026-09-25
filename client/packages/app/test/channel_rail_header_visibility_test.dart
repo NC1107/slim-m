@@ -49,15 +49,15 @@ void main() {
   });
 
   testWidgets(
-    'the rail header is hidden entirely while the desktop title bar is '
-    'mounted, so the Space is never named twice',
+    'the rail header still shows while the desktop title bar is mounted: '
+    'the title bar is the window title, the rail header is the Space',
     (tester) async {
       DesktopWindowShell.debugActivate(frameless: true);
       addTearDown(DesktopWindowShell.debugReset);
 
       final fixture = await _pumpAtExpandedWidth(tester);
 
-      expect(find.byType(RailHeader), findsNothing);
+      expect(find.byType(RailHeader), findsOneWidget);
 
       await teardownFixture(tester, fixture.container, fixture.db);
     },

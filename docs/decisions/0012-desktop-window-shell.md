@@ -242,3 +242,12 @@ The "not verified against a real display" caveat two paragraphs above turned out
 **The fix reorders `revealAfterHandoff` to `show()` first and wait second**, rather than raising or lowering the timeout. The wait after `show()` is kept, bounded the same way, purely so a host that stalls for a genuinely different reason still gets logged - nothing downstream awaits this method's completion, so the bound protects a log line rather than gating anything. This does not newly risk the stale-splash-frame flash the original wait-before-show order existed to prevent: because that order's own timeout fallback already called `show()` unconditionally once the wait failed, and the wait failed on every single launch on this platform, the exposure this reorder produces - the window becomes visible still showing the last frame the splash painted, at the geometry `prepareHandoff` already applied while hidden, until the already-pending `appReadyProvider` frame lands a moment later - is the same exposure every 0.61.0 launch already had, five seconds sooner.
 
 Verified directly: building the real Linux release binary and running it on the same KDE Plasma Wayland session with this fix applied no longer prints the timeout warning, and the window reaches its real content with no perceptible delay.
+
+## Addendum, 2026-09-25: the Space menu lives in the rail header on every platform
+
+Design review note 22 moved the Space name, connection dot and Space menu into the frameless title bar and hid `RailHeader` there, to avoid two copies of the same line 40px apart.
+The owner then found the menu chevron sitting beside the window quit kebab and the window controls read as window chrome, and its items were the wrong kind of thing to find there.
+The rail header now renders on every platform and carries the Space's identity and its menu, the shape Slack and Discord use.
+The title bar keeps the Space name and the build version as the window's own title and drops the dot and the menu.
+The name appears twice on purpose: once as a window title, once as the Space header, doing different jobs.
+

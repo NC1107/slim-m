@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The title bar's name line used to be the static literal `slim-m`,
 /// whatever deployment was actually open. It now shows the Space's real
-/// name, a connection dot, and this build's own version - the three things
-/// `RailHeader` already carries below it in the routed content.
+/// name and this build's own version, as a window title. The connection dot
+/// and the Space menu belong to `RailHeader`, which renders on every
+/// platform (0012's 2026-09-25 addendum), so this bar must not draw them.
 library;
 
 import 'dart:convert';
@@ -111,11 +112,12 @@ void main() {
     expect(find.text('slim-m'), findsOneWidget);
   });
 
-  testWidgets('carries the same connection dot RailHeader shows the Space '
-      'name beside', (tester) async {
+  testWidgets('draws neither the connection dot nor the Space menu: the rail '
+      'header owns both, so nothing is shown twice 40px apart', (tester) async {
     await _pump(tester);
 
-    expect(find.byType(SpaceConnectionDot), findsOneWidget);
+    expect(find.byType(SpaceConnectionDot), findsNothing);
+    expect(find.byIcon(AppIcons.chevronDown), findsNothing);
   });
 
   testWidgets('the window controls sit the same distance from the right edge no '

@@ -44,7 +44,7 @@ final serverInfoProvider = FutureProvider.autoDispose<api.Version>(
 /// rather than a second tally here nobody asked to compare.
 ///
 /// This header is hidden outright while the desktop title bar is mounted
-/// (`ChannelRail`, gated on `DesktopWindowShell.frameless`): that bar already
+/// (`ChannelRail`, on every platform now - see 0012's 2026-09-25 addendum): that bar already
 /// carries the Space's name, connection dot and menu chevron, and running
 /// both left the Space named twice 40px apart.
 ///
