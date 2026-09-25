@@ -29,6 +29,7 @@ mod gifs;
 mod link_preview;
 mod member_account;
 mod members_bulk;
+mod notification_schedule_calls;
 mod people;
 mod read_state;
 mod refusals;
@@ -284,14 +285,14 @@ pub async fn run(c: &mut Contract) {
     )
     .await;
 
-    push_calls(c, root, &channel).await;
+    push_calls(c, root, &channel, &bob_id).await;
     invite_calls(c, root, bob_token).await;
     // Last: a refusal leaves no state behind.
     refusals::refusal_calls(c, bob_token, &admin_id, &code).await;
     farewell_calls(c, root, &bob_id, &code, &channel).await;
 }
 
-async fn push_calls(c: &mut Contract, root: &str, channel: &str) {
+async fn push_calls(c: &mut Contract, root: &str, channel: &str, bob_id: &str) {
     c.get("getNotificationPreference", "/push/preference", root)
         .await;
     c.json(
@@ -325,6 +326,7 @@ async fn push_calls(c: &mut Contract, root: &str, channel: &str) {
     .await;
     channel_notification_override_calls(c, root, channel).await;
     quiet_hours_calls(c, root).await;
+    notification_schedule_calls::notification_schedule_calls(c, root, channel, bob_id).await;
     c.bare("deregisterPush", "DELETE", "/push", root).await;
 }
 

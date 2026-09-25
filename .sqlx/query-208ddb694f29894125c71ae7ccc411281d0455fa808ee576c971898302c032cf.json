@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT weekday AS \"weekday: i64\", start_minute AS \"start: i64\", end_minute AS \"end: i64\"\n               FROM notification_schedule_days WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "weekday: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "start: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "end: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "208ddb694f29894125c71ae7ccc411281d0455fa808ee576c971898302c032cf"
+}

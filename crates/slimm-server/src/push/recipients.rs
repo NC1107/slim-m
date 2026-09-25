@@ -9,7 +9,8 @@
 use std::collections::HashSet;
 
 use crate::ids::{ChannelId, UserId};
-use crate::notifications::{NotificationPreference, minute_of_day_utc};
+use crate::notification_schedule::degrade_for_off_hours;
+use crate::notifications::NotificationPreference;
 use crate::permissions::Permissions;
 use crate::presence::PresenceTracker;
 use crate::store::Store;
@@ -78,7 +79,7 @@ pub async fn message_recipients(
     let mentioned =
         resolved_mentions(store, channel_id, author_id, content, &viewers, presence).await?;
     let viewers = narrow_for_thread(store, channel_id, &mentioned, viewers).await?;
-    narrow_for_notification_preference(store, channel_id, &mentioned, viewers).await
+    narrow_for_notification_preference(store, channel_id, author_id, &mentioned, viewers).await
 }
 
 /// The distinct accounts a message's mentions resolve to - shared by
@@ -252,19 +253,19 @@ async fn narrow_for_thread(
 /// override still wakes a mentioned recipient whose account default is
 /// `nothing`.
 ///
-/// Quiet hours (`store/quiet_hours.rs`) run last, over whatever this
-/// resolved: a recipient whose current UTC minute falls inside their own
-/// window has their effective preference demoted one notch, from
-/// [`NotificationPreference::Everything`] to [`NotificationPreference::Mentions`],
-/// before the match above runs - never demoted to [`NotificationPreference::Nothing`],
-/// and never touching a recipient whose preference was already `mentions`
-/// or `nothing`. That keeps the same hierarchy this function already
-/// enforces: a quiet window says "do not wake me for ordinary chatter right
-/// now", not "silence even a direct mention", which is what choosing
-/// `nothing` outright already means.
+/// The notification schedule (`store/notification_schedule.rs`) runs last,
+/// over whatever this resolved: a recipient whose schedule reads the current
+/// instant as off hours (`Schedule::evaluate`, in their own IANA time zone)
+/// has their effective preference degraded by
+/// [`degrade_for_off_hours`] before the match above runs, unless this
+/// message's author or channel is on that recipient's own off-hours
+/// allow-list. A recipient with no schedule configured at all is untouched -
+/// see `store/notification_schedule.rs`'s own doc comment for why that is a
+/// distinct state from a schedule with every day empty.
 async fn narrow_for_notification_preference(
     store: &Store,
     channel_id: ChannelId,
+    author_id: UserId,
     mentioned: &HashSet<UserId>,
     viewers: Vec<UserId>,
 ) -> anyhow::Result<Vec<UserId>> {
@@ -275,18 +276,25 @@ async fn narrow_for_notification_preference(
         .channel_notification_preferences(channel_id, &viewers)
         .await?;
     let is_dm = store.channel_notifies_as_dm(channel_id).await?;
-    let quiet_hours = store.quiet_hours_for_users(&viewers).await?;
-    let current_minute = minute_of_day_utc(crate::store::now_ms());
+    let schedules = store.notification_schedules_for_users(&viewers).await?;
+    let channel_allowed = store
+        .viewers_allowing_channel_off_hours(&viewers, channel_id)
+        .await?;
+    let author_allowed = store
+        .viewers_allowing_author_off_hours(&viewers, author_id)
+        .await?;
+    let now_ms = crate::store::now_ms();
     Ok(viewers
         .into_iter()
         .filter(|user_id| {
             let mut preference = preferences.get(user_id).copied().unwrap_or_default();
-            if preference == NotificationPreference::Everything
-                && quiet_hours
-                    .get(user_id)
-                    .is_some_and(|window| window.contains(current_minute))
-            {
-                preference = NotificationPreference::Mentions;
+            if let Some(schedule) = schedules.get(user_id) {
+                preference = degrade_for_off_hours(
+                    preference,
+                    schedule.evaluate(now_ms),
+                    channel_allowed.contains(user_id),
+                    author_allowed.contains(user_id),
+                );
             }
             match preference {
                 NotificationPreference::Everything => true,

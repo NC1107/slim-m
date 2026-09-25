@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM notification_schedule_allowed_channels WHERE user_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f250df9a7a66d1e5550d384faf19783fab8958d89bd15ce310e923fe67ccb861"
+}

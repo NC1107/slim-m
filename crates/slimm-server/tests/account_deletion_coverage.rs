@@ -107,6 +107,22 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
         "subject_id",
         OnDelete::Keep("an audit log of what was done, kept for accountability"),
     ),
+    (
+        "notification_schedule_allowed_channels",
+        "user_id",
+        OnDelete::Purge,
+    ),
+    (
+        "notification_schedule_allowed_users",
+        "user_id",
+        OnDelete::Purge,
+    ),
+    (
+        "notification_schedule_allowed_users",
+        "allowed_user_id",
+        OnDelete::Purge,
+    ),
+    ("notification_schedules", "user_id", OnDelete::Purge),
     ("password_reset_codes", "issued_by", OnDelete::Anonymize),
     ("password_reset_codes", "user_id", OnDelete::Purge),
     ("pinned_messages", "pinned_by", OnDelete::Anonymize),

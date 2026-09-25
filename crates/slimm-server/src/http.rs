@@ -71,6 +71,7 @@ mod messages_bulk_window;
 mod metrics;
 mod module_commands;
 mod module_permissions;
+mod notification_schedule;
 mod overwrites;
 mod pins;
 mod polls;
@@ -198,6 +199,7 @@ pub fn router(state: AppState) -> Router {
         .merge(reactions::routes())
         .merge(push::routes())
         .merge(quiet_hours::routes())
+        .merge(notification_schedule::routes())
         .merge(pins::routes())
         .merge(saved_messages::routes())
         .merge(recovery::routes())

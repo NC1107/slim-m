@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO notification_schedules (user_id, timezone, off_hours_mode, snooze_until, updated_at)\n                 VALUES (?, 'UTC', ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8bbd7fcd61af9eb77d6412fcd3a4ed95e12dc27e1e7b4fa31040a4856c3ad738"
+}

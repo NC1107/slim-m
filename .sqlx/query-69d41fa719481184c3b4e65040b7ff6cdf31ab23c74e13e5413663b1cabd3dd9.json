@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT allowed_channel_id AS \"id: ChannelId\" FROM notification_schedule_allowed_channels WHERE user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: ChannelId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "69d41fa719481184c3b4e65040b7ff6cdf31ab23c74e13e5413663b1cabd3dd9"
+}

@@ -54,6 +54,10 @@ ed25519-dalek = { version = "2.2", default-features = false, features = ["zeroiz
 # Phase 3): no JIT, small binary footprint, and fuel metering for CPU limits.
 # Chosen over wasmtime specifically to protect the release-binary size budget.
 wasmi = "0.51"
+# IANA-timezone-aware datetime arithmetic for the notification schedule
+# (decision 0033): `tzdb-bundle-always` embeds the whole tz database in the
+# binary, since the distroless release image ships no /usr/share/zoneinfo.
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always", "serde"] }
 
 [profile.dev]
 # Line tables, not full DWARF. This crate builds 154 integration test files
