@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.87.0](https://github.com/NC1107/slim-m/compare/client-v0.86.0...client-v0.87.0) (2026-09-25)
+
+
+### Features
+
+* **client:** shift-click a message to select the whole range ([#1398](https://github.com/NC1107/slim-m/issues/1398)) ([effc602](https://github.com/NC1107/slim-m/commit/effc602d0a214f29c3b20b3c62de7fa7ec78cadc))
+* **client:** sink bots to their own group at the bottom of the member list ([#1386](https://github.com/NC1107/slim-m/issues/1386)) ([a91c532](https://github.com/NC1107/slim-m/commit/a91c532010830020778ce3cae4a6662cbd69a152))
+
+
+### Bug Fixes
+
+* **client:** a notification for a voice channel's chat opens the chat, not the call ([#1397](https://github.com/NC1107/slim-m/issues/1397)) ([6d147dc](https://github.com/NC1107/slim-m/commit/6d147dc72d00387d35c9f42328d78c11cdc86e9a))
+* **client:** a reaction chip is a button, not selectable text ([#1392](https://github.com/NC1107/slim-m/issues/1392)) ([5e324e2](https://github.com/NC1107/slim-m/commit/5e324e24dec62b2d105333df6725c62e20cf5577))
+* **client:** context-menu items act on the region's own context, so Moderate... anchors to its tile ([#1394](https://github.com/NC1107/slim-m/issues/1394)) ([984da69](https://github.com/NC1107/slim-m/commit/984da69e5824dd23aafb0ea4ae3f82f28eaa8cd7))
+* **client:** expected What's new entry count follows the 0.86 entry ([#1391](https://github.com/NC1107/slim-m/issues/1391)) ([c5a54d9](https://github.com/NC1107/slim-m/commit/c5a54d9b95e470ae41e4d6062260b795c6a97305))
+* **client:** gifs hold by default, play on hover, and pause while the window is unfocused ([#1399](https://github.com/NC1107/slim-m/issues/1399)) ([8175af6](https://github.com/NC1107/slim-m/commit/8175af6f3adb5e1294808ce108bec2e9f90a3110))
+* **client:** hold the roster while a call is shown, so tile menus read a loaded profile ([#1395](https://github.com/NC1107/slim-m/issues/1395)) ([cb9cf58](https://github.com/NC1107/slim-m/commit/cb9cf5852311068e74fce01c1bbcc658295a2bf7))
+* **client:** keep reactions_row's plain comments to one line ([#1393](https://github.com/NC1107/slim-m/issues/1393)) ([51e7d2b](https://github.com/NC1107/slim-m/commit/51e7d2b6c4553f419a65264b069fe8f78371bf52))
+* **client:** move the call-view screen-share label inside the stage ([#1382](https://github.com/NC1107/slim-m/issues/1382)) ([685f28d](https://github.com/NC1107/slim-m/commit/685f28dcdf9fd3827b600c94c68956b64ffdfcdd))
+* **client:** one header on a voice channel with chat open, and honour showHeader ([#1389](https://github.com/NC1107/slim-m/issues/1389)) ([bb1e11a](https://github.com/NC1107/slim-m/commit/bb1e11ab9f54b10df91999723f8720250210aef5))
+* **client:** run space menu actions on the button's context, not the overlay's ([#1385](https://github.com/NC1107/slim-m/issues/1385)) ([5a3c2dc](https://github.com/NC1107/slim-m/commit/5a3c2dc4de1a21de45c157e7adc3aeec8b8466a2))
+* **client:** staged attachments survive leaving and returning to a channel ([#1400](https://github.com/NC1107/slim-m/issues/1400)) ([bd69193](https://github.com/NC1107/slim-m/commit/bd6919374fd2d4bd4b9f1156008560744e003c72))
+* **client:** the Space menu lives in the rail header on every platform ([#1396](https://github.com/NC1107/slim-m/issues/1396)) ([f87ad94](https://github.com/NC1107/slim-m/commit/f87ad9413c255299f4964b279866da41b709ba88))
+* **client:** What's new entry for 0.86, so the freshness gate passes again ([#1390](https://github.com/NC1107/slim-m/issues/1390)) ([07526a4](https://github.com/NC1107/slim-m/commit/07526a48c204e1a54ce1c191fa96ae831a1c2fd2))
+
 ## [0.86.0](https://github.com/NC1107/slim-m/compare/client-v0.85.0...client-v0.86.0) (2026-09-25)
 
 
