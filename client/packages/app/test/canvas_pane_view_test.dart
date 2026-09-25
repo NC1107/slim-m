@@ -19,8 +19,10 @@ import 'canvas_pane_harness.dart';
 void main() {
   /// The one route back once panning or zooming has gone somewhere nothing
   /// is - see `worldLimit`'s own doc for why this was previously missing.
+  /// An empty canvas has no content to fit, so the origin is still correct
+  /// here - `cameraToFit`'s own fallback for a null `contentBounds`.
   testWidgets(
-    'the overflow\'s Recenter view jumps the camera back to the world '
+    'the overflow\'s Recenter view jumps an empty canvas back to the world '
     'origin',
     (tester) async {
       final fixture = CanvasPaneFixture();
@@ -46,6 +48,37 @@ void main() {
       expect(surfaceDocument(tester).camera, const Camera());
     },
   );
+
+  /// With real content, Recenter fits that content into view rather than
+  /// resetting to the origin - the bug this replaced: "Recenter" used to be
+  /// "reset to origin" regardless of where the drawing actually lived.
+  testWidgets('the overflow\'s Recenter view fits content placed away from the '
+      'origin into view, not the world origin', (tester) async {
+    final fixture = CanvasPaneFixture()
+      ..objects = [canvasNoteJson('note', x: 5000)];
+    final container = fixture.container();
+    addTearDown(container.dispose);
+    addTearDown(fixture.events.close);
+    await pumpCanvasPane(tester, container);
+    await tester.pumpAndSettle();
+
+    surfaceDocument(
+      tester,
+    ).setCamera(const Camera(x: -9000, y: -9000, zoom: 3.2));
+
+    await tester.tap(find.bySemanticsLabel('More canvas actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recenter view'));
+    await tester.pumpAndSettle();
+
+    final view = surfaceDocument(tester).worldView;
+    final bounds = surfaceDocument(tester).contentBounds!;
+    expect(
+      view.overlaps(bounds) && view.contains(bounds.center),
+      isTrue,
+      reason: 'the note at world x=5000 must land inside the new view',
+    );
+  });
 
   /// The desktop convention every other drawing surface honours: Delete or
   /// Backspace over the current Move-tool selection, not only the overflow

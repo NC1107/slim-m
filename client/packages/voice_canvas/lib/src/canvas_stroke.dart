@@ -7,6 +7,7 @@
 /// imported it for these types has to change.
 library;
 
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -87,6 +88,30 @@ class Camera {
 
   @override
   int get hashCode => Object.hash(x, y, zoom);
+}
+
+/// The [Camera] that brings [bounds] fully into view inside a [viewport]
+/// pane, with [padding] world units of breathing room on every side - what
+/// "Recenter" fits to instead of resetting to the world origin. Falls back
+/// to the origin camera when there is nothing to fit ([bounds] null) or no
+/// measured viewport yet, the same "nothing here" case [CanvasPresenceLayout
+/// .withMaxRowWidth] already falls back on.
+Camera cameraToFit(Rect? bounds, Size viewport, {double padding = 48}) {
+  if (bounds == null || viewport.width <= 0 || viewport.height <= 0) {
+    return const Camera();
+  }
+  final paddedWidth = bounds.width + padding * 2;
+  final paddedHeight = bounds.height + padding * 2;
+  final zoom = math
+      .min(viewport.width / paddedWidth, viewport.height / paddedHeight)
+      .clamp(minZoom, maxZoom);
+  final centerX = bounds.left + bounds.width / 2;
+  final centerY = bounds.top + bounds.height / 2;
+  return Camera(
+    x: centerX - viewport.width / (2 * zoom),
+    y: centerY - viewport.height / (2 * zoom),
+    zoom: zoom,
+  );
 }
 
 /// One stroke as the wire describes it, with no JSON and no api types: the
