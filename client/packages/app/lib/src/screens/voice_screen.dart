@@ -224,6 +224,8 @@ class _InCall extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final voice = ref.watch(voiceControllerProvider);
+    // autoDispose: hold the roster while a call is shown, or a tile's menu and card read it unloaded.
+    ref.listen(membersProvider, (_, _) {});
     final controller = ref.read(voiceControllerProvider.notifier);
 
     return Stack(
