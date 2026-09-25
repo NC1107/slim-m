@@ -72,7 +72,7 @@ class SettingsPane {
   final List<Widget>? actions;
 }
 
-/// A run of panes, usually under a heading: `YOU`, `SAFETY`.
+/// A run of panes, usually under a heading: `You`, `Safety`.
 class SettingsPaneGroup {
   const SettingsPaneGroup({required this.panes, this.label});
 
@@ -247,6 +247,12 @@ class _PaneBody extends StatelessWidget {
   );
 }
 
+/// One rule for every settings nav (design review note 19, applied here and
+/// to Space settings, which shares this same widget): a group label reads
+/// mono 10/medium with a hairline above it, not the small-caps sans label
+/// this nav used to share with [AppCard]'s own header - at 20px, a pane's
+/// icon outweighed an 11px caps label sitting right beside it, so the label
+/// read as a stray row rather than the heading above the rows.
 class _Nav extends StatelessWidget {
   const _Nav({
     required this.groups,
@@ -276,19 +282,23 @@ class _Nav extends StatelessWidget {
             children: [
               for (final group in groups) ...[
                 if (group.label case final label?)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      10,
-                      AppSpacing.s12,
-                      10,
-                      6,
+                  Container(
+                    margin: const EdgeInsets.only(top: AppSpacing.s12),
+                    padding: const EdgeInsets.fromLTRB(10, 14, 10, 6),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: tokens.borderSubtle),
+                      ),
                     ),
                     child: Semantics(
                       header: true,
                       child: Text(
-                        label.toUpperCase(),
-                        style: AppText.label.copyWith(
-                          color: tokens.textSecondary,
+                        label,
+                        style: AppText.code.copyWith(
+                          fontSize: 10,
+                          fontWeight: AppWeights.medium,
+                          letterSpacing: 1,
+                          color: tokens.textDisabled,
                         ),
                       ),
                     ),
