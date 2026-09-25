@@ -28,6 +28,7 @@ import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
+import '../widgets/voice_reconnect_banner.dart';
 import 'voice_call_dock.dart';
 import 'voice_join_preview.dart';
 import 'voice_text_pane.dart';
@@ -145,9 +146,13 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
         : null;
     final canRetry = errorMessage == null || voice.retryable;
 
-    final stage = connectedHere
+    // rejoiningHere stays on the call stage rather than the full-screen
+    // connecting spinner: the bounded auto-rejoin behind it is still trying,
+    // and the grid, filmstrip and controls it already had are worth more
+    // than a blank screen while that happens. See _InCall's own banner.
+    final stage = connectedHere || rejoiningHere
         ? 'call'
-        : (connectingHere || joiningHere || rejoiningHere)
+        : (connectingHere || joiningHere)
         ? 'connecting'
         : busyElsewhere
         ? 'switch'
@@ -162,10 +167,8 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
       key: ValueKey('voice-${stage == 'joining' ? 'connecting' : stage}'),
       child: switch (stage) {
         'call' => _InCall(channelId: channelId, isDm: widget.isDm),
-        'connecting' || 'joining' => VoiceConnecting(
-          // The word is all that separates a rejoin from a first connection.
-          label: rejoiningHere ? 'Reconnecting' : 'Connecting',
-        ),
+        // rejoiningHere never reaches here: it maps to 'call' above, with its own overlay instead of this full-screen spinner.
+        'connecting' || 'joining' => const VoiceConnecting(),
         'switch' => VoiceSwitchPrompt(onSwitch: () => _switchNow(controller)),
         _ => VoiceRejoinScreen(
           channelId: channelId,
@@ -230,6 +233,12 @@ class _InCall extends ConsumerWidget {
           onOpenProfile: (p) => _openProfile(context, ref, p),
           isDm: isDm,
         ),
+        // A bounded auto-rejoin in progress: see voice_screen.dart's own stage comment.
+        if (voice.rejoining)
+          const Align(
+            alignment: Alignment.topCenter,
+            child: VoiceReconnectBanner(),
+          ),
         Align(
           alignment: Alignment.bottomCenter,
           child: SafeArea(
