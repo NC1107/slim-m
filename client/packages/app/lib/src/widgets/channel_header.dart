@@ -44,6 +44,8 @@ class ChannelHeader extends ConsumerWidget {
     this.restricted = false,
     required this.searchOpen,
     required this.onToggleSearch,
+    this.textChatOpen = false,
+    this.onToggleTextChat,
   });
 
   final String channelId;
@@ -77,6 +79,13 @@ class ChannelHeader extends ConsumerWidget {
   /// overwrites, so the icon they already show wins.
   final bool restricted;
   final bool searchOpen;
+
+  /// The voice shell's toggle for `voice_text_pane.dart`'s docked chat, so a
+  /// voice channel has one header rather than a slim bar stacked above this
+  /// one. Null renders no toggle: a text channel, or a width the pane cannot
+  /// dock at - `VoiceScreen`'s own condition - so it is never dead chrome.
+  final bool textChatOpen;
+  final VoidCallback? onToggleTextChat;
   final VoidCallback onToggleSearch;
 
   @override
@@ -187,6 +196,15 @@ class ChannelHeader extends ConsumerWidget {
           const SizedBox(width: AppSpacing.s4),
           DmCallButton(channelId: channelId),
           const SizedBox(width: AppSpacing.s4),
+          if (onToggleTextChat case final toggle?) ...[
+            AppIconButton(
+              icon: AppIcons.chat,
+              semanticLabel: 'Toggle text chat',
+              active: textChatOpen,
+              onPressed: toggle,
+            ),
+            const SizedBox(width: AppSpacing.s4),
+          ],
           CanvasOpenButton(channelId: channelId, isVoice: isVoice, isDm: isDm),
           const SizedBox(width: AppSpacing.s4),
           AppIconButton(

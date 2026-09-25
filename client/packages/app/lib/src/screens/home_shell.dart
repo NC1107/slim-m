@@ -29,6 +29,7 @@ import '../providers/providers.dart';
 import '../providers/retention_sweep.dart';
 import '../providers/threads.dart';
 import '../providers/voice_controller.dart';
+import '../providers/channel_search_controller.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/app_panel_reveal.dart';
@@ -45,8 +46,8 @@ import '../widgets/rail_slot.dart';
 import '../widgets/update_banner_host.dart';
 import '../widgets/voice_strip_indicator.dart';
 import '../widgets/whats_new_gate.dart';
+import '../widgets/channel_header.dart';
 import 'canvas/canvas_fullscreen.dart';
-import 'canvas/canvas_open_button.dart';
 import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
 import 'dm_call_pane.dart';
@@ -367,7 +368,11 @@ class ConversationPane extends ConsumerWidget {
           if (!layout.showsBothPanes || !isVoice || canvasOpen) return body;
           return Column(
             children: [
-              _VoiceConversationHeader(channelId: channelId),
+              _VoiceConversationHeader(
+                channelId: channelId,
+                name: channel?.name ?? '',
+                topic: channel?.topic,
+              ),
               Expanded(child: body),
             ],
           );
@@ -377,87 +382,44 @@ class ConversationPane extends ConsumerWidget {
   }
 }
 
-/// [_ChannelTitle] plus, at a width [LayoutClass.fitsThreadPane] fits a
-/// docked pane at, the toggle for `voice_text_pane.dart`'s side pane -
-/// matching `VoiceScreen`'s own condition for showing that pane rather than
-/// its compact tab fallback, so the toggle is never dead chrome pointed at a
-/// pane that is not there.
+/// A voice channel's one header: [ChannelHeader] with the toggle for
+/// `voice_text_pane.dart`'s docked chat, offered only at a width
+/// [LayoutClass.fitsThreadPane] can dock it at - `VoiceScreen`'s own
+/// condition - so it is never chrome pointed at a pane that is not there.
+/// The docked pane passes `showHeader: false`, so this is the only bar.
 class _VoiceConversationHeader extends ConsumerWidget {
-  const _VoiceConversationHeader({required this.channelId});
+  const _VoiceConversationHeader({
+    required this.channelId,
+    required this.name,
+    this.topic,
+  });
 
   final String channelId;
+  final String name;
+  final String? topic;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
     final canDock = LayoutClass.of(
       context,
     ).fitsThreadPane(MediaQuery.sizeOf(context).width);
     final chatOpen = ref.watch(voiceChatPaneVisibleProvider);
-    return Container(
-      height: AppSizes.headerBar,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _ChannelTitle(channelId: channelId)),
-          if (canDock) ...[
-            AppIconButton(
-              icon: AppIcons.hash,
-              semanticLabel: 'Toggle text chat',
-              active: chatOpen,
-              onPressed: () =>
-                  ref.read(voiceChatPaneVisibleProvider.notifier).state =
-                      !chatOpen,
-            ),
-            const SizedBox(width: AppSpacing.s4),
-          ],
-          CanvasOpenButton(channelId: channelId, isVoice: true),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChannelTitle extends ConsumerWidget {
-  const _ChannelTitle({required this.channelId});
-
-  final String channelId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final storeAsync = ref.watch(storeProvider);
-    return storeAsync.maybeWhen(
-      orElse: () => const SizedBox.shrink(),
-      data: (store) => StreamBuilder<List<Channel>>(
-        stream: store.watchChannels(),
-        builder: (context, snapshot) {
-          final channel = snapshot.data
-              ?.where((c) => c.id == channelId)
-              .firstOrNull;
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                channel?.kind == 'voice' ? AppIcons.voice : AppIcons.hash,
-                size: AppSizes.icon16,
-              ),
-              const SizedBox(width: AppSpacing.s8),
-              // Expanded above makes this Row tight, so min does not hold it in.
-              Flexible(
-                child: Text(
-                  channel?.name ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: AppWeights.semi),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+    final search = ref.watch(channelSearchProvider(channelId));
+    void setChatOpen(bool open) =>
+        ref.read(voiceChatPaneVisibleProvider.notifier).state = open;
+    return ChannelHeader(
+      channelId: channelId,
+      name: name,
+      topic: topic,
+      isVoice: true,
+      searchOpen: search.open,
+      // Search lives in the docked chat, so opening it opens the pane it searches.
+      onToggleSearch: () {
+        if (!chatOpen) setChatOpen(true);
+        ref.read(channelSearchProvider(channelId).notifier).toggle();
+      },
+      textChatOpen: chatOpen,
+      onToggleTextChat: canDock ? () => setChatOpen(!chatOpen) : null,
     );
   }
 }
