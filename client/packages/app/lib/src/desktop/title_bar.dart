@@ -18,15 +18,14 @@
 /// is the one place every platform, with or without this bar, reads the
 /// version now.
 ///
-/// Carries [SpaceMenuButton] too now (design review note 22): the same
-/// chevron `RailHeader` shows beside its own copy of the name, so the one
-/// place a caller reaches Space settings/channel/category creation from does
-/// not depend on which bar is drawn. `ChannelRail` hides `RailHeader`
-/// outright while this bar is mounted (`DesktopWindowShell.frameless`),
-/// rather than running both side by side 40px apart repeating the same
-/// name, dot and menu; `RailHeader` still carries them on every platform
-/// without a custom title bar, member count dropped there as well since a
-/// count is not something this bar has room for either.
+/// Carries no Space menu and no connection dot any more. Design review note
+/// 22 had moved both here and hidden `RailHeader` on the frameless desktop to
+/// avoid two copies 40px apart; the owner then found a Space menu jammed
+/// beside the window quit kebab read as window chrome. So the rail header
+/// keeps the Space's identity and its menu on every platform (the Slack and
+/// Discord shape), and this bar is the window's own title: name, version,
+/// window menu, window controls. The name appears in both places on purpose,
+/// once as a window title and once as the Space header - different jobs.
 library;
 
 import 'dart:async';
@@ -36,10 +35,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/providers.dart' show appInfoProvider;
-import '../providers/sync_controller.dart' show syncControllerProvider;
-import '../widgets/channel_rail_frame.dart'
-    show SpaceConnectionDot, serverInfoProvider;
-import '../widgets/space_menu_button.dart' show SpaceMenuButton;
+import '../widgets/channel_rail_frame.dart' show serverInfoProvider;
 import 'close_behavior.dart';
 import 'desktop_window_port.dart';
 import 'window_menu_button.dart';
@@ -78,7 +74,6 @@ class TitleBar extends ConsumerWidget {
 
     // `/version` needs no session, same as `ClientTooOldGate`'s own read of it.
     final server = ref.watch(serverInfoProvider);
-    final syncStatus = ref.watch(syncControllerProvider);
     final appVersion = ref.watch(appInfoProvider).valueOrNull?.version;
     final name = server.valueOrNull?.name ?? 'slim-m';
 
@@ -95,8 +90,6 @@ class TitleBar extends ConsumerWidget {
             const SizedBox(width: AppSpacing.s12),
             AppBrandMark(size: AppSizes.icon20, color: tokens.accent),
             const SizedBox(width: AppSpacing.s8),
-            SpaceConnectionDot(status: syncStatus),
-            const SizedBox(width: 6),
             // The one flex child - a second one here split the leftover width and stranded the controls mid-bar.
             Expanded(
               child: _DragRegion(
@@ -125,8 +118,6 @@ class TitleBar extends ConsumerWidget {
                 ),
               ),
             ),
-            // Hidden entirely when nothing gates it open, same as everywhere else this button is drawn.
-            const SpaceMenuButton(),
             if (!isMac)
               _WindowControls(port: port, onRequestClose: onRequestClose),
           ],
