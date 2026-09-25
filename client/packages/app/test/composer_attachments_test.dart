@@ -12,8 +12,10 @@ library;
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
+import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/widgets/composer_attachments.dart';
 
 api.Attachment _attachment({
@@ -143,4 +145,50 @@ void main() {
     expect(looksLikeImage('notes.txt'), isFalse);
     expect(looksLikeImage('noextension'), isFalse);
   });
+
+  test(
+    'a different account signing in empties every channel\'s staging',
+    () async {
+      const bob = api.TokenPair(
+        userId: 'bob',
+        accessToken: 'a',
+        refreshToken: 'r',
+        accessExpiresAt: 0,
+      );
+      final session = api.SessionStore(tokens: bob);
+      final container = ProviderContainer(
+        overrides: [sessionProvider.overrideWithValue(session)],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(attachmentStagingProvider('c1'))
+          .addResolved(
+            const api.Attachment(
+              id: 'a1',
+              filename: 'photo.png',
+              contentType: 'image/png',
+              size: 1,
+            ),
+            Uint8List.fromList(const [1]),
+          );
+      expect(container.read(attachmentStagingProvider('c1')).isEmpty, isFalse);
+
+      session.set(
+        const api.TokenPair(
+          userId: 'alice',
+          accessToken: 'a',
+          refreshToken: 'r',
+          accessExpiresAt: 0,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container.read(attachmentStagingProvider('c1')).isEmpty,
+        isTrue,
+        reason:
+            'the next account on this device must never see the last one\'s files',
+      );
+    },
+  );
 }

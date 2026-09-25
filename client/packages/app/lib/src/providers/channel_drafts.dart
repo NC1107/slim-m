@@ -40,13 +40,12 @@ import 'providers.dart';
 /// failed write costs the words a crash would have cost anyway, and blocking the
 /// composer would cost every keystroke.
 ///
-/// A reply-in-progress and a staged attachment are deliberately not held
-/// here, and that is a decision, not an oversight: `ChannelScreen` already
-/// clears the reply target on a channel switch (see its own `didUpdateWidget`
-/// doc comment, "a reply is scoped to the conversation it was started in"),
-/// and `Composer` now clears a staged attachment the same way. Restoring text
-/// while a stale reply or attachment silently rode along pointed at the
-/// channel it came from would be worse than restoring nothing.
+/// A reply-in-progress is deliberately not held here, and that is a decision,
+/// not an oversight: `ChannelScreen` clears the reply target on a channel
+/// switch (see its own `didUpdateWidget` doc comment, "a reply is scoped to
+/// the conversation it was started in"). Staged attachments live beside this
+/// in `attachmentStagingProvider`, per channel for the session but never on
+/// disk, since the server sweeps an unsent upload after a day.
 class ChannelDraftsController {
   ChannelDraftsController(this._ref) {
     _account = _ref.read(sessionProvider).tokens?.userId;

@@ -14,9 +14,11 @@ library;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import '../api_failure.dart';
+import '../providers/providers.dart';
 
 /// One attachment as the composer sees it, from the moment its bytes are
 /// picked. [bytes] and [filename] never change once staged; a retry restages
@@ -84,13 +86,14 @@ bool looksLikeImage(String filename) {
   return imageExtensions.contains(filename.substring(dot).toLowerCase());
 }
 
-/// Stages attachments for one composer: a pick is visible the moment it
-/// happens, its upload runs in the background, and a failure stays in place
-/// until it is retried or removed rather than vanishing.
+/// Stages attachments for one channel's composer: a pick is visible the
+/// moment it happens, its upload runs in the background, and a failure stays
+/// in place until it is retried or removed rather than vanishing.
 ///
-/// A [ChangeNotifier] rather than Riverpod state: this is scoped to one
-/// composer instance exactly the way its `TextEditingController` already is,
-/// and nothing outside that composer ever needs to read it.
+/// One per channel, held by [attachmentStagingProvider] for the session, so
+/// what was picked in a channel is still there when that channel is reopened
+/// and never rides into another one. A [ChangeNotifier] like the composer's
+/// own `TextEditingController`, since the composer is its only reader.
 class AttachmentStagingController extends ChangeNotifier {
   AttachmentStagingController({required this.upload});
 
@@ -175,12 +178,6 @@ class AttachmentStagingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// A staged attachment is already uploaded, server-side, real cost, and
-  /// unlike the composer's text (see `channel_drafts.dart`) nothing restores
-  /// it for a later return to this channel, so carrying it silently into
-  /// whatever channel comes up next would risk sending it there by mistake.
-  void resetForChannelSwitch() => clear();
-
   Future<void> _runUpload(
     String localId,
     Uint8List bytes,
@@ -219,3 +216,28 @@ class AttachmentStagingController extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// The staging for one channel, alive for the whole session like the text
+/// drafts in `channel_drafts.dart`: a picked file is back on the composer
+/// when its channel is reopened, whether the screen switched channels or was
+/// torn down for voice, a call or the canvas. In memory only - the bytes are
+/// for the tile's preview and the server sweeps an unsent upload after a day,
+/// so a restart starts clean. A different account signing in on this process
+/// empties every channel's staging, the same boundary the drafts keep.
+final attachmentStagingProvider =
+    Provider.family<AttachmentStagingController, String>((ref, channelId) {
+      final controller = AttachmentStagingController(
+        upload: (bytes, filename) =>
+            ref.read(apiProvider).uploadAttachment(bytes, filename: filename),
+      );
+      final session = ref.read(sessionProvider);
+      final account = session.tokens?.userId;
+      final sub = session.changes.listen((tokens) {
+        if (tokens?.userId != account) ref.invalidateSelf();
+      });
+      ref.onDispose(() {
+        sub.cancel();
+        controller.dispose();
+      });
+      return controller;
+    });
