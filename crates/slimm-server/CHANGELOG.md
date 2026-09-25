@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.74.0](https://github.com/NC1107/slim-m/compare/server-v0.73.0...server-v0.74.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* **server:** refuse an over-ceiling module scene instead of cutting its JSON ([#1388](https://github.com/NC1107/slim-m/issues/1388)) ([899262a](https://github.com/NC1107/slim-m/commit/899262a4bef5c047499a7275e74c3d1f54a1eb47))
+
 ## [0.73.0](https://github.com/NC1107/slim-m/compare/server-v0.72.0...server-v0.73.0) (2026-09-25)
 
 
