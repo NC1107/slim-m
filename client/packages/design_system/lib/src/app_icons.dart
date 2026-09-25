@@ -58,11 +58,21 @@ abstract final class AppIcons {
   static const IconData moreVertical = LucideIcons.moreVertical300;
 
   /// A dedicated grab zone for a row whose primary control is an editable
-  /// text field (the categories screen): unlike a channel row's held-press
-  /// drag, wrapping the whole row here would contest the field's own
-  /// long-press text selection for the same gesture, so this needs its own
-  /// glyph rather than reusing that pattern.
+  /// text field: unlike a channel row's held-press drag, wrapping the whole
+  /// row here would contest the field's own long-press text selection for
+  /// the same gesture, so this needs its own glyph rather than reusing that
+  /// pattern.
   static const IconData dragHandle = LucideIcons.gripVertical300;
+
+  /// A menu's own reorder pair, for a list too short-lived a drag to be
+  /// worth building (the rail's per-category menu): moves one step, not a
+  /// destination picker.
+  static const IconData moveUp = LucideIcons.arrowUp300;
+  static const IconData moveDown = LucideIcons.arrowDown300;
+
+  /// Folding a category's channels out of the way, and the reverse.
+  static const IconData fold = LucideIcons.foldVertical300;
+  static const IconData unfold = LucideIcons.unfoldVertical300;
 
   // Messaging.
   static const IconData send = LucideIcons.send300;

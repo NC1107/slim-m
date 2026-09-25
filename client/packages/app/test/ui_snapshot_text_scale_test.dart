@@ -42,7 +42,6 @@ const _plainSurfaces = <String, String>{
   'admin-invites': '/settings/invites',
   'admin-overwrites': '/settings/permissions',
   'admin-emoji': '/settings/emoji',
-  'admin-categories': '/settings/categories',
   'admin-removed-members': '/settings/removed-members',
   'admin-analytics': '/settings/analytics',
   'debug-log': '/settings/debug-log',

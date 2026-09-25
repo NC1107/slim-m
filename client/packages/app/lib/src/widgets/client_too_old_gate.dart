@@ -73,7 +73,10 @@ class _ClientTooOldScreenState extends ConsumerState<ClientTooOldScreen> {
       _busy = true;
       _error = null;
     });
-    final result = await (widget.rpm ?? const RpmUpdater()).apply();
+    final mine = ref.read(appInfoProvider).valueOrNull?.version;
+    final result = await (widget.rpm ?? const RpmUpdater()).apply(
+      currentVersion: mine,
+    );
     if (!mounted) return;
     setState(() {
       _busy = false;

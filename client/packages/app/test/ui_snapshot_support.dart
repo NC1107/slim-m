@@ -36,7 +36,6 @@ import 'package:slimm_app/src/providers/sync_controller.dart';
 import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
-import 'package:slimm_app/src/screens/admin/categories_screen.dart';
 import 'package:slimm_app/src/screens/admin/channel_permissions_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
@@ -268,11 +267,6 @@ GoRouter fixtureRouter(String location) => GoRouter(
       path: '/settings/removed-members',
       pageBuilder: (context, state) =>
           modalPage(context, const RemovedMembersScreen()),
-    ),
-    GoRoute(
-      path: '/settings/categories',
-      pageBuilder: (context, state) =>
-          modalPage(context, const CategoriesScreen()),
     ),
     GoRoute(
       path: '/settings/analytics',

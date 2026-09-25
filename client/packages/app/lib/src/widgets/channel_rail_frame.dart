@@ -11,7 +11,6 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../desktop/update_watch.dart';
-import '../providers/member_presence.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
 import '../providers/sync_controller.dart';
@@ -36,8 +35,18 @@ final serverInfoProvider = FutureProvider.autoDispose<api.Version>(
   (ref) => ref.watch(apiProvider).version(),
 );
 
-/// The subtitle carries this build's version ([appInfoProvider], never the
-/// server's own), leaving the name line its room for a long Space name.
+/// No subtitle any more: it used to carry the member count and this build's
+/// version, both dropped (design review note 22/7). A version is not a
+/// property of the Space, and duplicated the desktop title bar's own copy;
+/// `AppInfoSection` (Personal settings > App) is the one place every
+/// platform reads it now. The member count is the member pane's own count
+/// (`MEMBERS · N`), one line below where a caller already looks for it,
+/// rather than a second tally here nobody asked to compare.
+///
+/// This header is hidden outright while the desktop title bar is mounted
+/// (`ChannelRail`, gated on `DesktopWindowShell.frameless`): that bar already
+/// carries the Space's name, connection dot and menu chevron, and running
+/// both left the Space named twice 40px apart.
 ///
 /// The name line also carries [SpaceConnectionDot] now (owner request,
 /// 2026-08-03): the Space's own connection used to show only in the profile
@@ -53,8 +62,6 @@ class RailHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final server = ref.watch(serverInfoProvider);
-    final members = ref.watch(membersProvider);
-    final version = ref.watch(appInfoProvider).valueOrNull?.version ?? '';
     // Latched past the first failure, so a retry loop does not flip this dot.
     final syncStatus = displaySyncStatus(
       ref.watch(syncControllerProvider),
@@ -70,7 +77,7 @@ class RailHeader extends ConsumerWidget {
         bottom: false,
         // Right is only the physical edge when nothing sits beside the rail.
         right: !_railHasNeighbour(context),
-        // minHeight, not height: the two text lines grow under a larger OS text scale.
+        // minHeight, not height: the name line grows under a larger OS text scale.
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: AppSizes.headerBar),
           child: Padding(
@@ -78,39 +85,18 @@ class RailHeader extends ConsumerWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SpaceConnectionDot(status: syncStatus),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              server.valueOrNull?.name ?? 'slim-m',
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.body.copyWith(
-                                color: tokens.textPrimary,
-                                fontWeight: AppWeights.semi,
-                              ),
-                            ),
+                      SpaceConnectionDot(status: syncStatus),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          server.valueOrNull?.name ?? 'slim-m',
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body.copyWith(
+                            color: tokens.textPrimary,
+                            fontWeight: AppWeights.semi,
                           ),
-                        ],
-                      ),
-                      Text(
-                        [
-                          ?members.maybeWhen(
-                            data: (list) => '${list.length} members',
-                            orElse: () => null,
-                          ),
-                          if (version.isNotEmpty) 'v$version',
-                        ].join(' · '),
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.micro.copyWith(
-                          color: tokens.textSecondary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],

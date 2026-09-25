@@ -175,6 +175,37 @@ void main() {
       expect(result.detail, contains('still be building'));
     });
 
+    test(
+      'still genuinely stuck when currentVersion is passed and matches too',
+      () async {
+        // Naming the running version must not turn a real "still building" into success.
+        final runner = _upgrading(before: '0.74.0', after: '0.74.0');
+        final result = await RpmUpdater(
+          run: runner.call,
+        ).apply(currentVersion: '0.74.0');
+
+        expect(result.ok, isFalse);
+        expect(result.detail, contains('still be building'));
+      },
+    );
+
+    test('nothing newer than what is already installed is success, not the '
+        '"still building" failure - an earlier attempt already landed it and '
+        'only a restart is left', () async {
+      // The owner's own box: rpm -q says 0.83.0, but the process never restarted into it.
+      final runner = _upgrading(before: '0.83.0', after: '0.83.0');
+      final result = await RpmUpdater(
+        run: runner.call,
+      ).apply(currentVersion: '0.82.0');
+
+      expect(result.ok, isTrue);
+      expect(
+        result.detail,
+        isNot(contains('still be building')),
+        reason: 'the reverse wording only belongs on a genuinely stuck install',
+      );
+    });
+
     test('the upgrade always refreshes the metadata first', () async {
       final runner = _upgrading();
       await RpmUpdater(run: runner.call).apply();

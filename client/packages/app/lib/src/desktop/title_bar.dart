@@ -11,13 +11,22 @@
 /// works. [DesktopWindowShell] only ever hides the native frame on Linux, so
 /// this widget is unreachable on the other two branches in this build.
 ///
-/// The name line consolidates three things `RailHeader` already shows below
-/// it in the routed content - the Space's name, its connection state, and
-/// this build's own version - rather than the static literal `slim-m` this
-/// bar shipped with, which never changed no matter which deployment was
-/// open or whether it was still reachable. `RailHeader` keeps its own copy:
-/// it is the only one of the two visible on every other platform, and it
-/// also carries the member count this bar has no room for.
+/// The name line shows the Space's name, its connection state, and this
+/// build's own version, rather than the static literal `slim-m` this bar
+/// shipped with, which never changed no matter which deployment was open or
+/// whether it was still reachable. `AppInfoSection` (Personal settings > App)
+/// is the one place every platform, with or without this bar, reads the
+/// version now.
+///
+/// Carries [SpaceMenuButton] too now (design review note 22): the same
+/// chevron `RailHeader` shows beside its own copy of the name, so the one
+/// place a caller reaches Space settings/channel/category creation from does
+/// not depend on which bar is drawn. `ChannelRail` hides `RailHeader`
+/// outright while this bar is mounted (`DesktopWindowShell.frameless`),
+/// rather than running both side by side 40px apart repeating the same
+/// name, dot and menu; `RailHeader` still carries them on every platform
+/// without a custom title bar, member count dropped there as well since a
+/// count is not something this bar has room for either.
 library;
 
 import 'dart:async';
@@ -30,6 +39,7 @@ import '../providers/providers.dart' show appInfoProvider;
 import '../providers/sync_controller.dart' show syncControllerProvider;
 import '../widgets/channel_rail_frame.dart'
     show SpaceConnectionDot, serverInfoProvider;
+import '../widgets/space_menu_button.dart' show SpaceMenuButton;
 import 'close_behavior.dart';
 import 'desktop_window_port.dart';
 import 'window_menu_button.dart';
@@ -87,25 +97,36 @@ class TitleBar extends ConsumerWidget {
             const SizedBox(width: AppSpacing.s8),
             SpaceConnectionDot(status: syncStatus),
             const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                name,
-                style: AppText.ui.copyWith(color: tokens.textPrimary),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (appVersion != null) ...[
-              const SizedBox(width: AppSpacing.s8),
-              Text(
-                'v$appVersion',
-                overflow: TextOverflow.ellipsis,
-                style: AppText.micro.copyWith(
-                  color: tokens.textSecondary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+            // The one flex child - a second one here split the leftover width and stranded the controls mid-bar.
+            Expanded(
+              child: _DragRegion(
+                port: port,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: AppText.ui.copyWith(color: tokens.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (appVersion != null) ...[
+                      const SizedBox(width: AppSpacing.s8),
+                      Text(
+                        'v$appVersion',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.micro.copyWith(
+                          color: tokens.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
-            Expanded(child: _DragRegion(port: port)),
+            ),
+            // Hidden entirely when nothing gates it open, same as everywhere else this button is drawn.
+            const SpaceMenuButton(),
             if (!isMac)
               _WindowControls(port: port, onRequestClose: onRequestClose),
           ],
@@ -115,20 +136,23 @@ class TitleBar extends ConsumerWidget {
   }
 }
 
-/// The bar's own empty middle: dragging moves the window, and a double-tap
-/// toggles maximized the way a native title bar already does for free -
-/// `window_manager` gives neither back once the frame is gone.
+/// Dragging moves the window, and a double-tap toggles maximized the way a
+/// native title bar already does for free - `window_manager` gives neither
+/// back once the frame is gone. [child], the name and version, sits inside
+/// rather than beside this so dragging the text itself also moves the window,
+/// the same as a native bar's own title.
 class _DragRegion extends StatelessWidget {
-  const _DragRegion({required this.port});
+  const _DragRegion({required this.port, this.child});
 
   final DesktopWindowPort port;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     behavior: HitTestBehavior.translucent,
     onPanStart: (_) => port.startDragging(),
     onDoubleTap: _toggleMaximize,
-    child: const SizedBox.expand(),
+    child: SizedBox.expand(child: child),
   );
 
   Future<void> _toggleMaximize() async {

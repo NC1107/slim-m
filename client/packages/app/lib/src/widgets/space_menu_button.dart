@@ -17,6 +17,7 @@ import '../providers/admin_providers.dart';
 import '../routing/routes.dart';
 import 'animated_menu_portal.dart';
 import 'context_menu_focus.dart';
+import 'create_category_sheet.dart';
 import 'create_channel_sheet.dart';
 import 'saved_messages_sheet.dart';
 import 'space_settings_section.dart';
@@ -88,7 +89,7 @@ class _SpaceMenuButtonState extends ConsumerState<SpaceMenuButton> {
                           leading: AppIcons.add,
                           onTap: () {
                             _controller.hide();
-                            context.push(Routes.adminCategories);
+                            showCreateCategorySheet(context);
                           },
                         ),
                       ],

@@ -117,4 +117,35 @@ void main() {
 
     expect(find.byType(SpaceConnectionDot), findsOneWidget);
   });
+
+  testWidgets('the window controls sit the same distance from the right edge no '
+      'matter how long the Space name is', (tester) async {
+    Future<double> gapToEdge(String name) async {
+      await _pump(
+        tester,
+        versionResponse: http.Response(
+          jsonEncode({'name': name, 'version': '0.9.0', 'protocol': 1}),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      final barRight = tester.getTopRight(find.byType(TitleBar)).dx;
+      final closeRight = tester
+          .getTopRight(find.byIcon(AppIcons.windowClose))
+          .dx;
+      return barRight - closeRight;
+    }
+
+    final shortGap = await gapToEdge('x');
+    final longGap = await gapToEdge(
+      'A Genuinely Long Deployment Name That Reaches Well Into The Bar',
+    );
+
+    // The regression: a second flex child split the leftover width, stranding the controls when the name was short.
+    expect(
+      longGap,
+      closeTo(shortGap, 0.5),
+      reason: 'the controls must stay flush right regardless of name length',
+    );
+  });
 }

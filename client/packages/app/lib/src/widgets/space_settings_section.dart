@@ -30,7 +30,6 @@ import '../routing/routes.dart';
 import '../screens/admin/account_recovery_screen.dart';
 import '../screens/admin/analytics_screen.dart';
 import '../screens/admin/bots_screen.dart';
-import '../screens/admin/categories_screen.dart';
 import '../screens/admin/channel_permissions_screen.dart';
 import '../screens/admin/dock_screen.dart';
 import '../screens/admin/emoji_screen.dart';
@@ -68,7 +67,6 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
   final canInvite = permissions.hasPermission(Perm.createInvite);
   final canManageRoles = permissions.hasPermission(Perm.manageRoles);
   final canManageServer = permissions.hasPermission(Perm.manageServer);
-  final canManageChannels = permissions.hasPermission(Perm.manageChannels);
   final canBan = permissions.hasPermission(Perm.banMembers);
   final canIssueResetCodes = permissions.hasPermission(Perm.administrator);
   // Unlike Roles (deployment-wide), this pane also opens via one overwrite.
@@ -147,14 +145,6 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.permissions,
             compactRoute: Routes.adminOverwrites,
             builder: (_) => const ChannelPermissionsPane(),
-          ),
-        if (canManageChannels)
-          SettingsPane(
-            id: 'categories',
-            label: 'Channel categories',
-            icon: AppIcons.hash,
-            compactRoute: Routes.adminCategories,
-            builder: (_) => const CategoriesPane(),
           ),
         if (canManageServer)
           SettingsPane(

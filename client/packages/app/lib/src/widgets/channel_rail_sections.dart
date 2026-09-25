@@ -4,8 +4,6 @@
 /// docs/decisions/0006-channel-categories.md.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,157 +12,18 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/channel_notification_overrides_controller.dart';
+import '../providers/collapsed_categories_preference.dart';
 import '../providers/member_presence.dart' show presenceSeedProvider;
 import '../routing/routes.dart';
+import 'category_header_menu.dart';
 import 'channel_grouping.dart';
 import 'channel_kind_icon.dart';
-import 'context_menu_region.dart';
-import 'create_channel_sheet.dart';
-import 'manage_category_sheet.dart';
 import 'channel_rail_channel_rows.dart';
 import 'channel_rail_reorder.dart';
+import 'channel_rail_section_label.dart';
 import 'channel_rail_selection_marker.dart';
 import 'dm_row.dart';
 import 'personal_space_row.dart';
-
-class _SectionLabel extends StatefulWidget {
-  const _SectionLabel(this.text, {this.trailingBuilder, this.chrome = true});
-
-  final String text;
-
-  /// Builds the section's add glyph given whether it should currently show,
-  /// and a callback to report the glyph's own focus back up to this header -
-  /// null for a section nobody may add to. See [_SectionLabelState].
-  final Widget Function(bool revealed, ValueChanged<bool> onFocusChange)?
-  trailingBuilder;
-
-  /// Whether [text] is this app's own wording rather than something someone
-  /// typed. Chrome takes the uppercase treatment; a category name does not.
-  ///
-  /// The owner named the mismatch: they typed "dev" and "General", the
-  /// categories screen showed them back exactly that way, and the rail
-  /// showed "DEV" and "GENERAL". A name is the user's, and showing it in a
-  /// case they did not choose is the app overruling them about their own
-  /// data. The treatment stays where the words are ours.
-  final bool chrome;
-
-  @override
-  State<_SectionLabel> createState() => _SectionLabelState();
-}
-
-/// Mirrors `ManagedChannelRow`'s own hover/focus reveal for its kebab: a
-/// pointer hovering the header reveals the trailing glyph, a keyboard
-/// reaching it does too, and touch shows it always since a finger has no
-/// hover. The header itself used to always show the glyph on the theory
-/// that "a header has no hover state of its own" - true of the text, not of
-/// the row it sits in, which can carry one exactly like a channel row does.
-class _SectionLabelState extends State<_SectionLabel> {
-  bool _hovered = false;
-  bool _trailingFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    if (widget.text.isEmpty) return const SizedBox.shrink();
-    // Announced in its natural case and as a heading: the uppercase is a
-    // visual treatment, and some screen readers spell such a word out.
-    final label = Semantics(
-      container: true,
-      header: true,
-      label: widget.text,
-      child: ExcludeSemantics(
-        child: Text(
-          widget.chrome ? widget.text.toUpperCase() : widget.text,
-          overflow: TextOverflow.ellipsis,
-          style: AppText.label.copyWith(color: tokens.textSecondary),
-        ),
-      ),
-    );
-    final touch = AppTouchTargets.of(context);
-    final revealed = touch || _hovered || _trailingFocused;
-    final trailing = widget.trailingBuilder?.call(
-      revealed,
-      (v) => setState(() => _trailingFocused = v),
-    );
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Padding(
-        // Mirrors AppListRow's horizontal padding, so header and row text share a left edge.
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s8,
-          AppRhythm.headingTop,
-          AppSpacing.s8,
-          AppRhythm.headingBottom,
-        ),
-        child: trailing == null
-            ? label
-            : Row(
-                children: [
-                  Expanded(child: label),
-                  trailing,
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-/// The `+` on a section header: makes a channel already filed under that
-/// section, so nobody has to create one and immediately drag it.
-///
-/// Hover-revealed by [_SectionLabel] the same way a row's kebab is; touch
-/// always shows it, since this is the only pointer-free way to create a
-/// channel in a specific place - a right-click has no touch equivalent. The
-/// reveal wraps only the button, inside the alignment [Padding], the same
-/// nesting `ManagedChannelRow`'s own kebab uses - wrapping the padding too
-/// would merge it into the button's own semantics box and throw off the
-/// shared right edge `category_add_channel_test.dart` measures.
-class _AddChannelGlyph extends StatelessWidget {
-  const _AddChannelGlyph({
-    required this.categoryId,
-    required this.categoryName,
-    required this.revealed,
-    required this.onFocusChange,
-  });
-
-  /// Null for the implicit uncategorised section, which is what the create
-  /// route already means by an absent category.
-  final String? categoryId;
-  final String categoryName;
-  final bool revealed;
-  final ValueChanged<bool> onFocusChange;
-
-  @override
-  Widget build(BuildContext context) {
-    // The exact inset ChannelRow gives its kebab, from an edge already matching AppListRow's; both glyphs land on one line.
-    final inset = AppTouchTargets.of(context) ? 0.0 : 4.0;
-    return Padding(
-      padding: EdgeInsets.only(right: inset),
-      child: Focus(
-        skipTraversal: true,
-        canRequestFocus: false,
-        onFocusChange: onFocusChange,
-        child: AnimatedOpacity(
-          opacity: revealed ? 1 : 0,
-          duration: AppMotion.reduced(context, AppMotion.fast),
-          // Hidden from the eye is not hidden from a screen reader.
-          alwaysIncludeSemantics: true,
-          child: AppIconButton(
-            icon: AppIcons.add,
-            semanticLabel: 'Create a channel in $categoryName',
-            size: AppIconButtonSize.sm,
-            onPressed: () => showCreateChannelSheet(
-              context,
-              initialKind: 'text',
-              categoryId: categoryId,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// A DM is stored locally as an ordinary [Channel] under `kind == 'dm'` (see
 /// `providers/dms.dart`), so this reads the same channel stream the
@@ -193,7 +52,7 @@ class DirectMessagesSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Seeds every DM peer's presence dot; membersProvider is already fetched for RailHeader's count.
+    // Seeds every DM peer's presence dot.
     ref.watch(presenceSeedProvider(null));
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final split = splitPersonalSpace(channels);
@@ -203,7 +62,7 @@ class DirectMessagesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel('Direct messages'),
+        const SectionLabel('Direct messages'),
         SelectionMarkerTarget(
           selected: personal != null && personal.id == selectedId,
           child: PersonalSpaceRow(
@@ -244,8 +103,9 @@ class DirectMessagesSection extends ConsumerWidget {
 /// [DirectMessagesSection] gives its own header (backlog item 55: a "+"
 /// with no header above it read as unexplained chrome). Creating a channel
 /// or a category is [SpaceMenuButton]'s job now, not a header button here;
-/// every named category is exactly the ones [SpaceSettingsSection]'s
-/// "Channel categories" screen manages.
+/// every named category is exactly the ones this section's own header menu
+/// (rename, move, delete) and the rail's background menu (create) manage -
+/// there is no separate settings screen for them any more.
 class ChannelCategorySections extends ConsumerStatefulWidget {
   const ChannelCategorySections({
     super.key,
@@ -290,6 +150,7 @@ class _ChannelCategorySectionsState
     final selectedId = widget.selectedId;
     final canManage = widget.canManage;
     final onReorder = widget.onReorder;
+    final collapsed = ref.watch(collapsedCategoriesProvider);
     final byCategory = channelsByCategory(channels);
     final implicitEmpty = (byCategory[null] ?? const <Channel>[]).isEmpty;
     // An empty category is a drop target for a manager and a dead header for
@@ -307,30 +168,43 @@ class _ChannelCategorySectionsState
     ];
 
     // Every channel hangs off its header rather than sharing its left edge, which is what read as floating rows between dividers.
-    Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) =>
-        Padding(
-          padding: const EdgeInsets.only(left: AppSpacing.s8),
-          child: SelectionMarkerTarget(
-            selected: channel.id == selectedId,
-            child: ManagedChannelRow(
-              canManage: canManage,
-              reorderable: longPressDrags,
-              dragHandleIndex: dragHandleIndex,
-              channel: channel,
-              row: (kebab) => channel.kind == 'voice'
-                  ? VoiceChannelRow(
-                      channel: channel,
-                      selected: channel.id == selectedId,
-                      trailingExtra: kebab,
-                    )
-                  : _TextChannelRow(
-                      channel: channel,
-                      selected: channel.id == selectedId,
-                      trailingExtra: kebab,
-                    ),
-            ),
+    //
+    // A collapsed category's rows render as zero-height rather than being
+    // left out of `sections`/`_items` entirely: `ReorderableChannelRows`
+    // builds its reorder payload from exactly the items it renders, and
+    // dropping a collapsed category's channels from that payload would tell
+    // the server to clear its membership the next time any other channel
+    // moves. Zero size keeps every channel's identity and position in the
+    // list - just invisible and unreachable by a drag - while collapsed.
+    Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) {
+      if (channel.categoryId != null &&
+          collapsed.contains(channel.categoryId)) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.only(left: AppSpacing.s8),
+        child: SelectionMarkerTarget(
+          selected: channel.id == selectedId,
+          child: ManagedChannelRow(
+            canManage: canManage,
+            reorderable: longPressDrags,
+            dragHandleIndex: dragHandleIndex,
+            channel: channel,
+            row: (kebab) => channel.kind == 'voice'
+                ? VoiceChannelRow(
+                    channel: channel,
+                    selected: channel.id == selectedId,
+                    trailingExtra: kebab,
+                  )
+                : _TextChannelRow(
+                    channel: channel,
+                    selected: channel.id == selectedId,
+                    trailingExtra: kebab,
+                  ),
           ),
-        );
+        ),
+      );
+    }
 
     Widget header(ChannelCategoryRow? category) {
       // Structurally always an item (see _dragging's doc comment); nothing while idle and empty.
@@ -338,11 +212,11 @@ class _ChannelCategorySectionsState
         return const SizedBox.shrink();
       }
       // Any section, the implicit uncategorised one included: it is a real place a channel can live.
-      final label = _SectionLabel(
+      final label = SectionLabel(
         category?.name ?? 'Channels',
         trailingBuilder: !canManage
             ? null
-            : (revealed, onFocusChange) => _AddChannelGlyph(
+            : (revealed, onFocusChange) => AddChannelGlyph(
                 categoryId: category?.id,
                 categoryName: category?.name ?? 'Channels',
                 revealed: revealed,
@@ -352,28 +226,11 @@ class _ChannelCategorySectionsState
       );
       // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
       if (category == null || !canManage) return label;
-      // Both verbs directly: deleting used to be a menu, a sheet, a danger zone and a confirmation.
-      return ContextMenuRegion(
-        itemsBuilder: (context, close) => [
-          AppMenuItem(
-            label: 'Rename category...',
-            leading: AppIcons.edit,
-            onTap: () {
-              close();
-              showManageCategorySheet(context, category);
-            },
-          ),
-          AppMenuItem(
-            label: 'Delete category...',
-            leading: AppIcons.delete,
-            tone: AppMenuItemTone.danger,
-            onTap: () {
-              close();
-              unawaited(confirmAndDeleteCategory(context, ref, category));
-            },
-          ),
-        ],
-        child: label,
+      return CategoryHeaderMenu(
+        category: category,
+        categories: categories,
+        collapsed: collapsed,
+        label: label,
       );
     }
 

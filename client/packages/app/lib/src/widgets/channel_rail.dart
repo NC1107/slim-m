@@ -12,6 +12,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../desktop/desktop_window_shell.dart';
 import '../permissions.dart';
 import '../providers/channel_order_controller.dart';
 import '../providers/dms.dart';
@@ -94,7 +95,8 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
       color: tokens.surfaceSunken,
       child: Column(
         children: [
-          const RailHeader(),
+          // The desktop title bar already carries this, 40px apart (design review note 22).
+          if (!DesktopWindowShell.frameless) const RailHeader(),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.s12,
