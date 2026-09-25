@@ -12,9 +12,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
-import 'package:slimm_rtc/rtc.dart';
 
-import '../providers/voice_controller.dart';
 import 'user_avatar.dart';
 
 /// Avatar, name, role badge, and the presence word beside its dot - never the
@@ -242,103 +240,6 @@ String formatRemaining(Duration remaining) {
   if (remaining.inMinutes >= 60) return '${remaining.inHours}h';
   if (remaining.inMinutes >= 1) return '${remaining.inMinutes}m';
   return '${remaining.inSeconds}s';
-}
-
-/// What this listener can do about hearing one participant, all of it local.
-///
-/// The volume slider is present only where the platform can actually change
-/// gain: on Linux, Windows and web the underlying call either throws or
-/// quietly does nothing (see `audio_gain.dart` in the rtc package), and a
-/// control that does nothing between its ends is worse than no control. The
-/// mute half works everywhere, so it always shows.
-class MemberLocalAudioSection extends StatefulWidget {
-  const MemberLocalAudioSection({
-    super.key,
-    required this.identity,
-    required this.controller,
-  });
-
-  final String identity;
-  final VoiceController controller;
-
-  @override
-  State<MemberLocalAudioSection> createState() =>
-      _MemberLocalAudioSectionState();
-}
-
-class _MemberLocalAudioSectionState extends State<MemberLocalAudioSection> {
-  /// The slider owns its position while it is being dragged. Reading it back
-  /// from the session on every frame would make the drag depend on a round
-  /// trip through the platform channel.
-  late double _volume = widget.controller.volumeFor(widget.identity);
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final muted = widget.controller.isLocallyMuted(widget.identity);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (widget.controller.supportsParticipantVolume)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.s12,
-              AppSpacing.s8,
-              AppSpacing.s12,
-              0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Volume for you',
-                      style: AppText.caption.copyWith(
-                        color: tokens.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      '${(_volume * 100).round()}%',
-                      style: AppText.code.copyWith(
-                        color: tokens.textPrimary,
-                        fontSize: 12,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                AppSlider(
-                  value: _volume * 100,
-                  min: 0,
-                  max: kMaxParticipantVolume * 100,
-                  ticks: const ['0', '100', '200'],
-                  semanticLabel: 'Volume for you',
-                  muted: muted,
-                  onChanged: (next) {
-                    setState(() => _volume = next / 100);
-                    widget.controller.setVolumeFor(widget.identity, _volume);
-                  },
-                ),
-              ],
-            ),
-          ),
-        AppMenuItem(
-          label: muted ? 'Unmute for me' : 'Mute for me',
-          leading: muted ? AppIcons.speakerOff : AppIcons.speaker,
-          selected: muted,
-          onTap: () async {
-            await widget.controller.setLocallyMuted(widget.identity, !muted);
-            if (mounted) setState(() {});
-          },
-        ),
-      ],
-    );
-  }
 }
 
 /// The inline timeout durations from the design: one tap, no dialog.

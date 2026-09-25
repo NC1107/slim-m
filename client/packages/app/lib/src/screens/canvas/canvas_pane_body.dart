@@ -83,6 +83,7 @@ class CanvasPaneBody extends StatefulWidget {
     required this.fullscreen,
     required this.onToggleFullscreen,
     this.callDock,
+    this.participantMenuItemsBuilder,
   });
 
   final String channelId;
@@ -212,6 +213,15 @@ class CanvasPaneBody extends StatefulWidget {
   /// The dock renders a call section only then; it always renders a canvas
   /// section, since this widget only exists while the canvas itself is open.
   final CallDockData? callDock;
+
+  /// Forwarded straight to [CanvasPresenceLayer.participantMenuItemsBuilder]
+  /// - see that field's own doc.
+  final List<Widget> Function(
+    BuildContext context,
+    VoiceParticipant participant,
+    VoidCallback close,
+  )?
+  participantMenuItemsBuilder;
 
   @override
   State<CanvasPaneBody> createState() => _CanvasPaneBodyState();
@@ -451,6 +461,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           onVideoInterest: widget.onVideoInterest,
           hideSelfCamera: widget.selfBubbleHidden,
           tool: widget.tool,
+          participantMenuItemsBuilder: widget.participantMenuItemsBuilder,
         ),
         // Topmost and non-interactive - see its own doc for why a pan or a tile drag stopping at worldLimit otherwise looks like nothing happened.
         CanvasWorldEdgeGlow(

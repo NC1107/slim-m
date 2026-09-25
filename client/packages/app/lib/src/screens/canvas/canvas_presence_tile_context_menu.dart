@@ -57,6 +57,7 @@ class CanvasPresenceTileContextMenu extends StatefulWidget {
     this.onToggleSentToBack,
     required this.onHide,
     this.onExpand,
+    this.participantItemsBuilder,
   });
 
   final CanvasPresenceTileMenuController controller;
@@ -70,6 +71,14 @@ class CanvasPresenceTileContextMenu extends StatefulWidget {
   final VoidCallback? onToggleSentToBack;
   final VoidCallback onHide;
   final VoidCallback? onExpand;
+
+  /// The volume/mute/profile/moderate rows for whoever this tile belongs to
+  /// - `participant_call_menu.dart`'s own `participantCallMenuItems`, closed
+  /// over the tile's participant by `canvas_presence_layer.dart`. Called
+  /// fresh every time this menu opens, the same "never stale" contract
+  /// `ContextMenuRegion.itemsBuilder` already documents, and null for this
+  /// device's own tile, which has nothing to say about itself here.
+  final List<Widget> Function(VoidCallback close)? participantItemsBuilder;
 
   @override
   State<CanvasPresenceTileContextMenu> createState() =>
@@ -120,6 +129,11 @@ class _CanvasPresenceTileContextMenuState
   }
 
   List<Widget> get _items => [
+    if (widget.participantItemsBuilder?.call(_close) case final participant?
+        when participant.isNotEmpty) ...[
+      ...participant,
+      const AppMenuDivider(),
+    ],
     if (widget.onExpand case final onExpand?)
       AppMenuItem(
         label: 'Full screen',

@@ -58,6 +58,7 @@ class CallStageLayout extends StatelessWidget {
     required this.controller,
     required this.onOpenProfile,
     required this.isDm,
+    this.menuItemsBuilder,
   });
 
   final VoiceState voice;
@@ -72,6 +73,17 @@ class CallStageLayout extends StatelessWidget {
 
   /// Needed only for the alone-in-call hint's canvas mention below.
   final bool isDm;
+
+  /// A tile's own right-click/long-press quick-actions rows, bound to the
+  /// participant [participantTile] builds each tile for -
+  /// `participant_call_menu.dart`'s own `participantCallMenuItems`, shared
+  /// with the canvas bubble's own context menu.
+  final List<Widget> Function(
+    BuildContext context,
+    VoiceParticipant participant,
+    VoidCallback close,
+  )?
+  menuItemsBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -114,12 +126,14 @@ class CallStageLayout extends StatelessWidget {
                       participants: voice.participants,
                       controller: controller,
                       onOpenProfile: onOpenProfile,
+                      menuItemsBuilder: menuItemsBuilder,
                     )
                   : _ParticipantGrid(
                       participants: voice.participants,
                       controller: controller,
                       onOpenProfile: onOpenProfile,
                       isDm: isDm,
+                      menuItemsBuilder: menuItemsBuilder,
                     ),
             ),
           ),
@@ -173,6 +187,7 @@ class _StageWithFilmstrip extends StatelessWidget {
     required this.participants,
     required this.controller,
     required this.onOpenProfile,
+    this.menuItemsBuilder,
   });
 
   final VoiceParticipant sharer;
@@ -180,6 +195,8 @@ class _StageWithFilmstrip extends StatelessWidget {
   final VoiceController controller;
   final void Function(BuildContext anchor, VoiceParticipant participant)
   onOpenProfile;
+  final List<Widget> Function(BuildContext, VoiceParticipant, VoidCallback)?
+  menuItemsBuilder;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -205,6 +222,7 @@ class _StageWithFilmstrip extends StatelessWidget {
           participants: participants,
           controller: controller,
           onOpenProfile: onOpenProfile,
+          menuItemsBuilder: menuItemsBuilder,
         ),
       ),
     ],
@@ -219,12 +237,15 @@ class _Filmstrip extends StatelessWidget {
     required this.participants,
     required this.controller,
     required this.onOpenProfile,
+    this.menuItemsBuilder,
   });
 
   final List<VoiceParticipant> participants;
   final VoiceController controller;
   final void Function(BuildContext anchor, VoiceParticipant participant)
   onOpenProfile;
+  final List<Widget> Function(BuildContext, VoiceParticipant, VoidCallback)?
+  menuItemsBuilder;
 
   @override
   Widget build(BuildContext context) => ListView.separated(
@@ -242,6 +263,7 @@ class _Filmstrip extends StatelessWidget {
             participant,
             controller,
             onOpenProfile,
+            menuItemsBuilder: menuItemsBuilder,
           ),
         ),
       );
@@ -258,6 +280,7 @@ class _ParticipantGrid extends StatelessWidget {
     required this.controller,
     required this.onOpenProfile,
     required this.isDm,
+    this.menuItemsBuilder,
   });
 
   final List<VoiceParticipant> participants;
@@ -265,6 +288,8 @@ class _ParticipantGrid extends StatelessWidget {
   final void Function(BuildContext anchor, VoiceParticipant participant)
   onOpenProfile;
   final bool isDm;
+  final List<Widget> Function(BuildContext, VoiceParticipant, VoidCallback)?
+  menuItemsBuilder;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -296,6 +321,7 @@ class _ParticipantGrid extends StatelessWidget {
                       controller,
                       onOpenProfile,
                       width: tileWidth,
+                      menuItemsBuilder: menuItemsBuilder,
                     ),
                   ),
                   if (participants.length == 1) ...[
@@ -370,6 +396,8 @@ Widget participantTile(
   void Function(BuildContext anchor, VoiceParticipant participant)
   onOpenProfile, {
   double width = kCallTileMinWidth,
+  List<Widget> Function(BuildContext, VoiceParticipant, VoidCallback)?
+  menuItemsBuilder,
 }) {
   final showsCamera = participant.isCameraOn;
   return CallParticipantTile(
@@ -388,5 +416,9 @@ Widget participantTile(
             kind: FullscreenVideoKind.camera,
           )
         : null,
+    contextMenuItemsBuilder: menuItemsBuilder == null
+        ? null
+        : (menuContext, close) =>
+              menuItemsBuilder(menuContext, participant, close),
   );
 }

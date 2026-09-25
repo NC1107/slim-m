@@ -92,17 +92,9 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 import 'canvas_presence_geometry.dart' show presenceScreenRect;
 import 'canvas_presence_tile_context_menu.dart';
 import 'canvas_presence_tile_controls.dart';
+import 'canvas_presence_tile_metrics.dart';
 
-/// The world-space box a resize may not shrink below or grow past - small
-/// enough that the name badge and controls still fit, large enough that a
-/// single tile can never swallow a typical viewport.
-const canvasPresenceTileMinSize = Size(72, 54);
-const canvasPresenceTileMaxSize = Size(720, 540);
-
-/// How long a touch reveal stays up with nothing else keeping it there - a
-/// mouse instead relies on [MouseRegion.onExit] firing the moment the
-/// pointer actually leaves, so this only ever governs touch.
-const canvasPresenceTileTouchRevealDuration = Duration(seconds: 3);
+export 'canvas_presence_tile_metrics.dart';
 
 class CanvasPresenceManipulableTile extends StatefulWidget {
   const CanvasPresenceManipulableTile({
@@ -122,6 +114,7 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
     required this.child,
     this.onExpand,
     this.fixedRenderSize,
+    this.participantItemsBuilder,
   });
 
   final Rect worldRect;
@@ -181,6 +174,8 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   /// via [TileResizeGrip], lockable, and depth-toggleable.
   final Size? fixedRenderSize;
 
+  /// Forwarded to `CanvasPresenceTileContextMenu.participantItemsBuilder` - see that field's own doc. Null for this device's own tile.
+  final List<Widget> Function(VoidCallback close)? participantItemsBuilder;
   @override
   State<CanvasPresenceManipulableTile> createState() =>
       _CanvasPresenceManipulableTileState();
@@ -449,13 +444,16 @@ class _CanvasPresenceManipulableTileState
                   onToggleSentToBack: widget.onToggleSentToBack,
                   onHide: widget.onHide,
                   onExpand: widget.onExpand,
+                  participantItemsBuilder: widget.participantItemsBuilder,
                 ),
                 IgnorePointer(
                   ignoring: _passThrough,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    // Opens this tile's own menu rather than a no-op now, but still HitTestBehavior.opaque - a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption.
+                    // Opens this tile's own menu rather than a no-op now, but still HitTestBehavior.opaque - a right-click on a tile must never leak to a canvas object underneath it, `canvas_self_presence_overlay.dart`'s old precedent for this exact absorption. onLongPressStart is its touch equivalent (law 3), matching canvas_object_context_menu.dart's own precedent.
                     onSecondaryTapUp: (details) =>
+                        _menuController.open(details.globalPosition),
+                    onLongPressStart: (details) =>
                         _menuController.open(details.globalPosition),
                     onPanUpdate: _drag,
                     onPanEnd: _settle,
