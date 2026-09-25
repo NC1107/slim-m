@@ -60,6 +60,11 @@ Future<bool> launchApp({
 
 /// Opens the apps picker for [channelId]. [onError] is forwarded to [launchApp]
 /// so a failed launch surfaces where the composer shows its command errors.
+///
+/// The body is its own [Consumer] rather than reading [ref] straight from the
+/// caller: the sheet is a separate Overlay entry, not that caller's
+/// descendant, so a watch bound to the caller's own element would never
+/// rebuild the sheet once shown, leaving a slow fetch spinning forever.
 Future<void> showAppLauncherSheet(
   BuildContext context,
   WidgetRef ref,
@@ -68,88 +73,104 @@ Future<void> showAppLauncherSheet(
 }) {
   return showAppSheet<void>(
     context,
-    builder: (sheetContext) {
-      final tokens = Theme.of(sheetContext).extension<AppTokens>()!;
-      final apps =
-          ref.watch(appLaunchProvider).valueOrNull ?? const <api.App>[];
-      final canManageServer = ref
-          .watch(myPermissionsProvider)
-          .hasPermission(Perm.manageServer);
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s12,
-            AppSpacing.s8,
-            AppSpacing.s12,
-            AppSpacing.s12,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (apps.isEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s16,
-                    vertical: AppSpacing.s8,
-                  ),
-                  child: Text(
-                    // Only an admin can act on this, so only an admin is told to.
-                    canManageServer
-                        ? 'No apps installed yet.'
-                        : 'No apps installed. Ask an admin to install one '
-                              'from the Dock.',
-                    style: AppText.caption.copyWith(
-                      color: tokens.textSecondary,
-                    ),
-                  ),
-                ),
-                if (canManageServer)
-                  AppListRow(
-                    label: 'Open the Dock',
-                    leading: Icon(
-                      AppIcons.dock,
-                      size: AppSizes.icon16,
-                      color: tokens.textSecondary,
-                    ),
-                    trailing: ExcludeSemantics(
-                      child: Icon(
-                        AppIcons.chevronRight,
-                        size: AppSizes.icon16,
-                        color: tokens.textSecondary,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      context.push(Routes.adminDock);
-                    },
-                  ),
-              ] else
-                for (final app in apps)
-                  AppListRow(
-                    label: app.name,
-                    subtitle: app.description,
-                    leading: Icon(
-                      AppIcons.dock,
-                      size: AppSizes.icon16,
-                      color: tokens.textSecondary,
-                    ),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      unawaited(
-                        launchApp(
-                          ref: ref,
-                          channelId: channelId,
-                          app: app,
-                          onError: onError,
+    builder: (sheetContext) => Consumer(
+      builder: (context, ref, _) {
+        final tokens = Theme.of(sheetContext).extension<AppTokens>()!;
+        final apps = ref.watch(appLaunchProvider);
+        final canManageServer = ref
+            .watch(myPermissionsProvider)
+            .hasPermission(Perm.manageServer);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s12,
+              AppSpacing.s8,
+              AppSpacing.s12,
+              AppSpacing.s12,
+            ),
+            // Empty is hand-rendered below: its copy depends on permission.
+            child: AppAsyncView<List<api.App>>(
+              value: AppAsyncState(data: apps.valueOrNull, error: apps.error),
+              center: false,
+              errorMessage: 'Could not load your apps.',
+              onRetry: () => ref.invalidate(appLaunchProvider),
+              data: (context, list) {
+                if (list.isEmpty) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s16,
+                          vertical: AppSpacing.s8,
                         ),
-                      );
-                    },
-                  ),
-            ],
+                        child: Text(
+                          // Only an admin can act on this, so only an admin is told to.
+                          canManageServer
+                              ? 'No apps installed yet.'
+                              : 'No apps installed. Ask an admin to install '
+                                    'one from the Dock.',
+                          style: AppText.caption.copyWith(
+                            color: tokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                      if (canManageServer)
+                        AppListRow(
+                          label: 'Open the Dock',
+                          leading: Icon(
+                            AppIcons.dock,
+                            size: AppSizes.icon16,
+                            color: tokens.textSecondary,
+                          ),
+                          trailing: ExcludeSemantics(
+                            child: Icon(
+                              AppIcons.chevronRight,
+                              size: AppSizes.icon16,
+                              color: tokens.textSecondary,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.of(sheetContext).pop();
+                            context.push(Routes.adminDock);
+                          },
+                        ),
+                    ],
+                  );
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final app in list)
+                      AppListRow(
+                        label: app.name,
+                        subtitle: app.description,
+                        leading: Icon(
+                          AppIcons.dock,
+                          size: AppSizes.icon16,
+                          color: tokens.textSecondary,
+                        ),
+                        onTap: () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(
+                            launchApp(
+                              ref: ref,
+                              channelId: channelId,
+                              app: app,
+                              onError: onError,
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
-      );
-    },
+        );
+      },
+    ),
   );
 }
