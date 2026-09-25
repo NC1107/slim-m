@@ -562,3 +562,9 @@ Practising this once on a copy, with `scripts/restore-drill.py`, is worth more t
 Litestream is deliberately held on the 0.3.x line rather than 0.5.x.
 0.5 replaced the replica format (WAL segments became LTX), and this example targets the longer-documented, more stable 0.3 config and CLI surface.
 Moving to 0.5 is a replica-format migration, not a tag bump.
+
+## Logging (`SLIMM_LOG`)
+
+The server logs at `info` by default; set `SLIMM_LOG=debug` to see per-request spans while chasing a problem.
+A debug span is labelled by the matched route template (`/invites/{code}`), never the filled-in path.
+So an invite code, a GIF or link-preview proxy token, or a webhook token is not written to the log at any level, and a pasted debug log does not leak a credential.
