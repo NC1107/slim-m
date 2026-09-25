@@ -70,4 +70,18 @@ extension CanvasDocumentQueries on CanvasDocument {
     }
     return (strokes: strokes, images: images, notes: notes, shapes: shapes);
   }
+
+  /// The union of every live object's box, or null with nothing drawn -
+  /// what "Recenter" fits the camera to instead of resetting to the world
+  /// origin. A plain scan for the same reason [liveCountsByKind] is: asked
+  /// for once per Recenter tap, never once per frame.
+  Rect? get contentBounds {
+    Rect? bounds;
+    for (final stroke in _strokes) {
+      if (stroke == null || !stroke.alive) continue;
+      final box = Rect.fromLTWH(stroke.x, stroke.y, stroke.w, stroke.h);
+      bounds = bounds?.expandToInclude(box) ?? box;
+    }
+    return bounds;
+  }
 }

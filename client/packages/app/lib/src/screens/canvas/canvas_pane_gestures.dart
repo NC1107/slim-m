@@ -124,10 +124,15 @@ extension _CanvasPaneGestures on _CanvasPaneState {
     _refresh();
   }
 
-  /// Jumps the camera back to the world origin - a plain camera move, so it
-  /// needs no `setState` any more than a scroll or a pinch does. See
-  /// `worldLimit`'s own doc for the "no route back" gap this closes.
-  void _onRecenter() => _document.setCamera(const Camera());
+  /// Fits the camera to whatever is actually drawn, falling back to the
+  /// world origin only when there is nothing to fit - a plain camera move,
+  /// so it needs no `setState` any more than a scroll or a pinch does. See
+  /// `worldLimit`'s own doc for the "no route back" gap this closes, and
+  /// `cameraToFit`'s own doc for why the origin fallback is still correct
+  /// for an empty canvas.
+  void _onRecenter() => _document.setCamera(
+    cameraToFit(_document.contentBounds, _document.viewport),
+  );
 
   /// Delete/Backspace over the current Move-tool selection, the desktop
   /// convention every other drawing surface honours - the overflow menu's
