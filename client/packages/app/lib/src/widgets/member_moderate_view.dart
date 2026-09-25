@@ -220,10 +220,22 @@ class _RoleRow extends StatelessWidget {
       meta: role.isEveryone
           ? 'Always granted'
           : (grantable ? null : 'Needs permissions you do not hold'),
-      trailing: AppToggle(
-        value: held,
-        onChanged: (!role.isEveryone && grantable) ? (v) => onChanged(v) : null,
-        semanticLabel: '${role.name} for $memberName',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (role.isManagedByBot) ...[
+            const AppBadge(variant: AppBadgeVariant.tag, label: 'Bot'),
+            const SizedBox(width: AppSpacing.s8),
+          ],
+          AppToggle(
+            value: held,
+            onChanged: (!role.isEveryone && grantable)
+                ? (v) => onChanged(v)
+                : null,
+            locked: role.isEveryone,
+            semanticLabel: '${role.name} for $memberName',
+          ),
+        ],
       ),
     );
   }
