@@ -42,6 +42,8 @@ class InertSession implements VoiceSession {
     ScreenShareOutcome outcome = ScreenShareOutcome.started,
     bool sourcePickerUseful = true,
     this.supportsScreenShareAudio = true,
+    this.supportsAudioOutputSelection = false,
+    this.audioOutputDeviceList = const [],
   }) : _needsSource = needsSource,
        _sources = sources ?? Future.value(const []),
        _outcome = outcome,
@@ -180,7 +182,14 @@ class InertSession implements VoiceSession {
   bool get supportsAudioInputSelection => false;
 
   @override
-  bool get supportsAudioOutputSelection => false;
+  final bool supportsAudioOutputSelection;
+
+  /// What [audioOutputDevices] answers with.
+  final List<AudioDevice> audioOutputDeviceList;
+
+  /// What the control actually passed through, so a test can assert the
+  /// chosen device reached the session.
+  AudioDevice? lastSelectedAudioOutput;
 
   @override
   Stream<void> get audioDeviceChanges => const Stream.empty();
@@ -189,13 +198,16 @@ class InertSession implements VoiceSession {
   Future<List<AudioDevice>> audioInputDevices() async => const [];
 
   @override
-  Future<List<AudioDevice>> audioOutputDevices() async => const [];
+  Future<List<AudioDevice>> audioOutputDevices() async => audioOutputDeviceList;
 
   @override
   Future<bool> selectAudioInputDevice(AudioDevice? device) async => false;
 
   @override
-  Future<bool> selectAudioOutputDevice(AudioDevice? device) async => false;
+  Future<bool> selectAudioOutputDevice(AudioDevice? device) async {
+    lastSelectedAudioOutput = device;
+    return true;
+  }
 
   @override
   Future<void> join({
