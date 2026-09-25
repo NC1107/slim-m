@@ -248,11 +248,14 @@ class _PaneBody extends StatelessWidget {
 }
 
 /// One rule for every settings nav (design review note 19, applied here and
-/// to Space settings, which shares this same widget): a group label reads
-/// mono 10/medium with a hairline above it, not the small-caps sans label
-/// this nav used to share with [AppCard]'s own header - at 20px, a pane's
-/// icon outweighed an 11px caps label sitting right beside it, so the label
-/// read as a stray row rather than the heading above the rows.
+/// to Space settings, which shares this widget): a group label is mono, faint
+/// and sentence case, with a hairline above it, rather than the small-caps
+/// sans label this nav used to borrow from [AppCard]'s own header.
+///
+/// That label was written to sit above a card's body, not beside a 20px pane
+/// icon. At the same size the icon outweighed it, so a caps label on its own
+/// row read as another nav row rather than the heading over the rows; the
+/// hairline and the quieter colour are what separate it now, not its size.
 class _Nav extends StatelessWidget {
   const _Nav({
     required this.groups,
@@ -295,7 +298,7 @@ class _Nav extends StatelessWidget {
                       child: Text(
                         label,
                         style: AppText.code.copyWith(
-                          fontSize: 10,
+                          fontSize: AppText.micro.fontSize,
                           fontWeight: AppWeights.medium,
                           letterSpacing: 1,
                           color: tokens.textDisabled,
