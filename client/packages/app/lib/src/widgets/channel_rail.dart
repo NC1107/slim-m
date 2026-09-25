@@ -170,119 +170,136 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
               ),
             ),
           ),
-          if (orderState.error != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s8,
-                0,
-                AppSpacing.s8,
-                AppRhythm.headingBottom,
-              ),
-              child: AppErrorState(
-                message: orderState.error!,
-                onRetry: () => unawaited(orderController.retry()),
-                onDismiss: orderController.dismiss,
-              ),
-            ),
           Expanded(
-            child: storeAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s16),
-                  child: AppErrorState(
-                    message: 'Could not load channels.',
-                    onRetry: () => ref.invalidate(storeProvider),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _railBody(
+                    storeAsync: storeAsync,
+                    orderState: orderState,
+                    selected: selected,
+                    canManageChannels: canManageChannels,
+                    orderController: orderController,
                   ),
                 ),
-              ),
-              data: (store) => StreamBuilder<List<Channel>>(
-                // Deduped to what the rail draws; see MessageStore.watchRailChannels.
-                stream: store.watchRailChannels(),
-                builder: (context, channelSnapshot) {
-                  return StreamBuilder<List<ChannelCategoryRow>>(
-                    stream: store.watchCategories(),
-                    builder: (context, categorySnapshot) {
-                      final categories =
-                          categorySnapshot.data ?? const <ChannelCategoryRow>[];
-                      final channels = _withPendingOrder(
-                        channelSnapshot.data ?? const <Channel>[],
-                        orderState.pendingOrder,
-                      );
-                      final nonDm = channels
-                          .where((c) => c.kind != dmChannelKind)
-                          .toList(growable: false);
-                      // A scroll view over one column, not a ListView: the selection marker layer has to span both sections to slide between them.
-                      final list = SingleChildScrollView(
-                        controller: widget.scrollController,
-                        // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.s8,
-                          AppRhythm.headingBottom,
-                          AppSpacing.s8,
-                          0,
-                        ),
-                        child: SelectionMarkerLayer(
-                          key: widget.markerLayerKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              DirectMessagesSection(
-                                channels: channels
-                                    .where((c) => c.kind == dmChannelKind)
-                                    .toList(),
-                                selectedId: selected,
-                              ),
-                              ChannelCategorySections(
-                                channels: nonDm,
-                                categories: categories,
-                                selectedId: selected,
-                                canManage: canManageChannels,
-                                onReorder: (groups) =>
-                                    unawaited(orderController.reorder(groups)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                      if (!canManageChannels) return list;
-                      // Wraps the whole viewport so the space under the last row is a target too; a row's own menu sits deeper and wins the arena.
-                      return ContextMenuRegion(
-                        // False: child is the whole scrollable list, not one row - each row already owns a tab stop, and a second one here rang the whole rail.
-                        ownsFocusNode: false,
-                        // Pointer-only on purpose: a long press here would fight the scroll, and touch has the section headers' own + instead.
-                        enableLongPress: false,
-                        itemsBuilder: (context, close) => [
-                          AppMenuItem(
-                            label: 'Create channel...',
-                            leading: AppIcons.add,
-                            onTap: () {
-                              close();
-                              showCreateChannelSheet(
-                                context,
-                                initialKind: 'text',
-                              );
-                            },
-                          ),
-                          AppMenuItem(
-                            label: 'Create category...',
-                            leading: AppIcons.addCategory,
-                            onTap: () {
-                              close();
-                              showCreateCategorySheet(context);
-                            },
-                          ),
-                        ],
-                        child: list,
-                      );
-                    },
-                  );
-                },
-              ),
+                // Overlaid on the list, not pushed above it: this answers the drag the reader just made, so it attaches to the list a drag happens in rather than displacing every row above to announce it.
+                if (orderState.error != null)
+                  Positioned(
+                    left: AppSpacing.s8,
+                    right: AppSpacing.s8,
+                    bottom: AppSpacing.s8,
+                    child: AppErrorState(
+                      message: orderState.error!,
+                      onRetry: () => unawaited(orderController.retry()),
+                      onDismiss: orderController.dismiss,
+                    ),
+                  ),
+              ],
             ),
           ),
           RailUserFooter(activeChannelId: selected),
         ],
+      ),
+    );
+  }
+
+  Widget _railBody({
+    required AsyncValue<MessageStore> storeAsync,
+    required ChannelOrderState orderState,
+    required String? selected,
+    required bool canManageChannels,
+    required ChannelOrderController orderController,
+  }) {
+    return storeAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          child: AppErrorState(
+            message: 'Could not load channels.',
+            onRetry: () => ref.invalidate(storeProvider),
+          ),
+        ),
+      ),
+      data: (store) => StreamBuilder<List<Channel>>(
+        // Deduped to what the rail draws; see MessageStore.watchRailChannels.
+        stream: store.watchRailChannels(),
+        builder: (context, channelSnapshot) {
+          return StreamBuilder<List<ChannelCategoryRow>>(
+            stream: store.watchCategories(),
+            builder: (context, categorySnapshot) {
+              final categories =
+                  categorySnapshot.data ?? const <ChannelCategoryRow>[];
+              final channels = _withPendingOrder(
+                channelSnapshot.data ?? const <Channel>[],
+                orderState.pendingOrder,
+              );
+              final nonDm = channels
+                  .where((c) => c.kind != dmChannelKind)
+                  .toList(growable: false);
+              // A scroll view over one column, not a ListView: the selection marker layer has to span both sections to slide between them.
+              final list = SingleChildScrollView(
+                controller: widget.scrollController,
+                // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.s8,
+                  AppRhythm.headingBottom,
+                  AppSpacing.s8,
+                  0,
+                ),
+                child: SelectionMarkerLayer(
+                  key: widget.markerLayerKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DirectMessagesSection(
+                        channels: channels
+                            .where((c) => c.kind == dmChannelKind)
+                            .toList(),
+                        selectedId: selected,
+                      ),
+                      ChannelCategorySections(
+                        channels: nonDm,
+                        categories: categories,
+                        selectedId: selected,
+                        canManage: canManageChannels,
+                        onReorder: (groups) =>
+                            unawaited(orderController.reorder(groups)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+              if (!canManageChannels) return list;
+              // Wraps the whole viewport so the space under the last row is a target too; a row's own menu sits deeper and wins the arena.
+              return ContextMenuRegion(
+                // False: child is the whole scrollable list, not one row - each row already owns a tab stop, and a second one here rang the whole rail.
+                ownsFocusNode: false,
+                // Pointer-only on purpose: a long press here would fight the scroll, and touch has the section headers' own + instead.
+                enableLongPress: false,
+                itemsBuilder: (context, close) => [
+                  AppMenuItem(
+                    label: 'Create channel...',
+                    leading: AppIcons.add,
+                    onTap: () {
+                      close();
+                      showCreateChannelSheet(context, initialKind: 'text');
+                    },
+                  ),
+                  AppMenuItem(
+                    label: 'Create category...',
+                    leading: AppIcons.addCategory,
+                    onTap: () {
+                      close();
+                      showCreateCategorySheet(context);
+                    },
+                  ),
+                ],
+                child: list,
+              );
+            },
+          );
+        },
       ),
     );
   }
