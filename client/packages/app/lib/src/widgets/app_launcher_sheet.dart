@@ -14,14 +14,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../api_failure.dart';
 import '../ids.dart';
+import '../permissions.dart';
+import '../providers/admin_providers.dart';
 import '../providers/app_launch.dart';
 import '../providers/message_extras.dart';
 import '../providers/providers.dart';
+import '../routing/routes.dart';
 
 /// Launches [app] into [channelId]: posts the message, then applies it to the
 /// local store and extras cache exactly as sending a poll does, so the surface
@@ -68,6 +72,9 @@ Future<void> showAppLauncherSheet(
       final tokens = Theme.of(sheetContext).extension<AppTokens>()!;
       final apps =
           ref.watch(appLaunchProvider).valueOrNull ?? const <api.App>[];
+      final canManageServer = ref
+          .watch(myPermissionsProvider)
+          .hasPermission(Perm.manageServer);
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -80,17 +87,44 @@ Future<void> showAppLauncherSheet(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (apps.isEmpty)
+              if (apps.isEmpty) ...[
                 Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s16,
+                    vertical: AppSpacing.s8,
+                  ),
                   child: Text(
-                    'No apps to launch. Install one from the Dock first.',
+                    // Only an admin can act on this, so only an admin is told to.
+                    canManageServer
+                        ? 'No apps installed yet.'
+                        : 'No apps installed. Ask an admin to install one '
+                              'from the Dock.',
                     style: AppText.caption.copyWith(
                       color: tokens.textSecondary,
                     ),
                   ),
-                )
-              else
+                ),
+                if (canManageServer)
+                  AppListRow(
+                    label: 'Open the Dock',
+                    leading: Icon(
+                      AppIcons.dock,
+                      size: AppSizes.icon16,
+                      color: tokens.textSecondary,
+                    ),
+                    trailing: ExcludeSemantics(
+                      child: Icon(
+                        AppIcons.chevronRight,
+                        size: AppSizes.icon16,
+                        color: tokens.textSecondary,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      context.push(Routes.adminDock);
+                    },
+                  ),
+              ] else
                 for (final app in apps)
                   AppListRow(
                     label: app.name,
