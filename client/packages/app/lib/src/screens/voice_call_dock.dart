@@ -22,9 +22,10 @@
 ///
 /// **Never shrinks a touch target to make room.** [CallDockButton] draws
 /// every control at a fixed size regardless of width, and the canvas toggle
-/// is the same button. When the row - mic, camera, maybe switch-camera,
-/// share, leave, and the toggle - would not fit the available width at that
-/// fixed size, the toggle folds into a second row of its own inside the same
+/// is the same button. When the row - mic, maybe speaker, camera, maybe
+/// switch-camera, share, leave, and the toggle - would not fit the available
+/// width at that fixed size, the toggle folds into a second row of its own
+/// inside the same
 /// [FloatingDockCard] instead, the identical "phone stacks two rows" shape
 /// `CanvasCallDock` already uses for the call-and-canvas combination. The
 /// four call controls never move: they stay the row a hand reaches for
@@ -142,6 +143,7 @@ class _VoiceCallDockState extends State<VoiceCallDock>
                 context,
                 constraints.maxWidth,
                 widget.voice.cameraEnabled,
+                widget.controller.supportsAudioOutputSelection,
               )) {
                 return FloatingDockCard(
                   rows: [
@@ -187,13 +189,19 @@ class _VoiceCallDockState extends State<VoiceCallDock>
 /// declared padding too, for the identical reason: `Border.all()`'s default
 /// 1dp width is itself `BoxDecoration.padding`, added on top rather than
 /// painted over the declared padding.
-bool _fitsOneRow(BuildContext context, double width, bool cameraEnabled) {
+bool _fitsOneRow(
+  BuildContext context,
+  double width,
+  bool cameraEnabled,
+  bool supportsAudioOutputSelection,
+) {
   final touch = AppTouchTargets.of(context);
   final hitTarget = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
   final chip = AppSizes.controlMd > hitTarget ? AppSizes.controlMd : hitTarget;
   final button = chip + 2 * (focusRingGap + focusRingWidth);
-  // mic, camera, [switch camera], share, leave, and the toggle itself.
-  final controlCount = (cameraEnabled ? 5 : 4) + 1;
+  // mic, [speaker], camera, [switch camera], share, leave, and the toggle itself.
+  final controlCount =
+      (cameraEnabled ? 5 : 4) + (supportsAudioOutputSelection ? 1 : 0) + 1;
   final cardPadding = AppSpacing.s12 * 2 + 2;
   final needed =
       controlCount * button + (controlCount - 1) * AppSpacing.s8 + cardPadding;

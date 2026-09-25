@@ -50,6 +50,7 @@ import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../providers/voice_settings_controller.dart'
     show voiceSettingsControllerProvider;
+import '../widgets/audio_output_sheet.dart';
 import '../widgets/camera_source_sheet.dart';
 import '../widgets/screen_source_sheet.dart';
 
@@ -80,6 +81,9 @@ class _CallControlsState extends ConsumerState<CallControls> {
 
   /// The same guard as [_shareRequestInFlight], for [_switchCamera].
   bool _cameraSwitchInFlight = false;
+
+  /// The same guard as [_shareRequestInFlight], for [_switchSpeaker].
+  bool _speakerSwitchInFlight = false;
 
   /// Whichever source [_startShare] last resolved a picker's choice to -
   /// preselected (never silently reused) the next time the picker opens, so
@@ -132,6 +136,19 @@ class _CallControlsState extends ConsumerState<CallControls> {
           active: voice.microphoneEnabled,
           onPressed: widget.controller.toggleMicrophone,
         ),
+        if (widget.controller.supportsAudioOutputSelection) ...[
+          const SizedBox(width: AppSpacing.s8),
+          CallDockButton(
+            icon: AppIcons.speaker,
+            tooltip: 'Switch speaker',
+            active: false,
+            pending: _speakerSwitchInFlight,
+            onPressed: () {
+              if (_speakerSwitchInFlight) return;
+              unawaited(_switchSpeaker(context));
+            },
+          ),
+        ],
         const SizedBox(width: AppSpacing.s8),
         CallDockButton(
           icon: voice.cameraEnabled ? AppIcons.camera : AppIcons.cameraOff,
@@ -314,6 +331,32 @@ class _CallControlsState extends ConsumerState<CallControls> {
       await controller.selectCameraDevice(chosen);
     } finally {
       if (mounted) setState(() => _cameraSwitchInFlight = false);
+    }
+  }
+
+  /// Goes through the same settings notifier the standalone Voice Settings
+  /// picker uses, `setAudioOutputDevice` persisting the choice and applying
+  /// it live in one call, so the two never drift out of sync with each other.
+  Future<void> _switchSpeaker(BuildContext context) async {
+    setState(() => _speakerSwitchInFlight = true);
+    try {
+      final devices = await widget.controller.audioOutputDevices();
+      if (!context.mounted) return;
+      final selectedId = ref
+          .read(voiceSettingsControllerProvider)
+          .audioOutputDeviceId;
+      final chosen = await showAudioOutputSheet(
+        context,
+        devices,
+        selectedId: selectedId,
+      );
+      if (chosen == null) return;
+      final device = isSystemDefaultAudioDevice(chosen) ? null : chosen;
+      await ref
+          .read(voiceSettingsControllerProvider.notifier)
+          .setAudioOutputDevice(device);
+    } finally {
+      if (mounted) setState(() => _speakerSwitchInFlight = false);
     }
   }
 }
