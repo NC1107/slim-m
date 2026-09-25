@@ -16,14 +16,15 @@
 //! one other participant), while `caller_name` is gated behind
 //! [`PushTarget::include_content`] exactly as a message's own sender name is.
 //!
-//! Quiet hours are not consulted here, deliberately. `push::recipients`'s own
-//! notification-preference narrowing only ever demotes
-//! [`NotificationPreference::Everything`] to [`NotificationPreference::Mentions`],
-//! and `Mentions` already lets every DM through - a direct call is at least
-//! as addressed-to-you as an ordinary DM message, so it is never muted by a
-//! quiet window either. The one preference that does suppress a ring is
-//! [`NotificationPreference::Nothing`]: an account that opted out of every
-//! notification, DMs included, also opted out of being rung.
+//! The notification schedule (`notification_schedule.rs`, decision
+//! docs/decisions/0033-notification-schedule.md) is not consulted here
+//! either, deliberately, in both its off-hours modes: a direct call is at
+//! least as addressed-to-you as an ordinary DM message, so neither
+//! `mentions`-and-DMs off hours nor `nothing` off hours mutes a ring - the
+//! one Slack-style exception this schedule makes. The one preference that
+//! does suppress a ring is [`NotificationPreference::Nothing`]: an account
+//! that opted out of every notification, DMs included, also opted out of
+//! being rung.
 
 use std::sync::Arc;
 
