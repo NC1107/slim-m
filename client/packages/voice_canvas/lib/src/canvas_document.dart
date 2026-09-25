@@ -462,11 +462,11 @@ class CanvasDocument extends ChangeNotifier {
 
   /// The world rectangle currently on screen.
   Rect get worldView => Rect.fromLTWH(
-    _camera.x,
-    _camera.y,
-    _viewport.width / _camera.zoom,
-    _viewport.height / _camera.zoom,
-  );
+        _camera.x,
+        _camera.y,
+        _viewport.width / _camera.zoom,
+        _viewport.height / _camera.zoom,
+      );
 
   Camera _clamp(Camera next) {
     final zoom = next.zoom.clamp(minZoom, maxZoom);

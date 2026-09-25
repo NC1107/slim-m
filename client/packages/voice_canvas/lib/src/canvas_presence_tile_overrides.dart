@@ -56,12 +56,13 @@ class CanvasPresenceTileState {
     bool? locked,
     bool? hidden,
     bool? sentToBack,
-  }) => CanvasPresenceTileState(
-    rect: rect ?? this.rect,
-    locked: locked ?? this.locked,
-    hidden: hidden ?? this.hidden,
-    sentToBack: sentToBack ?? this.sentToBack,
-  );
+  }) =>
+      CanvasPresenceTileState(
+        rect: rect ?? this.rect,
+        locked: locked ?? this.locked,
+        hidden: hidden ?? this.hidden,
+        sentToBack: sentToBack ?? this.sentToBack,
+      );
 }
 
 const _defaultTileState = CanvasPresenceTileState();
