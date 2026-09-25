@@ -277,7 +277,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                   }
                   return fadeThroughPage(
                     context,
-                    ConversationPane(channelId: channelId),
+                    ConversationPane(
+                      channelId: channelId,
+                      openChat: Routes.opensChat(state.uri),
+                    ),
                     key: ValueKey('channel-$channelId'),
                   );
                 },

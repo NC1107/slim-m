@@ -27,9 +27,13 @@ import '../routing/router.dart';
 /// A thread gets no case of its own: a reply into a thread pushes under the
 /// thread's own channel id, and [Routes.channel] renders a thread's transcript
 /// exactly as `ChannelScreen` already does for one reached any other way.
+///
+/// Routed with `openChat`: a notification is about a message, so landing in
+/// a voice channel means its chat, not its call. Without it the tap joined
+/// the call - mic state and all - for someone who only meant to read.
 String? channelRouteForTap(String? channelId) {
   if (channelId == null || channelId.isEmpty) return null;
-  return Routes.channel(channelId);
+  return Routes.channel(channelId, openChat: true);
 }
 
 /// Listens for notification taps and routes to the channel each came from.

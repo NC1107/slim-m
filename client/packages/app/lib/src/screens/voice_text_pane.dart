@@ -114,18 +114,22 @@ class VoiceCallWithChatTabs extends StatefulWidget {
   const VoiceCallWithChatTabs({
     required this.channelId,
     required this.call,
+    this.initiallyChatOpen = false,
     super.key,
   });
 
   final String channelId;
   final Widget call;
 
+  /// Start on the chat rather than the call; see `VoiceScreen.openChat`.
+  final bool initiallyChatOpen;
+
   @override
   State<VoiceCallWithChatTabs> createState() => _VoiceCallWithChatTabsState();
 }
 
 class _VoiceCallWithChatTabsState extends State<VoiceCallWithChatTabs> {
-  bool _chatOpen = false;
+  late bool _chatOpen = widget.initiallyChatOpen;
 
   @override
   Widget build(BuildContext context) {

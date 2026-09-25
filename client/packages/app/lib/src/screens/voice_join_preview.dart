@@ -178,7 +178,8 @@ class VoiceSwitchPrompt extends StatelessWidget {
 /// Shown after a hang-up (no error, just left) or a failed automatic join
 /// (an error the caller can read and, if [canRetry], act on). Rejoining is
 /// the one manual step that remains once a call ends; leaving the screen
-/// entirely is the other, via [leaveRecapScreen].
+/// entirely is the other, via [leaveRecapScreen]. It is also the join
+/// affordance for a member who arrived to read the chat ([wasInCall] false).
 class VoiceRejoinScreen extends ConsumerWidget {
   const VoiceRejoinScreen({
     super.key,
@@ -188,6 +189,7 @@ class VoiceRejoinScreen extends ConsumerWidget {
     required this.onRetry,
     this.errorMessage,
     this.recap,
+    this.wasInCall = true,
   });
 
   final String channelId;
@@ -195,6 +197,11 @@ class VoiceRejoinScreen extends ConsumerWidget {
   final bool canRetry;
   final VoidCallback onRetry;
   final String? errorMessage;
+
+  /// False for a member who came to read, not to talk (`VoiceScreen.openChat`)
+  /// and has not been in this call: no "you left" notice, and the button
+  /// offers a first join rather than a rejoin.
+  final bool wasInCall;
 
   /// The call that just ended here, already checked against this channel by
   /// the caller. Rendered only when [errorMessage] is null and
@@ -208,7 +215,9 @@ class VoiceRejoinScreen extends ConsumerWidget {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     // Whether the plain "You left this call." fallback, not the error or CallRecapCard, is next.
     final showsPlainLeftNotice =
-        errorMessage == null && (recap == null || !recap!.isWorthShowing);
+        wasInCall &&
+        errorMessage == null &&
+        (recap == null || !recap!.isWorthShowing);
     final rosterAsync = ref.watch(voiceRosterProvider(channelId));
     final rosterConfirmedEmpty = rosterAsync.valueOrNull?.isEmpty ?? false;
     return LayoutBuilder(
@@ -256,7 +265,7 @@ class VoiceRejoinScreen extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
                         child: CallRecapCard(recap: recap),
                       )
-                    else if (!rosterConfirmedEmpty)
+                    else if (wasInCall && !rosterConfirmedEmpty)
                       // An empty roster already folded this into _WhoIsHere above.
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.s12),
@@ -280,7 +289,11 @@ class VoiceRejoinScreen extends ConsumerWidget {
                           ),
                         ),
                         child: Text(
-                          errorMessage != null ? 'Try again' : 'Rejoin call',
+                          errorMessage != null
+                              ? 'Try again'
+                              : wasInCall
+                              ? 'Rejoin call'
+                              : 'Join call',
                         ),
                       ),
                       const SizedBox(height: AppSpacing.s8),

@@ -21,6 +21,7 @@ import 'package:slimm_app/src/audio/notification_sound.dart';
 import 'package:slimm_app/src/providers/notification_sound_controller.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/sync_controller.dart';
+import 'package:slimm_app/src/routing/routes.dart';
 import 'package:slimm_app/src/screens/home_shell.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -184,6 +185,7 @@ GoRouter testRouter(String location) => GoRouter(
               path: ':channelId',
               builder: (context, state) => ConversationPane(
                 channelId: state.pathParameters['channelId']!,
+                openChat: Routes.opensChat(state.uri),
               ),
             ),
           ],
