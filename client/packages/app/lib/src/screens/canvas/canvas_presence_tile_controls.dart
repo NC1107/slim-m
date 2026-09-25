@@ -126,8 +126,9 @@ class TileControls extends StatelessWidget {
           ),
         AppIconButton(
           icon: AppIcons.tileHide,
-          semanticLabel: 'Hide this tile on your canvas',
-          tooltip: 'Hide on your canvas',
+          semanticLabel:
+              'Hide this tile on your canvas; other participants still see it',
+          tooltip: 'Hide on your canvas - others still see it',
           size: AppIconButtonSize.sm,
           onPressed: onHide,
         ),

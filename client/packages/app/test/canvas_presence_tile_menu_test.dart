@@ -108,6 +108,29 @@ void main() {
     expect(find.text('Hide on your canvas'), findsOneWidget);
   });
 
+  testWidgets(
+    "Hide's own accessible label says other participants still see it, not "
+    'only that it leaves your canvas',
+    (tester) async {
+      final document = CanvasDocument()..setViewport(const Size(1200, 800));
+      addTearDown(document.dispose);
+      final overrides = CanvasPresenceTileOverrides();
+      addTearDown(overrides.dispose);
+      await tester.pumpWidget(_wrap(document: document, overrides: overrides));
+      await tester.pump();
+
+      await _rightClickTile(tester);
+
+      expect(
+        find.bySemanticsLabel(
+          'Hide this tile on your canvas; other participants still see it',
+        ),
+        // A merged ancestor Semantics node can inherit a lone child's label, matching this text twice.
+        findsAtLeastNWidgets(1),
+      );
+    },
+  );
+
   testWidgets('tapping Full screen in the menu opens the same route the hover '
       'control does, and closes the menu', (tester) async {
     // A real, joined voice session is load-bearing here: `_expand`'s route pops itself the instant the feed is not live, which a bare `ProviderScope` with no session always reports.

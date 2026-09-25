@@ -131,13 +131,38 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byKey(_avatarKey),
-        matching: find.bySemanticsLabel('Hide this tile on your canvas'),
+        matching: find.bySemanticsLabel(
+          'Hide this tile on your canvas; other participants still see it',
+        ),
       ),
     );
     await tester.pump();
 
     expect(overrides.stateFor('camera:user-avatar').hidden, isTrue);
   });
+
+  testWidgets(
+    "hide's own tooltip says other participants still see it, not only "
+    'that it leaves your canvas',
+    (tester) async {
+      final document = CanvasDocument()..setViewport(const Size(1000, 800));
+      addTearDown(document.dispose);
+      final overrides = CanvasPresenceTileOverrides();
+      addTearDown(overrides.dispose);
+
+      await tester.pumpWidget(_wrapLayer(_layer(document, overrides)));
+      await tester.pump();
+      await _reveal(tester, _avatarKey);
+
+      expect(
+        find.descendant(
+          of: find.byKey(_avatarKey),
+          matching: find.byTooltip('Hide on your canvas - others still see it'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('an avatar-only tile still drags to reposition', (tester) async {
     final document = CanvasDocument()..setViewport(const Size(1000, 800));
