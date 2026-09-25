@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.73.0](https://github.com/NC1107/slim-m/compare/server-v0.72.0...server-v0.73.0) (2026-09-25)
+
+
+### Features
+
+* per-weekday notification schedule with an off-hours policy ([#1376](https://github.com/NC1107/slim-m/issues/1376)) ([161bf69](https://github.com/NC1107/slim-m/commit/161bf69368c43cadec4e214fbb86fe73a962604d))
+
 ## [0.72.0](https://github.com/NC1107/slim-m/compare/server-v0.71.0...server-v0.72.0) (2026-09-25)
 
 
