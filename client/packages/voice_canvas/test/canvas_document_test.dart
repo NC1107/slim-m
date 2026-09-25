@@ -63,6 +63,33 @@ void main() {
     expect(document.strokeAt(document.paintOrder.single).authorId, isNull);
   });
 
+  test('a one-point stroke (a tapped dot) is placed as a real object', () {
+    final document = CanvasDocument()..setViewport(const Size(800, 600));
+    document.applyPlaced(
+      CanvasStrokeInput(
+        id: 'dot',
+        seq: 1,
+        zIndex: 1,
+        x: 5,
+        y: 5,
+        w: 0,
+        h: 0,
+        points: const [0, 0],
+        width: 3,
+        colorKey: 'annotation',
+      ),
+    );
+    document.refresh();
+
+    expect(document.objectCount.value, 1);
+    final slot = document.paintOrder.single;
+    final placed = document.strokeAt(slot);
+    expect(placed.points, [5.0, 5.0]);
+    // A bare moveTo has no contour to stroke; the dot needs the extra
+    // zero-length lineTo so the round stroke cap has something to draw.
+    expect(placed.path.computeMetrics(), isNotEmpty);
+  });
+
   test('the same id twice is one object', () {
     final document = CanvasDocument()..setViewport(const Size(800, 600));
     final first = document.applyPlaced(stroke('a'));
