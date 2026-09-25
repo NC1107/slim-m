@@ -20,9 +20,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart' show VoiceSessionState;
 
 import 'voice_call_controls_harness.dart';
+
+/// The shortcut hint every tooltip now carries; see the identical helper in
+/// `voice_call_controls_test.dart`.
+String _hint(AppAction action) => ' (${describeAppAction(action).join('+')})';
 
 const _phone = Size(390, 844);
 const _desktop = Size(1400, 900);
@@ -42,7 +47,12 @@ Future<void> _pumpAt(WidgetTester tester, Size size) async {
 }
 
 void main() {
-  const labels = ['Mute', 'Turn on camera', 'Share a screen', 'Leave call'];
+  final labels = [
+    'Mute${_hint(AppAction.toggleMuteCall)}',
+    'Turn on camera${_hint(AppAction.toggleCameraCall)}',
+    'Share a screen${_hint(AppAction.toggleShareCall)}',
+    'Leave call${_hint(AppAction.leaveCall)}',
+  ];
 
   testWidgets(
     'a pointer-width dock shrinks every call control below the old flat '

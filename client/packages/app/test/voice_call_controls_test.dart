@@ -23,9 +23,14 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/providers/voice_settings_controller.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import 'voice_call_controls_harness.dart';
+
+/// The shortcut hint every tooltip now carries, exactly as the control row
+/// builds it, so a key rebind here cannot silently desync from the widget.
+String _hint(AppAction action) => ' (${describeAppAction(action).join('+')})';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -59,7 +64,10 @@ void main() {
 
     expect(find.byIcon(AppIcons.screenShare), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.bySemanticsLabel('Stop sharing'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Stop sharing${_hint(AppAction.toggleShareCall)}'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -84,7 +92,9 @@ void main() {
         ScreenShareQuality.crisp,
       );
 
-      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.tap(
+        find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+      );
       await tester.pumpAndSettle();
 
       // The setting is authoritative, not a pre-fill for one more question.
@@ -116,7 +126,9 @@ void main() {
         isTrue,
       );
 
-      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.tap(
+        find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+      );
       await tester.pumpAndSettle();
 
       expect(session.screenShareCalls, hasLength(1));
@@ -135,7 +147,9 @@ void main() {
         screenShareMaxHeight: 720,
       );
 
-      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.tap(
+        find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+      );
       await tester.pumpAndSettle();
 
       expect(session.screenShareCalls.single.maxHeight, 720);
@@ -154,7 +168,9 @@ void main() {
         screenShareMaxHeight: null,
       );
 
-      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.tap(
+        find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+      );
       await tester.pumpAndSettle();
 
       expect(session.screenShareCalls.single.maxHeight, isNull);
@@ -171,7 +187,9 @@ void main() {
       session: session,
     );
 
-    await tester.tap(find.byTooltip('Share a screen'));
+    await tester.tap(
+      find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+    );
     await tester.pumpAndSettle();
 
     expect(session.screenShareCalls.single.includeAudio, isFalse);
@@ -191,7 +209,9 @@ void main() {
       session: session,
     );
 
-    final shareButton = find.byTooltip('Share a screen');
+    final shareButton = find.byTooltip(
+      'Share a screen${_hint(AppAction.toggleShareCall)}',
+    );
     // Both taps land before the source lookup they raced to start answers.
     await tester.tap(shareButton);
     await tester.pump();
@@ -229,7 +249,9 @@ void main() {
         session: session,
       );
 
-      await tester.tap(find.byTooltip('Share a screen'));
+      await tester.tap(
+        find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -254,10 +276,18 @@ void main() {
       session: session,
     );
 
-    expect(find.byTooltip('Turn on camera'), findsOneWidget);
-    expect(find.byTooltip('Leave call'), findsOneWidget);
+    expect(
+      find.byTooltip('Turn on camera${_hint(AppAction.toggleCameraCall)}'),
+      findsOneWidget,
+    );
+    expect(
+      find.byTooltip('Leave call${_hint(AppAction.leaveCall)}'),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.byTooltip('Turn on camera'));
+    await tester.tap(
+      find.byTooltip('Turn on camera${_hint(AppAction.toggleCameraCall)}'),
+    );
     await tester.pump();
 
     expect(session.setCameraCalls, [true]);

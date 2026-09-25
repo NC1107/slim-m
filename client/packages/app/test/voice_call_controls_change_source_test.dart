@@ -22,9 +22,14 @@ import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/voice_call_controls.dart';
 import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import 'voice_call_controls_harness.dart';
+
+/// The shortcut hint every tooltip now carries; see the identical helper in
+/// `voice_call_controls_test.dart`.
+String _hint(AppAction action) => ' (${describeAppAction(action).join('+')})';
 
 const _sources = [
   ScreenShareSource(id: '1', name: 'Screen 1'),
@@ -110,7 +115,9 @@ void main() {
     );
 
     // First share: picks Screen 1.
-    await tester.tap(find.byTooltip('Share a screen'));
+    await tester.tap(
+      find.byTooltip('Share a screen${_hint(AppAction.toggleShareCall)}'),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Screen 1'));
     await tester.pumpAndSettle();

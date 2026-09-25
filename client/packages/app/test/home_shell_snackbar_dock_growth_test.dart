@@ -78,7 +78,9 @@ void main() {
         reason: 'the reshow must not have dropped the message',
       );
       final dockRect = tester.getRect(find.byType(CanvasCallDock));
-      final leaveRect = tester.getRect(find.bySemanticsLabel('Leave call'));
+      final leaveRect = tester.getRect(
+        find.bySemanticsLabel(RegExp(r'^Leave call')),
+      );
       final snackRect = tester.getRect(find.text(message));
 
       expect(

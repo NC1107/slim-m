@@ -30,7 +30,19 @@ enum AppAction {
   previousChannel,
 
   /// Open settings.
-  openSettings;
+  openSettings,
+
+  /// Toggle this device's own microphone during a call.
+  toggleMuteCall,
+
+  /// Toggle this device's own camera during a call.
+  toggleCameraCall,
+
+  /// Start or stop sharing a screen during a call.
+  toggleShareCall,
+
+  /// Leave the call currently connected.
+  leaveCall;
 
   /// A human-readable name, for a keybinding screen.
   String get label => switch (this) {
@@ -40,6 +52,10 @@ enum AppAction {
         AppAction.nextChannel => 'Next channel',
         AppAction.previousChannel => 'Previous channel',
         AppAction.openSettings => 'Open settings',
+        AppAction.toggleMuteCall => 'Mute or unmute (in a call)',
+        AppAction.toggleCameraCall => 'Turn camera on or off (in a call)',
+        AppAction.toggleShareCall => 'Start or stop screen share (in a call)',
+        AppAction.leaveCall => 'Leave the call',
       };
 }
 
@@ -83,6 +99,12 @@ Map<ShortcutActivator, AppAction> defaultBindings({bool forWeb = kIsWeb}) => {
           AppAction.nextChannel,
       (forWeb ? _cycleChannelKeyWeb : _cycleChannelKey)(previous: true):
           AppAction.previousChannel,
+      // Mute/camera/share match Discord/Zoom; leave (hang up) follows the same shape with no convention of its own.
+      _primary(LogicalKeyboardKey.keyM, shift: true): AppAction.toggleMuteCall,
+      _primary(LogicalKeyboardKey.keyV, shift: true):
+          AppAction.toggleCameraCall,
+      _primary(LogicalKeyboardKey.keyS, shift: true): AppAction.toggleShareCall,
+      _primary(LogicalKeyboardKey.keyH, shift: true): AppAction.leaveCall,
     };
 
 /// The active bindings, defaults overlaid with a user's overrides.

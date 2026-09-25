@@ -128,7 +128,7 @@ void main() {
       );
 
       // Folding the toggle must not have clipped or stolen a neighbor's hit area.
-      await tester.tap(find.bySemanticsLabel('Mute'));
+      await tester.tap(find.bySemanticsLabel(RegExp(r'^Mute')));
       await tester.tap(find.bySemanticsLabel('Switch camera'));
       await tester.tap(find.bySemanticsLabel('Open canvas'));
       await tester.pump();

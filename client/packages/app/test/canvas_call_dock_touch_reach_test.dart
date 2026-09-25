@@ -35,7 +35,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Mute'));
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Mute')));
     await tester.pumpAndSettle();
     expect(
       built.controller!.state.microphoneEnabled,
@@ -43,7 +43,7 @@ void main() {
       reason: 'Mute must reach the real controller',
     );
 
-    await tester.tap(find.bySemanticsLabel('Leave call'));
+    await tester.tap(find.bySemanticsLabel(RegExp(r'^Leave call')));
     await tester.pumpAndSettle();
     expect(
       built.session!.leaveCalls,
