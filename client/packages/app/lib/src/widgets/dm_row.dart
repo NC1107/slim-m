@@ -42,7 +42,9 @@ import '../providers/dm_call_activity.dart';
 import 'mark_unread_action.dart';
 import '../providers/dms.dart';
 import '../providers/member_presence.dart' show presenceOf;
+import '../providers/notification_schedule_controller.dart';
 import '../providers/presence_controller.dart';
+import '../providers/providers.dart' show apiProvider;
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
@@ -88,6 +90,27 @@ class DmRow extends ConsumerWidget {
       );
     }
 
+    final allowedOffHours =
+        ref
+            .read(notificationScheduleProvider)
+            .valueOrNull
+            ?.allowedChannelIds
+            .contains(channel.id) ??
+        false;
+
+    void toggleOffHours() {
+      final client = ref.read(apiProvider);
+      run(
+        () =>
+            (allowedOffHours
+                    ? client.removeNotificationScheduleAllowedChannel(
+                        channel.id,
+                      )
+                    : client.addNotificationScheduleAllowedChannel(channel.id))
+                .then((_) => ref.invalidate(notificationScheduleProvider)),
+      );
+    }
+
     return [
       AppMenuItem(
         label: 'Open',
@@ -124,6 +147,12 @@ class DmRow extends ConsumerWidget {
         leading: AppIcons.mentions,
         selected: currentPreference == api.NotificationPreference.mentions,
         onTap: () => toggleNotifications(api.NotificationPreference.mentions),
+      ),
+      AppMenuItem(
+        label: 'Notify me off hours here',
+        leading: AppIcons.notificationsOn,
+        selected: allowedOffHours,
+        onTap: toggleOffHours,
       ),
       if (peerId != null) ...[
         const AppMenuDivider(),
