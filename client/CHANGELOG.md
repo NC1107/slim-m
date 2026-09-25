@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.86.0](https://github.com/NC1107/slim-m/compare/client-v0.85.0...client-v0.86.0) (2026-09-25)
+
+
+### Features
+
+* **client:** make a module scene's grid drivable by keyboard ([#1354](https://github.com/NC1107/slim-m/issues/1354)) ([176741c](https://github.com/NC1107/slim-m/commit/176741ca0972b096a240a111d4dbe92d8cedde35))
+* **client:** per-participant volume and a quick-actions menu for call tiles and canvas bubbles ([#1381](https://github.com/NC1107/slim-m/issues/1381)) ([20d6619](https://github.com/NC1107/slim-m/commit/20d6619e3856101a5376d2f1c13afbd7189e02ae))
+* **client:** show the canvas zoom level as a small chip ([#1375](https://github.com/NC1107/slim-m/issues/1375)) ([3c7cbe2](https://github.com/NC1107/slim-m/commit/3c7cbe238617e9a556d15bb0aacfda6311961e4e))
+* per-weekday notification schedule with an off-hours policy ([#1376](https://github.com/NC1107/slim-m/issues/1376)) ([161bf69](https://github.com/NC1107/slim-m/commit/161bf69368c43cadec4e214fbb86fe73a962604d))
+
+
+### Bug Fixes
+
+* **client:** add a tooltip to the canvas presence face-pile ([#1378](https://github.com/NC1107/slim-m/issues/1378)) ([951f69f](https://github.com/NC1107/slim-m/commit/951f69f3466b412df16a86a9f7feddd47bebf6d8))
+* **client:** anchor the call-tile member card, compact bot commands, hover the screen-share label ([#1379](https://github.com/NC1107/slim-m/issues/1379)) ([2db61b5](https://github.com/NC1107/slim-m/commit/2db61b541c6564f8f28f0789bb6a13018ae1438f))
+* **client:** give the create-channel and create-category sheets a real header ([#1374](https://github.com/NC1107/slim-m/issues/1374)) ([12136d6](https://github.com/NC1107/slim-m/commit/12136d6c49038b326feb5a011fa1559e43c01ec8))
+* **client:** give the settings nav its own group-label rule instead of AppCard's ([#1371](https://github.com/NC1107/slim-m/issues/1371)) ([1d75382](https://github.com/NC1107/slim-m/commit/1d7538262e3b400d14108ea53df59a19c7be4931))
+* **client:** stop stretching a module scene's aspect ratio in full screen ([#1373](https://github.com/NC1107/slim-m/issues/1373)) ([bc26b1b](https://github.com/NC1107/slim-m/commit/bc26b1be72ede28f026eb564dc20e3b6c0d249b3))
+* **client:** stop the title bar drawing a standing red box around Close ([#1377](https://github.com/NC1107/slim-m/issues/1377)) ([9349c18](https://github.com/NC1107/slim-m/commit/9349c18181efabeb9312d5dfe18d9f7c6ffc9bc2))
+
 ## [0.85.0](https://github.com/NC1107/slim-m/compare/client-v0.84.0...client-v0.85.0) (2026-09-25)
 
 
