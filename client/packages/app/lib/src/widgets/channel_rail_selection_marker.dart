@@ -33,6 +33,13 @@ class SelectionMarkerLayerState extends State<SelectionMarkerLayer> {
   Rect? _rect;
   Object? _owner;
 
+  /// The selected row's own rect, in this layer's coordinates - the same
+  /// content coordinates the enclosing scroll view scrolls, regardless of
+  /// which row reported it. Read by `CompactChannelRailDrawer` to scroll a
+  /// freshly opened drawer to the selection: reused rather than a second
+  /// row-geometry mechanism.
+  Rect? get selectedRect => _rect;
+
   void report(Object owner, Rect rect) {
     if (_owner == owner && _rect == rect) return;
     setState(() {

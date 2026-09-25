@@ -61,7 +61,29 @@ String? selectedChannelId(BuildContext context) =>
     channelIdInPath(GoRouterState.of(context).uri.path);
 
 class ChannelRail extends ConsumerStatefulWidget {
-  const ChannelRail({super.key});
+  const ChannelRail({super.key, this.scrollController, this.markerLayerKey});
+
+  /// Set only by [CompactChannelRailDrawer]: an owned controller it reads
+  /// and moves directly once the drawer's first frame lands, to restore the
+  /// offset a `Drawer`'s own disposal on close would otherwise reset, and to
+  /// scroll the selection into view if that restored offset predates it - a
+  /// channel picked while the drawer was closed, say. The docked layouts
+  /// pass nothing and keep the scroll view's own implicit controller; they
+  /// are never disposed, and snapping a manual scroll back to the selection
+  /// there would fight ordinary browsing.
+  final ScrollController? scrollController;
+
+  /// Set alongside [scrollController]: [SelectionMarkerLayerState.selectedRect]
+  /// is the selected row's position in the scroll view's own content
+  /// coordinates, already computed for the marker bar - reused here rather
+  /// than a second row-geometry mechanism. `Scrollable.ensureVisible` was
+  /// tried first and does not reach far enough: the managed rail nests a
+  /// shrink-wrapped, never-scrollable `ReorderableListView` around every
+  /// row, and that is the nearest `Scrollable` a row's own context finds -
+  /// asking it to reveal itself within a viewport already exactly its own
+  /// content size is a no-op, so the outer scroll view this rail actually
+  /// needs to move never hears about it.
+  final GlobalKey<SelectionMarkerLayerState>? markerLayerKey;
 
   /// The design's measured width at expanded layouts.
   static const double expandedWidth = 248;
@@ -192,6 +214,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                           .toList(growable: false);
                       // A scroll view over one column, not a ListView: the selection marker layer has to span both sections to slide between them.
                       final list = SingleChildScrollView(
+                        controller: widget.scrollController,
                         // The right inset is load-bearing beyond its own look: RailDragHandle's reach cap assumes a row's own edge sits exactly here.
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.s8,
@@ -200,6 +223,7 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
                           0,
                         ),
                         child: SelectionMarkerLayer(
+                          key: widget.markerLayerKey,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [

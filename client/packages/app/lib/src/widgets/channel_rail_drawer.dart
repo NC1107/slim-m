@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../routing/routes.dart';
 import 'channel_rail.dart';
+import 'channel_rail_selection_marker.dart';
 
 /// [ChannelRail] behind [Scaffold.drawer], for phone width.
 ///
@@ -42,6 +43,100 @@ class CompactChannelRailDrawer extends StatefulWidget {
 /// [Scaffold.closeDrawer] itself reenters a build already under way (this
 /// rebuild is the ancestor Scaffold's own), so the close waits a frame.
 class _CompactChannelRailDrawerState extends State<CompactChannelRailDrawer> {
+  /// Both survive this State's own disposal, since a `Drawer`'s subtree -
+  /// this one included - is torn down on close. [_lastOffset] is kept
+  /// current by [_trackOffset] on every scroll rather than read once at
+  /// [dispose]: a `Scrollable` unmounts before its ancestors do, so by the
+  /// time this State's own dispose runs, [_scrollController] has already
+  /// detached and has nothing left to read.
+  static double _lastOffset = 0;
+
+  /// The channel that was selected the last time this closed - compared
+  /// against [CompactChannelRailDrawer.selectedChannelId] on open to decide
+  /// whether [_lastOffset] is even still relevant. A channel picked while
+  /// this was closed (search, a notification) means the restored offset
+  /// predates the selection, and reopening should reveal the new choice
+  /// rather than reopen wherever browsing had scrolled to before it.
+  static String? _lastSelectedId;
+
+  /// Owned rather than the scroll view's own implicit one, so this can read
+  /// and move its offset directly once the drawer's first frame lands.
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<SelectionMarkerLayerState> _markerLayerKey =
+      GlobalKey<SelectionMarkerLayerState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_trackOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOrReveal());
+  }
+
+  void _trackOffset() {
+    if (_scrollController.hasClients) _lastOffset = _scrollController.offset;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_trackOffset);
+    _lastSelectedId = widget.selectedChannelId;
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Re-applied across a few frames rather than attempted once: the channel
+  /// list streams in from the local store, so the first frame or two lay out
+  /// against a still-empty (or partial) child, reporting a `maxScrollExtent`
+  /// smaller than the real one - [ScrollPosition.hasContentDimensions]
+  /// itself turns true on that first, too-small layout, so it cannot gate
+  /// this. Re-jumping every frame the real data can plausibly still be
+  /// arriving converges on the right offset once it does, and costs nothing
+  /// once it is already there - jumping to where it already is is a no-op.
+  int _restoreAttemptsLeft = 6;
+
+  void _restoreOrReveal() {
+    if (!mounted || !_scrollController.hasClients) return;
+    if (widget.selectedChannelId != _lastSelectedId) {
+      _revealSelected();
+      return;
+    }
+    if (_lastOffset <= 0) return;
+    final position = _scrollController.position;
+    if (position.hasContentDimensions) {
+      _scrollController.jumpTo(
+        _lastOffset.clamp(0.0, position.maxScrollExtent),
+      );
+    }
+    if (--_restoreAttemptsLeft > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOrReveal());
+    }
+  }
+
+  /// Same re-apply-across-a-few-frames shape as [_restoreOrReveal], and the
+  /// same reason: the selected row's rect and the scroll view's real extent
+  /// both depend on the channel list finishing its first stream emission.
+  int _revealAttemptsLeft = 6;
+
+  void _revealSelected() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final rect = _markerLayerKey.currentState?.selectedRect;
+    final position = _scrollController.position;
+    if (rect != null && position.hasContentDimensions) {
+      final viewport = position.viewportDimension;
+      final offset = position.pixels;
+      if (rect.top < offset) {
+        _scrollController.jumpTo(rect.top);
+      } else if (rect.bottom > offset + viewport) {
+        _scrollController.jumpTo(
+          (rect.bottom - viewport).clamp(0.0, position.maxScrollExtent),
+        );
+      }
+    }
+    if (--_revealAttemptsLeft > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelected());
+    }
+  }
+
   @override
   void didUpdateWidget(CompactChannelRailDrawer oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -91,7 +186,10 @@ class _CompactChannelRailDrawerState extends State<CompactChannelRailDrawer> {
     child: Listener(
       onPointerDown: (_) => _carried = 0,
       onPointerMove: _onPointerMove,
-      child: const ChannelRail(),
+      child: ChannelRail(
+        scrollController: _scrollController,
+        markerLayerKey: _markerLayerKey,
+      ),
     ),
   );
 }
