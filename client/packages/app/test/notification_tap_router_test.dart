@@ -93,8 +93,11 @@ Future<void> _mount(
 
 void main() {
   group('channelRouteForTap', () {
-    test('a channel id becomes that channel', () {
-      expect(channelRouteForTap('abc'), Routes.channel('abc'));
+    test('a channel id becomes that channel, opened for its chat', () {
+      expect(channelRouteForTap('abc'), Routes.channel('abc', openChat: true));
+      expect(channelRouteForTap('abc'), '/channels/abc?chat=1');
+      expect(Routes.opensChat(Uri.parse(channelRouteForTap('abc')!)), isTrue);
+      expect(Routes.opensChat(Uri.parse(Routes.channel('abc'))), isFalse);
     });
 
     test('nothing usable is no destination', () {
@@ -113,7 +116,7 @@ void main() {
     taps.emit('channel-1');
     await tester.pumpAndSettle();
 
-    expect(_where(router), Routes.channel('channel-1'));
+    expect(_where(router), Routes.channel('channel-1', openChat: true));
   });
 
   testWidgets('the tap that launched the app opens that channel', (
@@ -127,7 +130,7 @@ void main() {
 
     expect(
       _where(router),
-      Routes.channel('channel-2'),
+      Routes.channel('channel-2', openChat: true),
       reason:
           'a tap is how a killed app is usually launched, so the one '
           'held natively has to move the app too',

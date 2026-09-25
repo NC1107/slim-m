@@ -314,9 +314,16 @@ class _LayoutBridge extends StatelessWidget {
 /// way, so [CanvasBar] is the only header at every width. `DmCallPane`
 /// follows the identical shape for a DM's call, carrying its own bar.
 class ConversationPane extends ConsumerWidget {
-  const ConversationPane({required this.channelId, super.key});
+  const ConversationPane({
+    required this.channelId,
+    this.openChat = false,
+    super.key,
+  });
 
   final String channelId;
+
+  /// See [VoiceScreen.openChat]; only a voice channel consults it.
+  final bool openChat;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -359,7 +366,7 @@ class ConversationPane extends ConsumerWidget {
             child: canvasOpen
                 ? CanvasPane(channelId: channelId)
                 : isVoice
-                ? VoiceScreen(channelId: channelId)
+                ? VoiceScreen(channelId: channelId, openChat: openChat)
                 : dmCallOpen
                 ? DmCallPane(channelId: channelId)
                 : ChannelScreen(channelId: channelId),

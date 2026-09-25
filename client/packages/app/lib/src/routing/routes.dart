@@ -47,8 +47,16 @@ abstract final class Routes {
   static String adminDockModuleAccess(String moduleId) =>
       '${adminDockModule(moduleId)}/access';
 
-  /// The messages of one channel.
-  static String channel(String id) => '/channels/$id';
+  /// The messages of one channel. [openChat] arrives to read them: a voice
+  /// channel then opens its chat and leaves its call unjoined (see
+  /// `VoiceScreen.openChat`); a text channel ignores it.
+  static String channel(String id, {bool openChat = false}) =>
+      openChat ? '/channels/$id?$openChatQuery=1' : '/channels/$id';
+
+  /// The query flag [channel] sets for `openChat`; [opensChat] reads it back.
+  static const openChatQuery = 'chat';
+
+  static bool opensChat(Uri uri) => uri.queryParameters[openChatQuery] == '1';
 
   /// The pattern go_router matches, as distinct from a built path.
   static const channelPattern = '/channels/:channelId';

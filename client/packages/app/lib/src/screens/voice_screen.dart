@@ -61,9 +61,21 @@ CallRecap? recapForChannel(VoiceFlags voice, String channelId) =>
     voice.recap?.channelId == channelId ? voice.recap : null;
 
 class VoiceScreen extends ConsumerStatefulWidget {
-  const VoiceScreen({required this.channelId, this.isDm = false, super.key});
+  const VoiceScreen({
+    required this.channelId,
+    this.isDm = false,
+    this.openChat = false,
+    super.key,
+  });
 
   final String channelId;
+
+  /// Arrived to read the channel's chat - a tapped notification for a message
+  /// in it - rather than to talk: the chat opens and the call is not joined,
+  /// because joining a call must be a deliberate act. Join stays one tap away
+  /// on the same screen. Picking the channel from the rail arrives without
+  /// this and joins directly, as it always has.
+  final bool openChat;
 
   /// Whether this is a DM's call rather than a real voice channel's, so the
   /// rejoin screen can say "Call" instead of "Voice channel".
@@ -76,15 +88,38 @@ class VoiceScreen extends ConsumerStatefulWidget {
 class _VoiceScreenState extends ConsumerState<VoiceScreen> {
   /// The channel id an automatic join has already been requested for, so a
   /// failure - or an explicit hang-up, which leaves this same screen still
-  /// mounted - does not retry itself on every rebuild. Cleared only when
-  /// [widget]'s own channel changes, which is what makes revisiting the same
-  /// channel a fresh attempt again.
+  /// mounted - does not retry itself on every rebuild. Reset only by
+  /// [_arrive]: when [widget]'s own channel changes, which is what makes
+  /// revisiting the same channel a fresh attempt again, and when
+  /// [VoiceScreen.openChat] flips, so the rail's pick of a channel that was
+  /// opened for its chat still joins.
   String? _autoJoinedFor;
+
+  @override
+  void initState() {
+    super.initState();
+    _arrive();
+  }
 
   @override
   void didUpdateWidget(covariant VoiceScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.channelId != widget.channelId) _autoJoinedFor = null;
+    if (oldWidget.channelId != widget.channelId ||
+        oldWidget.openChat != widget.openChat) {
+      _arrive();
+    }
+  }
+
+  /// A fresh arrival owes an automatic join, unless the member came to read:
+  /// then it counts as already attempted, and the chat opens instead.
+  void _arrive() {
+    _autoJoinedFor = widget.openChat ? widget.channelId : null;
+    if (!widget.openChat) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(voiceChatPaneVisibleProvider.notifier).state = true;
+      }
+    });
   }
 
   void _maybeAutoJoin(VoiceController controller) {
@@ -174,6 +209,8 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
         _ => VoiceRejoinScreen(
           channelId: channelId,
           isDm: widget.isDm,
+          // Only a hang-up sets justLeftChannelId; an openChat arrival that never joined has no call to have left.
+          wasInCall: !widget.openChat || voice.justLeftChannelId == channelId,
           errorMessage: errorMessage,
           canRetry: canRetry,
           onRetry: () => controller.join(channelId),
@@ -192,7 +229,11 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
       color: tokens.surfaceBase,
       child: canDock
           ? VoiceCallWithChatPane(channelId: channelId, call: callBody)
-          : VoiceCallWithChatTabs(channelId: channelId, call: callBody),
+          : VoiceCallWithChatTabs(
+              channelId: channelId,
+              call: callBody,
+              initiallyChatOpen: widget.openChat,
+            ),
     );
   }
 }
