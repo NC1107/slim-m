@@ -47,6 +47,13 @@ Nothing here signs anything yet, and deriving the keypair then storing the publi
 It is held at 2.x rather than the freshly cut 3.0.0.
 3.0.0 depends on curve25519-dalek's stable 5.0.0, which cargo cannot resolve alongside `crypto_box`'s pinned 5.0.0-pre.1 in the same tree, because a pre-release satisfies nothing outside its own pre-release line.
 
+## jiff
+
+The notification schedule (`docs/decisions/0033-notification-schedule.md`) needs a real IANA time zone database to evaluate a per-weekday window correctly across a daylight-saving transition; a fixed UTC offset, which is all quiet hours ever stored, is exactly the bug that decision replaces.
+
+Built with `default-features = false` plus `std`, `tzdb-bundle-always` and `serde`: `tzdb-bundle-always` compiles the whole IANA database into the binary, since the release image (`gcr.io/distroless/static-debian12`) ships no `/usr/share/zoneinfo` for a runtime `TZDIR` lookup to find.
+`chrono-tz` was the obvious alternative and was rejected only because this project has no existing `chrono` dependency to piggyback on; see the decision record for the full comparison.
+
 ## The release profile
 
 `opt-level = "z"`, LTO, one codegen unit, stripped, and `panic = "abort"`.

@@ -15,7 +15,10 @@ use std::time::Duration;
 
 use serde_json::Value;
 use slimm_server::hub::Hub;
+use slimm_server::ids::UserId;
+use slimm_server::notification_schedule::{DayWindow, OffHoursMode, WEEKDAYS};
 use slimm_server::push::PushSender;
+use slimm_server::store::DaySetting;
 use slimm_server::sweep_stale_call_rings_at;
 use slimm_server::voice::{RING_TIMEOUT, VoiceService};
 use tower::ServiceExt;
@@ -209,4 +212,59 @@ async fn a_disabled_sender_pushes_nothing_for_a_missed_call() {
     // Give a wrongly-enabled sender every chance to have fired.
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert_eq!(mock.call_count(), 0);
+}
+
+/// A call rings straight through an active off-hours schedule in `nothing`
+/// mode, exactly as it always ignored the old quiet-hours window -
+/// `push::call_ring::deliver`'s own doc comment names this as the one
+/// Slack-style exception the schedule makes.
+#[tokio::test]
+async fn a_ring_still_wakes_the_callee_in_off_hours_nothing_mode() {
+    let (store, _channel, _guard) = seeded_store().await;
+    let (mock, relay_url) = spawn_mock_relay().await;
+    let push = PushSender::with_debounce_window_ms(&push_config(&relay_url), SHORT_DEBOUNCE_MS)
+        .expect("relay config is valid");
+    let voice = voice();
+    let hub = Hub::new();
+    let app = app_with_voice(store.clone(), push.clone(), voice.clone(), hub.clone());
+
+    let (alice_token, _alice_id) = register_user(&store, "alice").await;
+    let (bob_token, bob_id) = register_user(&store, "bob").await;
+    let _bob_secret = register_push(&app, &bob_token, "bobs-token").await;
+
+    let bob = UserId(uuid::Uuid::parse_str(&bob_id).unwrap());
+    // A ten-minute window well away from now, so "now" is guaranteed off hours.
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let now_minute = (now_ms / 60_000) % 1440;
+    let wrap = |m: i64| m.rem_euclid(1440);
+    let window = DayWindow::parse(wrap(now_minute + 15), wrap(now_minute + 25)).unwrap();
+    let off_hours = (0..WEEKDAYS as u8)
+        .map(|weekday| DaySetting { weekday, window })
+        .collect::<Vec<_>>();
+    store
+        .set_notification_schedule(bob, "UTC", OffHoursMode::Nothing, &off_hours)
+        .await
+        .unwrap();
+
+    let channel_id = open_dm(&app, &alice_token, &bob_id).await;
+    let rang = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{channel_id}/voice/ring"),
+            Some(&alice_token),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(rang.status(), axum::http::StatusCode::OK);
+
+    assert!(
+        wait_until(|| mock.call_count() > 0, WAIT_TIMEOUT).await,
+        "a ring must wake the callee even while their schedule reads off hours in nothing mode"
+    );
+    assert!(woken(&mock.all_messages()).contains(&"bobs-token".to_owned()));
 }
