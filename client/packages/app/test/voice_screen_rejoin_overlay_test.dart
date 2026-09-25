@@ -56,7 +56,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        expect(find.byTooltip('Leave call'), findsOneWidget);
+        expect(find.byTooltip(RegExp(r'^Leave call')), findsOneWidget);
         expect(find.byType(VoiceReconnectBanner), findsNothing);
 
         session.dropWith(VoiceDisconnect.connectionLost);
@@ -80,7 +80,7 @@ void main() {
           reason: 'reconnecting must read as in-progress feedback, not silence',
         );
         expect(
-          find.byTooltip('Leave call'),
+          find.byTooltip(RegExp(r'^Leave call')),
           findsOneWidget,
           reason: 'the call controls stay usable through the retry window',
         );
