@@ -57,7 +57,8 @@ OffHoursState evaluateNotificationSchedule(
   final today = byWeekday[weekday];
   final onToday = today != null && _coversFromStart(today, minute);
   final priorDay = byWeekday[yesterday];
-  final onFromYesterday = priorDay != null && _tailIntoNextDay(priorDay, minute);
+  final onFromYesterday =
+      priorDay != null && _tailIntoNextDay(priorDay, minute);
   if (onToday || onFromYesterday) return OffHoursState.onHours;
 
   return schedule.offHoursMode == api.OffHoursMode.nothing

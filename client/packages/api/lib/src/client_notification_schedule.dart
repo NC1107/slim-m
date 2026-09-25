@@ -53,8 +53,7 @@ extension SlimmApiNotificationSchedule on SlimmApi {
       );
 
   /// The channel menu's "notify me off-hours here" action.
-  Future<void> addNotificationScheduleAllowedChannel(String channelId) =>
-      _send(
+  Future<void> addNotificationScheduleAllowedChannel(String channelId) => _send(
         'PUT',
         '/notifications/schedule/allowed-channels/$channelId',
         expectNoContent: true,

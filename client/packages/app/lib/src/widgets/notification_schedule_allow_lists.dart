@@ -138,6 +138,18 @@ class _NotificationScheduleAllowedChannelsState
     with GuardedActionState<NotificationScheduleAllowedChannels> {
   bool _expanded = false;
 
+  /// Built once and reused across rebuilds - a `StreamBuilder` given a fresh
+  /// `Stream` on every `build()` re-subscribes every time, and a drift
+  /// stream emits its current value immediately on listen, which turns that
+  /// into a rebuild loop.
+  Stream<List<Channel>>? _channels;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _channels ??= _channelsStream();
+  }
+
   Future<void> _add() async {
     final store = await ref.read(storeProvider.future);
     final channels = await store.watchChannels().first;
@@ -149,8 +161,9 @@ class _NotificationScheduleAllowedChannelsState
     if (picked == null) return;
     final ok = await guard(
       whatFailed: 'add that channel to your off-hours list',
-      action: () =>
-          ref.read(apiProvider).addNotificationScheduleAllowedChannel(picked.id),
+      action: () => ref
+          .read(apiProvider)
+          .addNotificationScheduleAllowedChannel(picked.id),
     );
     if (ok) ref.invalidate(notificationScheduleProvider);
   }
@@ -168,9 +181,11 @@ class _NotificationScheduleAllowedChannelsState
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Channel>>(
-      stream: _channelsStream(),
+      stream: _channels,
       builder: (context, snapshot) {
-        final byId = {for (final c in snapshot.data ?? const []) c.id: c};
+        final byId = {
+          for (final c in snapshot.data ?? const <Channel>[]) c.id: c,
+        };
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

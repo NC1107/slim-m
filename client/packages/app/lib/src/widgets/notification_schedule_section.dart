@@ -24,6 +24,8 @@ import '../providers/notification_schedule_controller.dart';
 import '../providers/providers.dart';
 import 'notification_schedule_allow_lists.dart';
 import 'run_guarded.dart';
+import 'settings_select_row.dart';
+import 'settings_toggle_row.dart';
 
 const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const _dayFullNames = [

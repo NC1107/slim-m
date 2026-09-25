@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The notification schedule (`docs/decisions/0033-notification-schedule.md`):
 /// a per-weekday on-hours window, an off-hours policy, two allow-lists, and
-/// an optional snooze. Replaces [NotificationSchedule]'s own predecessor,
-/// [QuietHours] (`models_quiet_hours.dart`), which is unaffected and still
-/// works, but no longer gates push - see `/notifications/schedule`'s own
-/// route doc comment in `schema/openapi.yaml`.
+/// an optional snooze. Replaces the client's own use of the old quiet-hours
+/// window; the server's `/push/quiet-hours` routes are untouched, but this
+/// client no longer calls them - see `/notifications/schedule`'s own route
+/// doc comment in `schema/openapi.yaml`.
 ///
 /// Split out of models.dart purely to stay under this repo's line budget.
 library;
@@ -99,9 +99,9 @@ class NotificationSchedule {
             .toList(growable: false),
         offHoursMode: OffHoursMode.parse(json['off_hours_mode'] as String),
         snoozeUntil: json['snooze_until'] as int?,
-        allowedUserIds: (json['allowed_user_ids'] as List<dynamic>)
-            .cast<String>(),
-        allowedChannelIds: (json['allowed_channel_ids'] as List<dynamic>)
-            .cast<String>(),
+        allowedUserIds:
+            (json['allowed_user_ids'] as List<dynamic>).cast<String>(),
+        allowedChannelIds:
+            (json['allowed_channel_ids'] as List<dynamic>).cast<String>(),
       );
 }
