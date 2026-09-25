@@ -42,11 +42,13 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::{AuthedLimited, Json, MODULE};
 use super::messages::parse_uuid;
-use super::module_commands::{CODE_RUNNER_MODULE_ID, execute_code_runner, execute_command};
+use super::module_commands::{
+    CODE_RUNNER_MODULE_ID, CommandOutcome, execute_code_runner, execute_command,
+};
 use crate::hub::Event;
 use crate::ids::MessageId;
 use crate::permissions::Permissions;
-use crate::store::clamp_output;
+use crate::store::{MAX_SHARED_OUTPUT_BYTES, clamp_output};
 
 /// A code block's input is a whole snippet, so this matches the run route's
 /// own generous cap rather than the small write bodies elsewhere.
@@ -123,7 +125,7 @@ async fn run(
         )
         .await?
     };
-    let stored = clamp_output(&outcome.payload);
+    let (ok, stored) = stored_payload(req.module_id == CODE_RUNNER_MODULE_ID, outcome);
     let ran_at = state
         .store
         .record_code_run(
@@ -131,7 +133,7 @@ async fn run(
             block_index,
             &req.module_id,
             &req.command,
-            outcome.ok,
+            ok,
             &stored,
             ctx.user_id,
         )
@@ -143,13 +145,13 @@ async fn run(
         block_index,
         module_id: req.module_id,
         command: req.command,
-        ok: outcome.ok,
+        ok,
         output: stored.clone(),
         ran_by: Some(ctx.user_id),
         ran_at,
     });
 
-    let response = if outcome.ok {
+    let response = if ok {
         RunResponse {
             ok: true,
             output: Some(stored),
@@ -163,4 +165,52 @@ async fn run(
         }
     };
     Ok(Json(response))
+}
+
+/// Text may be byte-clamped; a scene is JSON, and a cut scene is garbage the
+/// client cannot parse, so an over-ceiling scene is refused whole instead.
+fn stored_payload(is_text: bool, outcome: CommandOutcome) -> (bool, String) {
+    if is_text {
+        return (outcome.ok, clamp_output(&outcome.payload));
+    }
+    if outcome.payload.len() > MAX_SHARED_OUTPUT_BYTES {
+        let message = format!(
+            "scene refused: {} bytes is over the {} byte ceiling",
+            outcome.payload.len(),
+            MAX_SHARED_OUTPUT_BYTES
+        );
+        return (false, message);
+    }
+    (outcome.ok, outcome.payload)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn outcome(payload: String) -> CommandOutcome {
+        CommandOutcome { ok: true, payload }
+    }
+
+    #[test]
+    fn text_over_the_ceiling_is_clamped_and_stays_ok() {
+        let (ok, stored) = stored_payload(true, outcome("x".repeat(MAX_SHARED_OUTPUT_BYTES + 10)));
+        assert!(ok);
+        assert!(stored.ends_with("(output truncated)"));
+    }
+
+    #[test]
+    fn a_scene_over_the_ceiling_is_refused_not_cut() {
+        let big = format!("{{\"ops\":\"{}\"}}", "a".repeat(MAX_SHARED_OUTPUT_BYTES));
+        let (ok, stored) = stored_payload(false, outcome(big));
+        assert!(!ok);
+        assert!(stored.starts_with("scene refused"));
+    }
+
+    #[test]
+    fn a_scene_under_the_ceiling_is_stored_untouched() {
+        let (ok, stored) = stored_payload(false, outcome("{\"ops\":[]}".into()));
+        assert!(ok);
+        assert_eq!(stored, "{\"ops\":[]}");
+    }
 }
