@@ -13,6 +13,12 @@ import 'package:slimm_design_system/design_system.dart';
 /// `VoiceState.awaitingBroadcast` is a request nobody can see yet, and
 /// showing this banner for it would be the exact lie that field exists to
 /// stop.
+///
+/// `call_stage_layout.dart` withholds this once the stage itself is already
+/// showing the local mirrored tile: that tile's own caption
+/// (`screen_share_stage.dart`) says the identical fact, and stacking both
+/// read as one thing said twice. This banner is what is left to say so
+/// before the roster catches up and the stage has nothing to show yet.
 class LocalScreenShareBanner extends StatelessWidget {
   const LocalScreenShareBanner({super.key});
 

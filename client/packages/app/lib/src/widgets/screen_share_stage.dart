@@ -18,6 +18,11 @@ import 'fullscreen_video_overlay.dart';
 /// arbitrary content, and any chrome tone bleeding around its letterbox reads
 /// as part of the screen. The name line says whose screen it is, because two
 /// people can share in turn and a bare rectangle does not say which.
+///
+/// The local caption reads as a full sentence ("You are sharing your
+/// screen") rather than a bare label ("Your screen"): it is what is left to
+/// confirm a live share once `local_screen_share_banner.dart`'s own banner
+/// is withheld here to avoid saying the identical thing twice.
 class ScreenShareStage extends StatelessWidget {
   const ScreenShareStage({
     super.key,
@@ -84,7 +89,9 @@ class ScreenShareStage extends StatelessWidget {
             const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: Text(
-                isLocal ? 'Your screen' : "$sharerName's screen",
+                isLocal
+                    ? 'You are sharing your screen'
+                    : "$sharerName's screen",
                 overflow: TextOverflow.ellipsis,
                 style: AppText.caption.copyWith(color: tokens.textSecondary),
               ),
