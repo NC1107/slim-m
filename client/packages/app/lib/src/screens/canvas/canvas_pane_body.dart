@@ -29,6 +29,7 @@ import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
 import 'canvas_selection_semantics.dart';
 import 'canvas_world_edge_glow.dart';
+import 'canvas_zoom_indicator.dart';
 
 class CanvasPaneBody extends StatefulWidget {
   const CanvasPaneBody({
@@ -457,6 +458,7 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
           tileOverrides: widget.tileOverrides,
           tokens: tokens,
         ),
+        CanvasZoomIndicator(document: widget.document, tokens: tokens),
       ],
     ),
   );
