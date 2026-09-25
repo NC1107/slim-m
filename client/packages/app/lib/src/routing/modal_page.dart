@@ -10,8 +10,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+import '../providers/voice_controller.dart';
 
 /// How large the floating panel is allowed to get.
 ///
@@ -31,9 +34,15 @@ const Color kScrimColor = Color(0x99000000);
 /// know which of the two it is being shown as.
 Page<void> modalPage(BuildContext context, Widget child) {
   if (MediaQuery.sizeOf(context).width < kCompactWidth) {
+    final screen = Column(
+      children: [
+        const _ActiveCallReminder(),
+        Expanded(child: child),
+      ],
+    );
     return AppMotion.isReduced(context)
-        ? NoTransitionPage<void>(child: child)
-        : MaterialPage<void>(child: child);
+        ? NoTransitionPage<void>(child: screen)
+        : MaterialPage<void>(child: screen);
   }
   // The motion spec's one 280ms moment: scrim and panel enter together, the
   // panel rising 16px; the exit runs faster (180ms, ease-in) because leaving
@@ -65,6 +74,60 @@ Page<void> modalPage(BuildContext context, Widget child) {
     },
     child: _ModalPanel(child: child),
   );
+}
+
+/// A phone-width settings/admin screen takes the whole window, so an active
+/// call has nowhere left visible the way it stays dimly in view beside the
+/// desktop's floating panel. This is the compact equivalent: a banner
+/// (desktop-vs-mobile.md rule 6, status the user did not ask for) that
+/// pushes the screen down rather than floats over it, carrying the two
+/// controls a call must never leave unreachable, mute and leave.
+class _ActiveCallReminder extends ConsumerWidget {
+  const _ActiveCallReminder();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final voice = ref.watch(voiceControllerProvider);
+    if (voice.channelId == null || voice.connectedAt == null) {
+      return const SizedBox.shrink();
+    }
+    final controller = ref.read(voiceControllerProvider.notifier);
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s12,
+          AppSpacing.s8,
+          AppSpacing.s12,
+          0,
+        ),
+        child: AppCallout(
+          tone: AppCalloutTone.accent,
+          icon: AppIcons.startCall,
+          child: Row(
+            children: [
+              const Expanded(child: Text('Voice call in progress.')),
+              AppIconButton(
+                icon: voice.microphoneEnabled ? AppIcons.mic : AppIcons.micOff,
+                semanticLabel: voice.microphoneEnabled ? 'Mute' : 'Unmute',
+                tooltip: voice.microphoneEnabled ? 'Mute' : 'Unmute',
+                size: AppIconButtonSize.touch,
+                onPressed: controller.toggleMicrophone,
+              ),
+              AppIconButton(
+                icon: AppIcons.leaveCall,
+                semanticLabel: 'Leave call',
+                tooltip: 'Leave call',
+                variant: AppIconButtonVariant.danger,
+                size: AppIconButtonSize.touch,
+                onPressed: controller.leave,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ModalPanel extends StatelessWidget {

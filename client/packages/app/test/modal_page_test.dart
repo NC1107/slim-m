@@ -4,13 +4,21 @@
 /// These screens took the whole window at every size, which on a monitor meant
 /// swallowing 1280 points to show eight rows and hiding the app behind them.
 /// A phone still gets the whole window, because that is the point there.
+///
+/// A phone screen taking the whole window also means an active call has no
+/// window margin left to stay visible through, unlike the desktop's floating
+/// panel; [_ActiveCallReminder] is the compact replacement, covered below.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_design_system/design_system.dart';
+
+import 'voice_controller_harness.dart';
 
 const Size _phone = Size(390, 844);
 const Size _desktop = Size(1280, 900);
@@ -18,31 +26,54 @@ const Size _desktop = Size(1280, 900);
 /// The screen being presented, marked so it can be found whichever way it is.
 const Key _screenKey = Key('screen-under-test');
 
-Future<void> _open(WidgetTester tester, Size window) async {
+/// A [VoiceController] a test can hand a fixed starting [VoiceState],
+/// mirroring the pattern `canvas_pane_hangup_closes_test.dart` already uses.
+class _StubVoiceController extends VoiceController {
+  _StubVoiceController(super.ref, VoiceState initial)
+    : super(session: FakeSession()) {
+    state = initial;
+  }
+}
+
+const _noCall = VoiceState();
+final _inCall = VoiceState(channelId: 'c1', connectedAt: DateTime(2024, 1, 1));
+
+Future<void> _open(
+  WidgetTester tester,
+  Size window, {
+  VoiceState voiceState = _noCall,
+}) async {
   tester.view.physicalSize = window;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
   final navigator = GlobalKey<NavigatorState>();
   await tester.pumpWidget(
-    MaterialApp(
-      theme: buildTheme(Brightness.dark, AppTokens.dark),
-      navigatorKey: navigator,
-      home: Scaffold(
-        body: Center(
-          child: Builder(
-            builder: (context) => TextButton(
-              onPressed: () => navigator.currentState!.push(
-                modalPage(
-                  context,
-                  const ColoredBox(
-                    key: _screenKey,
-                    color: Color(0xFF202020),
-                    child: SizedBox.expand(),
-                  ),
-                ).createRoute(context),
+    ProviderScope(
+      overrides: [
+        voiceControllerProvider.overrideWith(
+          (ref) => _StubVoiceController(ref, voiceState),
+        ),
+      ],
+      child: MaterialApp(
+        theme: buildTheme(Brightness.dark, AppTokens.dark),
+        navigatorKey: navigator,
+        home: Scaffold(
+          body: Center(
+            child: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => navigator.currentState!.push(
+                  modalPage(
+                    context,
+                    const ColoredBox(
+                      key: _screenKey,
+                      color: Color(0xFF202020),
+                      child: SizedBox.expand(),
+                    ),
+                  ).createRoute(context),
+                ),
+                child: const Text('open'),
               ),
-              child: const Text('open'),
             ),
           ),
         ),
@@ -67,19 +98,27 @@ Future<Page<void>> _pageFor(
 
   late Page<void> page;
   await tester.pumpWidget(
-    MediaQuery(
-      // From the view: a bare MediaQueryData reports Size.zero, which reads as
-      // a phone and would answer the desktop half of this with the other one.
-      data: MediaQueryData.fromView(
-        tester.view,
-      ).copyWith(disableAnimations: reduceMotion),
-      child: MaterialApp(
-        theme: buildTheme(Brightness.dark, AppTokens.dark),
-        home: Builder(
-          builder: (context) {
-            page = modalPage(context, const SizedBox.shrink());
-            return const SizedBox.shrink();
-          },
+    ProviderScope(
+      overrides: [
+        voiceControllerProvider.overrideWith(
+          (ref) => _StubVoiceController(ref, _noCall),
+        ),
+      ],
+      child: MediaQuery(
+        // From the view: a bare MediaQueryData reports Size.zero, which reads
+        // as a phone and would answer the desktop half of this with the
+        // other one.
+        data: MediaQueryData.fromView(
+          tester.view,
+        ).copyWith(disableAnimations: reduceMotion),
+        child: MaterialApp(
+          theme: buildTheme(Brightness.dark, AppTokens.dark),
+          home: Builder(
+            builder: (context) {
+              page = modalPage(context, const SizedBox.shrink());
+              return const SizedBox.shrink();
+            },
+          ),
         ),
       ),
     ),
@@ -125,6 +164,39 @@ void main() {
     final route = ModalRoute.of(tester.element(find.byKey(_screenKey)))!;
     expect(route.opaque, isFalse);
     expect(route.barrierDismissible, isTrue);
+  });
+
+  group('the compact active-call reminder', () {
+    testWidgets('is absent with no call to reach', (tester) async {
+      await _open(tester, _phone, voiceState: _noCall);
+
+      expect(find.text('Voice call in progress.'), findsNothing);
+    });
+
+    testWidgets('lets a phone reach mute and leave while the screen is open', (
+      tester,
+    ) async {
+      // The gap: a full-window phone screen left a call nowhere to be muted or left from.
+      await _open(tester, _phone, voiceState: _inCall);
+
+      expect(find.text('Voice call in progress.'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Mute'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Unmute'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Leave call'));
+      await tester.pumpAndSettle();
+      // Leaving clears channelId, which is this reminder's own condition.
+      expect(find.text('Voice call in progress.'), findsNothing);
+    });
+
+    testWidgets('does not show on the floating desktop panel', (tester) async {
+      // Compact-only: the desktop panel already leaves the app visible-and-dimmed.
+      await _open(tester, _desktop, voiceState: _inCall);
+
+      expect(find.text('Voice call in progress.'), findsNothing);
+    });
   });
 
   group('reduce motion', () {
