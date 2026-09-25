@@ -275,7 +275,12 @@ impl Store {
     /// The spend is a single conditional UPDATE, so the use limit holds under
     /// concurrent redemptions: two people racing the last slot cannot both win,
     /// because only one UPDATE can match.
-    pub async fn redeem_invite(&self, code: &str, user_id: UserId) -> Result<(), RedeemError> {
+    ///
+    /// Returns whether this call actually spent a use: `false` for the
+    /// already-redeemed retry below, so the caller can publish
+    /// `Event::MemberJoined` only for a fresh redemption and not fan out a
+    /// join announcement on every idempotent retry.
+    pub async fn redeem_invite(&self, code: &str, user_id: UserId) -> Result<bool, RedeemError> {
         let now = now_ms();
         // BEGIN IMMEDIATE: reads whether the caller already redeemed before writing, so two retries cannot each spend a use.
         let mut tx = self.begin_write().await?;
@@ -292,7 +297,7 @@ impl Store {
         .is_some();
         if already_redeemed {
             tx.commit().await?;
-            return Ok(());
+            return Ok(false);
         }
 
         let Some(role_grant) = spend_invite(&mut tx, code, now).await? else {
@@ -311,7 +316,7 @@ impl Store {
         }
 
         tx.commit().await?;
-        Ok(())
+        Ok(true)
     }
 
     /// The invite each of `ids` first registered through, for surfacing to a

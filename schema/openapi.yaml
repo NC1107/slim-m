@@ -10599,6 +10599,7 @@ components:
         - $ref: "#/components/schemas/MemberTimeout"
         - $ref: "#/components/schemas/MemberRemoved"
         - $ref: "#/components/schemas/MemberRestored"
+        - $ref: "#/components/schemas/MemberJoined"
         - $ref: "#/components/schemas/ProfileChanged"
         - $ref: "#/components/schemas/TypingStarted"
         - $ref: "#/components/schemas/TypingStopped"
@@ -11279,6 +11280,23 @@ components:
         type:
           type: string
           enum: [member.restored]
+        user_id:
+          type: string
+          format: uuid
+
+    MemberJoined:
+      type: object
+      required: [type, user_id]
+      description: >
+        Somebody actually joined the Space: registration, or an existing
+        account spending an invite code. Not sent for a restore from removal,
+        which is MemberRestored instead. Carries only the id, like
+        MemberRemoved: a bot resolves the rest of the profile over
+        GET /members.
+      properties:
+        type:
+          type: string
+          enum: [member.joined]
         user_id:
           type: string
           format: uuid

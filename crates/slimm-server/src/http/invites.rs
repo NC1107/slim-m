@@ -24,6 +24,7 @@ use super::error::ApiError;
 use super::extract::{
     AUTHED_READ, Authed, AuthedLimited, INVITE_CHECK, Json, RateLimited, WRITE, enforce,
 };
+use crate::hub::Event;
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use crate::store::{Invite, InviteCheck, RedeemError};
@@ -245,7 +246,9 @@ async fn check(
     }
 }
 
-/// Spends an invite for the signed-in account.
+/// Spends an invite for the signed-in account. A fresh spend publishes
+/// `Event::MemberJoined`; the idempotent already-redeemed retry does not, so a
+/// greeter bot cannot be told the same join twice.
 async fn redeem(
     Authed(ctx): Authed,
     parts: Parts,
@@ -257,7 +260,12 @@ async fn redeem(
     // server on the write lock while proving nothing.
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     match state.store.redeem_invite(&code, ctx.user_id).await {
-        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Ok(freshly_redeemed) => {
+            if freshly_redeemed {
+                state.hub.publish(Event::MemberJoined(ctx.user_id));
+            }
+            Ok(StatusCode::NO_CONTENT)
+        }
         // One answer for expired, spent, revoked, and never-existed.
         Err(RedeemError::Unusable) => Err(ApiError::BadRequest("that invite cannot be used")),
         Err(RedeemError::Internal(e)) => Err(e.into()),

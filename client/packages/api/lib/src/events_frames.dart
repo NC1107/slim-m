@@ -211,6 +211,15 @@ class MemberRestored extends ServerEvent {
   final String userId;
 }
 
+/// Somebody actually joined the Space: registration, or an existing account
+/// spending an invite code. Never sent for a restore from removal - that is
+/// [MemberRestored] instead, since they are not new.
+class MemberJoined extends ServerEvent {
+  const MemberJoined({required this.userId});
+
+  final String userId;
+}
+
 /// A user changed their display name. Carries only the id, never the new
 /// name: the value lives in exactly one place, a user's own profile, and a
 /// receiver re-asks for it (`SlimmApiUsers.getUser`/`listUsers`) rather than
