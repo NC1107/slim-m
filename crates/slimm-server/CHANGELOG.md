@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.72.0](https://github.com/NC1107/slim-m/compare/server-v0.71.0...server-v0.72.0) (2026-09-25)
+
+
+### Features
+
+* **server,client:** add a member.joined event so a bot can greet a new member ([#1357](https://github.com/NC1107/slim-m/issues/1357)) ([2487aa7](https://github.com/NC1107/slim-m/commit/2487aa79bca6bf901d371e6e2cdda8f1754d7c80))
+
 ## [0.71.0](https://github.com/NC1107/slim-m/compare/server-v0.70.0...server-v0.71.0) (2026-09-25)
 
 
