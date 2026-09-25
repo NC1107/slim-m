@@ -353,9 +353,9 @@ class RailUserFooter extends ConsumerWidget {
   /// conflating the two here used to blank a chosen status behind
   /// "connecting"/"offline" for the whole time a reconnect was in flight.
   ///
-  /// A typed status (`api.Me.statusText`) outranks the generic word once one
-  /// is set, the same way the member pane's own row shows it rather than
-  /// alongside "online": this footer used to say `connected` forever
+  /// A typed status (`api.Me.statusText`) joins the presence word once one is
+  /// set ("online · swagging"), the same pair the member pane's own row
+  /// shows for everyone else: this footer used to say `connected` forever
   /// regardless of what was typed into the status menu directly above it.
   final String? activeChannelId;
 
@@ -373,10 +373,10 @@ class RailUserFooter extends ConsumerWidget {
         inCall && callChannelId != null && callChannelId != activeChannelId;
 
     final (statusLabel, presence) = presenceDisplayOf(visibility);
-    // A typed status outranks the generic presence word, same as on any profile that shows it.
+    // A typed status joins the presence word rather than replacing it, so both facts the member pane shows about you show here too (design review note 7).
     final statusText = me.valueOrNull?.statusText;
     final secondLine = statusText != null && statusText.isNotEmpty
-        ? statusText
+        ? '$statusLabel · $statusText'
         : statusLabel;
 
     // Mirrors [RailHeader]: the raised bar and its top border bleed to the

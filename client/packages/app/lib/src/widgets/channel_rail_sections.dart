@@ -222,7 +222,6 @@ class _ChannelCategorySectionsState
                 revealed: revealed,
                 onFocusChange: onFocusChange,
               ),
-        chrome: category == null,
       );
       // Only a real category is manageable; the null section is the id-less implicit 'Channels' bucket.
       if (category == null || !canManage) return label;

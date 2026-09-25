@@ -19,7 +19,7 @@ import 'channel_management_harness.dart';
 
 void main() {
   group('section header (backlog item 55)', () {
-    testWidgets('the uncategorised section reads CHANNELS, the same treatment '
+    testWidgets('the uncategorised section reads Channels, the same treatment '
         'DirectMessagesSection gives its own header - it used to be a blank '
         'label with a floating "+" and no explanation', (tester) async {
       await tester.pumpWidget(
@@ -34,7 +34,7 @@ void main() {
         ),
       );
 
-      expect(find.text('CHANNELS'), findsOneWidget);
+      expect(find.text('Channels'), findsOneWidget);
       expect(find.bySemanticsLabel('Channels'), findsOneWidget);
     });
 
@@ -76,7 +76,7 @@ void main() {
         ),
       );
 
-      expect(find.text('CHANNELS'), findsOneWidget);
+      expect(find.text('Channels'), findsOneWidget);
       expect(find.text('Text'), findsNothing);
       expect(find.text('Voice'), findsNothing);
     });
@@ -102,7 +102,7 @@ void main() {
         ),
       );
 
-      expect(find.text('CHANNELS'), findsNothing);
+      expect(find.text('Channels'), findsNothing);
       expect(find.text('Text'), findsOneWidget);
     });
 
@@ -131,7 +131,7 @@ void main() {
 
       expect(find.text('dev'), findsOneWidget);
       expect(find.text('DEV'), findsNothing);
-      expect(find.text('CHANNELS'), findsOneWidget);
+      expect(find.text('Channels'), findsOneWidget);
     });
 
     /// The owner: the channels "look like they are floating and the
@@ -241,7 +241,7 @@ void main() {
       );
 
       // Hidden while every channel sits in "dev" - the exact gap the drag has to close.
-      expect(find.text('CHANNELS'), findsNothing);
+      expect(find.text('Channels'), findsNothing);
 
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('chat')),
@@ -253,8 +253,8 @@ void main() {
       }
 
       // Revealed for the length of the drag, with a real drop target rather than a zero-size placeholder.
-      expect(find.text('CHANNELS'), findsOneWidget);
-      expect(tester.getSize(find.text('CHANNELS')).height, greaterThan(0));
+      expect(find.text('Channels'), findsOneWidget);
+      expect(tester.getSize(find.text('Channels')).height, greaterThan(0));
 
       await tester.pumpAndSettle();
       await gesture.up();
