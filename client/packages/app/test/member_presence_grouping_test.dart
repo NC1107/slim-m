@@ -11,12 +11,14 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_design_system/design_system.dart' show AppPresence;
 
-api.UserProfile _m(String id, String displayName) => api.UserProfile(
-  id: id,
-  username: id,
-  displayName: displayName,
-  createdAt: 0,
-);
+api.UserProfile _m(String id, String displayName, {bool isBot = false}) =>
+    api.UserProfile(
+      isBot: isBot,
+      id: id,
+      username: id,
+      displayName: displayName,
+      createdAt: 0,
+    );
 
 void main() {
   group('isReachablePresence', () {
@@ -65,11 +67,42 @@ void main() {
     });
   });
 
+  test(
+    'a bot lands in its own group whatever its presence, never in online or offline',
+    () {
+      final grouped = groupMembersByPresence(
+        [
+          _m('a', 'Ana'),
+          _m('z', 'Zed bot', isBot: true),
+          _m('b', 'Bo bot', isBot: true),
+        ],
+        {'a': AppPresence.online, 'z': AppPresence.online},
+      );
+      expect(grouped.online.map((m) => m.id), ['a']);
+      expect(grouped.offline, isEmpty);
+      expect(grouped.bots.map((m) => m.id), ['b', 'z']);
+    },
+  );
+
+  test('rosterEntries puts the Bots group after Offline', () {
+    final entries = rosterEntries((
+      online: [_m('a', 'Ada')],
+      offline: [_m('b', 'Bo')],
+      bots: [_m('r', 'Roles', isBot: true)],
+    ));
+    expect((entries.last as RosterMember).profile.id, 'r');
+    expect(
+      (entries[entries.length - 2] as RosterGroupLabel).text,
+      'Bots \u00b7 1',
+    );
+  });
+
   group('rosterEntries', () {
     test('each non-empty group is its counted heading then its members', () {
       final entries = rosterEntries((
         online: [_m('a', 'Ada')],
         offline: [_m('b', 'Bo'), _m('c', 'Cy')],
+        bots: const [],
       ));
       expect(entries, hasLength(5));
       expect((entries[0] as RosterGroupLabel).text, 'Online \u00b7 1');
@@ -83,6 +116,7 @@ void main() {
       final entries = rosterEntries((
         online: const [],
         offline: [_m('b', 'Bo')],
+        bots: const [],
       ));
       expect(entries, hasLength(2));
       expect((entries[0] as RosterGroupLabel).text, startsWith('Offline'));
