@@ -2,6 +2,14 @@
 /// A rail section's own header label and its "+" (split out of
 /// `channel_rail_sections.dart` for the review budget): shared by
 /// `DirectMessagesSection` and every channel category header.
+///
+/// Every header renders in sentence case now, this app's own "Direct
+/// messages" and "Channels" included (design review note 1). Uppercasing
+/// only the app's own wording once left the rail speaking two header
+/// languages: a category typed "dev" showed back exactly that, while
+/// "Direct messages" shouted in caps two rows above it. The member pane's
+/// "ONLINE · 3" is the one place uppercase survives, because no user-typed
+/// text ever sits beside it there.
 library;
 
 import 'package:flutter/material.dart';
@@ -10,12 +18,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'create_channel_sheet.dart';
 
 class SectionLabel extends StatefulWidget {
-  const SectionLabel(
-    this.text, {
-    super.key,
-    this.trailingBuilder,
-    this.chrome = true,
-  });
+  const SectionLabel(this.text, {super.key, this.trailingBuilder});
 
   final String text;
 
@@ -24,16 +27,6 @@ class SectionLabel extends StatefulWidget {
   /// null for a section nobody may add to. See [_SectionLabelState].
   final Widget Function(bool revealed, ValueChanged<bool> onFocusChange)?
   trailingBuilder;
-
-  /// Whether [text] is this app's own wording rather than something someone
-  /// typed. Chrome takes the uppercase treatment; a category name does not.
-  ///
-  /// The owner named the mismatch: they typed "dev" and "General", the
-  /// categories screen showed them back exactly that way, and the rail
-  /// showed "DEV" and "GENERAL". A name is the user's, and showing it in a
-  /// case they did not choose is the app overruling them about their own
-  /// data. The treatment stays where the words are ours.
-  final bool chrome;
 
   @override
   State<SectionLabel> createState() => _SectionLabelState();
@@ -53,14 +46,13 @@ class _SectionLabelState extends State<SectionLabel> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     if (widget.text.isEmpty) return const SizedBox.shrink();
-    // Announced in its natural case: the uppercase is a visual treatment some screen readers would spell out.
     final label = Semantics(
       container: true,
       header: true,
       label: widget.text,
       child: ExcludeSemantics(
         child: Text(
-          widget.chrome ? widget.text.toUpperCase() : widget.text,
+          widget.text,
           overflow: TextOverflow.ellipsis,
           style: AppText.label.copyWith(color: tokens.textSecondary),
         ),

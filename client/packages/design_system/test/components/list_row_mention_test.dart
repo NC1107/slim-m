@@ -254,6 +254,44 @@ void main() {
     });
 
     testWidgets(
+        'a muted channel does not brighten when unread - only a mention '
+        'breaks through mute', (tester) async {
+      await _pump(
+        tester,
+        const SizedBox(
+          width: 240,
+          child: AppListRow(label: 'general', unread: true, muted: true),
+        ),
+      );
+      final mutedUnreadStyle = tester.widget<Text>(find.text('general')).style!;
+
+      await _pump(
+        tester,
+        const SizedBox(width: 240, child: AppListRow(label: 'general')),
+      );
+      final plainStyle = tester.widget<Text>(find.text('general')).style!;
+
+      expect(mutedUnreadStyle.fontWeight, plainStyle.fontWeight);
+      expect(mutedUnreadStyle.color, plainStyle.color);
+
+      await _pump(
+        tester,
+        const SizedBox(
+          width: 240,
+          child: AppListRow(
+            label: 'general',
+            unread: true,
+            muted: true,
+            mentioned: true,
+          ),
+        ),
+      );
+      final mutedMentionedStyle =
+          tester.widget<Text>(find.text('general')).style!;
+      expect(mutedMentionedStyle.fontWeight, AppWeights.medium);
+    });
+
+    testWidgets(
         'unread and mentioned still read as different silhouettes once '
         'colour is removed', (tester) async {
       final unreadMask =

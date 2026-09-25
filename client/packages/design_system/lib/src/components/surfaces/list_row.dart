@@ -29,7 +29,11 @@ import '../../touch_targets.dart';
 ///   `text-primary`) and weight (regular to medium) for `selected || unread`
 ///   alike, so unread's *distinguishing* cue from selected is the dot, shown
 ///   only when [trailing] is absent (a trailing count badge already carries
-///   the same meaning, so the dot would be redundant next to it).
+///   the same meaning, so the dot would be redundant next to it). [muted]
+///   suppresses this lift: a muted channel still shows the dot, but reads no
+///   brighter than a read one, since mute is a request to be left alone that
+///   an unread lift would otherwise fight. [mentioned] still breaks through
+///   mute - the one thing muting a channel never silences.
 /// - [mentioned]: a diamond in place of the unread dot's circle, painted in
 ///   [AppTokens.accentFill] instead of [AppTokens.textPrimary] - "unread
 ///   badge" and "mentions of you" are two of the seven closed accent roles
@@ -262,9 +266,9 @@ class _AppListRowState extends State<AppListRow> {
       hasSubtitle: widget.subtitle != null,
     );
 
-    // The source lifts colour and weight together for `selected || unread`;
-    // `mentioned` joins that same group, since a mention is always unread.
-    final emphasised = widget.selected || widget.unread || widget.mentioned;
+    // `mentioned` joins `selected`/`unread`'s lift; `muted` suppresses the unread half of it, since only a mention breaks through mute.
+    final emphasised =
+        widget.selected || widget.mentioned || (widget.unread && !widget.muted);
     final labelStyle = AppText.ui.copyWith(
       color: emphasised ? tokens.textPrimary : tokens.textSecondary,
       fontWeight: emphasised ? AppWeights.medium : AppWeights.regular,

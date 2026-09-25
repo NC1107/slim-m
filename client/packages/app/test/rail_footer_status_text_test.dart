@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rail footer's second line used to always be the generic presence
 /// word (`connected`, `away`, ...); `Me.statusText`, set from the same
-/// status menu right above this row, was never surfaced anywhere here.
+/// status menu right above this row, was never surfaced anywhere here. It
+/// now joins the presence word ("online · swagging"), the same pair the
+/// member pane shows for everyone else (design review note 7).
 library;
 
 import 'dart:convert';
@@ -90,15 +92,16 @@ Future<void> _pumpFooter(
 }
 
 void main() {
-  testWidgets('a typed status replaces the generic connected word', (
-    tester,
-  ) async {
+  testWidgets('a typed status joins the presence word rather than replacing '
+      'it', (tester) async {
     final container = _container(statusText: 'heads down, back in an hour');
     addTearDown(container.dispose);
     await _pumpFooter(tester, container);
 
-    expect(find.text('heads down, back in an hour'), findsOneWidget);
-    expect(find.text('connected'), findsNothing);
+    expect(
+      find.text('connected · heads down, back in an hour'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('with no status text set, the generic word still shows', (
