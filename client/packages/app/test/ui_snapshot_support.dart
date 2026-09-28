@@ -56,6 +56,7 @@ import 'package:slimm_platform/platform.dart';
 
 import 'support/mid_flight_capture.dart';
 import 'support/real_shadows.dart';
+import 'ui_snapshot_channel_settings.dart';
 import 'ui_snapshot_fixture_data.dart';
 
 export 'ui_snapshot_fonts.dart'
@@ -254,6 +255,7 @@ GoRouter fixtureRouter(String location) => GoRouter(
       path: '/settings/roles',
       pageBuilder: (context, state) => modalPage(context, const RolesScreen()),
     ),
+    channelSettingsFixtureRoute,
     GoRoute(
       path: '/settings/permissions',
       pageBuilder: (context, state) =>
