@@ -76,18 +76,22 @@ void main() {
     await teardown(tester, s.container, s.db);
   });
 
-  testWidgets('collapsing the rail unmounts it, giving back its width', (
-    tester,
-  ) async {
-    // Unmounted, not zero-width: it polls voice rosters while built.
+  testWidgets('narrowing the rail keeps it mounted at compact width, giving '
+      'the transcript the difference', (tester) async {
     final s = setup();
     await pumpAtWidth(tester, s.container, 1400);
-    expect(find.byType(ChannelRail), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(ChannelRail)).width,
+      ChannelRail.expandedWidth,
+    );
 
-    s.container.read(channelRailVisibleProvider.notifier).state = false;
+    s.container.read(channelRailExpandedProvider.notifier).state = false;
     await tester.pumpAndSettle();
 
-    expect(find.byType(ChannelRail), findsNothing);
+    expect(
+      tester.getSize(find.byType(ChannelRail)).width,
+      ChannelRail.compactWidth,
+    );
     await teardown(tester, s.container, s.db);
   });
 

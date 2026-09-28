@@ -5,7 +5,7 @@
 /// drag-to-resize with a plain click (backlog item 54): the owner found the
 /// draggable divider's wide hit region read as "a huge resize bar" for a
 /// feature that only ever needed to flip a bit, and said he would settle for
-/// a toggle. Reads and writes the same [channelRailVisibleProvider] #256
+/// a toggle. Reads and writes the same [channelRailExpandedProvider] #256
 /// already shipped, so nothing about how the collapsed state is stored or
 /// restored changes, only how it is reached.
 ///
@@ -29,60 +29,35 @@ import 'channel_rail.dart';
 
 /// Sits where the rail meets the conversation, at every width that docks the
 /// rail beside it (medium and expanded; the compact drawer from #301 is a
-/// separate mechanism and never builds this at all).
+/// separate mechanism and never builds this at all). Clicking it flips the
+/// rail between full and compact width ([channelRailExpandedProvider]).
 ///
 /// The painted line is always a single hairline - [AppTokens.borderSubtle],
 /// tinted with [AppTokens.accentFill] on hover for feedback - never a filled
-/// bar, which is the visual half of item 54's fix.
+/// bar, which is the visual half of item 54's fix. There is no collapsed
+/// state to rescue any more: the compact rail is still a rail, so the same
+/// hairline serves both widths and nothing has to stand in for a hidden pane.
 ///
-/// Collapsed, this is the *only* way back: there is no button anywhere else
-/// that restores the rail, so it always renders a real, hittable
-/// [AppIcons.sidebar] glyph rather than the empty gap a hidden rail would
-/// otherwise leave, in a real [AppSizes.rowPointer]/[AppSizes.rowTouch]-wide
-/// box - there is no boundary to keep clear of yet, since the rail itself is
-/// zero width, so this is a plain reserved [SizedBox] like any other control.
-/// `rail_drag_handle_test.dart`'s discoverability test mutation-tests
-/// exactly this: hiding the glyph while collapsed is the one failure mode
-/// this feature cannot ship with.
-///
-/// Open, the divider is a single hairline and reserves only that hairline's
-/// own width from the `Row` it sits in - [_RailHandleHitArea] is what makes
-/// the click/hover region comfortable anyway, by laying the same
-/// interactive subtree out wider than that, reaching back (capped at
-/// [AppSpacing.s8]) into the rail's own already-blank edge - never into the
-/// transcript, where a message row is opaque edge to edge - rather than
-/// pushing the rail or the transcript away from the line to make room for
-/// itself. [_RailHandleHitArea] wraps [Semantics] rather than sitting
-/// inside it, and it has to: the widening only reaches the real
+/// The divider reserves only that hairline's own width from the `Row` it
+/// sits in - [_RailHandleHitArea] is what makes the click/hover region
+/// comfortable anyway, by laying the same interactive subtree out wider
+/// than that, reaching back (capped at [AppSpacing.s8]) into the rail's own
+/// already-blank edge - never into the transcript, where a message row is
+/// opaque edge to edge. [_RailHandleHitArea] wraps [Semantics] rather than
+/// sitting inside it, and it has to: the widening only reaches the real
 /// [GestureDetector] if it sits above the whole chain, and `Semantics`
-/// merges its own render object's reported size with the same chain's, so
-/// nesting it the other way would report the wide box back to the `Row` too.
-/// The collapsed branch keeps `Semantics` outermost, unlike the open one, so
-/// `tester.getSemantics` - which resolves a finder to whatever render
-/// object this build() returns directly, falling back to an ancestor only
-/// when that object owns no semantics of its own - still finds it directly.
+/// merges its own render object's reported size with the same chain's.
 ///
 /// **"Already-blank" is an assumption this file cannot see enforced.**
 /// `channel_rail.dart`'s own row-list `ListView` pins its right inset to
 /// this exact same [AppSpacing.s8] (with a comment pointing back here) so a
 /// real channel row's own tap target never sits under the widened reach -
-/// `rail_drag_handle_test.dart` pins the geometry, since nothing about the
-/// type system ties two different files' padding together on its own.
+/// `rail_drag_handle_test.dart` pins the geometry.
 ///
 /// [GestureDetector] carries `excludeFromSemantics: true`: a real pointer
-/// tap needs its own recognizer now that a plain click has to work (it did
-/// not before item 54, when only a drag was handled here), but letting it
-/// also publish its own tap action bled this control's label onto an
-/// unrelated ancestor's - found by dumping the real semantics tree, not by
-/// reading the widget, since nothing about the code looked wrong.
-///
-/// The collapsed icon is coloured [AppTokens.textSecondary], not
-/// [AppTokens.borderSubtle] the way the open-state hairline is: it is the
-/// *only* way back once the rail is gone, and borderSubtle reads at roughly
-/// 1.3:1 against the surface in both themes, well under WCAG 1.4.11's 3:1
-/// floor for a UI component boundary, where textSecondary already clears
-/// the stricter 4.5:1 AA text floor (`contrast_test.dart`) and so clears
-/// this one with room, while staying the same muted, undecorated register.
+/// tap needs its own recognizer, but letting it also publish its own tap
+/// action bled this control's label onto an unrelated ancestor's - found by
+/// dumping the real semantics tree, not by reading the widget.
 class RailDragHandle extends ConsumerStatefulWidget {
   const RailDragHandle({super.key});
 
@@ -94,19 +69,19 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
   bool _hovered = false;
 
   void _toggle() =>
-      ref.read(channelRailVisibleProvider.notifier).update((value) => !value);
+      ref.read(channelRailExpandedProvider.notifier).update((value) => !value);
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final visible = ref.watch(channelRailVisibleProvider);
+    final expanded = ref.watch(channelRailExpandedProvider);
     final touch = AppTouchTargets.of(context);
     final hitWidth = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
 
-    // See this class's own doc for why Semantics sits where it does below.
+    // See this class's own doc for why Semantics sits inside the hit area.
     final gestureChain = Semantics(
       button: true,
-      label: visible ? 'Collapse channel list' : 'Expand channel list',
+      label: expanded ? 'Narrow channel list' : 'Widen channel list',
       onTap: _toggle,
       child: FocusableActionDetector(
         mouseCursor: SystemMouseCursors.click,
@@ -121,48 +96,25 @@ class _RailDragHandleState extends ConsumerState<RailDragHandle> {
           // The real pointer tap; the outer Semantics covers accessibility, see its own doc.
           excludeFromSemantics: true,
           onTap: _toggle,
-          // One hover clock lerps both colours; begin==end at mount, no play.
+          // One hover clock; begin==end at mount, so nothing plays.
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: _hovered ? 1.0 : 0.0),
             duration: AppMotion.reduced(context, AppMotion.fast),
             curve: AppMotion.entrance,
-            builder: (context, t, _) {
-              final lineColor = Color.lerp(
-                tokens.borderSubtle,
-                tokens.accentFill,
-                t,
-              )!;
-              // textSecondary, not borderSubtle: see this class's own doc.
-              final iconColor = Color.lerp(
-                tokens.textSecondary,
-                tokens.accentFill,
-                t,
-              )!;
-              return visible
-                  ? Row(
-                      children: [
-                        // The rail's own Container already paints this margin.
-                        const Expanded(child: SizedBox()),
-                        VerticalDivider(width: 1, color: lineColor),
-                      ],
-                    )
-                  : SizedBox(
-                      width: hitWidth,
-                      child: Center(
-                        child: Icon(
-                          AppIcons.sidebar,
-                          size: AppSizes.icon16,
-                          color: iconColor,
-                        ),
-                      ),
-                    );
-            },
+            builder: (context, t, _) => Row(
+              children: [
+                // The rail's own Container already paints this margin.
+                const Expanded(child: SizedBox()),
+                VerticalDivider(
+                  width: 1,
+                  color: Color.lerp(tokens.borderSubtle, tokens.accentFill, t),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
-
-    if (!visible) return gestureChain;
 
     // Capped at AppSpacing.s8 - see this class's own doc for why that's safe.
     final railReach = math.min(hitWidth / 2, AppSpacing.s8);

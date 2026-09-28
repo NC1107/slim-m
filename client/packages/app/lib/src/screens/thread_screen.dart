@@ -26,7 +26,7 @@
 ///   surface by the 2026-08-02 security review, not a thing anybody asked
 ///   for.
 /// - The member-pane and channel-rail toggles are worse than irrelevant:
-///   `memberPaneVisibleProvider` and `channelRailVisibleProvider`
+///   `memberPaneVisibleProvider` and `channelRailExpandedProvider`
 ///   (`widgets/member_pane.dart`, `widgets/channel_rail.dart`) are both bare
 ///   `StateProvider<bool>`, one flag for the whole app rather than one per
 ///   channel, and `HomeShell` reads them for whatever channel the router

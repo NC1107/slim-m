@@ -42,9 +42,9 @@ void main() {
       final s = setup();
       await pumpAtWidth(tester, s.container, 1400, reduceMotion: true);
 
-      s.container.read(channelRailVisibleProvider.notifier).state = false;
+      s.container.read(channelRailExpandedProvider.notifier).state = false;
       await tester.pumpAndSettle();
-      s.container.read(channelRailVisibleProvider.notifier).state = true;
+      s.container.read(channelRailExpandedProvider.notifier).state = true;
       await tester.pumpAndSettle();
 
       s.container.read(memberPaneVisibleProvider.notifier).state = false;

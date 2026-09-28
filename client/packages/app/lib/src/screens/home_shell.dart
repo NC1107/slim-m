@@ -112,7 +112,7 @@ class HomeShell extends ConsumerWidget {
         !canvasFullscreen &&
         !showThread &&
         ref.watch(memberPaneVisibleProvider);
-    final showRail = !canvasFullscreen && ref.watch(channelRailVisibleProvider);
+    final railExpanded = ref.watch(channelRailExpandedProvider);
 
     final railWidth = layout == LayoutClass.expanded
         ? ChannelRail.expandedWidth
@@ -123,10 +123,10 @@ class HomeShell extends ConsumerWidget {
       scaffold = Scaffold(
         body: Row(
           children: [
-            // The rail, the collapsed strip, or neither, plus the drag handle; see railSlot's own doc.
+            // The rail at full or compact width, or neither, plus its handle; see railSlot's own doc.
             ...railSlot(
               context: context,
-              showRail: showRail,
+              expanded: railExpanded,
               canvasFullscreen: canvasFullscreen,
               railWidth: railWidth,
             ),

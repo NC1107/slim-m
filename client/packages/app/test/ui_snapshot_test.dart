@@ -26,7 +26,7 @@ import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane.dart'
     show canvasOpenProvider;
 import 'package:slimm_app/src/widgets/channel_rail.dart'
-    show channelRailVisibleProvider;
+    show channelRailExpandedProvider;
 
 import 'support/surface_registry.dart';
 import 'ui_snapshot_support.dart';
@@ -104,11 +104,11 @@ final _shellStateSurfaces =
           spaceAnalyticsProvider.overrideWith((ref) => _analyticsFixture),
         ],
       ),
-      'rail-collapsed': (
+      'rail-compact': (
         route: '/channels/c-general',
         viewports: const ['desktop-narrow', 'desktop'],
         overrides: () => [
-          channelRailVisibleProvider.overrideWith((ref) => false),
+          channelRailExpandedProvider.overrideWith((ref) => false),
         ],
       ),
       // The thread docked beside the transcript, the presentation an in-app open now takes at expanded widths (UX1); the `thread` surface's pushed route still covers the compact modal.

@@ -278,7 +278,7 @@ void main() {
           findsNothing,
           reason:
               'the same global-state shape as the member toggle, over '
-              'channelRailVisibleProvider',
+              'channelRailExpandedProvider',
         );
         expect(
           find.bySemanticsLabel('Call'),
