@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The one guaranteed quit path, reachable with no tray host at all.
+/// The title bar's app-level menu: update when one is waiting, restart, and
+/// the one guaranteed quit path, reachable with no tray host at all.
 ///
 /// `close_behavior.dart`'s [CloseAction.minimizeToTaskbar] exists so a
 /// Linux desktop with no `org.kde.StatusNotifierWatcher` never gets a
@@ -15,31 +16,63 @@
 /// answers differently across the session (decision 0012's own note that a
 /// tray host can appear or disappear mid-session) and a control that
 /// vanishes out from under a keyboard user mid-navigation is its own bug.
-/// A second, always-reachable way to reach the same "Quit slim-m" the tray
-/// menu already offers costs nothing on a desktop that does have a tray.
+///
+/// Update appears only while `update_watch.dart` knows a newer version, so
+/// it never sits there doing nothing. On an rpm install with auto-update on,
+/// it restarts: the splash's own update pass installs through dnf and
+/// relaunches into the new build. Anywhere else it opens the release page,
+/// the same action the in-session banner offers, because this app does not
+/// fake a self-update the platform cannot do (decision 0020).
 library;
 
-import 'package:flutter/material.dart';
-import 'package:slimm_design_system/design_system.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:slimm_design_system/design_system.dart';
+import 'package:slimm_platform/platform.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../providers/auto_update_preference.dart';
+import '../providers/providers.dart';
 import '../widgets/context_menu_focus.dart';
 import 'desktop_window_port.dart';
+import 'update_check.dart';
+import 'update_watch.dart';
 
-class WindowMenuButton extends StatefulWidget {
+/// What the Update item does for [update] on this install.
+enum UpdateMenuAction { restartToUpdate, openRelease }
+
+/// Restart only where the splash will actually install on the way back up:
+/// an rpm, with the auto-update preference answered yes.
+UpdateMenuAction updateMenuAction(ClientUpdate update, {bool? autoUpdate}) =>
+    update.format == InstallFormat.rpm && autoUpdate == true
+    ? UpdateMenuAction.restartToUpdate
+    : UpdateMenuAction.openRelease;
+
+/// The auto-update preference, or null while unanswered or unreadable.
+final _autoUpdatePreferenceProvider = FutureProvider<bool?>((ref) async {
+  final prefs = await ref.watch(preferencesProvider.future);
+  return loadAutoUpdatePreference(prefs);
+});
+
+class WindowMenuButton extends ConsumerStatefulWidget {
   const WindowMenuButton({super.key, required this.port});
 
   final DesktopWindowPort port;
 
   @override
-  State<WindowMenuButton> createState() => _WindowMenuButtonState();
+  ConsumerState<WindowMenuButton> createState() => _WindowMenuButtonState();
 }
 
-class _WindowMenuButtonState extends State<WindowMenuButton> {
+class _WindowMenuButtonState extends ConsumerState<WindowMenuButton> {
   final _controller = OverlayPortalController();
   final _link = LayerLink();
 
   @override
   Widget build(BuildContext context) {
+    final update = ref.watch(inSessionUpdateProvider);
+    final autoUpdate = ref.watch(_autoUpdatePreferenceProvider).valueOrNull;
     return CompositedTransformTarget(
       link: _link,
       child: OverlayPortal(
@@ -61,8 +94,19 @@ class _WindowMenuButtonState extends State<WindowMenuButton> {
               child: ContextMenuKeyboardScope(
                 onDismiss: _controller.hide,
                 child: AppMenu(
-                  width: 160,
+                  width: 220,
                   children: [
+                    if (update != null)
+                      _updateItem(update, autoUpdate: autoUpdate),
+                    if (widget.port.canRelaunch)
+                      AppMenuItem(
+                        label: 'Restart slim-m',
+                        leading: AppIcons.retry,
+                        onTap: () {
+                          _controller.hide();
+                          unawaited(widget.port.relaunch());
+                        },
+                      ),
                     AppMenuItem(
                       label: 'Quit slim-m',
                       leading: AppIcons.windowQuit,
@@ -84,6 +128,30 @@ class _WindowMenuButtonState extends State<WindowMenuButton> {
           onPressed: _controller.toggle,
         ),
       ),
+    );
+  }
+
+  Widget _updateItem(ClientUpdate update, {required bool? autoUpdate}) {
+    final action = updateMenuAction(update, autoUpdate: autoUpdate);
+    return AppMenuItem(
+      label: switch (action) {
+        UpdateMenuAction.restartToUpdate =>
+          'Restart to update to ${update.version}',
+        UpdateMenuAction.openRelease => 'Get update ${update.version}',
+      },
+      leading: AppIcons.download,
+      onTap: () {
+        _controller.hide();
+        switch (action) {
+          case UpdateMenuAction.restartToUpdate:
+            unawaited(widget.port.relaunch());
+          case UpdateMenuAction.openRelease:
+            final uri = Uri.tryParse(update.releaseUrl);
+            if (uri != null) {
+              unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+            }
+        }
+      },
     );
   }
 }

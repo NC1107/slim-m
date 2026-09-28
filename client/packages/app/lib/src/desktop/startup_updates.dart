@@ -25,23 +25,19 @@ import 'package:url_launcher/url_launcher.dart';
 import '../diagnostics/debug_log.dart';
 import '../providers/auto_update_preference.dart';
 import '../providers/providers.dart';
+import 'relaunch.dart';
 import 'rpm_updater.dart';
 import 'startup_screen.dart';
 import 'startup_state.dart';
 import 'update_check.dart';
 
 /// Replaces the running process with a fresh one, so an installed update is
-/// the build actually in memory. Injectable; the real one detaches a new
-/// process from this one before it exits, or the exit would take the child
-/// with it.
+/// the build actually in memory. Injectable; the real one is `relaunch.dart`,
+/// whose child waits for this process to be gone before starting.
 typedef Relaunch = Future<void> Function();
 
 Future<void> _realRelaunch() async {
-  await Process.start(
-    Platform.resolvedExecutable,
-    Platform.executableArguments,
-    mode: ProcessStartMode.detached,
-  );
+  await spawnRelaunch();
   exit(0);
 }
 

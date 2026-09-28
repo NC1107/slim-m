@@ -12,6 +12,7 @@ import 'dart:ui' show Offset, Size;
 import 'package:screen_retriever/screen_retriever.dart' as sr;
 import 'package:window_manager/window_manager.dart' as wm;
 
+import 'relaunch.dart';
 import 'window_geometry.dart';
 
 /// The window-lifecycle events this app reacts to, named after
@@ -94,6 +95,12 @@ abstract interface class DesktopWindowPort {
   /// A real quit, bypassing whatever [setPreventClose] currently holds - the
   /// tray/Dock menu's own "Quit" item, since ordinary close no longer does.
   Future<void> destroy();
+
+  /// Whether [relaunch] has an honest implementation here; see `relaunch.dart`.
+  bool get canRelaunch;
+
+  /// [destroy], with a fresh copy of the app starting once this process is gone.
+  Future<void> relaunch();
 }
 
 /// The real implementation, a thin adapter with no logic of its own beyond
@@ -232,6 +239,15 @@ class WindowManagerDesktopWindowPort
 
   @override
   Future<void> destroy() => wm.windowManager.destroy();
+
+  @override
+  bool get canRelaunch => canRelaunchThisProcess();
+
+  @override
+  Future<void> relaunch() async {
+    await spawnRelaunch();
+    await destroy();
+  }
 
   @override
   Future<List<DisplayArea>> allDisplays() async {
