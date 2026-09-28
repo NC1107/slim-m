@@ -25,7 +25,8 @@ Each section below is named for its workflow file.
 | `e2e` | pull requests touching `client/`, `crates/`, the schema or the harness; every push to `main`; a nightly schedule; and by hand | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path, and by hand | a server-generated envelope through the relay repo's real HTTP handler |
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
-| `copr-publish` | called by `main-builds` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
+| `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
+| `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run |
@@ -737,9 +738,35 @@ Verifying `github.sha` then waits on a check a path filter correctly skipped, ti
 
 ## copr-publish
 
-The Fedora COPR snapshot submission `main-builds` calls, pulled into its own file once that workflow reached the 500-line hard ceiling.
+The Fedora COPR snapshot submission `main-builds` and `copr-catch-up` call, pulled into its own file once that workflow reached the 500-line hard ceiling.
 
 A reusable workflow rather than a composite action, because it needs its own container image (`fedora:44`), which a composite action cannot declare.
+
+## copr-catch-up
+
+Linux clients update through the COPR repo `nc1107/slim-m`, which `dnf upgrade` tracks, and COPR is fed by `main-builds` (snapshots) and `release` (tagged builds).
+Both are single event-driven paths: on 2026-09-25 a merge storm cancelled four `main-builds` runs before their `copr` job finished, COPR stayed on 0.84.0 while main reached 0.86.0, and nothing was red.
+
+This workflow is the self-healing layer.
+`scripts/copr-behind.sh` asks COPR's own API (`api_3/build/list`, filtered to `slim-m-client`) for the newest build that has not failed or been canceled, and compares its Version part to `client/pubspec.yaml` with `sort -V`.
+Only when COPR is behind does the workflow build the tarball (the `linux-tarball` composite action, shared with `main-builds`' `linux-client`) and submit it through `copr-publish.yml`, the same submit steps and the same `COPR_CONFIG` secret `main-builds` uses.
+
+Triggers:
+
+- `workflow_run` on `main-builds` completing, any conclusion.
+  A cancelled run still completes, so this fires exactly in the storm case; the last run of a storm is never cancelled, so at least one check happens after the dust settles.
+  It is not `push`, because a release-commit push is excluded from `main-builds` and would race it.
+- A six-hourly schedule as a backstop for what has no `main-builds` run to follow, such as a release PR merge (its bump files are path-excluded) or a failed submit.
+- `workflow_dispatch`, to catch up on demand.
+
+Idempotence rests on counting pending and running builds as current, so a check that lands while `main-builds` has just submitted does nothing; a build that failed or was canceled does not count, so the next trigger retries it.
+A submit that `copr-publish` attempts and fails stays a warning, as it does there, and heals on the next trigger for the same reason.
+
+The concurrency group `copr-catch-up` has `cancel-in-progress: false`: a submit must never be killed halfway.
+GitHub keeps one pending run and replaces older pending ones, which is fine here because every run asks the same question of COPR's current state rather than carrying a payload.
+
+Version ordering is unchanged: `copr-publish` stamps the snapshot Release as `0.<run_number>` (this workflow's own counter), which sorts below the committed spec's `1`.
+Because a catch-up only submits a Version COPR does not yet have, it cannot collide with a `main-builds` snapshot of the same Version, and a later tagged `-1` release still supersedes it.
 
 ## desktop-clients
 
