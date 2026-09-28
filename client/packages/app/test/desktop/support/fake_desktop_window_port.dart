@@ -70,6 +70,13 @@ class FakeDesktopWindowPort implements DesktopWindowPort {
   Future<void> destroy() async => destroyCalls++;
 
   @override
+  bool canRelaunch = true;
+  int relaunchCalls = 0;
+
+  @override
+  Future<void> relaunch() async => relaunchCalls++;
+
+  @override
   Future<void> ensureInitialized() async {}
   @override
   Future<void> setBounds(WindowRect rect) async {
