@@ -5,6 +5,11 @@
 /// the call site instead of a string that silently stops matching.
 library;
 
+/// The query flag [Routes.channel] sets for `openChat`. Outside [Routes] on
+/// purpose: every static string there is a route `route_reachability_test`
+/// expects something to navigate to, and a query key is not one.
+const _openChatQuery = 'chat';
+
 abstract final class Routes {
   static const onboarding = '/join';
   static const signIn = '/sign-in';
@@ -51,12 +56,10 @@ abstract final class Routes {
   /// channel then opens its chat and leaves its call unjoined (see
   /// `VoiceScreen.openChat`); a text channel ignores it.
   static String channel(String id, {bool openChat = false}) =>
-      openChat ? '/channels/$id?$openChatQuery=1' : '/channels/$id';
+      openChat ? '/channels/$id?$_openChatQuery=1' : '/channels/$id';
 
-  /// The query flag [channel] sets for `openChat`; [opensChat] reads it back.
-  static const openChatQuery = 'chat';
-
-  static bool opensChat(Uri uri) => uri.queryParameters[openChatQuery] == '1';
+  /// Whether [uri] was built by [channel] with `openChat`.
+  static bool opensChat(Uri uri) => uri.queryParameters[_openChatQuery] == '1';
 
   /// The pattern go_router matches, as distinct from a built path.
   static const channelPattern = '/channels/:channelId';
