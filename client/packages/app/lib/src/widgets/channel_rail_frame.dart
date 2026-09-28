@@ -246,13 +246,10 @@ class RailConnectionBar extends ConsumerWidget {
   }
 }
 
-/// The mic/deafen toggle pair, shared by [RailUserFooter]'s row and
-/// [CollapsedRailStrip]'s column so the two surfaces cannot diverge on icon,
-/// label or enabled state. Both read the same [VoiceFlags]/[VoiceController];
-/// only the surrounding layout differs.
+/// The mic/deafen toggle pair in [RailUserFooter]'s row.
 ///
-/// Takes [VoiceFlags] rather than the full [VoiceState] on purpose: neither
-/// caller has any use for the roster, and typing this as the narrower flags
+/// Takes [VoiceFlags] rather than the full [VoiceState] on purpose: the
+/// footer has no use for the roster, and typing this as the narrower flags
 /// object makes it impossible for a future caller to thread it back in.
 List<Widget> railVoiceToggleButtons({
   required VoiceFlags voice,
@@ -278,8 +275,7 @@ List<Widget> railVoiceToggleButtons({
   ];
 }
 
-/// The personal-settings nav button, shared the same way
-/// [railVoiceToggleButtons] is.
+/// The personal-settings nav button beside [railVoiceToggleButtons].
 ///
 /// Carries a dot when an update is waiting. The banner says the same thing in
 /// words, but it is dismissible and this is not: once the banner is gone the
@@ -337,6 +333,10 @@ class _UpdateDot extends StatelessWidget {
     );
   }
 }
+
+/// Below this footer width the name line gives way to the controls: avatar,
+/// three buttons and their insets leave too little for a readable name.
+const double _footerNameMinWidth = 200;
 
 class RailUserFooter extends ConsumerWidget {
   const RailUserFooter({super.key, this.activeChannelId});
@@ -406,40 +406,46 @@ class RailUserFooter extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    PresenceMenuButton(presence: presence),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            me.valueOrNull?.displayName ?? '',
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.ui.copyWith(
-                              color: tokens.textPrimary,
-                              fontWeight: AppWeights.medium,
-                              height: 1.25,
-                            ),
+                LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    children: [
+                      PresenceMenuButton(presence: presence),
+                      const SizedBox(width: 9),
+                      // At ChannelRail.compactWidth the three controls win; the presence dot still says who and how.
+                      if (constraints.maxWidth < _footerNameMinWidth)
+                        const Spacer()
+                      else
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                me.valueOrNull?.displayName ?? '',
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.ui.copyWith(
+                                  color: tokens.textPrimary,
+                                  fontWeight: AppWeights.medium,
+                                  height: 1.25,
+                                ),
+                              ),
+                              Text(
+                                secondLine,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.micro.copyWith(
+                                  color: tokens.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            secondLine,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.micro.copyWith(
-                              color: tokens.textSecondary,
-                            ),
-                          ),
-                        ],
+                        ),
+                      ...railVoiceToggleButtons(
+                        voice: voice,
+                        voiceController: voiceController,
                       ),
-                    ),
-                    ...railVoiceToggleButtons(
-                      voice: voice,
-                      voiceController: voiceController,
-                    ),
-                    railSettingsButton(context),
-                  ],
+                      railSettingsButton(context),
+                    ],
+                  ),
                 ),
                 if (inCallElsewhere) ...[
                   const SizedBox(height: 6),

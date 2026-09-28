@@ -38,21 +38,20 @@ String? channelIdInPath(String path) {
 ///
 /// Only valid under a `RouteBase.builder` subtree. A dialog, sheet or overlay
 /// pushed on the root navigator must read [channelIdInPath] off
-/// Whether the channel rail is shown beside the conversation.
+/// Whether the channel rail is at its full width, or at
+/// [ChannelRail.compactWidth]. `RailDragHandle` flips it at the rail's edge.
 ///
-/// Defaults open; `RailDragHandle` flips it at the rail's own edge now,
-/// rather than a header button. Collapsing gives the transcript the rail's
-/// width back, which is the point - on a laptop the rail is a fifth of the
-/// window and most of it is empty most of the time.
+/// The owner asked for compaction "the way Slack does it": the same rail a
+/// little narrower, never a strip of stacked icons. So compact keeps every
+/// channel name; only the width and the footer's name line give way.
 ///
-/// [HomeShell] unmounts the rail rather than holding it at zero width: it
-/// polls voice rosters while built, and a hidden pane must not keep fetching.
-///
-/// In-memory only, like the layout state around it: it resets to open on
-/// every fresh launch rather than surviving a restart, which is the same
-/// thing this provider already did before `RailDragHandle` replaced its
-/// header button.
-final channelRailVisibleProvider = StateProvider<bool>((ref) => true);
+/// In-memory only, like the layout state around it: it resets to full width
+/// on every fresh launch.
+final channelRailExpandedProvider = StateProvider<bool>((ref) => true);
+
+/// Below this search-field width the Ctrl+K keycaps are dropped; at
+/// [ChannelRail.compactWidth] they left room for three letters of Search.
+const double _searchHintMinWidth = 200;
 
 /// `GoRouter.of(context).state` instead, or [GoRouterState.of] throws a
 /// [GoError], which is an `Error` and so escapes every `on ...Exception` catch.
@@ -91,10 +90,10 @@ class ChannelRail extends ConsumerStatefulWidget {
   /// kept at the app's prior medium-width value.
   static const double mediumWidth = 240;
 
-  /// [CollapsedRailStrip]'s own width: narrow enough to read as "collapsed"
-  /// rather than a third rail size, wide enough for one [AppIconButton]
-  /// column with real breathing room either side.
-  static const double collapsedWidth = 48;
+  /// The compact rail: every channel name still fits beside its glyph at
+  /// this width, and [RailUserFooter] drops its name line to keep all three
+  /// controls. See [channelRailExpandedProvider].
+  static const double compactWidth = 200;
 
   @override
   ConsumerState<ChannelRail> createState() => _ChannelRailState();
@@ -127,44 +126,48 @@ class _ChannelRailState extends ConsumerState<ChannelRail> {
             ),
             // A real field would take focus and a keyboard; this only opens the
             // palette, so AbsorbPointer stops events and the trigger gets them.
-            child: GestureDetector(
-              key: const Key('rail-search-trigger'),
-              onTap: () => openCommandPalette(context),
-              child: AbsorbPointer(
-                child: AppInput(
-                  // The whole field is the tap target, so it takes the
-                  // design's 44pt size rather than its 32pt one on a phone.
-                  size: AppTouchTargets.of(context)
-                      ? AppInputSize.lg
-                      : AppInputSize.sm,
-                  placeholder: 'Search',
-                  icon: Icon(
-                    AppIcons.search,
-                    size: AppSizes.icon16,
-                    color: tokens.textSecondary,
-                  ),
-                  // Keycaps only where a keyboard is; a touch layout drops the Ctrl+K hint no finger can press.
-                  trailing: AppTouchTargets.of(context)
-                      ? null
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const AppKbd('Ctrl'),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 2,
-                              ),
-                              child: Text(
-                                '+',
-                                style: AppText.micro.copyWith(
-                                  color: tokens.textDisabled,
+            child: LayoutBuilder(
+              builder: (context, constraints) => GestureDetector(
+                key: const Key('rail-search-trigger'),
+                onTap: () => openCommandPalette(context),
+                child: AbsorbPointer(
+                  child: AppInput(
+                    // The whole field is the tap target, so it takes the
+                    // design's 44pt size rather than its 32pt one on a phone.
+                    size: AppTouchTargets.of(context)
+                        ? AppInputSize.lg
+                        : AppInputSize.sm,
+                    placeholder: 'Search',
+                    icon: Icon(
+                      AppIcons.search,
+                      size: AppSizes.icon16,
+                      color: tokens.textSecondary,
+                    ),
+                    // Keycaps only where a keyboard is and the field has room; at compact width the hint crushed the word Search.
+                    trailing:
+                        AppTouchTargets.of(context) ||
+                            constraints.maxWidth < _searchHintMinWidth
+                        ? null
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const AppKbd('Ctrl'),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: Text(
+                                  '+',
+                                  style: AppText.micro.copyWith(
+                                    color: tokens.textDisabled,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const AppKbd('K'),
-                          ],
-                        ),
-                  semanticLabel: 'Search channels, members and messages',
+                              const AppKbd('K'),
+                            ],
+                          ),
+                    semanticLabel: 'Search channels, members and messages',
+                  ),
                 ),
               ),
             ),

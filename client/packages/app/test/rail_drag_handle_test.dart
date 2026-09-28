@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Tests for the handle that replaced the header's rail-collapse button
-/// (#256's toggle) and then replaced drag-to-resize with a plain click
-/// (backlog item 54): tap the rail's own edge to open or close it.
-///
-/// The hard requirement is discoverability: a collapsed rail with nothing
-/// visible to click is a trap, so the collapsed-state test below asserts the
-/// glyph both renders and actually restores the rail through its published
-/// semantic action, not merely that an icon exists somewhere on screen.
+/// Tests for the handle at the rail's edge (#256's toggle, a plain click
+/// since backlog item 54): tap it to switch the rail between full and
+/// compact width. Compact is still the rail - every channel name stays - so
+/// "collapsed" is asserted as a width, never as the rail being gone.
 ///
 /// The header's own "the button is gone" regression lives beside its other
 /// tests, in `channel_header_test.dart`, which already carries the harness a
@@ -19,26 +15,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/widgets/channel_rail.dart';
 import 'package:slimm_app/src/widgets/channel_rail_drawer.dart';
+import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
 import 'package:slimm_app/src/widgets/rail_drag_handle.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import 'home_shell_harness.dart';
 
+double _railWidth(WidgetTester tester) =>
+    tester.getSize(find.byType(ChannelRail)).width;
+
 void main() {
-  testWidgets('clicking the handle collapses the rail, and clicking it '
-      'again restores it', (tester) async {
+  testWidgets('clicking the handle narrows the rail to compact, and clicking '
+      'it again widens it back', (tester) async {
     final s = setup();
     await pumpAtWidth(tester, s.container, 1400);
-    expect(find.byType(ChannelRail), findsOneWidget);
+    expect(_railWidth(tester), ChannelRail.expandedWidth);
 
     await tester.tap(find.byType(RailDragHandle));
     await tester.pumpAndSettle();
-    expect(find.byType(ChannelRail), findsNothing);
+    expect(_railWidth(tester), ChannelRail.compactWidth);
 
     await tester.tap(find.byType(RailDragHandle));
     await tester.pumpAndSettle();
-    expect(find.byType(ChannelRail), findsOneWidget);
+    expect(_railWidth(tester), ChannelRail.expandedWidth);
 
     await teardown(tester, s.container, s.db);
   });
@@ -93,7 +93,7 @@ void main() {
       final line = tester.getCenter(find.byType(RailDragHandle));
       await tester.tapAt(line - const Offset(6, 0));
       await tester.pumpAndSettle();
-      expect(find.byType(ChannelRail), findsNothing);
+      expect(_railWidth(tester), ChannelRail.compactWidth);
 
       await teardown(tester, s.container, s.db);
     },
@@ -110,7 +110,7 @@ void main() {
       final line = tester.getCenter(find.byType(RailDragHandle));
       await tester.tapAt(line + const Offset(6, 0));
       await tester.pumpAndSettle();
-      expect(find.byType(ChannelRail), findsOneWidget);
+      expect(_railWidth(tester), ChannelRail.expandedWidth);
 
       await teardown(tester, s.container, s.db);
     },
@@ -127,7 +127,7 @@ void main() {
       final line = tester.getCenter(find.byType(RailDragHandle));
       await tester.tapAt(line - const Offset(10, 0));
       await tester.pumpAndSettle();
-      expect(find.byType(ChannelRail), findsOneWidget);
+      expect(_railWidth(tester), ChannelRail.expandedWidth);
 
       await teardown(tester, s.container, s.db);
     },
@@ -150,8 +150,8 @@ void main() {
           .semanticsOwner!
           .rootSemanticsNode!
           .toStringDeep();
-      expect('Collapse channel list'.allMatches(dump).length, 1, reason: dump);
-      expect(find.bySemanticsLabel('Collapse channel list'), findsOneWidget);
+      expect('Narrow channel list'.allMatches(dump).length, 1, reason: dump);
+      expect(find.bySemanticsLabel('Narrow channel list'), findsOneWidget);
 
       semantics.dispose();
       await teardown(tester, s.container, s.db);
@@ -159,24 +159,37 @@ void main() {
   );
 
   testWidgets(
-    'collapsed, a real glyph stays on screen, and the semantic action a '
-    'screen reader or the keyboard would use really restores the rail - '
-    'the mutation that matters is deleting either half of this',
+    'compact, the rail keeps every channel name - no icon strip - and the '
+    'semantic action a screen reader or the keyboard would use widens it '
+    'again',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      final s = setup();
+      final s = setup(httpClient: quietClient(), signedIn: true);
+      await MessageStore(s.db).upsertChannels([
+        const api.Channel(
+          id: 'c1',
+          name: 'general',
+          kind: 'text',
+          createdAt: 0,
+        ),
+      ]);
       await pumpAtWidth(tester, s.container, 1400);
 
-      s.container.read(channelRailVisibleProvider.notifier).state = false;
+      s.container.read(channelRailExpandedProvider.notifier).state = false;
       await tester.pumpAndSettle();
-      expect(find.byType(ChannelRail), findsNothing);
+      expect(_railWidth(tester), ChannelRail.compactWidth);
+      expect(
+        find.descendant(
+          of: find.byType(ChannelRail),
+          matching: find.text('general'),
+        ),
+        findsOneWidget,
+        reason: 'the owner asked for a smaller rail, not a strip of icons',
+      );
 
-      // Discoverable: a real, labelled control is on screen, not a blank gap.
-      expect(find.byIcon(AppIcons.sidebar), findsOneWidget);
-      expect(find.bySemanticsLabel('Expand channel list'), findsOneWidget);
-
-      // Functional: the published action is what actually restores the rail, not merely a label sitting on an inert node.
-      final node = tester.getSemantics(find.byType(RailDragHandle));
+      final node = tester.getSemantics(
+        find.bySemanticsLabel('Widen channel list'),
+      );
       expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
       tester.binding.performSemanticsAction(
         SemanticsActionEvent(
@@ -186,47 +199,61 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(ChannelRail), findsOneWidget);
+      expect(_railWidth(tester), ChannelRail.expandedWidth);
 
       semantics.dispose();
       await teardown(tester, s.container, s.db);
     },
   );
 
-  /// shell.md: the collapsed icon is the sole way back once the rail is
-  /// gone, and it used to rest at `borderSubtle`, roughly 1.3:1 against the
-  /// surface in both themes - well under WCAG 1.4.11's 3:1 floor for a UI
-  /// component. `textSecondary` is already gated at the stricter 4.5:1 AA
-  /// text floor by `design_system/test/contrast_test.dart`, so pinning the
-  /// icon to that token, not the hairline border, is what this asserts.
-  testWidgets('the collapsed icon does not rest at the hairline border color', (
-    tester,
-  ) async {
-    final s = setup();
+  testWidgets('compact, the footer drops only its name line: presence, mic, '
+      'deafen and settings all stay', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final s = setup(httpClient: quietClient(), signedIn: true);
     await pumpAtWidth(tester, s.container, 1400);
-    s.container.read(channelRailVisibleProvider.notifier).state = false;
+    await tester.pumpAndSettle();
+    final footer = find.byType(RailUserFooter);
+    expect(
+      find.descendant(of: footer, matching: find.text('Bob')),
+      findsOneWidget,
+    );
+
+    s.container.read(channelRailExpandedProvider.notifier).state = false;
     await tester.pumpAndSettle();
 
-    final icon = tester.widget<Icon>(find.byIcon(AppIcons.sidebar));
-    final tokens = AppTokens.light;
-    expect(icon.color, tokens.textSecondary);
-    expect(icon.color, isNot(tokens.borderSubtle));
+    expect(
+      find.descendant(of: footer, matching: find.text('Bob')),
+      findsNothing,
+    );
+    for (final label in [
+      RegExp(r'^(Mute|Unmute)$'),
+      RegExp(r'^Deafen$'),
+      RegExp(r'^Personal settings'),
+    ]) {
+      expect(
+        find.descendant(of: footer, matching: find.bySemanticsLabel(label)),
+        findsOneWidget,
+        reason: label.pattern,
+      );
+    }
+    expect(tester.takeException(), isNull, reason: 'no overflow at 200px');
 
+    semantics.dispose();
     await teardown(tester, s.container, s.db);
   });
 
-  testWidgets('collapsing survives a channel switch, the same session-only '
+  testWidgets('compact survives a channel switch, the same session-only '
       'persistence the provider already had', (tester) async {
     final s = setup();
     await pumpAtWidth(tester, s.container, 1400);
 
     await tester.tap(find.byType(RailDragHandle));
     await tester.pumpAndSettle();
-    expect(find.byType(ChannelRail), findsNothing);
+    expect(_railWidth(tester), ChannelRail.compactWidth);
 
     // A fresh pump, as a channel switch causes, must not readopt the default.
     await pumpAtWidth(tester, s.container, 1400, location: '/channels/c1');
-    expect(find.byType(ChannelRail), findsNothing);
+    expect(_railWidth(tester), ChannelRail.compactWidth);
 
     await teardown(tester, s.container, s.db);
   });
