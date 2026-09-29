@@ -119,7 +119,9 @@ POST /channels/{channelId}/ephemeral-messages
 
 Only the author of `in_reply_to_id` sees it, marked "Only you can see this", on every device they have open.
 You do not name the recipient - it is that message's author, which is why you can answer a member who spoke to you and cannot message anyone else.
-The message must be in that channel, from a person rather than a bot, and no more than 15 minutes old.
+The message must be in that channel, from a person rather than a bot, no more than 15 minutes old, and addressed to you: it mentions you, replies to one of your messages, or starts with your registered prefix and one of your registered commands.
+Anything else is a 403, so register your commands before relying on this for `!command` messages.
+You get three private messages per anchor, and the fourth is a 429.
 
 It is never stored.
 It has no `seq`, never appears in a history page, in search or in `sync`, and is gone when the member reloads or dismisses it.

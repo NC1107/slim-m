@@ -51,6 +51,7 @@ mod dms;
 pub mod dock;
 mod embeds;
 mod emoji;
+mod ephemeral_anchor;
 mod ephemeral_messages;
 mod error;
 mod escalation;

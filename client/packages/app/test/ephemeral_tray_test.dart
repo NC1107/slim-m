@@ -64,6 +64,7 @@ void main() {
     expect(find.text('you have 500 chips'), findsOneWidget);
     expect(find.textContaining('Only you can see this'), findsOneWidget);
     expect(find.textContaining('Helper'), findsOneWidget);
+    expect(find.byType(AppBadge), findsOneWidget);
 
     await tester.tap(find.byTooltip('Dismiss'));
     await tester.pumpAndSettle();

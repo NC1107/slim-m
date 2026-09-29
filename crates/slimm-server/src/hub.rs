@@ -37,6 +37,7 @@ use std::time::Duration;
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, broadcast};
 
+use crate::ephemeral::EphemeralBudget;
 use crate::presence::PresenceTracker;
 use crate::typing::TypingTracker;
 
@@ -84,6 +85,7 @@ pub struct Hub {
     slots: Arc<Semaphore>,
     presence: PresenceTracker,
     typing: TypingTracker,
+    ephemeral_budget: EphemeralBudget,
     permissions_epoch: Arc<AtomicU64>,
     idle_poll_interval: Duration,
     memory_guard: Arc<MemoryGuard>,
@@ -248,6 +250,7 @@ impl Hub {
             slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
             presence: PresenceTracker::new(),
             typing: TypingTracker::new(),
+            ephemeral_budget: EphemeralBudget::default(),
             permissions_epoch: Arc::new(AtomicU64::new(0)),
             idle_poll_interval: IDLE_POLL_INTERVAL,
             memory_guard: Arc::new(MemoryGuard::new()),
@@ -380,6 +383,11 @@ impl Hub {
     /// The shared, cloneable typing tracker (a cheap `Arc` clone).
     pub fn typing(&self) -> TypingTracker {
         self.typing.clone()
+    }
+
+    /// How many private messages each bot has spent per anchor.
+    pub fn ephemeral_budget(&self) -> EphemeralBudget {
+        self.ephemeral_budget.clone()
     }
 }
 

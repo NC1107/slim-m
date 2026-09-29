@@ -90,26 +90,34 @@ class EphemeralMessageCard extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s8),
                   Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Only you can see this',
-                            style: AppText.caption.copyWith(
-                              color: tokens.textPrimary,
-                              fontWeight: AppWeights.semi,
-                            ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Only you can see this',
+                          maxLines: 1,
+                          style: AppText.caption.copyWith(
+                            color: tokens.textPrimary,
+                            fontWeight: AppWeights.semi,
                           ),
-                          TextSpan(
-                            text: '  from ${message.authorDisplayName}',
+                        ),
+                        const SizedBox(width: AppSpacing.s8),
+                        Flexible(
+                          child: Text(
+                            'from ${message.authorDisplayName}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: AppText.caption.copyWith(
                               color: tokens.textSecondary,
                             ),
                           ),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                        ),
+                        // Fixed size beside a name that ellipsizes: a bot may call itself "System".
+                        const SizedBox(width: AppSpacing.s4),
+                        const AppBadge(
+                          variant: AppBadgeVariant.tag,
+                          label: 'Bot',
+                        ),
+                      ],
                     ),
                   ),
                   AppIconButton(
