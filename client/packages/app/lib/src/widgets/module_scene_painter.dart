@@ -13,13 +13,15 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'module_scene.dart';
 import 'module_scene_path.dart';
+import 'module_scene_sweep.dart';
 
 class ModuleScenePainter extends CustomPainter {
   const ModuleScenePainter({
     required this.scene,
     required this.tokens,
     this.images = const {},
-  });
+    this.time,
+  }) : super(repaint: time);
 
   final ModuleScene scene;
   final AppTokens tokens;
@@ -30,6 +32,9 @@ class ModuleScenePainter extends CustomPainter {
   /// instead of being layered over the canvas.
   final Map<int, ui.Image> images;
 
+  /// Seconds into the scene's `sweep` motion, or null to draw the end state.
+  final Animation<double>? time;
+
   @override
   void paint(Canvas canvas, Size size) {
     final sx = scene.width == 0 ? 1.0 : size.width / scene.width;
@@ -38,8 +43,9 @@ class ModuleScenePainter extends CustomPainter {
       Offset.zero & size,
       Paint()..color = _resolve(scene.background, tokens.surfaceRaised),
     );
+    final seconds = time?.value ?? double.infinity;
     for (final op in scene.ops) {
-      _paintOp(canvas, op, sx, sy);
+      _paintOp(canvas, applySweep(op, seconds), sx, sy);
     }
   }
 
@@ -225,7 +231,8 @@ class ModuleScenePainter extends CustomPainter {
   bool shouldRepaint(ModuleScenePainter old) =>
       !identical(old.scene, scene) ||
       old.tokens != tokens ||
-      !identical(old.images, images);
+      !identical(old.images, images) ||
+      old.time != time;
 }
 
 /// Maps a scene colour name to a real colour: a `#rgb`/`#rrggbb`/`#aarrggbb`

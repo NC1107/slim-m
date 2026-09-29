@@ -20,8 +20,10 @@ library;
 import 'dart:typed_data';
 
 export 'module_scene_parse.dart' show parseModuleScene;
+export 'module_scene_sweep.dart' show SceneSweep;
 
 import 'module_scene_path.dart';
+import 'module_scene_sweep.dart';
 
 /// One drawing primitive. Coordinates are in the scene's own logical units
 /// ([ModuleScene.width] by [ModuleScene.height]); the painter scales them to
@@ -157,6 +159,7 @@ class RectOp extends SceneOp {
     this.strokeWidth = 1,
     this.radius = 0,
     this.tap,
+    this.sweep,
   });
 
   final double x;
@@ -172,6 +175,9 @@ class RectOp extends SceneOp {
   final double strokeWidth;
   final double radius;
   final String? tap;
+
+  /// Motion the client plays across this op; see `module_scene_sweep.dart`.
+  final SceneSweep? sweep;
 }
 
 class CircleOp extends SceneOp {
@@ -184,6 +190,7 @@ class CircleOp extends SceneOp {
     this.stroke,
     this.strokeWidth = 1,
     this.tap,
+    this.sweep,
   });
 
   final double cx;
@@ -196,6 +203,9 @@ class CircleOp extends SceneOp {
   final String? stroke;
   final double strokeWidth;
   final String? tap;
+
+  /// Motion the client plays across this op; see `module_scene_sweep.dart`.
+  final SceneSweep? sweep;
 }
 
 class LineOp extends SceneOp {
@@ -206,6 +216,7 @@ class LineOp extends SceneOp {
     required this.y2,
     this.stroke,
     this.strokeWidth = 1,
+    this.sweep,
   });
 
   final double x1;
@@ -214,6 +225,9 @@ class LineOp extends SceneOp {
   final double y2;
   final String? stroke;
   final double strokeWidth;
+
+  /// Motion the client plays across this op; see `module_scene_sweep.dart`.
+  final SceneSweep? sweep;
 }
 
 /// An arbitrary shape, from an SVG-style `d` string. The op that stops the
@@ -249,6 +263,7 @@ class TextOp extends SceneOp {
     this.fill,
     this.size = 12,
     this.align = 'left',
+    this.sweep,
   });
 
   final double x;
@@ -257,6 +272,9 @@ class TextOp extends SceneOp {
   final String? fill;
   final double size;
   final String align;
+
+  /// Motion the client plays across this op; see `module_scene_sweep.dart`.
+  final SceneSweep? sweep;
 }
 
 /// A raster image, carried inside the scene as base64.

@@ -181,7 +181,10 @@ fn stored_payload(is_text: bool, outcome: CommandOutcome) -> (bool, String) {
         );
         return (false, message);
     }
-    (outcome.ok, outcome.payload)
+    (
+        outcome.ok,
+        super::scene_limits::clamp_sweeps(&outcome.payload),
+    )
 }
 
 #[cfg(test)]
