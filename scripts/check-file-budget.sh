@@ -6,6 +6,8 @@
 # past 500 are in scripts/file-budget-allow.txt at the count they were listed
 # at, which this treats as their own ceiling.
 # What is excluded and why, and why 300 does not fail, is in docs/ci.md.
+# schema/openapi.yaml is exempt outright: it is the wire contract, guarded by the
+# router contract test and the additive-only oasdiff gate, and no split helps it.
 
 set -euo pipefail
 
@@ -34,6 +36,7 @@ mapfile -t files < <(
     '*.sql' '*.yml' '*.yaml' '*.toml' '*.cc' '*.h' '*.gradle' |
     grep -v '^node_modules/' |
     grep -v '^\.sqlx/' |
+    grep -Fxv 'schema/openapi.yaml' |
     grep -Ev '\.(g|freezed|pb|pbenum|pbjson|pbserver)\.dart$' |
     sort
 )
