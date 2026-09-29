@@ -55,6 +55,7 @@ mod error;
 mod escalation;
 mod extract;
 pub mod gifs;
+mod hidden_chars;
 mod invites;
 pub mod link_preview;
 mod members;
