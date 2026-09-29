@@ -93,30 +93,105 @@ Also note whether the menu sat off-screen or under the keyboard.
 
 ## 5. Phone flows changed this sprint
 
-These were only exercised in tests and screenshots.
-If your build predates a fix, the notes below say which pull request it is, and you can skip that item.
+These were mostly exercised in tests and screenshots, not on a phone.
+Each item is an action, then what you should see.
+If your build predates a change, the pull request number is there so you can skip that item.
 
-**Landing back on the channel after hang-up (#1410).**
-Open a text channel, join a voice channel, then hang up.
-Expected: you land on the last text channel you were reading, not on an empty screen or the voice channel.
+### Voice and calls
 
-**Call bar above the keyboard (#1412).**
-In a call, open the chat and tap the message box so the keyboard appears.
-Expected: the compact call bar sits above the message list and stays visible, and nothing overlaps the keyboard.
+- **Land back on the channel after hang-up (#1410).**
+  Open a text channel, join a voice channel, then hang up.
+  Expected: you land on the last text channel you were reading, not an empty screen or the voice channel.
+- **Call strip above the keyboard (#1412).**
+  In a call, open a text channel and tap the message box so the keyboard appears.
+  Expected: the compact call strip sits above the message list and stays visible, and nothing overlaps the keyboard.
+- **Call mini-player (#1439).**
+  Join a call where another person is sharing their screen or has their camera on, then open a different channel.
+  Expected: a small floating video card shows their screen or camera, and you can drag it to another corner.
+  Its buttons are Mute or Unmute, Leave call and Hide the mini-player, and tapping the card returns you to the call.
+  Not expected: the card while the keyboard is up, while you are on the call's own channel, or after you hide it until you change channel.
+- **Pre-muted voice channels (#1411).**
+  As an admin, open a voice channel's settings and turn on "Join muted" under Voice (the same switch is on the create channel sheet).
+  Then join that channel from the phone.
+  Expected: you enter already muted, the mute control shows it, and you can unmute yourself.
+- **Hold music (#1440).**
+  Open Settings, then Voice.
+  Expected: "Play soft music while you are alone in a call" is off by default.
+  Turn it on, join a call with nobody else in it, and listen.
+  Expected: soft music plays on your phone only, and it stops when someone else joins or you leave.
+  With the switch off, a call you are alone in stays silent.
 
-**Permissions grid on a phone (#1407).**
-As an admin, open a channel's permissions.
-Expected: role names stay pinned at the left while you scroll sideways, a hint shows there is more to scroll, cells are readable, and Save applies the change and shows it after reopening.
+### Members and moderation
 
-**Read state across devices (#1408).**
-Sign in on desktop and the phone as the same account, then have another account post in a channel.
-Read it on desktop and wait a few seconds.
-Expected: the phone does not buzz for that message, and its unread badge clears.
-Report if the phone still notified after you had read it.
+- **Member list by role (#1421).**
+  Open the member list in a channel.
+  Expected: members are grouped under headings with counts, such as a role name, "Online", "Offline" and "Bots", with bots and offline members below the rest.
+- **Moderation sheet (#1415).**
+  As a moderator, open the member list and use "Select members to moderate", tap two or three members, then tap "Moderate".
+  Expected: a bottom sheet titled "2 members selected" (or your count) opens with a "Time out for..." row of durations and a "Remove" button.
+  Pick a duration and confirm the members are timed out.
+  If a request is refused, the reason should stay on screen rather than flash and vanish.
+- **Remove from channel (#1419).**
+  As a moderator, tap a member, open their card menu, and choose "Remove from #channel-name".
+  Expected: a confirm dialog says they lose access to that channel and stay in the Space, and after "Remove" the channel drops out of their list.
+  You can let them back in from the channel permissions.
+- **Permissions grid (#1407).**
+  As an admin, open a channel's permissions.
+  Expected: role names stay pinned at the left while you scroll sideways, a hint shows there is more to scroll, cells are readable, and Save applies the change and shows it after reopening.
 
-**Pre-muted voice channels (#1411).**
-As an admin, mark a voice channel as joining muted, then join it from the phone.
-Expected: you enter already muted, the mute control shows that, and you can unmute yourself.
+### Chat, bots and read state
+
+- **Read state across devices (#1408).**
+  Sign in on desktop and the phone as the same account, then have another account post in a channel.
+  Read it on desktop and wait a few seconds.
+  Expected: the phone does not buzz for that message, and its unread badge clears.
+  Report it if the phone still notified after you had read it.
+- **A bot's private reply (#1425).**
+  Run a bot command that answers only you.
+  Expected: a card above the composer reading "Only you can see this", "from" the bot's name and a "Bot" badge.
+  Another account should not see it.
+- **A bot button (#1433).**
+  Press a button on a bot's message.
+  Expected: the button shows a pending state while it waits, then the answer arrives, private or in the channel.
+  If it fails you should see "That button did not work." or the bot's own reason, with retry and dismiss.
+
+### Images
+
+- **Share and save from the image viewer (#1427).**
+  Open a photo in a channel so it goes fullscreen, then tap "Share", then tap "Save to photos".
+  Expected on iPhone: Share opens the system share sheet, and the first Save asks for permission to add to your photos.
+  Allow it and expect the toast "Saved to photos.", then find the image in the Photos app.
+  Deny it on a second attempt and expect a message saying to allow photo access for slim-m in Settings.
+  Expected on Android: the same buttons and toast, and the image shows in Photos or Gallery.
+  Android may or may not show a permission prompt depending on the version, so say which you saw.
+
+### Sign-in and account
+
+- **Joining the official Space (#1424, #1438).**
+  On a fresh install, choose "Join the official Space" on the first screen.
+  Expected: you are not asked for a server address or fingerprint, and after sign-up you go straight to the first channel with no extra screen about updates.
+  The automatic update choice now lives in Settings, under About, and only on desktop, so a phone should show no such switch.
+- **New sign-in warning (#1432).**
+  Sign the same account in on a second device.
+  Expected: the first device shows a banner reading "New sign-in: ... signed in to your account at ...", with "This wasn't me" and "This was me".
+  Tap "This wasn't me".
+  Expected: the banner closes and Account & devices opens, where you can sign the other device out.
+
+### Local data and upgrade
+
+- **Upgrade keeps your history (#1444).**
+  This is the check that matters most.
+  On a phone that already has an older build with messages loaded and a draft typed in some channel, install the new build over it without deleting the app.
+  Open the app, turn on airplane mode, and look at a channel you had open.
+  Expected: old messages are still there and the draft is still in the box, with no re-login and no long blank load.
+  The first launch may take a moment while the local database is encrypted.
+  Report it if history or drafts were lost, if you were signed out, or if a callout says saved messages "were cleared and are downloading again from the server".
+  That callout is the fallback for a lost key, and it is worth a report even though it recovers.
+- **Fresh install works (#1444).**
+  Delete the app, install the new build, sign in, open a few channels and send a message.
+  Expected: everything loads and works normally, and it still does after you force close and reopen the app.
+
+Not on this list: rich presence (#1453, showing what someone is listening to) is Linux desktop only, so a phone has nothing to check.
 
 ## 6. Screen share and camera (iOS)
 
