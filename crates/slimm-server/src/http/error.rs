@@ -17,6 +17,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
 use crate::auth::HashError;
+use crate::permissions::Permissions;
 use crate::store::{CreateChannelError, CreateRoleError, OpenError, PushError, SendError};
 
 /// The fixed body a 500 always carries, never a stack trace or type path.
@@ -35,6 +36,9 @@ pub(crate) enum ApiError {
     BadRequestDetail(String),
     Unauthorized,
     Forbidden,
+    /// A write refused because it would grant permission bits the caller does
+    /// not hold. Carries those bits so the client can name them.
+    MissingPermissions(Permissions),
     NotFound(&'static str),
     Conflict(&'static str),
     TooManyRequests,
@@ -79,6 +83,9 @@ struct ErrorBody {
     /// field entirely rather than sending `null`.
     #[serde(skip_serializing_if = "Option::is_none")]
     retry_after_seconds: Option<i64>,
+    /// Only [`ApiError::MissingPermissions`] sets this: the refused bits.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    missing_permissions: Option<i64>,
 }
 
 impl IntoResponse for ApiError {
@@ -89,11 +96,19 @@ impl IntoResponse for ApiError {
             } => Some(*retry_after_seconds),
             _ => None,
         };
+        let missing_permissions = match &self {
+            ApiError::MissingPermissions(bits) => Some(bits.bits()),
+            _ => None,
+        };
         let (status, error): (StatusCode, Cow<'static, str>) = match self {
             ApiError::BadRequest(message) => (StatusCode::BAD_REQUEST, message.into()),
             ApiError::BadRequestDetail(message) => (StatusCode::BAD_REQUEST, message.into()),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid credentials".into()),
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "insufficient permissions".into()),
+            ApiError::MissingPermissions(_) => (
+                StatusCode::FORBIDDEN,
+                "cannot grant a permission you do not hold".into(),
+            ),
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message.into()),
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message.into()),
             ApiError::TooManyRequests => {
@@ -129,6 +144,7 @@ impl IntoResponse for ApiError {
             Json(ErrorBody {
                 error,
                 retry_after_seconds,
+                missing_permissions,
             }),
         )
             .into_response();

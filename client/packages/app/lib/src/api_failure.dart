@@ -9,6 +9,8 @@ library;
 
 import 'package:slimm_api/api.dart' as api;
 
+import 'screens/admin/channel_permissions_escalation.dart';
+
 /// Turns [e] into a plain sentence for [whatFailed] ("join the call"),
 /// never the raw transport string a [api.TransportException] carries.
 ///
@@ -20,6 +22,8 @@ String describeApiFailure(String whatFailed, api.ApiException e) => switch (e) {
     'Could not $whatFailed. ${sentenceCase(e.message)}',
   api.ConflictException() =>
     'Could not $whatFailed. ${sentenceCase(e.message)}',
+  api.ForbiddenException(missingPermissions: final int bits?) when bits != 0 =>
+    'Could not $whatFailed: you cannot grant ${joinLabels(permissionLabels(bits))}.',
   api.ForbiddenException() =>
     'Could not $whatFailed: you are not allowed to do that.',
   api.UnauthorizedException() =>

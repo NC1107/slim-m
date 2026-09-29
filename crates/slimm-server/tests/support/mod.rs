@@ -16,6 +16,9 @@ use slimm_server::store::Store;
 /// `tests/openapi_429_coverage.rs`.
 pub mod openapi;
 
+/// Router and account helpers shared by the channel-overwrite test binaries.
+pub mod overwrite_harness;
+
 /// Wasm fixtures for `crate::module_runtime`, shared by every test that
 /// installs a module and actually invokes it.
 #[allow(dead_code)]

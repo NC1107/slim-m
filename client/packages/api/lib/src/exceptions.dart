@@ -29,7 +29,11 @@ class UnauthorizedException extends ApiException {
 /// The caller is authenticated but not allowed. Also returned for a channel
 /// that does not exist, so absence is not distinguishable from denial.
 class ForbiddenException extends ApiException {
-  const ForbiddenException(super.message);
+  const ForbiddenException(super.message, {this.missingPermissions});
+
+  /// The permission bits the server says the caller lacked, when it names any
+  /// (a channel overwrite write that would grant more than the caller holds).
+  final int? missingPermissions;
 }
 
 /// The target does not exist within a scope the caller can see.

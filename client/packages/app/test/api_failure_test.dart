@@ -7,6 +7,7 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/api_failure.dart';
+import 'package:slimm_app/src/permissions.dart';
 
 void main() {
   test('a transport failure never leaks the exception string', () {
@@ -69,6 +70,17 @@ void main() {
         );
       },
     );
+  });
+
+  test('a forbidden that names missing permissions says which', () {
+    final message = describeApiFailure(
+      'save the permissions grid',
+      api.ForbiddenException(
+        'cannot grant a permission you do not hold',
+        missingPermissions: Perm.manageRoles,
+      ),
+    );
+    expect(message, contains('you cannot grant Manage roles'));
   });
 
   test('a forbidden and an unauthorized read differently', () {

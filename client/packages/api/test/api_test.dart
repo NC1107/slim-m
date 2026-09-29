@@ -183,6 +183,18 @@ void main() {
       await expectLater(api.version, throwsA(matcher));
     }
 
+    test('a 403 carries the refused permission bits', () async {
+      await expectMapped(
+        403,
+        '{"error":"x","missing_permissions":32}',
+        isA<ForbiddenException>().having(
+          (e) => e.missingPermissions,
+          'missingPermissions',
+          32,
+        ),
+      );
+    });
+
     test('statuses become typed exceptions carrying the reason', () async {
       await expectMapped(400, '{"error":"bad"}', isA<BadRequestException>());
       await expectMapped(
