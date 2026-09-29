@@ -174,14 +174,14 @@ class HomeShell extends ConsumerWidget {
       final showVoiceStrip =
           voiceState == VoiceSessionState.connected &&
           voiceChannelId != selected;
-      // Compact: the conversation replaces the list, with a way back.
-      final replacesHeader = canvasOpen || dmCallOpen;
       // Only the canvas (a drawing surface of its own) also claims the rail; see DmCallPane's own doc for why a DM call keeps it.
       final hidesRailAccess = canvasOpen;
       final channelId = selected;
       // Above the transcript while typing, so the composer sits on the keyboard.
       final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
       Widget compactScaffold(bool isDm) {
+        // Only a DM's call pane replaces the header; the call-return affordances also set the provider for voice channels.
+        final replacesHeader = canvasOpen || (dmCallOpen && isDm);
         final compactBody = Column(
           children: [
             const RailConnectionBar(),
