@@ -37,6 +37,7 @@ PLATFORMS = {
     "macos": re.compile(r"^slim-m-client-.+-macos\.zip$"),
 }
 DEFAULT_REQUIRE = "windows-x64,macos"
+SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 class ManifestError(Exception):
@@ -105,12 +106,19 @@ def _private_key_file(directory: str) -> str:
     return str(path)
 
 
+def _temp_file(directory: str, prefix: str, data: bytes) -> str:
+    """Write through a descriptor from mkstemp so no caller-influenced path is opened."""
+    fd, name = tempfile.mkstemp(prefix=prefix, dir=directory)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    return name
+
+
 def sign_bytes(data: bytes) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         key = _private_key_file(tmp)
-        payload = Path(tmp) / "payload"
-        payload.write_bytes(data)
-        return _openssl("pkeyutl", "-sign", "-rawin", "-inkey", key, "-in", str(payload))
+        payload = _temp_file(tmp, "payload-", data)
+        return _openssl("pkeyutl", "-sign", "-rawin", "-inkey", key, "-in", payload)
 
 
 def public_key_b64() -> str:
@@ -126,59 +134,72 @@ def verify_signature(data: bytes, signature: bytes, pubkey_b64: str) -> None:
     if len(signature) != 64:
         raise ManifestError("signature must be 64 raw bytes")
     with tempfile.TemporaryDirectory() as tmp:
-        pub = Path(tmp) / "pub.der"
-        payload = Path(tmp) / "payload"
-        sig = Path(tmp) / "sig"
-        pub.write_bytes(SPKI_PREFIX + raw)
-        payload.write_bytes(data)
-        sig.write_bytes(signature)
+        pub = _temp_file(tmp, "pub-", SPKI_PREFIX + raw)
+        payload = _temp_file(tmp, "payload-", data)
+        sig = _temp_file(tmp, "sig-", signature)
         args = ["pkeyutl", "-verify", "-rawin", "-pubin", "-keyform", "DER"]
         try:
-            _openssl(*args, "-inkey", str(pub), "-in", str(payload), "-sigfile", str(sig))
+            _openssl(*args, "-inkey", pub, "-in", payload, "-sigfile", sig)
         except ManifestError as err:
             raise ManifestError("signature does not match the manifest") from err
 
 
-def artifact_path(directory: Path, name: str) -> Path:
-    """A manifest is untrusted input until proven otherwise: only a bare filename inside the directory is acceptable."""
+def listed(directory: Path, name: str) -> Path | None:
+    """Return the entry called `name` from a listing of `directory`, never a path built from `name`."""
+    entries = {entry.name: entry for entry in directory.iterdir()}
+    return entries.get(name)
+
+
+def artifact_path(directory: Path, name: str) -> Path | None:
+    """A manifest is untrusted input until proven otherwise: only a bare filename listed in the directory is used."""
     if not name or name in (".", "..") or any(c in name for c in ("/", "\\", "\0")) or Path(name).is_absolute():
         raise ManifestError(f"unsafe artifact name in manifest: {name!r}")
-    root = directory.resolve()
-    path = (root / name).resolve()
-    if not path.is_relative_to(root) or path.parent != root:
-        raise ManifestError(f"artifact escapes the artifact directory: {name!r}")
-    return path
+    return listed(directory, name)
 
 
 def check_artifacts(manifest: dict, directory: Path) -> None:
     for platform, entry in manifest["artifacts"].items():
         name = entry["url"].rsplit("/", 1)[-1]
         path = artifact_path(directory, name)
-        if not path.is_file():
+        if path is None or not path.is_file():
             raise ManifestError(f"{platform}: {name} not found in {directory}")
         if path.stat().st_size != entry["size"] or sha256_of(path) != entry["sha256"]:
             raise ManifestError(f"{platform}: {name} does not match the manifest")
 
 
-def existing_file(path: Path) -> Path:
-    resolved = path.resolve()
-    if not resolved.is_file():
-        raise ManifestError(f"not a regular file: {path}")
-    return resolved
-
-
 def existing_dir(path: Path) -> Path:
+    """Resolve the directory from its parent's listing so the value used is a listed entry."""
     resolved = path.resolve()
-    if not resolved.is_dir():
+    if resolved.parent == resolved:
+        return resolved
+    found = listed(resolved.parent, resolved.name)
+    if found is None or not found.is_dir():
         raise ManifestError(f"not a directory: {path}")
-    return resolved
+    return found
+
+
+def existing_file(path: Path) -> Path:
+    parent = existing_dir(path.parent)
+    found = listed(parent, path.name)
+    if found is None or not found.is_file():
+        raise ManifestError(f"not a regular file: {path}")
+    return found
 
 
 def output_file(path: Path) -> Path:
-    resolved = path.resolve()
-    if not resolved.parent.is_dir() or (resolved.exists() and not resolved.is_file()):
+    """Outputs are a listed existing file, or a validated bare name inside a listed directory."""
+    if not SAFE_NAME.fullmatch(path.name) or path.name in (".", ".."):
+        raise ManifestError(f"cannot write to {path}: output name must match [A-Za-z0-9._-]+")
+    try:
+        parent = existing_dir(path.parent)
+    except ManifestError as err:
+        raise ManifestError(f"cannot write to {path}") from err
+    found = listed(parent, path.name)
+    if found is None:
+        return parent / path.name
+    if not found.is_file():
         raise ManifestError(f"cannot write to {path}")
-    return resolved
+    return found
 
 
 def verify(manifest_path: Path, sig_path: Path, pubkey: str, directory, newer_than) -> dict:

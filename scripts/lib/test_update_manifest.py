@@ -185,7 +185,9 @@ class UpdateManifestTest(unittest.TestCase):
         for name in ("../x", "/etc/passwd", "..", "", "a/b", "a\\b", "x\0y"):
             with self.assertRaises(mod.ManifestError, msg=name):
                 mod.artifact_path(self.assets, name)
-        self.assertEqual(mod.artifact_path(self.assets, "ok.zip").parent, self.assets.resolve())
+        self.assertIsNone(mod.artifact_path(self.assets, "ok.zip"))
+        listed = mod.artifact_path(self.assets, "SHA256SUMS")
+        self.assertEqual(listed.parent, self.assets.resolve())
 
     def test_signature_is_checked_before_any_artifact_is_touched(self):
         self.signed()
@@ -202,6 +204,26 @@ class UpdateManifestTest(unittest.TestCase):
         done = run("build", "--tag", TAG, "--dir", self.manifest, "--repo", "o/r",
                    "--out", self.tmp / "nodir" / "m.json")
         self.assertEqual(done.returncode, 1)
+
+    def test_paths_with_directory_components_stay_inside_the_named_directory(self):
+        self.signed()
+        (self.tmp / "other").mkdir()
+        wandering = self.tmp / "other" / ".." / "manifest.json"
+        done = run("verify", "--manifest", wandering, "--sig", self.sig, "--pubkey", self.pub)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        outside = self.tmp / "other" / ".." / ".." / "escaped-" / "m.json"
+        done = self.build_to(outside)
+        self.assertEqual(done.returncode, 1)
+        self.assertFalse(outside.parent.exists())
+
+    def test_output_names_outside_the_safe_set_are_refused(self):
+        for name in ("has space.json", "semi;colon.json", ".."):
+            done = self.build_to(self.tmp / name)
+            self.assertEqual(done.returncode, 1, name)
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ["assets", "manifest.json", "manifest.json.sig"][:0] + sorted(p.name for p in self.tmp.iterdir()))
+
+    def build_to(self, out):
+        return run("build", "--tag", TAG, "--dir", self.assets, "--repo", "o/r", "--out", out)
 
     def test_sign_without_a_key_fails_cleanly(self):
         self.build()
