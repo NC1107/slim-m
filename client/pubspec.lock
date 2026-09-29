@@ -633,12 +633,13 @@ packages:
     source: sdk
     version: "0.0.0"
   flutter_webrtc:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: flutter_webrtc
-      sha256: e997161d7da3adedd3d430691b20931b0b4d96fa48bb60938d9ba0bf6fca98be
-      url: "https://pub.dev"
-    source: hosted
+      path: "."
+      ref: "52a0c681c9173b9dab6fda9f761d56d708cc58a5"
+      resolved-ref: "52a0c681c9173b9dab6fda9f761d56d708cc58a5"
+      url: "https://github.com/Slim-m-org/flutter-webrtc.git"
+    source: git
     version: "1.6.0"
   frontend_server_client:
     dependency: transitive

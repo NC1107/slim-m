@@ -28,12 +28,25 @@ Against an unpatched plugin the call throws `MissingPluginException`, which is s
 It applies with `patch -p1` from the root of a flutter_webrtc 1.6.0 checkout and touches three files under `common/cpp`.
 It is not yet compiled or run against libwebrtc, only checked to apply cleanly.
 
-## Owner steps to carry it as a git dependency
+The patch has since been compiled: `flutter build linux --release` builds it into the plugin.
+It has not been run on a live Wayland session.
 
-1. Fork `flutter-webrtc/flutter-webrtc` on GitHub.
-2. Branch from the `v1.6.0` tag and apply the patch: `patch -p1 < reset-desktop-sources.patch`, then commit it.
-3. Push the branch and note the commit SHA.
-4. In `client/packages/rtc/pubspec.yaml` replace `flutter_webrtc: ^1.6.0` with a `git:` dependency (`url` of the fork, `ref` the SHA).
-5. Run `flutter pub get` (without `--enforce-lockfile`) so the lockfile records it, and confirm livekit_client 2.10.0 still resolves.
-6. Run `flutter build linux` and, on the Fedora KDE Wayland box, share a screen, hold the share button, and check the portal picker returns and peers see the new screen.
-7. Optionally offer the same patch upstream.
+## The fork
+
+The patch is carried as a git dependency.
+
+- Fork: https://github.com/Slim-m-org/flutter-webrtc
+- Branch: `slim-m/reset-desktop-sources`, one commit on top of the `v1.6.0` tag.
+- Pinned commit: `52a0c681c9173b9dab6fda9f761d56d708cc58a5`.
+- Wired in `client/pubspec.yaml` as a `dependency_overrides` entry, not in `packages/rtc`, because `livekit_client` 2.10.0 needs `flutter_webrtc` hosted and pub allows one source per package.
+
+## Bumping flutter_webrtc
+
+1. In a clone of the fork, fetch upstream's tags from `https://github.com/flutter-webrtc/flutter-webrtc.git`.
+2. Check whether the new release changed `FlutterScreenCapture` caching, or added its own reset. If so, drop the patch.
+3. Otherwise branch from the new tag and cherry-pick `52a0c681c9173b9dab6fda9f761d56d708cc58a5`, fixing conflicts in `common/cpp`.
+4. Push, and put the new commit SHA in `client/pubspec.yaml`.
+5. Run `flutter pub get` (without `--enforce-lockfile`), confirm `livekit_client` still resolves, and run `flutter build linux --release`.
+6. Manual check on the Fedora KDE Wayland box: share a screen, hold the share button, pick another screen or window, and confirm peers see it.
+
+Optionally offer the same patch upstream.

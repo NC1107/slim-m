@@ -17,6 +17,7 @@ not a gate. See docs/ci.md.
 import os
 import re
 from dataclasses import dataclass, field
+from typing import NamedTuple
 import subprocess
 import sys
 import tomllib
@@ -100,9 +101,16 @@ def _package_lines(text: str) -> list[str]:
     return lines
 
 
-def parse_lock(path: Path) -> list[tuple[str, str, str]]:
-    """Every package in a pubspec.lock, as (name, version, source)."""
-    packages: list[tuple[str, str, str]] = []
+class Locked(NamedTuple):
+    name: str
+    version: str
+    source: str
+    checkout: str = ""
+
+
+def parse_lock(path: Path) -> list[Locked]:
+    """Every package in a pubspec.lock."""
+    packages: list[Locked] = []
     current: dict[str, str] = {}
     for raw in _package_lines(path.read_text()):
         indent = len(raw) - len(raw.lstrip())
@@ -116,6 +124,10 @@ def parse_lock(path: Path) -> list[tuple[str, str, str]]:
             continue
         key, _, value = line.partition(":")
         value = value.strip().strip('"')
+        if key == "url" and value.endswith(".git"):
+            current["repo"] = value.rsplit("/", 1)[-1][: -len(".git")]
+        if key == "resolved-ref" and value:
+            current["ref"] = value
         if key in ("version", "source", "name") and value:
             current.setdefault(key, value)
     if current:
@@ -123,11 +135,12 @@ def parse_lock(path: Path) -> list[tuple[str, str, str]]:
     return packages
 
 
-def _finish(entry: dict[str, str], path: Path) -> tuple[str, str, str]:
+def _finish(entry: dict[str, str], path: Path) -> Locked:
     name = entry.get("name", entry["key"])
     if "version" not in entry or "source" not in entry:
         sys.exit(f"::error file={path}::{name} has no version or source; lock format changed")
-    return name, entry["version"], entry["source"]
+    checkout = f"{entry['repo']}-{entry['ref']}" if "repo" in entry and "ref" in entry else ""
+    return Locked(name, entry["version"], entry["source"], checkout)
 
 
 def pub_cache() -> Path:
@@ -149,8 +162,7 @@ def pub_cache() -> Path:
     )
 
 
-def license_text(name: str, version: str, cache: Path) -> tuple[Path, str] | None:
-    root = cache / "hosted" / PUB_HOST / f"{name}-{version}"
+def license_text(root: Path) -> tuple[Path, str] | None:
     for candidate in ("LICENSE", "LICENSE.md", "LICENSE.txt", "license", "COPYING"):
         path = root / candidate
         if path.is_file():
@@ -170,7 +182,7 @@ class Tally:
 
 
 def _check_one(
-    entry: tuple[str, str, str],
+    entry: Locked,
     workspace: set[str],
     cache: Path,
     allowed: set[str],
@@ -178,9 +190,13 @@ def _check_one(
     tally: Tally,
 ) -> None:
     """Classify one locked package, recording what happened either way."""
-    name, version, source = entry
+    name, version, source, checkout = entry
+    if source == "git" and checkout:
+        # A git dependency is a pinned checkout, classified from its LICENSE like a hosted one.
+        _classify_dir(name, version, cache / "git" / checkout, allowed, exceptions, tally)
+        return
     if source != "hosted":
-        # A path or git dependency has no pub licence to read, and the
+        # A path dependency has no pub licence to read, and the
         # workspace's own packages are covered by this repository's licences.
         if name not in workspace and source != "sdk":
             tally.failures.append(
@@ -191,8 +207,19 @@ def _check_one(
     if not (cache / "hosted" / PUB_HOST / f"{name}-{version}").is_dir():
         return
     tally.unpacked += 1
+    _classify_dir(name, version, cache / "hosted" / PUB_HOST / f"{name}-{version}",
+                  allowed, exceptions, tally)
 
-    found = license_text(name, version, cache)
+
+def _classify_dir(
+    name: str,
+    version: str,
+    root: Path,
+    allowed: set[str],
+    exceptions: dict[str, set[str]],
+    tally: Tally,
+) -> None:
+    found = license_text(root)
     if found is None:
         tally.failures.append(f"{name} {version} ships no LICENSE file in the pub cache")
         return
