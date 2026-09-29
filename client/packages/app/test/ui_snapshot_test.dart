@@ -78,6 +78,14 @@ final _analyticsFixture = api.SpaceAnalytics(
   ),
 );
 
+/// The shared fixture's fixed `connectedAt` reads as weeks in the rail's timer, so the rail cases start relative to now.
+VoiceState _callFor({int hours = 0, int minutes = 0, int seconds = 0}) =>
+    connectedCallState.copyWith(
+      connectedAt: DateTime.now().subtract(
+        Duration(hours: hours, minutes: minutes, seconds: seconds),
+      ),
+    );
+
 /// Shell states reachable only by overriding a provider the plain [snapshotSurfaces]
 /// table has no way to reach: a collapsed rail, a day divider forced to show,
 /// the transcript's connecting/genuinely-empty states (which the default
@@ -109,6 +117,44 @@ final _shellStateSurfaces =
         viewports: const ['desktop-narrow', 'desktop'],
         overrides: () => [
           channelRailExpandedProvider.overrideWith((ref) => false),
+        ],
+      ),
+      // A call live in another channel: the footer stays one bar, the call's name and timer in the name line's place.
+      'rail-in-call': (
+        route: '/channels/c-general',
+        viewports: const ['desktop-narrow', 'desktop'],
+        overrides: () => [
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(
+              ref,
+              _callFor(minutes: 12, seconds: 34),
+            ),
+          ),
+        ],
+      ),
+      'rail-compact-in-call': (
+        route: '/channels/c-general',
+        viewports: const ['desktop-narrow', 'desktop'],
+        overrides: () => [
+          channelRailExpandedProvider.overrideWith((ref) => false),
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(
+              ref,
+              _callFor(minutes: 12, seconds: 34),
+            ),
+          ),
+        ],
+      ),
+      'rail-in-call-phone': (
+        route: '/channels',
+        viewports: const ['phone-portrait'],
+        overrides: () => [
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(
+              ref,
+              _callFor(hours: 1, minutes: 2, seconds: 5),
+            ),
+          ),
         ],
       ),
       // The thread docked beside the transcript, the presentation an in-app open now takes at expanded widths (UX1); the `thread` surface's pushed route still covers the compact modal.

@@ -17,27 +17,22 @@ import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart';
 import 'call_participant_tiles.dart';
 
-/// A second row under the footer's usual identity line, appearing only
-/// while [RailUserFooter] decides a call elsewhere is worth surfacing.
+/// The call's channel and duration, standing in for [RailUserFooter]'s
+/// name line while a call elsewhere is live, so the footer stays one bar.
 ///
-/// Given its own row rather than squeezed into the identity row's width: a
-/// shared row left the channel name, duration and share cue fighting four
-/// icon buttons for 45-53pt, well under the 41pt the share cue needs on its
-/// own. Mic and deafen stay on the identity row (they are not repeated
-/// here); leave is, since nothing else in the footer offers it.
+/// Leave is [railLeaveCallButton], placed in the footer's control row; mic and
+/// deafen are the footer's own toggles and are not repeated here.
 class RailCallSummary extends ConsumerStatefulWidget {
   const RailCallSummary({
     super.key,
     required this.channelId,
     required this.connectedAt,
     required this.screenSharing,
-    required this.onLeave,
   });
 
   final String channelId;
   final DateTime? connectedAt;
   final bool screenSharing;
-  final VoidCallback onLeave;
 
   @override
   ConsumerState<RailCallSummary> createState() => _RailCallSummaryState();
@@ -53,73 +48,70 @@ class _RailCallSummaryState extends ConsumerState<RailCallSummary> {
         ref.watch(channelByIdProvider(widget.channelId)).valueOrNull?.name ??
         'a call';
 
-    return Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: 'Back to the call in $name',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (_) => setState(() => _pressed = true),
-              onTapUp: (_) => setState(() => _pressed = false),
-              onTapCancel: () => setState(() => _pressed = false),
-              onTap: () {
-                AppHaptics.selection();
-                // A no-op for a real voice channel; load-bearing for a DM.
-                ref.read(dmCallOpenProvider.notifier).state = widget.channelId;
-                context.go(Routes.channel(widget.channelId));
-              },
-              child: AnimatedOpacity(
-                opacity: _pressed ? 0.6 : 1,
-                duration: AppMotion.reduced(context, AppMotion.fast),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.ui.copyWith(
-                        color: tokens.textPrimary,
-                        fontWeight: AppWeights.medium,
-                        height: 1.25,
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (widget.connectedAt case final since?)
-                          CallDuration(since: since),
-                        Flexible(
-                          child: Text(
-                            widget.screenSharing ? ' - sharing' : ' - in call',
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.micro.copyWith(
-                              color: widget.screenSharing
-                                  ? tokens.accent
-                                  : tokens.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+    return Semantics(
+      button: true,
+      label: 'Back to the call in $name',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () {
+          AppHaptics.selection();
+          // A no-op for a real voice channel; load-bearing for a DM.
+          ref.read(dmCallOpenProvider.notifier).state = widget.channelId;
+          context.go(Routes.channel(widget.channelId));
+        },
+        child: AnimatedOpacity(
+          opacity: _pressed ? 0.6 : 1,
+          duration: AppMotion.reduced(context, AppMotion.fast),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.ui.copyWith(
+                  color: tokens.textPrimary,
+                  fontWeight: AppWeights.medium,
+                  height: 1.25,
                 ),
               ),
-            ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.connectedAt case final since?)
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: CallDuration(since: since),
+                      ),
+                    ),
+                  if (widget.screenSharing)
+                    Flexible(
+                      child: Text(
+                        ' - sharing',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.micro.copyWith(color: tokens.accent),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: AppSpacing.s8),
-        AppIconButton(
-          icon: AppIcons.leaveCall,
-          semanticLabel: 'Leave call',
-          tooltip: 'Leave call',
-          variant: AppIconButtonVariant.danger,
-          // Instant: the in-call bar's own leave button asks nothing either.
-          onPressed: widget.onLeave,
-        ),
-      ],
+      ),
     );
   }
 }
+
+/// Leaves the call from the footer without navigating to it first.
+Widget railLeaveCallButton(VoidCallback onLeave) => AppIconButton(
+  icon: AppIcons.leaveCall,
+  semanticLabel: 'Leave call',
+  tooltip: 'Leave call',
+  variant: AppIconButtonVariant.danger,
+  // Instant: the in-call bar's own leave button asks nothing either.
+  onPressed: onLeave,
+);

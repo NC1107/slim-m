@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
+import 'package:slimm_app/src/widgets/channel_rail.dart';
+import 'package:slimm_app/src/widgets/channel_rail_frame.dart';
 import 'package:slimm_app/src/widgets/rail_call_summary.dart';
 import 'package:slimm_app/src/widgets/voice_strip_indicator.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -29,6 +31,12 @@ void main() {
   const inMainCall = VoiceState(
     channelId: 'c-main',
     state: VoiceSessionState.connected,
+  );
+
+  final timedCall = VoiceState(
+    channelId: 'c-main',
+    state: VoiceSessionState.connected,
+    connectedAt: DateTime.now().subtract(const Duration(hours: 12)),
   );
 
   testWidgets(
@@ -123,4 +131,54 @@ void main() {
       await teardownFixture(tester, fixture.container, fixture.db);
     },
   );
+
+  for (final width in [ChannelRail.compactWidth, 240.0, 264.0, 320.0]) {
+    testWidgets('a call elsewhere keeps the footer one bar at $width wide', (
+      tester,
+    ) async {
+      Future<double> footerHeight(VoiceState voice) async {
+        final fixture = await fixtureContainer(
+          extraOverrides: [
+            voiceControllerProvider.overrideWith(
+              (ref) => _FixedVoiceController(ref, voice),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: fixture.container,
+            child: MaterialApp(
+              theme: buildTheme(Brightness.dark, AppTokens.dark),
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: SizedBox(
+                    width: width,
+                    child: const RailUserFooter(activeChannelId: 'c-other'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        final height = tester.getSize(find.byType(RailUserFooter)).height;
+        if (voice.state == VoiceSessionState.connected) {
+          expect(find.bySemanticsLabel('Leave call'), findsOneWidget);
+          expect(
+            find.byType(RailCallSummary),
+            width == ChannelRail.compactWidth ? findsNothing : findsOneWidget,
+            reason: 'the name line is where the call summary goes',
+          );
+        }
+        await teardownFixture(tester, fixture.container, fixture.db);
+        return height;
+      }
+
+      final idle = await footerHeight(const VoiceState());
+      final inCall = await footerHeight(timedCall);
+      expect(tester.takeException(), isNull, reason: 'no overflow');
+      expect(inCall, idle, reason: 'a call must not grow the footer');
+    });
+  }
 }
