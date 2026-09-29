@@ -5641,14 +5641,19 @@ paths:
         is no id to report.
 
         The recipient is not named. It is the author of `in_reply_to_id`, a
-        live message in this channel sent within the last 15 minutes, so a bot
-        can answer a member who spoke to it and reach nobody else. The caller
-        needs `VIEW_CHANNEL` and `SEND_MESSAGES` in the channel, and the
-        recipient must still be able to view it. A member who has blocked the
-        bot never receives it, and the call still succeeds. Bots and the
-        caller's own messages are not valid anchors. The 403 is the same
-        whatever the reason. Content follows the same length rules as
-        `sendMessage`. Metered as an ordinary write.
+        live message from a person in this channel, sent within the last 15
+        minutes, and addressed to the caller: it mentions the bot, replies to
+        one of the bot's messages, or opens with the bot's registered prefix
+        and one of its registered commands (decision 0031). A message that
+        does none of those is refused, so a bot can answer someone who spoke
+        to it and reach nobody else. The caller needs `VIEW_CHANNEL` and
+        `SEND_MESSAGES` in the channel, and the recipient must still be able
+        to view it. At most 3 private messages may be sent per anchor; the
+        fourth is a 429. A member who has blocked the bot never receives it,
+        and the call still succeeds. Bots and the caller's own messages are
+        not valid anchors. The 403 is the same whatever the reason. Content
+        follows the same length rules as `sendMessage`. Also metered as an
+        ordinary write.
       requestBody:
         required: true
         content:

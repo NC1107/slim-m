@@ -11,10 +11,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::AppState;
+use super::ephemeral_anchor::resolve_message;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::{parse_uuid, validate_content};
-use crate::ephemeral::{ANCHOR_WINDOW_MS, EphemeralMessage};
+use crate::ephemeral::EphemeralMessage;
 use crate::hub::Event;
 use crate::ids::{ChannelId, MessageId};
 use crate::permissions::Permissions;
@@ -65,8 +66,8 @@ impl From<&EphemeralMessage> for EphemeralMessageDto {
     }
 }
 
-/// Only a bot, and only to the author of a recent message in the channel, so a
-/// bot can answer a member who spoke to it and cannot reach anyone else. Every
+/// Only a bot, and only to the author of a recent message addressed to it (see
+/// `ephemeral_anchor`), at most [`crate::ephemeral::MAX_PER_ANCHOR`] times per message. Every
 /// refusal that would reveal another account's state is the same 403 or 404.
 async fn send_ephemeral(
     Authed(ctx): Authed,
@@ -90,26 +91,23 @@ async fn send_ephemeral(
     {
         return Err(ApiError::Forbidden);
     }
-    let anchor = state
-        .store
-        .message(anchor_id)
-        .await?
-        .filter(|m| m.channel_id == channel_id)
-        .ok_or(ApiError::NotFound("message not found"))?;
-    if crate::store::now_ms() - anchor.created_at > ANCHOR_WINDOW_MS {
-        return Err(ApiError::Forbidden);
-    }
-    let recipient_id = anchor.author_id.ok_or(ApiError::Forbidden)?;
-    // A bot answering another bot would be a channel nobody can moderate.
-    if recipient_id == ctx.user_id || state.store.is_bot(recipient_id).await? {
-        return Err(ApiError::Forbidden);
-    }
+    let anchor = resolve_message(&state, ctx.user_id, channel_id, anchor_id).await?;
+    let recipient_id = anchor.recipient_id;
     if !state
         .store
         .has_permission(recipient_id, channel_id, Permissions::VIEW_CHANNEL)
         .await?
     {
         return Err(ApiError::Forbidden);
+    }
+    let now = crate::store::now_ms();
+    let charged =
+        state
+            .hub
+            .ephemeral_budget()
+            .try_charge(ctx.user_id, anchor.id, anchor.expires_at, now);
+    if !charged {
+        return Err(ApiError::TooManyRequests);
     }
     let author = state
         .store
@@ -122,8 +120,8 @@ async fn send_ephemeral(
         author_id: ctx.user_id,
         author_display_name: author.display_name,
         content: content.to_owned(),
-        in_reply_to_id: anchor_id,
-        created_at: crate::store::now_ms(),
+        in_reply_to_id: anchor.in_reply_to_id,
+        created_at: now,
     });
     let dto = EphemeralMessageDto::from(message.as_ref());
     state.hub.publish(Event::EphemeralMessage {

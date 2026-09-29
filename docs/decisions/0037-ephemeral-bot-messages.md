@@ -36,24 +36,51 @@ The alternative, taking a `seq` and leaving a gap for everyone else, is what the
 The client keeps ephemeral messages in a list of their own, so nothing has to order them against a numbered stream.
 Its id is a UUIDv7, used only to dedupe and to dismiss.
 
-### Addressing: a reply to the recipient's own message
+### Addressing: a message that was aimed at this bot
 
 The recipient is not a parameter.
-It is the author of `in_reply_to_id`, and that message must be live, in this channel, and no more than 15 minutes old.
-This is the addressing model 0031's advertisement design leaves us with: the server has no interaction, so the nearest thing to "in response to that member's own command" is the message that carried the command.
-It means a bot can answer a member who spoke to it and cannot reach anybody else.
-The recipient cannot be forged, a bot cannot cold-message a member, and a bot cannot hold a private channel open by re-anchoring to an old message.
-The 15-minute window is a constant, `ephemeral::ANCHOR_WINDOW_MS`.
+It is the author of `in_reply_to_id`, and that message (the anchor) must be all of these:
 
-Anchors that are refused: a bot's own message, any other bot's message, a deleted message, a message in another channel, a message whose author is gone.
-A bot talking to a bot would be a channel nobody can see or moderate.
+- live, in this channel, and no more than 15 minutes old (`ephemeral::ANCHOR_WINDOW_MS`);
+- authored by a person, not by a bot, not by the caller, and not by a deleted account;
+- addressed to the calling bot, meaning at least one of: it mentions the bot (`message_mentions`), it replies to a message the bot wrote, or its text starts with the bot's registered prefix followed by one of its registered command names (decision 0031, compared case-insensitively, whole word).
+
+This is the addressing model 0031's advertisement design leaves us with: the server has no interaction, so the nearest thing to "in response to that member's own command" is the message that carried the command.
+The recipient cannot be forged.
+A bot cannot cold-message a member, because a member who never addressed it has no anchor.
+A bot cannot hold a private channel open by re-anchoring to an old message.
+The checks are in `http/ephemeral_anchor.rs`, and every failure is the same 403 (or 404 for an unknown or other-channel message), so the route does not say which of them failed.
+
+Residual gaps, stated plainly:
+
+- A mention is read from `message_mentions`, which also holds the expansion of `@everyone` and `@here`.
+  A person who holds `MENTION_EVERYONE` and uses it makes their message an anchor for every bot that can view the channel.
+  That is a deliberate, public act by someone with a moderator-grade permission, and it is left in.
+- A bot that is addressed once can send three private messages to that one person, so a hostile bot the person did talk to can still phish them there.
+  The badge below and the three-message cap are the mitigation, and revoking the bot is the control.
+- The prefix check reads the message text with the registered prefix and command names, so a bot that parses commands some other way than its registration says will be refused unless the message also mentions it.
+
+### Per-anchor budget
+
+A bot may send at most three private messages per anchor (`ephemeral::MAX_PER_ANCHOR`), and the fourth is a 429.
+The count is `Hub::ephemeral_budget`, kept in memory and keyed by (bot, anchor).
+An entry expires when the anchor's window closes, and expired entries are swept once the map holds more than 256, so it is bounded by the anchors still in the window.
+It is charged only after every other check has passed, so a refused call costs nothing.
+A restart forgets it, which at worst gives a bot another three messages on an anchor that is still inside its window.
+
+### Bot badge on the card
+
+The author's name is whatever the bot's display name is, so a bot can call itself "System" or "Admin".
+The client draws the `Bot` badge next to the name on every private-answer card.
+The server guarantees the author is a bot, which is why the frame carries no flag and the card always shows it.
+The badge is fixed-size beside a name that ellipsizes, so a long name cannot push it off the line.
 
 ### Button clicks reuse the same fan-out
 
 The follow-on card (buttons on bot messages) will hand the owning bot a click event carrying the clicker.
 A private reply to a click is the same primitive with a different anchor: the anchor becomes the interaction, and the recipient is the clicker.
 The delivery path, the frame, the client tray and the library method do not change.
-Only the check in `send_ephemeral` that turns an anchor into a recipient grows a second case.
+Only the resolver that turns an anchor into a recipient grows a second case: `ephemeral_anchor.rs` returns an `Anchor` (an id for the budget, the recipient, and an expiry), and an interaction would add a resolver beside `resolve_message`.
 That is why the recipient is derived from an anchor in one place rather than accepted from the caller.
 
 ### Who may send
@@ -62,7 +89,7 @@ Only a bot.
 It needs `VIEW_CHANNEL` and `SEND_MESSAGES` in the channel, the same as a public reply, so a bot muted in a channel is muted there privately too.
 The recipient must still hold `VIEW_CHANNEL`.
 Every refusal that depends on another account's state is the same 403, so the route is not an oracle for who can see a channel.
-It is metered as an ordinary write (`Class::Write`).
+It is metered as an ordinary write (`Class::Write`), and by the per-anchor budget above.
 
 ### Who receives it
 

@@ -18,7 +18,7 @@ use slimm_server::ids::{ChannelId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
-use slimm_server::store::Store;
+use slimm_server::store::{BotCommand, Store};
 use tokio::net::TcpListener;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -74,6 +74,19 @@ async fn world() -> World {
     }
     let bot = store
         .create_bot("helper", "Helper", Permissions::NONE, root.id)
+        .await
+        .unwrap();
+    store
+        .set_bot_commands(
+            bot.bot.user_id,
+            "!",
+            &[BotCommand {
+                name: "balance".to_owned(),
+                description: "show a balance".to_owned(),
+                usage: None,
+                permission: None,
+            }],
+        )
         .await
         .unwrap();
     let state = AppState {
@@ -276,7 +289,7 @@ async fn it_leaves_no_trace_in_history_search_sync_or_seq() {
 #[tokio::test]
 async fn a_member_cannot_send_one() {
     let w = world().await;
-    let anchor = say(&w, &w.alice.1, w.channel, "hi").await;
+    let anchor = say(&w, &w.alice.1, w.channel, "!balance").await;
     let (status, _) = whisper(&w, &w.bob.1, w.channel, &anchor, "boo").await;
     assert_eq!(status, StatusCode::FORBIDDEN);
     let (status, _) = whisper(&w, &w.admin.1, w.channel, &anchor, "boo").await;
@@ -293,7 +306,7 @@ async fn the_recipient_is_the_anchors_author_and_nobody_else() {
         .await
         .unwrap()
         .id;
-    let elsewhere = say(&w, &w.alice.1, other, "hi").await;
+    let elsewhere = say(&w, &w.alice.1, other, "!balance").await;
     let (status, _) = whisper(&w, &w.bot.1, w.channel, &elsewhere, "x").await;
     assert_eq!(
         status,
@@ -349,7 +362,7 @@ async fn a_recipient_who_can_no_longer_view_the_channel_is_refused() {
 #[tokio::test]
 async fn content_is_validated_like_a_message() {
     let w = world().await;
-    let anchor = say(&w, &w.alice.1, w.channel, "hi").await;
+    let anchor = say(&w, &w.alice.1, w.channel, "!balance").await;
     let (status, _) = whisper(&w, &w.bot.1, w.channel, &anchor, "   ").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     let (status, _) = whisper(&w, &w.bot.1, w.channel, &anchor, &"x".repeat(4_001)).await;
@@ -359,7 +372,7 @@ async fn content_is_validated_like_a_message() {
 #[tokio::test]
 async fn a_member_who_blocked_the_bot_never_hears_it() {
     let w = world().await;
-    let anchor = say(&w, &w.alice.1, w.channel, "hi").await;
+    let anchor = say(&w, &w.alice.1, w.channel, "!balance").await;
     w.state.store.block_user(w.alice.0, w.bot.0).await.unwrap();
     let addr = serve(w.state.clone()).await;
     let mut alice = connect(&w, addr, &w.alice.1).await;
@@ -370,4 +383,60 @@ async fn a_member_who_blocked_the_bot_never_hears_it() {
             .await
             .is_none()
     );
+}
+
+#[tokio::test]
+async fn a_message_not_addressed_to_the_bot_is_no_anchor() {
+    let w = world().await;
+    let chatter = say(&w, &w.alice.1, w.channel, "anyone seen the game?").await;
+    let (status, _) = whisper(&w, &w.bot.1, w.channel, &chatter, "click here").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let near_miss = say(&w, &w.alice.1, w.channel, "!balancer").await;
+    let (status, _) = whisper(&w, &w.bot.1, w.channel, &near_miss, "x").await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "a prefix alone is not a command"
+    );
+}
+
+#[tokio::test]
+async fn a_mention_or_a_reply_to_the_bot_addresses_it() {
+    let w = world().await;
+    let mention = say(&w, &w.alice.1, w.channel, "@helper are you there").await;
+    let (status, _) = whisper(&w, &w.bot.1, w.channel, &mention, "yes").await;
+    assert_eq!(status, StatusCode::OK);
+
+    let bots_own = say(&w, &w.bot.1, w.channel, "what next?").await;
+    let (status, reply) = call(
+        &w,
+        "POST",
+        &format!("/channels/{}/messages", w.channel),
+        &w.bob.1,
+        Some(json!({
+            "id": Uuid::now_v7().to_string(),
+            "content": "the second one",
+            "reply_to_id": bots_own["id"],
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = whisper(&w, &w.bot.1, w.channel, &reply, "done").await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_bot_gets_three_private_messages_per_anchor() {
+    let w = world().await;
+    let anchor = say(&w, &w.alice.1, w.channel, "!balance").await;
+    for n in 0..slimm_server::ephemeral::MAX_PER_ANCHOR {
+        let (status, _) = whisper(&w, &w.bot.1, w.channel, &anchor, &format!("part {n}")).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    let (status, _) = whisper(&w, &w.bot.1, w.channel, &anchor, "one too many").await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+
+    let fresh = say(&w, &w.alice.1, w.channel, "!balance").await;
+    let (status, _) = whisper(&w, &w.bot.1, w.channel, &fresh, "a new anchor").await;
+    assert_eq!(status, StatusCode::OK);
 }
