@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+name: update-manifest
+
+# Signs a manifest of a client release's desktop artifacts; see docs/ci.md and decision 0041.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      require:
+        type: string
+        required: false
+        default: "windows-x64,macos"
+    secrets:
+      UPDATE_SIGNING_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing client tag to sign a manifest for (e.g. client-v0.90.0)"
+        required: true
+        type: string
+      require:
+        description: "Comma-separated platforms that must be attached (add linux-x64 once release has run)"
+        required: false
+        type: string
+        default: "windows-x64,macos"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-manifest-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    name: sign update manifest
+    runs-on: ubuntu-latest
+    # write, not read: the last step attaches the manifest and signature to the github release.
+    permissions:
+      contents: write
+    env:
+      UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+      TAG: ${{ inputs.tag }}
+      REQUIRE: ${{ inputs.require }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: check secret
+        id: gate
+        run: |
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::UPDATE_SIGNING_KEY is not configured. Add it to publish a signed update manifest. Skipping."
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.gate.outputs.ready == 'true'
+
+      - name: download the desktop artifacts
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
+            --pattern 'slim-m-client-*-linux-amd64.tar.gz' \
+            --pattern 'slim-m-client-*-windows-x64.zip' \
+            --pattern 'slim-m-client-*-macos.zip'
+
+      - name: build and sign the manifest
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          python3 scripts/update-manifest.py build --tag "$TAG" --dir dist \
+            --repo "$GITHUB_REPOSITORY" --require "$REQUIRE" --out manifest.json
+          python3 scripts/update-manifest.py sign --manifest manifest.json --sig manifest.json.sig
+
+      # Round trip against the key's own public half, so a bad secret fails here and not on a user's machine.
+      - name: verify what was just signed
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          pubkey="$(python3 scripts/update-manifest.py pubkey)"
+          python3 scripts/update-manifest.py verify --manifest manifest.json \
+            --sig manifest.json.sig --pubkey "$pubkey" --dir dist
+
+      - name: attach to the github release
+        if: steps.gate.outputs.ready == 'true'
+        run: gh release upload "$TAG" manifest.json manifest.json.sig --repo "$GITHUB_REPOSITORY" --clobber
