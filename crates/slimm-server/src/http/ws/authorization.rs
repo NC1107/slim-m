@@ -151,11 +151,8 @@ pub(super) async fn authorize_unstamped(
         else {
             return Authorization::Withhold;
         };
-        return Authorization::Deliver(Box::new(ServerFrame::PresenceChanged {
-            user_id: target_id.to_string(),
-            status: status.as_str().to_owned(),
-            activity: hub.presence().activity_visible_at(target_id, status),
-        }));
+        let frame = signals::presence_frame(hub, target_id, status);
+        return Authorization::Deliver(Box::new(frame));
     }
     // Private to one account, so it is decided before any channel permission is consulted.
     if let Event::ReadStateChanged {

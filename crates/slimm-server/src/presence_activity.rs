@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub const MAX_TEXT_CHARS: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Serialised lowercase, matching the OpenAPI enum.
 #[serde(rename_all = "snake_case")]
 pub enum ActivityKind {
     Listening,
@@ -22,6 +23,7 @@ pub enum ActivityKind {
 /// One activity as it goes over the wire. There is deliberately no image
 /// field yet: art is never fetched from a sender-supplied URL (decision 0044).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Unknown fields are refused so no image URL can ride in.
 #[serde(deny_unknown_fields)]
 pub struct Activity {
     #[serde(rename = "type")]

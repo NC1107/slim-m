@@ -52,6 +52,22 @@ pub(super) async fn profile_calls(c: &mut Contract, root: &str, admin_id: &str, 
     c.get("getAvatar", &format!("/users/{admin_id}/avatar"), root)
         .await;
     c.bare("deleteAvatar", "DELETE", "/me/avatar", root).await;
+
+    c.json(
+        "setPresenceActivity",
+        "PUT",
+        "/presence/activity",
+        root,
+        json!({"type": "listening", "title": "Song", "subtitle": "Artist"}),
+    )
+    .await;
+    c.bare(
+        "clearPresenceActivity",
+        "DELETE",
+        "/presence/activity",
+        root,
+    )
+    .await;
 }
 
 pub(super) async fn safety_calls(c: &mut Contract, root: &str, bob_token: &str, bob_id: &str) {

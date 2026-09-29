@@ -22,6 +22,9 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
     _sub = _ref.read(liveEventsProvider).listen((event) {
       if (event is api.PresenceChanged) {
         state = {...state, event.userId: event.status};
+        _ref
+            .read(presenceActivityProvider.notifier)
+            .apply(event.userId, event.activity);
       }
     });
   }

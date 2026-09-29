@@ -18,6 +18,7 @@ import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import '../../touch_targets.dart';
+import 'list_row_label.dart';
 
 /// Reads every [AppListRow] label below it in `text-primary` at rest, for a
 /// settings card where each label names a control rather than a destination.
@@ -331,40 +332,12 @@ class _AppListRowState extends State<AppListRow> {
               // Excluded because the Semantics wrapper below already names this
               // row; without it a screen reader announces "general, general".
               child: ExcludeSemantics(
-                child: widget.subtitle == null
-                    ? Text(widget.label,
-                        overflow: TextOverflow.ellipsis, style: labelStyle)
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: labelStyle),
-                          Row(
-                            children: [
-                              if (widget.subtitleIcon != null) ...[
-                                Icon(
-                                  widget.subtitleIcon,
-                                  size: 12,
-                                  color: tokens.textSecondary,
-                                ),
-                                const SizedBox(width: AppSpacing.s4),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  widget.subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppText.caption
-                                      .copyWith(color: tokens.textSecondary),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                child: AppListRowLabel(
+                  label: widget.label,
+                  subtitle: widget.subtitle,
+                  subtitleIcon: widget.subtitleIcon,
+                  labelStyle: labelStyle,
+                ),
               ),
             ),
             if (widget.meta != null)

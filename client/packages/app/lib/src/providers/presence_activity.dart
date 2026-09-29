@@ -7,29 +7,18 @@
 /// as: the server never sends one for them.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/widgets.dart' show IconData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart' show AppIcons;
 
-import 'live_events.dart';
-
 class PresenceActivityController
     extends StateNotifier<Map<String, api.PresenceActivity>> {
-  PresenceActivityController(this._ref) : super(const {}) {
-    _sub = _ref.read(liveEventsProvider).listen((event) {
-      if (event is api.PresenceChanged) {
-        _set(event.userId, event.activity);
-      }
-    });
-  }
+  PresenceActivityController() : super(const {});
 
-  final Ref _ref;
-  late final StreamSubscription<api.ServerEvent> _sub;
-
-  void _set(String userId, api.PresenceActivity? activity) {
+  /// Sets or clears one member's activity. `PresenceController` feeds this
+  /// from the live socket, so this holds no subscription of its own.
+  void apply(String userId, api.PresenceActivity? activity) {
     if (!mounted || state[userId] == activity) return;
     final next = {...state};
     if (activity == null) {
@@ -43,7 +32,7 @@ class PresenceActivityController
   /// Applies a batch lookup: every id it names is now exactly as told.
   void applyBatch(Iterable<api.PresenceStatus> statuses) {
     for (final status in statuses) {
-      _set(status.userId, status.activity);
+      apply(status.userId, status.activity);
     }
   }
 
@@ -51,19 +40,13 @@ class PresenceActivityController
   void clear() {
     if (mounted) state = const {};
   }
-
-  @override
-  void dispose() {
-    unawaited(_sub.cancel());
-    super.dispose();
-  }
 }
 
 final presenceActivityProvider =
     StateNotifierProvider<
       PresenceActivityController,
       Map<String, api.PresenceActivity>
-    >((ref) => PresenceActivityController(ref));
+    >((ref) => PresenceActivityController());
 
 /// One member's visible activity, scoped so other members' changes do not
 /// rebuild the watcher.

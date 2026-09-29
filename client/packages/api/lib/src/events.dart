@@ -365,13 +365,8 @@ sealed class ServerEvent {
 /// for anything else (including a non-string), so a future server addition
 /// is ignored the same way an unrecognized frame type is rather than
 /// throwing out of an enum lookup.
-PresenceState? _presenceStateOf(Object? raw) {
-  if (raw is! String) return null;
-  for (final state in PresenceState.values) {
-    if (state.name == raw) return state;
-  }
-  return null;
-}
+PresenceState? _presenceStateOf(Object? raw) =>
+    PresenceState.values.where((s) => s.name == raw).firstOrNull;
 
 /// The server accepted the handshake.
 class HelloEvent extends ServerEvent {
