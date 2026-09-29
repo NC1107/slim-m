@@ -40,7 +40,7 @@ jobs:
   # Real benchmarks on a published release, uploaded for hand-curation into
   # perf/baselines/. Deliberately not environment-gated; see docs/ci.md.
   benchmark:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && !startsWith(github.event.release.tag_name, 'schema-v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

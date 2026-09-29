@@ -284,7 +284,7 @@ Today it reads 157 packages: 124 BSD-3-Clause, 24 MIT, 5 Apache-2.0, 2 BSD-2-Cla
 ## perf
 
 Path-gated to server and perf-scaffolding changes.
-GitHub Actions does not support path filters on the `release` event, so the release-triggered job is not path-gated; it only ever runs once per published release regardless.
+GitHub Actions does not support path filters on the `release` event, so the release-triggered job is not path-gated; it runs once per published release, except that it skips the `schema-v*` release the server config cuts alongside each server release.
 
 `compile-gate` is a fast compile-only gate on every pull request: it proves the benchmarks still build without paying for a full measurement run on each push.
 
@@ -447,11 +447,33 @@ It exists for one reason: `schema/openapi.yaml`'s `info.version` has to track th
 release-please resolves an `extra-files` path relative to the package directory, so a package rooted at `crates/slimm-server` cannot legally name a repo-root file - a parent-relative path is rejected with `illegal pathing characters in path`, and that rejection takes down every release-please run rather than just the one file, which is how PR #933 froze the standing release PR several merges behind main before #940 reverted it.
 Declaring the key at the config's top level does not help either; the path still resolves against the package directory.
 A package rooted at `.` can name the file, and the `linked-versions` plugin holds it to the server's version so a client-only release cannot drift `info.version` away from the server's Cargo version.
-That package publishes nothing of its own: `skip-github-release` and `skip-changelog` are both set, so it produces no second release and no second changelog.
+That package writes no changelog of its own (`skip-changelog`), but it does cut a `schema-v<version>` tag and GitHub release; see the next section for why.
 Its one visible artifact is a repo-root `version.txt`, which `release-type: simple` maintains; nothing reads it, and it is auto-maintained so it cannot drift.
 `scripts/lib/test_openapi_version_is_release_managed.py` pins each of those moving parts, since dropping any one silently returns us to hand-editing the release branch, which is how 0.46.0 and 0.47.0 shipped.
 
-That same `skip-github-release` is why the server config carries `commit-search-depth`.
+### The schema package cuts its own tag
+
+The package used to set `skip-github-release`, so no `schema-v*` tag ever existed.
+release-please reads a package's last version from the manifest but finds the commit for it from a release or the expected tag name, so with none it had no boundary and took the whole `commit-search-depth` window on every run.
+Because the package is rooted at `.` it matches every commit in the repo, client-only merges included.
+Any feature in that window made the schema package want a bump, and `linked-versions` dragged `crates/slimm-server` along with a `chore(server): Synchronize server versions` entry.
+Merging that PR shipped a no-op server release, an image and a deploy, and the next run proposed another one (0.53.0, 0.67.0, then #1262).
+
+The owner decided on 2026-09-29 to anchor the package instead of working around it: `skip-github-release` is dropped, so each server release now also creates `schema-v<version>`, and the second GitHub release per version is accepted.
+The next run then has a boundary and only sees commits since the last release.
+
+What was checked, not assumed:
+
+- Branch and title do not change. The combined branch `release-please--branches--main` and title `chore: release main` follow from the package count and `separate-pull-requests`, and neither is touched. `skip-github-release` is not an input to the branch name. The open standing PR uses exactly that branch.
+- `release.yml` only triggers its tag path on `server-v*` and `client-v*`, and reads outputs by the `crates/slimm-server--` and `client--` prefixes, so `schema-v*` starts no image, binary or desktop build. `desktop-clients.yml` is `client-v*` only.
+- `perf.yml`'s `benchmark` job runs on any published release, so it skips `schema-v*` explicitly; otherwise the benchmarks would run twice per server version.
+- `scripts/lib/test_openapi_version_is_release_managed.py` pins both the config and that guard.
+
+Known limit: the manifest already reads `.` = 0.74.0 with no `schema-v0.74.0` tag, so the first release after this lands still walks the window once and anchors from then on.
+Pushing `schema-v0.74.0` at the `server-v0.74.0` commit anchors it immediately; that is a new tag, not a moved one.
+`release-tag-watchdog` checks the server and client manifests only, so a missing schema tag is not reported.
+
+That same `skip-github-release` history is why the server config carries `commit-search-depth`.
 release-please bounds its walk back through main by the releases it can find, and a package that publishes no release gives it nothing to find: the run logs `looking for tagName: schema-v<version>`, then `could not find release`, and walks to the default depth of 500 merge commits every time.
 That walk grew expensive enough to be refused outright on 2026-09-15, with GitHub answering the paged GraphQL query `Something went wrong while executing your query` at around 120 commits in - which failed the job, which left both standing release PRs frozen several merges behind main while every merge looked green.
 A depth of 100 is far more history than this repo puts between two releases and bounds the query permanently.
