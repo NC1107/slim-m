@@ -167,7 +167,7 @@ No other bot and no other member gets it.
 Unlike a command advertisement it names who pressed, because you cannot answer a press without knowing.
 Answer within 15 minutes, in any of three ways, and the presser's button stops waiting as soon as you do:
 
-- `POST /channels/{channelId}/ephemeral-messages` with `in_reply_to_id` set to the `interaction_id`.
+- `POST /channels/{channelId}/ephemeral-messages` with `interaction_id` set to the press's id, in place of `in_reply_to_id` (send exactly one of the two).
   Only the presser sees it, and you get three replies per press; the fourth is a 429.
 - `PUT /channels/{channelId}/messages/{messageId}/components` to replace the buttons, for example to disable them.
   Pass `interaction_id` to say which press it answers.

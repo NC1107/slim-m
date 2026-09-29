@@ -65,12 +65,23 @@ It would have needed a new `AppState` field in every test that builds one, and i
 
 ### Private replies to a press
 
-`send_ephemeral` resolves its anchor in one place.
-That place, `http::ephemeral_anchor`, now has two resolvers: an interaction id, whose recipient is the presser, and a message id under 0037's rules, which require the message to be addressed to the bot.
-A press needs no such check, because pressing the bot's own button is the addressing.
-The interaction case requires that the caller is the bot the press went to, that it is in the same channel, and that the press is still open.
+The request names its anchor in one of two fields, and exactly one must be present: `in_reply_to_id` for a message under 0037's rules, or `interaction_id` for a press.
+They are separate ids with separate resolvers in `http::ephemeral_anchor`, and neither can be read as the other.
+This is a fix from the security review.
+The first draft reused `in_reply_to_id` for both, resolving a press first, so a member could press a button with the id of someone else's message and redirect a bot's legitimate whisper to themselves, or make it fail for everyone else.
+Now a press whose id already names a message is refused with a 409, and a press that is not the caller's is a 404 whichever field it is sent in.
+A press needs no addressing check, because pressing the bot's own button is the addressing.
+The press case requires that the caller is the bot the press went to, that it is in the same channel, and that the press is still open.
 It spends from the same per-anchor budget as a message anchor, three private replies, so a single press cannot become a standing channel to the presser.
 The delivery path, the frame, the tray and the block rules are unchanged.
+
+### What a button may say
+
+A label and a `custom_id` are refused if they hold control, zero-width or bidi characters, using the same test as display names, so a label cannot reorder or hide its own text.
+A link button's url is parsed, must be http or https with a host, cannot carry a username or password, and is stored in its normalized form.
+The raw text is checked first, because the parser silently drops tabs and newlines, and a url the parser had to forgive (`https:///host`, a backslash) is refused rather than shown as something else.
+The client shows the destination host under a link button, so a label cannot pose as a different site.
+A change of buttons that names a press checks the press before it changes anything, so a bad id does not leave the buttons half-updated and broadcast.
 
 ### Acknowledging
 

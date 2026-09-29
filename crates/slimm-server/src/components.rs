@@ -48,7 +48,13 @@ pub struct ComponentRow {
 
 /// Checks a bot's rows against the caps and returns them trimmed. The error is
 /// the wire-facing text.
-pub fn validate(mut rows: Vec<ComponentRow>) -> Result<Vec<ComponentRow>, &'static str> {
+///
+/// `hidden` is the deployment's spoofing-character test (zero-width, bidi and
+/// control characters), applied to every label and `custom_id`.
+pub fn validate(
+    mut rows: Vec<ComponentRow>,
+    hidden: fn(char) -> bool,
+) -> Result<Vec<ComponentRow>, &'static str> {
     if rows.len() > MAX_ROWS {
         return Err("too many component rows");
     }
@@ -61,7 +67,7 @@ pub fn validate(mut rows: Vec<ComponentRow>) -> Result<Vec<ComponentRow>, &'stat
             return Err("too many buttons in a row");
         }
         for button in &mut row.buttons {
-            validate_button(button)?;
+            validate_button(button, hidden)?;
             if let Some(id) = &button.custom_id
                 && !seen.insert(id.clone())
             {
@@ -72,7 +78,7 @@ pub fn validate(mut rows: Vec<ComponentRow>) -> Result<Vec<ComponentRow>, &'stat
     Ok(rows)
 }
 
-fn validate_button(button: &mut Button) -> Result<(), &'static str> {
+fn validate_button(button: &mut Button, hidden: fn(char) -> bool) -> Result<(), &'static str> {
     button.label = button.label.trim().to_owned();
     if button.label.is_empty() {
         return Err("a button needs a label");
@@ -80,8 +86,11 @@ fn validate_button(button: &mut Button) -> Result<(), &'static str> {
     if button.label.chars().count() > MAX_LABEL_CHARS {
         return Err("button label is too long");
     }
+    if button.label.chars().any(hidden) {
+        return Err("a button label cannot hold control or invisible characters");
+    }
     if button.style == ButtonStyle::Link {
-        return validate_link(button);
+        return validate_link(button, hidden);
     }
     if button.url.is_some() {
         return Err("only a link button takes a url");
@@ -93,21 +102,44 @@ fn validate_button(button: &mut Button) -> Result<(), &'static str> {
     if id.is_empty() || id.chars().count() > MAX_CUSTOM_ID_CHARS {
         return Err("custom_id must be 1 to 100 characters");
     }
+    if id.chars().any(hidden) {
+        return Err("custom_id cannot hold control or invisible characters");
+    }
     Ok(())
 }
 
-fn validate_link(button: &mut Button) -> Result<(), &'static str> {
+fn validate_link(button: &mut Button, hidden: fn(char) -> bool) -> Result<(), &'static str> {
     if button.custom_id.is_some() {
         return Err("a link button takes a url, not a custom_id");
     }
-    let url = button.url.as_deref().ok_or("a link button needs a url")?;
-    if url.chars().count() > MAX_URL_CHARS {
+    let raw = button.url.as_deref().ok_or("a link button needs a url")?;
+    if raw.chars().count() > MAX_URL_CHARS {
         return Err("button url is too long");
     }
-    let lower = url.to_ascii_lowercase();
-    if !(lower.starts_with("https://") || lower.starts_with("http://")) {
+    // Checked on the raw text: the parser silently drops tabs and newlines and trims spaces.
+    if raw.chars().any(|c| c.is_whitespace() || hidden(c)) {
+        return Err("a button url cannot hold spaces, control or invisible characters");
+    }
+    let url = url::Url::parse(raw).map_err(|_| "a button url could not be read")?;
+    if !matches!(url.scheme(), "http" | "https") {
         return Err("a button url must be http or https");
     }
+    // The parser forgives `https:///host` and `https:\\host`; a link that needs forgiving is not shown as written.
+    let authority_start = format!("{}://", url.scheme());
+    let plain_authority = raw
+        .get(..authority_start.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(&authority_start))
+        && !raw[authority_start.len()..].starts_with(['/', '\\', '?', '#']);
+    if !plain_authority || url.host_str().is_none_or(str::is_empty) {
+        return Err("a button url needs a host");
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err("a button url cannot carry a username or password");
+    }
+    if url.as_str().chars().count() > MAX_URL_CHARS {
+        return Err("button url is too long");
+    }
+    button.url = Some(url.into());
     Ok(())
 }
 
@@ -136,12 +168,67 @@ mod tests {
         ComponentRow { buttons }
     }
 
+    fn no_hidden(_: char) -> bool {
+        false
+    }
+
+    fn zero_width(c: char) -> bool {
+        c.is_control() || c == '\u{200B}' || c == '\u{202E}'
+    }
+
+    fn link(url: &str) -> Button {
+        Button {
+            label: "Docs".into(),
+            style: ButtonStyle::Link,
+            custom_id: None,
+            url: Some(url.into()),
+            disabled: false,
+        }
+    }
+
+    fn checked_url(url: &str) -> Result<String, &'static str> {
+        let rows = validate(vec![row(vec![link(url)])], zero_width)?;
+        Ok(rows[0].buttons[0].url.clone().unwrap())
+    }
+
+    #[test]
+    fn a_link_must_be_a_plain_http_url_with_a_host_and_no_userinfo() {
+        assert_eq!(
+            checked_url("https://Example.com").unwrap(),
+            "https://example.com/"
+        );
+        for bad in [
+            "https://user:pw@example.com/",
+            "https://example.com@evil.example/x",
+            "https:///nohost",
+            "ftp://example.com/",
+            "https://exa mple.com/",
+            " https://example.com/",
+            "https://example.com/\tpath",
+            "https://example.com/\u{202E}gpj",
+            "https://example.com/\u{200B}",
+            "not a url",
+        ] {
+            assert!(checked_url(bad).is_err(), "{bad:?} must be refused");
+        }
+    }
+
+    #[test]
+    fn invisible_characters_are_refused_in_a_label_and_a_custom_id() {
+        let mut b = button("ok");
+        b.label = "Hit\u{202E}".into();
+        assert!(validate(vec![row(vec![b])], zero_width).is_err());
+        let b = button("a\u{200B}b");
+        assert!(validate(vec![row(vec![b])], zero_width).is_err());
+        assert!(validate(vec![row(vec![button("fine")])], zero_width).is_ok());
+    }
+
     #[test]
     fn a_full_five_by_five_grid_passes() {
         let rows = (0..5)
             .map(|r| row((0..5).map(|c| button(&format!("b{r}{c}"))).collect()))
             .collect();
-        assert!(validate(rows).is_ok());
+        assert!(validate(rows, no_hidden).is_ok());
     }
 
     #[test]
@@ -149,35 +236,35 @@ mod tests {
         let rows = (0..6)
             .map(|r| row(vec![button(&format!("r{r}"))]))
             .collect();
-        assert!(validate(rows).is_err());
+        assert!(validate(rows, no_hidden).is_err());
         let wide = vec![row((0..6).map(|c| button(&format!("c{c}"))).collect())];
-        assert!(validate(wide).is_err());
+        assert!(validate(wide, no_hidden).is_err());
     }
 
     #[test]
     fn duplicate_custom_ids_are_refused() {
-        assert!(validate(vec![row(vec![button("a"), button("a")])]).is_err());
+        assert!(validate(vec![row(vec![button("a"), button("a")])], no_hidden).is_err());
     }
 
     #[test]
     fn a_link_needs_an_http_url_and_no_custom_id() {
         let mut link = button("x");
         link.style = ButtonStyle::Link;
-        assert!(validate(vec![row(vec![link.clone()])]).is_err());
+        assert!(validate(vec![row(vec![link.clone()])], no_hidden).is_err());
         link.custom_id = None;
         link.url = Some("javascript:alert(1)".into());
-        assert!(validate(vec![row(vec![link.clone()])]).is_err());
+        assert!(validate(vec![row(vec![link.clone()])], no_hidden).is_err());
         link.url = Some("https://example.com".into());
-        assert!(validate(vec![row(vec![link])]).is_ok());
+        assert!(validate(vec![row(vec![link])], no_hidden).is_ok());
     }
 
     #[test]
     fn a_blank_or_oversize_label_is_refused() {
         let mut b = button("a");
         b.label = "   ".into();
-        assert!(validate(vec![row(vec![b.clone()])]).is_err());
+        assert!(validate(vec![row(vec![b.clone()])], no_hidden).is_err());
         b.label = "x".repeat(MAX_LABEL_CHARS + 1);
-        assert!(validate(vec![row(vec![b])]).is_err());
+        assert!(validate(vec![row(vec![b])], no_hidden).is_err());
     }
 
     #[test]

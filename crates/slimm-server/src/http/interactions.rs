@@ -107,6 +107,15 @@ async fn click(
         created_at: now_ms(),
         answered: false,
     };
+    // A press id is its own id space: one that names a message could otherwise be aimed at that message's author.
+    if state
+        .store
+        .message_including_deleted(MessageId(id.0))
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::Conflict("interaction id already used"));
+    }
     let (stored, is_new) = state
         .store
         .record_interaction(&fresh)
@@ -149,16 +158,26 @@ pub(super) async fn answer_from_bot(
     id: InteractionId,
 ) -> Result<Interaction, ApiError> {
     let interaction = own_interaction(state, bot_id, channel_id, id).await?;
-    if state.store.mark_interaction_answered(id).await? {
+    answer(state, &interaction).await?;
+    Ok(interaction)
+}
+
+/// Tells the clicker their press was answered, the first time only.
+pub(super) async fn answer(state: &AppState, interaction: &Interaction) -> Result<(), ApiError> {
+    if state
+        .store
+        .mark_interaction_answered(interaction.id)
+        .await?
+    {
         state.hub.publish(Event::InteractionAnswered {
             interaction: Arc::new(interaction.clone()),
         });
     }
-    Ok(interaction)
+    Ok(())
 }
 
 /// The click `id` if it is still open, in `channel_id`, and addressed to `bot_id`.
-async fn own_interaction(
+pub(super) async fn own_interaction(
     state: &AppState,
     bot_id: UserId,
     channel_id: ChannelId,
@@ -172,27 +191,21 @@ async fn own_interaction(
         .ok_or(ApiError::NotFound("interaction not found"))
 }
 
-/// A press as a private-reply anchor: the recipient is whoever pressed. `None`
-/// when `id` is not a press at all, so the caller falls through to the
-/// message-anchor rules. The per-anchor budget and the window are the same as
-/// a message anchor's.
+/// A press as a private-reply anchor: the recipient is whoever pressed. Only
+/// the bot the press went to can use it, and it never reads as a message id.
+/// The per-anchor budget and the window are the same as a message anchor's.
 pub(super) async fn resolve_press(
     state: &AppState,
     bot_id: UserId,
     channel_id: ChannelId,
     id: InteractionId,
-) -> Result<Option<Anchor>, ApiError> {
-    let Some(interaction) = state.store.interaction(id).await? else {
-        return Ok(None);
-    };
-    if interaction.bot_id != bot_id || interaction.channel_id != channel_id {
-        return Err(ApiError::Forbidden);
-    }
-    Ok(Some(Anchor {
+) -> Result<Anchor, ApiError> {
+    let interaction = own_interaction(state, bot_id, channel_id, id).await?;
+    Ok(Anchor {
         id: id.0,
         recipient_id: interaction.clicker_id,
         in_reply_to_id: MessageId(id.0),
         expires_at: interaction.created_at + INTERACTION_WINDOW_MS,
         press: Some(id),
-    }))
+    })
 }

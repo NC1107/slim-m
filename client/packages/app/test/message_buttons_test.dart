@@ -131,6 +131,14 @@ void main() {
     expect(find.byIcon(AppIcons.externalLink), findsOneWidget);
   });
 
+  testWidgets('a link shows where it really goes, whatever its label says', (
+    tester,
+  ) async {
+    await _pump(tester);
+    expect(find.text('example.com'), findsOneWidget);
+    expect(find.text('Rules'), findsOneWidget);
+  });
+
   testWidgets('a press shows pending, then clears when the bot answers', (
     tester,
   ) async {

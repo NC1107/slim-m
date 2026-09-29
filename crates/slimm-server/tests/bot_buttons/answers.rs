@@ -48,7 +48,7 @@ async fn another_bot_cannot_answer_a_press_it_was_not_sent() {
     let (_, _, id) = press(&w, &w.alice.1, &sent, "hit").await;
     assert_eq!(
         whisper(&w, &w.other_bot.1, &id, "gotcha").await,
-        StatusCode::FORBIDDEN
+        StatusCode::NOT_FOUND
     );
     let (status, _) = call(
         &w,

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::AppState;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
-use super::interactions::answer_from_bot;
+use super::interactions::{answer, own_interaction};
 use super::messages::parse_uuid;
 use crate::components::{self, ComponentRow};
 use crate::hub::Event;
@@ -42,7 +42,7 @@ pub(super) async fn honored_for_send(
     if !state.store.is_bot(caller).await? {
         return Err(ApiError::Forbidden);
     }
-    components::validate(raw).map_err(ApiError::BadRequest)
+    components::validate(raw, super::auth::is_disallowed_label_char).map_err(ApiError::BadRequest)
 }
 
 /// Stores `rows` when `fresh`, then reads back what the message really has, so
@@ -90,7 +90,8 @@ async fn set_components(
         .as_deref()
         .map(|raw| parse_uuid(raw).map(InteractionId))
         .transpose()?;
-    let rows = components::validate(req.components).map_err(ApiError::BadRequest)?;
+    let rows = components::validate(req.components, super::auth::is_disallowed_label_char)
+        .map_err(ApiError::BadRequest)?;
     let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
     if !state.store.is_bot(ctx.user_id).await?
         || !state
@@ -109,6 +110,14 @@ async fn set_components(
     if message.author_id != Some(ctx.user_id) {
         return Err(ApiError::Forbidden);
     }
+    // Checked before anything changes: a bad press id must not leave the buttons half-updated.
+    let press = match interaction_id {
+        Some(id) => Some(own_interaction(&state, ctx.user_id, channel_id, id).await?),
+        None => None,
+    };
+    if press.as_ref().is_some_and(|p| p.message_id != message_id) {
+        return Err(ApiError::NotFound("interaction not found"));
+    }
     state
         .store
         .set_message_components(message_id, &rows)
@@ -118,8 +127,8 @@ async fn set_components(
         message_id,
         components: Arc::new(rows.clone()),
     });
-    if let Some(id) = interaction_id {
-        answer_from_bot(&state, ctx.user_id, channel_id, id).await?;
+    if let Some(press) = &press {
+        answer(&state, press).await?;
     }
     Ok(Json(ComponentsDto { components: rows }))
 }

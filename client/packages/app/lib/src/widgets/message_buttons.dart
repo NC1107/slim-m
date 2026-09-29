@@ -19,6 +19,8 @@ import 'embed_card.dart' show launchIfHttp;
 /// A failure stays a readable line under the row, not a full-width banner.
 const double _errorMaxWidth = 480;
 
+const double _hostMaxWidth = 220;
+
 AppButtonVariant _variantFor(api.ComponentButtonStyle style) => switch (style) {
   // Soft, not filled: several may share a message and only one action per screen is filled.
   api.ComponentButtonStyle.primary => AppButtonVariant.soft,
@@ -131,6 +133,7 @@ class _ButtonView extends StatelessWidget {
           ? (url == null ? null : () => unawaited(launchIfHttp(url)))
           : onPressed,
     );
+    if (isLink) return _WithHost(host: _hostOf(url), child: build(busy: false));
     if (!pending) return build(busy: false);
     // The invisible copy holds the label's width so the spinner swaps in without a reflow.
     return Stack(
@@ -143,6 +146,46 @@ class _ButtonView extends StatelessWidget {
           child: build(busy: false),
         ),
         Positioned.fill(child: build(busy: true)),
+      ],
+    );
+  }
+}
+
+/// The destination a link button opens, read off the url rather than the label.
+String? _hostOf(String? url) {
+  final host = url == null ? null : Uri.tryParse(url)?.host;
+  return host == null || host.isEmpty ? null : host;
+}
+
+/// Puts the destination host under a link button, so a label cannot pose as another site.
+class _WithHost extends StatelessWidget {
+  const _WithHost({required this.host, required this.child});
+
+  final String? host;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final host = this.host;
+    if (host == null) return child;
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        child,
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.s4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _hostMaxWidth),
+            child: Text(
+              host,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ),
+        ),
       ],
     );
   }

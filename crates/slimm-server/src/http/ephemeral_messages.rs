@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::AppState;
-use super::ephemeral_anchor::resolve;
+use super::ephemeral_anchor::{Target, resolve};
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::{parse_uuid, validate_content};
 use crate::ephemeral::EphemeralMessage;
 use crate::hub::Event;
-use crate::ids::{ChannelId, MessageId};
+use crate::ids::{ChannelId, InteractionId, MessageId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
 use std::sync::Arc;
@@ -36,7 +36,11 @@ pub fn routes() -> Router<AppState> {
 #[derive(Deserialize)]
 struct SendEphemeralRequest {
     /// The member's own message being answered; its author is the recipient.
-    in_reply_to_id: String,
+    #[serde(default)]
+    in_reply_to_id: Option<String>,
+    /// Or a button press on this bot's message; the presser is the recipient.
+    #[serde(default)]
+    interaction_id: Option<String>,
     content: String,
 }
 
@@ -78,7 +82,15 @@ async fn send_ephemeral(
 ) -> Result<Json<EphemeralMessageDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     let channel_id = ChannelId(parse_uuid(&channel_id)?);
-    let anchor_id = MessageId(parse_uuid(&req.in_reply_to_id)?);
+    let target = match (&req.in_reply_to_id, &req.interaction_id) {
+        (Some(id), None) => Target::Message(MessageId(parse_uuid(id)?)),
+        (None, Some(id)) => Target::Press(InteractionId(parse_uuid(id)?)),
+        _ => {
+            return Err(ApiError::BadRequest(
+                "send exactly one of in_reply_to_id and interaction_id",
+            ));
+        }
+    };
     let content = validate_content(&req.content, false)?;
     if !state.store.is_bot(ctx.user_id).await? {
         return Err(ApiError::Forbidden);
@@ -91,7 +103,7 @@ async fn send_ephemeral(
     {
         return Err(ApiError::Forbidden);
     }
-    let anchor = resolve(&state, ctx.user_id, channel_id, anchor_id.0).await?;
+    let anchor = resolve(&state, ctx.user_id, channel_id, target).await?;
     let recipient_id = anchor.recipient_id;
     if !state
         .store

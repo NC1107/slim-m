@@ -60,17 +60,22 @@ pub(super) async fn resolve_message(
     })
 }
 
-/// A button press on this bot's message, else a person's message addressed to it.
-/// One id space, so the caller need not say which it holds.
+/// What a bot names as the reason it may answer: a message, or a button press.
+/// The two are separate ids and separate resolvers, so neither can stand in for the other.
+pub(super) enum Target {
+    Message(MessageId),
+    Press(InteractionId),
+}
+
 pub(super) async fn resolve(
     state: &AppState,
     bot: UserId,
     channel_id: ChannelId,
-    anchor: Uuid,
+    target: Target,
 ) -> Result<Anchor, ApiError> {
-    match super::interactions::resolve_press(state, bot, channel_id, InteractionId(anchor)).await? {
-        Some(press) => Ok(press),
-        None => resolve_message(state, bot, channel_id, MessageId(anchor)).await,
+    match target {
+        Target::Message(id) => resolve_message(state, bot, channel_id, id).await,
+        Target::Press(id) => super::interactions::resolve_press(state, bot, channel_id, id).await,
     }
 }
 

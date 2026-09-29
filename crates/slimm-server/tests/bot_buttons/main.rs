@@ -30,6 +30,7 @@ mod support;
 
 mod answers;
 mod presses;
+mod security;
 mod sending;
 
 type Client =
@@ -192,7 +193,42 @@ async fn whisper(w: &World, token: &str, anchor: &str, text: &str) -> StatusCode
         "POST",
         &format!("/channels/{}/ephemeral-messages", w.channel),
         token,
-        Some(json!({ "in_reply_to_id": anchor, "content": text })),
+        Some(json!({ "interaction_id": anchor, "content": text })),
+    )
+    .await
+    .0
+}
+
+async fn whisper_to_message(w: &World, token: &str, message_id: &str, text: &str) -> StatusCode {
+    call(
+        w,
+        "POST",
+        &format!("/channels/{}/ephemeral-messages", w.channel),
+        token,
+        Some(json!({ "in_reply_to_id": message_id, "content": text })),
+    )
+    .await
+    .0
+}
+
+/// A press whose id the caller picks, to aim it at something that is not a press.
+async fn press_as(
+    w: &World,
+    token: &str,
+    message: &Value,
+    custom_id: &str,
+    id: &str,
+) -> StatusCode {
+    call(
+        w,
+        "POST",
+        &format!(
+            "/channels/{}/messages/{}/interactions",
+            w.channel,
+            message["id"].as_str().unwrap()
+        ),
+        token,
+        Some(json!({ "id": id, "custom_id": custom_id })),
     )
     .await
     .0

@@ -8607,17 +8607,24 @@ components:
             $ref: "#/components/schemas/BotCommandInput"
     SendEphemeralMessageRequest:
       type: object
-      required: [in_reply_to_id, content]
+      required: [content]
+      description: >-
+        Send exactly one of `in_reply_to_id` and `interaction_id`; anything
+        else is a 400. They are separate ids and never read as each other.
       properties:
         in_reply_to_id:
           type: string
           format: uuid
           description: >-
             The member's message being answered. Its author is the recipient.
-            It may instead be the `interaction_id` of a button press on this
-            bot's message (decision 0039-bot-message-buttons): the recipient is
-            then whoever pressed, within 15 minutes of the press and under the
-            same limit of 3.
+        interaction_id:
+          type: string
+          format: uuid
+          description: >-
+            A button press on this bot's message (decision
+            0039-bot-message-buttons): the recipient is whoever pressed, within
+            15 minutes of the press and under the same limit of 3. A press
+            that is not this bot's, or is in another channel, is a 404.
         content:
           type: string
     EphemeralMessage:
@@ -8773,7 +8780,7 @@ components:
         A member pressed one of this bot's buttons. Delivered to the bot's own
         connections only. The presser's id is given deliberately (decision
         0039), unlike an advertised command. Reply within 15 minutes with
-        `sendEphemeralMessage` using `interaction_id` as `in_reply_to_id`
+        `sendEphemeralMessage` with `interaction_id`
         (three replies at most), `setMessageComponents`, or
         `acknowledgeInteraction`. Best effort, with no catch-up.
       properties:
