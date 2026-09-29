@@ -242,6 +242,14 @@ String formatRemaining(Duration remaining) {
   return '${remaining.inSeconds}s';
 }
 
+/// The lengths every timeout chooser offers, so no surface drifts from another.
+const timeoutDurationOptions = <(String, Duration)>[
+  ('5m', Duration(minutes: 5)),
+  ('1h', Duration(hours: 1)),
+  ('24h', Duration(hours: 24)),
+  ('7d', Duration(days: 7)),
+];
+
 /// The inline timeout durations from the design: one tap, no dialog.
 ///
 /// A dialog for "5 minutes" would be a confirmation step for something that
@@ -270,13 +278,6 @@ class TimeoutDurationChips extends StatelessWidget {
   const TimeoutDurationChips({super.key, required this.onChosen});
 
   final void Function(Duration) onChosen;
-
-  static const _options = <(String, Duration)>[
-    ('5m', Duration(minutes: 5)),
-    ('1h', Duration(hours: 1)),
-    ('24h', Duration(hours: 24)),
-    ('7d', Duration(days: 7)),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +310,7 @@ class TimeoutDurationChips extends StatelessWidget {
             spacing: AppSpacing.s8,
             runSpacing: AppSpacing.s8,
             children: [
-              for (final (label, duration) in _options)
+              for (final (label, duration) in timeoutDurationOptions)
                 AppButton(
                   label: label,
                   variant: AppButtonVariant.secondary,

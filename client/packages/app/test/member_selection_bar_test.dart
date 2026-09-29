@@ -231,4 +231,82 @@ void main() {
     expect(requests, ['POST /members/bulk-timeout']);
     expect((bodies.single! as Map)['duration_seconds'], 3600);
   });
+
+  group('at phone width', () {
+    Future<ProviderContainer> phone(
+      WidgetTester tester, {
+      void Function(Duration)? onTimeOut,
+      Future<void> Function()? onRemove,
+    }) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final container = await _pump(
+        tester,
+        onTimeOut: onTimeOut,
+        onRemove: onRemove,
+      );
+      container.read(memberSelectionProvider.notifier)
+        ..enter()
+        ..toggle('u1');
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    testWidgets('the bar is one short strip, with no chips inside it', (
+      tester,
+    ) async {
+      await phone(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.text('5m'), findsNothing);
+      expect(find.text('Remove'), findsNothing);
+      expect(
+        tester.getSize(find.byType(MemberSelectionBar)).height,
+        lessThan(110),
+        reason: 'a tall bar is what half-covered the roster',
+      );
+    });
+
+    testWidgets('the durations share one row that fits 390px', (tester) async {
+      Duration? chosen;
+      await phone(tester, onTimeOut: (d) => chosen = d);
+      await tester.tap(find.text('Moderate'));
+      await tester.pumpAndSettle();
+
+      final tops = {
+        for (final l in ['5m', '1h', '24h', '7d'])
+          l: tester.getTopLeft(find.text(l)).dy,
+      };
+      expect(tops.values.toSet(), hasLength(1), reason: 'wrapped: $tops');
+      expect(tester.getTopRight(find.text('7d')).dx, lessThan(390));
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('24h'));
+      await tester.pumpAndSettle();
+      expect(chosen, const Duration(hours: 24));
+      expect(
+        find.text('Time out for...'),
+        findsNothing,
+        reason: 'sheet closes',
+      );
+    });
+
+    testWidgets('Remove sits apart from the durations and fires once', (
+      tester,
+    ) async {
+      var removes = 0;
+      await phone(tester, onRemove: () async => removes++);
+      await tester.tap(find.text('Moderate'));
+      await tester.pumpAndSettle();
+
+      final gap =
+          tester.getTopLeft(find.text('Remove')).dy -
+          tester.getBottomLeft(find.text('24h')).dy;
+      expect(gap, greaterThan(32), reason: 'divider plus padding between');
+
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      expect(removes, 1);
+    });
+  });
 }
