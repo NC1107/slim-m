@@ -41,14 +41,14 @@
 //! does not know, and an NSE reading an envelope sealed before this field
 //! existed treats absence as "not stale", never as a reason to refuse.
 
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as BASE64;
-use crypto_box::PublicKey;
-use crypto_box::aead::rand_core::{OsRng, TryRngCore};
+use std::collections::HashSet;
+
 use serde::Serialize;
 
 use crate::ids::{ChannelId, DeviceId, MessageId, Seq, UserId};
 use crate::store::PushTarget;
+
+use super::sealing::{TokenSlot, seal_to};
 
 /// Domain-separates this plaintext from anything else that might ever be
 /// sealed to the same device key, so a payload from a different context can
@@ -94,8 +94,15 @@ const ELISION: char = '\u{2026}';
 #[serde(rename_all = "lowercase")]
 pub(super) enum PushKind {
     Message,
+    /// A message that mentions its recipient; the relay alerts it as a mention.
+    Mention,
     /// A DM call ring; see `call_ring::CallRingEnvelope`.
     Call,
+    /// A ring that ended, so a device still showing it can stop; see `call_end`.
+    #[serde(rename = "call_end")]
+    CallEnd,
+    /// An account security alert; see `security`.
+    Security,
 }
 
 impl PushKind {
@@ -104,7 +111,10 @@ impl PushKind {
     pub(super) fn wire_str(self) -> &'static str {
         match self {
             PushKind::Message => "message",
+            PushKind::Mention => "mention",
             PushKind::Call => "call",
+            PushKind::CallEnd => "call_end",
+            PushKind::Security => "security",
         }
     }
 }
@@ -217,6 +227,7 @@ pub(super) struct SealedMessage {
     pub(super) device_id: DeviceId,
     pub(super) platform: String,
     pub(super) token: String,
+    pub(super) slot: TokenSlot,
     pub(super) kind: &'static str,
     pub(super) payload: String,
 }
@@ -239,10 +250,7 @@ pub(super) struct SealedMessage {
 /// receive push until it re-registers, not that the batch should fail or fall
 /// back to something unencrypted.
 ///
-/// Each sealed box draws its own randomness. There is no long-lived secret
-/// here for a bad RNG to compromise beyond one message's onward
-/// confidentiality, but `OsRng` is what the rest of this codebase already
-/// trusts for key and token generation, so it is what this uses too.
+/// A target in `mentioned` goes to the relay as a mention; the sealed envelope is the same.
 pub(super) fn seal_for_message(
     channel_id: ChannelId,
     message_id: MessageId,
@@ -250,6 +258,7 @@ pub(super) fn seal_for_message(
     sent_at: i64,
     preview: Option<&MessagePreview>,
     targets: &[PushTarget],
+    mentioned: &HashSet<UserId>,
 ) -> Vec<SealedMessage> {
     let Some(bare) = encode(channel_id, message_id, seq, sent_at, None) else {
         return Vec::new();
@@ -259,40 +268,21 @@ pub(super) fn seal_for_message(
         .and_then(|preview| encode(channel_id, message_id, seq, sent_at, Some(preview)))
         .filter(|plaintext| plaintext.len() <= MAX_ENVELOPE_PLAINTEXT_BYTES);
 
-    let mut sealed = Vec::with_capacity(targets.len());
-    for target in targets {
-        let Ok(key_bytes) = <[u8; PUBLIC_KEY_BYTES]>::try_from(target.push_public_key.as_slice())
-        else {
-            tracing::warn!(
-                device_id = %target.device_id,
-                "push: stored public key is the wrong size, skipping this device"
-            );
-            continue;
-        };
-        let public_key = PublicKey::from_bytes(key_bytes);
-
-        let plaintext = match (target.include_content, &with_content) {
-            (true, Some(with_content)) => with_content,
-            _ => &bare,
-        };
-
-        // Fresh randomness per sealed box, from the same OsRng this codebase
-        // already trusts for key and token generation.
-        let Ok(ciphertext) = public_key.seal(&mut OsRng.unwrap_err(), plaintext) else {
-            tracing::warn!(device_id = %target.device_id, "push: sealing failed, skipping this device");
-            continue;
-        };
-
-        sealed.push(SealedMessage {
-            user_id: target.user_id,
-            device_id: target.device_id,
-            platform: target.platform.clone(),
-            token: target.push_token.clone(),
-            kind: PushKind::Message.wire_str(),
-            payload: BASE64.encode(ciphertext),
-        });
-    }
-    sealed
+    targets
+        .iter()
+        .filter_map(|target| {
+            let plaintext = match (target.include_content, &with_content) {
+                (true, Some(with_content)) => with_content,
+                _ => &bare,
+            };
+            let kind = if mentioned.contains(&target.user_id) {
+                PushKind::Mention
+            } else {
+                PushKind::Message
+            };
+            seal_to(target, TokenSlot::Push, kind, plaintext)
+        })
+        .collect()
 }
 
 /// Serializes one envelope shape, or `None` if it somehow will not encode -

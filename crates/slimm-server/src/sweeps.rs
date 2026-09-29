@@ -309,6 +309,7 @@ pub async fn sweep_stale_call_rings_at(
             ring_id,
             outcome: voice::CallRingOutcome::TimedOut,
         });
+        push.notify_call_end(store.clone(), channel_id, ring_id, caller_id);
         // The missed call: the one outcome that used to leave no trace.
         record_timed_out_call(store, hub, push, channel_id, caller_id).await;
         match voice.remove_participant(channel_id, caller_id).await {

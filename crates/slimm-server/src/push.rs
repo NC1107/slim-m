@@ -39,13 +39,17 @@
 //! make it slower.
 
 mod attention;
+mod call_end;
 mod call_ring;
 mod debounce;
 mod deliver;
+mod dispatch;
 mod envelope;
 // pub(crate): crate::mentions reuses resolved_mentions directly rather than reimplementing it.
 pub(crate) mod recipients;
 mod relay;
+mod sealing;
+mod security;
 
 use std::sync::Arc;
 
@@ -58,6 +62,7 @@ use debounce::Debounce;
 
 pub use attention::narrow_for_attention;
 pub use recipients::message_recipients;
+pub use security::NewDeviceSignIn;
 
 /// How long a burst of messages in one channel collapses into a single wake.
 /// Leading-edge: the first message in a burst fires immediately and the rest
@@ -187,6 +192,30 @@ impl PushSender {
         tokio::spawn(call_ring::deliver(
             enabled, store, channel_id, ring_id, caller_id, callee_id,
         ));
+    }
+
+    /// Tells the callee's devices a ring ended, whatever ended it, so none keeps ringing.
+    pub fn notify_call_end(
+        &self,
+        store: Store,
+        channel_id: ChannelId,
+        ring_id: CallRingId,
+        caller_id: UserId,
+    ) {
+        let Some(enabled) = self.inner.clone() else {
+            return;
+        };
+        tokio::spawn(call_end::deliver(
+            enabled, store, channel_id, ring_id, caller_id,
+        ));
+    }
+
+    /// Alerts an account's other devices that a device it has not used before signed in.
+    pub fn notify_new_device_sign_in(&self, store: Store, sign_in: NewDeviceSignIn) {
+        let Some(enabled) = self.inner.clone() else {
+            return;
+        };
+        tokio::spawn(security::deliver(enabled, store, sign_in));
     }
 }
 

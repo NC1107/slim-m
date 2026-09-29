@@ -8,6 +8,7 @@
 
 use super::AppState;
 use crate::hub::Event;
+use crate::push::NewDeviceSignIn;
 use crate::ratelimit::Class;
 use crate::store::{IssuedTokens, now_ms};
 
@@ -36,11 +37,22 @@ pub(super) async fn announce(
     {
         return;
     }
+    let signed_in_at = now_ms();
     state.hub.publish(Event::NewDeviceSignIn {
         user_id: tokens.user_id,
         device_id: tokens.device_id,
         device_name: device_name.to_owned(),
         client_kind: client_kind.map(str::to_owned),
-        signed_in_at: now_ms(),
+        signed_in_at,
     });
+    // A device that is asleep never sees the live event above.
+    state.push.notify_new_device_sign_in(
+        state.store.clone(),
+        NewDeviceSignIn {
+            user_id: tokens.user_id,
+            device_id: tokens.device_id,
+            device_name: device_name.to_owned(),
+            signed_in_at,
+        },
+    );
 }

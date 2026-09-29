@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE devices SET voip_push_token_ref = NULL\n             WHERE id = ? AND user_id = ? AND voip_push_token_ref = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "438db68a34d562584708aa18e3152db822a9e52caa59223ad189a907c49f3de0"
+}

@@ -143,7 +143,14 @@ async fn decline(
             ring_id,
             outcome: CallRingOutcome::Declined,
         });
-        record_call(&state, channel_id, caller_id, CallRingOutcome::Declined).await;
+        record_call(
+            &state,
+            channel_id,
+            ring_id,
+            caller_id,
+            CallRingOutcome::Declined,
+        )
+        .await;
         match state.voice.remove_participant(channel_id, caller_id).await {
             Ok(()) | Err(VoiceError::Unavailable) => {}
             Err(VoiceError::Internal(err)) => {
@@ -169,9 +176,13 @@ async fn decline(
 pub(crate) async fn record_call(
     state: &AppState,
     channel_id: ChannelId,
+    ring_id: crate::ids::CallRingId,
     caller_id: crate::ids::UserId,
     outcome: CallRingOutcome,
 ) {
+    state
+        .push
+        .notify_call_end(state.store.clone(), channel_id, ring_id, caller_id);
     let (sent, record) = match state
         .store
         .record_call(channel_id, caller_id, outcome.as_str(), None)
@@ -183,6 +194,20 @@ pub(crate) async fn record_call(
             return;
         }
     };
+    // A ring the caller gave up on is a missed call to the callee, as a timed-out one is.
+    if outcome == CallRingOutcome::Canceled {
+        state.push.notify_message(
+            state.store.clone(),
+            crate::push::SentMessage {
+                channel_id,
+                author_id: caller_id,
+                message_id: sent.message.id,
+                seq: sent.message.seq,
+                content: sent.message.content.clone(),
+                presence: state.hub.presence(),
+            },
+        );
+    }
     state.hub.publish(Event::MessageCreated {
         message: std::sync::Arc::new(sent.message),
         attachments: std::sync::Arc::new(Vec::new()),

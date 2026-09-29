@@ -231,8 +231,14 @@ async fn heartbeat(
             ring_id,
             outcome: CallRingOutcome::Answered,
         });
-        super::voice_ring::record_call(&state, channel_id, caller_id, CallRingOutcome::Answered)
-            .await;
+        super::voice_ring::record_call(
+            &state,
+            channel_id,
+            ring_id,
+            caller_id,
+            CallRingOutcome::Answered,
+        )
+        .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -280,8 +286,14 @@ async fn forget_heartbeat(
             ring_id,
             outcome: CallRingOutcome::Canceled,
         });
-        super::voice_ring::record_call(&state, channel_id, ctx.user_id, CallRingOutcome::Canceled)
-            .await;
+        super::voice_ring::record_call(
+            &state,
+            channel_id,
+            ring_id,
+            ctx.user_id,
+            CallRingOutcome::Canceled,
+        )
+        .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }

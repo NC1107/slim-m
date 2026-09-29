@@ -36,7 +36,7 @@ pub struct PushTarget {
     pub device_id: DeviceId,
     pub platform: String,
     pub push_token: String,
-    #[allow(dead_code)] // carried for a future call/VoIP wake path
+    /// The PushKit token an iOS ring must use; APNs refuses the ordinary one on the VoIP topic.
     pub voip_push_token: Option<String>,
     pub push_public_key: Vec<u8>,
     pub lifecycle_state: Option<String>,
@@ -316,6 +316,26 @@ impl Store {
             device_id,
             user_id,
             push_token
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Clears only a device's VoIP token after the relay reported it dead, so its ordinary
+    /// token keeps carrying message pushes.
+    pub async fn clear_voip_push_token(
+        &self,
+        user_id: UserId,
+        device_id: DeviceId,
+        voip_push_token: &str,
+    ) -> anyhow::Result<()> {
+        sqlx::query!(
+            "UPDATE devices SET voip_push_token_ref = NULL
+             WHERE id = ? AND user_id = ? AND voip_push_token_ref = ?",
+            device_id,
+            user_id,
+            voip_push_token
         )
         .execute(&self.pool)
         .await?;

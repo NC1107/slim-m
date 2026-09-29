@@ -68,6 +68,20 @@ pub async fn message_recipients(
     content: &str,
     presence: &PresenceTracker,
 ) -> anyhow::Result<Vec<UserId>> {
+    let (recipients, _mentioned) =
+        message_audience(store, channel_id, author_id, content, presence).await?;
+    Ok(recipients)
+}
+
+/// [`message_recipients`] plus who among everyone the message mentions, so a mention can be
+/// pushed as one.
+pub(crate) async fn message_audience(
+    store: &Store,
+    channel_id: ChannelId,
+    author_id: UserId,
+    content: &str,
+    presence: &PresenceTracker,
+) -> anyhow::Result<(Vec<UserId>, HashSet<UserId>)> {
     // Push registrations first, permissions second; see the note above.
     let candidates = store.users_with_push_devices().await?;
     let blockers = store.blockers_of(author_id).await?;
@@ -79,7 +93,10 @@ pub async fn message_recipients(
     let mentioned =
         resolved_mentions(store, channel_id, author_id, content, &viewers, presence).await?;
     let viewers = narrow_for_thread(store, channel_id, &mentioned, viewers).await?;
-    narrow_for_notification_preference(store, channel_id, author_id, &mentioned, viewers).await
+    let recipients =
+        narrow_for_notification_preference(store, channel_id, author_id, &mentioned, viewers)
+            .await?;
+    Ok((recipients, mentioned))
 }
 
 /// The distinct accounts a message's mentions resolve to - shared by

@@ -14,7 +14,8 @@ use crate::ids::{ChannelId, UserId};
 use crate::store::{Store, now_ms};
 
 use super::debounce::Debounce;
-use super::{Enabled, SentMessage, envelope, message_recipients, narrow_for_attention, relay};
+use super::recipients::message_audience;
+use super::{Enabled, SentMessage, dispatch, envelope, narrow_for_attention, relay};
 
 /// How long a device's `foreground` report counts as still current. Past this
 /// the app could have backgrounded or been killed without a fresh report (the
@@ -25,7 +26,7 @@ const FOREGROUND_FRESHNESS_MS: i64 = 60_000;
 /// Every error path logs and returns rather than propagating: there is no
 /// caller left to report to, only the process log.
 ///
-/// The recipient rule lives in [`message_recipients`], including why the author
+/// The recipient rule lives in [`super::message_recipients`], including why the author
 /// and anybody who blocked them are dropped.
 ///
 /// The debounce is decided once per recipient, even when they have several
@@ -61,9 +62,9 @@ pub(super) async fn deliver(
         content,
         presence,
     } = sent;
-    let recipients =
-        match message_recipients(&store, channel_id, author_id, &content, &presence).await {
-            Ok(recipients) => recipients,
+    let (recipients, mentioned) =
+        match message_audience(&store, channel_id, author_id, &content, &presence).await {
+            Ok(audience) => audience,
             Err(err) => {
                 tracing::warn!(error = %err, %channel_id, "push: failed to resolve recipients");
                 return;
@@ -140,6 +141,7 @@ pub(super) async fn deliver(
         sent_at,
         preview.as_ref(),
         &targets,
+        &mentioned,
     );
 
     // Nothing sealed means nothing was attempted, so release; see this function's own doc.
@@ -166,16 +168,7 @@ pub(super) async fn deliver(
                         delivered.insert(target.user_id);
                     }
                     Some(relay::RelayStatus::Unregistered) => {
-                        if let Err(err) = store
-                            .clear_push_registration(
-                                target.user_id,
-                                target.device_id,
-                                &result.token,
-                            )
-                            .await
-                        {
-                            tracing::warn!(error = %err, "push: failed to clear a dead registration");
-                        }
+                        dispatch::clear_dead(&store, target).await;
                     }
                     Some(
                         relay::RelayStatus::Forbidden
@@ -211,7 +204,7 @@ pub(super) async fn deliver(
 /// once for the whole batch.
 ///
 /// One preview serves every recipient because none of it is per-viewer:
-/// blocking is already settled further up ([`message_recipients`] drops a
+/// blocking is already settled further up ([`super::message_recipients`] drops a
 /// blocked author's recipients outright rather than filtering their
 /// notification afterwards), and a display name and channel name are the same
 /// for everybody who can see the message at all.
