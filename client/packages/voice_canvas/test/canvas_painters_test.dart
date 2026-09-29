@@ -142,4 +142,17 @@ void main() {
           '"pay nothing for it unwired" choice selectionOutline makes',
     );
   });
+
+  test('a draft holding one point paints a dot at the stroke width', () {
+    final document = documentWithCommittedStroke(2);
+    addTearDown(document.dispose);
+    final draft = DraftStroke()..begin(const Offset(40, 40));
+    addTearDown(draft.dispose);
+
+    final canvas = RecordingCanvas();
+    DraftPainter(draft: draft, document: document, ink: ink, width: 4)
+        .paint(canvas, const Size(400, 400));
+
+    expect(canvas.deviceStrokeWidths, [8.0]);
+  });
 }
