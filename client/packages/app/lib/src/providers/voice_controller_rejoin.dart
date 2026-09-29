@@ -7,7 +7,8 @@ part of 'voice_controller.dart';
 /// for the reason [VoiceControllerInputMixin] gives. The timer itself lives
 /// in [VoiceAutoRejoin]; this is the part that knows what a drop meant and
 /// what to do about it.
-mixin VoiceControllerRejoinMixin on StateNotifier<VoiceState> {
+mixin VoiceControllerRejoinMixin
+    on StateNotifier<VoiceState>, VoiceControllerInputMixin {
   /// Bridges to [VoiceController]'s own members, [VoiceControllerInputMixin]'s
   /// own reasoning: the `on` clause, not this file's privacy, is what bounds
   /// what a mixin can reach.
@@ -36,10 +37,21 @@ mixin VoiceControllerRejoinMixin on StateNotifier<VoiceState> {
   /// flight and false the moment the budget runs out - which is when the
   /// manual "Try again" becomes the honest thing to show.
   void _scheduleAutoRejoin(String channelId) {
+    _watchSyncForRejoin();
     final queued = _rejoinAttempts.schedule(
       () => unawaited(_attemptAutoRejoin(channelId)),
     );
     state = state.copyWith(rejoining: queued);
+  }
+
+  /// Retries at once when the websocket comes back, keeping the timer as the
+  /// fallback: the socket returning is the first sign the network is usable,
+  /// and waiting out a 30s tail after that strands the call.
+  void _watchSyncForRejoin() {
+    _rejoinAttempts.watchSync(_inputRef, () {
+      final channelId = state.channelId;
+      if (channelId != null) unawaited(_attemptAutoRejoin(channelId));
+    });
   }
 
   /// One attempt, and the decision about the next one.
