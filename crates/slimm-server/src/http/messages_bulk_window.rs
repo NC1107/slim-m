@@ -147,7 +147,7 @@ async fn bulk_delete_by_author(
             });
         }
     }
-    super::message_forwards::publish_cascaded(&state, outcome.cascaded).await;
+    super::message_forwards::publish_cascaded(&state, outcome.cascade).await;
     // One reply-summary refresh for the whole batch; see `threads::notify_reply`.
     if !outcome.deleted.is_empty() {
         super::threads::notify_reply(&state, channel_id).await;

@@ -128,7 +128,7 @@ pub use code_runs::{CodeRunSummary, MAX_SHARED_OUTPUT_BYTES, clamp_output};
 pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
-pub use forward_cascade::CascadedDeletion;
+pub use forward_cascade::{CascadedDeletion, DetachedForward, ForwardCascade};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
 pub use message_embeds::{Embed, EmbedField, NewEmbed, NewEmbedField};
 pub use message_forwards::{ForwardOrigin, ForwardSource, ForwardSummary};

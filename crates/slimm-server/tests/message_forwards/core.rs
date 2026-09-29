@@ -400,5 +400,6 @@ async fn retrying_a_forward_still_works_after_the_original_is_deleted() {
     );
     let retried = json_body(retry).await;
     assert_eq!(retried["id"], send_id);
-    assert_eq!(retried["forwarded"]["content"], "the original text");
+    assert_eq!(retried["forwarded"]["removed"], true);
+    assert_eq!(retried["forwarded"]["content"], "");
 }

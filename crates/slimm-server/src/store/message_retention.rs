@@ -27,7 +27,9 @@ use std::collections::HashMap;
 
 use sqlx::QueryBuilder;
 
-use super::forward_cascade::live_copies_of;
+use super::forward_cascade::{
+    Copy, DetachedForward, detach_forward, live_copies_of, orphaned_copies,
+};
 use super::{Store, now_ms};
 use crate::ids::{ChannelId, MessageId, UserId};
 
@@ -65,6 +67,8 @@ pub struct PrunedMessage {
 #[derive(Debug, Default)]
 pub struct SweptMessageRetention {
     pub pruned: Vec<PrunedMessage>,
+    /// Forwarded copies that kept the forwarder's note and lost only the snapshot.
+    pub detached: Vec<DetachedForward>,
     /// Stale `message_ops` rows the same tick reclaimed; see the module doc.
     pub ops_reclaimed: u64,
 }
@@ -106,10 +110,11 @@ impl Store {
         }
         let cutoff = now_ms() - days * DAY_MS;
 
-        let pruned = self.prune_messages_before(cutoff).await?;
+        let (pruned, detached) = self.prune_messages_before(cutoff).await?;
         let ops_reclaimed = self.reclaim_message_ops_before(cutoff).await?;
         Ok(SweptMessageRetention {
             pruned,
+            detached,
             ops_reclaimed,
         })
     }
@@ -121,7 +126,10 @@ impl Store {
     /// (`actor_id: None`), but batched rather than per message so the write
     /// lock is held across a handful of round trips instead of one per
     /// message; see SRV2.
-    async fn prune_messages_before(&self, cutoff: i64) -> anyhow::Result<Vec<PrunedMessage>> {
+    async fn prune_messages_before(
+        &self,
+        cutoff: i64,
+    ) -> anyhow::Result<(Vec<PrunedMessage>, Vec<DetachedForward>)> {
         use sqlx::Row;
 
         let mut tx = self.begin_write().await?;
@@ -136,33 +144,28 @@ impl Store {
         .fetch_all(&mut *tx)
         .await?;
         let mut candidates = candidates;
-        // Copies whose original is already gone, left over when an earlier tick hit COPY_SWEEP_CAP.
-        let orphans = sqlx::query_scalar!(
-            r#"SELECT f.message_id AS "id!: MessageId" FROM message_forwards f
-               JOIN messages m ON m.id = f.message_id AND m.deleted_at IS NULL
-               JOIN messages o ON o.id = f.origin_message_id AND o.deleted_at IS NOT NULL
-               LIMIT ?"#,
-            CONTENT_SWEEP_BATCH
-        )
-        .fetch_all(&mut *tx)
-        .await?;
-        // Copies of this batch join it, sharing its one write and its dense seq runs.
-        let mut copies: Vec<MessageId> = live_copies_of(&mut tx, &candidates)
-            .await?
-            .into_iter()
-            .map(|(id, _)| id)
-            .collect();
+        // Copies of this batch and leftovers from a capped earlier tick; those with a note are detached, the rest join the delete.
+        let mut copies = live_copies_of(&mut tx, &candidates).await?;
         copies.truncate(COPY_SWEEP_CAP);
-        candidates.extend(orphans);
-        candidates.extend(copies);
+        copies.extend(orphaned_copies(&mut tx, CONTENT_SWEEP_BATCH).await?);
+        let (noted, bare): (Vec<Copy>, Vec<Copy>) = copies.into_iter().partition(|c| c.has_note);
+        candidates.extend(bare.iter().map(|c| c.message_id));
         candidates.sort_unstable_by_key(|id| id.0);
         candidates.dedup();
+        let now = now_ms();
+        let mut detached = Vec::new();
+        for copy in noted.iter().filter(|c| !candidates.contains(&c.message_id)) {
+            if detached
+                .iter()
+                .all(|d: &DetachedForward| d.message_id != copy.message_id)
+            {
+                detached.push(detach_forward(&mut tx, copy, None, now).await?);
+            }
+        }
         if candidates.is_empty() {
             tx.commit().await?;
-            return Ok(Vec::new());
+            return Ok((Vec::new(), detached));
         }
-
-        let now = now_ms();
 
         // One soft-delete for the whole batch; RETURNING names the rows it actually flipped and their channel.
         let mut update = QueryBuilder::new("UPDATE messages SET deleted_at = ");
@@ -182,7 +185,7 @@ impl Store {
             .collect::<Result<_, sqlx::Error>>()?;
         if channel_of.is_empty() {
             tx.commit().await?;
-            return Ok(Vec::new());
+            return Ok((Vec::new(), detached));
         }
 
         // Candidate (created_at ASC) order, restricted to what was really deleted, so seqs land in that order.
@@ -244,7 +247,7 @@ impl Store {
 
         tx.commit().await?;
 
-        Ok(ordered
+        let pruned = ordered
             .into_iter()
             .map(|(message_id, channel_id)| PrunedMessage {
                 channel_id,
@@ -252,7 +255,8 @@ impl Store {
                 op_seq: Some(op_seq_of[&message_id]),
                 freed_attachments: freed_of.remove(&message_id).unwrap_or_default(),
             })
-            .collect())
+            .collect();
+        Ok((pruned, detached))
     }
 
     /// Deletes up to [`OP_FLOOR_SWEEP_BATCH`] `message_ops` rows older than

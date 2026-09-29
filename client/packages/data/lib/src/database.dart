@@ -217,6 +217,10 @@ class Messages extends Table {
   IntColumn get forwardedCreatedAt => integer().nullable()();
   TextColumn get forwardedContent => text().nullable()();
 
+  /// The forward's original was deleted or aged out; the snapshot is blank.
+  BoolColumn get forwardedRemoved =>
+      boolean().withDefault(const Constant(false))();
+
   /// True while the send is in flight. The UI shows these differently and they
   /// are replaced in place by the server's copy on acknowledgement.
   BoolColumn get pending => boolean().withDefault(const Constant(false))();
@@ -256,6 +260,7 @@ extension MessageRowMapping on MessageRow {
                 authorAvatarUpdatedAt: forwardedAuthorAvatarUpdatedAt,
                 createdAt: forwardedCreatedAt!,
                 content: forwardedContent!,
+                removed: forwardedRemoved,
               ),
         pending: pending,
         failed: failed,
@@ -268,7 +273,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -426,6 +431,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 18) {
             await m.createTable(channelDrafts);
+          }
+          if (from < 19) {
+            await m.addColumn(messages, messages.forwardedRemoved);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

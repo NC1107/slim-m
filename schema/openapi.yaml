@@ -9692,9 +9692,11 @@ components:
       required: [message_id, channel_id, created_at, content]
       description: >
         What a message was forwarded from. A snapshot taken when the forward
-        was sent, not a live read: `content`, `created_at` and the author
-        stay answerable after the original is edited or deleted, and an edit
-        to the original never rewrites what was passed on.
+        was sent, not a live read: an edit to the original never rewrites what
+        was passed on. Deleting or ageing out the original removes the
+        snapshot: a copy with nothing of its own is deleted, and one carrying
+        the forwarder's note keeps it with `removed` true and the snapshot
+        blanked.
 
         Always the first original. Forwarding a forward does not nest: the
         chain is flattened at send time, so this never names a message that
@@ -9739,7 +9741,13 @@ components:
             the carrying message's own created_at.
         content:
           type: string
-          description: What the original said at the moment it was forwarded.
+          description: >
+            What the original said when it was forwarded. Empty once removed.
+        removed:
+          type: boolean
+          description: >
+            The original was deleted or aged out. Render "original message was
+            deleted" in place of the snapshot.
 
     Attachment:
       type: object
@@ -10788,6 +10796,12 @@ components:
         edited_at:
           type: integer
           format: int64
+        forwarded_removed:
+          type: boolean
+          description: >
+            On an `edit`, present and true when the message is a forward whose
+            original was removed, so the snapshot should be cleared. Applies
+            even when `content` is absent.
 
     ClientFrame:
       description: A frame sent by the client over the WebSocket.

@@ -66,4 +66,23 @@ void main() {
           'original',
     );
   });
+
+  test('a removed snapshot parses as removed, and absent means not removed',
+      () {
+    final removed = Message.fromJson(
+      _message(',"forwarded":{"message_id":"m0","channel_id":"c0",'
+          '"author_id":null,"author_display_name":null,'
+          '"author_avatar_updated_at":null,"created_at":10,'
+          '"content":"","removed":true}'),
+    );
+    final older = Message.fromJson(
+      _message(',"forwarded":{"message_id":"m0","channel_id":"c0",'
+          '"author_id":null,"author_display_name":null,'
+          '"author_avatar_updated_at":null,"created_at":10,'
+          '"content":"x"}'),
+    );
+
+    expect(removed.forwarded!.removed, isTrue);
+    expect(older.forwarded!.removed, isFalse);
+  });
 }

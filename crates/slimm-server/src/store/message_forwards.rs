@@ -52,6 +52,8 @@ pub struct ForwardSummary {
     /// Null once the origin's author is anonymized, exactly as on a message.
     pub author_display_name: Option<String>,
     pub author_avatar_updated_at: Option<i64>,
+    /// The original was deleted or aged out; the origin fields are then blank.
+    pub removed: bool,
 }
 
 impl Store {
@@ -64,7 +66,8 @@ impl Store {
     /// snapshotting that would hand the next reader a blank card attributed
     /// to somebody who only relayed it.
     ///
-    /// Deleted messages are refused, which is the one place this
+    /// A forward whose original is gone is refused too: it has nothing left to
+    /// pass on. Deleted messages are refused, which is the one place this
     /// deliberately parts company with [`Store::send_message`]'s reply
     /// target. A reply only points at its parent, so pointing at a
     /// since-deleted one stays honest; a forward copies the content, so
@@ -93,7 +96,8 @@ impl Store {
                       f.origin_content AS "origin_content?: String"
                FROM messages m
                LEFT JOIN message_forwards f ON f.message_id = m.id
-               WHERE m.id = ? AND m.deleted_at IS NULL"#,
+               WHERE m.id = ? AND m.deleted_at IS NULL
+                 AND f.origin_removed_at IS NULL"#,
             message_id
         )
         .fetch_optional(&self.pool)
@@ -139,6 +143,7 @@ impl Store {
         let mut builder = QueryBuilder::new(
             "SELECT f.message_id, f.origin_message_id, f.origin_channel_id, \
                     f.origin_author_id, f.origin_created_at, f.origin_content, \
+                    f.origin_removed_at IS NOT NULL AS removed, \
                     u.display_name AS author_display_name, \
                     u.avatar_updated_at AS author_avatar_updated_at \
              FROM message_forwards f \
@@ -168,6 +173,7 @@ impl Store {
                 },
                 author_display_name: row.try_get("author_display_name")?,
                 author_avatar_updated_at: row.try_get("author_avatar_updated_at")?,
+                removed: row.try_get("removed")?,
             };
             out.push((message_id, summary));
         }

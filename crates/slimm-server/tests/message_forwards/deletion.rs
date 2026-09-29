@@ -14,37 +14,24 @@ fn message_id(value: &Value) -> MessageId {
     MessageId(Uuid::parse_str(value["id"].as_str().unwrap()).unwrap())
 }
 
-async fn listed_ids(app: &axum::Router, channel: &str, token: &str) -> Vec<Value> {
-    let uri = format!("/channels/{channel}/messages");
-    let page = json_body(
-        app.clone()
-            .oneshot(request("GET", &uri, token, None))
-            .await
-            .unwrap(),
-    )
-    .await;
-    page.as_array()
-        .unwrap()
-        .iter()
-        .map(|m| m["id"].clone())
-        .collect()
-}
-
 struct Forwarded {
     original: Value,
-    same_channel: Value,
-    other_channel: Value,
+    /// A forward with nothing of its own, in another channel.
+    bare: Value,
+    /// A forward carrying the forwarder's own note, in the original's channel.
+    noted: Value,
     general: String,
     other: String,
+    channel: ChannelId,
 }
 
-/// The original in `general`, one copy of it in `general` and one in `other`.
 async fn original_with_two_copies(
     app: &axum::Router,
     store: &slimm_server::store::Store,
     general: ChannelId,
     token: &str,
 ) -> Forwarded {
+    let channel = general;
     let general = general.to_string();
     let other = store
         .create_channel("other", "text")
@@ -53,21 +40,71 @@ async fn original_with_two_copies(
         .id
         .to_string();
     let original = send(app, &general, token, "abusive text").await;
-    let same_channel =
-        json_body(post(app, &general, token, forward_body("", &original)).await).await;
-    let other_channel =
-        json_body(post(app, &other, token, forward_body("", &original)).await).await;
+    let noted = json_body(
+        post(
+            app,
+            &general,
+            token,
+            forward_body("my own words", &original),
+        )
+        .await,
+    )
+    .await;
+    let bare = json_body(post(app, &other, token, forward_body("", &original)).await).await;
     Forwarded {
         original,
-        same_channel,
-        other_channel,
+        bare,
+        noted,
         general,
         other,
+        channel,
     }
 }
 
+async fn listed(app: &axum::Router, channel: &str, token: &str) -> Vec<Value> {
+    let uri = format!("/channels/{channel}/messages");
+    let page = json_body(
+        app.clone()
+            .oneshot(request("GET", &uri, token, None))
+            .await
+            .unwrap(),
+    )
+    .await;
+    page.as_array().unwrap().clone()
+}
+
+/// The bare copy is gone; the noted one stays with its words and no snapshot.
+async fn assert_cold_reads(app: &axum::Router, f: &Forwarded, token: &str) {
+    let other = listed(app, &f.other, token).await;
+    assert!(
+        !other.iter().any(|m| m["id"] == f.bare["id"]),
+        "a bare copy is removed"
+    );
+    let general = listed(app, &f.general, token).await;
+    let kept = general
+        .iter()
+        .find(|m| m["id"] == f.noted["id"])
+        .expect("a copy with a note stays");
+    assert_eq!(kept["content"], "my own words");
+    assert_eq!(kept["forwarded"]["removed"], true);
+    assert_eq!(kept["forwarded"]["content"], "");
+    assert!(kept["forwarded"]["author_id"].is_null());
+}
+
+/// Sync agrees: the noted copy has an edit op flagged removed, the bare one a delete.
+async fn assert_ops(store: &slimm_server::store::Store, f: &Forwarded) {
+    let noted_id = message_id(&f.noted);
+    let page = store.message_ops_since(f.channel, 0, 100).await.unwrap();
+    let op = page
+        .ops
+        .iter()
+        .find(|o| o.message_id == noted_id && o.forwarded_removed)
+        .expect("an edit op says the snapshot is gone");
+    assert_eq!(op.content.as_deref(), Some("my own words"));
+}
+
 #[tokio::test]
-async fn deleting_the_original_removes_its_copies_everywhere() {
+async fn deleting_the_original_follows_into_its_copies() {
     let (store, _guard) = new_store().await;
     let (channel, token) = open_deployment(&store).await;
     let hub = Hub::new();
@@ -87,60 +124,59 @@ async fn deleting_the_original_removes_its_copies_everywhere() {
         .unwrap();
     assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
 
-    let mut seen: Vec<(ChannelId, MessageId, Option<i64>)> = Vec::new();
+    let (mut bare_deleted, mut noted_edited) = (false, false);
     while let Ok(event) = rx.try_recv() {
-        if let Event::MessageDeleted {
-            channel_id,
-            message_id,
-            op_seq,
-        } = event
-        {
-            seen.push((channel_id, message_id, op_seq));
+        match event {
+            Event::MessageDeleted {
+                channel_id,
+                message_id: m,
+                op_seq,
+            } if m == message_id(&f.bare) => {
+                assert_eq!(channel_id.to_string(), f.other);
+                assert!(op_seq.is_some());
+                bare_deleted = true;
+            }
+            Event::MessageEdited {
+                message,
+                forwarded,
+                op_seq,
+            } if message.id == message_id(&f.noted) => {
+                assert_eq!(message.content, "my own words");
+                assert!(forwarded.expect("the frame carries the marker").removed);
+                assert!(op_seq > 0);
+                noted_edited = true;
+            }
+            _ => {}
         }
     }
-    for (copy, channel) in [(&f.same_channel, &f.general), (&f.other_channel, &f.other)] {
-        let hit = seen
-            .iter()
-            .find(|(c, m, _)| c.to_string() == *channel && *m == message_id(copy))
-            .expect("a live delete event reaches the channel the copy lives in");
-        assert!(
-            hit.2.is_some(),
-            "the event carries an op seq so sync agrees"
-        );
-        assert!(
-            !listed_ids(&app, channel, &token)
-                .await
-                .contains(&copy["id"])
-        );
-    }
+    assert!(bare_deleted, "the bare copy's channel hears a delete");
+    assert!(noted_edited, "the noted copy's channel hears an edit");
+    assert_cold_reads(&app, &f, &token).await;
+    assert_ops(&store, &f).await;
 }
 
 #[tokio::test]
-async fn a_bulk_delete_of_the_original_removes_its_copies() {
+async fn a_bulk_delete_of_the_original_follows_into_its_copies() {
     let (store, _guard) = new_store().await;
     let (channel, token) = open_deployment(&store).await;
     let app = app(store.clone());
     let f = original_with_two_copies(&app, &store, channel, &token).await;
 
     let uri = format!("/channels/{}/messages/bulk-delete", f.general);
+    let body = json!({ "message_ids": [f.original["id"]] });
     let status = app
         .clone()
-        .oneshot(request(
-            "POST",
-            &uri,
-            &token,
-            Some(json!({ "message_ids": [f.original["id"]] })),
-        ))
+        .oneshot(request("POST", &uri, &token, Some(body)))
         .await
         .unwrap()
         .status();
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let left = listed_ids(&app, &f.other, &token).await;
-    assert!(!left.contains(&f.other_channel["id"]));
+    assert_cold_reads(&app, &f, &token).await;
+    assert_ops(&store, &f).await;
 }
 
 #[tokio::test]
-async fn ageing_out_the_original_removes_its_copies() {
+async fn ageing_out_the_original_follows_into_its_copies() {
     let (store, pool, _guard) = new_store_with_pool().await;
     let (channel, token) = open_deployment(&store).await;
     let app = app(store.clone());
@@ -156,11 +192,22 @@ async fn ageing_out_the_original_removes_its_copies() {
     let swept = store.sweep_message_retention().await.unwrap();
     let pruned: Vec<MessageId> = swept.pruned.iter().map(|p| p.message_id).collect();
     assert!(pruned.contains(&message_id(&f.original)));
-    assert!(pruned.contains(&message_id(&f.same_channel)));
-    assert!(pruned.contains(&message_id(&f.other_channel)));
-    assert!(swept.pruned.iter().all(|p| p.op_seq.is_some()));
-    let left = listed_ids(&app, &f.other, &token).await;
-    assert!(!left.contains(&f.other_channel["id"]));
+    assert!(pruned.contains(&message_id(&f.bare)));
+    assert!(!pruned.contains(&message_id(&f.noted)));
+    assert!(
+        swept
+            .detached
+            .iter()
+            .any(|d| d.message_id == message_id(&f.noted))
+    );
+    assert_cold_reads(&app, &f, &token).await;
+    assert_ops(&store, &f).await;
+
+    let again = store.sweep_message_retention().await.unwrap();
+    assert!(
+        again.detached.is_empty(),
+        "a detached copy is not swept twice"
+    );
 }
 
 /// The access half of the snapshot stays: an edit does not reach a copy.
@@ -187,9 +234,8 @@ async fn editing_the_original_leaves_the_copy_as_forwarded() {
         .await
         .unwrap();
     assert_eq!(edited.status(), StatusCode::OK);
-    assert!(
-        listed_ids(&app, &general, &token)
-            .await
-            .contains(&forward["id"])
-    );
+    let page = listed(&app, &general, &token).await;
+    let copy = page.iter().find(|m| m["id"] == forward["id"]).unwrap();
+    assert_eq!(copy["forwarded"]["content"], "as it was");
+    assert_eq!(copy["forwarded"]["removed"], false);
 }

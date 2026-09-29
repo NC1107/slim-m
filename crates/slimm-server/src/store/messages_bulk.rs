@@ -40,8 +40,8 @@ use crate::ids::{ChannelId, MessageId, UserId};
 pub struct BulkDeletion {
     pub deleted: Vec<DeletedMessage>,
     pub freed_attachments: Vec<String>,
-    /// Forwarded copies removed along with the originals, in any channel.
-    pub cascaded: Vec<super::CascadedDeletion>,
+    /// What happened to the forwarded copies of the originals, in any channel.
+    pub cascade: super::ForwardCascade,
 }
 
 #[derive(Debug)]
@@ -209,13 +209,9 @@ impl Store {
         }
 
         let deleted_ids: Vec<MessageId> = deleted.iter().map(|d| d.message_id).collect();
-        let cascaded = super::forward_cascade::delete_forward_copies(
-            &mut tx,
-            &deleted_ids,
-            Some(actor_id),
-            now,
-        )
-        .await?;
+        let cascade =
+            super::forward_cascade::cascade_to_copies(&mut tx, &deleted_ids, Some(actor_id), now)
+                .await?;
 
         // An act that deleted nothing is not an act, as the undo paths keep.
         if !deleted.is_empty() {
@@ -239,7 +235,7 @@ impl Store {
         Ok(BulkDeletion {
             deleted,
             freed_attachments,
-            cascaded,
+            cascade,
         })
     }
 }

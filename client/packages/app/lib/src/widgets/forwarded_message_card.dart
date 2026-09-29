@@ -68,6 +68,7 @@ class ForwardedMessageCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (forwarded.removed) return const _RemovedCard();
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final use24Hour = watchUse24Hour(ref, context);
     final name = forwarded.authorDisplayName ?? 'Unknown user';
@@ -144,6 +145,46 @@ class ForwardedMessageCard extends ConsumerWidget {
         onFocusChange: onFocusChange,
         borderRadius: BorderRadius.circular(AppRadii.control),
         child: card,
+      ),
+    );
+  }
+}
+
+/// What stands where the snapshot was once its original is deleted or aged
+/// out. The forwarder's own note, drawn by the message row, is untouched.
+class _RemovedCard extends StatelessWidget {
+  const _RemovedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Semantics(
+      label: 'Forwarded message. The original message was deleted.',
+      child: ExcludeSemantics(
+        child: Container(
+          decoration: BoxDecoration(
+            color: tokens.surfaceSunken,
+            border: Border.all(color: tokens.borderSubtle),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.s8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(AppIcons.forward, size: 13, color: tokens.textSecondary),
+              const SizedBox(width: AppSpacing.s8),
+              Flexible(
+                child: Text(
+                  'Original message was deleted',
+                  style: AppText.caption.copyWith(
+                    color: tokens.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

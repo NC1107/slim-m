@@ -49,6 +49,9 @@ pub struct MessageOpEntry {
     /// stream is what the client acts on instead.
     pub content: Option<String>,
     pub edited_at: Option<i64>,
+    /// The message is a forward whose original has since been removed, joined
+    /// at read time like `content`. Only ever true on an `edit`.
+    pub forwarded_removed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,10 +150,12 @@ impl Store {
             r#"SELECT o.seq AS "seq!: i64", o.message_id AS "message_id!: MessageId",
                       o.kind AS "kind!", o.actor_id AS "actor_id: UserId",
                       o.created_at AS "created_at!: i64",
-                      m.content AS "content?: String", m.edited_at AS "edited_at?: i64"
+                      m.content AS "content?: String", m.edited_at AS "edited_at?: i64",
+                      (f.origin_removed_at IS NOT NULL) AS "forwarded_removed!: bool"
                FROM message_ops o
                LEFT JOIN messages m
                  ON m.id = o.message_id AND o.kind = 'edit' AND m.deleted_at IS NULL
+               LEFT JOIN message_forwards f ON f.message_id = m.id
                WHERE o.channel_id = ? AND o.seq > ?
                ORDER BY o.seq ASC
                LIMIT ?"#,
@@ -173,6 +178,7 @@ impl Store {
                     created_at: row.created_at,
                     content: row.content,
                     edited_at: row.edited_at,
+                    forwarded_removed: row.forwarded_removed,
                 })
             })
             .collect();

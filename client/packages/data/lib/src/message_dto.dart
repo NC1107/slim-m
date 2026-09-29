@@ -43,6 +43,7 @@ class ForwardedMessage {
     this.authorAvatarUpdatedAt,
     required this.createdAt,
     required this.content,
+    this.removed = false,
   });
 
   final String messageId;
@@ -61,6 +62,9 @@ class ForwardedMessage {
   /// What the original said at the moment it was forwarded.
   final String content;
 
+  /// The original was deleted or aged out; the snapshot fields are blank.
+  final bool removed;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -71,7 +75,8 @@ class ForwardedMessage {
           other.authorDisplayName == authorDisplayName &&
           other.authorAvatarUpdatedAt == authorAvatarUpdatedAt &&
           other.createdAt == createdAt &&
-          other.content == content);
+          other.content == content &&
+          other.removed == removed);
 
   @override
   int get hashCode => Object.hash(
@@ -82,17 +87,18 @@ class ForwardedMessage {
         authorAvatarUpdatedAt,
         createdAt,
         content,
+        removed,
       );
 
   /// Spelled out because a failed equality between two of these is otherwise
   /// reported as two identical "Instance of 'ForwardedMessage'" lines, which
-  /// says nothing about which of the seven fields actually differed.
+  /// says nothing about which of the eight fields actually differed.
   @override
   String toString() =>
       'ForwardedMessage(messageId: $messageId, channelId: $channelId, '
       'authorId: $authorId, authorDisplayName: $authorDisplayName, '
       'authorAvatarUpdatedAt: $authorAvatarUpdatedAt, '
-      'createdAt: $createdAt, content: $content)';
+      'createdAt: $createdAt, content: $content, removed: $removed)';
 }
 
 /// One locally cached message, independent of how it is stored.

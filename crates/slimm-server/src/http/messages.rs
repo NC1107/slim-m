@@ -340,7 +340,7 @@ async fn delete(
 
     let outcome = state.store.delete_message(message_id, ctx.user_id).await?;
     if outcome.deleted {
-        super::message_forwards::publish_cascaded(&state, outcome.cascaded).await;
+        super::message_forwards::publish_cascaded(&state, outcome.cascade).await;
         state.hub.publish(Event::MessageDeleted {
             op_seq: outcome.op_seq,
             channel_id,
