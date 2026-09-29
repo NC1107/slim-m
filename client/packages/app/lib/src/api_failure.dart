@@ -24,6 +24,9 @@ String describeApiFailure(String whatFailed, api.ApiException e) => switch (e) {
     'Could not $whatFailed. ${sentenceCase(e.message)}',
   api.ForbiddenException(missingPermissions: final int bits?) when bits != 0 =>
     'Could not $whatFailed: you cannot grant ${joinLabels(permissionLabels(bits))}.',
+  // The Dock's registry served content the server refuses; its reason names the field.
+  api.ServerException(statusCode: 502) =>
+    'Could not $whatFailed. ${sentenceCase(e.message)}',
   api.ForbiddenException() =>
     'Could not $whatFailed: you are not allowed to do that.',
   api.UnauthorizedException() =>

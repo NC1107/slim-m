@@ -39,10 +39,10 @@ use axum::routing::post;
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
-use super::auth::is_disallowed_label_char;
 use super::code_fences::code_block;
 use super::error::ApiError;
 use super::extract::{AuthedLimited, Json, MODULE};
+use super::hidden_chars::is_hidden_char;
 use super::messages::parse_uuid;
 use super::module_commands::{
     CODE_RUNNER_MODULE_ID, CommandOutcome, execute_code_runner, execute_command,
@@ -67,9 +67,8 @@ const HIDDEN_CHARACTERS_REFUSAL: &str =
 /// character that changes what a reader sees without changing what runs
 /// (trojan source, CVE-2021-42574). Tab and line breaks are ordinary code.
 fn has_hidden_characters(text: &str) -> bool {
-    text.chars().any(|c| {
-        !matches!(c, '\t' | '\n' | '\r') && (is_disallowed_label_char(c) || c == '\u{061C}')
-    })
+    text.chars()
+        .any(|c| !matches!(c, '\t' | '\n' | '\r') && is_hidden_char(c))
 }
 
 pub fn routes() -> Router<AppState> {

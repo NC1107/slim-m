@@ -4,14 +4,14 @@
 
 use super::*;
 
-const GOOD_INDEX: &str = r#"{
+pub(super) const GOOD_INDEX: &str = r#"{
     "schema": 1,
     "modules": [
         {"id": "code-exec", "name": "Code Blocks", "version": "0.1.0", "summary": "runs code"}
     ]
 }"#;
 
-const GOOD_MANIFEST: &str = r#"{
+pub(super) const GOOD_MANIFEST: &str = r#"{
     "schema": 1,
     "id": "code-exec",
     "name": "Code Blocks",
@@ -100,7 +100,7 @@ fn rejects_a_command_extension_point_naming_an_undeclared_permission() {
     ));
 }
 
-const GOOD_MANIFEST_WITH_RUNNER: &str = r#"{
+pub(super) const GOOD_MANIFEST_WITH_RUNNER: &str = r#"{
     "schema": 1,
     "id": "code-exec",
     "name": "Code Blocks",
@@ -217,7 +217,7 @@ fn rejects_a_code_block_runner_naming_an_undeclared_command() {
     ));
 }
 
-const GOOD_MANIFEST_WITH_APP: &str = r#"{
+pub(super) const GOOD_MANIFEST_WITH_APP: &str = r#"{
     "schema": 1,
     "id": "game-of-life",
     "name": "Game of Life",

@@ -33,6 +33,16 @@ void main() {
     );
   });
 
+  test('a 502 from the module registry keeps the server\'s reason', () {
+    expect(
+      describeApiFailure(
+        'install Dice',
+        const api.ServerException('name "co llide" must be one keyword', 502),
+      ),
+      'Could not install Dice. Name "co llide" must be one keyword.',
+    );
+  });
+
   test('a conflict keeps the server\'s own reason, sentence-cased', () {
     expect(
       describeApiFailure(
