@@ -21,3 +21,8 @@ workspace:
   - packages/rtc
   - packages/voice_canvas
   - packages/app
+# Encrypted local database engine; see docs/decisions/0042-encrypt-local-database.md.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc

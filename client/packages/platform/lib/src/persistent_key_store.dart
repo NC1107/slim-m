@@ -149,8 +149,8 @@ class SecureKeyStore implements KeyStore {
 }
 
 /// The Linux fallback: a single JSON file under the user's
-/// application-support directory, restricted to this OS account (`chmod
-/// 600`) after every write. See the library doc for why this, not
+/// application-support directory, in a directory restricted to this OS
+/// account (0700), written through a 0600 temp file and renamed into place. See the library doc for why this, not
 /// flutter_secure_storage, is used there, and for what this does and does
 /// not defend against.
 ///
@@ -190,8 +190,10 @@ class FileKeyStore implements KeyStore {
 
   Future<File> _open() async {
     final file = await _fileNoCreate();
+    await file.parent.create(recursive: true);
+    await _chmod('700', file.parent);
     if (!await file.exists()) {
-      await file.create(recursive: true);
+      await file.create();
     }
     await _restrict(file);
     return file;
@@ -206,31 +208,53 @@ class FileKeyStore implements KeyStore {
     return File(p.join(dir.path, _fileName));
   }
 
-  /// Best-effort: a missing `chmod` binary (there is no other platform this
-  /// class ships to) must not break storage itself, only the extra
-  /// confidentiality this call exists to add.
-  Future<void> _restrict(File file) async {
-    try {
-      await Process.run('chmod', ['600', file.path]);
-    } catch (_) {
-      // Nothing to degrade to; the file is still written, just not proven
-      // private. See the class doc for the threat this narrows.
+  /// Fails loudly: a store that could not make its file private must not go
+  /// on to write secrets into it. Skipped on Windows, which has no POSIX mode
+  /// bits to set (and is not a platform that uses this store for secrets).
+  Future<void> _chmod(String mode, FileSystemEntity entity) async {
+    if (Platform.isWindows) return;
+    final result = await Process.run('chmod', [mode, entity.path]);
+    if (result.exitCode != 0) {
+      throw FileSystemException(
+        'chmod $mode failed: ${result.stderr}',
+        entity.path,
+      );
     }
   }
 
+  Future<void> _restrict(File file) => _chmod('600', file);
+
+  /// A file that does not parse is treated as holding nothing: a torn write
+  /// must cost a sign-in, not lock every later read out behind an exception.
   Future<Map<String, dynamic>> _readAll() async {
     final file = await _secretsFile();
     final contents = await file.readAsString();
     if (contents.trim().isEmpty) return {};
-    return jsonDecode(contents) as Map<String, dynamic>;
+    try {
+      return jsonDecode(contents) as Map<String, dynamic>;
+    } on FormatException {
+      return {};
+    } on TypeError {
+      return {};
+    }
   }
 
+  /// Writes a private temp file in full, flushes it, then renames it over the
+  /// real one, so a crash leaves the old contents or the new, never half of
+  /// each. The temp file is restricted before anything is written to it.
   Future<void> _writeAll(Map<String, dynamic> data) async {
     final file = await _secretsFile();
-    await file.writeAsString(jsonEncode(data));
-    // Reasserted on every write, not just at creation, in case the file was
-    // ever recreated (a fresh `create()` gets the process's default mode).
-    await _restrict(file);
+    final temp = File('${file.path}.tmp');
+    await temp.create();
+    await _restrict(temp);
+    final handle = await temp.open(mode: FileMode.write);
+    try {
+      await handle.writeString(jsonEncode(data));
+      await handle.flush();
+    } finally {
+      await handle.close();
+    }
+    await temp.rename(file.path);
   }
 
   @override

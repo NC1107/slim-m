@@ -2718,7 +2718,11 @@ class $$ChannelsTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ChannelsTable, Channel>(table),
+                    BaseReferences<_$SlimmDatabase, $ChannelsTable, Channel>(
+                        db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -3111,7 +3115,11 @@ class $$MessagesTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$MessagesTable, MessageRow>(table),
+                    BaseReferences<_$SlimmDatabase, $MessagesTable, MessageRow>(
+                        db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -3254,7 +3262,12 @@ class $$ChannelCategoriesTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ChannelCategoriesTable, ChannelCategoryRow>(
+                        table),
+                    BaseReferences<_$SlimmDatabase, $ChannelCategoriesTable,
+                        ChannelCategoryRow>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -3399,7 +3412,11 @@ class $$ChannelDraftsTableTableManager extends RootTableManager<
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ChannelDraftsTable, ChannelDraftRow>(table),
+                    BaseReferences<_$SlimmDatabase, $ChannelDraftsTable,
+                        ChannelDraftRow>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));

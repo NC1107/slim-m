@@ -8,8 +8,14 @@ library;
 
 import 'package:drift/drift.dart';
 
+import 'database_key.dart';
+
 /// Always throws: there is no sqlite3 this build can reach.
-Future<QueryExecutor> openSlimmDatabase() {
+Future<QueryExecutor> openSlimmDatabase({
+  required DatabaseKeyStore keys,
+  String? directoryPath,
+  void Function(DatabaseResetReason reason)? onReset,
+}) {
   throw UnsupportedError(
     'no sqlite3 backend compiled for this platform',
   );
