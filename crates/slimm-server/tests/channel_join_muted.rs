@@ -12,6 +12,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
+use slimm_server::ids::ChannelId;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
 use slimm_server::ratelimit::RateLimiter;
@@ -192,4 +193,53 @@ async fn a_channel_can_be_created_join_muted() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(json_body(response).await["join_muted"], true);
     assert!(listed_join_muted(&app, &token, "lecture").await);
+}
+
+/// Polls until the channel exists and returns the `join_muted` it first showed.
+async fn first_seen_join_muted(store: Store, id: ChannelId) -> bool {
+    loop {
+        if let Some(channel) = store.channel(id).await.unwrap() {
+            return channel.join_muted;
+        }
+        tokio::task::yield_now().await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_reader_never_sees_a_join_muted_channel_before_its_flag() {
+    let (store, _guard) = new_store().await;
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::MANAGE_CHANNELS),
+            true,
+        )
+        .await
+        .unwrap();
+    let token = register(&store, "alice").await;
+
+    for round in 0..20 {
+        let id = ChannelId::generate();
+        let reader = tokio::spawn(first_seen_join_muted(store.clone(), id));
+        // A router per round keeps the create inside the write rate limit.
+        let response = app(store.clone())
+            .oneshot(request(
+                "POST",
+                "/channels",
+                Some(&token),
+                Some(json!({
+                    "id": id.to_string(),
+                    "name": format!("stage-{round}"),
+                    "kind": "voice",
+                    "join_muted": true,
+                })),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            reader.await.unwrap(),
+            "round {round}: a reader saw the channel before join_muted was set"
+        );
+    }
 }

@@ -17,10 +17,12 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/call_recap.dart';
+import '../providers/channel_by_id_provider.dart';
 import '../providers/dm_call.dart';
 import '../providers/voice_roster.dart';
 import '../routing/routes.dart';
 import '../widgets/call_recap_card.dart';
+import '../widgets/join_muted_badge.dart';
 import '../widgets/user_avatar.dart';
 
 /// Leaves the ended call for wherever this channel's own conversation
@@ -218,6 +220,13 @@ class VoiceRejoinScreen extends ConsumerWidget {
         wasInCall &&
         errorMessage == null &&
         (recap == null || !recap!.isWorthShowing);
+    final joinsMuted =
+        !isDm &&
+        ref.watch(
+          channelByIdProvider(
+            channelId,
+          ).select((c) => c.valueOrNull?.joinMuted ?? false),
+        );
     final rosterAsync = ref.watch(voiceRosterProvider(channelId));
     final rosterConfirmedEmpty = rosterAsync.valueOrNull?.isEmpty ?? false;
     return LayoutBuilder(
@@ -249,6 +258,10 @@ class VoiceRejoinScreen extends ConsumerWidget {
                         fontWeight: AppWeights.semi,
                       ),
                     ),
+                    if (joinsMuted) ...[
+                      const SizedBox(height: AppSpacing.s8),
+                      const JoinMutedNote(),
+                    ],
                     const SizedBox(height: AppSpacing.s16),
                     _WhoIsHere(
                       rosterAsync: rosterAsync,

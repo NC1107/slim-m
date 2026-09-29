@@ -23,6 +23,7 @@ import '../routing/routes.dart';
 import 'channel_kind_icon.dart';
 import 'channel_row_menu.dart';
 import 'context_menu_region.dart';
+import 'join_muted_badge.dart';
 import 'user_avatar.dart';
 import 'voice_channel_tap.dart';
 
@@ -220,14 +221,23 @@ class VoiceChannelRow extends ConsumerWidget {
             restricted: channel.restricted ?? false,
             color: iconColor,
           ),
-          trailing: participants.isEmpty
+          trailing: participants.isEmpty && !channel.joinMuted
               ? null
-              : Text(
-                  '${participants.length}',
-                  style: AppText.micro.copyWith(
-                    color: tokens.textSecondary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (channel.joinMuted) const JoinMutedBadge(size: 14),
+                    if (channel.joinMuted && participants.isNotEmpty)
+                      const SizedBox(width: AppSpacing.s4),
+                    if (participants.isNotEmpty)
+                      Text(
+                        '${participants.length}',
+                        style: AppText.micro.copyWith(
+                          color: tokens.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                  ],
                 ),
           trailingExtra: trailingExtra,
           onTap: () {

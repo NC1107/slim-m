@@ -91,7 +91,8 @@ void main() {
 
   testWidgets('nobody is announced as muted for being offline', (tester) async {
     await withShell(tester, () async {
-      expect(find.bySemanticsLabel(RegExp('muted')), findsNothing);
+      // The fixture's voice channel joins muted; that label is about the channel, not a member.
+      expect(find.bySemanticsLabel(RegExp('(?<!Joins )muted')), findsNothing);
     });
   });
 
