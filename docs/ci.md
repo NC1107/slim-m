@@ -28,6 +28,7 @@ Each section below is named for its workflow file.
 | `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
+| `update-manifest` | called by `desktop-clients` after its archives attach, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Skips with a warning while the secret is unset |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
@@ -781,6 +782,21 @@ The macOS app is ad-hoc signed by the build itself, so Gatekeeper quarantines a 
 
 Both jobs declare `environment: release`, matching every asset-publishing job in `release`.
 They are tag-triggered, so unlike `main-builds` they should sit behind a reviewer gate if one is ever added; `main-builds` documents its own opt-out for the opposite reason, that a continuous build must not block on review.
+
+## update-manifest
+
+Groundwork for the per-user, signed self-update in `docs/decisions/0041`.
+It downloads the desktop artifacts already attached to a client release (the Linux tarball from `release`, the Windows and macOS archives from `desktop-clients`), builds a manifest of them with `scripts/update-manifest.py`, signs it with ed25519, checks the signature against the key's own public half, and attaches `manifest.json` and `manifest.json.sig` to the release.
+Nothing in the client reads the manifest yet.
+
+It is a reusable workflow rather than steps inside `release` because `release.yml` sits near its line budget, and `desktop-clients` is the one workflow that knows when the Windows and macOS archives are attached.
+`desktop-clients` calls it as its last job; by hand it takes a `tag` and a `require` list, which is how to backfill a release or to re-sign with `linux-x64` added once `release` has attached the tarball.
+The manifest lists whatever platforms are attached and fails only when a required one is missing, so the default of `windows-x64,macos` does not race the Linux tarball.
+
+The secret is `UPDATE_SIGNING_KEY`, an ed25519 private key in PKCS8 PEM form, stored as a repository secret.
+While it is unset the job passes with a warning and does nothing, the same shape as `copr-publish` without `COPR_CONFIG`.
+The owner's one-time key generation is in the decision record.
+`scripts/lib/test_update_manifest.py` covers build, sign and verify, tampering, wrong key, swapped artifacts and rollback against a throwaway key generated per run.
 
 ## main-builds
 

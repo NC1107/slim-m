@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+"""Build, sign and verify the signed desktop update manifest (decision 0041).
+
+The manifest is one JSON document naming, per platform, the release artifact
+URL, its sha256 and its size. An ed25519 signature over the exact manifest
+bytes travels beside it. The signing key is a PKCS8 PEM held in the
+UPDATE_SIGNING_KEY Actions secret; the app embeds only the raw 32-byte public
+key (base64), which `pubkey` prints for the owner's one-time setup.
+
+Stdlib only, with openssl (3.x, ed25519 raw signing) as the one external tool,
+since python has no ed25519 in its standard library.
+
+  build   --tag T --dir D --repo R [--require a,b] --out manifest.json
+  sign    --manifest M --sig S            (key in $UPDATE_SIGNING_KEY)
+  pubkey                                  (key in $UPDATE_SIGNING_KEY)
+  verify  --manifest M --sig S --pubkey B64 [--dir D] [--newer-than V]
+"""
+
+import argparse
+import base64
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+SCHEMA = 1
+# Raw ed25519 public key -> SPKI DER: openssl only reads the wrapped form.
+SPKI_PREFIX = bytes.fromhex("302a300506032b6570032100")
+PLATFORMS = {
+    "linux-x64": re.compile(r"^slim-m-client-.+-linux-amd64\.tar\.gz$"),
+    "windows-x64": re.compile(r"^slim-m-client-.+-windows-x64\.zip$"),
+    "macos": re.compile(r"^slim-m-client-.+-macos\.zip$"),
+}
+DEFAULT_REQUIRE = "windows-x64,macos"
+
+
+class ManifestError(Exception):
+    pass
+
+
+def sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def version_tuple(version: str) -> tuple[int, ...]:
+    core = version.split("+", 1)[0].split("-", 1)[0]
+    if not re.fullmatch(r"\d+\.\d+\.\d+", core):
+        raise ManifestError(f"not a plain X.Y.Z version: {version!r}")
+    return tuple(int(part) for part in core.split("."))
+
+
+def build_manifest(tag: str, directory: Path, repo: str, require: list[str]) -> dict:
+    if not tag.startswith("client-v"):
+        raise ManifestError(f"tag must look like client-vX.Y.Z, got {tag!r}")
+    version = tag.removeprefix("client-v")
+    version_tuple(version)
+    artifacts = {}
+    for path in sorted(directory.iterdir()):
+        for platform, pattern in PLATFORMS.items():
+            if not pattern.match(path.name):
+                continue
+            if platform in artifacts:
+                raise ManifestError(f"two files match {platform}: {path.name}")
+            artifacts[platform] = {
+                "url": f"https://github.com/{repo}/releases/download/{tag}/{path.name}",
+                "sha256": sha256_of(path),
+                "size": path.stat().st_size,
+            }
+    missing = [name for name in require if name not in artifacts]
+    if missing:
+        raise ManifestError(f"required platforms missing from {directory}: {', '.join(missing)}")
+    return {"schema": SCHEMA, "version": version, "tag": tag, "artifacts": artifacts}
+
+
+def canonical(manifest: dict) -> bytes:
+    return (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode()
+
+
+def _openssl(*args: str) -> bytes:
+    try:
+        done = subprocess.run(["openssl", *args], capture_output=True, check=True)
+    except FileNotFoundError as err:
+        raise ManifestError("openssl is not installed") from err
+    except subprocess.CalledProcessError as err:
+        raise ManifestError(f"openssl {args[0]} failed: {err.stderr.decode().strip()}") from err
+    return done.stdout
+
+
+def _private_key_file(directory: str) -> str:
+    pem = os.environ.get("UPDATE_SIGNING_KEY", "")
+    if not pem.strip():
+        raise ManifestError("UPDATE_SIGNING_KEY is empty")
+    path = Path(directory) / "key.pem"
+    path.touch(mode=0o600)
+    path.write_text(pem if pem.endswith("\n") else pem + "\n")
+    return str(path)
+
+
+def sign_bytes(data: bytes) -> bytes:
+    with tempfile.TemporaryDirectory() as tmp:
+        key = _private_key_file(tmp)
+        payload = Path(tmp) / "payload"
+        payload.write_bytes(data)
+        return _openssl("pkeyutl", "-sign", "-rawin", "-inkey", key, "-in", str(payload))
+
+
+def public_key_b64() -> str:
+    with tempfile.TemporaryDirectory() as tmp:
+        der = _openssl("pkey", "-in", _private_key_file(tmp), "-pubout", "-outform", "DER")
+    return base64.b64encode(der[-32:]).decode()
+
+
+def verify_signature(data: bytes, signature: bytes, pubkey_b64: str) -> None:
+    raw = base64.b64decode(pubkey_b64, validate=True)
+    if len(raw) != 32:
+        raise ManifestError("public key must be 32 raw bytes, base64 encoded")
+    if len(signature) != 64:
+        raise ManifestError("signature must be 64 raw bytes")
+    with tempfile.TemporaryDirectory() as tmp:
+        pub, payload, sig = (Path(tmp) / name for name in ("pub.der", "payload", "sig"))
+        pub.write_bytes(SPKI_PREFIX + raw)
+        payload.write_bytes(data)
+        sig.write_bytes(signature)
+        args = ["pkeyutl", "-verify", "-rawin", "-pubin", "-keyform", "DER"]
+        try:
+            _openssl(*args, "-inkey", str(pub), "-in", str(payload), "-sigfile", str(sig))
+        except ManifestError as err:
+            raise ManifestError("signature does not match the manifest") from err
+
+
+def check_artifacts(manifest: dict, directory: Path) -> None:
+    for platform, entry in manifest["artifacts"].items():
+        name = entry["url"].rsplit("/", 1)[-1]
+        path = directory / name
+        if not path.is_file():
+            raise ManifestError(f"{platform}: {name} not found in {directory}")
+        if path.stat().st_size != entry["size"] or sha256_of(path) != entry["sha256"]:
+            raise ManifestError(f"{platform}: {name} does not match the manifest")
+
+
+def verify(manifest_path: Path, sig_path: Path, pubkey: str, directory, newer_than) -> dict:
+    data = manifest_path.read_bytes()
+    verify_signature(data, base64.b64decode(sig_path.read_text().strip(), validate=True), pubkey)
+    manifest = json.loads(data)
+    if manifest.get("schema") != SCHEMA:
+        raise ManifestError(f"unsupported manifest schema {manifest.get('schema')!r}")
+    if newer_than and version_tuple(manifest["version"]) <= version_tuple(newer_than):
+        raise ManifestError(f"manifest {manifest['version']} is not newer than {newer_than}")
+    if directory:
+        check_artifacts(manifest, directory)
+    return manifest
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    build = sub.add_parser("build")
+    build.add_argument("--tag", required=True)
+    build.add_argument("--dir", type=Path, required=True)
+    build.add_argument("--repo", required=True)
+    build.add_argument("--require", default=DEFAULT_REQUIRE)
+    build.add_argument("--out", type=Path, required=True)
+    sign = sub.add_parser("sign")
+    sign.add_argument("--manifest", type=Path, required=True)
+    sign.add_argument("--sig", type=Path, required=True)
+    sub.add_parser("pubkey")
+    check = sub.add_parser("verify")
+    check.add_argument("--manifest", type=Path, required=True)
+    check.add_argument("--sig", type=Path, required=True)
+    check.add_argument("--pubkey", required=True)
+    check.add_argument("--dir", type=Path)
+    check.add_argument("--newer-than")
+    args = parser.parse_args(argv)
+    try:
+        if args.cmd == "build":
+            require = [name for name in args.require.split(",") if name]
+            manifest = build_manifest(args.tag, args.dir, args.repo, require)
+            args.out.write_bytes(canonical(manifest))
+        elif args.cmd == "sign":
+            signature = sign_bytes(args.manifest.read_bytes())
+            args.sig.write_text(base64.b64encode(signature).decode() + "\n")
+        elif args.cmd == "pubkey":
+            print(public_key_b64())
+        else:
+            manifest = verify(args.manifest, args.sig, args.pubkey, args.dir, args.newer_than)
+            print(f"ok: {manifest['version']} ({', '.join(sorted(manifest['artifacts']))})")
+    except (ManifestError, ValueError, KeyError, OSError) as err:
+        print(f"error: {err}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
