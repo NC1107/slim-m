@@ -378,5 +378,5 @@ Delivery and administration are different threat surfaces with almost no shared 
 
 Rotation shipped after the admin surface: `POST /webhooks/{id}/rotate` replaces `token_hash` in place and answers a `NewWebhook`, so the new path is shown once exactly as at mint.
 The row and its principal are kept, and the old token stops resolving in the same transaction.
-`webhook_rotate` joins the audit log as migration 0082, the same CHECK rebuild as 0078, with the acting admin as `actor_id` and the webhook principal as `subject_id`.
+`webhook_rotate` joins the audit log as migration 0086, the same CHECK rebuild as 0078, with the acting admin as `actor_id` and the webhook principal as `subject_id`.
 The list shows how long ago a webhook last delivered, not only whether it has.
