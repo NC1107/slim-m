@@ -37,6 +37,10 @@ class InviteDialogState extends ConsumerState<InviteDialog> {
   bool _busy = false;
   String? _error;
 
+  /// True once a link has named the server, so the address is not asked for
+  /// again; "Use a different server" brings the field back.
+  late bool _serverFromLink = widget.initial != null;
+
   @override
   void dispose() {
     _server.dispose();
@@ -58,8 +62,14 @@ class InviteDialogState extends ConsumerState<InviteDialog> {
     setState(() {
       _server.text = invite.server.toString();
       _code.text = invite.code;
+      _serverFromLink = true;
       _error = null;
     });
+  }
+
+  String _joiningHost() {
+    final host = Uri.tryParse(_server.text.trim())?.host ?? '';
+    return host.isEmpty ? _server.text.trim() : host;
   }
 
   Future<void> _verify() async {
@@ -132,14 +142,22 @@ class InviteDialogState extends ConsumerState<InviteDialog> {
             ),
           ),
           const SizedBox(height: AppSpacing.s12),
-          AppInput(
-            controller: _server,
-            placeholder: 'https://chat.example',
-            keyboardType: TextInputType.url,
-            semanticLabel: 'Server',
-            onChanged: _absorbPastedLink,
-          ),
-          const SizedBox(height: AppSpacing.s12),
+          if (_serverFromLink) ...[
+            Text(
+              'Joining ${_joiningHost()}',
+              style: AppText.code.copyWith(color: tokens.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+          ] else ...[
+            AppInput(
+              controller: _server,
+              placeholder: 'https://chat.example',
+              keyboardType: TextInputType.url,
+              semanticLabel: 'Server',
+              onChanged: _absorbPastedLink,
+            ),
+            const SizedBox(height: AppSpacing.s12),
+          ],
           AppInput(
             controller: _code,
             // Either field takes a whole link, because somebody pasting one has no reason to know which half it is.
@@ -164,6 +182,17 @@ class InviteDialogState extends ConsumerState<InviteDialog> {
             AppErrorState(message: _error!),
           ],
           const SizedBox(height: AppSpacing.s12),
+          if (_serverFromLink) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AppButton(
+                label: 'Use a different server',
+                variant: AppButtonVariant.ghost,
+                onPressed: () => setState(() => _serverFromLink = false),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+          ],
           Row(
             children: [
               Expanded(

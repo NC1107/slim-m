@@ -25,6 +25,7 @@ class SignInCredentialFields extends StatelessWidget {
     required this.displayName,
     required this.password,
     required this.creatingAccount,
+    this.askDisplayName = true,
     required this.busy,
     required this.errorFor,
     required this.onSubmit,
@@ -37,6 +38,10 @@ class SignInCredentialFields extends StatelessWidget {
   /// Whether this is a registration, which is the only time a display name is
   /// asked for.
   final bool creatingAccount;
+
+  /// False on the official server, where the name defaults to the username and
+  /// is editable later, so joining is username and password only.
+  final bool askDisplayName;
   final bool busy;
 
   /// The error currently owned by a given field, or null when it has none.
@@ -61,7 +66,7 @@ class SignInCredentialFields extends StatelessWidget {
             semanticLabel: 'Username',
           ),
         ),
-        if (creatingAccount) ...[
+        if (creatingAccount && askDisplayName) ...[
           const SizedBox(height: AppSpacing.s16),
           LabeledField(
             label: 'Display name',

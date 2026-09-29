@@ -111,7 +111,12 @@ class OnboardingScreen extends ConsumerWidget {
     if (result == null || !context.mounted) return;
 
     final (server, code) = result;
-    if (await confirmServerIdentity(context, ref, server)) {
+    if (await confirmServerIdentity(
+      context,
+      ref,
+      server,
+      silentFirstConnect: isOfficialServer(server),
+    )) {
       onServerChosen(server, code);
     }
   }
@@ -123,7 +128,12 @@ class OnboardingScreen extends ConsumerWidget {
     );
     if (server == null || !context.mounted) return;
 
-    if (await confirmServerIdentity(context, ref, server)) {
+    if (await confirmServerIdentity(
+      context,
+      ref,
+      server,
+      silentFirstConnect: isOfficialServer(server),
+    )) {
       onServerChosen(server, null);
     }
   }
