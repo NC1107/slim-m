@@ -61,11 +61,11 @@ class UpdateManifestTest(unittest.TestCase):
 
     def build(self, *extra):
         return run("build", "--tag", TAG, "--dir", self.assets, "--repo", "o/r",
-                   "--out", self.manifest, *extra)
+                   "--out", "manifest.json", *extra)
 
     def signed(self):
         self.assertEqual(self.build().returncode, 0)
-        done = run("sign", "--manifest", self.manifest, "--sig", self.sig, key=self.key)
+        done = run("sign", "--manifest", self.manifest, "--sig", "manifest.json.sig", key=self.key)
         self.assertEqual(done.returncode, 0, done.stderr)
 
     def verify(self, *extra, pub=None):
@@ -104,7 +104,7 @@ class UpdateManifestTest(unittest.TestCase):
 
     def test_build_refuses_a_bad_tag(self):
         done = run("build", "--tag", "v1", "--dir", self.assets, "--repo", "o/r",
-                   "--out", self.manifest)
+                   "--out", "manifest.json")
         self.assertEqual(done.returncode, 1)
 
     def test_signed_manifest_verifies_with_artifacts(self):
@@ -160,7 +160,7 @@ class UpdateManifestTest(unittest.TestCase):
         data = json.loads(self.manifest.read_text())
         data["artifacts"]["macos"]["url"] = "https://x/y/" + name
         self.manifest.write_text(json.dumps(data))
-        done = run("sign", "--manifest", self.manifest, "--sig", self.sig, key=self.key)
+        done = run("sign", "--manifest", self.manifest, "--sig", "manifest.json.sig", key=self.key)
         self.assertEqual(done.returncode, 0, done.stderr)
 
     def test_unsafe_artifact_names_are_refused_without_reading_outside(self):
@@ -179,7 +179,7 @@ class UpdateManifestTest(unittest.TestCase):
             data = json.loads(self.manifest.read_text())
             data["artifacts"]["macos"]["url"] = "https://x/" + name
             self.manifest.write_text(json.dumps(data))
-            run("sign", "--manifest", self.manifest, "--sig", self.sig, key=self.key)
+            run("sign", "--manifest", self.manifest, "--sig", "manifest.json.sig", key=self.key)
             done = self.verify("--dir", self.assets)
             self.assertEqual(done.returncode, 1, name)
 
@@ -233,7 +233,7 @@ class UpdateManifestTest(unittest.TestCase):
 
     def test_sign_without_a_key_fails_cleanly(self):
         self.build()
-        done = run("sign", "--manifest", self.manifest, "--sig", self.sig)
+        done = run("sign", "--manifest", self.manifest, "--sig", "manifest.json.sig")
         self.assertEqual(done.returncode, 1)
         self.assertIn("UPDATE_SIGNING_KEY", done.stderr)
         self.assertFalse(self.sig.exists())
