@@ -173,7 +173,7 @@ It also runs `shellcheck` over the inline `run:` blocks, so the two steps here c
 It found eight things when it was first run, all minor - unquoted `${PIPESTATUS[0]}`, unused `i` in four retry loops, two `ls | head` pipelines and one deliberately word-split variable - and all eight were fixed in the change that added it, so it lands green.
 The word-split one is worth naming since it was in `release.yml`: `refs` became an array, which produces an argv identical to the old unquoted expansion for digest strings and cannot break on one containing a space.
 
-`shellcheck` is the standalone-script half, run over every tracked `*.sh`, and pinned by image digest for a reason worth recording: this gate failed on the very pull request that added it.
+`shellcheck` is the standalone-script half, run over every tracked `*.sh` plus every extensionless tracked file whose first line is a `sh` or `bash` shebang (the tarball's `packaging/linux/slim-m` launcher), and pinned by image digest for a reason worth recording: this gate failed on the very pull request that added it.
 It was written against the runner's preinstalled shellcheck, and verified locally against the image tagged `stable`.
 Those are different programs - the runner ships 0.10.0, `stable` is 0.11.0, and 0.11.0 no longer reports the `SC2015` that 0.10.0 does - so "clean locally" and "clean in CI" were answering about different versions.
 A gate that disagrees with itself depending on where it runs is worse than no gate, so both linters here are pinned by digest.
