@@ -48,8 +48,8 @@ void main() {
     final toggle = find.byType(AppToggle);
     expect(
       tester.widget<AppToggle>(toggle).value,
-      isFalse,
-      reason: 'an install nobody has asked is not opted in',
+      isTrue,
+      reason: 'a fresh install is opted in (decision 0025 addendum)',
     );
 
     await tester.tap(toggle);
@@ -57,7 +57,7 @@ void main() {
 
     expect(
       (await SharedPreferences.getInstance()).getBool(autoUpdateKey),
-      isTrue,
+      isFalse,
     );
   });
 

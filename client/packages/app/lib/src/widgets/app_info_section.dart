@@ -57,7 +57,7 @@ class AppInfoSection extends ConsumerWidget {
           SettingsToggleRow(
             label: 'Automatic updates',
             description: automaticUpdatesDescription(currentInstallFormat()),
-            value: ref.watch(autoUpdateProvider) ?? false,
+            value: ref.watch(autoUpdateProvider),
             semanticLabel: 'Automatic updates',
             onChanged: (v) =>
                 unawaited(ref.read(autoUpdateProvider.notifier).set(v)),

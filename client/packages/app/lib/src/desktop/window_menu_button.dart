@@ -50,7 +50,7 @@ UpdateMenuAction updateMenuAction(ClientUpdate update, {bool? autoUpdate}) =>
     ? UpdateMenuAction.restartToUpdate
     : UpdateMenuAction.openRelease;
 
-/// The auto-update preference, or null while unanswered or unreadable.
+/// The auto-update preference, or null while it is still being read.
 final _autoUpdatePreferenceProvider = FutureProvider<bool?>((ref) async {
   final prefs = await ref.watch(preferencesProvider.future);
   return loadAutoUpdatePreference(prefs);
