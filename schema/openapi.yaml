@@ -9575,6 +9575,12 @@ components:
             that permission. Per-viewer exactly like `reacted`, and always
             false on the sender's own send or edit response: an author is
             never resolved as mentioning themselves.
+        webhook_username:
+          type: [string, "null"]
+          description: >-
+            A webhook post's own `username` label, or null on every other
+            message. A label only: `author_display_name` stays the webhook's
+            name and clients keep the Webhook badge beside it.
         embeds:
           type: array
           description: >-

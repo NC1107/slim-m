@@ -69,12 +69,17 @@ void main() {
 
   group('what a message row shows', () {
     /// Pumps one row whose author resolves to [profile].
-    Future<void> pumpRow(WidgetTester tester, api.UserProfile profile) async {
+    Future<void> pumpRow(
+      WidgetTester tester,
+      api.UserProfile profile, {
+      String? webhookUsername,
+    }) async {
       late BatchProfilesController controller;
       await tester.pumpWidget(
         harness(
           MessageRow(
             message: message(authorId: profile.id),
+            webhookUsername: webhookUsername,
             grouped: false,
             showNewDivider: false,
             knownUsernames: const {},
@@ -114,6 +119,31 @@ void main() {
         expect(find.text('CI Bot'), findsOneWidget);
       },
     );
+
+    testWidgets('a webhook post shows its own username beside the badge', (
+      tester,
+    ) async {
+      await pumpRow(
+        tester,
+        _profile(isWebhook: true),
+        webhookUsername: 'Grafana',
+      );
+
+      expect(find.text('Grafana'), findsOneWidget);
+      expect(find.text('CI Bot'), findsNothing);
+      expect(
+        find.text('WEBHOOK'),
+        findsOneWidget,
+        reason: 'the badge stays so the label cannot pass as a real member',
+      );
+    });
+
+    testWidgets('a username label on a real member is ignored', (tester) async {
+      await pumpRow(tester, _profile(), webhookUsername: 'Grafana');
+
+      expect(find.text('Grafana'), findsNothing);
+      expect(find.text('CI Bot'), findsOneWidget);
+    });
 
     testWidgets('a message from a person is not badged', (tester) async {
       await pumpRow(tester, _profile());

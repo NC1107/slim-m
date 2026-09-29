@@ -76,6 +76,7 @@ class MessageRow extends StatelessWidget {
     this.reactions = const [],
     this.attachments = const [],
     this.embeds = const [],
+    this.webhookUsername,
     this.poll,
     this.appSurface,
     this.call,
@@ -162,6 +163,9 @@ class MessageRow extends StatelessWidget {
 
   /// Structured content a webhook or a bot attached; see decision 0030.
   final List<api.Embed> embeds;
+
+  /// The webhook post's own username label, shown beside the Webhook badge.
+  final String? webhookUsername;
 
   /// The poll this message carries, if it is a poll message.
   final api.Poll? poll;
@@ -293,7 +297,10 @@ class MessageRow extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (!grouped)
-                                    MessageRowHeader(message: message),
+                                    MessageRowHeader(
+                                      message: message,
+                                      webhookUsername: webhookUsername,
+                                    ),
                                   if (message.replyToId != null)
                                     ReplyQuote(
                                       resolved: replyTo,

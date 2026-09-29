@@ -128,6 +128,11 @@ pub(crate) struct MessageDto {
     /// Fixed once a message exists, like `attachments`.
     #[serde(default)]
     pub(crate) embeds: Vec<EmbedDto>,
+    /// A webhook post's own `username` label, `null` for every other message.
+    /// A label only: `author_display_name` stays the webhook's name, and the
+    /// client keeps the webhook badge beside it. Set by the read enrichment
+    /// and the live frames, never by this conversion.
+    pub(crate) webhook_username: Option<String>,
 }
 
 /// One attachment as it appears on a message.
@@ -244,6 +249,7 @@ impl From<Message> for MessageDto {
             code_runs: Vec::new(),
             mentions_me: false,
             embeds: Vec::new(),
+            webhook_username: None,
         }
     }
 }

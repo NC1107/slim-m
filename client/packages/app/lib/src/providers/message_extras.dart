@@ -69,6 +69,7 @@ class MessageExtras {
     this.appSurface,
     this.call,
     this.embeds = const [],
+    this.webhookUsername,
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
@@ -80,6 +81,9 @@ class MessageExtras {
 
   /// Fixed once a message exists, like [attachments]; see decision 0030.
   final List<api.Embed> embeds;
+
+  /// A webhook post's own username label; fixed once the message exists.
+  final String? webhookUsername;
 
   /// The shared result of each fenced code block run in this message, one
   /// entry per block, ordered by block index. Follows [reactions]' merge
@@ -126,6 +130,7 @@ class MessageExtras {
     appSurface: appSurface ?? this.appSurface,
     call: call ?? this.call,
     embeds: embeds,
+    webhookUsername: webhookUsername,
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
@@ -245,6 +250,7 @@ class MessageExtrasController
     embeds: message.embeds.isNotEmpty
         ? message.embeds
         : existing?.embeds ?? const [],
+    webhookUsername: message.webhookUsername ?? existing?.webhookUsername,
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
     threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,
@@ -316,6 +322,7 @@ class MessageExtrasController
         codeRuns: existing.codeRuns,
         poll: existing.poll,
         embeds: existing.embeds,
+        webhookUsername: existing.webhookUsername,
         threadChannelId: threadChannelId,
         threadReplyCount: replyCount,
         threadLastReplyAt: lastReplyAt,

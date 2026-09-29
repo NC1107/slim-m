@@ -298,8 +298,8 @@ impl Store {
     }
 
     /// The `username` label stored against `message_id`, or `None` if it was
-    /// posted with none. No caller reads this yet outside tests; the read
-    /// path that surfaces it is stage 3's job (see this module's own doc).
+    /// posted with none. The live frames read it per message; list and sync
+    /// use [`Store::webhook_usernames_for_messages`].
     pub async fn webhook_message_username(
         &self,
         message_id: MessageId,
@@ -311,6 +311,31 @@ impl Store {
         .fetch_optional(&self.pool)
         .await?;
         Ok(username)
+    }
+
+    /// The label for each of `message_ids` that has one, batched like
+    /// [`Store::embeds_for_messages`]; messages with none are absent.
+    pub async fn webhook_usernames_for_messages(
+        &self,
+        message_ids: &[MessageId],
+    ) -> anyhow::Result<std::collections::HashMap<MessageId, String>> {
+        if message_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let mut builder = sqlx::QueryBuilder::new(
+            "SELECT message_id, username FROM webhook_message_usernames WHERE message_id IN (",
+        );
+        let mut separated = builder.separated(", ");
+        for id in message_ids {
+            separated.push_bind(*id);
+        }
+        builder.push(")");
+        use sqlx::Row;
+        let mut labels = std::collections::HashMap::new();
+        for row in builder.build().fetch_all(&self.pool).await? {
+            labels.insert(row.try_get("message_id")?, row.try_get("username")?);
+        }
+        Ok(labels)
     }
 
     /// Revokes a webhook by deleting its row outright. There is no session

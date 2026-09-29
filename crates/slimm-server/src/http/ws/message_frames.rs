@@ -75,6 +75,10 @@ pub(super) async fn created(
         .is_mentioned(message_id, viewer)
         .await
         .map_err(|_| ())?;
+    dto.webhook_username = store
+        .webhook_message_username(message_id)
+        .await
+        .map_err(|_| ())?;
     // Without this a call arrives blank until the next cold read.
     dto.call = store
         .call_for_message(message_id)
@@ -102,6 +106,10 @@ pub(super) async fn edited(
     let message_id = message.id;
     let mut dto = MessageDto::from(message);
     dto.forwarded = forwarded.map(Into::into);
+    dto.webhook_username = store
+        .webhook_message_username(message_id)
+        .await
+        .map_err(|_| ())?;
     dto.mentions_me = store
         .is_mentioned(message_id, viewer)
         .await

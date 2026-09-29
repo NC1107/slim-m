@@ -396,6 +396,7 @@ class _MessageTranscriptState extends State<MessageTranscript> {
                   reactions: extras.reactions,
                   attachments: extras.attachments,
                   embeds: extras.embeds,
+                  webhookUsername: extras.webhookUsername,
                   poll: extras.poll,
                   appSurface: extras.appSurface,
                   call: extras.call,

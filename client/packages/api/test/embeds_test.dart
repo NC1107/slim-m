@@ -57,4 +57,23 @@ void main() {
     });
     expect(message.embeds.single.accent, isNull);
   });
+
+  test('Message.fromJson reads webhook_username, null when absent', () {
+    final base = {
+      'id': 'm1',
+      'channel_id': 'c1',
+      'author_id': 'w1',
+      'author_display_name': 'alerts',
+      'seq': 1,
+      'content': 'hi',
+      'created_at': 0,
+    };
+
+    expect(
+      api.Message.fromJson({...base, 'webhook_username': 'Grafana'})
+          .webhookUsername,
+      'Grafana',
+    );
+    expect(api.Message.fromJson(base).webhookUsername, isNull);
+  });
 }
