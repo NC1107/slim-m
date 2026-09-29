@@ -20,8 +20,7 @@ import 'embed_card.dart' show launchIfHttp;
 const double _errorMaxWidth = 480;
 
 AppButtonVariant _variantFor(api.ComponentButtonStyle style) => switch (style) {
-  // Soft, not filled: a message may carry several, and only one action on a
-  // screen is meant to be the filled one.
+  // Soft, not filled: several may share a message and only one action per screen is filled.
   api.ComponentButtonStyle.primary => AppButtonVariant.soft,
   api.ComponentButtonStyle.secondary => AppButtonVariant.secondary,
   api.ComponentButtonStyle.danger => AppButtonVariant.danger,
@@ -133,8 +132,7 @@ class _ButtonView extends StatelessWidget {
           : onPressed,
     );
     if (!pending) return build(busy: false);
-    // The invisible copy holds the label's width, so the spinner swaps in
-    // without the row reflowing.
+    // The invisible copy holds the label's width so the spinner swaps in without a reflow.
     return Stack(
       children: [
         Visibility(

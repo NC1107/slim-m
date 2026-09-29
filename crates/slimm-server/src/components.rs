@@ -18,6 +18,7 @@ pub const MAX_URL_CHARS: usize = 512;
 pub const INTERACTION_WINDOW_MS: i64 = 15 * 60 * 1000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// How a button looks; a link opens a page instead of reaching the bot.
 #[serde(rename_all = "snake_case")]
 pub enum ButtonStyle {
     Primary,
