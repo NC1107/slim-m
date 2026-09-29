@@ -4031,10 +4031,14 @@ paths:
         did not launch.
 
 
-        An `input` containing a control, text-direction or zero-width
-        character (tab and line breaks aside) is refused with 403, for every
-        caller, so what a viewer reads is what runs (decision 0026's
-        addendum).
+        The server runs its own extraction of block `blockIndex` from the
+        stored message, by the same fence rules the client renders with, and
+        does not trust `input`; it is used as-is only for a message that
+        launched an app surface. A message with no code block at that index
+        (for instance after an edit) is refused with 409. A block containing
+        a control, text-direction or zero-width character (tab and line
+        breaks aside) is refused with 403, for every caller, so what a viewer
+        reads is what runs (decision 0026's addendum).
       requestBody:
         required: true
         content:

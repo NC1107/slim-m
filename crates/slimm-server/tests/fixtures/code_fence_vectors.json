@@ -1,0 +1,18 @@
+[
+  {"name": "no fence", "content": "just text", "blocks": []},
+  {"name": "labelled fence between text", "content": "before\n```dart\nfinal x = 1;\n```\nafter", "blocks": [{"language": "dart", "code": "final x = 1;"}]},
+  {"name": "unlabelled fence", "content": "```\necho hi\n```", "blocks": [{"language": null, "code": "echo hi"}]},
+  {"name": "empty fence", "content": "```\n```", "blocks": [{"language": null, "code": ""}]},
+  {"name": "two fences", "content": "```js\na\n```\ntext\n```py\nb\nc\n```", "blocks": [{"language": "js", "code": "a"}, {"language": "py", "code": "b\nc"}]},
+  {"name": "unterminated fence is text", "content": "```js\nnever closed", "blocks": []},
+  {"name": "unterminated after a closed one", "content": "```js\na\n```\n```py\nb", "blocks": [{"language": "js", "code": "a"}]},
+  {"name": "inline backticks are not a fence", "content": "run ```x``` here\n```\nreal\n```", "blocks": [{"language": null, "code": "real"}]},
+  {"name": "language characters", "content": "```c++\nx\n```\n```c#\ny\n```\n```my-lang_2\nz\n```", "blocks": [{"language": "c++", "code": "x"}, {"language": "c#", "code": "y"}, {"language": "my-lang_2", "code": "z"}]},
+  {"name": "a dot in the tag is not a fence", "content": "```a.b\nx\n```", "blocks": []},
+  {"name": "trailing spaces on both fences", "content": "```js  \nx\n```  ", "blocks": [{"language": "js", "code": "x"}]},
+  {"name": "crlf keeps the carriage return in the code", "content": "```js\r\nx\r\ny\r\n```\r\n", "blocks": [{"language": "js", "code": "x\r\ny\r"}]},
+  {"name": "a language line closes nothing", "content": "```\n```js\n```", "blocks": [{"language": null, "code": "```js"}]},
+  {"name": "a trailing bare fence with no close is text", "content": "```js\na\n```\nb\n```", "blocks": [{"language": "js", "code": "a"}]},
+  {"name": "no-break space after the tag is whitespace", "content": "```js \nx\n```", "blocks": [{"language": "js", "code": "x"}]},
+  {"name": "indented fence is text", "content": " ```js\nx\n```", "blocks": []}
+]
