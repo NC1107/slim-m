@@ -13,6 +13,8 @@
 //! version crossed the file-budget hard limit: `harness` is the store, router,
 //! and mock relay every test shares, `delivery` is the tests themselves.
 
+mod alerts;
+mod call_signals;
 mod delivery;
 mod harness;
 mod missed_call;

@@ -28,10 +28,6 @@
 
 use std::sync::Arc;
 
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as BASE64;
-use crypto_box::PublicKey;
-use crypto_box::aead::rand_core::{OsRng, TryRngCore};
 use serde::Serialize;
 
 use crate::ids::{CallRingId, ChannelId, UserId};
@@ -40,10 +36,11 @@ use crate::store::{Store, now_ms};
 
 use super::deliver::is_foreground_and_recent;
 use super::envelope::{
-    DOMAIN, ENVELOPE_VERSION, MAX_ENVELOPE_PLAINTEXT_BYTES, MAX_PREVIEW_NAME_CHARS,
-    PUBLIC_KEY_BYTES, PushKind, SealedMessage, truncate,
+    DOMAIN, ENVELOPE_VERSION, MAX_ENVELOPE_PLAINTEXT_BYTES, MAX_PREVIEW_NAME_CHARS, PushKind,
+    SealedMessage, truncate,
 };
-use super::{Enabled, relay};
+use super::sealing::{TokenSlot, seal_to};
+use super::{Enabled, dispatch};
 
 /// Delivers a push for one DM call ring to its one callee.
 ///
@@ -112,9 +109,7 @@ pub(super) async fn deliver(
         return;
     }
 
-    if let Err(err) = relay::send(&enabled.http, &enabled.send_url, &enabled.key, &messages).await {
-        tracing::warn!(error = %err, %channel_id, "push: relay send failed for a call ring");
-    }
+    dispatch::send_and_prune(&enabled, &store, &messages, "call ring").await;
 }
 
 /// The sealed plaintext for a DM call ring.
@@ -148,38 +143,26 @@ fn seal_for_call_ring(
         .and_then(|name| encode(channel_id, ring_id, caller_id, sent_at, Some(name)))
         .filter(|plaintext| plaintext.len() <= MAX_ENVELOPE_PLAINTEXT_BYTES);
 
-    let mut sealed = Vec::with_capacity(targets.len());
-    for target in targets {
-        let Ok(key_bytes) = <[u8; PUBLIC_KEY_BYTES]>::try_from(target.push_public_key.as_slice())
-        else {
-            tracing::warn!(
-                device_id = %target.device_id,
-                "push: stored public key is the wrong size, skipping this device"
-            );
-            continue;
-        };
-        let public_key = PublicKey::from_bytes(key_bytes);
+    targets
+        .iter()
+        .filter_map(|target| {
+            let plaintext = match (target.include_content, &with_content) {
+                (true, Some(with_content)) => with_content,
+                _ => &bare,
+            };
+            seal_to(target, ring_slot(target), PushKind::Call, plaintext)
+        })
+        .collect()
+}
 
-        let plaintext = match (target.include_content, &with_content) {
-            (true, Some(with_content)) => with_content,
-            _ => &bare,
-        };
-
-        let Ok(ciphertext) = public_key.seal(&mut OsRng.unwrap_err(), plaintext) else {
-            tracing::warn!(device_id = %target.device_id, "push: sealing failed, skipping this device");
-            continue;
-        };
-
-        sealed.push(SealedMessage {
-            user_id: target.user_id,
-            device_id: target.device_id,
-            platform: target.platform.clone(),
-            token: target.push_token.clone(),
-            kind: PushKind::Call.wire_str(),
-            payload: BASE64.encode(ciphertext),
-        });
+/// iOS rings through PushKit, whose topic only accepts the VoIP token; a device that never
+/// registered one is skipped rather than sent a ring APNs would refuse.
+fn ring_slot(target: &crate::store::PushTarget) -> TokenSlot {
+    if target.platform == "ios" {
+        TokenSlot::Voip
+    } else {
+        TokenSlot::Push
     }
-    sealed
 }
 
 fn encode(
