@@ -420,6 +420,19 @@ const _forwardedOrigin = api.ForwardedMessage(
   content: 'The spacing on the settings pane is off by a hair at 800.',
 );
 
+/// A forward whose original was deleted: the server blanks the snapshot and
+/// sets [removed], and the card says so in place of it.
+const _removedForwardedOrigin = api.ForwardedMessage(
+  messageId: 'm-2',
+  channelId: 'c-design',
+  authorId: null,
+  authorDisplayName: null,
+  authorAvatarUpdatedAt: null,
+  createdAt: 1753600000000,
+  content: '',
+  removed: true,
+);
+
 /// A reply inside `c-thread`, the thread hanging off [_message]'s `m-1`.
 api.Message _threadMessage(int seq, String author, String content) =>
     api.Message(
@@ -467,6 +480,12 @@ final fixtureMessages = [
     'user-nick',
     'Worth a look here too.',
     forwarded: _forwardedOrigin,
+  ),
+  _message(
+    5,
+    'user-ada',
+    'Passing this along with a note of my own.',
+    forwarded: _removedForwardedOrigin,
   ),
   _threadMessage(1, 'user-ada', 'Good catch - filed as #341.'),
   _threadMessage(2, 'user-nick', 'Thanks, verifying the fix now.'),

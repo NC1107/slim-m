@@ -340,6 +340,7 @@ async fn delete(
 
     let outcome = state.store.delete_message(message_id, ctx.user_id).await?;
     if outcome.deleted {
+        super::message_forwards::publish_cascaded(&state, outcome.cascade).await;
         state.hub.publish(Event::MessageDeleted {
             op_seq: outcome.op_seq,
             channel_id,
@@ -352,7 +353,6 @@ async fn delete(
                 message_id,
             });
         }
-        // A no-op for an ordinary channel; see `threads::notify_reply`.
         super::threads::notify_reply(&state, channel_id).await;
         // File reclamation only, best-effort; see the note on this function.
         for hex in outcome.freed_attachments {

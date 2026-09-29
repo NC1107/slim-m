@@ -67,6 +67,47 @@ void main() {
       expect(await store.opCursorFor('chan-1'), 7);
     });
 
+    test('an edit op flagged forwarded_removed clears the snapshot, even '
+        'with its content collapsed', () async {
+      await store.applyMessage(
+        api.Message(
+          id: 'm1',
+          channelId: 'chan-1',
+          authorId: 'user-1',
+          authorDisplayName: 'User One',
+          seq: 1,
+          content: 'my note',
+          createdAt: 1000,
+          editedAt: null,
+          forwarded: const api.ForwardedMessage(
+            messageId: 'o',
+            channelId: 'chan-1',
+            authorId: 'user-2',
+            authorDisplayName: 'Alice',
+            authorAvatarUpdatedAt: null,
+            createdAt: 1,
+            content: 'the original',
+          ),
+        ),
+      );
+
+      await applyOps(store, 'chan-1', const [
+        api.MessageEditOp(
+          seq: 9,
+          messageId: 'm1',
+          createdAt: 1,
+          content: null,
+          editedAt: null,
+          forwardedRemoved: true,
+        ),
+      ]);
+
+      final row = (await store.watchChannel('chan-1').first).single;
+      expect(row.content, 'my note');
+      expect(row.forwarded!.removed, isTrue);
+      expect(row.forwarded!.content, '');
+    });
+
     test('a delete removes the cached copy', () async {
       await store.applyMessage(_message('m1'));
 

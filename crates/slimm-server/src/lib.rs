@@ -10,6 +10,7 @@ pub mod config;
 pub mod cors;
 pub mod db;
 pub mod emoji;
+mod forward_events;
 pub mod http;
 pub mod hub;
 pub mod identity;

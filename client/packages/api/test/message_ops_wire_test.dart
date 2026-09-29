@@ -184,5 +184,24 @@ void main() {
 
       expect(event.opSeq, 11);
     });
+
+    test('an edit op carries forwarded_removed, defaulting to false', () {
+      final flagged = MessageOp.fromJson({
+        'seq': 3,
+        'kind': 'edit',
+        'message_id': 'm1',
+        'created_at': 1,
+        'forwarded_removed': true,
+      }) as MessageEditOp;
+      final plain = MessageOp.fromJson({
+        'seq': 4,
+        'kind': 'edit',
+        'message_id': 'm1',
+        'created_at': 1,
+      }) as MessageEditOp;
+
+      expect(flagged.forwardedRemoved, isTrue);
+      expect(plain.forwardedRemoved, isFalse);
+    });
   });
 }

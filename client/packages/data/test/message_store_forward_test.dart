@@ -105,6 +105,37 @@ void main() {
 
     expect(stored.forwarded, null);
   });
+
+  test('a removed snapshot round trips as removed', () async {
+    const removed = api.ForwardedMessage(
+      messageId: 'm-origin',
+      channelId: 'chan-2',
+      authorId: null,
+      authorDisplayName: null,
+      authorAvatarUpdatedAt: null,
+      createdAt: 10,
+      content: '',
+      removed: true,
+    );
+    await store.applyMessage(_forward(forwarded: removed));
+
+    final stored = (await store.watchChannel('chan-1').first).single;
+
+    expect(stored.forwarded, removed.toLocal());
+    expect(stored.forwarded!.removed, isTrue);
+  });
+
+  test('removeForwardSnapshot blanks the origin and keeps the note', () async {
+    await store.applyMessage(_forward());
+
+    await store.removeForwardSnapshot('m1');
+
+    final stored = (await store.watchChannel('chan-1').first).single;
+    expect(stored.content, 'look at this');
+    expect(stored.forwarded!.removed, isTrue);
+    expect(stored.forwarded!.content, '');
+    expect(stored.forwarded!.authorDisplayName, isNull);
+  });
 }
 
 /// The same values as the local DTO, so the round trip can be asserted whole
@@ -119,5 +150,6 @@ extension on api.ForwardedMessage {
         authorAvatarUpdatedAt: authorAvatarUpdatedAt,
         createdAt: createdAt,
         content: content,
+        removed: removed,
       );
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id?: UserId\",\n                      m.created_at AS \"created_at!: i64\",\n                      m.content AS \"content!: String\",\n                      f.origin_message_id AS \"origin_message_id?: MessageId\",\n                      f.origin_channel_id AS \"origin_channel_id?: ChannelId\",\n                      f.origin_author_id AS \"origin_author_id?: UserId\",\n                      f.origin_created_at AS \"origin_created_at?: i64\",\n                      f.origin_content AS \"origin_content?: String\"\n               FROM messages m\n               LEFT JOIN message_forwards f ON f.message_id = m.id\n               WHERE m.id = ? AND m.deleted_at IS NULL",
+  "query": "SELECT m.channel_id AS \"channel_id!: ChannelId\",\n                      m.author_id AS \"author_id?: UserId\",\n                      m.created_at AS \"created_at!: i64\",\n                      m.content AS \"content!: String\",\n                      f.origin_message_id AS \"origin_message_id?: MessageId\",\n                      f.origin_channel_id AS \"origin_channel_id?: ChannelId\",\n                      f.origin_author_id AS \"origin_author_id?: UserId\",\n                      f.origin_created_at AS \"origin_created_at?: i64\",\n                      f.origin_content AS \"origin_content?: String\"\n               FROM messages m\n               LEFT JOIN message_forwards f ON f.message_id = m.id\n               WHERE m.id = ? AND m.deleted_at IS NULL\n                 AND f.origin_removed_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -64,5 +64,5 @@
       false
     ]
   },
-  "hash": "01640d1184358291c7a2e1b333e0376865d4b04c523780a68ceeb673d7f1ee8c"
+  "hash": "7d5ed9fcd83ac0e65bbfe501d2feb7775416e8faae63a13c020b3211a57b1c20"
 }

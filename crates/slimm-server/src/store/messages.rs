@@ -95,6 +95,8 @@ pub struct MessageDeletion {
     /// The op stream seq this delete allocated, absent when it deleted
     /// nothing. A 200 does not imply the cursor advanced.
     pub op_seq: Option<i64>,
+    /// What happened to the forwarded copies of this message.
+    pub cascade: super::ForwardCascade,
 }
 
 /// What one edit actually did.
@@ -426,6 +428,8 @@ impl Store {
         let op_seq =
             insert_message_op(&mut tx, channel_id, id, "delete", Some(actor_id), now).await?;
         let freed_attachments = release_message_attachments(&mut tx, id).await?;
+        let cascade =
+            super::forward_cascade::cascade_to_copies(&mut tx, &[id], Some(actor_id), now).await?;
         if let Some(author_id) = claimed.author_id
             && author_id != actor_id
         {
@@ -448,6 +452,7 @@ impl Store {
             was_pinned,
             freed_attachments,
             op_seq: Some(op_seq),
+            cascade,
         })
     }
 }

@@ -40,6 +40,7 @@ sealed class MessageOp {
           createdAt: createdAt,
           content: json['content'] as String?,
           editedAt: json['edited_at'] as int?,
+          forwardedRemoved: json['forwarded_removed'] as bool? ?? false,
         ),
       'delete' => MessageDeleteOp(
           seq: seq,
@@ -70,10 +71,15 @@ class MessageEditOp extends MessageOp {
     required super.createdAt,
     required this.content,
     required this.editedAt,
+    this.forwardedRemoved = false,
   });
 
   final String? content;
   final int? editedAt;
+
+  /// The message forwards something whose original was removed; clear the
+  /// snapshot even when [content] is absent.
+  final bool forwardedRemoved;
 }
 
 /// A message was deleted.

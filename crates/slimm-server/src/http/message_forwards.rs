@@ -23,15 +23,16 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
+use crate::hub::Event;
 use crate::ids::{MessageId, UserId};
 use crate::permissions::Permissions;
-use crate::store::{ForwardOrigin, ForwardSummary};
+use crate::store::{ForwardCascade, ForwardOrigin, ForwardSummary};
 
 /// What a message was forwarded from, or absent on a message that forwards
 /// nothing.
 ///
-/// A snapshot taken when the forward was sent, not a live read, so it stays
-/// answerable once the original is edited or deleted.
+/// A snapshot taken when the forward was sent, so a later edit does not
+/// rewrite it. Deleting or ageing out the original removes the whole copy.
 #[derive(Serialize, Clone)]
 pub(crate) struct ForwardedDto {
     /// The original, for a client that wants to jump to it. An id the reader
@@ -52,6 +53,9 @@ pub(crate) struct ForwardedDto {
     /// What the original said when it was forwarded. A later edit to the
     /// original does not rewrite this; see the migration for why.
     pub content: String,
+    /// The original was deleted or aged out. The snapshot fields are then
+    /// blank and the client shows "original message was deleted" instead.
+    pub removed: bool,
 }
 
 impl From<ForwardSummary> for ForwardedDto {
@@ -64,6 +68,7 @@ impl From<ForwardSummary> for ForwardedDto {
             author_avatar_updated_at: summary.author_avatar_updated_at,
             created_at: summary.origin.created_at,
             content: summary.origin.content,
+            removed: summary.removed,
         }
     }
 }
@@ -117,4 +122,35 @@ pub(crate) async fn for_messages(
         .into_iter()
         .map(|(message_id, summary)| (message_id, summary.into()))
         .collect())
+}
+
+/// Tells live clients what became of the forwarded copies of a deleted
+/// message, in whichever channels they live, then reclaims files they freed.
+pub(super) async fn publish_cascaded(state: &AppState, cascade: ForwardCascade) {
+    crate::forward_events::publish_detached(&state.store, &state.hub, &cascade.detached).await;
+    let mut channels = Vec::new();
+    for copy in cascade.deleted {
+        state.hub.publish(Event::MessageDeleted {
+            op_seq: Some(copy.op_seq),
+            channel_id: copy.channel_id,
+            message_id: copy.message_id,
+        });
+        if copy.was_pinned {
+            state.hub.publish(Event::MessageUnpinned {
+                channel_id: copy.channel_id,
+                message_id: copy.message_id,
+            });
+        }
+        if !channels.contains(&copy.channel_id) {
+            channels.push(copy.channel_id);
+        }
+        for hex in copy.freed_attachments {
+            if let Err(err) = state.media.delete_attachment(&hex).await {
+                tracing::warn!(%hex, error = %err, "failed to remove a forwarded copy's attachment file");
+            }
+        }
+    }
+    for channel_id in channels {
+        super::threads::notify_reply(state, channel_id).await;
+    }
 }
