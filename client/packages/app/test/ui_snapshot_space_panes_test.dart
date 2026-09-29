@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// Every Space settings pane at two-pane width, opened by its nav row, so the
+/// pane heading is looked at on each rather than only on the first pane.
+library;
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+import 'ui_snapshot_support.dart';
+
+const _panes = <String>[
+  'Reports',
+  'Removed members',
+  'Invites',
+  'Account recovery',
+  'Roles',
+  'Channel permissions',
+  'Emoji',
+  'Performance',
+  'Analytics',
+  'Storage',
+  'Server metrics',
+  'Dock',
+  'Bots',
+  'Webhooks',
+];
+
+void main() {
+  setUpAll(loadRealFonts);
+
+  for (final theme in const ['dark', 'light']) {
+    for (final pane in _panes) {
+      testWidgets('space settings pane $pane at desktop ($theme)', (
+        tester,
+      ) async {
+        await renderSurface(
+          tester,
+          '/settings/space',
+          'desktop',
+          theme,
+          'space-pane-${pane.toLowerCase().replaceAll(' ', '-')}-$theme',
+          settleNestedResolve: true,
+          afterSettle: (tester) async {
+            final row = find.widgetWithText(AppListRow, pane);
+            await tester.ensureVisible(row);
+            await tester.pump();
+            await tester.tap(row);
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 350));
+          },
+        );
+      });
+    }
+  }
+}

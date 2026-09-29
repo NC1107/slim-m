@@ -16,6 +16,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/widgets/settings_section_header.dart';
+import 'package:slimm_design_system/design_system.dart';
 
 import 'settings_harness.dart';
 
@@ -86,9 +88,11 @@ void main() {
   });
 
   /// A pane whose whole body is one card must not title that card with the
-  /// name the nav already gives it: "Appearance" under "Appearance" is a
-  /// header carrying no information, which is the case decision 0013 made
-  /// `SettingsSectionCard.title` nullable for.
+  /// name its pane heading already gives it: "Appearance" under "Appearance"
+  /// is a header carrying no information, which is the case decision 0013
+  /// made `SettingsSectionCard.title` nullable for. The heading itself is the
+  /// pane's name at two-pane width, so the nav row is no longer its only
+  /// occurrence.
   ///
   /// `Blocked` is the deliberate exception and is absent from this list: its
   /// header earns the repeat by carrying a real description under it.
@@ -107,14 +111,14 @@ void main() {
       'Notifications',
       'About slim-m',
     ]) {
-      await tester.tap(find.text(label));
+      await tester.tap(find.widgetWithText(AppListRow, label));
       await tester.pumpAndSettle();
       expect(
-        find.text(label),
-        findsOneWidget,
+        find.widgetWithText(SettingsSectionHeader, label),
+        findsNothing,
         reason:
-            'the nav row is the only place "$label" should appear; a section '
-            'header repeating it says nothing the nav has not already said',
+            'the pane heading names the pane once; a section header repeating '
+            '"$label" under it says nothing the heading has not already said',
       );
     }
   });

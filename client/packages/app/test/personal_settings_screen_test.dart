@@ -282,7 +282,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Renaming lives in the "Profile" pane, not above the nav.
-    await tester.tap(find.text('Profile'));
+    await tester.tap(find.widgetWithText(AppListRow, 'Profile'));
     await tester.pumpAndSettle();
 
     expect(find.text('Self'), findsOneWidget);

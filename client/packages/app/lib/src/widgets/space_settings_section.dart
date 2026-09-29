@@ -136,6 +136,8 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             icon: AppIcons.shield,
             compactRoute: Routes.adminRoles,
             actions: [rolesPaneCreateAction(context)],
+            // RolesPane lays out its own two panes, which a ListView cannot bound.
+            scrollable: false,
             builder: (_) => const RolesPane(),
           ),
         if (canManageRolesAnywhere)
@@ -144,6 +146,7 @@ List<SettingsPaneGroup> spaceSettingsPaneGroups(
             label: 'Channel permissions',
             icon: AppIcons.permissions,
             compactRoute: Routes.adminOverwrites,
+            scrollable: false,
             builder: (_) => const ChannelPermissionsPane(),
           ),
         if (canManageServer)

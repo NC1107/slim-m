@@ -42,6 +42,7 @@ class AppInfoSection extends ConsumerWidget {
     final errors = ref.watch(debugLogProvider);
 
     return SettingsSectionCard(
+      divided: true,
       children: [
         AppListRow(
           leading: const Icon(AppIcons.info),
