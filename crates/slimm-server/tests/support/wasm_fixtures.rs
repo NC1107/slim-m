@@ -34,6 +34,40 @@ pub fn canned_ok_wasm(output: &str) -> Vec<u8> {
     canned_raw_wasm(format!(r#"{{"ok":true,"output":"{output}"}}"#).as_bytes())
 }
 
+/// A module that answers `{"ok":true,"output":"<its own request>"}`, with every
+/// `"` and `\` in the request replaced by `'` so the response stays valid JSON.
+#[allow(dead_code)]
+pub fn echo_request_wasm() -> Vec<u8> {
+    let prefix = r#"{"ok":true,"output":""#;
+    let data = escape_wat_string(prefix.as_bytes());
+    let plen = prefix.len();
+    let tail = plen + 2;
+    let text = format!(
+        r#"(module
+            (memory (export "memory") 1)
+            (data (i32.const 1024) "{data}")
+            (func (export "alloc") (param $len i32) (result i32) (i32.const 8192))
+            (func (export "run") (param $in_ptr i32) (param $in_len i32) (result i64)
+                (local $i i32) (local $b i32) (local $out i32)
+                (local.set $out (i32.add (i32.const 1024) (i32.const {plen})))
+                (block $done
+                    (loop $loop
+                        (br_if $done (i32.ge_u (local.get $i) (local.get $in_len)))
+                        (local.set $b (i32.load8_u (i32.add (local.get $in_ptr) (local.get $i))))
+                        (if (i32.or (i32.eq (local.get $b) (i32.const 34))
+                                    (i32.eq (local.get $b) (i32.const 92)))
+                            (then (local.set $b (i32.const 39))))
+                        (i32.store8 (i32.add (local.get $out) (local.get $i)) (local.get $b))
+                        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                        (br $loop)))
+                (i32.store8 (i32.add (local.get $out) (local.get $in_len)) (i32.const 34))
+                (i32.store8 (i32.add (local.get $out) (i32.add (local.get $in_len) (i32.const 1))) (i32.const 125))
+                (i64.or (i64.shl (i64.const 1024) (i64.const 32))
+                    (i64.extend_i32_u (i32.add (local.get $in_len) (i32.const {tail}))))))"#
+    );
+    wat::parse_str(&text).expect("echo-request wasm fixture must parse")
+}
+
 /// `run` never returns: an unconditional loop back to its own start, burning
 /// fuel forever. Proves a route driving `ModuleHost` end to end still
 /// answers cleanly rather than hanging or 500ing.

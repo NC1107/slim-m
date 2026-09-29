@@ -97,6 +97,26 @@ impl RunCommandResponse {
 struct ModuleWireRequest<'a> {
     command: &'a str,
     input: &'a str,
+    caller: ModuleCaller,
+}
+
+/// Who is asking, and nothing more: an id a module can dedupe against.
+/// See docs/decisions/0038-module-caller-id.md.
+#[derive(Serialize)]
+struct ModuleCaller {
+    id: String,
+}
+
+/// Stable per (module, user) and opaque: it never equals a user id and does
+/// not match across modules, so it cannot be used to follow a person around.
+fn module_caller_id(module_id: &str, user_id: UserId) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(b"slim-module-caller-v1\0");
+    hasher.update(module_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(user_id.to_string().as_bytes());
+    crate::media::to_hex(&hasher.finalize())
 }
 
 #[derive(Deserialize)]
@@ -180,8 +200,14 @@ pub(crate) async fn execute_command(
         ));
     }
     let limits = RunLimits::from(&module.runtime_limits);
-    let request_json = serde_json::to_vec(&ModuleWireRequest { command, input })
-        .map_err(|_| ApiError::Internal)?;
+    let request_json = serde_json::to_vec(&ModuleWireRequest {
+        command,
+        input,
+        caller: ModuleCaller {
+            id: module_caller_id(module_id, user_id),
+        },
+    })
+    .map_err(|_| ApiError::Internal)?;
 
     let outcome = match ModuleHost::run(wasm, module.artifact_sha256, limits, request_json).await {
         Ok(bytes) => match serde_json::from_slice::<ModuleWireResponse>(&bytes) {
