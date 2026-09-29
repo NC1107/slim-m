@@ -10,7 +10,7 @@
 ///
 /// Same split as every sibling in this family: the overflow assertion runs
 /// everywhere, the PNGs are written only under SLIMM_UI_SNAPSHOTS=1. One
-/// viewport (desktop) per state - the dialogs collapse to a bottom sheet
+/// viewport (desktop) per state, plus one phone-width mismatch warning - the dialogs collapse to a bottom sheet
 /// below 600px with identical content, and the identity screens carry no
 /// responsive branch at all (see `server_fingerprint_test.dart`).
 library;
@@ -81,6 +81,7 @@ Future<ProviderContainer> _pumpOnboarding(
   int checkStatus = 200,
   bool throwOnCheck = false,
   KeyStore? keyStore,
+  Size viewport = _viewport,
 }) async {
   final httpClient = MockClient((request) async {
     if (request.method == 'GET' && request.url.path == '/version') {
@@ -114,7 +115,7 @@ Future<ProviderContainer> _pumpOnboarding(
   );
   addTearDown(container.dispose);
 
-  tester.view.physicalSize = _viewport;
+  tester.view.physicalSize = viewport;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
@@ -356,6 +357,31 @@ void main() {
       await tester.tap(find.byType(Checkbox));
       await tester.pumpAndSettle();
       await _finish(tester, 'tofu-identity-changed-acknowledged-desktop');
+    });
+
+    testWidgets('the mismatch warning at phone width', (tester) async {
+      final keyStore = InMemoryKeyStore();
+      await keyStore.put(
+        'server_identity:https://chat.example',
+        _identityA['public_key'] as String,
+      );
+      await _pumpOnboarding(
+        tester,
+        versionBody: const {
+          'name': 'slim-m',
+          'version': '0.10.0',
+          'protocol': 1,
+          'identity': _identityB,
+        },
+        keyStore: keyStore,
+        viewport: const Size(390, 844),
+      );
+      await _openManualDialog(tester);
+      await tester.enterText(find.byType(TextField), 'https://chat.example');
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text("This server's identity changed"), findsOneWidget);
+      await _finish(tester, 'tofu-identity-changed-unacknowledged-phone');
     });
   });
 }
