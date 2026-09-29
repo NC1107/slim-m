@@ -100,6 +100,7 @@ export 'src/events.dart'
         PresenceChanged,
         ProfileChanged,
         ReactionsChanged,
+        ReadStateChanged,
         ReactionTally,
         CodeRunChanged,
         CodeRunsCleared,

@@ -225,6 +225,13 @@ sealed class ServerEvent {
           outcome: _callRingOutcomeOf(decoded['outcome'])!,
         ),
       'reports.changed' => const ReportsChanged(),
+      'read_state.changed'
+          when decoded['channel_id'] is String &&
+              decoded['last_read_seq'] is int =>
+        ReadStateChanged(
+          channelId: decoded['channel_id'] as String,
+          lastReadSeq: decoded['last_read_seq'] as int,
+        ),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&
               decoded['object'] is Map<String, dynamic> =>
@@ -500,6 +507,13 @@ class EventConnection {
   /// silently rather than erroring or closing the socket.
   void typing(String channelId) => _channel.sink.add(
         jsonEncode({'type': 'typing', 'channel_id': channelId}),
+      );
+
+  /// Reports the channels this device has open and focused, replacing its
+  /// previous report; empty clears it. The server lets a report lapse after
+  /// 90 seconds, so the caller re-sends it periodically while it holds.
+  void viewing(Iterable<String> channelIds) => _channel.sink.add(
+        jsonEncode({'type': 'viewing', 'channel_ids': channelIds.toList()}),
       );
 
   /// Reports this user's pointer position on a channel's canvas.

@@ -38,6 +38,7 @@
 //! nothing here can turn a successful send into an error, and nothing here can
 //! make it slower.
 
+mod attention;
 mod call_ring;
 mod debounce;
 mod deliver;
@@ -55,6 +56,7 @@ use crate::store::Store;
 
 use debounce::Debounce;
 
+pub use attention::narrow_for_attention;
 pub use recipients::message_recipients;
 
 /// How long a burst of messages in one channel collapses into a single wake.

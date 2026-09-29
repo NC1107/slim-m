@@ -150,7 +150,9 @@ fn moves_permissions(event: &Event) -> bool {
         // A category grants and denies nothing (docs/decisions/0006).
         | Event::CategoryChanged
         // A report being filed or resolved changes no permission's answer either.
-        | Event::ReportsChanged => false,
+        | Event::ReportsChanged
+        // A read marker moves no permission and needs no fan-out ordering.
+        | Event::ReadStateChanged { .. } => false,
     }
 }
 
@@ -218,7 +220,9 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::VoiceScreenShareChanged { .. }
         | Event::CallRinging { .. }
         | Event::CallRingEnded { .. }
-        | Event::ReportsChanged => false,
+        | Event::ReportsChanged
+        // A read marker moves no permission and needs no fan-out ordering.
+        | Event::ReadStateChanged { .. } => false,
     }
 }
 

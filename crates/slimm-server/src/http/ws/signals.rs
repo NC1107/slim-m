@@ -18,6 +18,7 @@ use crate::store::{SessionContext, Store, WORLD_LIMIT};
 pub(super) struct PresenceGuard {
     hub: Hub,
     user_id: UserId,
+    connection: u64,
     idle_watch: tokio::task::AbortHandle,
 }
 
@@ -35,17 +36,40 @@ impl PresenceGuard {
             hub.publish(Event::PresenceChanged(user_id));
         }
         let idle_watch = tokio::spawn(watch_idle(hub.clone(), store, user_id)).abort_handle();
+        let connection = hub.presence().viewing().new_connection();
         Self {
             hub,
             user_id,
+            connection,
             idle_watch,
         }
+    }
+
+    /// Records which channels this connection reports as open and focused.
+    ///
+    /// Unparseable ids are skipped and the list is capped: it only ever
+    /// shortens this account's own push, so a bad frame costs nothing else.
+    pub(super) fn set_viewing(&self, channel_ids: &[String]) {
+        let channels = channel_ids
+            .iter()
+            .take(crate::viewing::MAX_VIEWED_CHANNELS)
+            .filter_map(|raw| uuid::Uuid::parse_str(raw).ok())
+            .map(ChannelId)
+            .collect();
+        self.hub
+            .presence()
+            .viewing()
+            .set(self.user_id, self.connection, channels);
     }
 }
 
 impl Drop for PresenceGuard {
     fn drop(&mut self) {
         self.idle_watch.abort();
+        self.hub
+            .presence()
+            .viewing()
+            .clear(self.user_id, self.connection);
         if self.hub.presence().disconnect(self.user_id) {
             self.hub.publish(Event::PresenceChanged(self.user_id));
         }

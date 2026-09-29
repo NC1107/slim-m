@@ -433,3 +433,15 @@ CallRingOutcome? _callRingOutcomeOf(Object? raw) => switch (raw) {
 class ReportsChanged extends ServerEvent {
   const ReportsChanged();
 }
+
+/// This account's read marker in a channel moved on some device: a read on
+/// another one, or a message this account sent from another one. Delivered
+/// only to the account's own sockets, so it clears a badge and is never a
+/// read receipt. [lastReadSeq] is the stored marker, which only moves
+/// forward, so a receiver applies it as a max.
+class ReadStateChanged extends ServerEvent {
+  const ReadStateChanged({required this.channelId, required this.lastReadSeq});
+
+  final String channelId;
+  final int lastReadSeq;
+}

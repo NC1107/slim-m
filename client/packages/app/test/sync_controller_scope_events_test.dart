@@ -214,4 +214,50 @@ void main() {
       );
     });
   }
+
+  test('read_state.changed from another device clears the rail badge, and '
+      'never moves the marker backwards', () async {
+    final harness = _harness(
+      handle: (request) async => http.Response('unexpected call', 500),
+    );
+    addTearDown(harness.container.dispose);
+    addTearDown(harness.store.db.close);
+    final controller = harness.container.read(syncControllerProvider.notifier);
+    await harness.store.upsertChannels([
+      Channel.fromJson(_channelJson(id: 'c1', name: 'general')),
+    ]);
+    await harness.store.applyMessage(
+      Message.fromJson({
+        'id': 'm3',
+        'channel_id': 'c1',
+        'author_id': 'bob',
+        'author_display_name': 'Bob',
+        'seq': 3,
+        'content': 'hey',
+        'created_at': 1000,
+        'edited_at': null,
+      }),
+    );
+    // The same predicate the rail row uses for its unread dot.
+    Future<bool> badged() async {
+      final row = (await harness.store.allChannels()).single;
+      return row.cursor > row.lastReadSeq;
+    }
+
+    expect(await badged(), isTrue, reason: 'precondition: unread here');
+
+    await controller.applyServerEventForTest(
+      const ReadStateChanged(channelId: 'c1', lastReadSeq: 3),
+    );
+    expect(await badged(), isFalse);
+
+    await controller.applyServerEventForTest(
+      const ReadStateChanged(channelId: 'c1', lastReadSeq: 1),
+    );
+    expect(
+      (await harness.store.allChannels()).single.lastReadSeq,
+      3,
+      reason: 'a late, lower marker must not un-read the channel',
+    );
+  });
 }

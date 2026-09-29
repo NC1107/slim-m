@@ -17,15 +17,17 @@
 /// not make the channel look closed while the first is still on screen.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// A ref-counted registry of open channel ids.
-class MountedChannels {
+class MountedChannels extends ChangeNotifier {
   final _counts = <String, int>{};
 
   /// Marks one more caller as showing [channelId].
   void register(String channelId) {
     _counts[channelId] = (_counts[channelId] ?? 0) + 1;
+    notifyListeners();
   }
 
   /// Undoes one prior [register] call for [channelId]. Only drops it from
@@ -38,6 +40,7 @@ class MountedChannels {
     } else {
       _counts.remove(channelId);
     }
+    notifyListeners();
   }
 
   /// Every channel id at least one [ChannelScreen] is showing right now.

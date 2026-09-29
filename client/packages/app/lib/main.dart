@@ -21,6 +21,7 @@ import 'src/providers/app_lock_controller.dart';
 import 'src/providers/app_lock_preference.dart';
 import 'src/providers/desktop_call_notifier.dart';
 import 'src/providers/desktop_message_notifier.dart';
+import 'src/providers/viewing_reporter.dart';
 import 'src/desktop/desktop_chrome.dart';
 import 'src/desktop/desktop_quit_shortcut.dart';
 import 'src/desktop/desktop_window_shell.dart';
@@ -203,6 +204,7 @@ Future<void> _runBootstrapSequence(ProviderContainer container) async {
   container.read(pushControllerProvider);
   container.read(deepLinkControllerProvider);
   container.read(desktopMessageNotifierProvider);
+  container.read(viewingReporterProvider);
   container.read(desktopCallNotifierProvider);
   await DesktopWindowShell.registerListenersAndTray(container);
 }

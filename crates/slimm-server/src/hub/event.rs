@@ -583,4 +583,16 @@ pub enum Event {
     /// deployment-wide event here (`RoleChanged`, `CategoryChanged`,
     /// `MemberTimeoutChanged`) is already fine to broadcast unfiltered.
     ReportsChanged,
+    /// One account's read marker in a channel moved, from any of its devices.
+    ///
+    /// Private to `user_id`: `http::ws::authorization` delivers it only to that
+    /// account's own connections and withholds it from everyone else, so it is
+    /// the signal that clears a badge on the other devices and never a read
+    /// receipt (those stay deferred). Carries the marker itself rather than
+    /// "changed", because the marker is monotonic and applying it needs no read.
+    ReadStateChanged {
+        user_id: UserId,
+        channel_id: ChannelId,
+        last_read_seq: i64,
+    },
 }
