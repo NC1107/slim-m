@@ -26,7 +26,6 @@ import 'reset_password_sheet.dart';
 import 'sign_in_alternatives.dart';
 import 'sign_in_credential_fields.dart';
 import 'sign_in_error.dart';
-import 'sign_in_updates_handoff.dart';
 
 /// Sign in or create an account on a chosen server.
 ///
@@ -356,8 +355,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ref.read(pendingInviteProvider.notifier).state = null;
       }
       unawaited(ref.read(pushControllerProvider.notifier).register());
-      if (!mounted) return;
-      await askAboutUpdatesAfterSignUp(context, ref, created: _creatingAccount);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = signInErrorFor(e));

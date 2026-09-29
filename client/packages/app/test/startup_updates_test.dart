@@ -132,47 +132,26 @@ void main() {
     expect(c.read(startupPromptProvider), isNull);
   });
 
-  test('a signed-out install is not asked here - signup asks it', () async {
-    final c = container(signedIn: false);
-    final check = _Check(_update());
+  test('a fresh install checks without asking, signed in or not', () async {
+    for (final signedIn in [true, false]) {
+      final c = container(signedIn: signedIn);
+      final check = _Check(null);
 
-    await runStartupUpdates(
-      c,
-      check: check.call,
-      format: InstallFormat.rpm,
-      currentVersion: '1.0.0',
-    );
+      await runStartupUpdates(
+        c,
+        check: check.call,
+        format: InstallFormat.rpm,
+        currentVersion: '1.0.0',
+      );
 
-    expect(c.read(startupPromptProvider), isNull);
-    expect(check.ran, isFalse);
-    expect(
-      (await SharedPreferences.getInstance()).containsKey(autoUpdateKey),
-      isFalse,
-      reason: 'not asking must not count as an answer',
-    );
-  });
-
-  test('a signed-in install with no answer yet is asked, and a no is '
-      'remembered', () async {
-    final c = container();
-    final check = _Check(_update());
-
-    final pass = runStartupUpdates(
-      c,
-      check: check.call,
-      format: InstallFormat.rpm,
-      currentVersion: '1.0.0',
-    );
-    final prompt = await answer(c, primary: false);
-    await pass;
-
-    expect(prompt.title, 'Keep slim-m up to date automatically?');
-    expect(prompt.detail, contains('password'));
-    expect(check.ran, isFalse, reason: 'a no stops before the check');
-    expect(
-      (await SharedPreferences.getInstance()).getBool(autoUpdateKey),
-      isFalse,
-    );
+      expect(check.ran, isTrue, reason: 'on is the default');
+      expect(c.read(startupPromptProvider), isNull);
+      expect(
+        (await SharedPreferences.getInstance()).containsKey(autoUpdateKey),
+        isFalse,
+        reason: 'the default is not an answer to save',
+      );
+    }
   });
 
   test('a dnf install relaunches into the new build without asking', () async {
@@ -284,11 +263,5 @@ void main() {
     );
 
     expect(c.read(startupPromptProvider), isNull);
-  });
-
-  test('the mechanism note names dnf for a package install and not for a '
-      'tarball', () {
-    expect(autoUpdateSplashNote(InstallFormat.rpm), contains('package'));
-    expect(autoUpdateSplashNote(InstallFormat.tarball), contains('tell you'));
   });
 }

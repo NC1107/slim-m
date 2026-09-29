@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// What the splash does about updates, per the owner's shape in decision
-/// 0025: ask once whether this install may update itself, and from then on,
-/// when the answer is yes, fetch and install a newer version during the mini
-/// splash before the app starts.
-///
-/// The question is only asked here for an install that already has an
-/// account: a new one is asked during signup (`updates_choice_screen.dart`),
-/// which an install with a session never passes through again. Both write
-/// the same preference, and neither asks twice.
+/// What the splash does about updates, per decision 0025: unless the person
+/// turned it off in Settings, fetch and install a newer version during the
+/// mini splash before the app starts. Nothing is asked here; on is the default.
 ///
 /// Nothing here may fail startup. Every step is timeout-bounded or
 /// best-effort, and any error falls through to launching the client that is
@@ -54,13 +48,7 @@ Future<void> runStartupUpdates(
   if (!isDesktopHost || updateChecksDisabled()) return;
   try {
     final prefs = await container.read(preferencesProvider.future);
-    var enabled = loadAutoUpdatePreference(prefs);
-    if (enabled == null) {
-      if (!container.read(sessionProvider).isSignedIn) return;
-      enabled = await _askToEnable(container, format ?? currentInstallFormat());
-      await prefs.setBool(autoUpdateKey, enabled);
-    }
-    if (!enabled) return;
+    if (!loadAutoUpdatePreference(prefs)) return;
 
     container.read(startupStatusProvider.notifier).state =
         'Checking for updates';
@@ -81,26 +69,6 @@ Future<void> runStartupUpdates(
   } finally {
     container.read(startupPromptProvider.notifier).state = null;
   }
-}
-
-/// The one-time question. Answering is the only way past it, which is the
-/// point: it is asked once per install and never again.
-Future<bool> _askToEnable(
-  ProviderContainer container,
-  InstallFormat format,
-) async {
-  final answer = Completer<bool>();
-  container.read(startupPromptProvider.notifier).state = StartupPrompt(
-    title: 'Keep slim-m up to date automatically?',
-    detail: autoUpdateSplashNote(format),
-    primaryLabel: 'Turn on',
-    onPrimary: () => answer.complete(true),
-    secondaryLabel: 'Not now',
-    onSecondary: () => answer.complete(false),
-  );
-  final enabled = await answer.future;
-  container.read(startupPromptProvider.notifier).state = null;
-  return enabled;
 }
 
 /// The rpm path: dnf does the install behind the system's own polkit prompt,
@@ -171,15 +139,3 @@ Future<void> _offerManually(
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
-
-/// The mechanism line under the splash question, shorter than the join
-/// flow's because the splash has no room for a paragraph.
-String autoUpdateSplashNote(InstallFormat format) => switch (format) {
-  InstallFormat.rpm || InstallFormat.deb =>
-    'Installs with your package manager on each launch. Your system asks '
-        'for your password when there is one to install.',
-  InstallFormat.flatpak =>
-    'slim-m will tell you when a new version is ready and how to get it.',
-  InstallFormat.appImage || InstallFormat.tarball || InstallFormat.unknown =>
-    'slim-m will tell you when a new version is ready and open it for you.',
-};

@@ -158,3 +158,16 @@ Play upload automation and in-app updates; the flatpak remote; minisign-signed t
 - Provide the Developer ID certificate and notarization credentials, and a Windows signing certificate.
 - Create a minisign key pair and add the private key as a secret; the public key goes in the app.
 - Set Cloudflare's browser cache TTL to respect origin headers, or add a cache rule for `/app/*.js`.
+
+## Addendum 2026-09-29 - the choice moves to Settings, on by default
+
+The owner reviewed the signup flow for people joining the official server and decided the desktop "keep slim-m up to date?" screen does not belong in it.
+The terms checkbox stays; the update question goes.
+
+- Nothing asks about updates during signup, and the splash no longer asks an install that already has an account.
+  The screen between sign-up and the first channel is removed for every entry path.
+- The preference defaults to on.
+  An absent key now reads as on rather than as "never asked", so the three-state reading in principle 3 and in the splash section no longer applies.
+- A saved answer of either kind is kept, so an install that already chose off stays off.
+- The switch in Settings, under About, is the one place the choice is made or changed.
+- A signed-out desktop install now also checks on launch, because the default no longer waits for an account.

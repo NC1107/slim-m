@@ -182,4 +182,28 @@ void main() {
 
     await _teardown(tester, container, db);
   });
+
+  testWidgets('a new desktop account goes from sign-up straight to the '
+      'channels, with no updates screen between', (tester) async {
+    final (:container, :db) = _setup();
+    container.read(chosenServerProvider.notifier).restore(Uri.parse(_server));
+
+    final router = container.read(routerProvider);
+    final visited = <String>[];
+    router.routerDelegate.addListener(
+      () => visited.add(router.state.matchedLocation),
+    );
+    await _pumpApp(tester, container, router);
+    expect(router.state.matchedLocation, Routes.signIn);
+
+    // Creating the account stores the session, which is all sign-up does now.
+    container.read(sessionProvider).set(_tokens);
+    await tester.pump();
+    await tester.pump();
+
+    expect(router.state.matchedLocation, Routes.channels);
+    expect(visited.where((l) => l.contains('updates')), isEmpty);
+
+    await _teardown(tester, container, db);
+  });
 }
