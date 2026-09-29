@@ -412,6 +412,7 @@ Future<void> renderSurface(
   bool knownTransient = false,
   bool allowNoText = false,
   TextScaler? textScaler,
+  Future<void> Function(WidgetTester tester)? afterSettle,
 }) async {
   tester.view.physicalSize = viewports[viewportName]!;
   tester.view.devicePixelRatio = 1.0;
@@ -461,6 +462,10 @@ Future<void> renderSurface(
   // A fetch landing on the final frame above mounts its fade at t=0; one more timed frame lets it land - see this function's own doc.
   await tester.pump(const Duration(milliseconds: 350));
 
+  if (afterSettle != null) {
+    await afterSettle(tester);
+    await tester.pump(const Duration(milliseconds: 350));
+  }
   // Before writeSnapshot: its own extra pumps could mask what this looks for.
   await expectSettled(
     tester,

@@ -137,3 +137,19 @@ The six-idiom drift as a whole is still a rendered-screens question, not a sourc
 But the one rule this record actually commits to, horizontal inset is owned by the frame and never by a section, *is* a source-scan question, the same shape `type_scale_literal_test.dart` already gates an off-scale `fontSize:` literal with, and it would have caught `categories_screen.dart`'s reimplementation directly rather than waiting for a reviewer to read the file by hand.
 `settings_frame_inset_test.dart` reads every `SettingsScreenScaffold(...)` call under `lib/src/screens/` for an explicit `padding:` argument or a `Padding` wrapped around its `child:` before the frame sees it, with a named one-line-why allowlist for `reports_screen.dart`'s genuine need to own its own paginated `ListView`.
 Deliberately not attempted: `SettingsPanesScaffold` takes no `padding` parameter at all, so the only way a pane could re-derive its own inset is inside a `SettingsPane.builder` closure, which may be declared anywhere and is not something a scan of the scaffold call site can see - a real residual, left unenforced rather than approximated with a check that would either miss it or false-positive on unrelated `Padding` widgets a pane's own content legitimately uses.
+
+## Addendum, 2026-09-28: hierarchy inside the container
+
+The container vocabulary fixed the idiom, but the panes still read flat because the levels inside it were not distinct.
+Four concrete causes, found by rendering every personal pane at phone and desktop width in both themes.
+
+1. `AppListRow` sized its `meta` as a `Flexible` beside the `Expanded` label, so the two split the free space in half and the value floated mid-row instead of against the trailing edge.
+   Toggles sat at the right edge and selects did not, and the halved label truncated ("Attachment preview ...") with room to spare.
+   `meta` is sized to its text and capped at half the row now.
+2. Select and navigation rows read their label in `text-secondary` beside toggle rows in `text-primary`, so one card carried two greys.
+   `SettingsSectionCard` scopes its rows to `text-primary` through `AppStrongLabelScope`.
+3. Rows in a list-of-rows card had no rule between them (`divided: true` now draws a hairline), and an untitled card sat 24dp higher than a titled one, so stacked untitled cards touched and the first block jumped as you moved between panes.
+   An untitled card now leaves the same 24dp a titled header does.
+4. At two-pane width nothing in the pane named the pane, only the selected nav row.
+   `SettingsPanesScaffold` renders the pane label as a `heading` step above its sections, giving three levels (pane, section, row).
+   This supersedes `settings_taxonomy_test.dart`'s earlier "the nav row is the only place the name appears": a section header still may not restate the pane name, but the pane's own heading does.

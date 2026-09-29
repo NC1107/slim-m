@@ -130,4 +130,47 @@ void main() {
       expect(tester.takeException(), isAssertionError);
     },
   );
+
+  testWidgets('divided draws one hairline between each pair of rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        const SettingsSectionCard(
+          title: 'Display',
+          divided: true,
+          children: [Text('a'), Text('b'), Text('c')],
+        ),
+      ),
+    );
+    expect(find.byType(Divider), findsNWidgets(2));
+
+    await tester.pumpWidget(
+      _harness(
+        const SettingsSectionCard(
+          title: 'Display',
+          children: [Text('a'), Text('b'), Text('c')],
+        ),
+      ),
+    );
+    expect(find.byType(Divider), findsNothing);
+  });
+
+  testWidgets('an untitled card starts as far down as a titled one', (
+    tester,
+  ) async {
+    Future<double> cardTop(String? title) async {
+      await tester.pumpWidget(
+        _harness(
+          SettingsSectionCard(title: title, children: const [Text('row')]),
+        ),
+      );
+      return tester.getTopLeft(find.byType(AppCard)).dy;
+    }
+
+    final untitled = await cardTop(null);
+    final titled = await cardTop('Display');
+    expect(untitled, AppSpacing.s24);
+    expect(titled, greaterThan(untitled));
+  });
 }

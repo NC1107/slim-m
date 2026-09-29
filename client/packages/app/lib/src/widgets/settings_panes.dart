@@ -205,7 +205,7 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
             Expanded(
               child: selected == null
                   ? const SizedBox.shrink()
-                  : _PaneBody(pane: selected),
+                  : _PaneBody(pane: selected, showHeading: true),
             ),
           ],
         ),
@@ -224,9 +224,13 @@ class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
 /// flat" report on a wide desktop window, where the nav's 240px left nothing
 /// else bounding it.
 class _PaneBody extends StatelessWidget {
-  const _PaneBody({required this.pane});
+  const _PaneBody({required this.pane, this.showHeading = false});
 
   final SettingsPane pane;
+
+  /// Wide only: beside the nav nothing else names the pane, where on compact
+  /// the app bar already does.
+  final bool showHeading;
 
   @override
   Widget build(BuildContext context) => AppFadeIn(
@@ -237,7 +241,10 @@ class _PaneBody extends StatelessWidget {
       child: pane.scrollable
           ? ListView(
               padding: pane.padding,
-              children: [Builder(builder: pane.builder)],
+              children: [
+                if (showHeading) _PaneHeading(pane.label),
+                Builder(builder: pane.builder),
+              ],
             )
           : Padding(
               padding: pane.padding,
@@ -256,6 +263,27 @@ class _PaneBody extends StatelessWidget {
 /// icon. At the same size the icon outweighed it, so a caps label on its own
 /// row read as another nav row rather than the heading over the rows; the
 /// hairline and the quieter colour are what separate it now, not its size.
+class _PaneHeading extends StatelessWidget {
+  const _PaneHeading(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Semantics(
+      header: true,
+      child: Text(
+        label,
+        style: AppText.heading.copyWith(
+          color: tokens.textPrimary,
+          fontWeight: AppWeights.semi,
+        ),
+      ),
+    );
+  }
+}
+
 class _Nav extends StatelessWidget {
   const _Nav({
     required this.groups,

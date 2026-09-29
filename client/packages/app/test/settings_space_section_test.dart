@@ -58,7 +58,7 @@ void main() {
   ) async {
     await pumpSpaceSettings(tester, Perm.createInvite);
 
-    expect(find.text('Invites'), findsOneWidget);
+    expect(find.widgetWithText(AppListRow, 'Invites'), findsOneWidget);
     expect(find.text('Reports'), findsNothing);
     expect(find.text('Roles'), findsNothing);
     expect(find.text('Channel permissions'), findsNothing);
@@ -70,7 +70,7 @@ void main() {
     (tester) async {
       await pumpSpaceSettings(tester, Perm.manageRoles);
 
-      expect(find.text('Roles'), findsOneWidget);
+      expect(find.widgetWithText(AppListRow, 'Roles'), findsOneWidget);
       expect(find.text('Channel permissions'), findsOneWidget);
       expect(find.text('Reports'), findsNothing);
       expect(find.text('Invites'), findsNothing);

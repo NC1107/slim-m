@@ -33,6 +33,7 @@ class AppearanceSettingsSection extends ConsumerWidget {
     final highContrast = ref.watch(highContrastControllerProvider);
 
     return SettingsSectionCard(
+      divided: true,
       children: [
         SettingsSelectRow<AppThemeChoice>(
           label: 'Theme',

@@ -30,6 +30,7 @@ class PerformanceSettingsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SettingsSectionCard(
+      divided: true,
       children: [
         SettingsSelectRow<MediaAutoDownload>(
           label: 'Auto-download media',

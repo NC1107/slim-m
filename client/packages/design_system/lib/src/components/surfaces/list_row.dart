@@ -19,6 +19,18 @@ import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import '../../touch_targets.dart';
 
+/// Reads every [AppListRow] label below it in `text-primary` at rest, for a
+/// settings card where each label names a control rather than a destination.
+class AppStrongLabelScope extends InheritedWidget {
+  const AppStrongLabelScope({required super.child, super.key});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppStrongLabelScope>() != null;
+
+  @override
+  bool updateShouldNotify(AppStrongLabelScope oldWidget) => false;
+}
+
 /// A single-line row: optional leading content, a label, an optional `meta`
 /// caption, an optional trailing widget, and four states that combine freely.
 ///
@@ -270,7 +282,9 @@ class _AppListRowState extends State<AppListRow> {
     final emphasised =
         widget.selected || widget.mentioned || (widget.unread && !widget.muted);
     final labelStyle = AppText.ui.copyWith(
-      color: emphasised ? tokens.textPrimary : tokens.textSecondary,
+      color: emphasised || AppStrongLabelScope.of(context)
+          ? tokens.textPrimary
+          : tokens.textSecondary,
       fontWeight: emphasised ? AppWeights.medium : AppWeights.regular,
     );
 
@@ -295,60 +309,65 @@ class _AppListRowState extends State<AppListRow> {
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-      child: Row(
-        spacing: AppSpacing.s8,
-        children: [
-          // Excluded for the same reason the label below is: an avatar names
-          // itself, so a member row announced its name twice.
-          if (widget.leading != null)
-            ExcludeSemantics(
-              child: Opacity(
+      child: LayoutBuilder(
+        builder: (context, box) => Row(
+          spacing: AppSpacing.s8,
+          children: [
+            // Excluded for the same reason the label below is: an avatar names
+            // itself, so a member row announced its name twice.
+            if (widget.leading != null)
+              ExcludeSemantics(
+                child: Opacity(
+                  opacity: widget.muted ? 0.62 : 1,
+                  child: widget.leading!,
+                ),
+              ),
+            Expanded(
+              // Excluded because the Semantics wrapper below already names this
+              // row; without it a screen reader announces "general, general".
+              child: ExcludeSemantics(
+                child: widget.subtitle == null
+                    ? Text(widget.label,
+                        overflow: TextOverflow.ellipsis, style: labelStyle)
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: labelStyle),
+                          Text(
+                            widget.subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.caption
+                                .copyWith(color: tokens.textSecondary),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            if (widget.meta != null)
+              // Sized to its text and capped, not Flexible: a Flexible beside the
+              // Expanded label split the free space in half and floated the
+              // value mid-row instead of against the trailing edge.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: box.maxWidth * 0.5),
+                child: Text(
+                  widget.meta!,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(color: tokens.textSecondary),
+                ),
+              ),
+            if (trailingContent != null)
+              Opacity(
                 opacity: widget.muted ? 0.62 : 1,
-                child: widget.leading!,
+                child: trailingContent,
               ),
-            ),
-          Expanded(
-            // Excluded because the Semantics wrapper below already names this
-            // row; without it a screen reader announces "general, general".
-            child: ExcludeSemantics(
-              child: widget.subtitle == null
-                  ? Text(widget.label,
-                      overflow: TextOverflow.ellipsis, style: labelStyle)
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.label,
-                            overflow: TextOverflow.ellipsis, style: labelStyle),
-                        Text(
-                          widget.subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.caption
-                              .copyWith(color: tokens.textSecondary),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-          if (widget.meta != null)
-            // Flexible, not a bare Text: ellipsis only engages under a bounded
-            // width, so without this a long meta overflows instead of eliding.
-            Flexible(
-              child: Text(
-                widget.meta!,
-                overflow: TextOverflow.ellipsis,
-                style: AppText.caption.copyWith(color: tokens.textSecondary),
-              ),
-            ),
-          if (trailingContent != null)
-            Opacity(
-              opacity: widget.muted ? 0.62 : 1,
-              child: trailingContent,
-            ),
-          if (widget.trailingExtra != null) widget.trailingExtra!,
-        ],
+            if (widget.trailingExtra != null) widget.trailingExtra!,
+          ],
+        ),
       ),
     );
 

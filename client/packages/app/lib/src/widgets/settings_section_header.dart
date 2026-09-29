@@ -95,7 +95,14 @@ class SettingsSectionCard extends StatelessWidget {
     required this.children,
     this.description,
     this.crossAxisAlignment = CrossAxisAlignment.start,
+    this.divided = false,
   });
+
+  /// Draws a hairline between children, for a card that is a list of rows.
+  ///
+  /// Off by default: a card holding free-form content (a picker, an error
+  /// box) has no row boundaries for a rule to mark.
+  final bool divided;
 
   /// Null for a screen whose entire body is this one group, where a header
   /// would only restate the app bar title above it.
@@ -130,19 +137,36 @@ class SettingsSectionCard extends StatelessWidget {
       title != null || description == null,
       'SettingsSectionCard.description needs a title to render under',
     );
+    final tokens = Theme.of(context).extension<AppTokens>()!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (title != null)
-          SettingsSectionHeader(title!, description: description),
+          SettingsSectionHeader(title!, description: description)
+        else
+          const SizedBox(height: AppSpacing.s24),
         AppCard(
           padding: const EdgeInsets.all(AppSpacing.s8),
           child: Material(
             type: MaterialType.transparency,
-            child: Column(
-              crossAxisAlignment: crossAxisAlignment,
-              mainAxisSize: MainAxisSize.min,
-              children: children,
+            child: AppStrongLabelScope(
+              child: Column(
+                crossAxisAlignment: crossAxisAlignment,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    if (divided && i > 0)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: AppSpacing.s8,
+                        endIndent: AppSpacing.s8,
+                        color: tokens.borderSubtle,
+                      ),
+                    children[i],
+                  ],
+                ],
+              ),
             ),
           ),
         ),
