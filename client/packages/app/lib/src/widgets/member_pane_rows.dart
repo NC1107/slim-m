@@ -90,7 +90,15 @@ String? _presenceDescription(AppPresence status) => switch (status) {
 /// so a `PresenceChanged` for someone else never reaches this row's build
 /// at all, only the row for whoever actually changed.
 class MemberRow extends ConsumerWidget {
-  const MemberRow({required this.profile, required this.isSelf, super.key});
+  const MemberRow({
+    required this.profile,
+    required this.isSelf,
+    this.channelId,
+    super.key,
+  });
+
+  /// The channel whose roster this row is in.
+  final String? channelId;
 
   final api.UserProfile profile;
 
@@ -126,7 +134,13 @@ class MemberRow extends ConsumerWidget {
     final selectable = selecting && !isSelf;
 
     void open() => unawaited(
-      showMemberProfile(context, ref, profile: displayed, status: status),
+      showMemberProfile(
+        context,
+        ref,
+        profile: displayed,
+        status: status,
+        channelId: channelId,
+      ),
     );
     void toggle() =>
         ref.read(memberSelectionProvider.notifier).toggle(profile.id);
