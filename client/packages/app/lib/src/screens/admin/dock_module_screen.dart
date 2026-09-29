@@ -34,9 +34,13 @@ import 'dock_module_view.dart';
 import 'dock_host_access_card.dart';
 
 class DockModuleScreen extends ConsumerStatefulWidget {
-  const DockModuleScreen({super.key, required this.moduleId});
+  const DockModuleScreen({super.key, required this.moduleId, this.source});
 
   final String moduleId;
+
+  /// The community source this module was opened from; null is the official
+  /// one.
+  final String? source;
 
   @override
   ConsumerState<DockModuleScreen> createState() => _DockModuleScreenState();
@@ -84,7 +88,7 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
         .valueOrNull
         ?.installedFor(widget.moduleId);
     final manifest = ref
-        .read(dockManifestProvider(widget.moduleId))
+        .read(dockManifestFor(widget.moduleId, widget.source))
         .valueOrNull;
     if (manifest == null) return;
     setState(() {
@@ -124,6 +128,7 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
             moduleId: manifest.id,
             version: manifest.version,
             approvedHostCapabilities: approved.toList()..sort(),
+            source: widget.source,
           ),
     );
     if (!mounted) return;
@@ -141,7 +146,9 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     if (!wasInstalled && mounted) {
       // Installed is not usable until somebody is granted it; see that screen's doc.
       if (manifest.permissions.isNotEmpty) {
-        context.go(Routes.adminDockModuleAccess(manifest.id));
+        context.go(
+          Routes.adminDockModuleAccess(manifest.id, source: widget.source),
+        );
       } else {
         // Nothing to grant, so there is no later moment to turn it on at.
         await _setEnabled(manifest.name, true);
@@ -198,11 +205,17 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
 
   @override
   Widget build(BuildContext context) {
-    final manifest = ref.watch(dockManifestProvider(widget.moduleId));
-    final installed = ref
-        .watch(dockCatalogProvider)
-        .valueOrNull
-        ?.installedFor(widget.moduleId);
+    final manifest = ref.watch(dockManifestFor(widget.moduleId, widget.source));
+    final catalog = ref.watch(dockCatalogProvider).valueOrNull;
+    final installed = catalog?.installedFor(widget.moduleId);
+    final sourceRepo = widget.source == null
+        ? null
+        : catalog?.sections
+                  .where((s) => s.source.id == widget.source)
+                  .firstOrNull
+                  ?.source
+                  .repo ??
+              installed?.sourceRepo;
 
     return SettingsScreenScaffold(
       title: manifest.valueOrNull?.name ?? 'Module',
@@ -212,9 +225,11 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
         value: AppAsyncState(data: manifest.valueOrNull, error: manifest.error),
         center: false,
         errorMessage: 'Could not load this module.',
-        onRetry: () => ref.invalidate(dockManifestProvider(widget.moduleId)),
+        onRetry: () =>
+            ref.invalidate(dockManifestFor(widget.moduleId, widget.source)),
         data: (context, m) => DockManifestView(
           manifest: m,
+          sourceRepo: sourceRepo,
           installed: installed,
           approvedHostCapabilities: _approvedFor(m, installed),
           reapprovePosting:
@@ -229,7 +244,9 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
           onInstall: () => _install(m, wasInstalled: installed != null),
           onSetEnabled: (v) => _setEnabled(m.name, v),
           onUninstall: () => _uninstall(m.name),
-          onChooseAccess: () => context.go(Routes.adminDockModuleAccess(m.id)),
+          onChooseAccess: () => context.go(
+            Routes.adminDockModuleAccess(m.id, source: widget.source),
+          ),
         ),
       ),
     );

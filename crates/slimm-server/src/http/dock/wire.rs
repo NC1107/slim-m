@@ -14,15 +14,19 @@ pub(super) struct IndexEntryDto {
     name: String,
     version: String,
     summary: String,
+    /// True when another source already owns this id, so it cannot be
+    /// installed from the source being listed (decision 0046).
+    shadowed: bool,
 }
 
-impl From<IndexEntry> for IndexEntryDto {
-    fn from(entry: IndexEntry) -> Self {
+impl IndexEntryDto {
+    pub(super) fn new(entry: IndexEntry, shadowed: bool) -> Self {
         Self {
             id: entry.id,
             name: entry.name,
             version: entry.version,
             summary: entry.summary,
+            shadowed,
         }
     }
 }
@@ -156,6 +160,9 @@ pub(super) struct InstalledModuleDto {
     extension_points: Vec<ExtensionPointDto>,
     enabled: bool,
     installed_at: i64,
+    /// The community source's `owner/repo`; absent for the official source.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_repo: Option<String>,
 }
 
 impl From<InstalledModule> for InstalledModuleDto {
@@ -181,6 +188,7 @@ impl From<InstalledModule> for InstalledModuleDto {
                 .collect(),
             enabled: m.enabled,
             installed_at: m.installed_at,
+            source_repo: m.source_repo,
         }
     }
 }

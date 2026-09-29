@@ -212,14 +212,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '${Routes.adminDock}/:moduleId',
         pageBuilder: (context, state) => modalPage(
           context,
-          DockModuleScreen(moduleId: state.pathParameters['moduleId']!),
+          DockModuleScreen(
+            moduleId: state.pathParameters['moduleId']!,
+            source: state.uri.queryParameters['source'],
+          ),
         ),
       ),
       GoRoute(
         path: '${Routes.adminDock}/:moduleId/access',
         pageBuilder: (context, state) => modalPage(
           context,
-          DockModuleAccessScreen(moduleId: state.pathParameters['moduleId']!),
+          DockModuleAccessScreen(
+            moduleId: state.pathParameters['moduleId']!,
+            source: state.uri.queryParameters['source'],
+          ),
         ),
       ),
       GoRoute(

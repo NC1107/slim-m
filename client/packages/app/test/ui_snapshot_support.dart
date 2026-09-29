@@ -37,6 +37,7 @@ import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/screens/admin/channel_permissions_screen.dart';
+import 'package:slimm_app/src/screens/admin/dock_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/screens/admin/performance_screen.dart';
@@ -284,6 +285,10 @@ GoRouter fixtureRouter(String location) => GoRouter(
       path: '/settings/account-recovery',
       pageBuilder: (context, state) =>
           modalPage(context, const AccountRecoveryScreen()),
+    ),
+    GoRoute(
+      path: '/settings/dock',
+      pageBuilder: (context, state) => modalPage(context, const DockScreen()),
     ),
     GoRoute(
       path: '/settings/debug-log',

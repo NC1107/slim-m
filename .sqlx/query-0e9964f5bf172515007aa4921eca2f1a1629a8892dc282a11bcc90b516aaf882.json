@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO dock_sources (id, repo, created_at) VALUES (?, ?, ?)\n             ON CONFLICT(repo) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "0e9964f5bf172515007aa4921eca2f1a1629a8892dc282a11bcc90b516aaf882"
+}

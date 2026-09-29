@@ -185,24 +185,80 @@ final serverMetricsProvider = FutureProvider.autoDispose<api.ServerMetrics>(
 /// `docs/decisions/0021-modules-and-the-dock.md` and
 /// `screens/admin/dock_screen.dart`.
 class DockCatalog {
-  const DockCatalog({required this.entries, required this.installed});
+  const DockCatalog({
+    required this.entries,
+    required this.installed,
+    this.sections = const [],
+    this.sourcesFailed = false,
+  });
 
+  /// The official source's modules.
   final List<api.DockIndexEntry> entries;
   final List<api.InstalledDockModule> installed;
+
+  /// One per community source, each loaded on its own so a broken one shows
+  /// its own error and leaves the rest of the Dock alone (decision 0046).
+  final List<DockSourceSection> sections;
+
+  /// True when the source list itself could not be read.
+  final bool sourcesFailed;
 
   /// The install record for [moduleId], or null when it is not installed.
   api.InstalledDockModule? installedFor(String moduleId) =>
       installed.where((m) => m.id == moduleId).firstOrNull;
 }
 
+/// One community source and what it lists, or that it could not be read.
+class DockSourceSection {
+  const DockSourceSection({
+    required this.source,
+    required this.entries,
+    this.failed = false,
+  });
+
+  final api.DockSource source;
+  final List<api.DockIndexEntry> entries;
+  final bool failed;
+}
+
 final dockCatalogProvider = FutureProvider.autoDispose<DockCatalog>((
   ref,
 ) async {
-  final api = ref.watch(apiProvider);
-  final entries = await api.listDockModules();
-  final installed = await api.listInstalledDockModules();
-  return DockCatalog(entries: entries, installed: installed);
+  final client = ref.watch(apiProvider);
+  final entries = await client.listDockModules();
+  final installed = await client.listInstalledDockModules();
+  var communitySources = <api.DockSource>[];
+  var sourcesFailed = false;
+  try {
+    communitySources = [
+      for (final s in await client.listDockSources())
+        if (!s.official) s,
+    ];
+  } catch (_) {
+    sourcesFailed = true;
+  }
+  final sections = await Future.wait([
+    for (final source in communitySources) _loadSection(client, source),
+  ]);
+  return DockCatalog(
+    entries: entries,
+    installed: installed,
+    sections: sections,
+    sourcesFailed: sourcesFailed,
+  );
 });
+
+Future<DockSourceSection> _loadSection(
+  api.SlimmApi client,
+  api.DockSource source,
+) async {
+  try {
+    final entries = await client.listDockModules(source: source.id);
+    return DockSourceSection(source: source, entries: entries);
+  } catch (_) {
+    return DockSourceSection(source: source, entries: const [], failed: true);
+  }
+}
 
 /// One module's full manifest, fetched only once its row is opened - see
 /// `screens/admin/dock_module_sheet.dart`.
@@ -210,6 +266,23 @@ final dockManifestProvider = FutureProvider.autoDispose
     .family<api.DockManifest, String>(
       (ref, moduleId) => ref.watch(apiProvider).getDockModule(moduleId),
     );
+
+/// A community source's copy of one module's manifest.
+final dockSourceManifestProvider = FutureProvider.autoDispose
+    .family<api.DockManifest, ({String moduleId, String source})>(
+      (ref, key) => ref
+          .watch(apiProvider)
+          .getDockModule(key.moduleId, source: key.source),
+    );
+
+/// The manifest provider for a module opened from [source], where null is the
+/// official source.
+AutoDisposeFutureProvider<api.DockManifest> dockManifestFor(
+  String moduleId,
+  String? source,
+) => source == null
+    ? dockManifestProvider(moduleId)
+    : dockSourceManifestProvider((moduleId: moduleId, source: source));
 
 /// Every module-scoped permission any installed module currently declares -
 /// the catalog a role editor lists alongside the fixed permission bitmask.

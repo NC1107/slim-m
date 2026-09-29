@@ -6549,10 +6549,15 @@ paths:
     get:
       operationId: listDockModules
       tags: [space]
+      parameters:
+        - $ref: "#/components/parameters/DockSourceQuery"
       summary: Browse the module marketplace's index. Requires MANAGE_SERVER.
       description: >
         Fetches `index.json` from the addons repo (docs/decisions/0021) over
-        a host-allowlisted client. Nothing is installed by this call.
+        a host-allowlisted client. Nothing is installed by this call. The
+        `source` query parameter picks a community source (decision 0046);
+        omitted, it reads the official one. An entry with `shadowed: true`
+        cannot be installed from this source.
       responses:
         "200":
           description: The marketplace listing.
@@ -6583,6 +6588,8 @@ paths:
     get:
       operationId: getDockModule
       tags: [space]
+      parameters:
+        - $ref: "#/components/parameters/DockSourceQuery"
       summary: Read a module's full manifest before installing it. Requires MANAGE_SERVER.
       description: >
         Shows every permission the module will register and every capability
@@ -6616,10 +6623,13 @@ paths:
     post:
       operationId: installDockModule
       tags: [space]
+      parameters:
+        - $ref: "#/components/parameters/DockSourceQuery"
       summary: Install a module at a pinned version. Requires MANAGE_SERVER.
       description: >
         Re-fetches the module's manifest, refuses if its version no longer
-        matches the one requested, and records the install, its declared
+        matches the one requested, refuses (409) an id another source already
+        owns (decision 0046), and records the install, its declared
         permissions, and its approved capabilities. No runtime executes the
         module; see docs/decisions/0021's phasing. Off (disabled) by default -
         a separate enable call turns it on.
@@ -6738,6 +6748,92 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /space/dock/sources:
+    get:
+      operationId: listDockSources
+      tags: [space]
+      summary: List the module sources, the official one first. Requires MANAGE_SERVER.
+      responses:
+        "200":
+          description: Every module source.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DockSource"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    post:
+      operationId: addDockSource
+      tags: [space]
+      summary: Add a community module source. Requires MANAGE_SERVER.
+      description: >
+        A source is a GitHub `owner/repo` slug read from the same fixed host
+        as the official one (decision 0046); a URL or any other host is
+        refused. Adding a repo that is already a source answers 200 with the
+        existing one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDockSourceRequest"
+      responses:
+        "200":
+          description: That repo was already a source.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DockSource"
+        "201":
+          description: The source was added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DockSource"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /space/dock/sources/{sourceId}:
+    parameters:
+      - name: sourceId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: removeDockSource
+      tags: [space]
+      summary: Remove a community module source. Requires MANAGE_SERVER.
+      description: >
+        Modules already installed from it stay installed and enabled; they
+        keep their source label and cannot be updated until the source is
+        added again (decision 0046). The official source cannot be removed.
+      responses:
+        "204":
+          description: The source was removed.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
   /modules/{moduleId}/commands/{command}:
@@ -7142,6 +7238,15 @@ components:
       schema:
         type: string
         format: uuid
+    DockSourceQuery:
+      name: source
+      in: query
+      required: false
+      description: >
+        A module source's id from listDockSources; omitted, the official
+        source.
+      schema:
+        type: string
 
   responses:
     Tokens:
@@ -8001,7 +8106,7 @@ components:
             Settable range is 360 to 2160; the default is 2160.
     DockIndexEntry:
       type: object
-      required: [id, name, version, summary]
+      required: [id, name, version, summary, shadowed]
       properties:
         id:
           type: string
@@ -8012,6 +8117,34 @@ components:
           type: string
         summary:
           type: string
+        shadowed:
+          type: boolean
+          description: >
+            True when another source already owns this id, so it cannot be
+            installed from the source being listed.
+    DockSource:
+      type: object
+      required: [id, repo, official]
+      properties:
+        id:
+          type: string
+          description: Pass as `source`; the official source's id is `official`.
+        repo:
+          type: string
+          description: The GitHub `owner/repo` slug.
+        official:
+          type: boolean
+        created_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds; absent for the official source.
+    AddDockSourceRequest:
+      type: object
+      required: [repo]
+      properties:
+        repo:
+          type: string
+          description: A GitHub `owner/repo` slug, never a URL.
     DockArtifact:
       type: object
       required: [kind, path, sha256]
@@ -8189,6 +8322,11 @@ components:
             slim.host_call; empty for a module installed before that approval
             existed. A run may use only a capability that is declared in
             approved_capabilities and also listed here.
+        source_repo:
+          type: string
+          description: >
+            The community source's `owner/repo` it was installed from; absent
+            for the official source.
         extension_points:
           type: array
           description: >

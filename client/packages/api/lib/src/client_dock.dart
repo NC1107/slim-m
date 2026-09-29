@@ -7,9 +7,14 @@ part of 'client.dart';
 /// and Phase 2 (install/enable/uninstall, dynamic permissions) only; no
 /// module code ever runs from anything in this file.
 extension SlimmApiDock on SlimmApi {
-  /// Browses the marketplace's index. Nothing is installed by this call.
-  Future<List<DockIndexEntry>> listDockModules() async {
-    final json = await _send('GET', '/space/dock/modules');
+  /// Browses a source's index; [source] is a [DockSource.id], and null is the
+  /// official one. Nothing is installed by this call.
+  Future<List<DockIndexEntry>> listDockModules({String? source}) async {
+    final json = await _send(
+      'GET',
+      '/space/dock/modules',
+      query: _sourceQuery(source),
+    );
     return (json as List<dynamic>)
         .map((m) => DockIndexEntry.fromJson(m as Map<String, dynamic>))
         .toList(growable: false);
@@ -17,8 +22,12 @@ extension SlimmApiDock on SlimmApi {
 
   /// Reads one module's full manifest, including every permission it will
   /// register and every capability it asks for, before installing it.
-  Future<DockManifest> getDockModule(String moduleId) async {
-    final json = await _send('GET', '/space/dock/modules/$moduleId');
+  Future<DockManifest> getDockModule(String moduleId, {String? source}) async {
+    final json = await _send(
+      'GET',
+      '/space/dock/modules/$moduleId',
+      query: _sourceQuery(source),
+    );
     return DockManifest.fromJson(json as Map<String, dynamic>);
   }
 
@@ -34,10 +43,12 @@ extension SlimmApiDock on SlimmApi {
     required String moduleId,
     required String version,
     List<String>? approvedHostCapabilities,
+    String? source,
   }) async {
     final json = await _send(
       'POST',
       '/space/dock/modules/$moduleId/install',
+      query: _sourceQuery(source),
       body: {
         'version': version,
         if (approvedHostCapabilities != null)
@@ -66,6 +77,34 @@ extension SlimmApiDock on SlimmApi {
     final json = await _send('POST', '/space/dock/modules/$moduleId/disable');
     return InstalledDockModule.fromJson(json as Map<String, dynamic>);
   }
+
+  Map<String, String>? _sourceQuery(String? source) =>
+      source == null ? null : {'source': source};
+
+  /// The module sources, the official one first.
+  Future<List<DockSource>> listDockSources() async {
+    final json = await _send('GET', '/space/dock/sources');
+    return (json as List<dynamic>)
+        .map((s) => DockSource.fromJson(s as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Adds a community source by its GitHub `owner/repo`; a URL is refused.
+  Future<DockSource> addDockSource(String repo) async {
+    final json = await _send(
+      'POST',
+      '/space/dock/sources',
+      body: {'repo': repo},
+    );
+    return DockSource.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Removes a community source. Modules installed from it stay installed.
+  Future<void> removeDockSource(String sourceId) => _send(
+        'DELETE',
+        '/space/dock/sources/${Uri.encodeComponent(sourceId)}',
+        expectNoContent: true,
+      );
 
   /// Every module this space currently has installed.
   Future<List<InstalledDockModule>> listInstalledDockModules() async {
