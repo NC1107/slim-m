@@ -259,6 +259,16 @@ sealed class ServerEvent {
             decoded['message'] as Map<String, dynamic>,
           ),
         ),
+      'device.signed_in'
+          when decoded['device_id'] is String &&
+              decoded['device_name'] is String &&
+              decoded['signed_in_at'] is int =>
+        NewDeviceSignIn(
+          deviceId: decoded['device_id'] as String,
+          deviceName: decoded['device_name'] as String,
+          clientKind: decoded['client_kind'] as String?,
+          signedInAt: decoded['signed_in_at'] as int,
+        ),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&
               decoded['object'] is Map<String, dynamic> =>

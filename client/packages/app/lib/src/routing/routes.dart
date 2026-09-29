@@ -10,11 +10,22 @@ library;
 /// expects something to navigate to, and a query key is not one.
 const _openChatQuery = 'chat';
 
+/// The query key [Routes.personalSettingsPane] sets, kept out of [Routes] for
+/// the same reason as [_openChatQuery].
+const settingsPaneQuery = 'pane';
+
+/// The id of the personal settings pane that lists signed-in devices.
+const accountDevicesPane = 'account-devices';
+
 abstract final class Routes {
   static const onboarding = '/join';
   static const signIn = '/sign-in';
   static const channels = '/channels';
   static const personalSettings = '/settings';
+
+  /// [personalSettings] opened on one pane; see [settingsPaneQuery].
+  static String personalSettingsPane(String paneId) =>
+      '$personalSettings?$settingsPaneQuery=$paneId';
   static const spaceSettings = '/settings/space';
   static const adminReports = '/settings/reports';
   static const adminInvites = '/settings/invites';

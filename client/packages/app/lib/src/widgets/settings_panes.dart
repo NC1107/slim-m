@@ -94,9 +94,13 @@ class SettingsPanesScaffold extends StatefulWidget {
     required this.backTooltip,
     required this.backFallback,
     this.footer,
+    this.initialPaneId,
   });
 
   final String title;
+
+  /// The pane shown first; on a phone this opens straight into it.
+  final String? initialPaneId;
   final List<SettingsPaneGroup> groups;
 
   /// Names the destination, not just "Back"; see [BackToButton].
@@ -113,7 +117,7 @@ class SettingsPanesScaffold extends StatefulWidget {
 }
 
 class _SettingsPanesScaffoldState extends State<SettingsPanesScaffold> {
-  String? _selectedId;
+  late String? _selectedId = widget.initialPaneId;
 
   List<SettingsPane> get _allPanes => [
     for (final group in widget.groups) ...group.panes,

@@ -63,11 +63,15 @@ import '../widgets/settings_profile_preview.dart';
 import 'voice_settings_screen.dart';
 
 class PersonalSettingsScreen extends StatelessWidget {
-  const PersonalSettingsScreen({super.key});
+  const PersonalSettingsScreen({super.key, this.initialPaneId});
+
+  /// The pane to open on, when something deep-links to one.
+  final String? initialPaneId;
 
   @override
   Widget build(BuildContext context) {
     return SettingsPanesScaffold(
+      initialPaneId: initialPaneId,
       title: 'Settings',
       // Reached with go(), which replaces, so there is no stack to pop.
       backTooltip: 'Back to channels',
@@ -91,7 +95,7 @@ class PersonalSettingsScreen extends StatelessWidget {
               ),
             ),
             SettingsPane(
-              id: 'account-devices',
+              id: accountDevicesPane,
               label: 'Account & devices',
               icon: AppIcons.devices,
               builder: (context) => const Column(

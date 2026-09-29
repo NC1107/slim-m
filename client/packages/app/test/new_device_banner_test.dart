@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// The warning shown when another device signs into this account: it appears
+/// on the live frame, "This wasn't me" opens the devices pane, and it is
+/// gone for a dismissal. Also the PNGs for looking at it under
+/// SLIMM_UI_SNAPSHOTS=1, light and dark, phone and desktop.
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:slimm_api/api.dart';
+import 'package:slimm_app/src/providers/live_events.dart';
+import 'package:slimm_app/src/routing/routes.dart';
+import 'package:slimm_app/src/widgets/new_device_banner_host.dart';
+import 'package:slimm_design_system/design_system.dart';
+
+import 'support/mid_flight_capture.dart';
+import 'ui_snapshot_support.dart';
+
+const _signIn = NewDeviceSignIn(
+  deviceId: 'd2',
+  deviceName: 'Ada laptop',
+  clientKind: 'desktop',
+  signedInAt: 1700000000000,
+);
+
+class _Harness {
+  _Harness(this.events, this.router);
+
+  final StreamController<ServerEvent> events;
+  final GoRouter router;
+}
+
+Future<_Harness> _pump(
+  WidgetTester tester, {
+  Size size = const Size(390, 844),
+  Brightness brightness = Brightness.light,
+}) async {
+  SharedPreferences.setMockInitialValues({});
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  final events = StreamController<ServerEvent>.broadcast();
+  addTearDown(events.close);
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => NewDeviceBannerHost(
+          child: const Scaffold(body: Center(child: Text('shell'))),
+        ),
+      ),
+      GoRoute(
+        path: Routes.personalSettings,
+        builder: (context, state) => Text(
+          'settings pane ${state.uri.queryParameters[settingsPaneQuery]}',
+        ),
+      ),
+    ],
+  );
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [liveEventsProvider.overrideWithValue(events.stream)],
+      child: RepaintBoundary(
+        key: snapshotBoundary,
+        child: MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(
+            brightness,
+            brightness == Brightness.light ? AppTokens.light : AppTokens.dark,
+          ),
+          routerConfig: router,
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  return _Harness(events, router);
+}
+
+/// The frame reaches the provider a microtask after `add`, so it needs a second pump to paint.
+Future<void> _emit(WidgetTester tester, _Harness harness) async {
+  harness.events.add(_signIn);
+  await tester.pump();
+  await tester.pump();
+}
+
+void main() {
+  setUpAll(loadRealFonts);
+
+  testWidgets('nothing shows until a device signs in', (tester) async {
+    await _pump(tester);
+    expect(find.byType(NewDeviceSignInBanner), findsNothing);
+    expect(find.text('shell'), findsOneWidget);
+  });
+
+  testWidgets('a live frame shows the device and "This wasn\'t me" opens '
+      'the devices pane', (tester) async {
+    final harness = await _pump(tester);
+    await _emit(tester, harness);
+
+    expect(find.textContaining('Ada laptop (desktop)'), findsOneWidget);
+    await tester.tap(find.text("This wasn't me"));
+    await tester.pumpAndSettle();
+
+    expect(find.text('settings pane $accountDevicesPane'), findsOneWidget);
+    harness.router.go('/');
+    await tester.pumpAndSettle();
+    expect(find.byType(NewDeviceSignInBanner), findsNothing);
+  });
+
+  testWidgets('"This was me" dismisses it without navigating', (tester) async {
+    final harness = await _pump(tester);
+    await _emit(tester, harness);
+
+    await tester.tap(find.text('This was me'));
+    await tester.pump();
+
+    expect(find.byType(NewDeviceSignInBanner), findsNothing);
+    expect(find.text('shell'), findsOneWidget);
+  });
+
+  const viewports = {'phone': Size(390, 844), 'desktop': Size(1400, 880)};
+  for (final viewport in viewports.entries) {
+    for (final brightness in Brightness.values) {
+      testWidgets('banner at ${viewport.key} ${brightness.name} fits', (
+        tester,
+      ) async {
+        final harness = await _pump(
+          tester,
+          size: viewport.value,
+          brightness: brightness,
+        );
+        await _emit(tester, harness);
+
+        final name = 'new-device-banner-${viewport.key}-${brightness.name}';
+        await expectSettled(tester, name);
+        await writeSnapshot(tester, name);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+}

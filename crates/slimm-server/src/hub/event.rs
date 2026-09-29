@@ -11,7 +11,8 @@ use std::sync::Arc;
 use crate::components::ComponentRow;
 use crate::ephemeral::EphemeralMessage;
 use crate::ids::{
-    CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
+    CallRingId, CanvasObjectId, CanvasOpId, ChannelId, DeviceId, MessageId, RoleId, Seq, SessionId,
+    UserId,
 };
 use crate::store::{
     AppSurface, AttachmentSummary, CallRecord, CanvasObject, Channel, CodeRunSummary, Embed,
@@ -630,6 +631,19 @@ pub enum Event {
     /// button can leave its pending state.
     InteractionAnswered {
         interaction: Arc<crate::store::Interaction>,
+    },
+    /// A device this account has not used before just signed in.
+    ///
+    /// Private to `user_id` and withheld from the connection of `device_id`
+    /// itself, which is the one that just signed in. Durable rather than
+    /// ephemeral: it is rare and a security notice, so it must not be the
+    /// thing a lagging socket skips past.
+    NewDeviceSignIn {
+        user_id: UserId,
+        device_id: DeviceId,
+        device_name: String,
+        client_kind: Option<String>,
+        signed_in_at: i64,
     },
     /// A moderation event with its number, added by [`crate::hub::Hub::publish`]
     /// and never built by a handler. See `hub::moderation_seq`.

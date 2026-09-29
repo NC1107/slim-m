@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+//! Telling an account's other devices when an unfamiliar one signs in.
+//!
+//! Push is not used: the relay's kind vocabulary is fixed (message, mention,
+//! call, wake) and lives in another repository, so this reaches connected
+//! devices over the account-private hub path and the rest through the devices
+//! list they already open.
+
+use super::AppState;
+use crate::hub::Event;
+use crate::ratelimit::Class;
+use crate::store::{IssuedTokens, now_ms};
+
+/// Best-effort: the sign-in already succeeded, so nothing here may fail it.
+pub(super) async fn announce(
+    state: &AppState,
+    tokens: &IssuedTokens,
+    device_name: &str,
+    client_kind: Option<&str>,
+) {
+    let unfamiliar = state
+        .store
+        .is_unfamiliar_sign_in(tokens.user_id, tokens.device_id, device_name, client_kind)
+        .await;
+    match unfamiliar {
+        Ok(true) => {}
+        Ok(false) => return,
+        Err(err) => {
+            tracing::warn!(error = %err, "failed to decide whether a sign-in is unfamiliar");
+            return;
+        }
+    }
+    if !state
+        .limiter
+        .check(Class::SignInAlert, &format!("u:{}", tokens.user_id))
+    {
+        return;
+    }
+    state.hub.publish(Event::NewDeviceSignIn {
+        user_id: tokens.user_id,
+        device_id: tokens.device_id,
+        device_name: device_name.to_owned(),
+        client_kind: client_kind.map(str::to_owned),
+        signed_in_at: now_ms(),
+    });
+}

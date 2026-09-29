@@ -110,8 +110,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.personalSettings,
-        pageBuilder: (context, state) =>
-            modalPage(context, const PersonalSettingsScreen()),
+        pageBuilder: (context, state) => modalPage(
+          context,
+          PersonalSettingsScreen(
+            initialPaneId: state.uri.queryParameters[settingsPaneQuery],
+          ),
+        ),
       ),
       GoRoute(
         path: Routes.spaceSettings,

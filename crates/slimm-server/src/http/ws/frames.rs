@@ -292,6 +292,16 @@ pub(super) enum ServerFrame {
         channel_id: String,
         message: EphemeralMessageDto,
     },
+    /// A device this account has not used before signed in; see
+    /// [`crate::hub::Event::NewDeviceSignIn`]. Delivered only to the
+    /// account's other devices.
+    #[serde(rename = "device.signed_in")]
+    NewDeviceSignIn {
+        device_id: String,
+        device_name: String,
+        client_kind: Option<String>,
+        signed_in_at: i64,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]

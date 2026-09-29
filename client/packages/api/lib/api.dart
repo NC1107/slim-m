@@ -97,6 +97,7 @@ export 'src/events.dart'
         MessageEdited,
         MessagePinned,
         MessageUnpinned,
+        NewDeviceSignIn,
         OverwriteChanged,
         PollVoted,
         PollOptionTally,
