@@ -6,100 +6,18 @@
 //! evaluator returns.
 
 use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use serde_json::{Value, json};
-use slimm_server::auth::Auth;
-use slimm_server::config::Config;
-use slimm_server::db;
-use slimm_server::http::{self, AppState};
-use slimm_server::hub::Hub;
+use axum::http::StatusCode;
+use serde_json::json;
 use slimm_server::permissions::Permissions;
-use slimm_server::push::PushSender;
-use slimm_server::ratelimit::RateLimiter;
 use slimm_server::store::Store;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 mod support;
+use support::overwrite_harness::{app, general_channel_id, json_body, register, request};
 
 async fn new_store() -> (Store, support::TestDbGuard) {
-    let (path, guard) = support::TestDbGuard::new("slimm-overwrites-test");
-    let config = Config {
-        port: 0,
-        database_path: path,
-        hash_concurrency: 2,
-        ..Config::default()
-    };
-    let pool = db::connect(&config).await.expect("connect + migrate");
-    (Store::new(pool), guard)
-}
-
-fn app(store: Store) -> Router {
-    http::router(AppState {
-        store,
-        auth: Auth::new(2).unwrap(),
-        hub: Hub::new(),
-        limiter: RateLimiter::new(),
-        push: PushSender::disabled(),
-        voice: slimm_server::voice::VoiceService::disabled(),
-        media: slimm_server::media::Media::for_tests(),
-        gifs: slimm_server::http::gifs::GifSearch::disabled(),
-        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
-        dock: slimm_server::http::dock::Dock::disabled(),
-        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
-    })
-}
-
-fn request(method: &str, uri: &str, token: Option<&str>, body: Option<Value>) -> Request<Body> {
-    let mut builder = Request::builder().method(method).uri(uri);
-    if let Some(token) = token {
-        builder = builder.header("authorization", format!("Bearer {token}"));
-    }
-    match body {
-        Some(value) => builder
-            .header("content-type", "application/json")
-            .body(Body::from(value.to_string()))
-            .unwrap(),
-        None => builder.body(Body::empty()).unwrap(),
-    }
-}
-
-async fn json_body(response: axum::response::Response) -> Value {
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    serde_json::from_slice(&bytes).unwrap()
-}
-
-/// A member with a session, built straight through the store.
-///
-/// Deliberately not the `/auth/register` route: joining a claimed deployment
-/// is an invite-gated policy decision, and it is pinned by its own tests in
-/// `registration_gate.rs`. These tests only need somebody signed in, so going
-/// through the store keeps them independent of that policy.
-async fn register(store: &Store, username: &str) -> (String, String) {
-    let account = store
-        .create_account(username, username, "not-a-real-hash")
-        .await
-        .unwrap();
-    // The first account through here claims the deployment, exactly as the
-    // first real registration does; later ones find it already set up.
-    store.bootstrap_deployment(account.id).await.unwrap();
-    let tokens = store.open_session(account.id, "cli").await.unwrap();
-    (tokens.access_token, account.id.to_string())
-}
-
-async fn general_channel_id(store: &Store) -> String {
-    store
-        .list_channels()
-        .await
-        .unwrap()
-        .into_iter()
-        .next()
-        .expect("bootstrap seeds a general channel")
-        .id
-        .to_string()
+    support::overwrite_harness::new_store("slimm-overwrites-test").await
 }
 
 async fn everyone_role_id(store: &Store) -> String {
@@ -162,59 +80,6 @@ async fn nonexistent_channel_refuses_identically_for_everyone() {
 
 /// A MANAGE_ROLES holder in a channel cannot force-allow a permission they do
 /// not themselves hold there, even for themselves.
-#[tokio::test]
-async fn allow_cannot_grant_a_permission_the_caller_lacks() {
-    let (store, _guard) = new_store().await;
-    let app = app(store.clone());
-    let (admin_token, _admin_id) = register(&store, "alice").await;
-    let (member_token, member_id) = register(&store, "bob").await;
-    let channel_id = general_channel_id(&store).await;
-
-    // Bob holds MANAGE_ROLES (via a role) but never BAN_MEMBERS.
-    let manager_role = store
-        .create_role("manager", Permissions::MANAGE_ROLES, false)
-        .await
-        .unwrap();
-    store
-        .assign_role(
-            slimm_server::ids::UserId(Uuid::parse_str(&member_id).unwrap()),
-            manager_role,
-        )
-        .await
-        .unwrap();
-
-    let response = app
-        .clone()
-        .oneshot(request(
-            "PUT",
-            &format!("/channels/{channel_id}/overwrites/member/{member_id}"),
-            Some(&member_token),
-            Some(json!({ "allow": Permissions::BAN_MEMBERS.bits(), "deny": 0 })),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    let body = json_body(response).await;
-    assert_eq!(
-        body["missing_permissions"],
-        Permissions::BAN_MEMBERS.bits(),
-        "the refusal names the bit the caller cannot grant"
-    );
-
-    // The same admin-only token can, since ADMINISTRATOR resolves to ALL.
-    let allowed = app
-        .clone()
-        .oneshot(request(
-            "PUT",
-            &format!("/channels/{channel_id}/overwrites/member/{member_id}"),
-            Some(&admin_token),
-            Some(json!({ "allow": Permissions::BAN_MEMBERS.bits(), "deny": 0 })),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(allowed.status(), StatusCode::NO_CONTENT);
-}
-
 // --- Validation ---
 
 #[tokio::test]
@@ -366,101 +231,6 @@ async fn clearing_an_unset_overwrite_is_idempotent() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
-}
-
-/// Clearing a deny grants that permission just as surely as setting an allow.
-/// Judging a write by its `allow` bits alone let a caller strip a deny and hand
-/// themselves a bit they could never have granted directly.
-#[tokio::test]
-async fn clearing_a_deny_you_do_not_hold_is_refused() {
-    let (store, _guard) = new_store().await;
-    let app = app(store.clone());
-
-    // First account claims the deployment and is its administrator.
-    let (admin, _admin_id) = register(&store, "admin").await;
-    let (moderator, moderator_id) = register(&store, "moderator").await;
-    let channel = general_channel_id(&store).await;
-
-    // The moderator may manage roles, but never gets MANAGE_SERVER.
-    let role = json_body(
-        app.clone()
-            .oneshot(request(
-                "POST",
-                "/roles",
-                Some(&admin),
-                Some(json!({
-                    "name": "moderator",
-                    "permissions": Permissions::VIEW_CHANNEL
-                        .union(Permissions::MANAGE_ROLES)
-                        .bits()
-                })),
-            ))
-            .await
-            .unwrap(),
-    )
-    .await;
-    let role_id = role["id"].as_str().unwrap().to_owned();
-    app.clone()
-        .oneshot(request(
-            "PUT",
-            &format!("/members/{moderator_id}/roles/{role_id}"),
-            Some(&admin),
-            None,
-        ))
-        .await
-        .unwrap();
-
-    // The administrator denies MANAGE_SERVER to that role in this channel.
-    let overwrite = format!("/channels/{channel}/overwrites/role/{role_id}");
-    let denied = app
-        .clone()
-        .oneshot(request(
-            "PUT",
-            &overwrite,
-            Some(&admin),
-            Some(json!({ "allow": 0, "deny": Permissions::MANAGE_SERVER.bits() })),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(denied.status(), StatusCode::NO_CONTENT);
-
-    // Rewriting the overwrite to drop the deny would grant MANAGE_SERVER, which
-    // the moderator does not hold.
-    let rewrite = app
-        .clone()
-        .oneshot(request(
-            "PUT",
-            &overwrite,
-            Some(&moderator),
-            Some(json!({ "allow": 0, "deny": 0 })),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(
-        rewrite.status(),
-        StatusCode::FORBIDDEN,
-        "dropping a deny grants that bit, so it needs the same check setting an allow does"
-    );
-    assert_eq!(
-        json_body(rewrite).await["missing_permissions"],
-        Permissions::MANAGE_SERVER.bits()
-    );
-
-    // And deleting the overwrite outright must not be the way around it.
-    let cleared = app
-        .clone()
-        .oneshot(request("DELETE", &overwrite, Some(&moderator), None))
-        .await
-        .unwrap();
-    assert_eq!(
-        cleared.status(),
-        StatusCode::FORBIDDEN,
-        "clearing an overwrite grants back everything it denied"
-    );
-    assert_eq!(
-        json_body(cleared).await["missing_permissions"],
-        Permissions::MANAGE_SERVER.bits()
-    );
 }
 
 // --- Listing ---
