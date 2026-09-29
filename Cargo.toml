@@ -7,7 +7,7 @@ members = ["crates/*"]
 edition = "2024"
 rust-version = "1.94"
 license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
-repository = "https://github.com/NC1107/slim-m"
+repository = "https://github.com/Slim-m-org/slim-m"
 
 # Shared dependency versions live here so every crate stays in lockstep.
 # Why each crate and feature set is what it is: docs/dependencies.md.

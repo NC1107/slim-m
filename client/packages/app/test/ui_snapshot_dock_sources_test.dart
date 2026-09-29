@@ -50,7 +50,11 @@ api.SlimmApi _dock(Ref ref) => api.SlimmApi(
       '/space/dock/sources?' => (
         200,
         [
-          {'id': 'official', 'repo': 'NC1107/slim-addons', 'official': true},
+          {
+            'id': 'official',
+            'repo': 'Slim-m-org/slim-addons',
+            'official': true,
+          },
           {'id': 's1', 'repo': 'acme/mods', 'official': false},
           {'id': 's2', 'repo': 'somebody/experiments', 'official': false},
         ],

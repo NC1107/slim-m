@@ -18,7 +18,7 @@ Map<String, dynamic> rel(
   bool prerelease = false,
 }) => {
   'tag_name': tag,
-  'html_url': 'https://github.com/NC1107/slim-m/releases/tag/$tag',
+  'html_url': 'https://github.com/Slim-m-org/slim-m/releases/tag/$tag',
   'draft': draft,
   'prerelease': prerelease,
 };

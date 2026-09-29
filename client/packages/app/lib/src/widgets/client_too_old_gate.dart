@@ -23,7 +23,7 @@ import '../providers/client_floor.dart';
 import '../providers/providers.dart';
 
 /// Where a build that cannot self-update sends someone instead.
-const releasesUrl = 'https://github.com/NC1107/slim-m/releases';
+const releasesUrl = 'https://github.com/Slim-m-org/slim-m/releases';
 
 /// Renders [child] unless this client is below the server's floor.
 class ClientTooOldGate extends ConsumerWidget {

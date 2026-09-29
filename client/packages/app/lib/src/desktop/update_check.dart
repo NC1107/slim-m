@@ -18,7 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:slimm_platform/platform.dart';
 
 /// The repository whose `client-v*` releases this build updates from.
-const clientReleaseRepo = 'NC1107/slim-m';
+const clientReleaseRepo = 'Slim-m-org/slim-m';
 
 /// Whether the update check is switched off by `SLIMM_NO_UPDATE_CHECK`. Honors
 /// AppImage's golden rule that an app respect a "do not check for updates"

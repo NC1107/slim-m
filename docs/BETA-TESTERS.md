@@ -60,7 +60,7 @@ Put it somewhere durable - the relevant `docs/OPEN-QUESTIONS.md` item is the nat
 
 ## Do not let anyone "fix" this during beta
 
-`VoipPushRegistrar` is declared and constructed nowhere, so the inbound VoIP push path does not run at all - despite a passing XCTest suite guarding it ([#230](https://github.com/NC1107/slim-m/issues/230)).
+`VoipPushRegistrar` is declared and constructed nowhere, so the inbound VoIP push path does not run at all - despite a passing XCTest suite guarding it ([#230](https://github.com/Slim-m-org/slim-m/issues/230)).
 
 That is a deliberate deferral.
 Constructing it turns a dormant path into a live one that has to be correct on the very first push, because iOS kills an app that receives a VoIP push and does not report a call synchronously.

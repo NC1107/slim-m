@@ -31,7 +31,7 @@ Those need mediated host capabilities, which are deferred by design - see [Limit
 ## Quickstart
 
 A module is any wasm binary that follows the ABI below.
-The examples here are Rust compiled to `wasm32-unknown-unknown`, which is the toolchain the reference modules in [slim-addons](https://github.com/NC1107/slim-addons) use, but nothing in slim requires Rust.
+The examples here are Rust compiled to `wasm32-unknown-unknown`, which is the toolchain the reference modules in [slim-addons](https://github.com/Slim-m-org/slim-addons) use, but nothing in slim requires Rust.
 
 A minimal module that echoes its input back:
 
@@ -484,7 +484,7 @@ Do not rely on a capability doing anything today.
 ## Publishing a module
 
 Modules are served from a registry: a static site (or repo) with an index and one directory per module.
-The reference registry is [slim-addons](https://github.com/NC1107/slim-addons), and its layout is the contract:
+The reference registry is [slim-addons](https://github.com/Slim-m-org/slim-addons), and its layout is the contract:
 
 ```text
 index.json                         # the catalogue
