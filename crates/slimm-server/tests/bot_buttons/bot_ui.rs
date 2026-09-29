@@ -242,6 +242,12 @@ async fn a_call_control_needs_a_voice_channel_and_a_member_on_the_call() {
     w.state
         .voice
         .record_heartbeat_reporting_new(w.alice.0, call_channel);
+    let (status, _) = use_entry(&w, call_channel, &w.alice.1, control_use("pause")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "the bot is not on the call");
+
+    w.state
+        .voice
+        .record_heartbeat_reporting_new(w.bot.0, call_channel);
     let addr = serve(w.state.clone()).await;
     let mut bot = connect(&w, addr, &w.bot.1).await;
     let (status, id) = use_entry(&w, call_channel, &w.alice.1, control_use("pause")).await;
@@ -269,6 +275,9 @@ async fn a_retried_use_is_the_same_use_and_an_ack_clears_it() {
     w.state
         .voice
         .record_heartbeat_reporting_new(w.alice.0, call_channel);
+    w.state
+        .voice
+        .record_heartbeat_reporting_new(w.bot.0, call_channel);
     let addr = serve(w.state.clone()).await;
     let mut bot = connect(&w, addr, &w.bot.1).await;
     let mut alice = connect(&w, addr, &w.alice.1).await;
@@ -305,4 +314,73 @@ async fn a_retried_use_is_the_same_use_and_an_ack_clears_it() {
         .await
         .expect("the member hears the answer");
     assert!(answered.get("message_id").is_none());
+}
+
+#[tokio::test]
+async fn a_bot_with_two_live_tokens_lists_each_entry_once() {
+    let w = world().await;
+    register(&w, &w.bot.1, registration()).await;
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .connect(&format!("sqlite://{}", w.db_path))
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO bot_tokens (token_hash, bot_user_id, session_id, name, created_by, created_at)
+         SELECT 'second-token', bot_user_id, session_id, name, created_by, created_at
+         FROM bot_tokens WHERE bot_user_id = ?",
+    )
+    .bind(w.bot.0)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let bots = listed(&w, w.channel, &w.bob.1).await;
+    assert_eq!(bots.as_array().unwrap().len(), 1);
+    assert_eq!(bots[0]["message_menu"].as_array().unwrap().len(), 1);
+    assert_eq!(bots[0]["call_controls"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn a_bot_removed_from_the_space_cannot_be_used() {
+    let w = world().await;
+    register(&w, &w.bot.1, registration()).await;
+    let sent = plain_message(&w).await;
+    let (status, _) = use_entry(&w, w.channel, &w.alice.1, menu_use("translate", &sent)).await;
+    assert_eq!(status, StatusCode::OK);
+    w.state
+        .store
+        .remove_from_space(w.bot.0, w.bob.0, None)
+        .await
+        .unwrap();
+    let (status, _) = use_entry(&w, w.channel, &w.alice.1, menu_use("translate", &sent)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn reusing_a_use_id_for_anything_different_is_a_conflict() {
+    let w = world().await;
+    register(&w, &w.bot.1, registration()).await;
+    let sent = plain_message(&w).await;
+    let other = plain_message(&w).await;
+    let id = Uuid::now_v7().to_string();
+    let uri = format!("/channels/{}/bot-ui/{}/interactions", w.channel, w.bot.0);
+    let body = |entry: &str, message: &Value| json!({ "id": id, "surface": "message_menu", "entry_id": entry, "message_id": message["id"] });
+    let (status, _) = call(&w, "POST", &uri, &w.alice.1, Some(body("translate", &sent))).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call(&w, "POST", &uri, &w.alice.1, Some(body("translate", &sent))).await;
+    assert_eq!(status, StatusCode::OK, "the same use is idempotent");
+    let (status, _) = call(&w, "POST", &uri, &w.alice.1, Some(body("mods", &sent))).await;
+    assert_ne!(status, StatusCode::OK, "another entry under the same id");
+    let (status, _) = call(
+        &w,
+        "POST",
+        &uri,
+        &w.alice.1,
+        Some(body("translate", &other)),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "another message under the same id"
+    );
 }

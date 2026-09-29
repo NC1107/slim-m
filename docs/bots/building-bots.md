@@ -232,6 +232,8 @@ Members see your menu rows under your name and a Bot badge, after the app's own 
 Using one sends you the same `interaction.created` frame as a button, with `kind` set to `message_menu` or `call_control`, `custom_id` set to your entry id and the member's id and name.
 A menu entry's frame has the `message_id` it was used on; a call control's has none.
 Answer exactly as for a button: an ephemeral reply with `interaction_id`, or an ack.
+Only a bot that registers entries ever receives these, but an older library will see the new `kind` field and a `message_id` that is absent for a call control, so read `message_id` with a default.
+A call control is refused unless you are on that call, judged by your call heartbeat.
 
 See `docs/decisions/0045-bot-contributed-ui.md`.
 

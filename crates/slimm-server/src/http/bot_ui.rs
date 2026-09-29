@@ -125,7 +125,7 @@ async fn use_entry(
         return Err(ApiError::Forbidden);
     }
     const GONE: ApiError = ApiError::NotFound("entry not found");
-    let bot_can_hear = state.store.is_bot(bot_id).await?
+    let bot_can_hear = state.store.bot_is_live(bot_id).await?
         && state
             .store
             .has_permission(bot_id, channel_id, Permissions::VIEW_CHANNEL)
@@ -160,6 +160,9 @@ async fn use_entry(
                 return Err(ApiError::BadRequest("a call control names no message"));
             }
             require_in_call(&state, ctx.user_id, channel_id).await?;
+            if !state.voice.has_heartbeat(bot_id, channel_id) {
+                return Err(GONE);
+            }
             (None, InteractionKind::CallControl)
         }
     };

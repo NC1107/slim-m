@@ -54,6 +54,20 @@ impl Store {
         Ok(())
     }
 
+    /// Whether `bot` is a live bot: a live token and not removed from the Space.
+    pub async fn bot_is_live(&self, bot: UserId) -> anyhow::Result<bool> {
+        let row = sqlx::query(
+            "SELECT 1 FROM users u
+             WHERE u.id = ? AND u.is_bot = 1 AND u.deleted_at IS NULL
+               AND EXISTS (SELECT 1 FROM bot_tokens t WHERE t.bot_user_id = u.id AND t.revoked_at IS NULL)
+               AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id)",
+        )
+        .bind(bot)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.is_some())
+    }
+
     /// One registered entry, or `None` when the bot has not registered it.
     pub async fn bot_ui_entry(
         &self,
@@ -86,8 +100,8 @@ impl Store {
                     e.entry_id, e.label, e.icon, e.permission
              FROM bot_ui_entries e
              JOIN users u ON u.id = e.bot_user_id
-             JOIN bot_tokens t ON t.bot_user_id = u.id AND t.revoked_at IS NULL
              WHERE u.is_bot = 1 AND u.deleted_at IS NULL
+               AND EXISTS (SELECT 1 FROM bot_tokens t WHERE t.bot_user_id = u.id AND t.revoked_at IS NULL)
                AND NOT EXISTS (SELECT 1 FROM space_removals sr WHERE sr.user_id = u.id)
              ORDER BY u.display_name ASC, u.id ASC, e.surface ASC, e.position ASC",
         )

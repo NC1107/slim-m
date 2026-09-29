@@ -77,7 +77,14 @@ impl Store {
             == 1;
         let stored = self.interaction(new.id).await?;
         Ok(stored
-            .filter(|s| s.clicker_id == new.clicker_id && s.message_id == new.message_id)
+            .filter(|s| {
+                s.clicker_id == new.clicker_id
+                    && s.bot_id == new.bot_id
+                    && s.kind == new.kind
+                    && s.custom_id == new.custom_id
+                    && s.channel_id == new.channel_id
+                    && s.message_id == new.message_id
+            })
             .map(|s| (s, inserted)))
     }
 

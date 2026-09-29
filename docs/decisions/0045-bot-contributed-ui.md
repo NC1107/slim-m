@@ -72,6 +72,15 @@ Everyone on the call sees them, since anyone on the call can use them.
 A member who is not on the call gets a 403 on use: viewing a voice channel is not being in its call, and the server already knows who is on a call from the call heartbeat.
 A control's use is best effort like a press: silence shows an error on the control with a retry, and a bot that is offline simply never answers.
 
+### Liveness, idempotency and older libraries
+
+Using an entry needs the same bot liveness as listing it: a live token and no removal from the Space, else the same 404.
+A call control also needs the bot itself to be on the call, judged by its call heartbeat, else the same 404; the member's own heartbeat is checked separately and gives a 403.
+A retried use is the same use only if it matches on member, bot, kind, entry, channel and message; any difference under a reused id is a 409, as for a button.
+An older bot library will see two things it did not before on `interaction.created`: a `kind` field, and a `message_id` that is absent for a call control.
+A library that reads `message_id` unconditionally will fail on a call control, and one that ignores `kind` will treat a menu use as a button press with an unknown `custom_id`.
+Neither can happen until a bot registers entries, so only a bot that opts in meets them.
+
 ### Delivery is best effort
 
 Same as 0039.
