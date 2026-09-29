@@ -18,9 +18,20 @@ import 'package:slimm_design_system/design_system.dart';
 import 'create_channel_sheet.dart';
 
 class SectionLabel extends StatefulWidget {
-  const SectionLabel(this.text, {super.key, this.trailingBuilder});
+  const SectionLabel(
+    this.text, {
+    super.key,
+    this.trailingBuilder,
+    this.collapsed = false,
+    this.onToggle,
+  });
 
   final String text;
+
+  /// Null for a header that does not fold (Direct messages, the implicit
+  /// uncategorised bucket); otherwise pressing the header calls it.
+  final VoidCallback? onToggle;
+  final bool collapsed;
 
   /// Builds the section's add glyph given whether it should currently show,
   /// and a callback to report the glyph's own focus back up to this header -
@@ -46,7 +57,8 @@ class _SectionLabelState extends State<SectionLabel> {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     if (widget.text.isEmpty) return const SizedBox.shrink();
-    final label = Semantics(
+    final onToggle = widget.onToggle;
+    final title = Semantics(
       container: true,
       header: true,
       label: widget.text,
@@ -58,6 +70,14 @@ class _SectionLabelState extends State<SectionLabel> {
         ),
       ),
     );
+    final label = onToggle == null
+        ? title
+        : _FoldButton(
+            collapsed: widget.collapsed,
+            name: widget.text,
+            onToggle: onToggle,
+            child: title,
+          );
     final touch = AppTouchTargets.of(context);
     final revealed = touch || _hovered || _trailingFocused;
     final trailing = widget.trailingBuilder?.call(
@@ -139,6 +159,59 @@ class AddChannelGlyph extends StatelessWidget {
               categoryId: categoryId,
               categoryName: categoryId == null ? null : categoryName,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The header's press target: a chevron that turns right when folded, then
+/// the name. A real focusable button so Enter and Space fold it too.
+class _FoldButton extends StatelessWidget {
+  const _FoldButton({
+    required this.collapsed,
+    required this.name,
+    required this.onToggle,
+    required this.child,
+  });
+
+  final bool collapsed;
+  final String name;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final touch = AppTouchTargets.of(context);
+    return Semantics(
+      header: true,
+      button: true,
+      expanded: !collapsed,
+      label: name,
+      hint: collapsed ? 'Expand' : 'Collapse',
+      excludeSemantics: true,
+      onTap: onToggle,
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: touch ? AppSpacing.s12 : 0),
+          child: Row(
+            children: [
+              AnimatedRotation(
+                turns: collapsed ? -0.25 : 0,
+                duration: AppMotion.reduced(context, AppMotion.fast),
+                child: Icon(
+                  AppIcons.chevronDown,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s4),
+              Expanded(child: child),
+            ],
           ),
         ),
       ),
