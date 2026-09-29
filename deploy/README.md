@@ -532,7 +532,7 @@ The last remaining administrator cannot be removed at all.
 
 CI publishes the browser client as `ghcr.io/nc1107/slim-m-web`: nginx plus a release web build, signed with cosign like the server image.
 A client merge to `main` moves `latest`, and a server release tags the same version as the server, so `SLIMM_VERSION` pins both.
-It listens on port 80 inside the container, serves the app at `/` and also at `/app/`, and is not started by default.
+It runs as a non-root user and listens on port 8080 inside the container, serves the app at `/` and also at `/app/`, and is not started by default.
 
 To run it from this compose file, add `COMPOSE_PROFILES=web` to `.env` and route it from your proxy.
 With the bundled Caddy that is one more block in `deploy/Caddyfile`, on the same domain or another one:
@@ -540,7 +540,7 @@ With the bundled Caddy that is one more block in `deploy/Caddyfile`, on the same
 ```
 {$SLIMM_API_DOMAIN} {
 	handle /app* {
-		reverse_proxy web:80
+		reverse_proxy web:8080
 	}
 	reverse_proxy server:8080
 }
@@ -567,7 +567,7 @@ The host currently unpacks a hand-built tarball into an nginx container through 
 
 1. In the host's `docker-compose.override.yml`, replace that nginx service's `image:` with `ghcr.io/nc1107/slim-m-web:latest` and delete its bind mount of the unpacked bundle.
 2. Add the label `com.centurylinklabs.watchtower.enable: "true"` if the host's Watchtower runs with label filtering.
-3. Keep the Traefik router as it is. It strips `/app` today and the image answers either way, so nothing about routing changes.
+3. Point the Traefik service at port 8080 instead of 80, since the image runs unprivileged. Keep the router rule as it is. It strips `/app` today and the image answers either way, so nothing about routing changes.
 4. `docker compose pull web && docker compose up -d web`, then open the app and check `curl -s https://<host>/app/version.json` names a build id.
 5. Delete the old unpacked bundle directory once the new container has served a day.
 

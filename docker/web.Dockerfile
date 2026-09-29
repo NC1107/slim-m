@@ -31,8 +31,8 @@ RUN bash tool/fetch_web_assets.sh \
     && grep -q "main.dart.js?v=${SHA}" build/web/flutter_bootstrap.js \
     && grep -q "flutter_bootstrap.js?v=${SHA}" build/web/index.html
 
-FROM nginx:1-alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
+FROM nginxinc/nginx-unprivileged:1-alpine@sha256:26b0bf6fbf07297983cb341998d79c831508787de26627dd2a112321b9c3a4af
 COPY docker/web-nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /build/client/packages/app/build/web /usr/share/nginx/html
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO /dev/null http://127.0.0.1/version.json || exit 1
-EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO /dev/null http://127.0.0.1:8080/version.json || exit 1
+EXPOSE 8080

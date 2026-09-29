@@ -766,7 +766,7 @@ Verifying `github.sha` then waits on a check a path filter correctly skipped, ti
 
 ## web-image
 
-Builds `docker/web.Dockerfile` into `ghcr.io/nc1107/slim-m-web`: `flutter build web --release --base-href /app/` at the pinned Flutter version, behind nginx (`docker/web-nginx.conf`).
+Builds `docker/web.Dockerfile` into `ghcr.io/nc1107/slim-m-web`: `flutter build web --release --base-href /app/` at the pinned Flutter version, behind the unprivileged nginx image (`docker/web-nginx.conf`), which runs as a non-root user on port 8080.
 It is a reusable workflow with one input, the newline-separated tags for the merged manifest, and it has the same shape as `server-image` and `server-image-merge`: one image per architecture on a native runner, pushed by digest with an SBOM and provenance, then merged and cosign-signed keylessly.
 The merge job checks it got two digests, so a failed arch cannot ship a single-arch manifest.
 

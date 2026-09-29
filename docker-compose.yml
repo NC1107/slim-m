@@ -147,7 +147,7 @@ services:
       # A host running Watchtower with label-enable follows this tag, as it does the server's.
       com.centurylinklabs.watchtower.enable: "true"
     expose:
-      - "80"
+      - "8080"
 
 volumes:
   slimm_data:   # the embedded SQLite database
