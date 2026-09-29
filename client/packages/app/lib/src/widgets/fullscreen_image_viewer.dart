@@ -55,6 +55,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/attachment_bytes.dart';
+import 'fullscreen_image_actions.dart';
 import 'fullscreen_image_page.dart';
 import 'message_row_parts.dart';
 
@@ -128,6 +129,7 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
   late final PageController _pages = PageController(initialPage: widget.index);
   late int _current = widget.index;
   bool _zoomed = false;
+  String? _exportFailure;
 
   @override
   void dispose() {
@@ -197,6 +199,11 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
         );
   }
 
+  Future<Uint8List> _currentBytes() {
+    if (_current == widget.index) return Future.value(widget.bytes);
+    return ref.read(attachmentBytesProvider(widget.images[_current].id).future);
+  }
+
   void _onZoomChanged(bool zoomed) => setState(() => _zoomed = zoomed);
 
   @override
@@ -225,7 +232,24 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
                         ? '${_current + 1} of ${widget.images.length}'
                         : null,
                     onClose: _close,
+                    actions: ImageExportActions(
+                      key: ValueKey(widget.images[_current].id),
+                      image: widget.images[_current],
+                      loadBytes: _currentBytes,
+                      onFailure: (message) =>
+                          setState(() => _exportFailure = message),
+                    ),
                   ),
+                  if (_exportFailure case final message?)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s12,
+                      ),
+                      child: AppErrorState(
+                        message: message,
+                        onDismiss: () => setState(() => _exportFailure = null),
+                      ),
+                    ),
                   Expanded(
                     child: PageView.builder(
                       controller: _pages,
@@ -234,8 +258,10 @@ class _FullscreenImageViewerState extends ConsumerState<FullscreenImageViewer> {
                           ? const NeverScrollableScrollPhysics()
                           : null,
                       itemCount: widget.images.length,
-                      onPageChanged: (index) =>
-                          setState(() => _current = index),
+                      onPageChanged: (index) => setState(() {
+                        _current = index;
+                        _exportFailure = null;
+                      }),
                       itemBuilder: (_, index) => _page(index),
                     ),
                   ),
@@ -254,9 +280,13 @@ class _ViewerHeader extends StatelessWidget {
     required this.filename,
     required this.counter,
     required this.onClose,
+    required this.actions,
   });
 
   final String filename;
+
+  /// Share and Save for the image on screen, left of the close control.
+  final Widget actions;
 
   /// "2 of 5", or null when the message carries only this one image and there
   /// is nothing to count.
@@ -290,6 +320,7 @@ class _ViewerHeader extends StatelessWidget {
                 style: AppText.label.copyWith(color: tokens.textSecondary),
               ),
             ),
+          actions,
           AppIconButton(
             icon: AppIcons.dismiss,
             semanticLabel: 'Close image',

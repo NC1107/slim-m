@@ -170,3 +170,25 @@ Flutter has no built-in way to ask the platform for this: `DateTime.now().timeZo
 Its own platform list covers Android, iOS, macOS, Windows, Linux and web, matching every platform this client ships to.
 
 License is Apache-2.0, already on `deny.toml`'s allowlist.
+
+### `share_plus` and `gal`, for sharing and saving an opened image
+
+The image viewer's Share and Save controls (`fullscreen_image_actions.dart`, `image_export.dart`) need two system integrations: the OS share sheet, and the phone's photo library.
+They are two packages because no single one does both, and each is only ever called on the platforms that have the thing it wraps.
+
+`share_plus` (fluttercommunity.dev, verified publisher, BSD-3-Clause) wraps `UIActivityViewController` on iOS and `ACTION_SEND` on Android.
+It also lists Linux, Windows and web, but there it degrades to a mailto or Web Share fallback rather than a real share sheet, so the viewer only shows the Share control on iOS and Android and never on a desktop window.
+`super_clipboard` and `flutter_sharing_intent` were not looked at further: the first is a clipboard library and the second is about receiving shares.
+
+`gal` (midoridesign.studio, MIT) writes bytes to the photo library on Android (SDK 21+), iOS 11+, macOS and Windows, using the platform's own media APIs with no bundled native library.
+It has no Linux implementation, and this client does not call it off a phone anyway.
+`image_gallery_saver` was rejected as unmaintained, and `saver_gallery` as a smaller fork doing the same job.
+`file_picker` (already a dependency) cannot stand in for it: on iOS its `saveFile` is a Files export, not the photo library, and on Android it is the create-document flow.
+
+Everywhere without a phone photo library, Save keeps using `file_picker`'s `saveFile`: a native Save as dialog on desktop and a download on web.
+That is one existing dependency covering three platforms, so the two new packages only cover the two.
+
+Permissions: iOS gets `NSPhotoLibraryAddUsageDescription` (write only, so no read prompt), and `hygiene.yml`'s purpose-string check now requires it.
+Android gets `WRITE_EXTERNAL_STORAGE` capped at `maxSdkVersion="29"`, which `gal` documents as the only case needing it; Android 10 and later need none.
+A refused permission surfaces as an `AppErrorState` naming Settings, never a silent no-op.
+Neither iOS nor Android behavior has been run on a real device yet.
