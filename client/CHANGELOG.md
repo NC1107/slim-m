@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.88.0](https://github.com/NC1107/slim-m/compare/client-v0.87.0...client-v0.88.0) (2026-09-29)
+
+
+### Features
+
+* buttons on bot messages, with private answers to a press ([b49c3cd](https://github.com/NC1107/slim-m/commit/b49c3cd1e5c2319350b6360dbd091d70474abb1f))
+* **client:** encrypt the local device database at rest ([#1444](https://github.com/NC1107/slim-m/issues/1444)) ([4a50d50](https://github.com/NC1107/slim-m/commit/4a50d50828e1a416e8aaf5f8c107594fd04faf47))
+* **client:** floating mini-player keeps a call's video playing on other channels ([#1439](https://github.com/NC1107/slim-m/issues/1439)) ([a9b02c2](https://github.com/NC1107/slim-m/commit/a9b02c2b85a8caf25206c4af09859537a30b5ca0))
+* **client:** joining the official space asks for no server address or fingerprint ([#1424](https://github.com/NC1107/slim-m/issues/1424)) ([c080aaa](https://github.com/NC1107/slim-m/commit/c080aaa179ef40ff893f439d90c8a3db88442e9b))
+* **client:** move the desktop update choice from signup to Settings, on by default ([#1438](https://github.com/NC1107/slim-m/issues/1438)) ([a4d93b2](https://github.com/NC1107/slim-m/commit/a4d93b21d3e59b7e4c0f164840e89011e31f1a8a))
+* **client:** narrow the sidebar to a compact rail instead of an icon strip ([#1404](https://github.com/NC1107/slim-m/issues/1404)) ([bdd3ac7](https://github.com/NC1107/slim-m/commit/bdd3ac713dfe4c23366e8f54c9f503a45a95771e))
+* **client:** play soft hold music locally while alone in a call ([#1440](https://github.com/NC1107/slim-m/issues/1440)) ([aa82cd9](https://github.com/NC1107/slim-m/commit/aa82cd904bea94da791604fcccbf2bca6b5ca51f))
+* **client:** remove someone from one channel from their member card ([#1419](https://github.com/NC1107/slim-m/issues/1419)) ([40c3841](https://github.com/NC1107/slim-m/commit/40c38413f8501851ee085cd4f80afcd8175d028f))
+* **client:** section the member list by role, with bots and offline below ([#1421](https://github.com/NC1107/slim-m/issues/1421)) ([576aff8](https://github.com/NC1107/slim-m/commit/576aff8d07f875626f951f0892f1afc8cbc7f9a7))
+* **client:** share or save an image from the fullscreen viewer ([#1427](https://github.com/NC1107/slim-m/issues/1427)) ([7a66768](https://github.com/NC1107/slim-m/commit/7a667683b7909c1286760ee9c2a18504b657c2df))
+* **client:** web client image built by ci, plus a reload pill for open tabs ([62384cc](https://github.com/NC1107/slim-m/commit/62384ccf68c07d726ca665c06ad1a756993241ee))
+* let a bot answer one member privately (ephemeral messages) ([2da9182](https://github.com/NC1107/slim-m/commit/2da9182e94896b69edcda853a7f6ae0945e188cf))
+* pre-muted voice channels, a per-channel join_muted default ([5c6cde4](https://github.com/NC1107/slim-m/commit/5c6cde45dfa5ac9aa57877fa92e9f0a08ae1782d))
+* **server,client:** a scene can declare motion for the client to play, bounded on both sides ([3fda014](https://github.com/NC1107/slim-m/commit/3fda014d70505a67ca94d230fec5b67409f4b907))
+* **server,client:** rich presence, show what a member is listening to (linux MPRIS first) ([1d157a3](https://github.com/NC1107/slim-m/commit/1d157a314d025367b9f5375bf4bdd09019aa579b))
+* **server,client:** rotate a webhook's URL in place ([1b09059](https://github.com/NC1107/slim-m/commit/1b090596ee974e9689aae3624202f5c23e64b074))
+* **server,client:** turn on module capabilities (kv.store and message.post), approved per module at install ([699c993](https://github.com/NC1107/slim-m/commit/699c99390f2756fc207a313369820d25b22dc221))
+* **server,client:** warn an account's other devices when an unfamiliar device signs in ([96e64a8](https://github.com/NC1107/slim-m/commit/96e64a8bffbe66d861df534fa6b77cc0c666c470))
+* **server:** bot-contributed message menu entries and call controls ([#1456](https://github.com/NC1107/slim-m/issues/1456)) ([e63a343](https://github.com/NC1107/slim-m/commit/e63a3432c0971203027b44b9b9b1ccce57705dab))
+* **server:** community module sources beside the official dock registry ([#1457](https://github.com/NC1107/slim-m/issues/1457)) ([478f60c](https://github.com/NC1107/slim-m/commit/478f60c22fe2cb14d6ed74fabde896a8b758841a))
+* **server:** surface a webhook post's own username label on list, sync and live frames ([#1416](https://github.com/NC1107/slim-m/issues/1416)) ([c4ed6a6](https://github.com/NC1107/slim-m/commit/c4ed6a6a12ad63851a4a197ada871eac0d5d328f))
+
+
+### Bug Fixes
+
+* **client:** a tap with the pen tool leaves a dot on the canvas ([2cd7b6a](https://github.com/NC1107/slim-m/commit/2cd7b6a3b240935aec04029661e11cc55c4f535a))
+* **client:** centre the empty pane's shortcut list under its heading ([#1463](https://github.com/NC1107/slim-m/issues/1463)) ([f4be2a7](https://github.com/NC1107/slim-m/commit/f4be2a7c94c9ae738b636ddafdee26347724e8f8))
+* **client:** channel permissions grid on a phone - pinned labels, scroll hint, readable cells, save that reloads ([#1407](https://github.com/NC1107/slim-m/issues/1407)) ([7d8eb14](https://github.com/NC1107/slim-m/commit/7d8eb142fbd170269b6067b305238038eba9bc8b))
+* **client:** drop the cached portal session before listing screens on linux ([#1452](https://github.com/NC1107/slim-m/issues/1452)) ([a6343b6](https://github.com/NC1107/slim-m/commit/a6343b6925cfe83b7d0686bc5e48a65351c54554))
+* **client:** drop the leading separator from the call strip subtitle ([#1445](https://github.com/NC1107/slim-m/issues/1445)) ([d8b24d7](https://github.com/NC1107/slim-m/commit/d8b24d78293c5a4774dcc597ea4ed551831bebfb))
+* **client:** give settings panes a real hierarchy through the shared shell ([#1430](https://github.com/NC1107/slim-m/issues/1430)) ([5303ffe](https://github.com/NC1107/slim-m/commit/5303ffedf875489f2506ac34bb12920098eb0a14))
+* **client:** give the canvas tile resize grip a touch-sized hit area and the same hover and press states as the tile buttons ([#1442](https://github.com/NC1107/slim-m/issues/1442)) ([e893311](https://github.com/NC1107/slim-m/commit/e893311b5be7bddd775bb775d04def281279eaed))
+* **client:** hanging up on a phone returns to the last text channel ([#1410](https://github.com/NC1107/slim-m/issues/1410)) ([a2d5866](https://github.com/NC1107/slim-m/commit/a2d586682676d41076c5b5829674b9b1d2151a2e))
+* **client:** keep refused moderation writes on screen, and gate runGuarded sentences ([#1449](https://github.com/NC1107/slim-m/issues/1449)) ([22784f7](https://github.com/NC1107/slim-m/commit/22784f7b4a5c4a8692cd60cae1baa6ba884b5b8c))
+* **client:** keep rejoining a dropped call for a few minutes, not seventeen seconds ([#1420](https://github.com/NC1107/slim-m/issues/1420)) ([aac2c21](https://github.com/NC1107/slim-m/commit/aac2c213fb9969786230ff26669fbcf73fcd6d85))
+* **client:** keep the phone app bar after returning to a voice channel's call ([#1465](https://github.com/NC1107/slim-m/issues/1465)) ([af854c5](https://github.com/NC1107/slim-m/commit/af854c511a5c825bcab28f623f35b653f0f86b4b))
+* **client:** move the compact call strip above the transcript while the keyboard is up ([#1412](https://github.com/NC1107/slim-m/issues/1412)) ([122aa52](https://github.com/NC1107/slim-m/commit/122aa525edec62f0e89b54e48e2c596877e23be6))
+* **client:** one rail footer bar while in a call, and pin the kebab hover fill ([#1418](https://github.com/NC1107/slim-m/issues/1418)) ([e30c646](https://github.com/NC1107/slim-m/commit/e30c64656ca59ee67c73179420f10afdd0ba687d))
+* **client:** put phone bulk moderation in a sheet with one row of durations ([#1415](https://github.com/NC1107/slim-m/issues/1415)) ([e7ef324](https://github.com/NC1107/slim-m/commit/e7ef32435daf95e6c82862190fa7403cca1a4620))
+* **client:** show the hang-up recap toast wherever the call is left ([#1447](https://github.com/NC1107/slim-m/issues/1447)) ([ec87172](https://github.com/NC1107/slim-m/commit/ec87172e76a413b6fb53008501f9167a3f08dd6b))
+* **client:** show the peer's picture on DM rows and the other person-avatar spots ([#1461](https://github.com/NC1107/slim-m/issues/1461)) ([3a7eda7](https://github.com/NC1107/slim-m/commit/3a7eda7de622b5ee4fe8d5811917da21e5665270))
+* **client:** start a new message group when a webhook changes username ([#1454](https://github.com/NC1107/slim-m/issues/1454)) ([e65e9bd](https://github.com/NC1107/slim-m/commit/e65e9bd7656d665c778c2ad5e7ba5abc1fc80cd7))
+* **server,client:** refuse and mark code blocks that hide text-direction characters ([8d8b8ef](https://github.com/NC1107/slim-m/commit/8d8b8efe590bdb9c7ce399c5dedb131f1e48befa))
+* **server:** name the refused permission bits in an overwrite write's 403 ([#1446](https://github.com/NC1107/slim-m/issues/1446)) ([681b9da](https://github.com/NC1107/slim-m/commit/681b9daf51653101bdce59a8a8ccc5ecad915060))
+* **server:** read state travels between an account's devices ([#1408](https://github.com/NC1107/slim-m/issues/1408)) ([d68ccf5](https://github.com/NC1107/slim-m/commit/d68ccf50906d7af1883faf35dd45735a438b3e80))
+* **server:** refuse colliding command names, untypable keywords and hidden characters in a module manifest ([b185e70](https://github.com/NC1107/slim-m/commit/b185e70bffbd4ade99c8e5a8fa07e4954a181f45))
+* **server:** remove forwarded snapshots when their original is deleted or ages out ([4395e67](https://github.com/NC1107/slim-m/commit/4395e67af863decc742ac4558c3d57ff246c188d))
+* **server:** run the stored code block, not the input a client sends ([59689a3](https://github.com/NC1107/slim-m/commit/59689a3c194f49b7b781ffd3f3d2750b6e46b72e))
+
 ## [0.87.0](https://github.com/NC1107/slim-m/compare/client-v0.86.0...client-v0.87.0) (2026-09-28)
 
 
