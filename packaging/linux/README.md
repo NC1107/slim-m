@@ -4,8 +4,11 @@ This is the Flutter bundle exactly as the release pipeline builds it: the app, i
 Nothing here needs installing.
 
 ```bash
-./slimm_app
+./slim-m
 ```
+
+`slim-m` is a small launcher that checks the bundle's shared libraries first and names the package to install for any that are missing, then starts `slimm_app`.
+Running `./slimm_app` directly works too, but a missing library then shows only the loader's own error.
 
 The runner locates `data/` and `lib/` relative to its own path, so the directory has to stay together, but it can live anywhere and it can be moved.
 
@@ -20,9 +23,14 @@ The tarball has no dependency mechanism of its own to declare any of the rest, u
 | `libGL.so.1`, `libEGL.so.1` | the window never renders |
 | `libpulse.so.0`, `libasound.so.2` | no microphone or speaker in a call |
 | `libpipewire-0.3.so.0` | no screen share |
+| `libmpv.so.2` (video playback) | linked, so the app will not start without it |
+| `libepoxy.so.0` | linked, so the app will not start without it |
 | `libsecret-1.so.0` | linked, so the app will not start without it |
 | `libgstreamer-1.0.so.0`, `libgstapp-1.0.so.0` (GStreamer, the audio backend) | linked, so the app will not start without it |
 | `libayatana-appindicator3.so.1` (the tray icon) | linked, so the app will not start without it |
+
+`libmpv.so.2` is the one a fresh machine most often lacks: install `libmpv2` on Debian and Ubuntu, `mpv-libs` on Fedora, `libmpv2` on openSUSE, or `mpv` on Arch.
+It is not bundled because distro builds of mpv and ffmpeg are GPL, which does not combine with this project's licence, and because the set of libraries it pulls in is large and differs per distribution.
 
 Screen share also needs `xdg-desktop-portal` running, and a remembered sign-in needs a Secret Service provider (gnome-keyring, KWallet, KeePassXC).
 

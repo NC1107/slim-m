@@ -1,0 +1,57 @@
+#!/bin/sh
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# Portable-bundle launcher: names the distro package for any shared library the
+# bundle cannot resolve, instead of the loader's bare "cannot open shared object".
+here=$(dirname "$(readlink -f "$0")")
+
+distro_ids() {
+  [ -r /etc/os-release ] || return 0
+  (
+    # shellcheck source=/dev/null
+    . /etc/os-release
+    echo "${ID:-} ${ID_LIKE:-}"
+  )
+}
+
+# Arguments are the Debian/Ubuntu, Fedora, openSUSE and Arch package names.
+distro_pkg() {
+  case " $(distro_ids) " in
+    *" debian "* | *" ubuntu "*) echo "$1 (sudo apt install $1)" ;;
+    *" fedora "* | *" rhel "*) echo "$2 (sudo dnf install $2)" ;;
+    *" suse "* | *" opensuse "*) echo "$3 (sudo zypper install $3)" ;;
+    *" arch "*) echo "$4 (sudo pacman -S $4)" ;;
+    *) echo "$1 (Debian/Ubuntu), $2 (Fedora), $3 (openSUSE), $4 (Arch)" ;;
+  esac
+}
+
+package_for() {
+  case "$1" in
+    libmpv.so.2) distro_pkg libmpv2 mpv-libs libmpv2 mpv ;;
+    libepoxy.so.0) distro_pkg libepoxy0 libepoxy libepoxy0 libepoxy ;;
+    libsecret-1.so.0) distro_pkg libsecret-1-0 libsecret libsecret-1-0 libsecret ;;
+    libayatana-appindicator3.so.1) distro_pkg libayatana-appindicator3-1 libayatana-appindicator-gtk3 libayatana-appindicator3-1 libayatana-appindicator ;;
+    libgstreamer-1.0.so.0 | libgstapp-1.0.so.0) distro_pkg libgstreamer1.0-0 gstreamer1 libgstreamer-1_0-0 gstreamer ;;
+    libgtk-3.so.0) distro_pkg libgtk-3-0 gtk3 libgtk-3-0 gtk3 ;;
+    *) echo "the package that provides $1" ;;
+  esac
+}
+
+# libjvm.so is skipped: libdartjni.so links it but the app never uses the JVM bridge on Linux.
+missing_libraries() {
+  command -v ldd >/dev/null 2>&1 || return 0
+  for obj in "$here/slimm_app" "$here"/lib/*.so; do
+    LD_LIBRARY_PATH="$here/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ldd "$obj" 2>/dev/null
+  done | sed -n 's/^[[:space:]]*\(.*\) => not found.*/\1/p' | grep -v '^libjvm\.so$' | sort -u
+}
+
+missing=$(missing_libraries)
+if [ -n "$missing" ]; then
+  echo "slim-m cannot start: this system is missing shared libraries." >&2
+  echo "$missing" | while read -r lib; do
+    echo "  $lib - install $(package_for "$lib")" >&2
+  done
+  exit 1
+fi
+
+exec "$here/slimm_app" "$@"
