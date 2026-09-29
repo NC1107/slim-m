@@ -358,7 +358,7 @@ async fn record_timed_out_call(
         )
         .await
     {
-        Ok(sent) => {
+        Ok((sent, record)) => {
             push.notify_message(
                 store.clone(),
                 crate::push::SentMessage {
@@ -378,6 +378,7 @@ async fn record_timed_out_call(
                 code_run: None,
                 poll: None,
                 embeds: std::sync::Arc::new(Vec::new()),
+                call: Some(std::sync::Arc::new(record)),
             });
         }
         Err(err) => tracing::warn!(

@@ -237,10 +237,10 @@ async fn send(
             code_run: None,
             poll: None,
             embeds: Arc::new(stored_embeds.clone()),
+            call: None,
         });
 
-        // Cheap in-memory decision only, real work detached; see the note on
-        // this function.
+        // Cheap in-memory decision only, real work detached; see this function's note.
         state.push.notify_message(
             state.store.clone(),
             crate::push::SentMessage {

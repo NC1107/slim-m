@@ -14,9 +14,11 @@ use super::super::link_preview::LinkPreviews;
 use super::super::message_dto::{CallDto, CodeRunDto};
 use super::super::polls::PollDto;
 use super::{AttachmentDto, MessageDto, frames::ServerFrame};
+use crate::hub::Event;
 use crate::ids::UserId;
 use crate::store::{
-    AppSurface, AttachmentSummary, CodeRunSummary, Embed, ForwardSummary, Message, Poll, Store,
+    AppSurface, AttachmentSummary, CallRecord, CodeRunSummary, Embed, ForwardSummary, Message,
+    Poll, Store,
 };
 
 /// Everything about a freshly created message that the bare row cannot
@@ -33,6 +35,40 @@ pub(super) struct MessageExtras {
     pub poll: Option<Poll>,
     /// Raw; image tokens resolve here, per connection.
     pub embeds: Vec<Embed>,
+    pub call: Option<CallRecord>,
+}
+
+/// [`created`] for a [`Event::MessageCreated`], cloning its shared payload only
+/// here, past every filter in `authorize`; anything else is unresolved.
+pub(super) async fn created_from_event(
+    store: &Store,
+    link_previews: &LinkPreviews,
+    viewer: UserId,
+    event: Event,
+) -> Result<ServerFrame, ()> {
+    let Event::MessageCreated {
+        message,
+        attachments,
+        forwarded,
+        app_surface,
+        code_run,
+        poll,
+        embeds,
+        call,
+    } = event
+    else {
+        return Err(());
+    };
+    let extras = MessageExtras {
+        attachments: (*attachments).clone(),
+        forwarded: forwarded.map(|f| (*f).clone()),
+        app_surface: app_surface.map(|s| (*s).clone()),
+        code_run: code_run.map(|c| (*c).clone()),
+        poll: poll.map(|p| (*p).clone()),
+        embeds: (*embeds).clone(),
+        call: call.map(|c| (*c).clone()),
+    };
+    created(store, link_previews, viewer, (*message).clone(), extras).await
 }
 
 /// The frame for a freshly sent message, with `mentions_me` resolved by one
@@ -80,11 +116,7 @@ pub(super) async fn created(
         .await
         .map_err(|_| ())?;
     // Without this a call arrives blank until the next cold read.
-    dto.call = store
-        .call_for_message(message_id)
-        .await
-        .map_err(|_| ())?
-        .map(CallDto::from);
+    dto.call = extras.call.map(CallDto::from);
     Ok(ServerFrame::MessageCreated {
         channel_id,
         seq,

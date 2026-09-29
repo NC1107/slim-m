@@ -378,34 +378,19 @@ pub(super) async fn authorize_unstamped(
         Err(event) => *event,
     };
     Authorization::Deliver(Box::new(match event {
-        Event::MessageCreated {
-            message,
-            attachments,
-            forwarded,
-            app_surface,
-            code_run,
-            poll,
-            embeds,
-        } => match super::message_frames::created(
-            store,
-            link_previews,
-            ctx.user_id,
-            // Cloned only here, past every filter above; see `Event::MessageCreated`'s own doc.
-            (*message).clone(),
-            super::message_frames::MessageExtras {
-                attachments: (*attachments).clone(),
-                forwarded: forwarded.map(|f| (*f).clone()),
-                app_surface: app_surface.map(|s| (*s).clone()),
-                code_run: code_run.map(|c| (*c).clone()),
-                poll: poll.map(|p| (*p).clone()),
-                embeds: (*embeds).clone(),
-            },
-        )
-        .await
-        {
-            Ok(frame) => frame,
-            Err(()) => return Authorization::Unknown,
-        },
+        created @ Event::MessageCreated { .. } => {
+            match super::message_frames::created_from_event(
+                store,
+                link_previews,
+                ctx.user_id,
+                created,
+            )
+            .await
+            {
+                Ok(frame) => frame,
+                Err(()) => return Authorization::Unknown,
+            }
+        }
         Event::MessageEdited {
             message,
             op_seq,
