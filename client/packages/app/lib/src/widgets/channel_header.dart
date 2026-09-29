@@ -25,6 +25,7 @@ import 'channel_kind_icon.dart';
 import 'member_pane.dart';
 import 'pinned_messages_sheet.dart';
 import 'threads_sheet.dart';
+import 'user_avatar.dart';
 
 /// How much of the header a channel name may take before it has to elide, so
 /// a long one cannot crowd the topic out entirely. Only applies when there is
@@ -140,7 +141,11 @@ class ChannelHeader extends ConsumerWidget {
                         color: tokens.textSecondary,
                       )
                     else if (isDm)
-                      AppAvatar(name: name, tintKey: dmParticipantId, size: 24)
+                      AuthorAvatar(
+                        name: name,
+                        userId: dmParticipantId,
+                        size: 24,
+                      )
                     else
                       ChannelKindIcon(
                         isVoice: isVoice,

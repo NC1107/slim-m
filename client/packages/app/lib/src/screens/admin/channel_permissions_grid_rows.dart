@@ -10,6 +10,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/bot_avatar_placeholder.dart';
+import '../../widgets/user_avatar.dart';
 import 'channel_permissions_cell.dart';
 
 export 'channel_permissions_cell.dart';
@@ -217,9 +218,9 @@ class _HeaderCell extends StatelessWidget {
                     size: AppSizes.icon16,
                     color: tokens.textSecondary,
                   )
-                : AppAvatar(
+                : AuthorAvatar(
                     name: column.label,
-                    tintKey: column.id,
+                    userId: column.id,
                     size: 20,
                     shape: column.isBot
                         ? AppAvatarShape.square
