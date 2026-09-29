@@ -307,11 +307,20 @@ class MessageRowExtras extends ConsumerWidget {
     required this.messageId,
     required this.channelId,
     required this.builder,
+    this.previousMessageId,
   });
 
   final String messageId;
   final String channelId;
-  final Widget Function(MessageExtras extras, bool editing) builder;
+
+  /// The row visually above, so [builder] can tell a username change from a continuation.
+  final String? previousMessageId;
+  final Widget Function(
+    MessageExtras extras,
+    bool editing,
+    String? previousWebhookUsername,
+  )
+  builder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => builder(
@@ -322,6 +331,11 @@ class MessageRowExtras extends ConsumerWidget {
     ),
     ref.watch(
       editingMessageIdProvider(channelId).select((id) => id == messageId),
+    ),
+    ref.watch(
+      messageExtrasProvider.select(
+        (extras) => extras[previousMessageId]?.webhookUsername,
+      ),
     ),
   );
 }

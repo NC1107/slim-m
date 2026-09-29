@@ -365,14 +365,22 @@ class _MessageTranscriptState extends State<MessageTranscript> {
               key: ValueKey(message.id),
               messageId: message.id,
               channelId: widget.channelId,
-              builder: (extras, editing) => MessageSelectable(
+              previousMessageId: previous?.id,
+              builder: (extras, editing, previousWebhookUsername) => MessageSelectable(
                 channelId: widget.channelId,
                 messageId: message.id,
                 order: order,
                 child: MessageRow(
                   message: message,
                   // A new day breaks a group so a continuation across midnight regains its avatar and header.
-                  grouped: isGrouped(message, previous) && !newDay,
+                  grouped:
+                      isGrouped(
+                        message,
+                        previous,
+                        webhookUsername: extras.webhookUsername,
+                        previousWebhookUsername: previousWebhookUsername,
+                      ) &&
+                      !newDay,
                   showNewDivider: startsUnread(
                     message,
                     previous,
