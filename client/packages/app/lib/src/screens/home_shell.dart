@@ -35,6 +35,7 @@ import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/app_panel_reveal.dart';
 import '../widgets/channel_grouping.dart';
+import '../widgets/call_mini_player.dart';
 import '../widgets/channel_rail.dart';
 import '../widgets/channel_rail_drawer.dart';
 import '../widgets/channel_rail_frame.dart';
@@ -136,7 +137,12 @@ class HomeShell extends ConsumerWidget {
             // whole rail: no channel row, section or search field reached a
             // screen reader at all. The member pane paints after it and so
             // was never affected, which is what made this look like a rail bug.
-            Expanded(child: Semantics(container: true, child: child)),
+            Expanded(
+              child: Semantics(
+                container: true,
+                child: CallMiniPlayerHost(child: child),
+              ),
+            ),
             // Between the transcript and the roster (the Discord/Slack order); it and the roster never both take width, so the transcript loses at most one third pane.
             if (threadFits)
               _ThreadPaneSlot(channelId: openThread, requested: showThread),
@@ -173,7 +179,12 @@ class HomeShell extends ConsumerWidget {
             if (showVoiceStrip && keyboardUp)
               const VoiceStripIndicator(atTop: true),
             // Its own semantics node for the same reason the wide layout gives the pane one: the modal barrier inside this pane's navigator drops everything painted before it, which here is the connection bar.
-            Expanded(child: Semantics(container: true, child: child)),
+            Expanded(
+              child: Semantics(
+                container: true,
+                child: CallMiniPlayerHost(keyboardUp: keyboardUp, child: child),
+              ),
+            ),
             if (showVoiceStrip && !keyboardUp) const VoiceStripIndicator(),
           ],
         );
