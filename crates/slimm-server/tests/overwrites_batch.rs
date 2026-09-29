@@ -191,6 +191,10 @@ async fn batch_refuses_the_whole_request_if_one_entry_escalates() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        json_body(response).await["missing_permissions"],
+        Permissions::BAN_MEMBERS.bits()
+    );
 
     let body = get_overwrites(&app, &admin_token, &channel_id).await;
     let overwrites = body["overwrites"].as_array().unwrap();

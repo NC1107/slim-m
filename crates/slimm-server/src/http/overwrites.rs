@@ -143,6 +143,16 @@ async fn require_manage_roles_here(
     Ok(permissions)
 }
 
+/// Refuses a write that hands out bits the caller lacks, naming them in the body.
+fn refuse_ungrantable(caller: Permissions, granted: Permissions) -> Result<(), ApiError> {
+    let missing = granted.remove(caller);
+    if missing == Permissions::NONE {
+        Ok(())
+    } else {
+        Err(ApiError::MissingPermissions(missing))
+    }
+}
+
 /// Sets (or replaces) an overwrite. Rejects unknown permission bits outright,
 /// and rejects any `allow` bit the caller does not themselves currently hold
 /// in this channel.
@@ -181,9 +191,7 @@ async fn set(
         .await?
         .unwrap_or((Permissions::NONE, Permissions::NONE));
     let granted = allow.remove(old_allow).union(old_deny.remove(deny));
-    if !caller_permissions.contains(granted) {
-        return Err(ApiError::Forbidden);
-    }
+    refuse_ungrantable(caller_permissions, granted)?;
 
     let previously_visible_to = previously_visible_to(&state, channel_id, target).await?;
     match target {
@@ -287,9 +295,7 @@ async fn batch_set(
             .await?
             .unwrap_or((Permissions::NONE, Permissions::NONE));
         let granted = allow.remove(old_allow).union(old_deny.remove(deny));
-        if !caller_permissions.contains(granted) {
-            return Err(ApiError::Forbidden);
-        }
+        refuse_ungrantable(caller_permissions, granted)?;
 
         targets.push(target);
         entries.push(OverwriteBatchEntry {
@@ -360,9 +366,8 @@ async fn clear(
         .store
         .overwrite_for(channel_id, target_type, target_id)
         .await?
-        && !caller_permissions.contains(old_deny)
     {
-        return Err(ApiError::Forbidden);
+        refuse_ungrantable(caller_permissions, old_deny)?;
     }
 
     let previously_visible_to = previously_visible_to(&state, channel_id, target).await?;

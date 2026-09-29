@@ -194,6 +194,12 @@ async fn allow_cannot_grant_a_permission_the_caller_lacks() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let body = json_body(response).await;
+    assert_eq!(
+        body["missing_permissions"],
+        Permissions::BAN_MEMBERS.bits(),
+        "the refusal names the bit the caller cannot grant"
+    );
 
     // The same admin-only token can, since ADMINISTRATOR resolves to ALL.
     let allowed = app
@@ -435,6 +441,10 @@ async fn clearing_a_deny_you_do_not_hold_is_refused() {
         StatusCode::FORBIDDEN,
         "dropping a deny grants that bit, so it needs the same check setting an allow does"
     );
+    assert_eq!(
+        json_body(rewrite).await["missing_permissions"],
+        Permissions::MANAGE_SERVER.bits()
+    );
 
     // And deleting the overwrite outright must not be the way around it.
     let cleared = app
@@ -446,6 +456,10 @@ async fn clearing_a_deny_you_do_not_hold_is_refused() {
         cleared.status(),
         StatusCode::FORBIDDEN,
         "clearing an overwrite grants back everything it denied"
+    );
+    assert_eq!(
+        json_body(cleared).await["missing_permissions"],
+        Permissions::MANAGE_SERVER.bits()
     );
 }
 

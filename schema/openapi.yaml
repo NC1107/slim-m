@@ -6881,6 +6881,13 @@ components:
             only on a slow-mode 429 from `sendMessage` (also echoed as a
             `Retry-After` header on that same response); absent everywhere
             else, including every other 429.
+        missing_permissions:
+          type: integer
+          format: int64
+          description: >
+            The permission bits the caller lacked. Present only on the 403
+            from a channel overwrite write that would grant bits the caller
+            does not hold.
 
     Version:
       type: object

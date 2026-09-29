@@ -200,10 +200,15 @@ extension SlimmApiTransport on SlimmApi {
 
   ApiException _errorFor(http.Response response) {
     var reason = 'request failed';
+    int? missingPermissions;
     try {
       final decoded = jsonDecode(response.body);
       if (decoded is Map<String, dynamic> && decoded['error'] is String) {
         reason = decoded['error'] as String;
+      }
+      if (decoded is Map<String, dynamic> &&
+          decoded['missing_permissions'] is int) {
+        missingPermissions = decoded['missing_permissions'] as int;
       }
     } catch (_) {
       // A non-JSON body is not itself an error worth surfacing; the status is.
@@ -211,7 +216,10 @@ extension SlimmApiTransport on SlimmApi {
     return switch (response.statusCode) {
       400 => BadRequestException(reason),
       401 => UnauthorizedException(reason),
-      403 => ForbiddenException(reason),
+      403 => ForbiddenException(
+          reason,
+          missingPermissions: missingPermissions,
+        ),
       404 => NotFoundException(reason),
       409 => ConflictException(reason),
       429 => RateLimitedException(
