@@ -67,6 +67,8 @@ dependencies:
   window_manager: ^0.5.2
   app_links: ^7.2.1
   url_launcher: ^6.3.2
+  share_plus: ^13.3.0
+  gal: ^2.3.3
 dev_dependencies:
   # Only ever imported from test/; production app code reaches drift through slimm_data.
   drift: ^2.20.0

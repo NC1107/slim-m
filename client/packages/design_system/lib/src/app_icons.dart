@@ -145,6 +145,9 @@ abstract final class AppIcons {
   /// or a video before it finishes buffering. See `attachment_save.dart`.
   static const IconData download = LucideIcons.download300;
 
+  /// Handing an opened image to the system share sheet; see `image_export.dart`.
+  static const IconData share = LucideIcons.share2300;
+
   /// A staleness cue distinct from [pending]: the same glyph, a different
   /// role (an expiring device or invite rather than an in-flight send), kept
   /// as its own name so the two are never conflated at a call site.

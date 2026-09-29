@@ -20,6 +20,8 @@
     <!-- Declared alongside the camera pre-toggle this change adds; without
          it the toggle would appear to work and capture nothing. -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- gal writes to shared storage directly only before Android 10; later versions need no permission. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
     <application
         android:label="slim-m"
         android:name="${applicationName}"
