@@ -11,6 +11,7 @@ import 'client.dart';
 import 'models.dart';
 
 part 'events_frames.dart';
+part 'events_frames_bots.dart';
 part 'events_frames_canvas.dart';
 
 /// The envelope version this client speaks. The server refuses a mismatch, so a

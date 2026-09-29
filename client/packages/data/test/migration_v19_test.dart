@@ -24,6 +24,9 @@ Future<void> _downgradeToV18(File file) async {
         ),
       );
   await db.customStatement('ALTER TABLE channels DROP COLUMN join_muted');
+  await db.customStatement(
+    'ALTER TABLE messages DROP COLUMN forwarded_removed',
+  );
   await db.customStatement('PRAGMA user_version = 18');
   await db.close();
 }
