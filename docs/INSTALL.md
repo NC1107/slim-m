@@ -13,10 +13,10 @@ Ask them for both before you start.
 | --- | --- |
 | Anything with a browser | Open the space's web address, if it has one. No install at all. |
 | Fedora | `sudo dnf copr enable nc1107/slim-m` then `sudo dnf install slim-m-client` |
-| Other Linux | The `.flatpak` or the `.tar.gz` from [Releases](https://github.com/NC1107/slim-m/releases/latest) |
-| Windows | The `-windows-x64.zip` from [Releases](https://github.com/NC1107/slim-m/releases/latest) |
-| macOS | The `-macos.zip` from [Releases](https://github.com/NC1107/slim-m/releases/latest) |
-| Android | The `-android.apk` from [Releases](https://github.com/NC1107/slim-m/releases/latest) |
+| Other Linux | The `.flatpak` or the `.tar.gz` from [Releases](https://github.com/Slim-m-org/slim-m/releases/latest) |
+| Windows | The `-windows-x64.zip` from [Releases](https://github.com/Slim-m-org/slim-m/releases/latest) |
+| macOS | The `-macos.zip` from [Releases](https://github.com/Slim-m-org/slim-m/releases/latest) |
+| Android | The `-android.apk` from [Releases](https://github.com/Slim-m-org/slim-m/releases/latest) |
 | iPhone or iPad | Ask the space's owner for a TestFlight invite |
 
 ## The browser, which needs no install
@@ -44,7 +44,7 @@ One oddity worth knowing: `dnf upgrade` can answer "Nothing to do" for up to 48 
 
 ## Other Linux
 
-Two options from the [latest release](https://github.com/NC1107/slim-m/releases/latest).
+Two options from the [latest release](https://github.com/Slim-m-org/slim-m/releases/latest).
 
 **Flatpak**, if you have it:
 

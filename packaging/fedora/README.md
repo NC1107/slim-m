@@ -15,7 +15,7 @@ sudo dnf copr enable nc1107/slim-m
 sudo dnf install slim-m-client
 ```
 
-Or take the `.rpm` straight from a [client release](https://github.com/NC1107/slim-m/releases) and `sudo dnf install ./slim-m-client-*.rpm` - no COPR needed.
+Or take the `.rpm` straight from a [client release](https://github.com/Slim-m-org/slim-m/releases) and `sudo dnf install ./slim-m-client-*.rpm` - no COPR needed.
 That route configures the repo too: the package ships `/etc/yum.repos.d/slim-m-client.repo`, so `dnf upgrade slim-m-client` and the client's own in-app update both work straight away, with no `dnf copr enable` step and no polkit prompt for one.
 The two repo ids coexist if you also ran `dnf copr enable`; see that file's header for why the ids differ.
 The release also carries a `SHA256SUMS`, and a `SHA256SUMS.asc` when the signing key is configured.

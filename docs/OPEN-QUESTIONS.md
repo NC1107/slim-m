@@ -18,7 +18,7 @@ Three changes shipped this week are correct as far as unit tests and traced libr
 This matters more than it normally would, because an iOS screen-share fix was recorded as done on 2026-07-29 on exactly that basis and a real device later disproved it.
 
 - **Screen share on iOS** (client 0.16.0 and later). Start a share from a call and confirm it survives past the first few seconds rather than raising "Screen Recording has stopped".
-- **CallKit background execution** ([#212](https://github.com/NC1107/slim-m/issues/212), merged in #231). Start a call from the app's own UI, background the app, and confirm the call keeps running and appears in the Dynamic Island.
+- **CallKit background execution** ([#212](https://github.com/Slim-m-org/slim-m/issues/212), merged in #231). Start a call from the app's own UI, background the app, and confirm the call keeps running and appears in the Dynamic Island.
 - ~~**The camera pre-toggle** (#231).~~ **Joining a call with the camera on** (#231, then removed with the join lobby on 2026-08-03, then rebuilt as a persisted Voice Settings toggle in PR #546 on 2026-08-11 - so the thing to confirm is that toggle rather than the lobby control the original entry meant). This box has no webcam, so the capture path itself has never run.
 - **The lock-screen push preview** (2026-08-11). Lock the phone, have somebody send a message, and confirm the notification names the sender and shows the text rather than saying "New message". Two separate things could make it fall back and look identical from the outside: the keychain refusing to hand the extension the push key on a locked screen, or the sealed box failing to open. What *is* proven is the decryption itself, by an XCTest that opens real server-produced ciphertext on a macOS runner (see `crates/slimm-server/tests/push_envelope_fixture.rs`); what is not proven is that a real ReplayKit-free extension process on a real locked device reaches that code with a key in hand.
 
@@ -37,7 +37,7 @@ That permission is declared now, but the fix is unverified, and the same blind s
 
 ## 3. `VoipPushRegistrar` is dead code, and waking it up is risky
 
-[#230](https://github.com/NC1107/slim-m/issues/230). `VoipPushRegistrar` is declared in `VoipCallHandler.swift` and constructed nowhere, so the inbound VoIP push path does not run at all, despite a passing XCTest suite that has been guarding it.
+[#230](https://github.com/Slim-m-org/slim-m/issues/230). `VoipPushRegistrar` is declared in `VoipCallHandler.swift` and constructed nowhere, so the inbound VoIP push path does not run at all, despite a passing XCTest suite that has been guarding it.
 
 This was deliberately not fixed autonomously. Constructing it turns a dormant path into a live one that must be correct on the very first push, because iOS terminates an app that receives a VoIP push and does not report a call synchronously. The failure mode is the app being killed, on your phone, with no local way to test it first.
 
@@ -101,7 +101,7 @@ Nothing here proves the same thing across two real devices on two networks, and 
 ## 9. ~~The client release PR is stuck~~ (closed 2026-08-01, and the diagnosis held exactly)
 
 **Closed.** Client **0.18.0** is released and on TestFlight.
-The fix was the one predicted below and nothing else: merging a client-affecting change ([#259](https://github.com/NC1107/slim-m/pull/259)) made release-please regenerate the standing PR, which went from `CONFLICTING` to `MERGEABLE` within about two minutes and merged cleanly, with no generated file touched by hand.
+The fix was the one predicted below and nothing else: merging a client-affecting change ([#259](https://github.com/Slim-m-org/slim-m/pull/259)) made release-please regenerate the standing PR, which went from `CONFLICTING` to `MERGEABLE` within about two minutes and merged cleanly, with no generated file touched by hand.
 The reconciliation work is now on your devices as well as the server.
 
 The *question* at the end is now the live part, and **it happened a third time within the hour**, in the other direction: merging client 0.19.0 conflicted the standing **server** 0.22.1 release PR.
@@ -121,7 +121,7 @@ The original entry follows, kept because the reasoning is what made the fix pred
 
 Server 0.21.0 is released and deployed; the live instance reports it, so migration 0027 has run against production.
 
-The matching client release ([#229](https://github.com/NC1107/slim-m/pull/229), 0.17.0) is **conflicted and was left that way deliberately**.
+The matching client release ([#229](https://github.com/Slim-m-org/slim-m/pull/229), 0.17.0) is **conflicted and was left that way deliberately**.
 
 What happened is understood rather than guessed: release-please only refreshes a component's standing PR when that component has new releasable commits.
 Nothing client-facing merged after #238, so it left its own branch untouched while merging the server release moved `.release-please-manifest.json` underneath it.

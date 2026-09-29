@@ -29,10 +29,10 @@ Release:        1%{?dist}
 Summary:        Desktop client for the slim-m self-hosted messaging platform
 
 License:        LicenseRef-PolyForm-Noncommercial-1.0.0
-URL:            https://github.com/NC1107/slim-m
+URL:            https://github.com/Slim-m-org/slim-m
 # The portable release tarball. Repackaged rather than built from source: a
 # Flutter build needs network for pub, which a COPR/mock buildroot has not.
-Source0:        https://github.com/NC1107/slim-m/releases/download/client-v%{version}/slim-m-client-%{version}-linux-amd64.tar.gz
+Source0:        https://github.com/Slim-m-org/slim-m/releases/download/client-v%{version}/slim-m-client-%{version}-linux-amd64.tar.gz
 Source1:        top.npcserver.slimm.desktop
 # The hicolor icons, from client/packages/design_system/brand. Every Source
 # lands in one flat directory, which is why the sizes are in the basenames.

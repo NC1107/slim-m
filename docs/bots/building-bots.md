@@ -129,7 +129,7 @@ This is deployment-wide, not gated on `VIEW_CHANNEL`: every connected session re
 It carries only the id; call `GET /members` (or wait for your own roster cache to catch up) for the display name before you greet them.
 
 This is the event a greeter bot listens for.
-Post your welcome message from the handler rather than inferring a join from someone's first message or a presence frame - see `examples/bot-greeter` in [slim-bots](https://github.com/NC1107/slim-bots).
+Post your welcome message from the handler rather than inferring a join from someone's first message or a presence frame - see `examples/bot-greeter` in [slim-bots](https://github.com/Slim-m-org/slim-bots).
 
 ## Sending a message
 
@@ -298,7 +298,7 @@ That only applies to the token the bot still holds. If you revoked the bot's tok
 
 ## The templates
 
-[`bot-ping`](https://github.com/NC1107/slim-bots/tree/main/bot-ping) in [slim-bots](https://github.com/NC1107/slim-bots) is a working bot in one file: it answers `!ping` with `pong`.
+[`bot-ping`](https://github.com/Slim-m-org/slim-bots/tree/main/bot-ping) in [slim-bots](https://github.com/Slim-m-org/slim-bots) is a working bot in one file: it answers `!ping` with `pong`.
 
 ```bash
 pip install websockets
@@ -315,7 +315,7 @@ What it deliberately leaves out, and what a bot doing real work needs:
 - **Backoff.** It reconnects on a flat delay. Use exponential backoff against a real deployment.
 - **Scoping.** It answers in any channel it can see. Most bots should be told which channels are theirs.
 
-[slim-bots](https://github.com/NC1107/slim-bots) has templates that do each of those: `bot-reminders` for durable state and a cursor, `bot-roles` for a command-driven flow, `bot-canvas-board` for driving the canvas, `bot-modlog` for watching moderation events.
+[slim-bots](https://github.com/Slim-m-org/slim-bots) has templates that do each of those: `bot-reminders` for durable state and a cursor, `bot-roles` for a command-driven flow, `bot-canvas-board` for driving the canvas, `bot-modlog` for watching moderation events.
 Each one's readme says what it deliberately leaves out, which is usually the more useful half.
 
 ## Where a bot should live

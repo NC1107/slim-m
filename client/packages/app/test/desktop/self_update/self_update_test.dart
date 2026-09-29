@@ -14,9 +14,9 @@ import 'package:slimm_app/src/desktop/self_update/update_keys.dart';
 import 'package:slimm_app/src/desktop/self_update/update_manifest.dart';
 
 const _base =
-    'https://github.com/NC1107/slim-m/releases/download/client-v0.90.0';
+    'https://github.com/Slim-m-org/slim-m/releases/download/client-v0.90.0';
 const _releases =
-    'https://api.github.com/repos/NC1107/slim-m/releases?per_page=30';
+    'https://api.github.com/repos/Slim-m-org/slim-m/releases?per_page=30';
 
 typedef _Handler = FutureOr<http.StreamedResponse> Function(http.BaseRequest r);
 

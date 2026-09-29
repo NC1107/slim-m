@@ -155,6 +155,7 @@ slim contains none of this; it only routes the command to the module and enforce
 ## Decisions (owner, 2026-09-06)
 
 - **Repository:** `NC1107/slim-addons`, public, default branch `main`. The Dock fetches `https://raw.githubusercontent.com/NC1107/slim-addons/main/index.json` and per-module manifests under it. Created with the code-exec manifest already present.
+  - Update 2026-09-29: the repository moved to `Slim-m-org/slim-addons` with the rest of the project, and the Dock now defaults to it. It still falls back to the old slug on a 404 or a redirect, since it never follows redirects; see `Config::addons_repos`.
 - **First language:** JavaScript, via the pure-Rust `boa` engine compiled to import-free WASM that the code-exec module carries (chosen over QuickJS/javy, which require WASI imports the ABI forbids; both are JS). slim itself stays language-agnostic.
 - **Permissions:** space-wide for the first pass; channel-scoped overwrites for module permissions are a later extension.
 - **Integrity:** sha256 pin only for now; an artifact signature is a later hardening (Phase 5).

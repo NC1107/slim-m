@@ -33,7 +33,7 @@ services:
   server:
     # Set SLIMM_VERSION in .env to pin a release, and bump it on every upgrade:
     # a stale tag predates every security fix since. See deploy/README.md.
-    image: ghcr.io/nc1107/slim-m-server:${SLIMM_VERSION:-latest}
+    image: ghcr.io/slim-m-org/slim-m-server:${SLIMM_VERSION:-latest}
     restart: unless-stopped
     environment:
       SLIMM_LOG: ${SLIMM_LOG:-info}
@@ -139,7 +139,7 @@ services:
 
   web:
     # Opt-in (COMPOSE_PROFILES=web); pinned by the same SLIMM_VERSION as the server, routed from your proxy: deploy/README.md.
-    image: ghcr.io/nc1107/slim-m-web:${SLIMM_VERSION:-latest}
+    image: ghcr.io/slim-m-org/slim-m-web:${SLIMM_VERSION:-latest}
     profiles:
       - web
     restart: unless-stopped
