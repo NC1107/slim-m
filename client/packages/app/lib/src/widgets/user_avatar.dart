@@ -27,6 +27,7 @@ class UserAvatar extends ConsumerWidget {
     this.speaking = false,
     this.ringColor,
     this.semanticLabel,
+    this.placeholder,
   });
 
   final String name;
@@ -42,6 +43,9 @@ class UserAvatar extends ConsumerWidget {
   final bool speaking;
   final Color? ringColor;
   final String? semanticLabel;
+
+  /// Drawn instead of initials on a square avatar with no picture (a bot).
+  final Widget? placeholder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,6 +77,7 @@ class UserAvatar extends ConsumerWidget {
       speaking: speaking,
       ringColor: ringColor,
       semanticLabel: semanticLabel,
+      placeholder: placeholder,
     );
   }
 }
@@ -89,6 +94,8 @@ class AuthorAvatar extends ConsumerWidget {
     this.size = 36,
     this.shape = AppAvatarShape.circle,
     this.speaking = false,
+    this.status,
+    this.placeholder,
   });
 
   final String name;
@@ -102,6 +109,8 @@ class AuthorAvatar extends ConsumerWidget {
   /// Draws [AppAvatar]'s speaking ring, for the voice surfaces that identify
   /// a participant by author id the same way a message row does.
   final bool speaking;
+  final AppPresence? status;
+  final Widget? placeholder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,6 +125,8 @@ class AuthorAvatar extends ConsumerWidget {
       size: size,
       shape: shape,
       speaking: speaking,
+      status: status,
+      placeholder: placeholder,
     );
   }
 }

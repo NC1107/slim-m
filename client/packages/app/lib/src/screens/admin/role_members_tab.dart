@@ -16,6 +16,7 @@ import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
 import '../../widgets/bot_avatar_placeholder.dart';
 import '../../widgets/run_guarded.dart';
+import '../../widgets/user_avatar.dart';
 
 /// A group past this size collapses to this many rows plus a "+N more"
 /// summary, matching the design's own worked example.
@@ -118,9 +119,10 @@ class _RoleMembersTabState extends ConsumerState<RoleMembersTab>
             ),
             for (final candidate in candidates)
               AppListRow(
-                leading: AppAvatar(
+                leading: UserAvatar(
                   name: candidate.displayName,
-                  tintKey: candidate.id,
+                  userId: candidate.id,
+                  avatarUpdatedAt: candidate.avatarUpdatedAt,
                   size: 26,
                   shape: candidate.isBot
                       ? AppAvatarShape.square
@@ -208,9 +210,10 @@ class _HolderGroup extends StatelessWidget {
           for (final holder in shown)
             AppListRow(
               key: ValueKey(holder.id),
-              leading: AppAvatar(
+              leading: UserAvatar(
                 name: holder.displayName,
-                tintKey: holder.id,
+                userId: holder.id,
+                avatarUpdatedAt: holder.avatarUpdatedAt,
                 size: 26,
                 shape: holder.isBot
                     ? AppAvatarShape.square

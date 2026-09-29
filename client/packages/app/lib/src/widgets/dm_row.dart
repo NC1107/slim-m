@@ -49,6 +49,7 @@ import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
 import 'safety_actions.dart';
+import 'user_avatar.dart';
 
 /// [channel] is never the caller's own personal space: that DM-shaped row is
 /// [PersonalSpaceRow], reached separately, since a self-conversation has no
@@ -215,9 +216,9 @@ class DmRow extends ConsumerWidget {
         unread: channel.cursor > channel.lastReadSeq,
         mentioned: channel.mentionedSeq > channel.lastReadSeq,
         muted: muted,
-        leading: AppAvatar(
+        leading: AuthorAvatar(
           name: channel.name,
-          tintKey: channel.dmParticipantId,
+          userId: channel.dmParticipantId,
           size: 20,
           status: presence,
         ),
