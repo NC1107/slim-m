@@ -133,6 +133,9 @@ pub(crate) struct MessageDto {
     /// client keeps the webhook badge beside it. Set by the read enrichment
     /// and the live frames, never by this conversion.
     pub(crate) webhook_username: Option<String>,
+    /// Buttons a bot attached; see decision 0039. A bot may replace them.
+    #[serde(default)]
+    pub(crate) components: Vec<crate::components::ComponentRow>,
 }
 
 /// One attachment as it appears on a message.
@@ -250,6 +253,7 @@ impl From<Message> for MessageDto {
             mentions_me: false,
             embeds: Vec::new(),
             webhook_username: None,
+            components: Vec::new(),
         }
     }
 }

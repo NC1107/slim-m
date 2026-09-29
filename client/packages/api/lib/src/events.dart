@@ -232,6 +232,24 @@ sealed class ServerEvent {
           channelId: decoded['channel_id'] as String,
           lastReadSeq: decoded['last_read_seq'] as int,
         ),
+      'message.components'
+          when decoded['channel_id'] is String &&
+              decoded['message_id'] is String &&
+              decoded['components'] is List =>
+        MessageComponentsChanged(
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+          components: ComponentRow.listFromJson(decoded['components']),
+        ),
+      'interaction.answered'
+          when decoded['interaction_id'] is String &&
+              decoded['channel_id'] is String &&
+              decoded['message_id'] is String =>
+        InteractionAnswered(
+          interactionId: decoded['interaction_id'] as String,
+          channelId: decoded['channel_id'] as String,
+          messageId: decoded['message_id'] as String,
+        ),
       'message.ephemeral'
           when decoded['channel_id'] is String &&
               decoded['message'] is Map<String, dynamic> =>

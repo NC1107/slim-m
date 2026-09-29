@@ -202,6 +202,7 @@ async fn deliver(
             poll: None,
             embeds: std::sync::Arc::new(stored_embeds),
             call: None,
+            components: std::sync::Arc::new(Vec::new()),
         });
         state.push.notify_message(
             state.store.clone(),

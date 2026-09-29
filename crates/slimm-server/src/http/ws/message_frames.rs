@@ -36,6 +36,7 @@ pub(super) struct MessageExtras {
     /// Raw; image tokens resolve here, per connection.
     pub embeds: Vec<Embed>,
     pub call: Option<CallRecord>,
+    pub components: Vec<crate::components::ComponentRow>,
 }
 
 /// [`created`] for a [`Event::MessageCreated`], cloning its shared payload only
@@ -55,6 +56,7 @@ pub(super) async fn created_from_event(
         poll,
         embeds,
         call,
+        components,
     } = event
     else {
         return Err(());
@@ -67,6 +69,7 @@ pub(super) async fn created_from_event(
         poll: poll.map(|p| (*p).clone()),
         embeds: (*embeds).clone(),
         call: call.map(|c| (*c).clone()),
+        components: (*components).clone(),
     };
     created(store, link_previews, viewer, (*message).clone(), extras).await
 }
@@ -96,6 +99,7 @@ pub(super) async fn created(
     dto.app_surface = extras.app_surface.map(AppSurfaceDto::from);
     dto.poll = extras.poll.map(PollDto::from);
     dto.embeds = embeds::dtos_from_stored(link_previews, extras.embeds);
+    dto.components = extras.components;
     if let Some(run) = extras.code_run {
         dto.code_runs = vec![CodeRunDto {
             block_index: run.block_index,

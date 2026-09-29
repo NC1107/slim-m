@@ -6,6 +6,7 @@
 
 pub mod auth;
 pub mod code_runner;
+pub mod components;
 pub mod config;
 pub mod cors;
 pub mod db;
