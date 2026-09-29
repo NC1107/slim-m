@@ -218,12 +218,14 @@ It warns at 300 and fails at 500, because 300 is the review budget rather than a
 When this was written 64 files were over 300 and 14 were over 500.
 
 The check runs over hand-authored source only, from `git ls-files`, so nothing untracked or ignored is counted: `.rs`, `.dart`, `.py`, `.sh`, `.swift`, `.kt`, `.kts`, `.js`, `.sql`, `.yml`, `.yaml`, `.toml`, `.cc`, `.h`, `.gradle`.
-Generated Dart (`.g.dart`, `.freezed.dart`, the protobuf suffixes), the committed `.sqlx/` cache and the vendored `node_modules/` are excluded, because their size is nobody's decision here.
+Generated Dart (`.g.dart`, `.freezed.dart`, the protobuf suffixes), the committed `.sqlx/` cache, the vendored `node_modules/` and `schema/openapi.yaml` are excluded, because their size is nobody's decision here.
+The schema is the wire contract, already guarded by the router contract test and the additive-only breaking-change gate, and it had its own allowlist line that nearly every server PR edited, so any two of them conflicted.
 Markdown is excluded too, deliberately: the budget is a code-review budget, and prose is not reviewed by the line.
 Including it would put this file, `CLAUDE.md` and most of `docs/` over the hard limit on day one, which would make the gate noise rather than a gate.
 
 The 14 files already past 500 are listed in `scripts/file-budget-allow.txt` with the line count they were listed at and a one-line reason.
 That number is the point.
+The three exhaustive-match files (`hub/event.rs`, `ws/authorization.rs`, `hub.rs`) keep their ceiling in steps of 50 so two PRs that each add one variant do not both rewrite the same number.
 The gate treats it as that file's own ceiling, so a listed file may shrink and may not grow, and raising a number is a visible line in a diff somebody has to justify.
 An entry whose file has dropped back under 500, or which no longer names a checked file, is an error rather than a silent no-op, so the list cannot rot the way a plain exemption list would.
 
