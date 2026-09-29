@@ -325,6 +325,10 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
+        sqlx::query("DELETE FROM bot_ui_entries WHERE bot_user_id = ?")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
         // The role itself stays; it may be shared with a human.
         sqlx::query!(
             "UPDATE roles SET managed_bot_id = NULL WHERE managed_bot_id = ?",

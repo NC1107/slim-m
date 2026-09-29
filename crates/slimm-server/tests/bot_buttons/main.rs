@@ -29,6 +29,7 @@ use uuid::Uuid;
 mod support;
 
 mod answers;
+mod bot_ui;
 mod presses;
 mod security;
 mod sending;
@@ -43,6 +44,7 @@ struct World {
     bob: (UserId, String),
     bot: (UserId, String),
     other_bot: (UserId, String),
+    db_path: String,
     _guard: support::TestDbGuard,
 }
 
@@ -50,7 +52,7 @@ async fn world() -> World {
     let (path, guard) = support::TestDbGuard::new("slimm-buttons");
     let config = Config {
         port: 0,
-        database_path: path,
+        database_path: path.clone(),
         hash_concurrency: 2,
         ..Config::default()
     };
@@ -100,6 +102,7 @@ async fn world() -> World {
         bob: members.remove(0),
         bot: bots.remove(0),
         other_bot: bots.remove(0),
+        db_path: path,
         _guard: guard,
     }
 }

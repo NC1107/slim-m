@@ -49,6 +49,7 @@ class VoiceCallDock extends StatefulWidget {
     required this.controller,
     required this.voice,
     this.canvasChannelId,
+    this.botControls,
   });
 
   final VoiceController controller;
@@ -61,6 +62,10 @@ class VoiceCallDock extends StatefulWidget {
   /// The channel the toggle opens, or null to omit the toggle entirely -
   /// see this file's own doc for the two reasons that happens.
   final String? canvasChannelId;
+
+  /// A bot's call controls, in a row of their own above the call's own; null
+  /// when no bot on the call offers any. See decision 0045.
+  final Widget? botControls;
 
   /// Exposed so a test can find the entrance's own `SlideTransition`
   /// directly - `MaterialApp`'s default route transition mounts one of its
@@ -134,8 +139,9 @@ class _VoiceCallDockState extends State<VoiceCallDock>
       controller: widget.controller,
       voice: widget.voice,
     );
+    final botRow = widget.botControls;
     final card = channelId == null
-        ? FloatingDockCard(rows: [callRow])
+        ? FloatingDockCard(rows: [?botRow, callRow])
         : LayoutBuilder(
             builder: (context, constraints) {
               final toggle = _CanvasToggleButton(channelId: channelId);
@@ -147,6 +153,7 @@ class _VoiceCallDockState extends State<VoiceCallDock>
               )) {
                 return FloatingDockCard(
                   rows: [
+                    ?botRow,
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -160,6 +167,7 @@ class _VoiceCallDockState extends State<VoiceCallDock>
               }
               return FloatingDockCard(
                 rows: [
+                  ?botRow,
                   callRow,
                   Center(child: toggle),
                 ],

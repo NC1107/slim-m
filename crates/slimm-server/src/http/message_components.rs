@@ -115,7 +115,10 @@ async fn set_components(
         Some(id) => Some(own_interaction(&state, ctx.user_id, channel_id, id).await?),
         None => None,
     };
-    if press.as_ref().is_some_and(|p| p.message_id != message_id) {
+    if press
+        .as_ref()
+        .is_some_and(|p| p.message_id != Some(message_id))
+    {
         return Err(ApiError::NotFound("interaction not found"));
     }
     state

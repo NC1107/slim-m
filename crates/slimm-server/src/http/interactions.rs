@@ -22,7 +22,7 @@ use crate::hub::Event;
 use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{Interaction, now_ms};
+use crate::store::{Interaction, InteractionKind, now_ms};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -44,7 +44,7 @@ struct ClickRequest {
 }
 
 #[derive(Serialize)]
-struct InteractionDto {
+pub(super) struct InteractionDto {
     id: String,
     created_at: i64,
 }
@@ -102,15 +102,26 @@ async fn click(
         bot_id,
         clicker_id: ctx.user_id,
         channel_id,
-        message_id,
+        message_id: Some(message_id),
         custom_id: req.custom_id,
+        kind: InteractionKind::Button,
         created_at: now_ms(),
         answered: false,
     };
-    // A press id is its own id space: one that names a message could otherwise be aimed at that message's author.
+    record_and_publish(&state, fresh, display_name).await
+}
+
+/// Stores a fresh click and hands it to the bot, once. A press id is its own
+/// id space: one that names a message could otherwise be aimed at that
+/// message's author.
+pub(super) async fn record_and_publish(
+    state: &AppState,
+    fresh: Interaction,
+    clicker_display_name: String,
+) -> Result<Json<InteractionDto>, ApiError> {
     if state
         .store
-        .message_including_deleted(MessageId(id.0))
+        .message_including_deleted(MessageId(fresh.id.0))
         .await?
         .is_some()
     {
@@ -128,7 +139,7 @@ async fn click(
     if is_new {
         state.hub.publish(Event::InteractionCreated {
             interaction: Arc::new(stored),
-            clicker_display_name: display_name,
+            clicker_display_name,
         });
     }
     Ok(Json(dto))

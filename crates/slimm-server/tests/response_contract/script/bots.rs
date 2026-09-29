@@ -111,6 +111,34 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     .await;
 
     c.json(
+        "setBotUi",
+        "PUT",
+        "/bots/ui",
+        &bot_token,
+        json!({ "message_menu": [{ "id": "translate", "label": "Translate" }] }),
+    )
+    .await;
+    c.get(
+        "listChannelBotUi",
+        &format!("/channels/{channel}/bot-ui"),
+        root,
+    )
+    .await;
+    c.json(
+        "useBotUiEntry",
+        "POST",
+        &format!("/channels/{channel}/bot-ui/{bot_id}/interactions"),
+        root,
+        json!({
+            "id": uuid::Uuid::now_v7().to_string(),
+            "surface": "message_menu",
+            "entry_id": "translate",
+            "message_id": message_id,
+        }),
+    )
+    .await;
+
+    c.json(
         "setBotPermissions",
         "PATCH",
         &format!("/bots/{bot_id}/permissions"),

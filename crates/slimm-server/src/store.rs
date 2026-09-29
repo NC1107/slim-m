@@ -22,6 +22,7 @@ mod apps;
 mod attachments;
 mod bootstrap;
 mod bot_commands;
+mod bot_ui;
 mod bots;
 mod calls;
 mod canvas;
@@ -113,6 +114,7 @@ pub use bot_commands::{
     MAX_BOT_COMMAND_USAGE_LEN, MAX_BOT_COMMANDS, MAX_BOT_PREFIX_LEN, RESERVED_BOT_PREFIXES,
     SetBotCommandsError, VisibleBotCommand,
 };
+pub use bot_ui::VisibleBotUi;
 pub use bots::{BOT_TOKEN_PREFIX, Bot, CreateBotError, NewBot, UpdateBotPermissionsError};
 pub use calls::CallRecord;
 pub use canvas::{
@@ -134,7 +136,7 @@ pub(crate) use dms::DM_CHANNEL_KIND;
 pub use dms::{DmConversation, OpenDmError};
 pub use emoji::{CreateEmojiError, CustomEmoji, MAX_CUSTOM_EMOJI};
 pub use forward_cascade::{CascadedDeletion, DetachedForward, ForwardCascade};
-pub use interactions::Interaction;
+pub use interactions::{Interaction, InteractionKind};
 pub use invites::{Invite, InviteCheck, InviteMetadata, RedeemError};
 pub use message_embeds::{Embed, EmbedField, NewEmbed, NewEmbedField};
 pub use message_forwards::{ForwardOrigin, ForwardSource, ForwardSummary};

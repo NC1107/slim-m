@@ -98,13 +98,17 @@ pub(super) enum ServerFrame {
         message_id: String,
         components: Vec<crate::components::ComponentRow>,
     },
-    /// A member pressed this bot's button. Bot connections only.
+    /// A member used this bot's button, menu entry or call control. Bot
+    /// connections only. `custom_id` is the entry id for the latter two, and a
+    /// call control names no message.
     #[serde(rename = "interaction.created")]
     InteractionCreated {
         interaction_id: String,
         channel_id: String,
-        message_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
         custom_id: String,
+        kind: String,
         user_id: String,
         user_display_name: String,
         created_at: i64,
@@ -114,7 +118,8 @@ pub(super) enum ServerFrame {
     InteractionAnswered {
         interaction_id: String,
         channel_id: String,
-        message_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
     },
     #[serde(rename = "presence.changed")]
     PresenceChanged {

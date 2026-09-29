@@ -363,4 +363,19 @@ abstract final class AppIcons {
   /// The title bar's own quit item - a real exit reachable with no tray, see
   /// `window_menu_button.dart`'s own doc comment for why it has to exist.
   static const IconData windowQuit = LucideIcons.power300;
+
+  /// Glyphs a bot's call control may name (decision 0045). `play`, `pause` and
+  /// the volume pair reuse [play], [pause], [speaker] and [speakerOff].
+  static const IconData callStop = LucideIcons.square300;
+  static const IconData callSkipNext = LucideIcons.skipForward300;
+  static const IconData callSkipPrevious = LucideIcons.skipBack300;
+  static const IconData callRepeat = LucideIcons.repeat300;
+  static const IconData callShuffle = LucideIcons.shuffle300;
+  static const IconData callList = LucideIcons.listMusic300;
+
+  /// Leads every row a bot adds to a menu, so none can borrow a built-in's glyph.
+  static const IconData botAction = LucideIcons.bot300;
+
+  /// The fallback for a call control whose icon this client does not know.
+  static const IconData callControl = LucideIcons.circleDot300;
 }

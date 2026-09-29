@@ -9,14 +9,44 @@ use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 
 use super::{Store, now_ms};
 
+/// What was used: a button on a message, a bot's entry in a message's menu,
+/// or a bot's control in a call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionKind {
+    Button,
+    MessageMenu,
+    CallControl,
+}
+
+impl InteractionKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            InteractionKind::Button => "button",
+            InteractionKind::MessageMenu => "message_menu",
+            InteractionKind::CallControl => "call_control",
+        }
+    }
+
+    fn parse(text: &str) -> Self {
+        match text {
+            "message_menu" => InteractionKind::MessageMenu,
+            "call_control" => InteractionKind::CallControl,
+            _ => InteractionKind::Button,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Interaction {
     pub id: InteractionId,
     pub bot_id: UserId,
     pub clicker_id: UserId,
     pub channel_id: ChannelId,
-    pub message_id: MessageId,
+    /// Absent for a call control, which is used on a call and not a message.
+    pub message_id: Option<MessageId>,
+    /// The button's `custom_id`, or the id of the menu entry or call control.
     pub custom_id: String,
+    pub kind: InteractionKind,
     pub created_at: i64,
     pub answered: bool,
 }
@@ -30,8 +60,8 @@ impl Store {
     ) -> anyhow::Result<Option<(Interaction, bool)>> {
         let inserted = sqlx::query(
             "INSERT OR IGNORE INTO interactions
-                (id, bot_id, clicker_id, channel_id, message_id, custom_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (id, bot_id, clicker_id, channel_id, message_id, custom_id, created_at, kind)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(new.id)
         .bind(new.bot_id)
@@ -40,13 +70,21 @@ impl Store {
         .bind(new.message_id)
         .bind(&new.custom_id)
         .bind(new.created_at)
+        .bind(new.kind.as_str())
         .execute(&self.pool)
         .await?
         .rows_affected()
             == 1;
         let stored = self.interaction(new.id).await?;
         Ok(stored
-            .filter(|s| s.clicker_id == new.clicker_id && s.message_id == new.message_id)
+            .filter(|s| {
+                s.clicker_id == new.clicker_id
+                    && s.bot_id == new.bot_id
+                    && s.kind == new.kind
+                    && s.custom_id == new.custom_id
+                    && s.channel_id == new.channel_id
+                    && s.message_id == new.message_id
+            })
             .map(|s| (s, inserted)))
     }
 
@@ -54,7 +92,7 @@ impl Store {
     pub async fn interaction(&self, id: InteractionId) -> anyhow::Result<Option<Interaction>> {
         let row = sqlx::query(
             "SELECT id, bot_id, clicker_id, channel_id, message_id, custom_id,
-                    created_at, answered_at
+                    created_at, answered_at, kind
              FROM interactions WHERE id = ? AND created_at > ?",
         )
         .bind(id)
@@ -63,6 +101,7 @@ impl Store {
         .await?;
         row.map(|r| {
             let answered_at: Option<i64> = r.try_get("answered_at")?;
+            let kind: String = r.try_get("kind")?;
             Ok(Interaction {
                 id: r.try_get("id")?,
                 bot_id: r.try_get("bot_id")?,
@@ -71,6 +110,7 @@ impl Store {
                 message_id: r.try_get("message_id")?,
                 custom_id: r.try_get("custom_id")?,
                 created_at: r.try_get("created_at")?,
+                kind: InteractionKind::parse(&kind),
                 answered: answered_at.is_some(),
             })
         })

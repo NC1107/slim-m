@@ -214,6 +214,29 @@ A press is best effort like typing: if you were offline, it is lost.
 
 See `docs/decisions/0039-bot-message-buttons.md`.
 
+## Menu entries and call controls
+
+`PUT /bots/ui` registers rows for a message's context menu and buttons for a call, replacing your whole previous set:
+
+```json
+{ "message_menu": [{ "id": "translate", "label": "Translate" }],
+  "call_controls": [{ "id": "pause", "label": "Pause", "icon": "pause" }] }
+```
+
+At most 5 menu entries and 8 call controls.
+A label is 32 characters and an id 64 of letters, digits and `-_.`.
+An entry may name one `permission` bit; members without it neither see nor can use it.
+`icon` is for call controls only: `play`, `pause`, `stop`, `skip_next`, `skip_previous`, `volume`, `volume_off`, `repeat`, `shuffle` or `list`.
+Members see your menu rows under your name and a Bot badge, after the app's own rows, and your controls in a call only while you are on it.
+
+Using one sends you the same `interaction.created` frame as a button, with `kind` set to `message_menu` or `call_control`, `custom_id` set to your entry id and the member's id and name.
+A menu entry's frame has the `message_id` it was used on; a call control's has none.
+Answer exactly as for a button: an ephemeral reply with `interaction_id`, or an ack.
+Only a bot that registers entries ever receives these, but an older library will see the new `kind` field and a `message_id` that is absent for a call control, so read `message_id` with a default.
+A call control is refused unless you are on that call, judged by your call heartbeat.
+
+See `docs/decisions/0045-bot-contributed-ui.md`.
+
 ## Registering your commands
 
 Call this once you are connected, and again every time you reconnect:
