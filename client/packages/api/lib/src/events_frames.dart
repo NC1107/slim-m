@@ -455,3 +455,31 @@ class MessageEphemeral extends ServerEvent {
   final String channelId;
   final EphemeralMessage message;
 }
+
+/// A bot replaced or cleared the buttons on its message. Carries the whole
+/// current list, so a receiver replaces rather than merges.
+class MessageComponentsChanged extends ServerEvent {
+  const MessageComponentsChanged({
+    required this.channelId,
+    required this.messageId,
+    required this.components,
+  });
+
+  final String channelId;
+  final String messageId;
+  final List<ComponentRow> components;
+}
+
+/// The bot answered this account's button press, so the button can stop
+/// showing as pending. See docs/decisions/0038-bot-message-buttons.md.
+class InteractionAnswered extends ServerEvent {
+  const InteractionAnswered({
+    required this.interactionId,
+    required this.channelId,
+    required this.messageId,
+  });
+
+  final String interactionId;
+  final String channelId;
+  final String messageId;
+}

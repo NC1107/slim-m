@@ -69,6 +69,7 @@ class MessageExtras {
     this.appSurface,
     this.call,
     this.embeds = const [],
+    this.components = const [],
     this.threadChannelId,
     this.threadReplyCount,
     this.threadLastReplyAt,
@@ -80,6 +81,11 @@ class MessageExtras {
 
   /// Fixed once a message exists, like [attachments]; see decision 0030.
   final List<api.Embed> embeds;
+
+  /// A bot's buttons. Unlike [embeds] a bot can replace or clear them, so a
+  /// REST fetch and a `message.components` frame both replace the list, where
+  /// a bare live create or edit frame only ever adds.
+  final List<api.ComponentRow> components;
 
   /// The shared result of each fenced code block run in this message, one
   /// entry per block, ordered by block index. Follows [reactions]' merge
@@ -118,6 +124,7 @@ class MessageExtras {
     api.Poll? poll,
     api.AppSurface? appSurface,
     api.CallRecord? call,
+    List<api.ComponentRow>? components,
   }) => MessageExtras(
     reactions: reactions ?? this.reactions,
     attachments: attachments ?? this.attachments,
@@ -126,6 +133,7 @@ class MessageExtras {
     appSurface: appSurface ?? this.appSurface,
     call: call ?? this.call,
     embeds: embeds,
+    components: components ?? this.components,
     threadChannelId: threadChannelId,
     threadReplyCount: threadReplyCount,
     threadLastReplyAt: threadLastReplyAt,
@@ -161,6 +169,8 @@ class MessageExtrasController
         _applyCodeRunsCleared(messageId);
       case api.PollVoted(:final messageId, :final options):
         _applyPollTally(messageId, options);
+      case api.MessageComponentsChanged(:final messageId, :final components):
+        _set(messageId, extrasFor(messageId).copyWith(components: components));
       case api.ThreadUpdated(
         :final parentMessageId,
         :final threadChannelId,
@@ -245,6 +255,10 @@ class MessageExtrasController
     embeds: message.embeds.isNotEmpty
         ? message.embeds
         : existing?.embeds ?? const [],
+    // Same rule as reactions: a REST fetch replaces, so buttons a bot cleared while this client was away go.
+    components: authoritative || message.components.isNotEmpty
+        ? message.components
+        : existing?.components ?? const [],
     threadChannelId: message.threadChannelId ?? existing?.threadChannelId,
     threadReplyCount: message.threadReplyCount ?? existing?.threadReplyCount,
     threadLastReplyAt: message.threadLastReplyAt ?? existing?.threadLastReplyAt,
@@ -316,6 +330,7 @@ class MessageExtrasController
         codeRuns: existing.codeRuns,
         poll: existing.poll,
         embeds: existing.embeds,
+        components: existing.components,
         threadChannelId: threadChannelId,
         threadReplyCount: replyCount,
         threadLastReplyAt: lastReplyAt,

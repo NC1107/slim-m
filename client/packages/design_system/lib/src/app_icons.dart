@@ -339,6 +339,9 @@ abstract final class AppIcons {
   /// queue's "Jump to message", not a link to another site.
   static const IconData jumpToMessage = LucideIcons.externalLink300;
 
+  /// A button that opens another site in the browser, as a bot's link button does.
+  static const IconData externalLink = LucideIcons.externalLink300;
+
   /// The custom title bar's own three window controls, decision 0012.
   /// [windowMaximize] shares [expand]'s glyph on purpose - one shape, two
   /// call sites - and [windowRestore] is what the same button becomes once

@@ -75,6 +75,13 @@ const Map<String, String> _allowlist = {
       'from its own process, never from this client, which only receives the '
       'message.ephemeral frame - the same shape as PUT /bots/commands above. '
       'See docs/decisions/0037-ephemeral-bot-messages.md',
+  'PUT /channels/{}/messages/{}/components': 'a bot replaces its own '
+      'buttons from its process; this client only receives the '
+      'message.components frame. See '
+      'docs/decisions/0038-bot-message-buttons.md',
+  'POST /channels/{}/interactions/{}/ack': 'a bot acknowledges a press from '
+      'its own process; this client only receives interaction.answered. See '
+      'docs/decisions/0038-bot-message-buttons.md',
   'POST /voice/webhook': 'called only by the configured LiveKit deployment '
       'itself, verified by its own JWT signature rather than a session - '
       'the same "no client binding by design" shape as POST /webhooks/{}/{} '
