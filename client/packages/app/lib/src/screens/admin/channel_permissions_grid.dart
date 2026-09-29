@@ -68,6 +68,30 @@ class _ChannelPermissionsGridState extends ConsumerState<ChannelPermissionsGrid>
     _pending = {..._original};
   }
 
+  /// Applies what another admin changed without touching a cell, column or
+  /// removal the local admin has already edited.
+  void _mergeRemote(List<api.ChannelOverwrite> overwrites) {
+    final fresh = {
+      for (final o in overwrites) '${o.kind.wire}:${o.id}': (o.allow, o.deny),
+    };
+    setState(() {
+      for (final key in {..._original.keys, ...fresh.keys}) {
+        final edited =
+            _removed.contains(key) ||
+            (_pending.containsKey(key) && _pending[key] != _original[key]);
+        if (edited) {
+          if (!fresh.containsKey(key)) _removed.remove(key);
+        } else if (fresh.containsKey(key)) {
+          _pending[key] = fresh[key]!;
+        } else {
+          _pending.remove(key);
+        }
+      }
+      _addedLocally.removeWhere(fresh.containsKey);
+      _original = fresh;
+    });
+  }
+
   bool get _isDirty {
     if (_removed.isNotEmpty) return true;
     for (final entry in _pending.entries) {
@@ -283,6 +307,11 @@ class _ChannelPermissionsGridState extends ConsumerState<ChannelPermissionsGrid>
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    ref.listen(channelOverwritesProvider(widget.channel.id), (previous, next) {
+      if (!_loaded || !next.hasValue || next.isLoading) return;
+      if (identical(previous?.value, next.value)) return;
+      _mergeRemote(next.requireValue);
+    });
     final overwritesAsync = ref.watch(
       channelOverwritesProvider(widget.channel.id),
     );

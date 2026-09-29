@@ -103,7 +103,7 @@ void main() {
     expect(find.text('Allow'), findsOneWidget);
     expect(find.text('Inherit from role'), findsOneWidget);
     expect(find.text('Deny'), findsOneWidget);
-    expect(find.text('everyone'), findsOneWidget);
+    expect(find.byTooltip('everyone'), findsOneWidget);
   });
 
   testWidgets(

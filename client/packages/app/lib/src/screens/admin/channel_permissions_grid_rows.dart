@@ -162,7 +162,7 @@ class HeaderRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     for (final column in columns)
-                      _HeaderCell(
+                      HeaderCell(
                         column: column,
                         width: metrics.cellWidth,
                         onRemove: () => onRemove(column),
@@ -191,8 +191,11 @@ class HeaderRow extends StatelessWidget {
   }
 }
 
-class _HeaderCell extends StatelessWidget {
-  const _HeaderCell({
+/// One principal's header: avatar or role icon, its name when it fits, and
+/// the remove control.
+class HeaderCell extends StatelessWidget {
+  const HeaderCell({
+    super.key,
     required this.column,
     required this.width,
     required this.onRemove,
@@ -212,29 +215,33 @@ class _HeaderCell extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            column.kind == api.OverwriteTarget.role
-                ? Icon(
-                    AppIcons.shield,
-                    size: AppSizes.icon16,
-                    color: tokens.textSecondary,
-                  )
-                : AuthorAvatar(
-                    name: column.label,
-                    userId: column.id,
-                    size: 20,
-                    shape: column.isBot
-                        ? AppAvatarShape.square
-                        : AppAvatarShape.circle,
-                    placeholder: column.isBot
-                        ? botAvatarPlaceholder(context, column.label)
-                        : null,
-                  ),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              column.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.caption.copyWith(color: tokens.textPrimary),
+            Tooltip(
+              message: column.label,
+              triggerMode: TooltipTriggerMode.tap,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  column.kind == api.OverwriteTarget.role
+                      ? Icon(
+                          AppIcons.shield,
+                          size: AppSizes.icon16,
+                          color: tokens.textSecondary,
+                        )
+                      : AuthorAvatar(
+                          name: column.label,
+                          userId: column.id,
+                          size: 20,
+                          shape: column.isBot
+                              ? AppAvatarShape.square
+                              : AppAvatarShape.circle,
+                          placeholder: column.isBot
+                              ? botAvatarPlaceholder(context, column.label)
+                              : null,
+                        ),
+                  const SizedBox(height: AppSpacing.s4),
+                  _HeaderName(label: column.label),
+                ],
+              ),
             ),
             Semantics(
               button: true,
@@ -255,6 +262,38 @@ class _HeaderCell extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The column's name, shown only when the whole of it fits the cell. A name
+/// that does not fit collapses to its avatar (the tooltip carries it) rather
+/// than painting a mid-word ellipsis, and keeps its line height so avatars
+/// across headers stay level.
+class _HeaderName extends StatelessWidget {
+  const _HeaderName({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    final style = AppText.caption.copyWith(color: tokens.textPrimary);
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final size = painter.size;
+    painter.dispose();
+    return LayoutBuilder(
+      builder: (context, box) => SizedBox(
+        height: size.height,
+        child: size.width <= box.maxWidth
+            ? Text(label, maxLines: 1, softWrap: false, style: style)
+            : null,
       ),
     );
   }
