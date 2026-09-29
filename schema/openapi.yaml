@@ -11226,6 +11226,17 @@ components:
         protocol:
           type: integer
           format: int32
+        moderation_seq:
+          type: integer
+          format: int64
+          description: >
+            The number of the latest moderation event (`member.timeout`,
+            `member.removed`, `member.restored`, `member.role_changed`,
+            `role.changed`), each of which carries the same kind of number as
+            `seq`. A consumer that stored the last one it saw and finds a
+            larger head here missed events while disconnected. Not a
+            history cursor: nothing can be replayed from it, and it is
+            monotonic across restarts but not consecutive.
 
     MessageCreated:
       type: object
@@ -11560,6 +11571,10 @@ components:
         type:
           type: string
           enum: [member.timeout]
+        seq:
+          type: integer
+          format: int64
+          description: Moderation cursor; see ServerHello.moderation_seq.
         user_id:
           type: string
           format: uuid
@@ -11578,6 +11593,10 @@ components:
         type:
           type: string
           enum: [member.removed]
+        seq:
+          type: integer
+          format: int64
+          description: Moderation cursor; see ServerHello.moderation_seq.
         user_id:
           type: string
           format: uuid
@@ -11594,6 +11613,10 @@ components:
         type:
           type: string
           enum: [member.restored]
+        seq:
+          type: integer
+          format: int64
+          description: Moderation cursor; see ServerHello.moderation_seq.
         user_id:
           type: string
           format: uuid
@@ -11681,6 +11704,10 @@ components:
         type:
           type: string
           enum: [role.changed]
+        seq:
+          type: integer
+          format: int64
+          description: Moderation cursor; see ServerHello.moderation_seq.
         role_id:
           type: string
           format: uuid
@@ -11698,6 +11725,10 @@ components:
         type:
           type: string
           enum: [member.role_changed]
+        seq:
+          type: integer
+          format: int64
+          description: Moderation cursor; see ServerHello.moderation_seq.
         user_id:
           type: string
           format: uuid

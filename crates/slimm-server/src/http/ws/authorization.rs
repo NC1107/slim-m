@@ -101,7 +101,32 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
         | Event::ReportsChanged
-        | Event::ReadStateChanged { .. } => None,
+        | Event::ReadStateChanged { .. }
+        | Event::Stamped { .. } => None,
+    }
+}
+
+/// [`authorize_unstamped`], with a moderation event's number attached to the frame it delivers.
+pub(super) async fn authorize(
+    store: &Store,
+    hub: &Hub,
+    link_previews: &LinkPreviews,
+    ctx: &SessionContext,
+    cache: &mut PermissionCache,
+    event: Event,
+) -> Authorization {
+    let (seq, event) = match event {
+        Event::Stamped { seq, event } => (Some(seq), *event),
+        other => (None, other),
+    };
+    match (
+        authorize_unstamped(store, hub, link_previews, ctx, cache, event).await,
+        seq,
+    ) {
+        (Authorization::Deliver(frame), Some(seq)) => {
+            Authorization::Deliver(Box::new(frame.with_moderation_seq(seq)))
+        }
+        (outcome, _) => outcome,
     }
 }
 
@@ -111,7 +136,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
 /// match: it has no channel to check view permission against (it is
 /// deployment-wide, like the member list) and needs the receiving connection's
 /// own user id to resolve the right answer for it.
-pub(super) async fn authorize(
+pub(super) async fn authorize_unstamped(
     store: &Store,
     hub: &Hub,
     link_previews: &LinkPreviews,
@@ -163,17 +188,20 @@ pub(super) async fn authorize(
     match event {
         Event::MemberTimeoutChanged { user_id, until } => {
             return Authorization::Deliver(Box::new(ServerFrame::MemberTimeoutChanged {
+                seq: None,
                 user_id: user_id.to_string(),
                 until,
             }));
         }
         Event::MemberRemoved(user_id) => {
             return Authorization::Deliver(Box::new(ServerFrame::MemberRemoved {
+                seq: None,
                 user_id: user_id.to_string(),
             }));
         }
         Event::MemberRestored(user_id) => {
             return Authorization::Deliver(Box::new(ServerFrame::MemberRestored {
+                seq: None,
                 user_id: user_id.to_string(),
             }));
         }
@@ -184,11 +212,13 @@ pub(super) async fn authorize(
         }
         Event::RoleChanged { role_id } => {
             return Authorization::Deliver(Box::new(ServerFrame::RoleChanged {
+                seq: None,
                 role_id: role_id.to_string(),
             }));
         }
         Event::MemberRoleChanged { user_id, role_id } => {
             return Authorization::Deliver(Box::new(ServerFrame::MemberRoleChanged {
+                seq: None,
                 user_id: user_id.to_string(),
                 role_id: role_id.to_string(),
             }));
@@ -269,7 +299,8 @@ pub(super) async fn authorize(
             | Event::ChannelDeleted { .. }
             | Event::CategoryChanged
             | Event::ReportsChanged
-            | Event::ReadStateChanged { .. } => return Authorization::Withhold,
+            | Event::ReadStateChanged { .. }
+            | Event::Stamped { .. } => return Authorization::Withhold,
         },
     };
     // The one event whose subject may have just lost this very view.
@@ -596,6 +627,7 @@ pub(super) async fn authorize(
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
         | Event::ReportsChanged
-        | Event::ReadStateChanged { .. } => return Authorization::Withhold,
+        | Event::ReadStateChanged { .. }
+        | Event::Stamped { .. } => return Authorization::Withhold,
     }))
 }

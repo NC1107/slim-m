@@ -116,6 +116,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
         &mut sink,
         &ServerFrame::Hello {
             protocol: PROTOCOL_VERSION,
+            moderation_seq: state.hub.moderation_head(),
         },
     )
     .await

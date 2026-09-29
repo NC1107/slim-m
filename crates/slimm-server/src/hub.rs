@@ -42,9 +42,11 @@ use crate::typing::TypingTracker;
 
 mod event;
 mod memory_guard;
+mod moderation_seq;
 pub use event::Event;
 use memory_guard::MemoryGuard;
 pub use memory_guard::{MemoryAdmissionSnapshot, MemoryReading};
+use moderation_seq::{ModerationClock, is_moderation};
 
 /// How many events the durable channel buffers per subscriber before the
 /// slowest one starts losing the oldest and receives a `Lagged` error.
@@ -87,6 +89,7 @@ pub struct Hub {
     permissions_epoch: Arc<AtomicU64>,
     idle_poll_interval: Duration,
     memory_guard: Arc<MemoryGuard>,
+    moderation: Arc<ModerationClock>,
 }
 
 /// Default value of [`Hub::idle_poll_interval`]: how often a live connection
@@ -153,6 +156,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::ReportsChanged
         // A read marker moves no permission and needs no fan-out ordering.
         | Event::ReadStateChanged { .. } => false,
+        Event::Stamped { event, .. } => moves_permissions(event),
     }
 }
 
@@ -223,6 +227,7 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::ReportsChanged
         // A read marker moves no permission and needs no fan-out ordering.
         | Event::ReadStateChanged { .. } => false,
+        Event::Stamped { event, .. } => is_ephemeral(event),
     }
 }
 
@@ -246,6 +251,7 @@ impl Hub {
             permissions_epoch: Arc::new(AtomicU64::new(0)),
             idle_poll_interval: IDLE_POLL_INTERVAL,
             memory_guard: Arc::new(MemoryGuard::new()),
+            moderation: Arc::new(ModerationClock::new()),
         }
     }
 
@@ -297,6 +303,14 @@ impl Hub {
     /// are no subscribers on that channel; never blocks or errors from the
     /// caller's point of view.
     pub fn publish(&self, event: Event) {
+        let event = if is_moderation(&event) {
+            Event::Stamped {
+                seq: self.moderation.advance(),
+                event: Box::new(event),
+            }
+        } else {
+            event
+        };
         // Bumped before the send, so no subscriber can act on a stale answer.
         if moves_permissions(&event) {
             self.permissions_epoch.fetch_add(1, Ordering::Release);
@@ -306,6 +320,12 @@ impl Hub {
         } else {
             let _ = self.sender.send(event);
         }
+    }
+
+    /// The number of the latest moderation event, for the connect `hello`; see
+    /// `hub::moderation_seq`.
+    pub fn moderation_head(&self) -> u64 {
+        self.moderation.head()
     }
 
     /// A counter bumped whenever a published event means permissions moved.

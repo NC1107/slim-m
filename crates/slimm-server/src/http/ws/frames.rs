@@ -16,7 +16,7 @@ use crate::http::messages::MessageDto;
 #[serde(tag = "type")]
 pub(super) enum ServerFrame {
     #[serde(rename = "hello")]
-    Hello { protocol: u32 },
+    Hello { protocol: u32, moderation_seq: u64 },
     #[serde(rename = "message.created")]
     MessageCreated {
         channel_id: String,
@@ -94,11 +94,24 @@ pub(super) enum ServerFrame {
     #[serde(rename = "presence.changed")]
     PresenceChanged { user_id: String, status: String },
     #[serde(rename = "member.timeout")]
-    MemberTimeoutChanged { user_id: String, until: Option<i64> },
+    MemberTimeoutChanged {
+        user_id: String,
+        until: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seq: Option<u64>,
+    },
     #[serde(rename = "member.removed")]
-    MemberRemoved { user_id: String },
+    MemberRemoved {
+        user_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seq: Option<u64>,
+    },
     #[serde(rename = "member.restored")]
-    MemberRestored { user_id: String },
+    MemberRestored {
+        user_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seq: Option<u64>,
+    },
     #[serde(rename = "member.joined")]
     MemberJoined { user_id: String },
     #[serde(rename = "profile.changed")]
@@ -108,9 +121,18 @@ pub(super) enum ServerFrame {
     #[serde(rename = "typing.stopped")]
     TypingStopped { channel_id: String, user_id: String },
     #[serde(rename = "role.changed")]
-    RoleChanged { role_id: String },
+    RoleChanged {
+        role_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seq: Option<u64>,
+    },
     #[serde(rename = "member.role_changed")]
-    MemberRoleChanged { user_id: String, role_id: String },
+    MemberRoleChanged {
+        user_id: String,
+        role_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        seq: Option<u64>,
+    },
     #[serde(rename = "channel.created")]
     ChannelCreated { channel: ChannelDto },
     #[serde(rename = "channel.updated")]
@@ -258,6 +280,21 @@ pub(crate) struct ReactionCountDto {
 pub(crate) struct PollOptionCountDto {
     pub(super) position: i64,
     pub(super) votes: i64,
+}
+
+impl ServerFrame {
+    /// Attaches a moderation number to the five frames that carry one.
+    pub(super) fn with_moderation_seq(mut self, number: u64) -> Self {
+        match &mut self {
+            Self::MemberTimeoutChanged { seq, .. }
+            | Self::MemberRemoved { seq, .. }
+            | Self::MemberRestored { seq, .. }
+            | Self::RoleChanged { seq, .. }
+            | Self::MemberRoleChanged { seq, .. } => *seq = Some(number),
+            _ => {}
+        }
+        self
+    }
 }
 
 #[derive(Deserialize)]

@@ -62,6 +62,40 @@ You only receive what your permissions allow - fan-out is authorized per connect
 A frame you do not recognise should be ignored, not treated as an error.
 New event types are added over time, and a bot that dies on one it has never heard of breaks on somebody else's upgrade.
 
+## Which events carry a `seq`, and what to do after a gap
+
+Message events carry a per-channel `seq`, and `POST /sync` replays a channel from a `seq` you hold, so a bot that was offline can catch up on messages.
+That is the only cursor there is for channel traffic.
+Most other frames - presence, typing, voice, channel and profile changes, `member.joined` - carry none, and a reconnect does not replay them.
+Refetch the state they describe instead.
+
+The moderation events are the case where a hole matters most: `member.timeout`, `member.removed`, `member.restored`, `member.role_changed` and `role.changed`.
+They reach every connection, but there is no route a bot can call to read back what it missed, because `GET /roles`, `GET /reports/history` and `GET /members/removed` are each behind their own permission.
+So they carry a different, deployment-wide `seq`, and the server's `hello` reply carries the head as `moderation_seq`:
+
+```json
+{ "type": "hello", "protocol": 1, "moderation_seq": 1790000123456 }
+{ "type": "member.timeout", "user_id": "...", "until": 1790000183456, "seq": 1790000123999 }
+```
+
+To keep an audit trail honest, persist the largest moderation `seq` you have seen, and compare it with `moderation_seq` on every reconnect.
+If the head is larger, moderation events landed while you were away and your trail has a hole: say so in the log instead of presenting it as complete.
+An event with a `seq` at or below the head can still arrive right after the `hello`, so a hole is only confirmed once the head is still ahead of everything you have received.
+
+Two limits to plan around.
+The number is a cursor, not a history: nothing can be replayed from it, and it is increasing but not consecutive, so you cannot count how many events were missed.
+It is also clock-seeded, so the first reconnect after a server restart always reads as a possible gap, which is the safe direction.
+
+Two shapes to know about:
+
+- `member.role_changed` does not say whether the role was granted or revoked.
+  Diff the member's current `role_ids` from `GET /users/{id}`, which any account can read.
+- `role.changed` carries only the id, never the name.
+  A role nobody holds cannot be resolved without MANAGE_ROLES, so log the id and say why the name is missing.
+
+Timing out your own bot makes its next post return 403, because the timeout removes SEND_MESSAGES before you process the frame that announced it.
+Catch the failure per frame rather than letting it end the connection, which would open a gap.
+
 ## Voice events
 
 Three frames tell you who is on a voice call, live, without polling `GET /channels/{channelId}/voice/roster`:

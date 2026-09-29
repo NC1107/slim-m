@@ -1,0 +1,193 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+//! Moderation events carry a number and the connect `hello` carries the head,
+//! so a consumer that was offline can tell it missed some. See
+//! `hub::moderation_seq`.
+
+use std::time::Duration;
+
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use futures_util::{SinkExt, StreamExt};
+use serde_json::{Value, json};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::Store;
+use tokio::net::TcpListener;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message as WsMessage;
+use tower::ServiceExt;
+
+mod support;
+
+type Client =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-live-moderation-seq-test");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn state_for(store: &Store) -> AppState {
+    AppState {
+        store: store.clone(),
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
+        dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
+    }
+}
+
+/// Creates a user and returns (rest access token, ws connect ticket, user id).
+async fn ticket_for(store: &Store, user: slimm_server::ids::UserId) -> String {
+    let tokens = store.open_session(user, "device").await.unwrap();
+    let ctx = store
+        .authenticate(&tokens.access_token)
+        .await
+        .unwrap()
+        .unwrap();
+    store.mint_ws_ticket(&ctx).await.unwrap().0
+}
+
+async fn serve(state: AppState) -> std::net::SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, http::router(state)).await.unwrap();
+    });
+    addr
+}
+
+async fn connect(addr: std::net::SocketAddr, ticket: &str) -> (Client, Value) {
+    let (mut ws, _response) = connect_async(format!("ws://{addr}/ws")).await.unwrap();
+    ws.send(WsMessage::Text(
+        json!({ "type": "hello", "ticket": ticket, "protocol": 1 }).to_string(),
+    ))
+    .await
+    .unwrap();
+    let ack = read_frame(&mut ws).await;
+    assert_eq!(ack["type"], "hello");
+    (ws, ack)
+}
+
+/// Reads the next text frame as JSON, skipping `presence.changed`: every
+/// connect in this file publishes one on the same shared hub these tests
+/// assert against, and it is real chatter no test here is checking.
+async fn read_frame(ws: &mut Client) -> Value {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            match ws.next().await {
+                Some(Ok(WsMessage::Text(text))) => {
+                    let frame: Value = serde_json::from_str(text.as_str()).unwrap();
+                    if frame["type"] == "presence.changed" {
+                        continue;
+                    }
+                    return frame;
+                }
+                Some(Ok(_)) => continue,
+                other => panic!("expected a text frame, got {other:?}"),
+            }
+        }
+    })
+    .await
+    .expect("timed out waiting for a frame")
+}
+
+fn req(method: &str, uri: &str, token: &str, body: Option<Value>) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("authorization", format!("Bearer {token}"));
+    match body {
+        Some(value) => {
+            builder = builder.header("content-type", "application/json");
+            builder.body(Body::from(value.to_string())).unwrap()
+        }
+        None => builder.body(Body::empty()).unwrap(),
+    }
+}
+
+async fn timeout(state: &AppState, admin_token: &str, target: slimm_server::ids::UserId) {
+    let response = http::router(state.clone())
+        .oneshot(req(
+            "PUT",
+            &format!("/members/{target}/timeout"),
+            admin_token,
+            Some(json!({ "duration_seconds": 60 })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+/// A bot that was offline for a timeout reconnects to a head past the last
+/// number it saw, which is the signal that its trail has a hole.
+#[tokio::test]
+async fn a_reconnect_after_a_missed_moderation_event_sees_a_later_head() {
+    let (store, _guard) = new_store().await;
+    let admin = store.create_account("admin", "Admin", "x").await.unwrap();
+    store.bootstrap_deployment(admin.id).await.unwrap();
+    let admin_token = store
+        .open_session(admin.id, "cli")
+        .await
+        .unwrap()
+        .access_token;
+    let bot = store.create_user("bot", "bot").await.unwrap();
+    let victim = store.create_user("victim", "victim").await.unwrap();
+    let state = state_for(&store);
+    let addr = serve(state.clone()).await;
+
+    let (ws, first_hello) = connect(addr, &ticket_for(&store, bot.id).await).await;
+    let last_seen = first_hello["moderation_seq"]
+        .as_u64()
+        .expect("hello carries the head");
+    drop(ws);
+
+    timeout(&state, &admin_token, victim.id).await;
+
+    let (mut ws, second_hello) = connect(addr, &ticket_for(&store, bot.id).await).await;
+    let head = second_hello["moderation_seq"].as_u64().unwrap();
+    assert!(
+        head > last_seen,
+        "a missed event must move the head: {head} vs {last_seen}"
+    );
+
+    timeout(&state, &admin_token, victim.id).await;
+    let frame = read_frame(&mut ws).await;
+    assert_eq!(frame["type"], "member.timeout");
+    assert!(
+        frame["seq"].as_u64().unwrap() > head,
+        "a live event is numbered past the head: {frame}"
+    );
+}
+
+/// With nothing moderated in between, a reconnect sees the same head, so a
+/// quiet gap is not reported as a hole.
+#[tokio::test]
+async fn a_quiet_reconnect_sees_the_same_head() {
+    let (store, _guard) = new_store().await;
+    let bot = store.create_user("bot", "bot").await.unwrap();
+    let addr = serve(state_for(&store)).await;
+
+    let (ws, first) = connect(addr, &ticket_for(&store, bot.id).await).await;
+    drop(ws);
+    let (_ws, second) = connect(addr, &ticket_for(&store, bot.id).await).await;
+    assert_eq!(first["moderation_seq"], second["moderation_seq"]);
+}
