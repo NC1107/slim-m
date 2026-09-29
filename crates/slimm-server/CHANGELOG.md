@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.75.0](https://github.com/NC1107/slim-m/compare/server-v0.74.0...server-v0.75.0) (2026-09-29)
+
+
+### Features
+
+* buttons on bot messages, with private answers to a press ([b49c3cd](https://github.com/NC1107/slim-m/commit/b49c3cd1e5c2319350b6360dbd091d70474abb1f))
+* let a bot answer one member privately (ephemeral messages) ([2da9182](https://github.com/NC1107/slim-m/commit/2da9182e94896b69edcda853a7f6ae0945e188cf))
+* pre-muted voice channels, a per-channel join_muted default ([5c6cde4](https://github.com/NC1107/slim-m/commit/5c6cde45dfa5ac9aa57877fa92e9f0a08ae1782d))
+* **server,client:** a scene can declare motion for the client to play, bounded on both sides ([3fda014](https://github.com/NC1107/slim-m/commit/3fda014d70505a67ca94d230fec5b67409f4b907))
+* **server,client:** rich presence, show what a member is listening to (linux MPRIS first) ([1d157a3](https://github.com/NC1107/slim-m/commit/1d157a314d025367b9f5375bf4bdd09019aa579b))
+* **server,client:** rotate a webhook's URL in place ([1b09059](https://github.com/NC1107/slim-m/commit/1b090596ee974e9689aae3624202f5c23e64b074))
+* **server,client:** turn on module capabilities (kv.store and message.post), approved per module at install ([699c993](https://github.com/NC1107/slim-m/commit/699c99390f2756fc207a313369820d25b22dc221))
+* **server,client:** warn an account's other devices when an unfamiliar device signs in ([96e64a8](https://github.com/NC1107/slim-m/commit/96e64a8bffbe66d861df534fa6b77cc0c666c470))
+* **server:** bot-contributed message menu entries and call controls ([#1456](https://github.com/NC1107/slim-m/issues/1456)) ([e63a343](https://github.com/NC1107/slim-m/commit/e63a3432c0971203027b44b9b9b1ccce57705dab))
+* **server:** hand modules an opaque caller id, and document what run receives ([#1431](https://github.com/NC1107/slim-m/issues/1431)) ([4bc6439](https://github.com/NC1107/slim-m/commit/4bc6439719204a49722826a3bf240029b5839a49))
+* **server:** number moderation events and carry the head in the ws hello ([#1417](https://github.com/NC1107/slim-m/issues/1417)) ([fa50f85](https://github.com/NC1107/slim-m/commit/fa50f85dae6cea8104e0483bcca9de087739032d))
+* **server:** surface a webhook post's own username label on list, sync and live frames ([#1416](https://github.com/NC1107/slim-m/issues/1416)) ([c4ed6a6](https://github.com/NC1107/slim-m/commit/c4ed6a6a12ad63851a4a197ada871eac0d5d328f))
+
+
+### Bug Fixes
+
+* **server,client:** refuse and mark code blocks that hide text-direction characters ([8d8b8ef](https://github.com/NC1107/slim-m/commit/8d8b8efe590bdb9c7ce399c5dedb131f1e48befa))
+* **server:** name the refused permission bits in an overwrite write's 403 ([#1446](https://github.com/NC1107/slim-m/issues/1446)) ([681b9da](https://github.com/NC1107/slim-m/commit/681b9daf51653101bdce59a8a8ccc5ecad915060))
+* **server:** read state travels between an account's devices ([#1408](https://github.com/NC1107/slim-m/issues/1408)) ([d68ccf5](https://github.com/NC1107/slim-m/commit/d68ccf50906d7af1883faf35dd45735a438b3e80))
+* **server:** refuse colliding command names, untypable keywords and hidden characters in a module manifest ([b185e70](https://github.com/NC1107/slim-m/commit/b185e70bffbd4ade99c8e5a8fa07e4954a181f45))
+* **server:** remove forwarded snapshots when their original is deleted or ages out ([4395e67](https://github.com/NC1107/slim-m/commit/4395e67af863decc742ac4558c3d57ff246c188d))
+* **server:** run the stored code block, not the input a client sends ([59689a3](https://github.com/NC1107/slim-m/commit/59689a3c194f49b7b781ffd3f3d2750b6e46b72e))
+
+
+### Performance Improvements
+
+* **server:** key viewing reports by user so a frame never scans the whole map ([#1448](https://github.com/NC1107/slim-m/issues/1448)) ([273a8a8](https://github.com/NC1107/slim-m/commit/273a8a8c0f2acbbb06fd6d657c022716cf0e3539))
+* **server:** resolve a call message's record once, not per ws subscriber ([#1450](https://github.com/NC1107/slim-m/issues/1450)) ([3a228c4](https://github.com/NC1107/slim-m/commit/3a228c42b08ccec2e60f0d67ee80ecdb2a33420d))
+
 ## [0.74.0](https://github.com/NC1107/slim-m/compare/server-v0.73.0...server-v0.74.0) (2026-09-28)
 
 
