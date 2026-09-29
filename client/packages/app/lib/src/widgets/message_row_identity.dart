@@ -261,9 +261,17 @@ class MessageRowLeading extends ConsumerWidget {
 }
 
 class MessageRowHeader extends ConsumerWidget {
-  const MessageRowHeader({super.key, required this.message});
+  const MessageRowHeader({
+    super.key,
+    required this.message,
+    this.webhookUsername,
+  });
 
   final Message message;
+
+  /// A webhook's per-post label, drawn as the name only while the author
+  /// resolves to a webhook, so the Webhook badge always sits beside it.
+  final String? webhookUsername;
 
   /// An author who has not resolved yet reads as neither a bot nor a
   /// webhook, so a badge is absent until the profile is known rather than
@@ -278,12 +286,15 @@ class MessageRowHeader extends ConsumerWidget {
         (m) => authorResolution(m, message.authorId ?? ''),
       ),
     );
-    final name = authorLabelResolved(
-      authorId: message.authorId,
-      cachedDisplayName: message.authorDisplayName,
-      resolution: resolution,
-    );
     final isWebhook = resolution.profile?.isWebhook ?? false;
+    final label = webhookUsername?.trim();
+    final name = isWebhook && label != null && label.isNotEmpty
+        ? label
+        : authorLabelResolved(
+            authorId: message.authorId,
+            cachedDisplayName: message.authorDisplayName,
+            resolution: resolution,
+          );
     final isBot = resolution.profile?.isBot ?? false;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s4),

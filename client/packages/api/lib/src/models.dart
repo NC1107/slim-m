@@ -105,7 +105,9 @@ class Ticket {
   final int expiresAt;
 
   factory Ticket.fromJson(Map<String, dynamic> json) => Ticket(
-      ticket: json['ticket'] as String, expiresAt: json['expires_at'] as int);
+        ticket: json['ticket'] as String,
+        expiresAt: json['expires_at'] as int,
+      );
 
   @override
   String toString() => 'Ticket(expiresAt: $expiresAt)';
@@ -140,6 +142,7 @@ class Message {
     this.forwarded,
     this.mentionsMe = false,
     this.embeds = const [],
+    this.webhookUsername,
   });
 
   final String id;
@@ -238,6 +241,10 @@ class Message {
   /// exists, like [attachments]. Always present, empty when there is none.
   final List<Embed> embeds;
 
+  /// A webhook post's own `username` label, null on every other message. Shown
+  /// beside the webhook badge, never in place of it.
+  final String? webhookUsername;
+
   bool get isEdited => editedAt != null;
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -288,6 +295,7 @@ class Message {
                 ?.map((e) => Embed.fromJson(e as Map<String, dynamic>))
                 .toList(growable: false) ??
             const [],
+        webhookUsername: json['webhook_username'] as String?,
       );
 }
 
