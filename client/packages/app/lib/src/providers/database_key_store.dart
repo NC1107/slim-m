@@ -4,7 +4,7 @@
 /// See docs/decisions/0042-encrypt-local-database.md.
 library;
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -44,6 +44,9 @@ String localStoreErrorMessage(Object error) =>
     : 'Could not load this screen.';
 
 /// Says that the local cache was cleared and is downloading again.
+///
+/// Informational, so an [AppCallout] rather than an error state; the
+/// SafeArea and stripped padding follow `NewDeviceBannerHost`.
 class DatabaseResetNotice extends ConsumerWidget {
   const DatabaseResetNotice({super.key, required this.child});
 
@@ -55,20 +58,46 @@ class DatabaseResetNotice extends ConsumerWidget {
     if (reason == null) return child;
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.s8),
-          child: AppErrorState(
-            message: reason == DatabaseResetReason.keyMissing
-                ? 'This device lost the key to its saved messages, so they '
-                      'were cleared and are downloading again from the server.'
-                : "This device's saved messages could not be read, so they "
-                      'were cleared and are downloading again from the server.',
-            onDismiss: () =>
-                ref.read(databaseResetProvider.notifier).state = null,
+        Material(
+          type: MaterialType.transparency,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.s8),
+              child: AppCallout(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_resetMessage(reason)),
+                    AppButton(
+                      label: 'Dismiss',
+                      variant: AppButtonVariant.ghost,
+                      size: AppButtonSize.sm,
+                      onPressed: () =>
+                          ref.read(databaseResetProvider.notifier).state = null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-        Expanded(child: child),
+        Expanded(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: child,
+          ),
+        ),
       ],
     );
   }
 }
+
+String _resetMessage(DatabaseResetReason reason) =>
+    reason == DatabaseResetReason.keyMissing
+    ? 'This device lost the key to its saved messages, so they were cleared '
+          'and are downloading again from the server.'
+    : "This device's saved messages could not be read, so they were cleared "
+          'and are downloading again from the server.';

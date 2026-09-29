@@ -34,7 +34,7 @@ void main() {
     await _pump(tester);
 
     expect(find.text('the shell'), findsOneWidget);
-    expect(find.byType(AppErrorState), findsNothing);
+    expect(find.byType(AppCallout), findsNothing);
   });
 
   testWidgets('says the cache was cleared, and dismisses', (tester) async {
@@ -50,7 +50,7 @@ void main() {
     await tester.tap(find.text('Dismiss'));
     await tester.pump();
 
-    expect(find.byType(AppErrorState), findsNothing);
+    expect(find.byType(AppCallout), findsNothing);
   });
 
   test('an unreachable key store reads as locked, not as a blank screen', () {

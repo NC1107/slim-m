@@ -62,7 +62,7 @@ Three different situations, treated differently:
    A keychain that errors once often works on the next try, and any destructive response now would throw away data that a retry would have unlocked.
    No fallback to a plaintext database, ever.
 2. **The store answers "no key" and an encrypted file exists** (a keychain wipe, or the file restored without its key): the file is unreadable by construction, so it is deleted, a new key is minted and the cache is fetched again.
-   The shell says so plainly and dismissibly, in an `AppErrorState`.
+   The shell says so plainly and dismissibly, in an `AppCallout`, since it is information and not a failure.
 3. **The key is present but does not open the file** (or the file is too damaged to read): same as 2.
 
 A reinstall does not hit 2 or 3 in the way the owner feared.
@@ -104,6 +104,16 @@ An encrypted browser database would be theatre.
 `flutter_secure_storage` on web already says the same thing about itself.
 The web build is a test surface, not a distribution target (`packages/app/web/README.md`), and it keeps the plain `sqlite3.wasm`.
 The pinned versions and sha256 digests in `tool/fetch_web_assets.sh` move with the upgrade.
+
+## Packaging without a network
+
+The hook downloads its prebuilt library while `flutter build linux` runs, so that step needs network.
+Every packaging path only repackages the bundle that step produced, and none of them builds Dart itself.
+`flatpak-ci.yml` and `release.yml` run `flutter build linux` online before `flatpak-builder`, whose manifest takes the bundle as a `dir` source, and the rpm spec has an empty `%build` and unpacks the release tarball that COPR receives as an srpm.
+So `flatpak-builder` and mock never reach the hook and need no offline source.
+`libsqlite3mc.so` links only libc and carries `RUNPATH $ORIGIN`, so it needs nothing the flatpak runtime or the rpm lacks.
+The remaining exposure is a GitHub outage during an online `flutter build`, the same class of failure as `pub get`, and the hook caches the download under `.dart_tool/hooks_runner/shared`.
+Only a CI run can prove the flatpak and rpm results; the reading above is from the manifest, the spec and the workflows, and a local Fedora flatpak build is not authoritative.
 
 ## Cost
 
