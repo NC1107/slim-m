@@ -109,5 +109,5 @@ Landed as its own PR, after the core registration surface, per the coordinating 
 ## What this record does not decide
 
 - Whether advertisement ever grows into a real interaction model. The `name`-keyed shape is left stable enough to support that later, but nothing here designs it.
-- The server-side ephemeral message primitive named above.
+- The server-side ephemeral message primitive named above (built later, see decision 0037).
 - Any change to the pre-existing module-command newest-first collision resolution; this record only guarantees it does not add a second version of that problem.

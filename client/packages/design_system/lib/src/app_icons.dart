@@ -232,6 +232,10 @@ abstract final class AppIcons {
   /// [micOff]/[cameraOff], which mute a signal rather than remove a tile.
   static const IconData tileHide = LucideIcons.eyeOff300;
 
+  /// A bot's private answer, marked "Only you can see this". Shares its glyph
+  /// with [tileHide]: both mean "not shown to everyone".
+  static const IconData privateReply = LucideIcons.eyeOff300;
+
   /// A tile's own resize grip, drawn at its bottom-right corner.
   static const IconData tileResize = LucideIcons.moveDiagonal2300;
 

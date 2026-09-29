@@ -101,7 +101,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
         | Event::ReportsChanged
-        | Event::ReadStateChanged { .. } => None,
+        | Event::ReadStateChanged { .. }
+        | Event::EphemeralMessage { .. } => None,
     }
 }
 
@@ -146,6 +147,13 @@ pub(super) async fn authorize(
         } else {
             Authorization::Withhold
         };
+    }
+    if let Event::EphemeralMessage {
+        recipient_id,
+        message,
+    } = &event
+    {
+        return super::ephemeral_frames::authorize(store, ctx, *recipient_id, message).await;
     }
     // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
     if let Event::ReportsChanged = event {
@@ -269,7 +277,8 @@ pub(super) async fn authorize(
             | Event::ChannelDeleted { .. }
             | Event::CategoryChanged
             | Event::ReportsChanged
-            | Event::ReadStateChanged { .. } => return Authorization::Withhold,
+            | Event::ReadStateChanged { .. }
+            | Event::EphemeralMessage { .. } => return Authorization::Withhold,
         },
     };
     // The one event whose subject may have just lost this very view.
@@ -596,6 +605,7 @@ pub(super) async fn authorize(
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
         | Event::ReportsChanged
-        | Event::ReadStateChanged { .. } => return Authorization::Withhold,
+        | Event::ReadStateChanged { .. }
+        | Event::EphemeralMessage { .. } => return Authorization::Withhold,
     }))
 }
