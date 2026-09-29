@@ -29,6 +29,7 @@ use uuid::Uuid;
 mod support;
 
 mod answers;
+mod bot_ui;
 mod presses;
 mod security;
 mod sending;

@@ -22,6 +22,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../providers/bot_ui_uses.dart';
 import '../providers/call_recap.dart';
 import '../providers/last_text_channel.dart';
 import '../providers/member_presence.dart' show membersProvider, presenceOf;
@@ -30,6 +31,7 @@ import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
+import '../widgets/bot_call_controls.dart';
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/participant_call_menu.dart';
@@ -287,6 +289,12 @@ class _InCall extends ConsumerWidget {
     // autoDispose: hold the roster while a call is shown, or a tile's menu and card read it unloaded.
     ref.listen(membersProvider, (_, _) {});
     final controller = ref.read(voiceControllerProvider.notifier);
+    final botGroups = isDm
+        ? const <BotCallGroup>[]
+        : botCallGroups(
+            ref.watch(channelBotUiProvider(channelId)).valueOrNull ?? const [],
+            {for (final p in voice.participants) p.identity},
+          );
 
     return Stack(
       children: [
@@ -322,6 +330,9 @@ class _InCall extends ConsumerWidget {
                 controller: controller,
                 voice: VoiceFlags.from(voice),
                 canvasChannelId: isDm ? null : channelId,
+                botControls: botGroups.isEmpty
+                    ? null
+                    : BotCallControls(channelId: channelId, groups: botGroups),
               ),
             ),
           ),

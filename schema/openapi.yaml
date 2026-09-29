@@ -5894,6 +5894,123 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /bots/ui:
+    put:
+      operationId: setBotUi
+      tags: [bots]
+      summary: Bulk-overwrite the caller's own message menu entries and call controls.
+      description: >-
+        Decision 0045-bot-contributed-ui. Replaces the caller's whole
+        registration in one transaction, all or nothing, so a bot re-sends its
+        complete set on every connect. Refused for a caller that is not a bot.
+        At most 5 `message_menu` entries and 8 `call_controls`. A label is 1 to
+        32 characters and cannot hold control, zero-width or bidi characters;
+        an id is 1 to 64 characters of letters, digits and `-_.`, unique within
+        its surface. `icon` is one of `play`, `pause`, `stop`, `skip_next`,
+        `skip_previous`, `volume`, `volume_off`, `repeat`, `shuffle`, `list`,
+        and only a call control takes one. `permission` is one
+        `Permissions` bit the member must hold in the channel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetBotUiRequest"
+      responses:
+        "204":
+          description: Registered.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/bot-ui:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      operationId: listChannelBotUi
+      tags: [channels]
+      summary: Menu entries and call controls the caller may be offered in this channel.
+      description: >-
+        Decision 0045-bot-contributed-ui. A bot is listed only while its token
+        is live, it is still a member of the Space and it holds `VIEW_CHANNEL`
+        here. An entry that names a `permission` is left out when the caller
+        lacks it. Masked to an empty list for a caller who cannot view the
+        channel. Each bot is listed with its own name so a client can show
+        its entries apart from the app's own.
+      responses:
+        "200":
+          description: Each bot's entries here, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelBotUi"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/bot-ui/{botId}/interactions:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: botId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: useBotUiEntry
+      tags: [bots]
+      summary: Use a bot's message menu entry or call control.
+      description: >-
+        Decision 0045-bot-contributed-ui. Delivered to that bot only, as an
+        `interaction.created` frame with `kind` `message_menu` or
+        `call_control`, the entry id as `custom_id` and the member's id and
+        display name, the same as a button press, and answered the same way
+        (`sendEphemeralMessage` with `interaction_id`, or
+        `acknowledgeInteraction`). The caller needs `VIEW_CHANNEL` and must
+        not be a bot. A menu entry names the message it was used on. A call
+        control needs a voice channel with the caller on its call, else 403.
+        A bot that has left or cannot view the channel, an entry it has not
+        registered, one whose `permission` the caller lacks and a message
+        that is not in the channel are the same 404. The `id` is chosen by the
+        caller, so a retry is the same use. Charged to the same per-caller
+        rate limit class as a button press.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UseBotUiEntryRequest"
+      responses:
+        "200":
+          description: Recorded and delivered to the bot, if it is connected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Interaction"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /bots/{botId}/permissions:
     parameters:
       - name: botId
@@ -8907,6 +9024,73 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ComponentRow"
+    BotUiEntry:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+          description: A call control's glyph, from the list `setBotUi` names.
+        permission:
+          type: integer
+          format: int64
+    SetBotUiRequest:
+      type: object
+      properties:
+        message_menu:
+          type: array
+          items:
+            $ref: "#/components/schemas/BotUiEntry"
+        call_controls:
+          type: array
+          items:
+            $ref: "#/components/schemas/BotUiEntry"
+    ChannelBotUi:
+      type: object
+      required:
+        [
+          bot_user_id,
+          bot_username,
+          bot_display_name,
+          message_menu,
+          call_controls,
+        ]
+      properties:
+        bot_user_id:
+          type: string
+          format: uuid
+        bot_username:
+          type: string
+        bot_display_name:
+          type: string
+        message_menu:
+          type: array
+          items:
+            $ref: "#/components/schemas/BotUiEntry"
+        call_controls:
+          type: array
+          items:
+            $ref: "#/components/schemas/BotUiEntry"
+    UseBotUiEntryRequest:
+      type: object
+      required: [id, surface, entry_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        surface:
+          type: string
+          enum: [message_menu, call_control]
+        entry_id:
+          type: string
+        message_id:
+          type: string
+          format: uuid
+          description: Required for a menu entry, absent for a call control.
     InteractionCreated:
       type: object
       required:
@@ -8914,14 +9098,15 @@ components:
           type,
           interaction_id,
           channel_id,
-          message_id,
           custom_id,
           user_id,
           user_display_name,
           created_at,
         ]
       description: >
-        A member pressed one of this bot's buttons. Delivered to the bot's own
+        A member pressed one of this bot's buttons, or used one of its message
+        menu entries or call controls (decision 0045). For the latter two
+        `custom_id` is the entry id, and a call control names no message. Delivered to the bot's own
         connections only. The presser's id is given deliberately (decision
         0039), unlike an advertised command. Reply within 15 minutes with
         `sendEphemeralMessage` with `interaction_id`
@@ -8940,6 +9125,9 @@ components:
         message_id:
           type: string
           format: uuid
+        kind:
+          type: string
+          enum: [button, message_menu, call_control]
         custom_id:
           type: string
         user_id:
@@ -8952,9 +9140,10 @@ components:
           format: int64
     InteractionAnswered:
       type: object
-      required: [type, interaction_id, channel_id, message_id]
+      required: [type, interaction_id, channel_id]
       description: >
-        The bot answered this account's press. Delivered to the presser's own
+        The bot answered this account's press. Absent `message_id` means a
+        call control. Delivered to the presser's own
         connections only, so the pressed button can stop showing as pending.
       properties:
         type:

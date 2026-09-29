@@ -71,6 +71,9 @@ const Map<String, String> _allowlist = {
       'HTTP from its own process, never from this client - the same shape '
       'as POST /webhooks/{}/{} above. See '
       'docs/decisions/0031-bot-command-registration.md',
+  'PUT /bots/ui': 'a bot registers its own menu entries and call controls '
+      'from its process, never from this client - the same shape as PUT '
+      '/bots/commands above. See docs/decisions/0045-bot-contributed-ui.md',
   'POST /channels/{}/ephemeral-messages': 'a bot answers a member privately '
       'from its own process, never from this client, which only receives the '
       'message.ephemeral frame - the same shape as PUT /bots/commands above. '

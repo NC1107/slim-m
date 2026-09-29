@@ -26,8 +26,9 @@ pub(super) async fn authorize(
                 ServerFrame::InteractionCreated {
                     interaction_id: interaction.id.to_string(),
                     channel_id: interaction.channel_id.to_string(),
-                    message_id: interaction.message_id.to_string(),
+                    message_id: interaction.message_id.map(|m| m.to_string()),
                     custom_id: interaction.custom_id.clone(),
+                    kind: interaction.kind.as_str().to_owned(),
                     user_id: interaction.clicker_id.to_string(),
                     user_display_name: clicker_display_name.clone(),
                     created_at: interaction.created_at,
@@ -40,7 +41,7 @@ pub(super) async fn authorize(
                 ServerFrame::InteractionAnswered {
                     interaction_id: interaction.id.to_string(),
                     channel_id: interaction.channel_id.to_string(),
-                    message_id: interaction.message_id.to_string(),
+                    message_id: interaction.message_id.map(|m| m.to_string()),
                 }
             })
             .await,

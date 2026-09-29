@@ -33,6 +33,8 @@ import '../providers/threads.dart';
 import '../routing/breakpoints.dart';
 import '../routing/routes.dart';
 import '../widgets/app_snackbar.dart';
+import '../providers/bot_ui_uses.dart';
+import '../widgets/bot_menu_sections.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/forward_message.dart' show forwardMessage;
 import '../widgets/message_context_menu.dart';
@@ -276,6 +278,7 @@ MessageActions messageActionsFor(
   required Set<String> pinnedIds,
   required void Function(Message) onReply,
   required void Function(Message) onEdit,
+  List<api.ChannelBotUi> botUi = const [],
 }) {
   final pinned = pinnedIds.contains(message.id);
   return MessageActions(
@@ -320,5 +323,20 @@ MessageActions messageActionsFor(
               .read(messageSelectionProvider(channelId).notifier)
               .start(message.id)
         : null,
+    botSections: message.pending || message.failed
+        ? const []
+        : botMenuSections(
+            botUi,
+            onUse: (bot, entry) => unawaited(
+              ref
+                  .read(botUiUsesProvider.notifier)
+                  .useMenuEntry(
+                    channelId: channelId,
+                    botId: bot.botUserId,
+                    entryId: entry.id,
+                    messageId: message.id,
+                  ),
+            ),
+          ),
   );
 }

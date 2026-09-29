@@ -32,6 +32,7 @@ import '../routing/breakpoints.dart';
 import 'app_surface_view.dart';
 import 'attachment_view.dart';
 import 'embed_card.dart';
+import 'bot_ui_failure.dart';
 import 'message_buttons.dart';
 import 'emoji_picker.dart';
 import 'forwarded_message_card.dart';
@@ -343,6 +344,7 @@ class MessageRow extends StatelessWidget {
                                       rows: components,
                                       unavailable: message.authorId == null,
                                     ),
+                                  BotUiFailureLine(messageId: message.id),
                                   if (message.forwarded case final forwarded?)
                                     Padding(
                                       padding: const EdgeInsets.only(

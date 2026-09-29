@@ -24,6 +24,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/blocks_controller.dart';
+import '../providers/bot_ui_uses.dart';
 import '../providers/channel_history.dart';
 import '../providers/channel_permissions.dart';
 import '../providers/channel_search_controller.dart';
@@ -126,6 +127,8 @@ class ChannelTranscriptPane extends ConsumerWidget {
     final historyKnown = ref.watch(initialSyncCompleteProvider);
     final myId = ref.watch(meProvider).valueOrNull?.id;
     final myPermissions = ref.watch(myChannelPermissionsProvider(channelId));
+    final botUi =
+        ref.watch(channelBotUiProvider(channelId)).valueOrNull ?? const [];
     final pinnedIds = <String>{
       for (final p
           in ref.watch(pinsControllerProvider(channelId)).pinned ??
@@ -232,6 +235,7 @@ class ChannelTranscriptPane extends ConsumerWidget {
                                 pinnedIds: pinnedIds,
                                 onReply: onReply,
                                 onEdit: (m) => _startEdit(ref, m),
+                                botUi: botUi,
                               ),
                           onRetry: (m) => unawaited(retryMessage(ref.read, m)),
                           onDiscard: (m) =>

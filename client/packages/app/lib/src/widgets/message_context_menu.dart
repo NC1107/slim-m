@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import 'bot_menu_sections.dart';
 import 'context_menu_region.dart';
 import 'hover_reveal.dart';
 
@@ -40,6 +41,7 @@ class MessageActions {
     required this.canSave,
     required this.onSave,
     this.onStartSelecting,
+    this.botSections = const [],
   });
 
   /// Enters the transcript's selection mode with this message picked, for
@@ -53,6 +55,10 @@ class MessageActions {
   /// past their own message to somebody else's. Rendered inside the same
   /// [canDelete] group at the menu, since it never appears on its own.
   final VoidCallback? onStartSelecting;
+
+  /// Rows bots add, each set under its bot's name after everything the app
+  /// itself offers. See decision 0045.
+  final List<BotMenuSection> botSections;
 
   /// Gated on SEND_MESSAGES in this channel, unlike [canEdit] and [canDelete]:
   /// replying is a new send, not an act on a message you already authored.
@@ -275,6 +281,7 @@ class _MessageContextMenuRegionState extends State<MessageContextMenuRegion> {
           onTap: () => run(actions.onDelete),
         ),
       ],
+      ...botMenuItems(actions.botSections, close),
     ];
   }
 

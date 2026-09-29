@@ -245,12 +245,11 @@ sealed class ServerEvent {
         ),
       'interaction.answered'
           when decoded['interaction_id'] is String &&
-              decoded['channel_id'] is String &&
-              decoded['message_id'] is String =>
+              decoded['channel_id'] is String =>
         InteractionAnswered(
           interactionId: decoded['interaction_id'] as String,
           channelId: decoded['channel_id'] as String,
-          messageId: decoded['message_id'] as String,
+          messageId: decoded['message_id'] as String?,
         ),
       'message.ephemeral'
           when decoded['channel_id'] is String &&

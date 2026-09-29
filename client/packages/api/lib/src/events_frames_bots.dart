@@ -33,10 +33,12 @@ class InteractionAnswered extends ServerEvent {
   const InteractionAnswered({
     required this.interactionId,
     required this.channelId,
-    required this.messageId,
+    this.messageId,
   });
 
   final String interactionId;
   final String channelId;
-  final String messageId;
+
+  /// Absent when the answered use was a call control, which names no message.
+  final String? messageId;
 }
