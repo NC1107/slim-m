@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.76.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.75.0...server-v0.76.0) (2026-09-29)
+
+
+### Bug Fixes
+
+* **client:** drop an event socket that goes silent and reconnect ([#1470](https://github.com/Slim-m-org/slim-m/issues/1470)) ([9c90818](https://github.com/Slim-m-org/slim-m/commit/9c90818cc25876e98795fee3468697e950819213))
+* **server:** keep the dock catalog across the move to Slim-m-org ([#1475](https://github.com/Slim-m-org/slim-m/issues/1475)) ([f254db1](https://github.com/Slim-m-org/slim-m/commit/f254db1967766e73ee0a4bea8d668c79b52a8b95))
+
 ## [0.75.0](https://github.com/NC1107/slim-m/compare/server-v0.74.0...server-v0.75.0) (2026-09-29)
 
 
