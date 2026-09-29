@@ -164,6 +164,7 @@ class AppMemberPane extends ConsumerWidget {
                     RosterMember(:final profile) => MemberRow(
                       profile: profile,
                       isSelf: profile.id == myId,
+                      channelId: channelId,
                     ),
                   },
                 );

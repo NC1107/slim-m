@@ -49,6 +49,7 @@ import 'member_profile_note_field.dart';
 import 'member_profile_popover.dart';
 import 'member_profile_push_transition.dart';
 import 'member_profile_sections.dart';
+import 'member_remove_from_channel.dart';
 import 'participant_audio_controls.dart' show MemberLocalAudioSection;
 import 'run_guarded.dart';
 
@@ -76,6 +77,7 @@ Future<void> showMemberProfile(
   String? mentionChannelName,
   String? callChannelName,
   bool initiallyModerating = false,
+  String? channelId,
 }) {
   // Read before anything pops: a popped context has no navigator above it.
   final host = Navigator.of(anchor, rootNavigator: true).context;
@@ -103,6 +105,7 @@ Future<void> showMemberProfile(
           host: host,
           memberPaneScaffold: memberPaneScaffold,
           initiallyModerating: initiallyModerating,
+          channelId: channelId,
           onDone: () => Navigator.of(context).pop(),
         ),
       ),
@@ -134,6 +137,7 @@ Future<void> showMemberProfile(
         host: host,
         memberPaneScaffold: memberPaneScaffold,
         initiallyModerating: initiallyModerating,
+        channelId: channelId,
         onDone: () => Navigator.of(context).pop(),
       ),
     ),
@@ -171,6 +175,7 @@ class MemberProfileBody extends ConsumerStatefulWidget {
     this.host,
     this.memberPaneScaffold,
     this.initiallyModerating = false,
+    this.channelId,
   });
 
   final api.UserProfile profile;
@@ -181,6 +186,9 @@ class MemberProfileBody extends ConsumerStatefulWidget {
   /// not land on a profile the caller already knows, one screen before the
   /// moderation the row promised.
   final bool initiallyModerating;
+
+  /// The channel whose roster this card opened from, for "Remove from #channel".
+  final String? channelId;
 
   /// Named so "Mention in #general" can say which channel; absent where
   /// there is no channel in view, and the row goes with it.
@@ -362,6 +370,14 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
           ),
         MemberProfileNoteField(subjectId: profile.id),
         MemberNotifyOffHoursItem(host: host, profile: profile, run: run),
+        if (widget.channelId case final channelId?)
+          MemberRemoveFromChannelItem(
+            channelId: channelId,
+            profile: profile,
+            host: host,
+            guard: guard,
+            onDone: widget.onDone,
+          ),
         if (showModeration) ...[
           const AppMenuDivider(),
           AppMenuItem(
