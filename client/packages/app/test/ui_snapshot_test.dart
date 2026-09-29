@@ -19,6 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/admin_providers.dart'
     show spaceAnalyticsProvider;
+import 'package:slimm_app/src/providers/ephemeral_messages.dart'
+    show EphemeralMessagesController, ephemeralMessagesProvider;
 import 'package:slimm_app/src/providers/sync_controller.dart'
     show SyncStatus, initialSyncCompleteProvider, syncControllerProvider;
 import 'package:slimm_app/src/providers/threads.dart' show openThreadProvider;
@@ -92,6 +94,27 @@ VoiceState _callFor({int hours = 0, int minutes = 0, int seconds = 0}) =>
 /// fixture's offline `SyncController` can never produce on its own), and a
 /// voice channel pinned to its connecting state rather than left to a real,
 /// unmocked auto-join.
+EphemeralMessagesController _privateAnswers(Ref ref) {
+  api.EphemeralMessage answer(String id, String text) => api.EphemeralMessage(
+    id: id,
+    channelId: 'c-general',
+    authorId: 'u-bot',
+    authorDisplayName: 'Helper',
+    content: text,
+    inReplyToId: 'm-1',
+    createdAt: 1785000000000,
+  );
+  return EphemeralMessagesController(ref)
+    ..add(answer('e-1', 'You need Manage Messages to run that.'))
+    ..add(
+      answer(
+        'e-2',
+        'Your balance is 500 chips.\n'
+            '${List.filled(12, 'Recent hands: win, loss, win, push.').join('\n')}',
+      ),
+    );
+}
+
 final _shellStateSurfaces =
     <
       String,
@@ -162,6 +185,13 @@ final _shellStateSurfaces =
         route: '/channels/c-general',
         viewports: const ['expanded-999', 'expanded-1000'],
         overrides: () => [openThreadProvider.overrideWith((ref) => 'c-thread')],
+      ),
+      'channel-ephemeral': (
+        route: '/channels/c-general',
+        viewports: phoneAndDesktop,
+        overrides: () => [
+          ephemeralMessagesProvider.overrideWith(_privateAnswers),
+        ],
       ),
       'channel-day-divider': (
         route: '/channels/c-general',

@@ -232,6 +232,15 @@ sealed class ServerEvent {
           channelId: decoded['channel_id'] as String,
           lastReadSeq: decoded['last_read_seq'] as int,
         ),
+      'message.ephemeral'
+          when decoded['channel_id'] is String &&
+              decoded['message'] is Map<String, dynamic> =>
+        MessageEphemeral(
+          channelId: decoded['channel_id'] as String,
+          message: EphemeralMessage.fromJson(
+            decoded['message'] as Map<String, dynamic>,
+          ),
+        ),
       'canvas.object.placed'
           when decoded['channel_id'] is String &&
               decoded['object'] is Map<String, dynamic> =>

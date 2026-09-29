@@ -71,6 +71,10 @@ const Map<String, String> _allowlist = {
       'HTTP from its own process, never from this client - the same shape '
       'as POST /webhooks/{}/{} above. See '
       'docs/decisions/0031-bot-command-registration.md',
+  'POST /channels/{}/ephemeral-messages': 'a bot answers a member privately '
+      'from its own process, never from this client, which only receives the '
+      'message.ephemeral frame - the same shape as PUT /bots/commands above. '
+      'See docs/decisions/0037-ephemeral-bot-messages.md',
   'POST /voice/webhook': 'called only by the configured LiveKit deployment '
       'itself, verified by its own JWT signature rather than a session - '
       'the same "no client binding by design" shape as POST /webhooks/{}/{} '

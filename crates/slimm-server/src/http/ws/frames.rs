@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::http::canvas::CanvasObjectDto;
 use crate::http::channels::ChannelDto;
+use crate::http::ephemeral_messages::EphemeralMessageDto;
 use crate::http::messages::MessageDto;
 
 #[derive(Serialize)]
@@ -259,6 +260,13 @@ pub(super) enum ServerFrame {
     ReadStateChanged {
         channel_id: String,
         last_read_seq: i64,
+    },
+    /// A bot's private answer to this account; see
+    /// [`crate::hub::Event::EphemeralMessage`]. Carries no `seq`.
+    #[serde(rename = "message.ephemeral")]
+    MessageEphemeral {
+        channel_id: String,
+        message: EphemeralMessageDto,
     },
     #[serde(rename = "pong")]
     Pong,

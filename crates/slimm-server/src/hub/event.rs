@@ -8,6 +8,7 @@
 
 use std::sync::Arc;
 
+use crate::ephemeral::EphemeralMessage;
 use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
@@ -598,6 +599,16 @@ pub enum Event {
         user_id: UserId,
         channel_id: ChannelId,
         last_read_seq: i64,
+    },
+    /// A bot answered a member privately.
+    ///
+    /// Private to `recipient_id`: `http::ws::authorization` delivers it only to
+    /// that account's own connections, and only while it can still view the
+    /// channel. It has no `seq` and is never stored, so it can leave no gap in a
+    /// channel's ordering and cannot appear in a page, a search or a `/sync`.
+    EphemeralMessage {
+        recipient_id: UserId,
+        message: Arc<EphemeralMessage>,
     },
     /// A moderation event with its number, added by [`crate::hub::Hub::publish`]
     /// and never built by a handler. See `hub::moderation_seq`.

@@ -14,6 +14,7 @@ import 'channel_history.dart';
 import 'channel_refresher.dart';
 import 'dm_call_activity.dart';
 import 'dm_call_ring_controller.dart';
+import 'ephemeral_messages.dart';
 import 'presence_controller.dart';
 import 'voice_controller.dart';
 import 'failed_send_retry.dart';
@@ -192,6 +193,8 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     // Same: typing.stopped is ephemeral, so one missed frame sticks forever.
     _ref.invalidate(typingControllerProvider);
+    // Listens for private answers from here on; created lazily it would miss the first one.
+    _ref.read(ephemeralMessagesProvider);
     try {
       final api = _ref.read(apiProvider);
       final store = await _ref.read(storeProvider.future);
@@ -454,6 +457,7 @@ class SyncController extends StateNotifier<SyncStatus> {
     _ref.invalidate(meProvider);
     _ref.invalidate(initialSyncCompleteProvider);
     _ref.invalidate(hasFailedSinceLiveProvider);
+    _ref.invalidate(ephemeralMessagesProvider);
     _ref.read(messageExtrasProvider.notifier).clear();
     _ref.read(dmCallRingControllerProvider.notifier).clear();
     _ref.read(dmCallActivityProvider.notifier).clear();
