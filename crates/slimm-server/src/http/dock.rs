@@ -16,6 +16,7 @@ mod fetch;
 mod manifest;
 mod sources;
 mod ssrf;
+mod testing;
 mod wire;
 
 use std::sync::Arc;
@@ -42,7 +43,7 @@ use crate::store::{
 };
 
 use capabilities::{approvable_host_capabilities, carried_host_capabilities};
-use fetch::{FetchError, fetch_capped};
+use fetch::{FetchError, fetch_first};
 use manifest::{IndexEntry, Manifest, ManifestError, parse_index, parse_manifest, validate_slug};
 use sources::SourceQuery;
 use wire::{IndexEntryDto, InstalledModuleDto, ManifestDto};
@@ -64,10 +65,11 @@ pub struct Dock {
 
 struct Enabled {
     client: reqwest::Client,
-    base_url: Url,
-    /// The root community sources hang off as `<root>/<owner>/<repo>/main/`.
+    /// The official source's bases, tried in order; see `Config::addons_repos`.
+    official_bases: Vec<Url>,
+    /// The root every source hangs off as `<root>/<owner>/<repo>/main/`.
     source_root: Url,
-    official_repo: String,
+    official_repos: Vec<String>,
     allowed_host: String,
 }
 
@@ -76,19 +78,40 @@ impl Dock {
     /// off switch - `MANAGE_SERVER` alone gates it. Only the repo it points
     /// at is configurable.
     pub fn new(config: &Config) -> Self {
-        let base_url = Url::parse(&format!(
-            "https://{ADDONS_HOST}/{}/main/",
-            config.addons_repo
-        ))
-        .expect("a fixed host and an operator-provided repo slug always form a valid URL");
+        let root = Url::parse(&format!("https://{ADDONS_HOST}/"))
+            .expect("a fixed host is always a valid URL");
+        Self::rooted_at(root, config.addons_repos(), false)
+    }
+
+    fn rooted_at(source_root: Url, official_repos: Vec<String>, allow_private: bool) -> Self {
+        let official_bases = official_repos
+            .iter()
+            .map(|repo| {
+                source_root
+                    .join(&format!("{repo}/main/"))
+                    .expect("a fixed host and a repo slug always form a valid URL")
+            })
+            .collect();
+        Self::from_parts(source_root, official_repos, official_bases, allow_private)
+    }
+
+    fn from_parts(
+        source_root: Url,
+        official_repos: Vec<String>,
+        official_bases: Vec<Url>,
+        allow_private: bool,
+    ) -> Self {
+        let allowed_host = source_root
+            .host_str()
+            .expect("the source root always has a host")
+            .to_owned();
         Self {
             inner: Some(Arc::new(Enabled {
-                client: ssrf::build_client(false),
-                base_url,
-                source_root: Url::parse(&format!("https://{ADDONS_HOST}/"))
-                    .expect("a fixed host is always a valid URL"),
-                official_repo: config.addons_repo.clone(),
-                allowed_host: ADDONS_HOST.to_owned(),
+                client: ssrf::build_client(allow_private),
+                official_bases,
+                source_root,
+                official_repos,
+                allowed_host,
             })),
         }
     }
@@ -100,30 +123,18 @@ impl Dock {
         Self { inner: None }
     }
 
-    /// An enabled Dock pointed at a local fake upstream, for a test that
-    /// drives the real router. [base_url] must end in `/`; its host becomes
-    /// the allowlisted one, and the guard resolver allows private addresses
-    /// so the loopback a fake upstream binds to is reachable.
-    pub fn for_test(base_url: &str) -> Self {
-        let parsed = Url::parse(base_url).expect("test base url must parse");
-        let allowed_host = parsed
-            .host_str()
-            .expect("test base url must have a host")
-            .to_owned();
-        Self {
-            inner: Some(Arc::new(Enabled {
-                client: ssrf::build_client(true),
-                source_root: parsed.clone(),
-                base_url: parsed,
-                official_repo: "official/addons".to_owned(),
-                allowed_host,
-            })),
-        }
-    }
-
     /// The official source's repo slug, for the sources listing.
     pub(crate) fn official_repo(&self) -> Result<&str, ApiError> {
-        Ok(&self.enabled()?.official_repo)
+        Ok(&self.enabled()?.official_repos[0])
+    }
+
+    /// Whether `repo` is any slug the official source is read from.
+    pub(crate) fn is_official(&self, repo: &str) -> Result<bool, ApiError> {
+        Ok(self
+            .enabled()?
+            .official_repos
+            .iter()
+            .any(|official| official.eq_ignore_ascii_case(repo)))
     }
 
     fn enabled(&self) -> Result<&Enabled, ApiError> {
@@ -167,7 +178,7 @@ impl From<FetchError> for ApiError {
         match err {
             // Unreachable unless the Dock's own fixed-base URL construction broke, never a caller's doing.
             FetchError::Refused => ApiError::Internal,
-            FetchError::Unavailable => ApiError::Unavailable,
+            FetchError::Unavailable | FetchError::Missing => ApiError::Unavailable,
         }
     }
 }
@@ -204,13 +215,11 @@ pub(crate) fn validate_module_id(id: &str) -> Result<(), ApiError> {
 /// confirming the registry's own `id` field agrees with the path it was
 /// fetched at - the same "does not alias a different resource" check
 /// `messages::SendError::IdConflict` exists for elsewhere.
-async fn fetch_manifest(dock: &Enabled, base: &Url, id: &str) -> Result<Manifest, ApiError> {
-    let url = base
-        .join(&format!("modules/{id}/manifest.json"))
-        .map_err(|_| ApiError::Internal)?;
-    let bytes = fetch_capped(
+async fn fetch_manifest(dock: &Enabled, bases: &[Url], id: &str) -> Result<Manifest, ApiError> {
+    let bytes = fetch_first(
         &dock.client,
-        &url,
+        bases,
+        &format!("modules/{id}/manifest.json"),
         &dock.allowed_host,
         fetch::MAX_MANIFEST_BYTES,
     )
@@ -224,12 +233,12 @@ async fn fetch_manifest(dock: &Enabled, base: &Url, id: &str) -> Result<Manifest
     Ok(manifest)
 }
 
-/// `base`'s `index.json`, fetched capped and validated.
-async fn fetch_index(dock: &Enabled, base: &Url) -> Result<Vec<IndexEntry>, ApiError> {
-    let url = base.join("index.json").map_err(|_| ApiError::Internal)?;
-    let bytes = fetch_capped(
+/// The first of `bases`' `index.json` that exists, fetched capped and validated.
+async fn fetch_index(dock: &Enabled, bases: &[Url]) -> Result<Vec<IndexEntry>, ApiError> {
+    let bytes = fetch_first(
         &dock.client,
-        &url,
+        bases,
+        "index.json",
         &dock.allowed_host,
         fetch::MAX_INDEX_BYTES,
     )
@@ -247,7 +256,7 @@ async fn list_modules(
     require_manage_server(&state, ctx.user_id).await?;
     let dock = state.dock.enabled()?;
     let resolved = sources::resolve(&state, dock, query.source.as_deref()).await?;
-    let index = fetch_index(dock, &resolved.base).await?;
+    let index = fetch_index(dock, &resolved.bases).await?;
     let taken = match &resolved.repo {
         Some(repo) => sources::taken_ids(&state, dock, repo).await?,
         None => Default::default(),
@@ -275,7 +284,7 @@ async fn get_module(
     validate_module_id(&id)?;
     let dock = state.dock.enabled()?;
     let resolved = sources::resolve(&state, dock, query.source.as_deref()).await?;
-    let manifest = fetch_manifest(dock, &resolved.base, &id).await?;
+    let manifest = fetch_manifest(dock, &resolved.bases, &id).await?;
     Ok(Json(ManifestDto::from(manifest)))
 }
 
@@ -308,7 +317,7 @@ async fn install(
     let dock = state.dock.enabled()?;
     let resolved = sources::resolve(&state, dock, query.source.as_deref()).await?;
     sources::check_id_free(&state, dock, &resolved, &id).await?;
-    let manifest = fetch_manifest(dock, &resolved.base, &id).await?;
+    let manifest = fetch_manifest(dock, &resolved.bases, &id).await?;
     if manifest.version != req.version {
         return Err(ApiError::Conflict(
             "the module's current version no longer matches the one requested; reopen it in the Dock",
@@ -318,7 +327,7 @@ async fn install(
         Some(requested) => approvable_host_capabilities(&manifest, requested)?,
         None => carried_host_capabilities(&state, &manifest).await?,
     };
-    let artifact = fetch_artifact(dock, &resolved.base, &manifest).await?;
+    let artifact = fetch_artifact(dock, &resolved.bases, &manifest).await?;
 
     let permissions: Vec<ModulePermissionSpec> = manifest
         .permissions
@@ -385,15 +394,13 @@ async fn install(
 /// repeats again, defense in depth, right before it ever runs them.
 async fn fetch_artifact(
     dock: &Enabled,
-    base: &Url,
+    bases: &[Url],
     manifest: &Manifest,
 ) -> Result<Vec<u8>, ApiError> {
-    let url = base
-        .join(&manifest.artifact.path)
-        .map_err(|_| ApiError::Internal)?;
-    let bytes = fetch_capped(
+    let bytes = fetch_first(
         &dock.client,
-        &url,
+        bases,
+        &manifest.artifact.path,
         &dock.allowed_host,
         fetch::MAX_ARTIFACT_BYTES,
     )

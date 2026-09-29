@@ -41,7 +41,7 @@ jobs:
       - name: checkout slim-m-relay
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: NC1107/slim-m-relay
+          repository: ${{ github.repository_owner }}/slim-m-relay
           path: slim-m-relay
           # Deliberately no `token:` input. An empty string is a provided value
           # and 401s rather than falling back to the default; see docs/ci.md.

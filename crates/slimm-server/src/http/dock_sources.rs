@@ -102,10 +102,9 @@ pub(super) async fn add_source(
 ) -> Result<(StatusCode, Json<SourceDto>), ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     require_manage_server(&state, ctx.user_id).await?;
-    let official_repo = state.dock.official_repo()?;
     let repo = req.repo.trim();
     validate_repo(repo)?;
-    if repo.eq_ignore_ascii_case(official_repo) {
+    if state.dock.is_official(repo)? {
         return Err(ApiError::Conflict("that is already the official source"));
     }
     let existing = state.store.list_dock_sources().await?;

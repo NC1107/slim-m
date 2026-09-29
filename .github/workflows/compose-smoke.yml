@@ -41,7 +41,9 @@ jobs:
       # The published image is only correct for main, so this branch's image is
       # built under the tag SLIMM_VERSION=smoke resolves to and compose uses it.
       - name: build the server image from this branch
-        run: docker build -f docker/server.Dockerfile -t ghcr.io/nc1107/slim-m-server:smoke .
+        run: |
+          image="$(grep -oE 'ghcr\.io/[a-z0-9-]+/slim-m-server' docker-compose.yml | head -n1)"
+          docker build -f docker/server.Dockerfile -t "${image:?no slim-m-server image in docker-compose.yml}:smoke" .
         env:
           SQLX_OFFLINE: "true"
 

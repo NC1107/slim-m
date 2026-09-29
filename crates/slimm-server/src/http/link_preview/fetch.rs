@@ -21,7 +21,7 @@ use super::video;
 /// Identifies the fetch as this server's link-preview bot; many sites only
 /// emit OpenGraph tags to a real-looking agent, and it is honest about who is
 /// asking.
-const USER_AGENT_VALUE: &str = "slimm-link-preview/1.0 (+https://github.com/NC1107/slim-m)";
+const USER_AGENT_VALUE: &str = "slimm-link-preview/1.0 (+https://github.com/Slim-m-org/slim-m)";
 
 const MAX_REDIRECTS: usize = 5;
 pub(super) const MAX_HTML_BYTES: usize = 256 * 1024;

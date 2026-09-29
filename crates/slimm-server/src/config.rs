@@ -142,7 +142,8 @@ pub struct Config {
     /// reaches it at `https://raw.githubusercontent.com/<repo>/main/`; only
     /// the repo slug is configurable, never the host, so the marketplace
     /// fetch stays inside the same fixed allowlist regardless of what an
-    /// operator sets here.
+    /// operator sets here. See [`Config::addons_repos`] for the one slug the
+    /// Dock may fall back to.
     #[serde(default = "default_addons_repo")]
     pub addons_repo: String,
 
@@ -188,8 +189,16 @@ fn default_attachment_max_bytes() -> u64 {
     1024 * 1024 * 1024
 }
 
+/// The official module registry's home since the move to the Slim-m-org
+/// GitHub organisation.
+pub const OFFICIAL_ADDONS_REPO: &str = "Slim-m-org/slim-addons";
+
+/// Where the official registry lived before that move, kept as a fallback
+/// because the Dock does not follow redirects.
+pub const LEGACY_ADDONS_REPO: &str = "NC1107/slim-addons";
+
 fn default_addons_repo() -> String {
-    "NC1107/slim-addons".to_owned()
+    OFFICIAL_ADDONS_REPO.to_owned()
 }
 
 impl Default for Config {
@@ -261,6 +270,25 @@ impl Config {
             present(&self.livekit_api_key)?,
             present(&self.livekit_api_secret)?,
         ))
+    }
+
+    /// The official registry slugs the Dock tries, in order. Either of the
+    /// two official slugs also tries the other one, so a server keeps its
+    /// catalog on both sides of the organisation move without following a
+    /// redirect; any other slug is an operator's own registry and is tried
+    /// alone.
+    pub fn addons_repos(&self) -> Vec<String> {
+        let repo = self.addons_repo.trim();
+        let other = if repo.eq_ignore_ascii_case(OFFICIAL_ADDONS_REPO) {
+            Some(LEGACY_ADDONS_REPO)
+        } else if repo.eq_ignore_ascii_case(LEGACY_ADDONS_REPO) {
+            Some(OFFICIAL_ADDONS_REPO)
+        } else {
+            None
+        };
+        std::iter::once(repo.to_owned())
+            .chain(other.map(str::to_owned))
+            .collect()
     }
 
     /// Reads configuration from `SLIMM_`-prefixed environment variables,
@@ -348,6 +376,37 @@ mod tests {
             "lots".to_owned(),
         )]);
         assert!(envy::from_iter::<_, Config>(env).is_err());
+    }
+
+    #[test]
+    fn the_default_addons_repo_is_the_org_one_with_the_old_slug_behind_it() {
+        assert_eq!(
+            Config::default().addons_repos(),
+            vec!["Slim-m-org/slim-addons", "NC1107/slim-addons"]
+        );
+    }
+
+    #[test]
+    fn a_pinned_legacy_addons_repo_falls_back_to_the_org_one() {
+        let env = std::collections::HashMap::from([(
+            "ADDONS_REPO".to_owned(),
+            "nc1107/slim-addons".to_owned(),
+        )]);
+        let config: Config = envy::from_iter(env).expect("a slug parses");
+        assert_eq!(
+            config.addons_repos(),
+            vec!["nc1107/slim-addons", "Slim-m-org/slim-addons"]
+        );
+    }
+
+    #[test]
+    fn an_operators_own_addons_repo_has_no_fallback() {
+        let env = std::collections::HashMap::from([(
+            "ADDONS_REPO".to_owned(),
+            "someone/their-addons".to_owned(),
+        )]);
+        let config: Config = envy::from_iter(env).expect("a slug parses");
+        assert_eq!(config.addons_repos(), vec!["someone/their-addons"]);
     }
 
     /// An unset origin list and an explicitly empty one must be the same
