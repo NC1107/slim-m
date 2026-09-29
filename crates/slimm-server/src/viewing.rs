@@ -7,6 +7,11 @@
 //! suspended without closing its socket cannot silence push forever. It is
 //! only ever read by the push path for the reporting user's own account and
 //! is never broadcast, so a hidden presence stays hidden.
+//!
+//! Reports are keyed by user, then connection, so a frame or a push check
+//! touches only that user's own few connections rather than every report on
+//! the deployment. Lapsed reports are pruned per user on that user's next
+//! frame, and a connection's own exit removes its entry.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -29,7 +34,7 @@ struct Report {
 
 #[derive(Clone, Default)]
 pub struct ViewingTracker {
-    reports: Arc<Mutex<HashMap<(UserId, u64), Report>>>,
+    reports: Arc<Mutex<HashMap<UserId, HashMap<u64, Report>>>>,
     next_connection: Arc<AtomicU64>,
 }
 
@@ -51,18 +56,25 @@ impl ViewingTracker {
         channels: HashSet<ChannelId>,
         now: Instant,
     ) {
-        let mut reports = lock(&self.reports);
         if channels.is_empty() {
-            reports.remove(&(user_id, connection));
+            self.clear(user_id, connection);
             return;
         }
-        reports.retain(|_, report| now.duration_since(report.at) < VIEWING_TTL);
-        reports.insert((user_id, connection), Report { channels, at: now });
+        let mut reports = lock(&self.reports);
+        let own = reports.entry(user_id).or_default();
+        own.retain(|_, report| now.duration_since(report.at) < VIEWING_TTL);
+        own.insert(connection, Report { channels, at: now });
     }
 
     /// Forgets a connection, on every exit path of its socket.
     pub fn clear(&self, user_id: UserId, connection: u64) {
-        lock(&self.reports).remove(&(user_id, connection));
+        let mut reports = lock(&self.reports);
+        if let Some(own) = reports.get_mut(&user_id) {
+            own.remove(&connection);
+            if own.is_empty() {
+                reports.remove(&user_id);
+            }
+        }
     }
 
     /// Whether any live connection of `user_id` reported `channel_id` open
@@ -72,10 +84,10 @@ impl ViewingTracker {
     }
 
     pub fn is_viewing_at(&self, user_id: UserId, channel_id: ChannelId, now: Instant) -> bool {
-        lock(&self.reports).iter().any(|((user, _), report)| {
-            *user == user_id
-                && report.channels.contains(&channel_id)
-                && now.duration_since(report.at) < VIEWING_TTL
+        lock(&self.reports).get(&user_id).is_some_and(|own| {
+            own.values().any(|report| {
+                report.channels.contains(&channel_id) && now.duration_since(report.at) < VIEWING_TTL
+            })
         })
     }
 }
@@ -116,6 +128,44 @@ mod tests {
         assert!(tracker.is_viewing(user, channel));
         tracker.set(user, 2, HashSet::new());
         assert!(!tracker.is_viewing(user, channel));
+    }
+
+    #[test]
+    fn a_frame_touches_only_its_own_users_reports() {
+        let tracker = ViewingTracker::default();
+        let (idle, busy, channel) = (
+            UserId::generate(),
+            UserId::generate(),
+            ChannelId::generate(),
+        );
+        let start = Instant::now();
+        tracker.set_at(idle, 1, one(channel), start);
+        let later = start + VIEWING_TTL + Duration::from_secs(1);
+        tracker.set_at(busy, 1, one(channel), later);
+        // A whole-map sweep would have dropped the lapsed report of `idle`.
+        assert!(lock(&tracker.reports).contains_key(&idle));
+        tracker.set_at(idle, 1, one(channel), later);
+        tracker.set_at(idle, 2, one(channel), later);
+        assert_eq!(lock(&tracker.reports)[&idle].len(), 2);
+    }
+
+    #[test]
+    fn a_users_lapsed_connection_is_pruned_on_their_next_frame() {
+        let tracker = ViewingTracker::default();
+        let (user, channel) = (UserId::generate(), ChannelId::generate());
+        let start = Instant::now();
+        tracker.set_at(user, 1, one(channel), start);
+        tracker.set_at(user, 2, one(channel), start + VIEWING_TTL);
+        assert_eq!(lock(&tracker.reports)[&user].len(), 1);
+    }
+
+    #[test]
+    fn clearing_the_last_connection_forgets_the_user() {
+        let tracker = ViewingTracker::default();
+        let (user, channel) = (UserId::generate(), ChannelId::generate());
+        tracker.set(user, 1, one(channel));
+        tracker.clear(user, 1);
+        assert!(lock(&tracker.reports).is_empty());
     }
 
     #[test]
