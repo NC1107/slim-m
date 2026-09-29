@@ -36,8 +36,9 @@ On compact: back is `compact_channel_app_bar`, the rail becomes `channel_rail_dr
 5. **A place with its own nav or list you return to** (settings, admin, member management) -> **`modalPage` route**: fullscreen on a phone, a floating ~860x720 panel on desktop. Sections inside are `SettingsPanes`, never their own dialogs.
 6. **Status the user did not ask for** (offline, retrying, a degraded call) -> **banner**: it pushes content, never overlays it. Amber is transient; red attaches to what failed. Snackbars/toasts are for confirmations only, never for errors.
 7. **An unsolicited, time-limited prompt that demands a decision** (an incoming call, an invite that expires) -> **full-focus overlay**: painted above the routed tree and above every dialog and sheet, never in flow - a status banner pushes content because there is nothing to decide, but this vanishes on its own timeout unless answered, so it must be seen. On desktop it also raises and focuses the window, so it reaches the user even minimized or behind another app. Below `kCompactWidth` it is a full-screen takeover, the same shape a phone's own incoming-call screen already uses; at or above it, a floating card that leaves the rest of the window usable. Escape (or its on-screen equivalent) resolves it to a less intrusive state, the same "no keyboard trap" rule every other surface here follows.
+8. **Content the user chose to watch, once they leave where it lives** (a screen share or camera from a call in another channel) -> **floating mini-player**: a draggable, corner-snapping card over the routed pane only, never over the composer, the keyboard, or a status banner, sized by width and never by platform. It carries video only; an audio-only call stays with the strip and the rail summary (rule 6). See `docs/decisions/0040-call-mini-player-and-pop-out.md`.
 
-Write the rule number (1-7) in the PR description.
+Write the rule number (1-8) in the PR description.
 If none fits, the design question comes back to the spec before code is written.
 
 ## Never-rules
