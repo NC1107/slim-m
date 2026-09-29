@@ -95,22 +95,6 @@ impl Store {
         .await?)
     }
 
-    /// Records that `module_id` posted `message_id` through `message.post`.
-    pub async fn record_module_message_origin(
-        &self,
-        message_id: MessageId,
-        module_id: &str,
-    ) -> anyhow::Result<()> {
-        sqlx::query!(
-            "INSERT INTO module_message_origins (message_id, module_id) VALUES (?, ?)",
-            message_id,
-            module_id
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
     /// The module that posted `message_id`, or `None` for an ordinary message.
     pub async fn module_message_origin(
         &self,

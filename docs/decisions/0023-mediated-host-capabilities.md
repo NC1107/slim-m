@@ -167,6 +167,9 @@ The per-module approval below is the switch, and a module with none stays on the
   Each entry must be declared by the manifest and implemented by the host, or the install is refused with 400.
   An empty list withdraws every approval.
   Omitting it keeps the earlier approval minus anything the new manifest no longer declares, and never adds one, so "update all" does not strip or widen access.
+  The exception is `message.post`: when the artifact changed it is dropped and must be approved again, because a new build is new code.
+  `kv.store` carries over.
+  The Dock says so on the update screen, and the switch starts off.
 - A run's effective set is declared, approved and implemented, all three, evaluated on every run.
 
 ### `kv.store`
@@ -180,15 +183,20 @@ The per-module approval below is the switch, and a module with none stays on the
 
 ### `message.post`
 
-- The request is `{capability, channel_id, content}`.
+- The request is `{capability, content}` with an optional `channel_id`.
   The host posts as the invoking user, never as an identity the module names.
-  The message is recorded in `module_message_origins` and carries a `via <module name>` embed footer, so every client shows the attribution with the embed rendering it already has.
+  The message, its `module_message_origins` row and a `via <module name>` embed footer are written in one transaction, so a failure leaves all three or none.
+  Fan-out (mentions, live frame, push) is best effort after the commit and never turns a stored message into an error, so a module cannot be invited to retry into a duplicate.
 - Permission: VIEW_CHANNEL and SEND_MESSAGES for the invoking user in that channel, the same check as a first-party send.
   A missing channel and a denied one get the same refusal.
   Slow mode, content length, mentions, read sync, push and fan-out follow the ordinary send path.
 - Limits: three posts per run, then a per-(module, user) token bucket of five with one refill every six seconds, and a module-wide bucket that charges a quarter token per post.
-- The module chooses the channel, so a module can post in any channel where its invoker could.
-  A stricter "only the channel the command was run from" rule needs the run request to carry a channel, which it does not today.
+- A module can post only into the channel the invoker ran the command from.
+  The run route takes an optional `channel_id` (a slash command sends the channel it was typed in), the poster is bound to it, and a `channel_id` in the module's request that differs is refused.
+  A run that names no channel is offered no `message.post` at all.
+- The message-scoped code-block run (`code_runs`) and any other caller of `execute_command` are untrusted: the input is whoever wrote the message, not the clicker, so they get no `message.post`.
+  Otherwise a crafted block for an approved module would make the person who clicks Run post attacker text, `@everyone` included, as themselves.
+  `kv.store` is still offered on those runs, since it is the module's own data.
 
 ### What is still not built
 

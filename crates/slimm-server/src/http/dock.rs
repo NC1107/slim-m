@@ -324,7 +324,8 @@ async fn install(
 }
 
 /// What an install that named no approvals keeps: the module's current host
-/// capabilities that the new manifest still declares. Nothing is added.
+/// capabilities that the new manifest still declares, except `message.post`
+/// when the artifact changed. Nothing is added.
 async fn carried_host_capabilities(
     state: &AppState,
     manifest: &Manifest,
@@ -332,10 +333,13 @@ async fn carried_host_capabilities(
     let Some(current) = state.store.installed_module(&manifest.id).await? else {
         return Ok(Vec::new());
     };
+    // A new build gets no unseen power to post: message.post must be approved again.
+    let same_build = current.artifact_sha256 == manifest.artifact.sha256;
     Ok(current
         .approved_host_capabilities
         .into_iter()
         .filter(|c| manifest.capabilities.contains(c))
+        .filter(|c| same_build || c != "message.post")
         .collect())
 }
 

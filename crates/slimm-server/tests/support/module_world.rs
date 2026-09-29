@@ -11,7 +11,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
-use slimm_server::ids::{MessageId, RoleId};
+use slimm_server::ids::{ChannelId, MessageId, RoleId};
 use slimm_server::media::Media;
 use slimm_server::permissions::Permissions;
 use slimm_server::push::PushSender;
@@ -31,6 +31,7 @@ pub struct World {
     pub everyone: RoleId,
     pub user: User,
     pub token: String,
+    pub db_path: String,
     _guard: super::TestDbGuard,
 }
 
@@ -38,7 +39,7 @@ pub async fn world(name: &str) -> World {
     let (path, guard) = super::TestDbGuard::new(name);
     let config = Config {
         port: 0,
-        database_path: path,
+        database_path: path.clone(),
         hash_concurrency: 2,
         ..Config::default()
     };
@@ -73,6 +74,7 @@ pub async fn world(name: &str) -> World {
         everyone,
         user,
         token,
+        db_path: path,
         _guard: guard,
     }
 }
@@ -137,15 +139,24 @@ impl World {
         s.grant_module_permission(role, id, "run").await.unwrap();
     }
 
-    /// Runs `module`'s command as `nia`; returns the route's JSON answer.
-    pub async fn run(&self, module: &str) -> Value {
+    /// Runs `module`'s command as `nia`, from `channel` when given; returns
+    /// the route's JSON answer.
+    pub async fn run_in(&self, module: &str, channel: Option<ChannelId>) -> Value {
+        let mut body = json!({ "input": "go" });
+        if let Some(channel) = channel {
+            body["channel_id"] = json!(channel.to_string());
+        }
         let request = Request::builder()
             .method("POST")
             .uri(format!("/modules/{module}/commands/run"))
             .header("authorization", format!("Bearer {}", self.token))
             .header("content-type", "application/json")
-            .body(Body::from(json!({ "input": "go" }).to_string()))
+            .body(Body::from(body.to_string()))
             .unwrap();
+        self.send(request).await
+    }
+
+    pub async fn send(&self, request: Request<Body>) -> Value {
         let response = self.router.clone().oneshot(request).await.unwrap();
         let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
@@ -153,9 +164,15 @@ impl World {
         serde_json::from_slice(&bytes).unwrap()
     }
 
-    /// The text a module reported, whether it succeeded or was refused.
+    /// The text a module reported, whether it succeeded or was refused, for a
+    /// run that names no channel.
     pub async fn answer(&self, module: &str) -> String {
-        let body = self.run(module).await;
+        self.answer_in(module, None).await
+    }
+
+    /// As [`World::answer`], for a command invoked from `channel`.
+    pub async fn answer_in(&self, module: &str, channel: Option<ChannelId>) -> String {
+        let body = self.run_in(module, channel).await;
         body["output"]
             .as_str()
             .or_else(|| body["error"].as_str())

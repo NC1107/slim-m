@@ -32,6 +32,7 @@ Future<void> sendSlashCommand({
   required SlimmApi api,
   required SlashCommand command,
   required String args,
+  required String channelId,
   required TextEditingController controller,
   required bool Function() isMounted,
   required Future<void> Function() post,
@@ -42,6 +43,7 @@ Future<void> sendSlashCommand({
       moduleId: command.moduleId,
       command: command.command,
       input: args,
+      channelId: channelId,
     );
     if (!isMounted()) return;
     final output = result.output;
@@ -105,6 +107,7 @@ Future<bool> runComposedCommand({
     api: ref.read(apiProvider),
     command: match!.$1,
     args: match.$2,
+    channelId: channelId,
     controller: controller,
     isMounted: isMounted,
     post: post,

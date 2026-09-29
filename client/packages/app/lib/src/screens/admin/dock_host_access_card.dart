@@ -41,6 +41,7 @@ class DockHostAccessCard extends StatelessWidget {
     required this.approved,
     required this.onChanged,
     required this.moduleName,
+    this.reapprovePosting = false,
     this.enabled = true,
   });
 
@@ -48,6 +49,9 @@ class DockHostAccessCard extends StatelessWidget {
   final Set<String> approved;
   final void Function(String capability, bool approved) onChanged;
   final String moduleName;
+
+  /// Says the update needs "Post messages" approved again.
+  final bool reapprovePosting;
   final bool enabled;
 
   @override
@@ -61,7 +65,11 @@ class DockHostAccessCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.s8),
           child: Text(
-            'Off unless you turn it on. Applied when you install or save.',
+            reapprovePosting
+                ? 'This is a new build, so Post messages needs your approval '
+                      'again. Other access carries over. Applied when you '
+                      'update or save.'
+                : 'Off unless you turn it on. Applied when you install or save.',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
           ),
         ),

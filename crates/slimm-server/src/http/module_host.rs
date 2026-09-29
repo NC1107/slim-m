@@ -25,7 +25,7 @@ use crate::module_runtime::{
 };
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
-use crate::store::{InstalledModule, KvSetError, NewEmbed, NewMessage, Store};
+use crate::store::{InstalledModule, KvSetError, NewMessage, Store};
 
 /// The capabilities this host implements behind `slim.host_call`. A manifest
 /// may declare others (it is free text); none of them can ever be approved.
@@ -50,12 +50,20 @@ pub(crate) fn effective_capabilities(module: &InstalledModule) -> Vec<String> {
 
 /// The capability surface for one run of `module`, invoked by `user_id`.
 /// Must be called from inside the tokio runtime that will drive the run.
+///
+/// `channel` is the channel the invoker ran the command from. Without one the
+/// run is untrusted (a code block's text, or a caller that named no channel)
+/// and `message.post` is not offered at all.
 pub(crate) fn surface_for(
     state: &AppState,
     module: &InstalledModule,
     user_id: UserId,
+    channel: Option<ChannelId>,
 ) -> CapabilitySurface {
-    let approved = effective_capabilities(module);
+    let mut approved = effective_capabilities(module);
+    if channel.is_none() {
+        approved.retain(|c| c != "message.post");
+    }
     if approved.is_empty() {
         return CapabilitySurface::Disabled;
     }
@@ -64,14 +72,18 @@ pub(crate) fn surface_for(
         store: state.store.clone(),
         handle: handle.clone(),
     });
-    let poster = Arc::new(ChannelPoster {
+    let surface = CapabilitySurface::enabled(approved, module.id.clone(), kv);
+    let Some(channel) = channel else {
+        return surface;
+    };
+    surface.with_poster(Arc::new(ChannelPoster {
         state: state.clone(),
         handle,
         module_id: module.id.clone(),
         module_name: module.name.clone(),
         user_id,
-    });
-    CapabilitySurface::enabled(approved, module.id.clone(), kv).with_poster(poster)
+        channel,
+    }))
 }
 
 struct SqliteKv {
@@ -122,10 +134,12 @@ struct ChannelPoster {
     module_id: String,
     module_name: String,
     user_id: UserId,
+    /// The one channel this run may post into: where the command was invoked.
+    channel: ChannelId,
 }
 
 impl MessagePoster for ChannelPoster {
-    fn post(&self, channel_id: &str, content: &str) -> Result<String, PostRefused> {
+    fn post(&self, channel_id: Option<&str>, content: &str) -> Result<String, PostRefused> {
         self.handle
             .block_on(self.post_async(channel_id, content))
             .map(|id| id.to_string())
@@ -136,11 +150,23 @@ impl ChannelPoster {
     /// The same checks a first-party send makes, evaluated for the invoking
     /// user, so a module can post exactly where that user could. A missing
     /// channel and a denied one are refused identically.
-    async fn post_async(&self, channel: &str, content: &str) -> Result<MessageId, PostRefused> {
+    async fn post_async(
+        &self,
+        named: Option<&str>,
+        content: &str,
+    ) -> Result<MessageId, PostRefused> {
         let state = &self.state;
-        let channel_id = Uuid::parse_str(channel)
-            .map(ChannelId)
-            .map_err(|_| PostRefused("invalid channel_id"))?;
+        let channel_id = self.channel;
+        if let Some(named) = named {
+            let named = Uuid::parse_str(named)
+                .map(ChannelId)
+                .map_err(|_| PostRefused("invalid channel_id"))?;
+            if named != channel_id {
+                return Err(PostRefused(
+                    "message.post can only post in the channel the command was run from",
+                ));
+            }
+        }
         let needed = Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES);
         match state
             .store
@@ -159,25 +185,47 @@ impl ChannelPoster {
             .map_err(|_| PostRefused("slow mode is active in that channel"))?;
 
         let id = MessageId::generate();
+        let footer = format!("via {}", self.module_name);
         let sent = state
             .store
-            .send_message(NewMessage::plain(channel_id, self.user_id, id, content))
+            .send_module_message(
+                NewMessage::plain(channel_id, self.user_id, id, content),
+                &self.module_id,
+                &footer,
+            )
             .await
             .map_err(|_| PostRefused("message.post is unavailable"))?;
-        let embeds = self.attribute(id).await?;
 
-        super::message_mentions::resolve_and_store(
+        // Committed with its attribution; nothing below may fail the call, or a retry duplicates it.
+        self.fan_out(&sent.message).await;
+        Ok(id)
+    }
+
+    /// Best-effort delivery of a message that is already stored and attributed.
+    async fn fan_out(&self, message: &crate::store::Message) {
+        let state = &self.state;
+        let id = message.id;
+        let embeds = match state.store.embeds_for_messages(&[id]).await {
+            Ok(rows) => rows.into_iter().next().map(|(_, e)| e).unwrap_or_default(),
+            Err(err) => {
+                tracing::warn!(%err, "module post: could not reload embeds");
+                Vec::new()
+            }
+        };
+        if let Err(err) = super::message_mentions::resolve_and_store(
             state,
-            channel_id,
+            message.channel_id,
             self.user_id,
             id,
-            &sent.message.content,
+            &message.content,
         )
         .await
-        .map_err(|_| PostRefused("message.post is unavailable"))?;
-        super::read_sync::advance_for_author(state, self.user_id, &sent.message).await;
+        {
+            tracing::warn!(%err, "module post: mention resolution failed");
+        }
+        super::read_sync::advance_for_author(state, self.user_id, message).await;
         state.hub.publish(Event::MessageCreated {
-            message: Arc::new(sent.message.clone()),
+            message: Arc::new(message.clone()),
             attachments: Arc::new(Vec::new()),
             forwarded: None,
             app_surface: None,
@@ -188,15 +236,14 @@ impl ChannelPoster {
         state.push.notify_message(
             state.store.clone(),
             crate::push::SentMessage {
-                channel_id,
+                channel_id: message.channel_id,
                 author_id: self.user_id,
                 message_id: id,
-                seq: sent.message.seq,
-                content: sent.message.content.clone(),
+                seq: message.seq,
+                content: message.content.clone(),
                 presence: state.hub.presence(),
             },
         );
-        Ok(id)
     }
 
     fn charge_rate_limits(&self) -> Result<(), PostRefused> {
@@ -210,33 +257,5 @@ impl ChannelPoster {
         } else {
             Err(PostRefused("message.post rate limit reached"))
         }
-    }
-
-    /// Records the module as the message's origin and stamps a footer so every
-    /// client shows "via <module>" through the embed rendering it already has.
-    async fn attribute(&self, id: MessageId) -> Result<Vec<crate::store::Embed>, PostRefused> {
-        let store = &self.state.store;
-        let footer = NewEmbed {
-            footer_text: Some(format!("via {}", self.module_name)),
-            ..NewEmbed::default()
-        };
-        let unavailable = |_| PostRefused("message.post is unavailable");
-        store
-            .record_module_message_origin(id, &self.module_id)
-            .await
-            .map_err(unavailable)?;
-        store
-            .set_message_embeds(id, &[footer])
-            .await
-            .map_err(unavailable)?;
-        let stored = store
-            .embeds_for_messages(&[id])
-            .await
-            .map_err(unavailable)?;
-        Ok(stored
-            .into_iter()
-            .next()
-            .map(|(_, embeds)| embeds)
-            .unwrap_or_default())
     }
 }

@@ -17,9 +17,11 @@ pub const MAX_POSTS_PER_RUN: u32 = 3;
 pub struct PostRefused(pub &'static str);
 
 /// Posts on behalf of the user who invoked the module, after the host's own
-/// permission, rate and content checks. Returns the new message id.
+/// permission, rate and content checks. Returns the new message id. The
+/// poster is bound to one channel; `channel_id` is only ever checked against
+/// it, never used to pick a destination.
 pub trait MessagePoster: Send + Sync {
-    fn post(&self, channel_id: &str, content: &str) -> Result<String, PostRefused>;
+    fn post(&self, channel_id: Option<&str>, content: &str) -> Result<String, PostRefused>;
 }
 
 #[derive(Deserialize)]
@@ -40,10 +42,10 @@ pub fn handle(poster: &dyn MessagePoster, posts_remaining: &mut u32, request: &[
     let Ok(req) = serde_json::from_slice::<PostRequest>(request) else {
         return refusal("malformed message.post request");
     };
-    let (Some(channel_id), Some(content)) = (req.channel_id, req.content) else {
-        return refusal("message.post needs a channel_id and content");
+    let Some(content) = req.content else {
+        return refusal("message.post needs content");
     };
-    match poster.post(&channel_id, &content) {
+    match poster.post(req.channel_id.as_deref(), &content) {
         Ok(message_id) => serde_json::to_vec(&json!({ "ok": true, "message_id": message_id }))
             .unwrap_or_else(|_| br#"{"ok":true}"#.to_vec()),
         Err(PostRefused(reason)) => refusal(reason),
@@ -62,7 +64,7 @@ mod tests {
     struct Fixed(Result<String, &'static str>);
 
     impl MessagePoster for Fixed {
-        fn post(&self, _: &str, _: &str) -> Result<String, PostRefused> {
+        fn post(&self, _: Option<&str>, _: &str) -> Result<String, PostRefused> {
             self.0.clone().map_err(PostRefused)
         }
     }
@@ -110,8 +112,8 @@ mod tests {
         let out = text(handle(
             &Fixed(Ok("id".into())),
             &mut left,
-            br#"{"content":"hi"}"#,
+            br#"{"channel_id":"c"}"#,
         ));
-        assert!(out.contains("needs a channel_id and content"), "{out}");
+        assert!(out.contains("needs content"), "{out}");
     }
 }

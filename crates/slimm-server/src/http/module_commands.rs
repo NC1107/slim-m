@@ -42,7 +42,7 @@ use super::dock::validate_module_id;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, AuthedLimited, Json, MODULE};
 use super::module_host;
-use crate::ids::UserId;
+use crate::ids::{ChannelId, UserId};
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
 use crate::permissions::Permissions;
 use crate::ratelimit::Class;
@@ -70,6 +70,10 @@ pub fn routes() -> Router<AppState> {
 #[derive(Deserialize)]
 struct RunCommandRequest {
     input: String,
+    /// The channel the command was invoked from (a slash command's channel).
+    /// Without it the run is not offered `message.post`.
+    #[serde(default)]
+    channel_id: Option<String>,
 }
 
 /// The module ABI's own response shape, echoed straight through: see
@@ -162,12 +166,29 @@ pub(crate) struct CommandOutcome {
 /// module is ever executed. Shared by [`run_command`] (the generic route) and
 /// the message-scoped code-block run (`super::code_runs`), so both apply the
 /// exact same install/enable/permission checks before `ModuleHost::run`.
+///
+/// The run is untrusted: `input` is not necessarily the invoker's own (a code
+/// block's text is whoever wrote the message), so it is offered no
+/// `message.post`. Use [`execute_command_in`] for a command the invoker typed.
 pub(crate) async fn execute_command(
     state: &AppState,
     user_id: UserId,
     module_id: &str,
     command: &str,
     input: &str,
+) -> Result<CommandOutcome, ApiError> {
+    execute_command_in(state, user_id, module_id, command, input, None).await
+}
+
+/// [`execute_command`] for a command the invoker composed themselves in
+/// `channel`, which is the only channel a `message.post` may target.
+pub(crate) async fn execute_command_in(
+    state: &AppState,
+    user_id: UserId,
+    module_id: &str,
+    command: &str,
+    input: &str,
+    channel: Option<ChannelId>,
 ) -> Result<CommandOutcome, ApiError> {
     validate_module_id(module_id)?;
     validate_command_name(command)?;
@@ -210,7 +231,7 @@ pub(crate) async fn execute_command(
     })
     .map_err(|_| ApiError::Internal)?;
 
-    let surface = module_host::surface_for(state, &module, user_id);
+    let surface = module_host::surface_for(state, &module, user_id, channel);
     let ran = ModuleHost::run_with_capabilities(
         wasm,
         module.artifact_sha256,
@@ -301,7 +322,20 @@ async fn run_command(
         let permissions = state.store.base_permissions(ctx.user_id).await?;
         execute_code_runner(&state, permissions, ctx.user_id, &command, &req.input).await?
     } else {
-        execute_command(&state, ctx.user_id, &module_id, &command, &req.input).await?
+        let channel = req
+            .channel_id
+            .as_deref()
+            .map(|raw| super::messages::parse_uuid(raw).map(ChannelId))
+            .transpose()?;
+        execute_command_in(
+            &state,
+            ctx.user_id,
+            &module_id,
+            &command,
+            &req.input,
+            channel,
+        )
+        .await?
     };
     let response = if outcome.ok {
         RunCommandResponse {

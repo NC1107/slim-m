@@ -334,6 +334,37 @@ async fn install_approves_only_the_host_capabilities_the_admin_named() {
 }
 
 #[tokio::test]
+async fn an_update_to_a_new_build_must_approve_posting_again() {
+    let (s, _guard) = store("slimm-dock-repost-approval").await;
+    let (admin, _member) = deployment(&s).await;
+    let session = s.open_session(admin.id, "laptop").await.unwrap();
+    let token = session.access_token.as_str();
+    let router = app(s.clone(), Dock::for_test(&fake_registry().await));
+    let install = |body: Value| {
+        let request = req_json("POST", "/space/dock/modules/code-exec/install", token, body);
+        router.clone().oneshot(request)
+    };
+    let approved = json!({ "version": "0.1.0", "approved_host_capabilities": ["message.post"] });
+    json_body(install(approved).await.unwrap()).await;
+
+    // The space is on a different build than the registry now offers.
+    s.install_module(slimm_server::store::InstallModuleRequest {
+        id: "code-exec",
+        name: "Code Blocks",
+        version: "0.0.9",
+        artifact_sha256: &"b".repeat(64),
+        approved_capabilities: &["message.post".to_owned()],
+        runtime_limits: &slimm_server::store::ModuleRuntimeLimits::default(),
+        permissions: &[],
+        extension_points: &[],
+    })
+    .await
+    .unwrap();
+    let updated = json_body(install(json!({ "version": "0.1.0" })).await.unwrap()).await;
+    assert_eq!(updated["approved_host_capabilities"], json!([]));
+}
+
+#[tokio::test]
 async fn install_refuses_a_version_that_no_longer_matches_the_registry() {
     let (s, _guard) = store("slimm-dock-version-mismatch").await;
     let (admin, _member) = deployment(&s).await;

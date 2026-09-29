@@ -56,12 +56,27 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     api.InstalledDockModule? installed,
   ) {
     final grantable = grantableHostCapabilities(manifest.capabilities);
-    final chosen = _hostApproved ?? installed?.approvedHostCapabilities ?? [];
+    final carried = installed?.approvedHostCapabilities ?? const <String>[];
+    final chosen = _hostApproved ?? carried;
     return {
       for (final capability in grantable)
-        if (chosen.contains(capability)) capability,
+        if (chosen.contains(capability) &&
+            (_hostApproved != null ||
+                !_needsReapproval(capability, manifest, installed)))
+          capability,
     };
   }
+
+  /// A new build never inherits the power to post: it has to be switched on
+  /// again for the version the admin is looking at.
+  static bool _needsReapproval(
+    String capability,
+    api.DockManifest manifest,
+    api.InstalledDockModule? installed,
+  ) =>
+      capability == 'message.post' &&
+      installed != null &&
+      installed.artifactSha256 != manifest.artifact.sha256;
 
   void _toggleHostCapability(String capability, bool approved) {
     final installed = ref
@@ -202,6 +217,11 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
           manifest: m,
           installed: installed,
           approvedHostCapabilities: _approvedFor(m, installed),
+          reapprovePosting:
+              _hostApproved == null &&
+              installed != null &&
+              installed.approvedHostCapabilities.contains('message.post') &&
+              _needsReapproval('message.post', m, installed),
           onToggleHostCapability: _toggleHostCapability,
           busy: _busy,
           error: actionError,

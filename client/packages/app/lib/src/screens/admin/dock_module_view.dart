@@ -44,6 +44,7 @@ class DockManifestView extends StatelessWidget {
     required this.onChooseAccess,
     required this.approvedHostCapabilities,
     required this.onToggleHostCapability,
+    this.reapprovePosting = false,
   });
 
   final api.DockManifest manifest;
@@ -52,6 +53,10 @@ class DockManifestView extends StatelessWidget {
   /// The host capabilities currently switched on, applied on the next install
   /// or save.
   final Set<String> approvedHostCapabilities;
+
+  /// True when this update is a new build of a module that could post: the
+  /// switch is off until the admin turns it on again.
+  final bool reapprovePosting;
   final void Function(String capability, bool approved) onToggleHostCapability;
   final bool busy;
   final String? error;
@@ -98,6 +103,7 @@ class DockManifestView extends StatelessWidget {
             approved: approvedHostCapabilities,
             onChanged: onToggleHostCapability,
             moduleName: manifest.name,
+            reapprovePosting: reapprovePosting,
             enabled: !busy,
           ),
         ],

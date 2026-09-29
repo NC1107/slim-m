@@ -54,17 +54,18 @@ Map<String, dynamic> _manifest() => {
   ],
 };
 
-Map<String, dynamic> _installedRow(List<String> approvedHost) => {
-  'id': 'ladder',
-  'name': 'Ladder',
-  'version': '0.1.0',
-  'artifact_sha256': _sha,
-  'approved_capabilities': ['kv.store', 'message.post', 'surface.render'],
-  'approved_host_capabilities': approvedHost,
-  'extension_points': <Map<String, dynamic>>[],
-  'enabled': true,
-  'installed_at': 1000,
-};
+Map<String, dynamic> _installedRow(List<String> approvedHost, {String? sha}) =>
+    {
+      'id': 'ladder',
+      'name': 'Ladder',
+      'version': '0.1.0',
+      'artifact_sha256': sha ?? _sha,
+      'approved_capabilities': ['kv.store', 'message.post', 'surface.render'],
+      'approved_host_capabilities': approvedHost,
+      'extension_points': <Map<String, dynamic>>[],
+      'enabled': true,
+      'installed_at': 1000,
+    };
 
 http.Response _json(Object body) => http.Response(
   jsonEncode(body),
@@ -77,6 +78,7 @@ http.Response _json(Object body) => http.Response(
 Future<List<Map<String, dynamic>>> _pump(
   WidgetTester tester, {
   List<String>? installedApproved,
+  String? installedSha,
   Size size = const Size(420, 1400),
 }) async {
   final installs = <Map<String, dynamic>>[];
@@ -89,7 +91,8 @@ Future<List<Map<String, dynamic>>> _pump(
     }
     if (path == '/space/dock/installed') {
       return _json([
-        if (installedApproved != null) _installedRow(installedApproved),
+        if (installedApproved != null)
+          _installedRow(installedApproved, sha: installedSha),
       ]);
     }
     if (path == '/space/dock/modules/ladder') return _json(_manifest());
@@ -214,5 +217,19 @@ void main() {
       'kv.store',
       'message.post',
     ]);
+  });
+
+  testWidgets('a new build must be approved for posting again', (tester) async {
+    final installs = await _pump(
+      tester,
+      installedApproved: ['kv.store', 'message.post'],
+      installedSha: List.filled(64, 'b').join(),
+    );
+    expect(_switches(tester).sublist(0, 2), [true, false]);
+    expect(find.textContaining('needs your approval again'), findsOneWidget);
+
+    await tester.tap(find.text('Save access'));
+    await tester.pumpAndSettle();
+    expect(installs.single['approved_host_capabilities'], ['kv.store']);
   });
 }

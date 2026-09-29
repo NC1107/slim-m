@@ -7819,6 +7819,11 @@ components:
           description: >
             The module ABI's own request `input` field, passed through
             verbatim. What it means is entirely up to the module.
+        channel_id:
+          type: string
+          description: >
+            The channel the command was typed in. Only a run that names one
+            may use the message.post capability, and it may post only there.
     RunCodeBlockRequest:
       type: object
       required: [module_id, command, input]
