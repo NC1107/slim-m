@@ -4,6 +4,8 @@
 /// docs/decisions/0006-channel-categories.md.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -177,8 +179,12 @@ class _ChannelCategorySectionsState
     // moves. Zero size keeps every channel's identity and position in the
     // list - just invisible and unreachable by a drag - while collapsed.
     Widget row(Channel channel, bool longPressDrags, int? dragHandleIndex) {
+      final pinnedOpen =
+          channel.id == selectedId ||
+          channel.mentionedSeq > channel.lastReadSeq;
       if (channel.categoryId != null &&
-          collapsed.contains(channel.categoryId)) {
+          collapsed.contains(channel.categoryId) &&
+          !pinnedOpen) {
         return const SizedBox.shrink();
       }
       return Padding(
@@ -214,6 +220,14 @@ class _ChannelCategorySectionsState
       // Any section, the implicit uncategorised one included: it is a real place a channel can live.
       final label = SectionLabel(
         category?.name ?? 'Channels',
+        collapsed: collapsed.contains(category?.id),
+        onToggle: category == null
+            ? null
+            : () => unawaited(
+                ref
+                    .read(collapsedCategoriesProvider.notifier)
+                    .toggle(category.id),
+              ),
         trailingBuilder: !canManage
             ? null
             : (revealed, onFocusChange) => AddChannelGlyph(
