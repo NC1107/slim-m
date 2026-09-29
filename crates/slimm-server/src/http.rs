@@ -77,6 +77,7 @@ mod messages_bulk;
 mod messages_bulk_window;
 mod metrics;
 mod module_commands;
+mod module_host;
 mod module_permissions;
 mod notification_schedule;
 mod overwrites;

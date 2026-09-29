@@ -35,28 +35,29 @@
 //! come later as an explicit, mediated host function rather than ambient
 //! access - see decision 0021's "no ambient authority" principle.
 //!
-//! # The mediated-capability surface (decision 0023, scaffolded, off by default)
+//! # The mediated-capability surface (decision 0023)
 //!
 //! [`ModuleHost::run_with_capabilities`] is the seam for that "later": with a
 //! [`CapabilitySurface`] enabled, a module may import the single gated
 //! `slim.host_call` function (and nothing else), whose requests the surface
-//! gates and answers. Phases B and C of decision 0023: the gate
-//! ([`capabilities`]) and the first capability behind it, [`kv`]'s `kv.store`.
-//! Every live path passes [`CapabilitySurface::Disabled`], so the surface ships
-//! dark and a stock deployment behaves exactly as the import-free model above.
-//! See [`capabilities`] for the gate and the fail-closed guarantees, and [`kv`]
-//! for the reference capability and its bounds.
+//! gates and answers: the gate ([`capabilities`]), [`kv`]'s `kv.store` and
+//! [`post`]'s `message.post`. A run is enabled only for a module an admin
+//! approved a host capability for; every other run passes
+//! [`CapabilitySurface::Disabled`] and behaves exactly as the import-free model
+//! above. See [`capabilities`] for the gate and the fail-closed guarantees.
 
 mod capabilities;
 mod compiled;
 mod host;
 mod kv;
 mod limits;
+mod post;
 
 pub use capabilities::CapabilitySurface;
 pub use host::{ModuleHost, RunError};
-pub use kv::{InMemoryKv, KvBackend};
+pub use kv::{InMemoryKv, KvBackend, KvError, MAX_ENTRIES, MAX_TOTAL_BYTES};
 pub use limits::{MAX_FUEL, MAX_MEMORY_MB, MAX_WALL_MS, RunLimits};
+pub use post::{MessagePoster, PostRefused};
 
 #[cfg(test)]
 mod tests;

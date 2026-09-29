@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT key FROM module_kv WHERE module_id = ? ORDER BY key LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "key",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6505f89c52157e561a87c9277cfc0278b9c31b8f227ad06a15c8a9eca01eb3cd"
+}

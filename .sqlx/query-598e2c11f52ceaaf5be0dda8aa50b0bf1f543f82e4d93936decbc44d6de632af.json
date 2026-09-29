@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"entries!: i64\",\n                      COALESCE(SUM(length(CAST(key AS BLOB)) + length(CAST(value AS BLOB))), 0) AS \"bytes!: i64\"\n               FROM module_kv WHERE module_id = ? AND key <> ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "entries!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "bytes!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "598e2c11f52ceaaf5be0dda8aa50b0bf1f543f82e4d93936decbc44d6de632af"
+}

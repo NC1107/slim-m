@@ -272,6 +272,15 @@ pub enum Class {
     /// held-down key must not be able to drive it as fast as it can open
     /// connections. Sized for a person tapping a button a few times, not a loop.
     Interaction,
+    /// A module's `message.post` host call (decision 0023), charged in
+    /// addition to the [`Class::Module`] run that made it.
+    ///
+    /// Keyed per (module, invoking user): five posts in a burst, then one every
+    /// six seconds. The same class is charged against the module as a whole at a
+    /// quarter of a token per post, so many users together still cannot push one
+    /// module past twenty in a burst. A module is admin-approved code, but a
+    /// buggy loop in one should cost a channel a few messages, not a flood.
+    ModulePost,
 }
 
 impl Class {
@@ -309,6 +318,8 @@ impl Class {
             Class::LiveKitWebhook => (120.0, 20.0),
             // A person pressing buttons: a short burst, then about one press a second.
             Class::Interaction => (8.0, 1.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::ModulePost => (5.0, 1.0 / 6.0),
         }
     }
 
@@ -317,7 +328,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 21] = [
+    pub const ALL: [Class; 22] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -339,6 +350,7 @@ impl Class {
         Class::Webhook,
         Class::LiveKitWebhook,
         Class::Interaction,
+        Class::ModulePost,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -366,6 +378,7 @@ impl Class {
             Class::Webhook => "webhook",
             Class::LiveKitWebhook => "livekit_webhook",
             Class::Interaction => "interaction",
+            Class::ModulePost => "module_post",
         }
     }
 }

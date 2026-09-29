@@ -26,14 +26,23 @@ extension SlimmApiDock on SlimmApi {
   /// with 409 if the registry's current manifest no longer matches it.
   /// Installed off (disabled); a separate [enableDockModule] call turns it
   /// on.
+  ///
+  /// [approvedHostCapabilities] is what the admin approved for `slim.host_call`
+  /// after seeing it listed; an empty list withdraws every approval, and null
+  /// keeps what was approved before (never adding to it).
   Future<InstalledDockModule> installDockModule({
     required String moduleId,
     required String version,
+    List<String>? approvedHostCapabilities,
   }) async {
     final json = await _send(
       'POST',
       '/space/dock/modules/$moduleId/install',
-      body: {'version': version},
+      body: {
+        'version': version,
+        if (approvedHostCapabilities != null)
+          'approved_host_capabilities': approvedHostCapabilities,
+      },
     );
     return InstalledDockModule.fromJson(json as Map<String, dynamic>);
   }

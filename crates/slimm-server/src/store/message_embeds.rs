@@ -56,6 +56,57 @@ pub struct Embed {
     pub fields: Vec<EmbedField>,
 }
 
+/// Writes `embeds` inside the caller's transaction, so a message and its
+/// embeds can commit or roll back together.
+pub(super) async fn insert_embeds(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    message_id: MessageId,
+    embeds: &[NewEmbed],
+) -> anyhow::Result<()> {
+    for (position, embed) in embeds.iter().enumerate() {
+        let position = position as i64;
+        sqlx::query!(
+            "INSERT INTO message_embeds
+                    (message_id, position, title, description, url, color,
+                     author_name, author_url, footer_text, embed_timestamp,
+                     image_url, thumbnail_url)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            message_id,
+            position,
+            embed.title,
+            embed.description,
+            embed.url,
+            embed.color,
+            embed.author_name,
+            embed.author_url,
+            embed.footer_text,
+            embed.timestamp,
+            embed.image_url,
+            embed.thumbnail_url,
+        )
+        .execute(&mut **tx)
+        .await?;
+        for (field_index, field) in embed.fields.iter().enumerate() {
+            let field_index = field_index as i64;
+            let inline = field.inline as i64;
+            sqlx::query!(
+                "INSERT INTO message_embed_fields
+                        (message_id, position, field_index, name, value, inline)
+                     VALUES (?, ?, ?, ?, ?, ?)",
+                message_id,
+                position,
+                field_index,
+                field.name,
+                field.value,
+                inline,
+            )
+            .execute(&mut **tx)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
 impl Store {
     /// Stores `embeds`, in order, against `message_id` - insert only, called
     /// at most once per message; an edit never touches them.
@@ -68,47 +119,7 @@ impl Store {
             return Ok(());
         }
         let mut tx = self.pool.begin().await?;
-        for (position, embed) in embeds.iter().enumerate() {
-            let position = position as i64;
-            sqlx::query!(
-                "INSERT INTO message_embeds
-                    (message_id, position, title, description, url, color,
-                     author_name, author_url, footer_text, embed_timestamp,
-                     image_url, thumbnail_url)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                message_id,
-                position,
-                embed.title,
-                embed.description,
-                embed.url,
-                embed.color,
-                embed.author_name,
-                embed.author_url,
-                embed.footer_text,
-                embed.timestamp,
-                embed.image_url,
-                embed.thumbnail_url,
-            )
-            .execute(&mut *tx)
-            .await?;
-            for (field_index, field) in embed.fields.iter().enumerate() {
-                let field_index = field_index as i64;
-                let inline = field.inline as i64;
-                sqlx::query!(
-                    "INSERT INTO message_embed_fields
-                        (message_id, position, field_index, name, value, inline)
-                     VALUES (?, ?, ?, ?, ?, ?)",
-                    message_id,
-                    position,
-                    field_index,
-                    field.name,
-                    field.value,
-                    inline,
-                )
-                .execute(&mut *tx)
-                .await?;
-            }
-        }
+        insert_embeds(&mut tx, message_id, embeds).await?;
         tx.commit().await?;
         Ok(())
     }

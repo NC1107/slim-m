@@ -40,15 +40,19 @@ extension SlimmApiModuleCommands on SlimmApi {
   /// Runs [moduleId]'s [command] with [input], returning the module ABI's
   /// own outcome. Requires the module to be installed, enabled, and the
   /// caller to hold the permission the command declared.
+  ///
+  /// [channelId] is the channel the command was typed in; only then may the
+  /// module post a message, and only into that channel.
   Future<RunModuleCommandResult> runModuleCommand({
     required String moduleId,
     required String command,
     required String input,
+    String? channelId,
   }) async {
     final json = await _send(
       'POST',
       '/modules/$moduleId/commands/$command',
-      body: {'input': input},
+      body: {'input': input, if (channelId != null) 'channel_id': channelId},
     );
     return RunModuleCommandResult.fromJson(json as Map<String, dynamic>);
   }
