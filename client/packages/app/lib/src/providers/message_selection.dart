@@ -113,3 +113,10 @@ final messageSelectionProvider = StateNotifierProvider.autoDispose
     .family<MessageSelectionController, MessageSelection, String>(
       (ref, channelId) => MessageSelectionController(),
     );
+
+/// A refused bulk delete, kept above the selection bar until dismissed.
+///
+/// The bar stays up with the selection intact for a retry, so the failure has
+/// a place to sit; autoDispose drops it when the mode ends.
+final messageBulkDeleteErrorProvider = StateProvider.autoDispose
+    .family<String?, String>((ref, channelId) => null);

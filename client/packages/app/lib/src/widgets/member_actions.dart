@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
+import '../providers/member_moderation_error.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/notification_schedule_controller.dart';
 import '../providers/providers.dart';
@@ -112,14 +113,15 @@ Future<void> removeMemberFromSpace(
     confirmLabel: 'Remove',
   );
   if (!confirmed) return;
+  container.read(memberModerationErrorProvider.notifier).state = null;
   await runGuarded(
     whatFailed: 'remove $name',
     action: () => container.read(apiProvider).removeMember(userId: profile.id),
   ).then((failure) {
     if (failure == null) {
       container.invalidate(membersProvider);
-    } else if (host.mounted) {
-      showAppSnackbar(host, failure);
+    } else {
+      container.read(memberModerationErrorProvider.notifier).state = failure;
     }
   });
 }

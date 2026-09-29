@@ -33,11 +33,11 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/blocks_controller.dart';
 import '../providers/dms.dart';
+import '../providers/member_moderation_error.dart';
 import '../providers/member_presence.dart' show membersProvider;
 import '../providers/providers.dart';
 import '../providers/voice_controller.dart';
 import '../routing/routes.dart';
-import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'member_actions.dart';
 import 'member_moderate_view.dart';
@@ -270,14 +270,15 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
       confirmLabel: 'Eject',
     );
     if (!confirmed) return;
+    container.read(memberModerationErrorProvider.notifier).state = null;
     final failure = await runGuarded(
       whatFailed: 'eject $name from the call',
       action: () => container
           .read(apiProvider)
           .kickVoiceParticipant(channelId, widget.profile.id),
     );
-    if (failure != null && host.mounted) {
-      showAppSnackbar(host, failure);
+    if (failure != null) {
+      container.read(memberModerationErrorProvider.notifier).state = failure;
     }
   }
 

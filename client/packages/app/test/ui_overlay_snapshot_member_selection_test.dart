@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
+import 'package:slimm_app/src/providers/member_moderation_error.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/member_selection.dart';
 import 'package:slimm_app/src/providers/providers.dart';
@@ -31,7 +32,7 @@ api.UserProfile _profile(String id, String name) => api.UserProfile(
   createdAt: 0,
 );
 
-Future<void> _pump(
+Future<ProviderContainer> _pump(
   WidgetTester tester, {
   required Size window,
   required bool drawer,
@@ -91,6 +92,7 @@ Future<void> _pump(
     ..enter()
     ..toggle('1');
   await tester.pumpAndSettle();
+  return container;
 }
 
 Future<void> _finish(WidgetTester tester, String name) async {
@@ -115,5 +117,17 @@ void main() {
   testWidgets('desktop: the pane keeps its stacked bar', (tester) async {
     await _pump(tester, window: const Size(1280, 800), drawer: false);
     await _finish(tester, 'member-selection-desktop');
+  });
+
+  testWidgets('phone: a refused write stays above the bar', (tester) async {
+    final container = await _pump(
+      tester,
+      window: const Size(390, 844),
+      drawer: true,
+    );
+    container.read(memberModerationErrorProvider.notifier).state =
+        'Could not time the member out. Try again in a moment.';
+    await tester.pumpAndSettle();
+    await _finish(tester, 'member-selection-phone-error');
   });
 }

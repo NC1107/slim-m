@@ -120,6 +120,17 @@ and interpolated forms all differ), for a shape nothing in this codebase
 writes inside a catch block today - the block-comment case was worth
 closing because Dart's own doc-comment convention makes `/* */` an
 ordinary thing to type; a stray `}`-led line inside a string literal is not.
+
+A failure never has to be *caught* to be surfaced wrongly. `runGuarded` does
+the catching itself and hands back a sentence, so `final failure = await
+runGuarded(...); showAppSnackbar(context, failure)` has no `catch` in the
+caller at all, and every pattern above was blind to it: the member pane's
+bulk timeout and bulk remove, the row menu's remove and the profile's eject
+all shipped that way past a gate that reported zero offenders. The sentence
+that reaches a `showAppSnackbar` from a `runGuarded` result in the same
+function is flagged too; see `guarded_snackbars`. A surface that has closed
+by the time the request answers (a menu) may still be listed in
+`GUARDED_EXCEPTIONS` with its reason, keyed by function name.
 """
 
 import re
@@ -133,6 +144,20 @@ from dart_source import strip_block_comments  # noqa: E402
 
 EXCEPTIONS: dict[tuple[str, int], str] = {}
 
+# Keyed by function name so an edit above a site does not un-allow it; each is a closed menu.
+GUARDED_EXCEPTIONS: dict[tuple[str, str], str] = {
+    ("client/packages/app/lib/src/screens/channel_message_actions.dart", "_reporting"):
+        "a message's context menu has closed before the request answers",
+    ("client/packages/app/lib/src/screens/channel_message_actions.dart", "saveMessageForLater"):
+        "a message's context menu has closed before the request answers",
+    ("client/packages/app/lib/src/widgets/manage_category_sheet.dart", "confirmAndDeleteCategory"):
+        "the header context menu has closed before the request answers",
+    ("client/packages/app/lib/src/widgets/member_actions.dart", "toggleNotificationScheduleAllowedUser"):
+        "the member row's context menu has closed before the request answers",
+    ("client/packages/app/lib/src/widgets/safety_actions.dart", "_tell"):
+        "block and report run from a menu that has closed before the request answers",
+}
+
 EXCEPTIONS_SOURCE = "client/packages/api/lib/src/exceptions.dart"
 # Falls back to this alone when EXCEPTIONS_SOURCE is unreadable, e.g. a test's own synthetic repo.
 FALLBACK_EXCEPTION_NAMES = ("ApiException",)
@@ -144,6 +169,66 @@ CATCH_ERROR_HEADER = re.compile(
     r"^(?P<indent>[ \t]*)[^\n]*\.catchError\([ \t]*\([^)]*\)[ \t]*\{[ \t]*$"
 )
 SHOWS_SNACKBAR = re.compile(r"ScaffoldMessenger|SnackBar\(|showAppSnackbar\(")
+
+
+GUARDED_BINDING = re.compile(r"\b(\w+)\s*=\s*await\s+runGuarded\(")
+GUARDED_THEN = re.compile(r"\brunGuarded\((?:.|\n)*?\)\s*\.then\(\(\s*(\w+)\s*\)")
+SNACKBAR_CALL = re.compile(r"\bshowAppSnackbar\(")
+TOP_LEVEL_HEADER = re.compile(r"^[A-Za-z_@]")
+TYPE_HEADER = re.compile(r"^(?:abstract\s+|final\s+|base\s+)*(?:class|mixin|extension|enum)\b")
+MEMBER_HEADER = re.compile(r"^  [A-Za-z_]")
+
+
+def function_start(lines: list[str], index: int) -> int:
+    """Index of the line that opens the function containing `lines[index]`.
+
+    A top-level function opens at column 0; a member of a class, mixin or
+    extension opens at the nearest column-2 line above. Bodies and parameter
+    lists sit deeper, so a nested closure never masquerades as the start.
+    """
+    top = index
+    while top > 0 and not TOP_LEVEL_HEADER.match(lines[top]):
+        top -= 1
+    if not TYPE_HEADER.match(lines[top]):
+        return top
+    member = index
+    while member > top and not MEMBER_HEADER.match(lines[member]):
+        member -= 1
+    return member
+
+
+def call_arguments(text: str, open_paren: int) -> str:
+    """The text between the parenthesis at `open_paren` and its match."""
+    depth = 0
+    for i in range(open_paren, len(text)):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_paren + 1 : i]
+    return text[open_paren + 1 :]
+
+
+def guarded_snackbars(source: str):
+    """Yields (1-based line, enclosing function name) for each `showAppSnackbar(...)` call
+    whose arguments name a variable that a `runGuarded` result in the same
+    function was bound to, which is a failure sentence being shown as a
+    SnackBar without any `catch` for the other patterns to see.
+    """
+    lines = source.splitlines()
+    for match in SNACKBAR_CALL.finditer(source):
+        line = source.count("\n", 0, match.start())
+        start = function_start(lines, line)
+        head = "\n".join(lines[start : line + 1])
+        bound = {m.group(1) for m in GUARDED_BINDING.finditer(head)}
+        bound |= {m.group(1) for m in GUARDED_THEN.finditer(head)}
+        arguments = call_arguments(source, match.end() - 1)
+        for name in sorted(bound):
+            if re.search(rf"\b{re.escape(name)}\b", arguments):
+                header = re.search(r"(\w+)\s*\(", lines[start])
+                yield line + 1, header.group(1) if header else ""
+                break
 
 
 def api_exception_names(root: Path) -> list[str]:
@@ -223,28 +308,41 @@ def main() -> int:
     checked = 0
     offenders: list[str] = []
     for rel in files:
-        lines = strip_block_comments((root / rel).read_text()).splitlines()
+        source = strip_block_comments((root / rel).read_text())
+        lines = source.splitlines()
+        checked += len(GUARDED_BINDING.findall(source))
+        checked += len(GUARDED_THEN.findall(source))
+        for lineno, function in guarded_snackbars(source):
+            if (rel, function) not in GUARDED_EXCEPTIONS:
+                offenders.append(f"{rel}:{lineno}:{function}")
         for lineno, body in catch_blocks(lines, catch_header):
             checked += 1
             if not any(SHOWS_SNACKBAR.search(candidate) for candidate in body):
                 continue
             if (rel, lineno) in EXCEPTIONS:
                 continue
-            offenders.append(f"{rel}:{lineno}")
+            offenders.append(f"{rel}:{lineno}:")
 
     if checked == 0:
         print("::error::no caught-exception blocks found anywhere; the gate is not reading anything")
         return 1
 
     for offender in offenders:
-        path, _, lineno = offender.partition(":")
-        entry = f'("{path}", {lineno}): "why",'
+        path, lineno, function = offender.split(":")
+        if function:
+            where = "GUARDED_EXCEPTIONS"
+            entry = f'("{path}", "{function}"): "why",'
+            what = "a failure sentence from runGuarded is shown with a SnackBar here"
+        else:
+            where = "EXCEPTIONS"
+            entry = f'("{path}", {lineno}): "why",'
+            what = "a caught failure is shown with a SnackBar here"
         print(
-            f"::error file={path},line={lineno}::a caught failure is shown with a "
-            "SnackBar here; use GuardedActionState/AppErrorState instead (see "
-            "run_guarded.dart's own doc comment), or if this surface has "
-            "genuinely already closed by the time the request answers, add "
-            f"'{entry}' to EXCEPTIONS in scripts/check-error-surface.py"
+            f"::error file={path},line={lineno}::{what}; use "
+            "GuardedActionState/AppErrorState instead (see run_guarded.dart's "
+            "own doc comment), or if this surface has genuinely already closed "
+            f"by the time the request answers, add '{entry}' to {where} in "
+            "scripts/check-error-surface.py"
         )
 
     print(f"error surface: {checked} catch block(s) checked in {len(files)} files, {len(offenders)} offender(s)")
