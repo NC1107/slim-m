@@ -3,7 +3,7 @@
 
 See [README.md](README.md) for what "confirmed" and "suspected" mean here and how this differs from `docs/BACKLOG.md` and `docs/OPEN-QUESTIONS.md`.
 
-Read `client/packages/app/web/README.md` before anything else in this file - it states the web build's actual purpose directly: **"It is a test surface, not a distribution target."**
+Read `client/packages/app/web/README.md` before anything else in this file - it states the web build's purpose: driving the UI automatically, and (since decision 0025) the `slim-m-web` image the live host serves.
 The web build exists so this project's own e2e harness (`scripts/e2e.sh`) can drive the UI headlessly through Chrome DevTools Protocol, because a native Linux build cannot be driven by synthetic input on this project's Wayland desktop.
 That framing matters for reading every entry below: several of these are findings from *using the web build as a test harness*, not from treating it as a real deployment target end users are meant to reach, and some entries below are explicitly about the harness rather than the product.
 
