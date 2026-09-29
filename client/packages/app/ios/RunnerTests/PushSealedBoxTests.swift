@@ -256,6 +256,21 @@ final class PushSealedBoxTests: XCTestCase {
     XCTAssertNotEqual(applied.title, "Nick", "the stale preview itself must still be refused")
   }
 
+  /// Notifications for one channel must group into a single lock-screen
+  /// stack, with or without a preview, and one with no channel stays ungrouped.
+  func testChannelIdBecomesTheThreadIdentifier() throws {
+    let previewed = try decodeEnvelope(sender: "Nick", body: "hi", channelId: "channel-1")
+    XCTAssertEqual(
+      previewed.applied(to: UNMutableNotificationContent()).threadIdentifier, "channel-1")
+
+    let placeholder = try decodeEnvelope(sender: "", body: "", channelId: "channel-2")
+    XCTAssertEqual(
+      placeholder.applied(to: UNMutableNotificationContent()).threadIdentifier, "channel-2")
+
+    let noChannel = try decodeEnvelope(sender: "Nick", body: "hi")
+    XCTAssertEqual(noChannel.applied(to: UNMutableNotificationContent()).threadIdentifier, "")
+  }
+
   /// The real, fixture-driven end of this: an envelope actually sealed by
   /// `crypto_box` with no `sent_at` field at all (the exact bytes a
   /// pre-this-field server produced) still opens and still previews, proving
