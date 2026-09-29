@@ -96,36 +96,49 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True, cwd=REPO_ROOT).stdout.strip()
 
 
+def component_tag(component: str, manifest: str) -> str | None:
+    path = REPO_ROOT / manifest
+    if not path.is_file():
+        return None
+    return f"{component}-v{next(iter(json.loads(path.read_text()).values()))}"
+
+
+def release_runs(repo: str, tag: str, sha: str) -> tuple[list[dict], dict]:
+    base = f"repos/{repo}/actions/workflows/release.yml/runs"
+    by_sha = gh_json(f"{base}?head_sha={sha}&per_page=100")["workflow_runs"]
+    dispatched = gh_json(f"{base}?branch={tag}&event=workflow_dispatch&per_page=100")["workflow_runs"]
+    runs = list({r["id"]: r for r in by_sha + dispatched}.values())
+    jobs = {r["id"]: [] for r in runs}
+    for r in runs:
+        if r["status"] == "completed" and r["head_sha"] == sha:
+            jobs[r["id"]] = gh_json(f"repos/{repo}/actions/runs/{r['id']}/jobs?per_page=100")["jobs"]
+    return runs, jobs
+
+
+def handle(repo: str, component: str, tag: str, release_yml: str, dry_run: bool) -> None:
+    try:
+        sha = git("rev-parse", "-q", "--verify", f"refs/tags/{tag}^{{commit}}")
+    except subprocess.CalledProcessError:
+        print(f"{tag}: no tag yet, release-tag-watchdog owns that")
+        return
+    tag_age = int(time.time()) - int(git("log", "-1", "--format=%ct", sha))
+    runs, jobs = release_runs(repo, tag, sha)
+    checks = gh_paginated(f"repos/{repo}/commits/{sha}/check-runs", "check_runs")
+    go, reason = decide(component, tag, sha, tag_age, runs, jobs, checks,
+                        required_checks(release_yml, component))
+    print(f"{tag}: {'dispatch' if go else 'skip'} - {reason}")
+    if go and not dry_run:
+        subprocess.run(["gh", "workflow", "run", "release.yml", "--ref", tag], check=True)
+
+
 def main() -> int:
     repo = os.environ["GITHUB_REPOSITORY"]
     dry_run = os.environ.get("DRY_RUN") == "1"
     release_yml = (REPO_ROOT / ".github/workflows/release.yml").read_text()
     for component, manifest in PACKAGES:
-        path = REPO_ROOT / manifest
-        if not path.is_file():
-            continue
-        version = next(iter(json.loads(path.read_text()).values()))
-        tag = f"{component}-v{version}"
-        try:
-            sha = git("rev-parse", "-q", "--verify", f"refs/tags/{tag}^{{commit}}")
-        except subprocess.CalledProcessError:
-            print(f"{tag}: no tag yet, release-tag-watchdog owns that")
-            continue
-        tag_age = int(time.time()) - int(git("log", "-1", "--format=%ct", sha))
-        base = f"repos/{repo}/actions/workflows/release.yml/runs"
-        by_sha = gh_json(f"{base}?head_sha={sha}&per_page=100")["workflow_runs"]
-        dispatched = gh_json(f"{base}?branch={tag}&event=workflow_dispatch&per_page=100")["workflow_runs"]
-        relevant = {r["id"]: r for r in by_sha + dispatched}.values()
-        jobs = {r["id"]: [] for r in relevant}
-        for r in relevant:
-            if r["status"] == "completed" and r["head_sha"] == sha:
-                jobs[r["id"]] = gh_json(f"repos/{repo}/actions/runs/{r['id']}/jobs?per_page=100")["jobs"]
-        checks = gh_paginated(f"repos/{repo}/commits/{sha}/check-runs", "check_runs")
-        go, reason = decide(component, tag, sha, tag_age, list(relevant), jobs, checks,
-                            required_checks(release_yml, component))
-        print(f"{tag}: {'dispatch' if go else 'skip'} - {reason}")
-        if go and not dry_run:
-            subprocess.run(["gh", "workflow", "run", "release.yml", "--ref", tag], check=True)
+        tag = component_tag(component, manifest)
+        if tag:
+            handle(repo, component, tag, release_yml, dry_run)
     return 0
 
 

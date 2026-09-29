@@ -16,9 +16,8 @@ on:
     - cron: "31 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
+# Granted per job, so nothing is inherited.
+permissions: {}
 
 # No concurrency group at all, and that is the whole point rather than an
 # omission. This workflow was written on 2026-08-06 to catch a release run
@@ -36,6 +35,9 @@ jobs:
   check:
     name: release bookkeeping matches reality
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
