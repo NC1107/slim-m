@@ -50,6 +50,8 @@ dependencies:
   slimm_platform:
   slimm_rtc:
   slimm_voice_canvas:
+  # Ed25519 verify for the signed update manifest; already resolved via slimm_platform.
+  cryptography: ^2.9.0
   http: ^1.2.0
   # 10.x, not 9.x: file_picker 12 requires win32 6, so the whole tree moves
   # off win32 5 and the old hold on 9.x no longer resolves.

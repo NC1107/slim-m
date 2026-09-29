@@ -18,7 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:slimm_platform/platform.dart';
 
 /// The repository whose `client-v*` releases this build updates from.
-const _repo = 'NC1107/slim-m';
+const clientReleaseRepo = 'NC1107/slim-m';
 
 /// Whether the update check is switched off by `SLIMM_NO_UPDATE_CHECK`. Honors
 /// AppImage's golden rule that an app respect a "do not check for updates"
@@ -83,7 +83,9 @@ Future<ClientUpdate?> checkForClientUpdate({
   try {
     final response = await owned
         .get(
-          Uri.parse('https://api.github.com/repos/$_repo/releases?per_page=30'),
+          Uri.parse(
+            'https://api.github.com/repos/$clientReleaseRepo/releases?per_page=30',
+          ),
           headers: const {'Accept': 'application/vnd.github+json'},
         )
         .timeout(_timeout);

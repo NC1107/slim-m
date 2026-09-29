@@ -1,0 +1,131 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+/// The verify-and-download half of decision 0041: fetch the signed manifest
+/// from the latest client release, check it, and download the artifact for
+/// this platform into staging. Nothing here applies or swaps anything.
+library;
+
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
+
+import '../update_check.dart';
+import 'self_update_failure.dart';
+import 'update_download.dart';
+import 'update_keys.dart';
+import 'update_manifest.dart';
+
+const _timeout = Duration(seconds: 15);
+const _maxManifestBytes = 256 * 1024;
+
+/// A downloaded, hash-checked artifact waiting in the staging directory.
+class VerifiedUpdate {
+  const VerifiedUpdate({
+    required this.version,
+    required this.tag,
+    required this.file,
+  });
+
+  final String version;
+  final String tag;
+  final File file;
+}
+
+/// Returns the verified download for [platformKey], or null when the newest
+/// release is not newer than [currentVersion] or has no artifact for this
+/// platform. Throws [SelfUpdateFailure] for every other stop; the staging
+/// directory then holds no finished file.
+Future<VerifiedUpdate?> fetchVerifiedUpdate({
+  required String currentVersion,
+  required String platformKey,
+  required Directory stagingDir,
+  required http.Client client,
+  List<String> trustedKeys = trustedUpdateKeys,
+  FreeSpace freeSpace = freeSpaceOf,
+}) async {
+  final tag = await _latestClientTag(client);
+  if (tag == null) return null;
+  final base = 'https://github.com/$clientReleaseRepo/releases/download/$tag';
+  final manifestBytes = await _getBytes(
+    client,
+    Uri.parse('$base/manifest.json'),
+  );
+  final signature = utf8.decode(
+    await _getBytes(client, Uri.parse('$base/manifest.json.sig')),
+    allowMalformed: true,
+  );
+  final signed = await manifestSignatureIsValid(
+    manifestBytes: manifestBytes,
+    signatureBase64: signature,
+    trustedKeys: trustedKeys,
+  );
+  if (!signed) {
+    throw const SelfUpdateFailure(
+      SelfUpdateFailureKind.badSignature,
+      'The update could not be verified, so it was not installed.',
+    );
+  }
+  final manifest = parseManifest(manifestBytes);
+  if (parseVersion(manifest.version) == null) {
+    throw const SelfUpdateFailure(
+      SelfUpdateFailureKind.badManifest,
+      'The update information was not in a form this version understands.',
+    );
+  }
+  if (!isNewer(manifest.version, currentVersion)) return null;
+  final artifact = manifest.artifacts[platformKey];
+  if (artifact == null) return null;
+  final file = await downloadArtifact(
+    artifact: artifact,
+    stagingDir: stagingDir,
+    client: client,
+    freeSpace: freeSpace,
+  );
+  return VerifiedUpdate(
+    version: manifest.version,
+    tag: manifest.tag,
+    file: file,
+  );
+}
+
+Future<String?> _latestClientTag(http.Client client) async {
+  final bytes = await _getBytes(
+    client,
+    Uri.parse(
+      'https://api.github.com/repos/$clientReleaseRepo/releases?per_page=30',
+    ),
+  );
+  final releases = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+  if (releases is! List) return null;
+  String? best;
+  for (final entry in releases) {
+    if (entry is! Map<String, dynamic>) continue;
+    if (entry['draft'] == true || entry['prerelease'] == true) continue;
+    final tag = entry['tag_name'];
+    if (tag is! String || !tag.startsWith('client-v')) continue;
+    final version = tag.substring('client-v'.length);
+    if (parseVersion(version) == null) continue;
+    if (best == null || isNewer(version, best.substring('client-v'.length))) {
+      best = tag;
+    }
+  }
+  return best;
+}
+
+Future<Uint8List> _getBytes(http.Client client, Uri url) async {
+  try {
+    final response = await client.get(url).timeout(_timeout);
+    if (response.statusCode != 200 ||
+        response.bodyBytes.length > _maxManifestBytes) {
+      throw HttpException('status ${response.statusCode}', uri: url);
+    }
+    return response.bodyBytes;
+  } catch (error) {
+    throw SelfUpdateFailure(
+      SelfUpdateFailureKind.unreachable,
+      'Could not reach the update server.',
+      detail: '$error',
+    );
+  }
+}
