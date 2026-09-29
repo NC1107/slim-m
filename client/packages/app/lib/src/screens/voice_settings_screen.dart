@@ -280,6 +280,15 @@ class _SoundsSection extends ConsumerWidget {
               .read(voiceSettingsControllerProvider.notifier)
               .setCallRingSoundEnabled(value),
         ),
+        const SizedBox(height: AppSpacing.s8),
+        SettingsToggleRow(
+          label: 'Play soft music while you are alone in a call',
+          value: settings.holdMusicEnabled,
+          semanticLabel: 'Play hold music while alone in a call',
+          onChanged: (value) => ref
+              .read(voiceSettingsControllerProvider.notifier)
+              .setHoldMusicEnabled(value),
+        ),
       ],
     );
   }

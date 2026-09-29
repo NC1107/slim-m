@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
+import '../providers/hold_music_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
 import '../providers/last_text_channel.dart';
@@ -84,6 +85,8 @@ class HomeShell extends ConsumerWidget {
     ref.watch(roleChangeWatcherProvider);
     // Forces creation for the session; nothing here reads its own state.
     ref.watch(notificationSoundControllerProvider);
+    // Session-lifetime, so hold music reacts to the call without a screen mounting it.
+    ref.watch(holdMusicControllerProvider);
     // Same reasoning: read lazily, its first read would race a module's own sound trigger against this provider's async load from disk.
     ref.watch(moduleSoundSettingsProvider);
     // Same reasoning as the channel-mute watch above: session-lifetime, for the sound and desktop-notifier paths.
