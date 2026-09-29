@@ -22,6 +22,7 @@ import 'dart:typed_data';
 
 import 'module_scene.dart';
 import 'module_scene_path.dart';
+import 'module_scene_sweep.dart';
 
 /// Reads [raw] as a scene, or returns null if it is not one - the fast path
 /// for the overwhelmingly common case of ordinary text output. Never throws:
@@ -41,11 +42,13 @@ ModuleScene? parseModuleScene(String raw) {
   final opsRaw = decoded['ops'];
   final ops = <SceneOp>[];
   var images = 0;
+  var animated = 0;
   if (opsRaw is List) {
     for (final entry in opsRaw) {
       if (entry is! Map) continue;
-      final op = _parseOp(entry);
+      final op = _parseOp(entry, allowSweep: animated < SceneSweep.maxPerScene);
       if (op == null) continue;
+      if (sweepOf(op) != null) animated++;
       // Counted here: _parseOp sees one op and cannot know how many preceded it.
       if (op is ImageOp && ++images > ImageOp.maxPerScene) continue;
       ops.add(op);
@@ -64,7 +67,8 @@ ModuleScene? parseModuleScene(String raw) {
   );
 }
 
-SceneOp? _parseOp(Map<Object?, Object?> op) {
+SceneOp? _parseOp(Map<Object?, Object?> op, {required bool allowSweep}) {
+  final sweep = allowSweep ? SceneSweep.parse(op['sweep']) : null;
   switch (op['op']) {
     case 'cells':
       final data = _string(op['data']);
@@ -91,6 +95,7 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         strokeWidth: _double(op['sw'], 1),
         radius: _double(op['r'], 0),
         tap: _string(op['tap']),
+        sweep: sweep,
       );
     case 'circle':
       return CircleOp(
@@ -102,6 +107,7 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         stroke: _string(op['stroke']),
         strokeWidth: _double(op['sw'], 1),
         tap: _string(op['tap']),
+        sweep: sweep,
       );
     case 'line':
       return LineOp(
@@ -111,6 +117,7 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         y2: _double(op['y2'], 0),
         stroke: _string(op['stroke']),
         strokeWidth: _double(op['sw'], 1),
+        sweep: sweep,
       );
     case 'path':
       final d = _string(op['d']);
@@ -134,6 +141,7 @@ SceneOp? _parseOp(Map<Object?, Object?> op) {
         fill: _string(op['fill']),
         size: _double(op['size'], 12),
         align: _string(op['align']) ?? 'left',
+        sweep: sweep,
       );
     case 'input':
       final submit = _string(op['submit']);
