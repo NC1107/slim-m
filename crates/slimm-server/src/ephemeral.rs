@@ -31,13 +31,16 @@ pub const MAX_PER_ANCHOR: u32 = 3;
 /// Above this many tracked anchors, expired ones are swept on the next charge.
 const SWEEP_ABOVE: usize = 256;
 
+/// Messages sent so far and the instant the anchor stops entitling more.
+type Spent = (u32, i64);
+
 /// How many private messages each (bot, anchor) has used, in memory only.
 ///
 /// An entry lives until its anchor's window closes and is then forgotten, so
 /// the map is bounded by the anchors still inside the window.
 #[derive(Clone, Default)]
 pub struct EphemeralBudget {
-    used: Arc<Mutex<HashMap<(UserId, Uuid), (u32, i64)>>>,
+    used: Arc<Mutex<HashMap<(UserId, Uuid), Spent>>>,
 }
 
 impl EphemeralBudget {
