@@ -45,9 +45,14 @@ class DockManifestView extends StatelessWidget {
     required this.approvedHostCapabilities,
     required this.onToggleHostCapability,
     this.reapprovePosting = false,
+    this.sourceRepo,
   });
 
   final api.DockManifest manifest;
+
+  /// The community source's `owner/repo` this module comes from, or null for
+  /// the official source. Shown before anything is installed.
+  final String? sourceRepo;
   final api.InstalledDockModule? installed;
 
   /// The host capabilities currently switched on, applied on the next install
@@ -83,6 +88,13 @@ class DockManifestView extends StatelessWidget {
               : 'v${manifest.version} · ${manifest.author}',
           style: AppText.caption.copyWith(color: tokens.textSecondary),
         ),
+        if (sourceRepo != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppBadge(
+            variant: AppBadgeVariant.warn,
+            label: 'Community source: $sourceRepo',
+          ),
+        ],
         const SizedBox(height: AppSpacing.s12),
         Text(
           manifest.summary,

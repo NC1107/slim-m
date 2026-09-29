@@ -41,22 +41,29 @@ import '../settings_screen_scaffold.dart';
 /// Resolves the manifest for [moduleId] so this screen can be deep-linked and
 /// popped back to like any other, rather than needing its subject handed in.
 class DockModuleAccessScreen extends ConsumerWidget {
-  const DockModuleAccessScreen({super.key, required this.moduleId});
+  const DockModuleAccessScreen({
+    super.key,
+    required this.moduleId,
+    this.source,
+  });
 
   final String moduleId;
 
+  /// The community source the module was installed from; null is official.
+  final String? source;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final manifest = ref.watch(dockManifestProvider(moduleId));
+    final manifest = ref.watch(dockManifestFor(moduleId, source));
     return SettingsScreenScaffold(
       title: 'Who can use this',
       backTooltip: 'Back to the module',
-      backFallback: Routes.adminDockModule(moduleId),
+      backFallback: Routes.adminDockModule(moduleId, source: source),
       child: AppAsyncView<api.DockManifest>(
         value: AppAsyncState(data: manifest.valueOrNull, error: manifest.error),
         center: false,
         errorMessage: 'Could not load this module.',
-        onRetry: () => ref.invalidate(dockManifestProvider(moduleId)),
+        onRetry: () => ref.invalidate(dockManifestFor(moduleId, source)),
         data: (context, m) => ModuleAccessPane(manifest: m),
       ),
     );

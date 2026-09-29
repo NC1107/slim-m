@@ -138,6 +138,25 @@ pub(super) async fn dock_calls(c: &mut Contract, root: &str, admin_id: &str, cha
     c.bare("deleteRole", "DELETE", &format!("/roles/{role_id}"), root)
         .await;
 
+    let source = c
+        .json(
+            "addDockSource",
+            "POST",
+            "/space/dock/sources",
+            root,
+            json!({ "repo": "acme/mods" }),
+        )
+        .await;
+    let source_id = text(&source, "id");
+    c.get("listDockSources", "/space/dock/sources", root).await;
+    c.bare(
+        "removeDockSource",
+        "DELETE",
+        &format!("/space/dock/sources/{source_id}"),
+        root,
+    )
+    .await;
+
     c.bare(
         "disableDockModule",
         "POST",

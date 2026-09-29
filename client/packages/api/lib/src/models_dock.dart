@@ -16,6 +16,7 @@ class DockIndexEntry {
     required this.name,
     required this.version,
     required this.summary,
+    this.shadowed = false,
   });
 
   /// The module's slug id, stable across versions and safe for a URL path
@@ -25,11 +26,39 @@ class DockIndexEntry {
   final String version;
   final String summary;
 
+  /// True when another source already owns [id], so it cannot be installed
+  /// from the source this entry was listed under.
+  final bool shadowed;
+
   factory DockIndexEntry.fromJson(Map<String, dynamic> json) => DockIndexEntry(
         id: json['id'] as String,
         name: json['name'] as String,
         version: json['version'] as String,
         summary: json['summary'] as String,
+        shadowed: json['shadowed'] as bool? ?? false,
+      );
+}
+
+/// A place the Dock reads modules from: the official registry, or a community
+/// GitHub repo an admin added.
+class DockSource {
+  const DockSource({
+    required this.id,
+    required this.repo,
+    required this.official,
+  });
+
+  /// Passed as `source` to the module routes; `official` for the official one.
+  final String id;
+
+  /// The GitHub `owner/repo` slug.
+  final String repo;
+  final bool official;
+
+  factory DockSource.fromJson(Map<String, dynamic> json) => DockSource(
+        id: json['id'] as String,
+        repo: json['repo'] as String,
+        official: json['official'] as bool,
       );
 }
 
@@ -218,11 +247,16 @@ class InstalledDockModule {
     required this.extensionPoints,
     required this.enabled,
     required this.installedAt,
+    this.sourceRepo,
   });
 
   final String id;
   final String name;
   final String version;
+
+  /// The community source's `owner/repo` it was installed from, or null for
+  /// the official source.
+  final String? sourceRepo;
   final String artifactSha256;
   final List<String> approvedCapabilities;
 
@@ -262,5 +296,6 @@ class InstalledDockModule {
             .toList(growable: false),
         enabled: json['enabled'] as bool,
         installedAt: json['installed_at'] as int,
+        sourceRepo: json['source_repo'] as String?,
       );
 }

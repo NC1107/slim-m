@@ -16,7 +16,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
-import 'package:go_router/go_router.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../providers/admin_providers.dart';
@@ -25,10 +24,12 @@ import '../../providers/code_block_runner.dart';
 import '../../providers/providers.dart';
 import '../../providers/slash_command.dart';
 import '../../routing/routes.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/run_guarded.dart';
-import '../../widgets/settings_entity_row.dart';
 import '../../widgets/settings_section_header.dart';
 import '../settings_screen_scaffold.dart';
+import 'dock_module_row.dart';
+import 'dock_sources_section.dart';
 
 class DockScreen extends StatelessWidget {
   const DockScreen({super.key});
@@ -122,6 +123,23 @@ class _DockPaneState extends ConsumerState<DockPane>
     );
   }
 
+  Future<void> _removeSource(api.DockSource source) async {
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Remove ${source.repo}?',
+      message:
+          'Modules already installed from it stay installed and enabled, but '
+          'they cannot be updated until you add this source again.',
+      confirmLabel: 'Remove source',
+    );
+    if (!confirmed || !mounted) return;
+    final ok = await guard(
+      whatFailed: 'remove ${source.repo}',
+      action: () => ref.read(apiProvider).removeDockSource(source.id),
+    );
+    if (ok) ref.invalidate(dockCatalogProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
@@ -132,8 +150,6 @@ class _DockPaneState extends ConsumerState<DockPane>
       center: false,
       errorMessage: 'Could not reach the module marketplace.',
       onRetry: () => ref.invalidate(dockCatalogProvider),
-      isEmpty: (c) => c.entries.isEmpty,
-      emptyMessage: 'No modules are published in the marketplace yet.',
       // No section title: this screen is one group, matching Roles' own choice.
       data: (context, catalog) {
         final shown = [
@@ -167,20 +183,45 @@ class _DockPaneState extends ConsumerState<DockPane>
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.s16),
                 child: Text(
-                  'No module matches "${_query.text.trim()}".',
+                  catalog.entries.isEmpty
+                      ? 'No modules are published in the marketplace yet.'
+                      : 'No module matches "${_query.text.trim()}".',
                   style: AppText.body.copyWith(color: tokens.textSecondary),
                 ),
               )
             else
               SettingsSectionCard(
+                title: catalog.sections.isEmpty ? null : 'Official modules',
                 children: [
                   for (final entry in shown)
-                    _ModuleRow(
+                    DockModuleRow(
                       entry: entry,
                       installed: catalog.installedFor(entry.id),
                     ),
                 ],
               ),
+            for (final section in catalog.sections)
+              DockCommunitySection(
+                section: section,
+                catalog: catalog,
+                needle: needle,
+                onRemove: () => unawaited(_removeSource(section.source)),
+              ),
+            if (catalog.sourcesFailed) ...[
+              const SizedBox(height: AppSpacing.s12),
+              const AppErrorState(
+                message: 'Could not load the community sources.',
+              ),
+            ],
+            const SizedBox(height: AppSpacing.s16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AppButton(
+                label: 'Add a community source',
+                icon: AppIcons.add,
+                onPressed: () => unawaited(showAddDockSourceSheet(context)),
+              ),
+            ),
           ],
         );
       },
@@ -233,64 +274,6 @@ class _UpdateAllBar extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ModuleRow extends StatelessWidget {
-  const _ModuleRow({required this.entry, required this.installed});
-
-  final api.DockIndexEntry entry;
-
-  /// This space's own install record for [entry], or null when it has never
-  /// been docked here.
-  final api.InstalledDockModule? installed;
-
-  /// What this space has, against what the marketplace now offers.
-  ///
-  /// A version that differs is the whole update affordance on this screen:
-  /// the row used to show the registry's version and the word "Installed"
-  /// side by side, which reads as agreement even when they disagree.
-  static AppBadge _stateBadge(
-    api.DockIndexEntry entry,
-    api.InstalledDockModule installed,
-  ) {
-    if (installed.version != entry.version) {
-      return AppBadge(
-        variant: AppBadgeVariant.warn,
-        label: 'v${installed.version} · update',
-      );
-    }
-    return AppBadge(
-      variant: AppBadgeVariant.role,
-      label: installed.enabled ? 'Installed' : 'Installed · Off',
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    final installed = this.installed;
-    return SettingsEntityRow(
-      // Accent leading when installed, so it reads as installed down the list at a glance, not only from its badge.
-      leading: Icon(
-        AppIcons.dock,
-        color: installed == null ? null : tokens.accent,
-      ),
-      headline: entry.name,
-      badge: installed == null ? null : _stateBadge(entry, installed),
-      details: [
-        SettingsEntityDetail('v${entry.version}'),
-        SettingsEntityDetail(entry.summary, wrap: true),
-      ],
-      onTap: () => context.go(Routes.adminDockModule(entry.id)),
-      onTapSemanticLabel: 'View ${entry.name}',
-      // Decorative: the row itself is the control, so this points the way without being a second, smaller target.
-      actions: [
-        ExcludeSemantics(
-          child: Icon(AppIcons.chevronRight, color: tokens.textSecondary),
         ),
       ],
     );

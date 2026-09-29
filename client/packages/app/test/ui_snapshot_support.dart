@@ -37,6 +37,7 @@ import 'package:slimm_app/src/routing/modal_page.dart';
 import 'package:slimm_app/src/screens/admin/account_recovery_screen.dart';
 import 'package:slimm_app/src/screens/admin/analytics_screen.dart';
 import 'package:slimm_app/src/screens/admin/channel_permissions_screen.dart';
+import 'package:slimm_app/src/screens/admin/dock_screen.dart';
 import 'package:slimm_app/src/screens/admin/emoji_screen.dart';
 import 'package:slimm_app/src/screens/admin/invites_screen.dart';
 import 'package:slimm_app/src/screens/admin/performance_screen.dart';
@@ -286,6 +287,10 @@ GoRouter fixtureRouter(String location) => GoRouter(
           modalPage(context, const AccountRecoveryScreen()),
     ),
     GoRoute(
+      path: '/settings/dock',
+      pageBuilder: (context, state) => modalPage(context, const DockScreen()),
+    ),
+    GoRoute(
       path: '/settings/debug-log',
       pageBuilder: (context, state) =>
           modalPage(context, const DebugLogScreen()),
@@ -461,7 +466,6 @@ Future<void> renderSurface(
   }
   // A fetch landing on the final frame above mounts its fade at t=0; one more timed frame lets it land - see this function's own doc.
   await tester.pump(const Duration(milliseconds: 350));
-
   if (afterSettle != null) {
     await afterSettle(tester);
     await tester.pump(const Duration(milliseconds: 350));
@@ -487,13 +491,10 @@ Future<void> renderSurface(
 class _SilentPlayer implements SoundPlayer {
   @override
   Future<void> play(NotificationSound sound) async {}
-
   @override
   Future<void> loop(NotificationSound sound) async {}
-
   @override
   Future<void> stopLoop() async {}
-
   @override
   Future<void> dispose() async {}
 }

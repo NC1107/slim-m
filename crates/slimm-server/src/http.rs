@@ -51,6 +51,7 @@ mod code_runs;
 mod device_client_info;
 mod dms;
 pub mod dock;
+mod dock_sources;
 mod embeds;
 mod emoji;
 mod ephemeral_anchor;

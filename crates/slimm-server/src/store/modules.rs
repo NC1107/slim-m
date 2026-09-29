@@ -31,6 +31,9 @@ pub struct InstalledModule {
     pub extension_points: Vec<ModuleExtensionPoint>,
     pub enabled: bool,
     pub installed_at: i64,
+    /// The `owner/repo` of the community source it was installed from, or
+    /// `None` for the official one (decision 0046).
+    pub source_repo: Option<String>,
 }
 
 /// The manifest's `runtime.limits`, persisted verbatim so the module host can
@@ -109,6 +112,7 @@ struct ModuleRow {
     extension_points: String,
     enabled: bool,
     installed_at: i64,
+    source_repo: Option<String>,
 }
 
 impl From<ModuleRow> for InstalledModule {
@@ -131,6 +135,7 @@ impl From<ModuleRow> for InstalledModule {
             extension_points,
             enabled: row.enabled,
             installed_at: row.installed_at,
+            source_repo: row.source_repo,
         }
     }
 }
@@ -207,7 +212,8 @@ impl Store {
                       approved_host_capabilities AS "approved_host_capabilities!",
                       runtime_limits AS "runtime_limits!",
                       extension_points AS "extension_points!",
-                      enabled AS "enabled!: bool", installed_at AS "installed_at!"
+                      enabled AS "enabled!: bool", installed_at AS "installed_at!",
+                      source_repo
                FROM installed_modules WHERE id = ?"#,
             id
         )
@@ -226,7 +232,8 @@ impl Store {
                       approved_host_capabilities AS "approved_host_capabilities!",
                       runtime_limits AS "runtime_limits!",
                       extension_points AS "extension_points!",
-                      enabled AS "enabled!: bool", installed_at AS "installed_at!"
+                      enabled AS "enabled!: bool", installed_at AS "installed_at!",
+                      source_repo
                FROM installed_modules ORDER BY installed_at DESC"#
         )
         .fetch_all(&self.pool)
@@ -262,6 +269,25 @@ impl Store {
         let affected = sqlx::query!(
             "UPDATE installed_modules SET approved_host_capabilities = ? WHERE id = ?",
             json,
+            id
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(affected > 0)
+    }
+
+    /// Records which community source an installed module came from; `None`
+    /// is the official one. `Ok(false)` if it is not installed. Like the host
+    /// capabilities, an upsert leaves it alone and `http::dock` sets it.
+    pub async fn set_module_source(
+        &self,
+        id: &str,
+        source_repo: Option<&str>,
+    ) -> anyhow::Result<bool> {
+        let affected = sqlx::query!(
+            "UPDATE installed_modules SET source_repo = ? WHERE id = ?",
+            source_repo,
             id
         )
         .execute(&self.pool)

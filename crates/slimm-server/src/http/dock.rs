@@ -11,15 +11,17 @@
 //! 0019 gives link preview's arbitrary-host fetch, narrowed here to the one
 //! fixed host this Dock is configured with; `wire.rs` holds the DTOs.
 
+mod capabilities;
 mod fetch;
 mod manifest;
+mod sources;
 mod ssrf;
 mod wire;
 
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::{get, post};
@@ -28,10 +30,10 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 use super::AppState;
+use super::dock_sources::{add_source, list_sources, remove_source};
 use super::error::ApiError;
 use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
-use super::module_host;
 use crate::config::Config;
 use crate::media::to_hex;
 use crate::ratelimit::Class;
@@ -39,8 +41,10 @@ use crate::store::{
     InstallModuleRequest, ModuleExtensionPointSpec, ModulePermissionSpec, ModuleRuntimeLimits,
 };
 
+use capabilities::{approvable_host_capabilities, carried_host_capabilities};
 use fetch::{FetchError, fetch_capped};
-use manifest::{Manifest, ManifestError, parse_index, parse_manifest, validate_slug};
+use manifest::{IndexEntry, Manifest, ManifestError, parse_index, parse_manifest, validate_slug};
+use sources::SourceQuery;
 use wire::{IndexEntryDto, InstalledModuleDto, ManifestDto};
 
 const BODY_LIMIT: usize = 4 * 1024;
@@ -61,6 +65,9 @@ pub struct Dock {
 struct Enabled {
     client: reqwest::Client,
     base_url: Url,
+    /// The root community sources hang off as `<root>/<owner>/<repo>/main/`.
+    source_root: Url,
+    official_repo: String,
     allowed_host: String,
 }
 
@@ -78,6 +85,9 @@ impl Dock {
             inner: Some(Arc::new(Enabled {
                 client: ssrf::build_client(false),
                 base_url,
+                source_root: Url::parse(&format!("https://{ADDONS_HOST}/"))
+                    .expect("a fixed host is always a valid URL"),
+                official_repo: config.addons_repo.clone(),
                 allowed_host: ADDONS_HOST.to_owned(),
             })),
         }
@@ -103,16 +113,32 @@ impl Dock {
         Self {
             inner: Some(Arc::new(Enabled {
                 client: ssrf::build_client(true),
+                source_root: parsed.clone(),
                 base_url: parsed,
+                official_repo: "official/addons".to_owned(),
                 allowed_host,
             })),
         }
+    }
+
+    /// The official source's repo slug, for the sources listing.
+    pub(crate) fn official_repo(&self) -> Result<&str, ApiError> {
+        Ok(&self.enabled()?.official_repo)
     }
 
     fn enabled(&self) -> Result<&Enabled, ApiError> {
         self.inner.as_deref().ok_or(ApiError::NotConfigured(
             "the module marketplace is not configured",
         ))
+    }
+}
+
+impl Enabled {
+    /// A community source's base: always the fixed host, only the slug varies.
+    fn base_for(&self, repo: &str) -> Result<Url, ApiError> {
+        self.source_root
+            .join(&format!("{repo}/main/"))
+            .map_err(|_| ApiError::Internal)
     }
 }
 
@@ -128,6 +154,11 @@ pub fn routes() -> Router<AppState> {
         .route("/space/dock/modules/{id}/enable", post(enable))
         .route("/space/dock/modules/{id}/disable", post(disable))
         .route("/space/dock/installed", get(list_installed))
+        .route("/space/dock/sources", get(list_sources).post(add_source))
+        .route(
+            "/space/dock/sources/{sourceId}",
+            axum::routing::delete(remove_source),
+        )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -173,9 +204,8 @@ pub(crate) fn validate_module_id(id: &str) -> Result<(), ApiError> {
 /// confirming the registry's own `id` field agrees with the path it was
 /// fetched at - the same "does not alias a different resource" check
 /// `messages::SendError::IdConflict` exists for elsewhere.
-async fn fetch_manifest(dock: &Enabled, id: &str) -> Result<Manifest, ApiError> {
-    let url = dock
-        .base_url
+async fn fetch_manifest(dock: &Enabled, base: &Url, id: &str) -> Result<Manifest, ApiError> {
+    let url = base
         .join(&format!("modules/{id}/manifest.json"))
         .map_err(|_| ApiError::Internal)?;
     let bytes = fetch_capped(
@@ -194,18 +224,9 @@ async fn fetch_manifest(dock: &Enabled, id: &str) -> Result<Manifest, ApiError> 
     Ok(manifest)
 }
 
-async fn list_modules(
-    State(state): State<AppState>,
-    parts: Parts,
-    Authed(ctx): Authed,
-) -> Result<Json<Vec<IndexEntryDto>>, ApiError> {
-    enforce(&state, &parts, Some(&ctx), Class::Write)?;
-    require_manage_server(&state, ctx.user_id).await?;
-    let dock = state.dock.enabled()?;
-    let url = dock
-        .base_url
-        .join("index.json")
-        .map_err(|_| ApiError::Internal)?;
+/// `base`'s `index.json`, fetched capped and validated.
+async fn fetch_index(dock: &Enabled, base: &Url) -> Result<Vec<IndexEntry>, ApiError> {
+    let url = base.join("index.json").map_err(|_| ApiError::Internal)?;
     let bytes = fetch_capped(
         &dock.client,
         &url,
@@ -213,8 +234,33 @@ async fn list_modules(
         fetch::MAX_INDEX_BYTES,
     )
     .await?;
-    let index = parse_index(&bytes)?;
-    Ok(Json(index.into_iter().map(IndexEntryDto::from).collect()))
+    Ok(parse_index(&bytes)?)
+}
+
+async fn list_modules(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+    Query(query): Query<SourceQuery>,
+) -> Result<Json<Vec<IndexEntryDto>>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    require_manage_server(&state, ctx.user_id).await?;
+    let dock = state.dock.enabled()?;
+    let resolved = sources::resolve(&state, dock, query.source.as_deref()).await?;
+    let index = fetch_index(dock, &resolved.base).await?;
+    let taken = match &resolved.repo {
+        Some(repo) => sources::taken_ids(&state, dock, repo).await?,
+        None => Default::default(),
+    };
+    Ok(Json(
+        index
+            .into_iter()
+            .map(|e| {
+                let shadowed = taken.contains(&e.id);
+                IndexEntryDto::new(e, shadowed)
+            })
+            .collect(),
+    ))
 }
 
 async fn get_module(
@@ -222,12 +268,14 @@ async fn get_module(
     parts: Parts,
     Authed(ctx): Authed,
     Path(id): Path<String>,
+    Query(query): Query<SourceQuery>,
 ) -> Result<Json<ManifestDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     require_manage_server(&state, ctx.user_id).await?;
     validate_module_id(&id)?;
     let dock = state.dock.enabled()?;
-    let manifest = fetch_manifest(dock, &id).await?;
+    let resolved = sources::resolve(&state, dock, query.source.as_deref()).await?;
+    let manifest = fetch_manifest(dock, &resolved.base, &id).await?;
     Ok(Json(ManifestDto::from(manifest)))
 }
 
@@ -251,13 +299,16 @@ async fn install(
     parts: Parts,
     Authed(ctx): Authed,
     Path(id): Path<String>,
+    Query(query): Query<SourceQuery>,
     Json(req): Json<InstallRequest>,
 ) -> Result<Json<InstalledModuleDto>, ApiError> {
     enforce(&state, &parts, Some(&ctx), Class::Write)?;
     require_manage_server(&state, ctx.user_id).await?;
     validate_module_id(&id)?;
     let dock = state.dock.enabled()?;
-    let manifest = fetch_manifest(dock, &id).await?;
+    let resolved = sources::resolve(&state, dock, query.source.as_deref()).await?;
+    sources::check_id_free(&state, dock, &resolved, &id).await?;
+    let manifest = fetch_manifest(dock, &resolved.base, &id).await?;
     if manifest.version != req.version {
         return Err(ApiError::Conflict(
             "the module's current version no longer matches the one requested; reopen it in the Dock",
@@ -267,7 +318,7 @@ async fn install(
         Some(requested) => approvable_host_capabilities(&manifest, requested)?,
         None => carried_host_capabilities(&state, &manifest).await?,
     };
-    let artifact = fetch_artifact(dock, &manifest).await?;
+    let artifact = fetch_artifact(dock, &resolved.base, &manifest).await?;
 
     let permissions: Vec<ModulePermissionSpec> = manifest
         .permissions
@@ -315,6 +366,10 @@ async fn install(
         .store
         .set_module_host_capabilities(&installed.id, &approved_host)
         .await?;
+    state
+        .store
+        .set_module_source(&installed.id, resolved.repo.as_deref())
+        .await?;
     let installed = state
         .store
         .installed_module(&installed.id)
@@ -323,56 +378,17 @@ async fn install(
     Ok(Json(InstalledModuleDto::from(installed)))
 }
 
-/// What an install that named no approvals keeps: the module's current host
-/// capabilities that the new manifest still declares, except `message.post`
-/// when the artifact changed. Nothing is added.
-async fn carried_host_capabilities(
-    state: &AppState,
-    manifest: &Manifest,
-) -> Result<Vec<String>, ApiError> {
-    let Some(current) = state.store.installed_module(&manifest.id).await? else {
-        return Ok(Vec::new());
-    };
-    // A new build gets no unseen power to post: message.post must be approved again.
-    let same_build = current.artifact_sha256 == manifest.artifact.sha256;
-    Ok(current
-        .approved_host_capabilities
-        .into_iter()
-        .filter(|c| manifest.capabilities.contains(c))
-        .filter(|c| same_build || c != "message.post")
-        .collect())
-}
-
-/// `requested`, deduplicated, if every entry is a capability the manifest
-/// declared and this host implements; anything else refuses the install rather
-/// than quietly approving less than the admin asked for.
-fn approvable_host_capabilities(
-    manifest: &Manifest,
-    requested: &[String],
-) -> Result<Vec<String>, ApiError> {
-    let mut approved: Vec<String> = Vec::new();
-    for capability in requested {
-        let implemented = module_host::HOST_CAPABILITIES.contains(&capability.as_str());
-        if !implemented || !manifest.capabilities.contains(capability) {
-            return Err(ApiError::BadRequest(
-                "cannot approve a capability the module does not declare or the host does not implement",
-            ));
-        }
-        if !approved.contains(capability) {
-            approved.push(capability.clone());
-        }
-    }
-    Ok(approved)
-}
-
 /// Fetches the module's own artifact bytes at `manifest.artifact.path`,
 /// relative to the same allowlisted base the manifest itself came from, and
 /// refuses them if their sha256 does not match what the manifest declared -
 /// the fetch-time half of the check `crate::module_runtime::ModuleHost`
 /// repeats again, defense in depth, right before it ever runs them.
-async fn fetch_artifact(dock: &Enabled, manifest: &Manifest) -> Result<Vec<u8>, ApiError> {
-    let url = dock
-        .base_url
+async fn fetch_artifact(
+    dock: &Enabled,
+    base: &Url,
+    manifest: &Manifest,
+) -> Result<Vec<u8>, ApiError> {
+    let url = base
         .join(&manifest.artifact.path)
         .map_err(|_| ApiError::Internal)?;
     let bytes = fetch_capped(
