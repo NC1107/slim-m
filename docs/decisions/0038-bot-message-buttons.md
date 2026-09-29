@@ -66,9 +66,10 @@ It would have needed a new `AppState` field in every test that builds one, and i
 ### Private replies to a press
 
 `send_ephemeral` resolves its anchor in one place.
-That place now has two cases: an interaction id, whose recipient is the presser, and a message id under 0037's rules.
+That place, `http::ephemeral_anchor`, now has two resolvers: an interaction id, whose recipient is the presser, and a message id under 0037's rules, which require the message to be addressed to the bot.
+A press needs no such check, because pressing the bot's own button is the addressing.
 The interaction case requires that the caller is the bot the press went to, that it is in the same channel, and that the press is still open.
-It spends one of three private replies per press, so a single press cannot become a standing channel to the presser.
+It spends from the same per-anchor budget as a message anchor, three private replies, so a single press cannot become a standing channel to the presser.
 The delivery path, the frame, the tray and the block rules are unchanged.
 
 ### Acknowledging

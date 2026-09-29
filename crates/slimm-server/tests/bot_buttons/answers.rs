@@ -16,15 +16,15 @@ async fn a_private_reply_to_a_press_reaches_only_the_clicker_and_is_budgeted() {
         whisper(&w, &w.bot.1, &id, "you drew a king").await,
         StatusCode::OK
     );
+    let heard = frame_of_kind(&mut alice, "message.ephemeral")
+        .await
+        .expect("the clicker hears it");
+    assert_eq!(heard["message"]["content"], "you drew a king");
     assert!(
         frame_of_kind(&mut alice, "interaction.answered")
             .await
             .is_some()
     );
-    let heard = frame_of_kind(&mut alice, "message.ephemeral")
-        .await
-        .expect("the clicker hears it");
-    assert_eq!(heard["message"]["content"], "you drew a king");
     assert!(frame_of_kind(&mut bob, "message.ephemeral").await.is_none());
     assert!(
         frame_of_kind(&mut bob, "interaction.answered")
@@ -36,7 +36,7 @@ async fn a_private_reply_to_a_press_reaches_only_the_clicker_and_is_budgeted() {
     assert_eq!(whisper(&w, &w.bot.1, &id, "three").await, StatusCode::OK);
     assert_eq!(
         whisper(&w, &w.bot.1, &id, "four").await,
-        StatusCode::FORBIDDEN,
+        StatusCode::TOO_MANY_REQUESTS,
         "three replies per press"
     );
 }

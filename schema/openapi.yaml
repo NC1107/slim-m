@@ -8614,6 +8614,10 @@ components:
           format: uuid
           description: >-
             The member's message being answered. Its author is the recipient.
+            It may instead be the `interaction_id` of a button press on this
+            bot's message (decision 0038-bot-message-buttons): the recipient is
+            then whoever pressed, within 15 minutes of the press and under the
+            same limit of 3.
         content:
           type: string
     EphemeralMessage:
