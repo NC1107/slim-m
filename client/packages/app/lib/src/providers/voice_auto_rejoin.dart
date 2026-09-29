@@ -16,10 +16,12 @@
 /// timer-owning collaborator, so `voice_controller.dart` gains the decision
 /// and not the bookkeeping.
 ///
-/// Deliberately bounded. Retrying forever would turn an outage into a
-/// battery drain and would keep a screen claiming to reconnect long after
-/// anybody watching it had given up, so the attempts run out and the manual
-/// surface takes over.
+/// Deliberately bounded. Retrying forever would keep a screen claiming to
+/// reconnect long after anybody watching it had given up, so the attempts
+/// run out after a few minutes and the manual surface takes over. An
+/// attempt made with no network fails at the token request without touching
+/// the SFU, so the slow tail costs a request every half minute, not a
+/// connection.
 library;
 
 import 'dart:async';
@@ -29,14 +31,26 @@ class VoiceAutoRejoin {
 
   /// One entry per attempt, measured from the previous failure.
   ///
-  /// Three of them, widening: the first covers the common case where the
-  /// network is already back by the time LiveKit stops trying, and the
-  /// later two cover a handover that is still settling. Past that the
-  /// problem is not one this can retry its way out of.
+  /// The first three widen quickly for the common case where the network is
+  /// already back by the time LiveKit stops trying, or a handover is still
+  /// settling. The tail is patient: a tunnel or a lift keeps a phone offline
+  /// well past LiveKit's 44 seconds, and a client that gives up after
+  /// seventeen more strands somebody who came back a minute later. Measured
+  /// against a real SFU, a client offline for 90 seconds exhausted the old
+  /// three attempts while still offline and then sat on "Try again" with a
+  /// working network.
   static const defaultDelays = [
     Duration(seconds: 2),
     Duration(seconds: 5),
     Duration(seconds: 10),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
+    Duration(seconds: 30),
   ];
 
   final List<Duration> delays;
@@ -75,7 +89,7 @@ class VoiceAutoRejoin {
   /// Drops any pending attempt and restores the full budget, for a call that
   /// ended or reconnected. Both halves matter: a connected call must not be
   /// interrupted by a stale timer, and the next drop is a new problem that
-  /// deserves its own three tries rather than whatever this one left over.
+  /// deserves its own full budget rather than whatever this one left over.
   void reset() {
     _timer?.cancel();
     _timer = null;
