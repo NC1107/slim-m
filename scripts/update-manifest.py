@@ -187,20 +187,16 @@ def existing_file(path: Path) -> Path:
 
 
 def output_file(path: Path) -> Path:
-    """Outputs are only the two files the release workflow writes, inside a listed directory."""
+    """Outputs are only the two files the release workflow writes, always in the working directory."""
     name = next((n for n in OUTPUT_NAMES if n == path.name), None)
     if name is None:
         raise ManifestError(f"cannot write to {path}: output must be one of {', '.join(OUTPUT_NAMES)}")
-    try:
-        parent = existing_dir(path.parent)
-    except ManifestError as err:
-        raise ManifestError(f"cannot write to {path}") from err
-    found = listed(parent, name)
-    if found is None:
-        return parent / name
-    if not found.is_file():
+    target = Path.cwd() / name
+    if path.resolve() != target.resolve():
+        raise ManifestError(f"cannot write to {path}: outputs go in the working directory")
+    if target.exists() and not target.is_file():
         raise ManifestError(f"cannot write to {path}")
-    return found
+    return target
 
 
 def verify(manifest_path: Path, sig_path: Path, pubkey: str, directory, newer_than) -> dict:
