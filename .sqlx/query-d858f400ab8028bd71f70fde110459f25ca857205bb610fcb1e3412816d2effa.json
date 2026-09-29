@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE webhooks SET token_hash = ? WHERE id = ?\n               RETURNING user_id AS \"user_id!: UserId\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id!: UserId",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d858f400ab8028bd71f70fde110459f25ca857205bb610fcb1e3412816d2effa"
+}

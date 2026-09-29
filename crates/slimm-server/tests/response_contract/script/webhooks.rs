@@ -58,6 +58,13 @@ pub(crate) async fn webhook_calls(c: &mut Contract, root: &str, channel: &str) {
     )
     .await;
     c.bare(
+        "rotateWebhook",
+        "POST",
+        &format!("/webhooks/{webhook_id}/rotate"),
+        root,
+    )
+    .await;
+    c.bare(
         "revokeWebhook",
         "POST",
         &format!("/webhooks/{webhook_id}/revoke"),

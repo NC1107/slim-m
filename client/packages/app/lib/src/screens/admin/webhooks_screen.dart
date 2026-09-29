@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// Minting, listing, renaming and revoking webhooks. See
+/// Minting, listing, renaming, rotating and revoking webhooks. See
 /// `docs/decisions/0030-incoming-webhooks.md`.
 ///
 /// The delivery URL is shown once, here, and unrecoverable afterwards -
@@ -88,16 +88,17 @@ class _WebhooksPaneState extends ConsumerState<WebhooksPane>
     setState(() {
       _busy = false;
       if (ok && created != null) {
-        final url = ref
-            .read(apiProvider)
-            .baseUrl
-            .resolve(created!.deliveryPath);
-        _justCreated = (created: created!, url: url);
+        _reveal(created!);
         _label.clear();
         _channel = null;
       }
     });
     if (ok) ref.invalidate(webhooksProvider);
+  }
+
+  void _reveal(api.NewWebhook created) {
+    final url = ref.read(apiProvider).baseUrl.resolve(created.deliveryPath);
+    setState(() => _justCreated = (created: created, url: url));
   }
 
   @override
@@ -169,7 +170,8 @@ class _WebhooksPaneState extends ConsumerState<WebhooksPane>
           emptyMessage: 'No webhooks yet.',
           data: (context, list) => SettingsSectionCard(
             children: [
-              for (final webhook in list) _WebhookRow(webhook: webhook),
+              for (final webhook in list)
+                _WebhookRow(webhook: webhook, onRotated: _reveal),
             ],
           ),
         ),
@@ -200,8 +202,8 @@ class _UrlReveal extends StatelessWidget {
           message:
               'This is the only time ${created.webhook.label}\'s URL is '
               'shown. Copy it now - the server keeps only a hash of its '
-              'token, so it cannot be shown again. Revoke it and make '
-              'another if you lose it.',
+              'token, so it cannot be shown again. Rotate it for a new one '
+              'if you lose it.',
         ),
         const SizedBox(height: AppSpacing.s12),
         SelectableText(
@@ -235,9 +237,10 @@ class _UrlReveal extends StatelessWidget {
 }
 
 class _WebhookRow extends ConsumerStatefulWidget {
-  const _WebhookRow({required this.webhook});
+  const _WebhookRow({required this.webhook, required this.onRotated});
 
   final api.Webhook webhook;
+  final ValueChanged<api.NewWebhook> onRotated;
 
   @override
   ConsumerState<_WebhookRow> createState() => _WebhookRowState();
@@ -267,6 +270,31 @@ class _WebhookRowState extends ConsumerState<_WebhookRow>
     if (ok) ref.invalidate(webhooksProvider);
   }
 
+  Future<void> _rotate() async {
+    final confirmed = await confirmDangerousAction(
+      context,
+      title: 'Rotate ${widget.webhook.label}?',
+      message:
+          'Its current URL stops working immediately, and you will get a new '
+          'one to paste into whatever was using it. What it already posted '
+          'stays attributed to it.',
+      confirmLabel: 'Rotate',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _busy = true);
+    api.NewWebhook? rotated;
+    final ok = await guard(
+      whatFailed: 'rotate ${widget.webhook.label}',
+      action: () async {
+        rotated = await ref.read(apiProvider).rotateWebhook(widget.webhook.id);
+      },
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok && rotated != null) widget.onRotated(rotated!);
+    if (ok) ref.invalidate(webhooksProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final webhook = widget.webhook;
@@ -275,22 +303,26 @@ class _WebhookRowState extends ConsumerState<_WebhookRow>
       details: [
         if (webhook.createdByDisplayName case final minter?)
           SettingsEntityDetail('Minted by $minter'),
-        if (webhook.lastDeliveryAt == null)
-          const SettingsAbsentValue('Never delivered yet.')
+        if (webhook.lastDeliveryAt case final at?)
+          SettingsEntityDetail(webhookDeliveryLabel(at, DateTime.now()))
         else
-          const SettingsEntityDetail('Has delivered.'),
+          const SettingsAbsentValue('Never delivered yet.'),
       ],
       actions: [
-        AppButton(
-          label: 'Rename',
-          variant: AppButtonVariant.secondary,
-          size: AppButtonSize.sm,
+        AppIconButton(
+          icon: AppIcons.edit,
+          semanticLabel: 'Rename ${webhook.label}',
           onPressed: () => showRenameWebhookSheet(context, webhook),
         ),
-        AppButton(
-          label: 'Revoke',
-          variant: AppButtonVariant.secondary,
-          size: AppButtonSize.sm,
+        AppIconButton(
+          icon: AppIcons.retry,
+          semanticLabel: 'Rotate ${webhook.label}',
+          onPressed: _busy ? null : _rotate,
+        ),
+        AppIconButton(
+          icon: AppIcons.revoke,
+          semanticLabel: 'Revoke ${webhook.label}',
+          variant: AppIconButtonVariant.danger,
           onPressed: _busy ? null : _revoke,
         ),
       ],
@@ -298,6 +330,20 @@ class _WebhookRowState extends ConsumerState<_WebhookRow>
       onErrorDismiss: clearActionError,
     );
   }
+}
+
+/// "Last delivered 3h ago", so a silent integration reads as silent.
+String webhookDeliveryLabel(int deliveredAtMs, DateTime now) {
+  final elapsed = now.difference(
+    DateTime.fromMillisecondsSinceEpoch(deliveredAtMs),
+  );
+  final ago = switch (elapsed) {
+    Duration(inMinutes: < 1) => 'just now',
+    Duration(inHours: < 1) => '${elapsed.inMinutes}m ago',
+    Duration(inDays: < 1) => '${elapsed.inHours}h ago',
+    _ => '${elapsed.inDays}d ago',
+  };
+  return 'Last delivered $ago';
 }
 
 /// Opens the label editor for one webhook.
