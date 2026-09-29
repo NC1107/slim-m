@@ -13,6 +13,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../../widgets/settings_section_header.dart';
 import '../../widgets/settings_toggle_row.dart';
 import 'dock_command_panel_group.dart';
+import 'dock_host_access_card.dart';
 import 'dock_what_it_adds.dart';
 
 /// A module's manifest, plus the lifecycle action appropriate to
@@ -41,10 +42,22 @@ class DockManifestView extends StatelessWidget {
     required this.onSetEnabled,
     required this.onUninstall,
     required this.onChooseAccess,
+    required this.approvedHostCapabilities,
+    required this.onToggleHostCapability,
+    this.reapprovePosting = false,
   });
 
   final api.DockManifest manifest;
   final api.InstalledDockModule? installed;
+
+  /// The host capabilities currently switched on, applied on the next install
+  /// or save.
+  final Set<String> approvedHostCapabilities;
+
+  /// True when this update is a new build of a module that could post: the
+  /// switch is off until the admin turns it on again.
+  final bool reapprovePosting;
+  final void Function(String capability, bool approved) onToggleHostCapability;
   final bool busy;
   final String? error;
   final VoidCallback onErrorDismiss;
@@ -83,10 +96,22 @@ class DockManifestView extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.s16),
         _CapabilitiesCard(manifest: manifest),
+        if (grantableHostCapabilities(manifest.capabilities).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s16),
+          DockHostAccessCard(
+            declared: manifest.capabilities,
+            approved: approvedHostCapabilities,
+            onChanged: onToggleHostCapability,
+            moduleName: manifest.name,
+            reapprovePosting: reapprovePosting,
+            enabled: !busy,
+          ),
+        ],
         const SizedBox(height: AppSpacing.s16),
         _ActionsCard(
           manifest: manifest,
           installed: installed,
+          hostAccessChanged: _hostAccessChanged(),
           busy: busy,
           onInstall: onInstall,
           onSetEnabled: onSetEnabled,
@@ -107,6 +132,15 @@ class DockManifestView extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  /// Whether the switches differ from what this space approved at its last
+  /// install, which is when a Save is needed for them to take effect.
+  bool _hostAccessChanged() {
+    final current = installed?.approvedHostCapabilities.toSet() ?? const {};
+    return installed != null &&
+        (current.length != approvedHostCapabilities.length ||
+            !current.containsAll(approvedHostCapabilities));
   }
 
   /// Every `command` extension point [installed] declares, or none at all
@@ -236,6 +270,7 @@ class _ActionsCard extends StatelessWidget {
   const _ActionsCard({
     required this.manifest,
     required this.installed,
+    required this.hostAccessChanged,
     required this.busy,
     required this.onInstall,
     required this.onSetEnabled,
@@ -245,6 +280,7 @@ class _ActionsCard extends StatelessWidget {
 
   final api.DockManifest manifest;
   final api.InstalledDockModule? installed;
+  final bool hostAccessChanged;
   final bool busy;
   final VoidCallback onInstall;
   final ValueChanged<bool> onSetEnabled;
@@ -285,6 +321,16 @@ class _ActionsCard extends StatelessWidget {
             'This space is on v${installed.version}. Updating keeps who can '
             'use it, and whether it is on.',
             style: AppText.caption.copyWith(color: tokens.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.s16),
+        ],
+        if (hostAccessChanged && !outdated) ...[
+          AppButton(
+            label: busy ? 'Saving...' : 'Save access',
+            variant: AppButtonVariant.primary,
+            full: true,
+            disabled: busy,
+            onPressed: onInstall,
           ),
           const SizedBox(height: AppSpacing.s16),
         ],

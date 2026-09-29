@@ -18,6 +18,9 @@ pub mod openapi;
 
 /// Router and account helpers shared by the channel-overwrite test binaries.
 pub mod overwrite_harness;
+/// A one-member deployment plus helpers to install and run a wasm module.
+#[allow(dead_code)]
+pub mod module_world;
 
 /// Wasm fixtures for `crate::module_runtime`, shared by every test that
 /// installs a module and actually invokes it.

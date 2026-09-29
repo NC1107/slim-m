@@ -189,6 +189,28 @@ impl Store {
     /// `busy_timeout`, because waiting could deadlock. Taking the write lock
     /// up front makes concurrent sends queue instead.
     pub async fn send_message(&self, msg: NewMessage<'_>) -> Result<Sent, SendError> {
+        self.send_message_stamped(msg, None).await
+    }
+
+    /// [`Store::send_message`] for a message a module posted: the origin row and
+    /// the footer embed commit in the same transaction as the message, so a
+    /// failure leaves either all three or none. A retry of an id that already
+    /// landed returns the stored message without stamping it again.
+    pub async fn send_module_message(
+        &self,
+        msg: NewMessage<'_>,
+        module_id: &str,
+        footer: &str,
+    ) -> Result<Sent, SendError> {
+        self.send_message_stamped(msg, Some((module_id, footer)))
+            .await
+    }
+
+    async fn send_message_stamped(
+        &self,
+        msg: NewMessage<'_>,
+        stamp: Option<(&str, &str)>,
+    ) -> Result<Sent, SendError> {
         let NewMessage {
             channel_id,
             author_id,
@@ -276,6 +298,21 @@ impl Store {
 
         if let Some(origin) = &forward {
             super::message_forwards::insert_forward(&mut tx, id, origin).await?;
+        }
+
+        if let Some((module_id, footer)) = stamp {
+            sqlx::query!(
+                "INSERT INTO module_message_origins (message_id, module_id) VALUES (?, ?)",
+                id,
+                module_id
+            )
+            .execute(&mut *tx)
+            .await?;
+            let embed = super::NewEmbed {
+                footer_text: Some(footer.to_owned()),
+                ..super::NewEmbed::default()
+            };
+            super::message_embeds::insert_embeds(&mut tx, id, &[embed]).await?;
         }
 
         // Read the name inside the same transaction the insert used, so the

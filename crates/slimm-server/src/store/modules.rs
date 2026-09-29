@@ -23,6 +23,10 @@ pub struct InstalledModule {
     pub version: String,
     pub artifact_sha256: String,
     pub approved_capabilities: Vec<String>,
+    /// The subset of `approved_capabilities` an admin explicitly approved for
+    /// the module to exercise through `slim.host_call` (decision 0023). Empty
+    /// for every module installed before that approval existed.
+    pub approved_host_capabilities: Vec<String>,
     pub runtime_limits: ModuleRuntimeLimits,
     pub extension_points: Vec<ModuleExtensionPoint>,
     pub enabled: bool,
@@ -100,6 +104,7 @@ struct ModuleRow {
     version: String,
     artifact_sha256: String,
     approved_capabilities: String,
+    approved_host_capabilities: String,
     runtime_limits: String,
     extension_points: String,
     enabled: bool,
@@ -111,6 +116,8 @@ impl From<ModuleRow> for InstalledModule {
         // A parse failure means the row was corrupted elsewhere; fall back to empty rather than erroring a read.
         let approved_capabilities =
             serde_json::from_str(&row.approved_capabilities).unwrap_or_default();
+        let approved_host_capabilities =
+            serde_json::from_str(&row.approved_host_capabilities).unwrap_or_default();
         let runtime_limits = serde_json::from_str(&row.runtime_limits).unwrap_or_default();
         let extension_points = serde_json::from_str(&row.extension_points).unwrap_or_default();
         Self {
@@ -119,6 +126,7 @@ impl From<ModuleRow> for InstalledModule {
             version: row.version,
             artifact_sha256: row.artifact_sha256,
             approved_capabilities,
+            approved_host_capabilities,
             runtime_limits,
             extension_points,
             enabled: row.enabled,
@@ -196,6 +204,7 @@ impl Store {
             r#"SELECT id AS "id!", name AS "name!", version AS "version!",
                       artifact_sha256 AS "artifact_sha256!",
                       approved_capabilities AS "approved_capabilities!",
+                      approved_host_capabilities AS "approved_host_capabilities!",
                       runtime_limits AS "runtime_limits!",
                       extension_points AS "extension_points!",
                       enabled AS "enabled!: bool", installed_at AS "installed_at!"
@@ -214,6 +223,7 @@ impl Store {
             r#"SELECT id AS "id!", name AS "name!", version AS "version!",
                       artifact_sha256 AS "artifact_sha256!",
                       approved_capabilities AS "approved_capabilities!",
+                      approved_host_capabilities AS "approved_host_capabilities!",
                       runtime_limits AS "runtime_limits!",
                       extension_points AS "extension_points!",
                       enabled AS "enabled!: bool", installed_at AS "installed_at!"
@@ -239,9 +249,30 @@ impl Store {
         Ok(affected > 0)
     }
 
+    /// Records which of a module's declared capabilities an admin approved for
+    /// `slim.host_call`, replacing any earlier approval. `Ok(false)` if it is
+    /// not installed. An upsert leaves the approval alone; `http::dock` decides
+    /// per install whether to replace it or carry it forward.
+    pub async fn set_module_host_capabilities(
+        &self,
+        id: &str,
+        approved: &[String],
+    ) -> anyhow::Result<bool> {
+        let json = serde_json::to_string(approved)?;
+        let affected = sqlx::query!(
+            "UPDATE installed_modules SET approved_host_capabilities = ? WHERE id = ?",
+            json,
+            id
+        )
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(affected > 0)
+    }
+
     /// Uninstalls a module. `Ok(false)` if it was not installed. The
-    /// `module_permissions`, `role_module_permissions` and `module_artifacts`
-    /// rows all cascade away on the `installed_modules` foreign key, so
+    /// `module_permissions`, `role_module_permissions`, `module_artifacts` and
+    /// `module_kv` rows all cascade away on the `installed_modules` foreign key, so
     /// nothing dangles: see the migrations' own comments.
     pub async fn uninstall_module(&self, id: &str) -> anyhow::Result<bool> {
         let affected = sqlx::query!("DELETE FROM installed_modules WHERE id = ?", id)

@@ -214,6 +214,7 @@ class InstalledDockModule {
     required this.version,
     required this.artifactSha256,
     required this.approvedCapabilities,
+    this.approvedHostCapabilities = const [],
     required this.extensionPoints,
     required this.enabled,
     required this.installedAt,
@@ -224,6 +225,11 @@ class InstalledDockModule {
   final String version;
   final String artifactSha256;
   final List<String> approvedCapabilities;
+
+  /// The host capabilities an admin approved this module to use (`kv.store`,
+  /// `message.post`). Empty for a module installed before that approval
+  /// existed: nothing was granted then and nothing is now.
+  final List<String> approvedHostCapabilities;
 
   /// Which commands this installed module offers, and the permission each
   /// needs, as recorded at its last install - not re-fetched from the
@@ -247,6 +253,10 @@ class InstalledDockModule {
         approvedCapabilities: (json['approved_capabilities'] as List<dynamic>)
             .map((c) => c as String)
             .toList(growable: false),
+        approvedHostCapabilities:
+            ((json['approved_host_capabilities'] as List<dynamic>?) ?? const [])
+                .map((c) => c as String)
+                .toList(growable: false),
         extensionPoints: (json['extension_points'] as List<dynamic>)
             .map((e) => DockExtensionPoint.fromJson(e as Map<String, dynamic>))
             .toList(growable: false),

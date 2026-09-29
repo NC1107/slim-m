@@ -31,6 +31,7 @@ import '../../routing/routes.dart';
 import '../../widgets/run_guarded.dart';
 import '../settings_screen_scaffold.dart';
 import 'dock_module_view.dart';
+import 'dock_host_access_card.dart';
 
 class DockModuleScreen extends ConsumerStatefulWidget {
   const DockModuleScreen({super.key, required this.moduleId});
@@ -44,6 +45,54 @@ class DockModuleScreen extends ConsumerStatefulWidget {
 class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     with GuardedActionState<DockModuleScreen> {
   bool _busy = false;
+
+  /// The switches the admin has flipped, or null to show what is installed.
+  Set<String>? _hostApproved;
+
+  /// What the switches show: the admin's edits, else what this space approved,
+  /// limited to what [manifest] declares and the host can grant.
+  Set<String> _approvedFor(
+    api.DockManifest manifest,
+    api.InstalledDockModule? installed,
+  ) {
+    final grantable = grantableHostCapabilities(manifest.capabilities);
+    final carried = installed?.approvedHostCapabilities ?? const <String>[];
+    final chosen = _hostApproved ?? carried;
+    return {
+      for (final capability in grantable)
+        if (chosen.contains(capability) &&
+            (_hostApproved != null ||
+                !_needsReapproval(capability, manifest, installed)))
+          capability,
+    };
+  }
+
+  /// A new build never inherits the power to post: it has to be switched on
+  /// again for the version the admin is looking at.
+  static bool _needsReapproval(
+    String capability,
+    api.DockManifest manifest,
+    api.InstalledDockModule? installed,
+  ) =>
+      capability == 'message.post' &&
+      installed != null &&
+      installed.artifactSha256 != manifest.artifact.sha256;
+
+  void _toggleHostCapability(String capability, bool approved) {
+    final installed = ref
+        .read(dockCatalogProvider)
+        .valueOrNull
+        ?.installedFor(widget.moduleId);
+    final manifest = ref
+        .read(dockManifestProvider(widget.moduleId))
+        .valueOrNull;
+    if (manifest == null) return;
+    setState(() {
+      final next = {..._approvedFor(manifest, installed)};
+      approved ? next.add(capability) : next.remove(capability);
+      _hostApproved = next;
+    });
+  }
 
   /// Installs, or updates: the same call either way.
   ///
@@ -60,6 +109,10 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
     api.DockManifest manifest, {
     bool wasInstalled = false,
   }) async {
+    final approved = _approvedFor(
+      manifest,
+      ref.read(dockCatalogProvider).valueOrNull?.installedFor(manifest.id),
+    );
     setState(() => _busy = true);
     final ok = await guard(
       whatFailed: wasInstalled
@@ -67,10 +120,17 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
           : 'install ${manifest.name}',
       action: () => ref
           .read(apiProvider)
-          .installDockModule(moduleId: manifest.id, version: manifest.version),
+          .installDockModule(
+            moduleId: manifest.id,
+            version: manifest.version,
+            approvedHostCapabilities: approved.toList()..sort(),
+          ),
     );
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      if (ok) _hostApproved = null;
+    });
     if (!ok) return;
     ref.invalidate(dockCatalogProvider);
     ref.invalidate(modulePermissionsProvider);
@@ -156,6 +216,13 @@ class _DockModuleScreenState extends ConsumerState<DockModuleScreen>
         data: (context, m) => DockManifestView(
           manifest: m,
           installed: installed,
+          approvedHostCapabilities: _approvedFor(m, installed),
+          reapprovePosting:
+              _hostApproved == null &&
+              installed != null &&
+              installed.approvedHostCapabilities.contains('message.post') &&
+              _needsReapproval('message.post', m, installed),
+          onToggleHostCapability: _toggleHostCapability,
           busy: _busy,
           error: actionError,
           onErrorDismiss: clearActionError,

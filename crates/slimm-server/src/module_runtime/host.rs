@@ -4,6 +4,7 @@
 //! panicking the caller.
 
 use std::fmt;
+use std::time::Instant;
 
 use sha2::{Digest, Sha256};
 use wasmi::core::TrapCode;
@@ -96,9 +97,8 @@ impl ModuleHost {
     /// single `slim.host_call` function (and nothing else), whose requests are
     /// gated by the surface; every other import is still refused.
     ///
-    /// The surface ships dark: the live paths pass `Disabled`, so this path is
-    /// only reached once an owner turns capabilities on (a future step) - see
-    /// the [`super::capabilities`] module doc and decision 0023's Phase B.
+    /// A host call made after the wall-clock deadline is refused, so a run the
+    /// caller has already given up on cannot keep acting through a capability.
     pub async fn run_with_capabilities(
         wasm: Vec<u8>,
         expected_sha256: String,
@@ -112,9 +112,10 @@ impl ModuleHost {
         }
 
         let wall = limits.wall;
+        let deadline = Instant::now() + wall;
         let task = tokio::task::spawn_blocking(move || {
             let module = compiled_module(&digest, &wasm)?;
-            run_sync(&module, limits, &input, surface)
+            run_sync(&module, limits, &input, (surface, deadline))
         });
         match tokio::time::timeout(wall, task).await {
             Ok(Ok(result)) => result,
@@ -129,13 +130,14 @@ impl ModuleHost {
 struct HostState {
     limits: StoreLimits,
     surface: CapabilitySurface,
+    deadline: Instant,
 }
 
 fn run_sync(
     module: &Module,
     limits: RunLimits,
     input: &[u8],
-    surface: CapabilitySurface,
+    (surface, deadline): (CapabilitySurface, Instant),
 ) -> Result<Vec<u8>, RunError> {
     let engine = shared_engine();
     // The only import a module may declare is the single gated `slim.host_call`, and only with the surface on and a capability approved; every other case (any import while off, any other import ever, a second import) is refused, the same no-ambient-authority rule v1 has always had (decisions 0021, 0023).
@@ -157,6 +159,7 @@ fn run_sync(
         HostState {
             limits: store_limits,
             surface,
+            deadline,
         },
     );
     store.limiter(|state| &mut state.limits);
@@ -232,6 +235,9 @@ fn read_guest<'a, T: 'a>(
 /// return nothing but can never make it read or write outside its own memory,
 /// nor turn a bad request into a host error.
 fn host_call(mut caller: Caller<'_, HostState>, req_ptr: i32, req_len: i32) -> i64 {
+    if Instant::now() > caller.data().deadline {
+        return 0;
+    }
     let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
         return 0;
     };

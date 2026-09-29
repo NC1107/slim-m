@@ -89,6 +89,63 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     slimm_server::media::to_hex(&Sha256::digest(bytes))
 }
 
+/// A module that imports `slim.host_call`, sends `request` through it `count`
+/// times, and answers with the last host response wrapped as its own output
+/// (`"` and `\` in it become `'`, so the caller reads it as a plain string).
+/// A `@@` in `request` is overwritten each round with the two-digit round
+/// number, so one run can write distinct keys.
+#[allow(dead_code)]
+pub fn host_call_loop_wasm(request: &str, count: u32) -> Vec<u8> {
+    let data = escape_wat_string(request.as_bytes());
+    let len = request.len();
+    let patch = request.find("@@").map_or(String::new(), |at| {
+        let tens = 1024 + at;
+        let ones = tens + 1;
+        format!(
+            "(i32.store8 (i32.const {tens}) (i32.add (i32.const 48) (i32.div_u (local.get $i) (i32.const 10))))
+             (i32.store8 (i32.const {ones}) (i32.add (i32.const 48) (i32.rem_u (local.get $i) (i32.const 10))))"
+        )
+    });
+    let prefix = r#"{"ok":true,"output":""#;
+    let prefix_data = escape_wat_string(prefix.as_bytes());
+    let plen = prefix.len();
+    let text = format!(
+        r#"(module
+            (import "slim" "host_call" (func $host_call (param i32 i32) (result i64)))
+            (memory (export "memory") 2)
+            (data (i32.const 1024) "{data}")
+            (data (i32.const 24576) "{prefix_data}")
+            (func (export "alloc") (param $len i32) (result i32) (i32.const 16384))
+            (func (export "run") (param $in_ptr i32) (param $in_len i32) (result i64)
+                (local $i i32) (local $j i32) (local $b i32)
+                (local $packed i64) (local $ptr i32) (local $rlen i32)
+                (loop $rounds
+                    {patch}
+                    (local.set $packed (call $host_call (i32.const 1024) (i32.const {len})))
+                    (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                    (br_if $rounds (i32.lt_u (local.get $i) (i32.const {count}))))
+                (local.set $ptr (i32.wrap_i64 (i64.shr_u (local.get $packed) (i64.const 32))))
+                (local.set $rlen (i32.wrap_i64 (i64.and (local.get $packed) (i64.const 0xffffffff))))
+                (block $done
+                    (loop $copy
+                        (br_if $done (i32.ge_u (local.get $j) (local.get $rlen)))
+                        (local.set $b (i32.load8_u (i32.add (local.get $ptr) (local.get $j))))
+                        (if (i32.or (i32.eq (local.get $b) (i32.const 34))
+                                    (i32.eq (local.get $b) (i32.const 92)))
+                            (then (local.set $b (i32.const 39))))
+                        (i32.store8 (i32.add (i32.const {out}) (local.get $j)) (local.get $b))
+                        (local.set $j (i32.add (local.get $j) (i32.const 1)))
+                        (br $copy)))
+                (i32.store8 (i32.add (i32.const {out}) (local.get $rlen)) (i32.const 34))
+                (i32.store8 (i32.add (i32.const {out}) (i32.add (local.get $rlen) (i32.const 1))) (i32.const 125))
+                (i64.or (i64.shl (i64.const 24576) (i64.const 32))
+                    (i64.extend_i32_u (i32.add (local.get $rlen) (i32.const {tail}))))))"#,
+        out = 24576 + plen,
+        tail = plen + 2,
+    );
+    wat::parse_str(&text).expect("host-call loop wasm fixture must parse")
+}
+
 /// Escapes `bytes` as a WAT string-literal body: only `\` and `"` need it for
 /// content in this file's own callers, all of which are ASCII with no quotes
 /// or backslashes of their own, but this stays correct if that ever changes.

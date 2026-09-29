@@ -2,13 +2,13 @@
 //! The mediated-capability surface, per decision 0023 - the gate a module's
 //! `slim.host_call` requests pass through.
 //!
-//! Phases B and C of that record: the gate, and the first capability behind it,
-//! [`super::kv`]'s `kv.store`. The surface ships dark - [`CapabilitySurface::Disabled`]
-//! is the default and the only value the live run paths pass today, so a module
-//! still may import nothing and every `host_call` is refused until an owner
-//! turns the surface on (a future, deliberate step). A capability the module
-//! did not have approved, or one the host does not implement, is refused even
-//! then.
+//! The gate, and the capabilities behind it: [`super::kv`]'s `kv.store` and
+//! [`super::post`]'s `message.post`. A run gets [`CapabilitySurface::Enabled`]
+//! only when an admin approved at least one host capability for the module at
+//! install (`http::module_host`); every other run is [`CapabilitySurface::Disabled`],
+//! so a module may import nothing and every `host_call` is refused. A capability
+//! the module did not have approved, or one the host does not implement, is
+//! refused even on an enabled run.
 //!
 //! Everything here fails closed: an off surface, an unapproved capability, a
 //! malformed request, or a capability the host does not implement all return a
@@ -22,6 +22,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::kv::{self, KvBackend};
+use super::post::{self, MessagePoster};
 
 /// Whether the capability surface is available to a module run, and - when it
 /// is - the space-approved capability set, the module's identity and storage
@@ -45,6 +46,10 @@ pub enum CapabilitySurface {
         kv: Arc<dyn KvBackend>,
         /// Remaining `kv.store` calls this run may make, decremented per call.
         kv_calls_remaining: u32,
+        /// Posts as the invoking user; `None` leaves `message.post` unavailable.
+        poster: Option<Arc<dyn MessagePoster>>,
+        /// Remaining `message.post` attempts this run may make.
+        posts_remaining: u32,
     },
 }
 
@@ -61,7 +66,18 @@ impl CapabilitySurface {
             module_id: module_id.into(),
             kv,
             kv_calls_remaining: kv::MAX_CALLS_PER_RUN,
+            poster: None,
+            posts_remaining: post::MAX_POSTS_PER_RUN,
         }
+    }
+
+    /// Makes `message.post` available through `poster`. A no-op on a disabled
+    /// surface.
+    pub fn with_poster(mut self, new_poster: Arc<dyn MessagePoster>) -> Self {
+        if let CapabilitySurface::Enabled { poster, .. } = &mut self {
+            *poster = Some(new_poster);
+        }
+        self
     }
 
     /// Whether this run may link the single `slim.host_call` import: only when
@@ -82,6 +98,8 @@ impl CapabilitySurface {
             module_id,
             kv,
             kv_calls_remaining,
+            poster,
+            posts_remaining,
         } = self
         else {
             return refusal("the capability surface is off");
@@ -95,7 +113,11 @@ impl CapabilitySurface {
         }
         match parsed.capability.as_str() {
             "kv.store" => kv::handle(kv.as_ref(), module_id, kv_calls_remaining, request),
-            // Approved, but the host implements no such capability; a later phase adds an arm here, and until then it fails closed.
+            "message.post" => match poster {
+                Some(poster) => post::handle(poster.as_ref(), posts_remaining, request),
+                None => refusal("capability not available: message.post"),
+            },
+            // Approved, but the host implements no such capability; it fails closed.
             other => refusal(&format!("capability not available: {other}")),
         }
     }

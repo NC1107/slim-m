@@ -7984,6 +7984,17 @@ components:
           description: >
             The version reviewed in the Dock before installing. Refused with
             409 if the registry's current manifest no longer matches it.
+        approved_host_capabilities:
+          type: array
+          items:
+            type: string
+          description: >
+            The host capabilities the admin approved after seeing them listed
+            (kv.store, message.post; decision 0023). Each must be declared in
+            the manifest and implemented by the host, or the install is refused
+            with 400. An empty list withdraws every approval. Omitted keeps
+            what was approved before, minus anything the new manifest no
+            longer declares, and never adds one.
     InstalledDockModule:
       type: object
       required:
@@ -7993,6 +8004,7 @@ components:
           version,
           artifact_sha256,
           approved_capabilities,
+          approved_host_capabilities,
           extension_points,
           enabled,
           installed_at,
@@ -8010,6 +8022,15 @@ components:
           type: array
           items:
             type: string
+        approved_host_capabilities:
+          type: array
+          items:
+            type: string
+          description: >
+            The host capabilities an admin approved the module to use through
+            slim.host_call; empty for a module installed before that approval
+            existed. A run may use only a capability that is declared in
+            approved_capabilities and also listed here.
         extension_points:
           type: array
           description: >
@@ -8031,6 +8052,11 @@ components:
           description: >
             The module ABI's own request `input` field, passed through
             verbatim. What it means is entirely up to the module.
+        channel_id:
+          type: string
+          description: >
+            The channel the command was typed in. Only a run that names one
+            may use the message.post capability, and it may post only there.
     RunCodeBlockRequest:
       type: object
       required: [module_id, command, input]

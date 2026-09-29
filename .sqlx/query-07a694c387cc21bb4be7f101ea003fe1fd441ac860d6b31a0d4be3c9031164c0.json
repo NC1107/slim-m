@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", name AS \"name!\", version AS \"version!\",\n                      artifact_sha256 AS \"artifact_sha256!\",\n                      approved_capabilities AS \"approved_capabilities!\",\n                      runtime_limits AS \"runtime_limits!\",\n                      extension_points AS \"extension_points!\",\n                      enabled AS \"enabled!: bool\", installed_at AS \"installed_at!\"\n               FROM installed_modules WHERE id = ?",
+  "query": "SELECT id AS \"id!\", name AS \"name!\", version AS \"version!\",\n                      artifact_sha256 AS \"artifact_sha256!\",\n                      approved_capabilities AS \"approved_capabilities!\",\n                      approved_host_capabilities AS \"approved_host_capabilities!\",\n                      runtime_limits AS \"runtime_limits!\",\n                      extension_points AS \"extension_points!\",\n                      enabled AS \"enabled!: bool\", installed_at AS \"installed_at!\"\n               FROM installed_modules WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -29,23 +29,28 @@
         "type_info": "Text"
       },
       {
-        "name": "runtime_limits!",
+        "name": "approved_host_capabilities!",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "extension_points!",
+        "name": "runtime_limits!",
         "ordinal": 6,
         "type_info": "Text"
       },
       {
-        "name": "enabled!: bool",
+        "name": "extension_points!",
         "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "enabled!: bool",
+        "ordinal": 8,
         "type_info": "Integer"
       },
       {
         "name": "installed_at!",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Integer"
       }
     ],
@@ -61,8 +66,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "b57c2df2e59dc6c05b41319ccfd985659ad46d6ec7d197003f2a4c8336f9403a"
+  "hash": "07a694c387cc21bb4be7f101ea003fe1fd441ac860d6b31a0d4be3c9031164c0"
 }

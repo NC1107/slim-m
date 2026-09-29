@@ -2,14 +2,11 @@
 //! `kv.store`: the first reference capability (decision 0023), the safest one -
 //! a key-value store private to a single module, touching nothing else.
 //!
-//! The capability's reviewable substance lives here and is fully exercised in
-//! memory: the four operations, the per-request and per-store bounds, and the
-//! isolation between modules. Where the bytes actually live is a
-//! [`KvBackend`] - this module ships an in-memory one ([`InMemoryKv`]) as the
-//! reference and for tests; a durable, per-space backend is the deliberate next
-//! step an owner reviews (see decision 0023's persistence section), and is why
-//! this is a trait seam rather than a direct database dependency: `kv.store`'s
-//! shape can be judged without deciding how it persists.
+//! The capability's reviewable substance lives here: the four operations, the
+//! per-request and per-store bounds, and the isolation between modules. Where
+//! the bytes live is a [`KvBackend`]: [`InMemoryKv`] is the reference used by
+//! tests, and `http::module_host::SqliteKv` is the durable one every live run
+//! uses (decision 0023's addendum).
 //!
 //! Every path fails closed. A malformed request, an unknown op, an over-bound
 //! key or value, a full store, or an exhausted per-run call budget all return a
@@ -38,12 +35,12 @@ pub const MAX_CALLS_PER_RUN: u32 = 64;
 /// see another's. The runtime holds this behind the capability gate; a durable
 /// implementation is a future, reviewed step (decision 0023).
 pub trait KvBackend: Send + Sync {
-    fn get(&self, module_id: &str, key: &str) -> Option<String>;
+    fn get(&self, module_id: &str, key: &str) -> Result<Option<String>, KvError>;
     /// Stores `value` at `key`, or [`KvError::Full`] if it would take the
     /// module past [`MAX_ENTRIES`] or [`MAX_TOTAL_BYTES`].
     fn set(&self, module_id: &str, key: &str, value: &str) -> Result<(), KvError>;
-    fn delete(&self, module_id: &str, key: &str);
-    fn list(&self, module_id: &str) -> Vec<String>;
+    fn delete(&self, module_id: &str, key: &str) -> Result<(), KvError>;
+    fn list(&self, module_id: &str) -> Result<Vec<String>, KvError>;
 }
 
 /// Why a `set` was refused by the backend (as opposed to a per-request bound
@@ -51,6 +48,8 @@ pub trait KvBackend: Send + Sync {
 #[derive(Debug)]
 pub enum KvError {
     Full,
+    /// The backing store failed; the module sees a refusal, never the cause.
+    Unavailable,
 }
 
 /// Dispatches one `kv.store` request against `backend` for `module_id`,
@@ -74,7 +73,10 @@ pub fn handle(
 
     match req.op.as_str() {
         "get" => match req.key {
-            Some(key) => ok(json!({ "value": backend.get(module_id, &key) })),
+            Some(key) => match backend.get(module_id, &key) {
+                Ok(value) => ok(json!({ "value": value })),
+                Err(_) => refusal("kv.store is unavailable"),
+            },
             None => refusal("kv.store get needs a key"),
         },
         "set" => {
@@ -90,16 +92,20 @@ pub fn handle(
             match backend.set(module_id, &key, &value) {
                 Ok(()) => ok(json!({})),
                 Err(KvError::Full) => refusal("kv.store is full for this module"),
+                Err(KvError::Unavailable) => refusal("kv.store is unavailable"),
             }
         }
         "delete" => match req.key {
-            Some(key) => {
-                backend.delete(module_id, &key);
-                ok(json!({}))
-            }
+            Some(key) => match backend.delete(module_id, &key) {
+                Ok(()) => ok(json!({})),
+                Err(_) => refusal("kv.store is unavailable"),
+            },
             None => refusal("kv.store delete needs a key"),
         },
-        "list" => ok(json!({ "keys": backend.list(module_id) })),
+        "list" => match backend.list(module_id) {
+            Ok(keys) => ok(json!({ "keys": keys })),
+            Err(_) => refusal("kv.store is unavailable"),
+        },
         other => refusal(&format!("unknown kv.store op: {other}")),
     }
 }
@@ -134,9 +140,9 @@ pub struct InMemoryKv {
 }
 
 impl KvBackend for InMemoryKv {
-    fn get(&self, module_id: &str, key: &str) -> Option<String> {
+    fn get(&self, module_id: &str, key: &str) -> Result<Option<String>, KvError> {
         let modules = self.modules.lock().unwrap();
-        modules.get(module_id).and_then(|m| m.get(key)).cloned()
+        Ok(modules.get(module_id).and_then(|m| m.get(key)).cloned())
     }
 
     fn set(&self, module_id: &str, key: &str, value: &str) -> Result<(), KvError> {
@@ -154,19 +160,20 @@ impl KvBackend for InMemoryKv {
         Ok(())
     }
 
-    fn delete(&self, module_id: &str, key: &str) {
+    fn delete(&self, module_id: &str, key: &str) -> Result<(), KvError> {
         let mut modules = self.modules.lock().unwrap();
         if let Some(store) = modules.get_mut(module_id) {
             store.remove(key);
         }
+        Ok(())
     }
 
-    fn list(&self, module_id: &str) -> Vec<String> {
+    fn list(&self, module_id: &str) -> Result<Vec<String>, KvError> {
         let modules = self.modules.lock().unwrap();
-        modules
+        Ok(modules
             .get(module_id)
             .map(|m| m.keys().cloned().collect())
-            .unwrap_or_default()
+            .unwrap_or_default())
     }
 }
 
@@ -340,9 +347,9 @@ mod tests {
             "one byte larger in place is charged the difference"
         );
 
-        kv.delete("m", last);
+        kv.delete("m", last).unwrap();
         assert!(kv.set("m", "z", &value).is_ok(), "a delete frees its bytes");
-        let listed = kv.list("m");
+        let listed = kv.list("m").unwrap();
         assert_eq!(listed.len(), entries);
         assert!(listed.contains(&"z".to_owned()) && !listed.contains(last));
     }

@@ -1,6 +1,6 @@
 # 0023 - Mediated host capabilities
 
-Status: proposed (design only; the capability-granting surface is not built by this record)
+Status: accepted; phases B, C and D are live (see the addendum at the end)
 Date: 2026-09-07
 
 ## The ask
@@ -149,3 +149,56 @@ They change the sandbox boundary, so they are reviewed and merged by the owner d
 Phases B and C are now scaffolded, off by default, as owner-reviewed pull requests: the gated `slim.host_call` surface, and `kv.store`'s shape (operations, bounds, isolation) against a `KvBackend` trait with an in-memory reference, both proven end to end but reached by no live path.
 
 Not built: reactive execution (Phase E), `message.post` (Phase D), and `kv.store`'s durable backend (see the persistence section - the deliberate fork left to the owner). The owner flag that would ever turn the surface on is also not built; until it is, `slim.host_call` is refused exactly like any other import.
+
+## Addendum (2026-09-29): the surface is live
+
+`kv.store` and `message.post` are now reachable from every module run, gated per module.
+There is no deployment-wide flag.
+The per-module approval below is the switch, and a module with none stays on the import-free ABI exactly as before.
+
+### Approval
+
+- `installed_modules.approved_host_capabilities` holds what an admin approved.
+  It is separate from `approved_capabilities`, which is only the manifest's declared list.
+- A module installed before migration 0087 starts with an empty approval, whatever its manifest declares, so nothing is gained silently.
+- The Dock install screen lists each capability the host can grant, with a switch that starts off.
+  A save on an installed module re-sends the switches.
+- `POST /space/dock/modules/{id}/install` takes `approved_host_capabilities`.
+  Each entry must be declared by the manifest and implemented by the host, or the install is refused with 400.
+  An empty list withdraws every approval.
+  Omitting it keeps the earlier approval minus anything the new manifest no longer declares, and never adds one, so "update all" does not strip or widen access.
+  The exception is `message.post`: when the artifact changed it is dropped and must be approved again, because a new build is new code.
+  `kv.store` carries over.
+  The Dock says so on the update screen, and the switch starts off.
+- A run's effective set is declared, approved and implemented, all three, evaluated on every run.
+
+### `kv.store`
+
+- Durable, in `module_kv`, keyed by module id with a cascading foreign key to `installed_modules`.
+  Uninstalling wipes the data, and a reinstall or upgrade keeps it.
+- Caps are unchanged from the scaffold: 256-byte keys, 4 KiB values, 256 entries, 64 KiB per module, 64 calls per run.
+  The entry and byte totals are checked inside the same write transaction as the insert, so concurrent runs cannot both fit under the cap.
+- The persistence fork is resolved as option (a): the backend `block_on`s one bounded query per call from the blocking thread.
+  A host call made after the run's wall-clock deadline is refused, so a run the caller abandoned cannot keep acting.
+
+### `message.post`
+
+- The request is `{capability, content}` with an optional `channel_id`.
+  The host posts as the invoking user, never as an identity the module names.
+  The message, its `module_message_origins` row and a `via <module name>` embed footer are written in one transaction, so a failure leaves all three or none.
+  Fan-out (mentions, live frame, push) is best effort after the commit and never turns a stored message into an error, so a module cannot be invited to retry into a duplicate.
+- Permission: VIEW_CHANNEL and SEND_MESSAGES for the invoking user in that channel, the same check as a first-party send.
+  A missing channel and a denied one get the same refusal.
+  Slow mode, content length, mentions, read sync, push and fan-out follow the ordinary send path.
+- Limits: three posts per run, then a per-(module, user) token bucket of five with one refill every six seconds, and a module-wide bucket that charges a quarter token per post.
+- A module can post only into the channel the invoker ran the command from.
+  The run route takes an optional `channel_id` (a slash command sends the channel it was typed in), the poster is bound to it, and a `channel_id` in the module's request that differs is refused.
+  A run that names no channel is offered no `message.post` at all.
+- The message-scoped code-block run (`code_runs`) and any other caller of `execute_command` are untrusted: the input is whoever wrote the message, not the clicker, so they get no `message.post`.
+  Otherwise a crafted block for an approved module would make the person who clicks Run post attacker text, `@everyone` included, as themselves.
+  `kv.store` is still offered on those runs, since it is the module's own data.
+
+### What is still not built
+
+Reactive events (phase E) and the `on_event` export.
+The `via` footer is an embed, not a dedicated badge field on the message.
