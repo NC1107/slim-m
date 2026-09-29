@@ -6074,6 +6074,40 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /webhooks/{webhookId}/rotate:
+    parameters:
+      - name: webhookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: The webhook's own id.
+    post:
+      operationId: rotateWebhook
+      tags: [webhooks]
+      summary: Issue a webhook a new token, keeping its identity.
+      description: >-
+        The old delivery path 404s from the same commit and the new one is
+        returned here, once, like createWebhook. The webhook keeps its
+        principal, so what it already posted stays attributed to it. Audited
+        as webhook_rotate.
+      responses:
+        "200":
+          description: Rotated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewWebhook"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /webhooks/{webhookId}/revoke:
     parameters:
       - name: webhookId

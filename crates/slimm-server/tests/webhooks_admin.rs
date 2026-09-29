@@ -205,6 +205,11 @@ async fn an_ordinary_member_cannot_provision_list_or_revoke_webhooks() {
         ("GET", "/webhooks".to_owned(), None),
         (
             "POST",
+            format!("/webhooks/{}/rotate", minted.webhook.id),
+            None,
+        ),
+        (
+            "POST",
             format!("/webhooks/{}/revoke", minted.webhook.id),
             None,
         ),
@@ -243,4 +248,98 @@ async fn creating_a_webhook_on_an_unknown_channel_answers_404() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn rotating_a_webhook_replaces_its_token_and_keeps_its_principal() {
+    let (path, _guard) = support::TestDbGuard::new("slimm-webhooks-admin-rotate");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    let store = Store::new(pool.clone());
+    let (admin_id, root, channel_id) = admin(&store, "root").await;
+    let app = app(store.clone());
+
+    let minted = store
+        .create_webhook(
+            slimm_server::ids::ChannelId(uuid::Uuid::parse_str(&channel_id).unwrap()),
+            "alerts",
+            admin_id,
+        )
+        .await
+        .unwrap();
+    let old_path = format!("/webhooks/{}/{}", minted.webhook.id, minted.token);
+
+    let rotated = json_body(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                &format!("/webhooks/{}/rotate", minted.webhook.id),
+                &root,
+                None,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let new_path = rotated["delivery_path"].as_str().unwrap().to_owned();
+    assert_ne!(new_path, old_path, "rotation must issue a different token");
+    assert_eq!(rotated["webhook"]["id"], minted.webhook.id.to_string());
+
+    let deliver = |path: String| {
+        let app = app.clone();
+        async move {
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(path)
+                    .header("content-type", "application/json")
+                    .body(Body::from(json!({ "content": "ping" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+        }
+    };
+    assert_eq!(
+        deliver(old_path).await,
+        StatusCode::NOT_FOUND,
+        "the leaked URL must stop working at once"
+    );
+    assert!(deliver(new_path).await.is_success(), "the new URL delivers");
+
+    let principals: Vec<(Vec<u8>,)> = sqlx::query_as("SELECT user_id FROM webhooks")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        principals[0].0.as_slice(),
+        minted.webhook.principal_id.0.as_bytes().as_slice(),
+        "rotation must keep the principal so history stays attributed"
+    );
+
+    let actions: Vec<(String,)> =
+        sqlx::query_as("SELECT action FROM moderation_audit_log WHERE subject_id = ? ORDER BY id")
+            .bind(minted.webhook.principal_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    let actions: Vec<&str> = actions.iter().map(|(a,)| a.as_str()).collect();
+    assert_eq!(actions, vec!["webhook_create", "webhook_rotate"]);
+
+    let unknown = app
+        .oneshot(request(
+            "POST",
+            &format!("/webhooks/{}/rotate", uuid::Uuid::now_v7()),
+            &root,
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! Minting, listing, renaming and revoking webhooks. See
+//! Minting, listing, renaming, rotating and revoking webhooks. See
 //! `docs/decisions/0030-incoming-webhooks.md`, and its "admin surface"
 //! addendum for what this file's routes had to decide beyond delivery.
 //!
@@ -35,6 +35,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/webhooks", get(list).post(create))
         .route("/webhooks/{webhook_id}", patch(rename))
+        .route("/webhooks/{webhook_id}/rotate", post(rotate))
         .route("/webhooks/{webhook_id}/revoke", post(revoke))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
@@ -154,6 +155,27 @@ async fn rename(
         Some(webhook) => Ok(Json(webhook.into())),
         None => Err(ApiError::NotFound("no such webhook")),
     }
+}
+
+/// Issues a new token for a webhook, keeping its principal. The old URL 404s
+/// from the same commit; the new path is returned here and never again.
+async fn rotate(
+    State(state): State<AppState>,
+    parts: Parts,
+    Authed(ctx): Authed,
+    Path(webhook_id): Path<String>,
+) -> Result<Json<NewWebhookDto>, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::Write)?;
+    require_manage_server(&state, ctx.user_id).await?;
+    let webhook_id = WebhookId(parse_uuid(&webhook_id)?);
+    let Some((webhook, token)) = state.store.rotate_webhook(webhook_id, ctx.user_id).await? else {
+        return Err(ApiError::NotFound("no such webhook"));
+    };
+    let delivery_path = format!("/webhooks/{}/{}", webhook.id, token);
+    Ok(Json(NewWebhookDto {
+        webhook: webhook.into(),
+        delivery_path,
+    }))
 }
 
 /// Revokes a webhook. Its URL 404s on its very next delivery attempt - see
