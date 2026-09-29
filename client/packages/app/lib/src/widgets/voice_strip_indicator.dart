@@ -32,7 +32,10 @@ import 'user_avatar.dart';
 /// Whether a call is live and worth surfacing, regardless of which channel is
 /// on screen. The caller decides *where* it renders; this decides *if*.
 class VoiceStripIndicator extends ConsumerWidget {
-  const VoiceStripIndicator({super.key});
+  const VoiceStripIndicator({super.key, this.atTop = false});
+
+  /// Pinned above the transcript instead of below it, so the border flips.
+  final bool atTop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,7 +49,12 @@ class VoiceStripIndicator extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: tokens.surfaceSunken,
-        border: Border(top: BorderSide(color: tokens.borderSubtle)),
+        border: Border(
+          top: atTop ? BorderSide.none : BorderSide(color: tokens.borderSubtle),
+          bottom: atTop
+              ? BorderSide(color: tokens.borderSubtle)
+              : BorderSide.none,
+        ),
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.s12,

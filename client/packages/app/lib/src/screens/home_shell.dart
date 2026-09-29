@@ -164,13 +164,17 @@ class HomeShell extends ConsumerWidget {
       // Only the canvas (a drawing surface of its own) also claims the rail; see DmCallPane's own doc for why a DM call keeps it.
       final hidesRailAccess = canvasOpen;
       final channelId = selected;
+      // Above the transcript while typing, so the composer sits on the keyboard.
+      final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
       Widget compactScaffold(bool isDm) {
         final compactBody = Column(
           children: [
             const RailConnectionBar(),
+            if (showVoiceStrip && keyboardUp)
+              const VoiceStripIndicator(atTop: true),
             // Its own semantics node for the same reason the wide layout gives the pane one: the modal barrier inside this pane's navigator drops everything painted before it, which here is the connection bar.
             Expanded(child: Semantics(container: true, child: child)),
-            if (showVoiceStrip) const VoiceStripIndicator(),
+            if (showVoiceStrip && !keyboardUp) const VoiceStripIndicator(),
           ],
         );
         return Scaffold(
