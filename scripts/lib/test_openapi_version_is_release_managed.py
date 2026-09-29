@@ -25,6 +25,7 @@ one and send us back to hand-editing release branches.
 """
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -122,17 +123,30 @@ class OpenapiVersionIsReleaseManagedTest(unittest.TestCase):
         self.assertIn("server", components)
         self.assertIn(config()["packages"]["."]["component"], components)
 
-    def test_the_root_package_publishes_nothing_of_its_own(self):
+    def test_the_root_package_cuts_its_own_release_to_anchor_itself(self):
         root = config()["packages"]["."]
-        self.assertTrue(
+        self.assertFalse(
             root.get("skip-github-release"),
-            "the root package exists only to bump a file; a GitHub release "
-            "for it would be a second, meaningless release per server tag",
+            "without a schema-v* release the package has no boundary commit, "
+            "re-reads the commit window every run and drags the server into an "
+            "empty release (docs/ci.md, 'The schema package cuts its own tag')",
         )
         self.assertTrue(
             root.get("skip-changelog"),
             "the root package must not write a second changelog at the repo "
             "root alongside crates/slimm-server/CHANGELOG.md",
+        )
+
+    def test_a_schema_release_cannot_reach_a_publish_job(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text()
+        tag_globs = re.findall(r'^\s+- "([a-z]+-v\*)"$', workflow, re.M)
+        self.assertEqual(sorted(tag_globs), ["client-v*", "server-v*"])
+        perf = (REPO_ROOT / ".github" / "workflows" / "perf.yml").read_text()
+        self.assertIn(
+            "!startsWith(github.event.release.tag_name, 'schema-v')",
+            perf,
+            "a schema-v* release would start the release-only benchmark run a "
+            "second time per server version",
         )
 
     def test_both_packages_start_from_the_same_version(self):
