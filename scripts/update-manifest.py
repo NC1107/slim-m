@@ -37,7 +37,7 @@ PLATFORMS = {
     "macos": re.compile(r"^slim-m-client-.+-macos\.zip$"),
 }
 DEFAULT_REQUIRE = "windows-x64,macos"
-SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
+OUTPUT_NAMES = ("manifest.json", "manifest.json.sig")
 
 
 class ManifestError(Exception):
@@ -187,16 +187,17 @@ def existing_file(path: Path) -> Path:
 
 
 def output_file(path: Path) -> Path:
-    """Outputs are a listed existing file, or a validated bare name inside a listed directory."""
-    if not SAFE_NAME.fullmatch(path.name) or path.name in (".", ".."):
-        raise ManifestError(f"cannot write to {path}: output name must match [A-Za-z0-9._-]+")
+    """Outputs are only the two files the release workflow writes, inside a listed directory."""
+    name = next((n for n in OUTPUT_NAMES if n == path.name), None)
+    if name is None:
+        raise ManifestError(f"cannot write to {path}: output must be one of {', '.join(OUTPUT_NAMES)}")
     try:
         parent = existing_dir(path.parent)
     except ManifestError as err:
         raise ManifestError(f"cannot write to {path}") from err
-    found = listed(parent, path.name)
+    found = listed(parent, name)
     if found is None:
-        return parent / path.name
+        return parent / name
     if not found.is_file():
         raise ManifestError(f"cannot write to {path}")
     return found

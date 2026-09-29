@@ -216,11 +216,12 @@ class UpdateManifestTest(unittest.TestCase):
         self.assertEqual(done.returncode, 1)
         self.assertFalse(outside.parent.exists())
 
-    def test_output_names_outside_the_safe_set_are_refused(self):
-        for name in ("has space.json", "semi;colon.json", ".."):
+    def test_output_names_outside_the_allowed_set_are_refused(self):
+        before = sorted(p.name for p in self.tmp.iterdir())
+        for name in ("has space.json", "semi;colon.json", "..", "other.json"):
             done = self.build_to(self.tmp / name)
             self.assertEqual(done.returncode, 1, name)
-        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ["assets", "manifest.json", "manifest.json.sig"][:0] + sorted(p.name for p in self.tmp.iterdir()))
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), before)
 
     def build_to(self, out):
         return run("build", "--tag", TAG, "--dir", self.assets, "--repo", "o/r", "--out", out)
