@@ -50,6 +50,24 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     )
     .await;
 
+    let anchor = c
+        .json(
+            "sendMessage",
+            "POST",
+            &format!("/channels/{channel}/messages"),
+            root,
+            json!({ "id": uuid::Uuid::now_v7().to_string(), "content": "!ping" }),
+        )
+        .await;
+    c.json(
+        "sendEphemeralMessage",
+        "POST",
+        &format!("/channels/{channel}/ephemeral-messages"),
+        &bot_token,
+        json!({ "in_reply_to_id": text(&anchor, "id"), "content": "pong, only you" }),
+    )
+    .await;
+
     c.json(
         "setBotPermissions",
         "PATCH",

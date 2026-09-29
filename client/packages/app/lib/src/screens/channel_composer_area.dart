@@ -25,6 +25,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/message_selection.dart';
 import '../providers/providers.dart';
 import '../widgets/composer.dart';
+import '../widgets/ephemeral_tray.dart';
 import '../widgets/message_selection_bar.dart';
 import '../widgets/reply_banner.dart';
 import '../widgets/timeout_banner.dart';
@@ -93,6 +94,7 @@ class ChannelComposerArea extends ConsumerWidget {
               ? null
               : ReplyBanner(message: replyingTo!, onCancel: onCancelReply),
         ),
+        EphemeralTray(channelId: channelId),
         Composer(
           controller: controller,
           channelId: channelId,

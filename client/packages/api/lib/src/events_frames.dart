@@ -445,3 +445,13 @@ class ReadStateChanged extends ServerEvent {
   final String channelId;
   final int lastReadSeq;
 }
+
+/// A bot answered this account privately. Delivered only to the account's own
+/// sockets and never replayed, so a receiver keeps it in memory and drops it
+/// on dismissal or reload. See docs/decisions/0037-ephemeral-bot-messages.md.
+class MessageEphemeral extends ServerEvent {
+  const MessageEphemeral({required this.channelId, required this.message});
+
+  final String channelId;
+  final EphemeralMessage message;
+}

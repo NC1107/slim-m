@@ -142,6 +142,29 @@ The `id` is yours, and it makes the send idempotent within the channel: retrying
 So a retry after a timeout is safe.
 Never vary the content between attempts under one id - the server replays what it first stored, whatever the retry carried.
 
+## Answering privately
+
+A refusal, a balance or a validation error does not have to be posted for everyone to read past:
+
+```
+POST /channels/{channelId}/ephemeral-messages
+{ "in_reply_to_id": "<the message you are answering>", "content": "you need Manage Messages for that" }
+```
+
+Only the author of `in_reply_to_id` sees it, marked "Only you can see this", on every device they have open.
+You do not name the recipient - it is that message's author, which is why you can answer a member who spoke to you and cannot message anyone else.
+The message must be in that channel, from a person rather than a bot, no more than 15 minutes old, and addressed to you: it mentions you, replies to one of your messages, or starts with your registered prefix and one of your registered commands.
+Anything else is a 403, so register your commands before relying on this for `!command` messages.
+You get three private messages per anchor, and the fourth is a 429.
+
+It is never stored.
+It has no `seq`, never appears in a history page, in search or in `sync`, and is gone when the member reloads or dismisses it.
+A member who is offline when you send it never sees it, so use it for answers to something they just did, not for anything they must not miss.
+Moderators cannot see it either.
+A member who blocked you still gets a 200 back, so you cannot tell.
+
+See `docs/decisions/0037-ephemeral-bot-messages.md`.
+
 ## Registering your commands
 
 Call this once you are connected, and again every time you reconnect:

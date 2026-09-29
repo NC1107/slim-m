@@ -78,3 +78,37 @@ class BotCommandRegistration {
             .toList(growable: false),
       );
 }
+
+/// A bot's private answer to this account, from the `message.ephemeral`
+/// frame. Not a stored message: it has no `seq` and cannot be fetched again.
+/// See docs/decisions/0037-ephemeral-bot-messages.md.
+class EphemeralMessage {
+  const EphemeralMessage({
+    required this.id,
+    required this.channelId,
+    required this.authorId,
+    required this.authorDisplayName,
+    required this.content,
+    required this.inReplyToId,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String channelId;
+  final String authorId;
+  final String authorDisplayName;
+  final String content;
+  final String inReplyToId;
+  final int createdAt;
+
+  factory EphemeralMessage.fromJson(Map<String, dynamic> json) =>
+      EphemeralMessage(
+        id: json['id'] as String,
+        channelId: json['channel_id'] as String,
+        authorId: json['author_id'] as String,
+        authorDisplayName: json['author_display_name'] as String,
+        content: json['content'] as String,
+        inReplyToId: json['in_reply_to_id'] as String,
+        createdAt: json['created_at'] as int,
+      );
+}
