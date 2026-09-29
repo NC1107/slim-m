@@ -122,13 +122,6 @@ fn post(uri: &str, token: &str, body: Value) -> Request<Body> {
         .unwrap()
 }
 
-async fn json_body(response: axum::response::Response) -> Value {
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    serde_json::from_slice(&bytes).unwrap()
-}
-
 async fn scene(s: &Store) -> (User, User, ChannelId, String, String) {
     s.create_role(
         "everyone",

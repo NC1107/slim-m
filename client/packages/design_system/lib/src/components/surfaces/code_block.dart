@@ -169,7 +169,7 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
                         style: span.role == AppCodeRole.hidden
                             ? TextStyle(
                                 color: tokens.dangerText,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                                 backgroundColor: tokens.dangerBorder.withValues(
                                   alpha: 0.2,
                                 ),
