@@ -1,0 +1,22 @@
+{
+  "artifacts": {
+    "linux-x64": {
+      "sha256": "0505d0b44658eeddeff84c2285b226158758a991854437e0886720cee6fe4a9b",
+      "size": 25965616,
+      "url": "https://github.com/NC1107/slim-m/releases/download/client-v0.87.0/slim-m-client-0.87.0-linux-amd64.tar.gz"
+    },
+    "macos": {
+      "sha256": "f923ad785875ac10e9f5430618b4dd0233f78be5b7c11a68af207ba97eb3d1b9",
+      "size": 60153445,
+      "url": "https://github.com/NC1107/slim-m/releases/download/client-v0.87.0/slim-m-client-0.87.0-macos.zip"
+    },
+    "windows-x64": {
+      "sha256": "bcfabfcf640732e5b05e75f95f885722e447900bdbdf3c8faef4f94bec459d67",
+      "size": 49482826,
+      "url": "https://github.com/NC1107/slim-m/releases/download/client-v0.87.0/slim-m-client-0.87.0-windows-x64.zip"
+    }
+  },
+  "schema": 1,
+  "tag": "client-v0.87.0",
+  "version": "0.87.0"
+}
