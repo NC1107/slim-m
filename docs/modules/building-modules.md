@@ -9,7 +9,7 @@ That single constraint is the whole of the v1 security model, and it is what let
 Read `docs/decisions/0021-modules-and-the-dock.md` for why the system is shaped this way, and `docs/decisions/0022-module-extensibility-and-evolution.md` for how it grows.
 This document is the practical how-to; those two are the reasoning.
 
-Not sure whether your idea is a module or a bot? See `docs/decisions/0034-module-or-bot.md`.
+Not sure whether your idea is a module or a bot? See `docs/decisions/0035-module-or-bot.md`.
 
 ## What a module can do
 

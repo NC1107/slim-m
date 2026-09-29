@@ -1,4 +1,4 @@
-# 0034 - When something is a module and when it is a bot
+# 0035 - When something is a module and when it is a bot
 
 Status: accepted
 Date: 2026-09-28
@@ -64,6 +64,33 @@ This closes the personal access token question: a contributor who wants to autom
 | Homelab dashboard | Both | Bot: polls the LAN services and holds the credentials (1, 2). Module: renders the panels in the Dock from what the bot posted. |
 | Rich presence | Neither | "Listening to" is core presence, a client and server field. It follows checklist 5, not a new primitive. |
 | Code runner | Neither, a brokered service | The server brokers a submission to an operator-run Piston instance and never executes it ([0026](0026-polyglot-code-runner.md)). The odd languages stay modules. |
+
+## What already exists, classified
+
+Checked on 2026-09-28 against `slim-bots/bots` and `slim-addons/modules` (manifests and READMEs).
+
+| Existing | Answer | Checklist reason |
+| --- | --- | --- |
+| bot: ping | Bot, correct | A reference bot that answers as its own identity (3). |
+| bot: greeter | Bot, correct | Reacts to member joins with nobody present (2). |
+| bot: modlog | Bot, correct | Mirrors moderation events over time and posts as itself (2, 3). |
+| bot: roles | Bot, correct | Grants roles, so it holds MANAGE_ROLES and must be auditable (3). |
+| bot: reminders | Bot, correct | Fires on its own schedule (2). |
+| bot: jellyfin | Bot, correct | Holds the Jellyfin key, watches a LAN service, joins a call (1, 2, 3). Its `!watch` is the bot half of the watch party. |
+| bot: canvas-board | Bot, correct | Draws on the Voice Canvas as an identity and keeps the board between commands (3). |
+| bot: casino | Bot, correct with a note | Chip balances are durable per-person state and it posts as itself (3). The game boards themselves are surfaces, see follow-ups. |
+| module: connect-four, tic-tac-toe, minesweeper, word-guess, game-of-life | Module, correct | Interactive boards, pure, per viewer, safe from any click (4). |
+| module: music-box, spirograph, plot, table | Module, correct | Render a result as a scene or formatted block from the input alone (4). |
+| module: dice, hashkit, json-tools, markdown-tools | Module, correct | Pure functions of their input; `message.post` only posts the caller's own result (4, 0023). |
+| module: code-exec | Module, correct for now | JavaScript only, in the sandbox, no network (4). Common languages go to the brokered runner in 0026. |
+
+## Follow-ups
+
+None of the existing pieces sits clearly on the wrong side.
+Two are worth a card each:
+
+- **casino games:** the two game boards are surfaces that would render better as modules, with the bot keeping only the balance and the payout. Not urgent, and it needs the split wire from "What this does not decide".
+- **code-exec:** once the Piston runner from 0026 ships, this module should shrink to the languages the runner lacks, so it does not answer for a language the runner already handles.
 
 ## What this changes
 

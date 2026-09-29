@@ -8,7 +8,7 @@ If you can make an HTTP request and open a WebSocket, you can write a bot.
 
 See `docs/decisions/0028-bot-accounts.md` for why it is built this way.
 
-Not sure whether your idea is a bot or a module? See `docs/decisions/0034-module-or-bot.md`.
+Not sure whether your idea is a bot or a module? See `docs/decisions/0035-module-or-bot.md`.
 
 ## Getting a token
 
