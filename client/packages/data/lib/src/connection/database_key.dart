@@ -45,6 +45,29 @@ class LocalDatabaseKeyUnavailable implements Exception {
   String toString() => 'LocalDatabaseKeyUnavailable: $cause';
 }
 
+/// The linked SQLite has no cipher, so a key would be silently ignored and the
+/// file written in the clear. Nothing is opened or written when this is thrown.
+class DatabaseEncryptionUnavailable implements Exception {
+  const DatabaseEncryptionUnavailable(this.detail);
+
+  final String detail;
+
+  @override
+  String toString() => 'DatabaseEncryptionUnavailable: $detail';
+}
+
+/// A SQLite failure from a statement that carried the key, stripped of the
+/// statement text `SqliteException.toString` would otherwise print into logs.
+class DatabaseCipherException implements Exception {
+  const DatabaseCipherException(this.resultCode, this.message);
+
+  final int resultCode;
+  final String message;
+
+  @override
+  String toString() => 'DatabaseCipherException($resultCode): $message';
+}
+
 /// A fresh 256-bit key from the operating system's CSPRNG, as hex.
 String generateDatabaseKey([Random? random]) {
   final source = random ?? Random.secure();

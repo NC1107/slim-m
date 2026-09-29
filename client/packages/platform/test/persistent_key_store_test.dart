@@ -134,6 +134,28 @@ void main() {
       // process umask is typically group-readable, the exposure this closes.
       expect(file.statSync().modeString(), 'rw-------');
     }, testOn: 'linux');
+
+    test('the directory is owner-only and no temp file is left behind',
+        () async {
+      final store = FileKeyStore(directory: dir);
+      await store.put('session', 'super-secret');
+      await store.put('session', 'rotated');
+
+      expect(dir.statSync().modeString(), 'rwx------');
+      expect(File('${dir.path}/slimm_secrets.json.tmp').existsSync(), isFalse);
+    }, testOn: 'linux');
+
+    test('a torn file reads as empty and the next write repairs it', () async {
+      final store = FileKeyStore(directory: dir);
+      await store.put('session', 'super-secret');
+      File('${dir.path}/slimm_secrets.json')
+          .writeAsStringSync('{"session": "su');
+
+      expect(await store.read('session'), isNull);
+      await store.put('session', 'fresh');
+
+      expect(await store.read('session'), 'fresh');
+    });
   });
 
   group('SecureKeyStore', () {

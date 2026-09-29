@@ -12,6 +12,7 @@ export 'src/channel_reposition.dart' show ChannelReposition;
 export 'src/connection/connection.dart' show openSlimmDatabase;
 export 'src/connection/database_key.dart'
     show
+        DatabaseEncryptionUnavailable,
         DatabaseKeyStore,
         DatabaseResetReason,
         LocalDatabaseKeyUnavailable,

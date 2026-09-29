@@ -36,12 +36,16 @@ final databaseResetProvider = StateProvider<DatabaseResetReason?>(
 
 /// What the shell shows when the store cannot open, in place of a raw
 /// exception.
-String localStoreErrorMessage(Object error) =>
-    error is LocalDatabaseKeyUnavailable
-    ? "This device's secure storage could not be reached, so the saved copy "
-          'of your messages stays locked. Nothing was deleted. Try again, and '
-          'if it keeps failing, unlock or restart your keychain.'
-    : 'Could not load this screen.';
+String localStoreErrorMessage(Object error) => switch (error) {
+  LocalDatabaseKeyUnavailable() =>
+    "This device's secure storage could not be reached, so the saved copy "
+        'of your messages stays locked. Nothing was deleted. Try again, and '
+        'if it keeps failing, unlock or restart your keychain.',
+  DatabaseEncryptionUnavailable() =>
+    'This build cannot encrypt the saved copy of your messages, so it will '
+        'not store them. Nothing was written or deleted.',
+  _ => 'Could not load this screen.',
+};
 
 /// Says that the local cache was cleared and is downloading again.
 ///

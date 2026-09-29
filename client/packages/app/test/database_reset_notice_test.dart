@@ -60,6 +60,10 @@ void main() {
 
     expect(message, contains('Nothing was deleted'));
     expect(
+      localStoreErrorMessage(const DatabaseEncryptionUnavailable('x')),
+      contains('cannot encrypt'),
+    );
+    expect(
       localStoreErrorMessage(StateError('x')),
       'Could not load this screen.',
     );

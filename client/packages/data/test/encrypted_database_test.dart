@@ -13,9 +13,12 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:slimm_api/api.dart' as api;
+import 'package:sqlite3/sqlite3.dart';
 import 'package:slimm_data/data.dart';
 import 'package:slimm_data/src/connection/native.dart'
     show slimmDatabaseFileName;
+import 'package:slimm_data/src/connection/database_key.dart'
+    show DatabaseCipherException;
 import 'package:slimm_data/src/connection/encrypted_database.dart';
 
 class _FakeKeys implements DatabaseKeyStore {
@@ -224,6 +227,26 @@ void main() {
     await reopened.close();
   });
 
+  test('a truncated encrypted file is set aside, not deleted', () async {
+    final keys = _FakeKeys();
+    final db = await open(keys);
+    final store = MessageStore(db);
+    await store.replaceCategories(
+      List.generate(300, (i) => _category('cat-$i')),
+    );
+    await db.close();
+    final bytes = file.readAsBytesSync();
+    file.writeAsBytesSync(bytes.sublist(0, bytes.length ~/ 2 - 5));
+    final resets = <DatabaseResetReason>[];
+
+    final reopened = await open(keys, onReset: resets.add);
+
+    expect(resets, [DatabaseResetReason.unreadable]);
+    expect(File('${file.path}.corrupt').existsSync(), isTrue);
+    expect(await categoryIds(reopened), isEmpty);
+    await reopened.close();
+  });
+
   test('an unreachable key store fails closed and touches nothing', () async {
     final keys = _FakeKeys();
     final db = await open(keys);
@@ -257,6 +280,89 @@ void main() {
     await expectLater(open(keys), throwsA(isA<LocalDatabaseKeyUnavailable>()));
 
     expect(file.readAsBytesSync(), before);
+  });
+
+  test('a malformed stored key on an encrypted file is treated as lost',
+      () async {
+    final db = await open(_FakeKeys());
+    await MessageStore(db).replaceCategories([_category('a')]);
+    await db.close();
+    final keys = _FakeKeys('not-a-key");drop table channels;--');
+    final resets = <DatabaseResetReason>[];
+
+    final reopened = await open(keys, onReset: resets.add);
+
+    expect(resets, [DatabaseResetReason.keyMissing]);
+    expect(keys.key, matches(RegExp(r'^[0-9a-f]{64}$')));
+    await reopened.close();
+  });
+
+  test('a malformed stored key never encrypts a plaintext file', () async {
+    await seedPlaintext(['a']);
+    final keys = _FakeKeys('zz');
+
+    final db = await open(keys);
+
+    expect(await categoryIds(db), ['a']);
+    await db.close();
+    expect(keys.key, matches(RegExp(r'^[0-9a-f]{64}$')));
+  });
+
+  test('applying a key that is not 64 hex digits is refused', () {
+    final db = sqlite3.openInMemory();
+    addTearDown(db.close);
+
+    expect(() => applyDatabaseKey(db, "x'; --"), throwsArgumentError);
+  });
+
+  test('the cipher is active on a keyed connection', () {
+    final db = sqlite3.open(p.join(dir.path, 'cipher-check.db'));
+    addTearDown(db.close);
+
+    applyDatabaseKey(db, generateDatabaseKey());
+
+    expect(db.select('SELECT sqlite3mc_version() AS v').first['v'], isNotNull);
+  });
+
+  test('an error from a keyed statement does not carry the key', () {
+    final key = generateDatabaseKey();
+    final db = sqlite3.openInMemory();
+    addTearDown(db.close);
+
+    Object? caught;
+    try {
+      sanitizeCipherErrors(() => db.execute("SELECT no_such_function('$key')"));
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught, isA<DatabaseCipherException>());
+    expect(caught.toString(), isNot(contains(key)));
+  });
+
+  test('migration leaves a plaintext-free file and a private staging area',
+      () async {
+    await seedPlaintext(['needle-marker']);
+    final keys = _FakeKeys();
+
+    final db = await open(keys);
+    await db.close();
+
+    final raw = String.fromCharCodes(file.readAsBytesSync());
+    expect(raw.contains('needle-marker'), isFalse);
+    expect(file.statSync().modeString(), 'rw-------');
+  }, testOn: 'linux');
+
+  test('two callers at once mint one key between them', () async {
+    final keys = _FakeKeys();
+
+    final results = await Future.wait([
+      prepareEncryptedDatabase(file: file, keys: keys),
+      prepareEncryptedDatabase(file: file, keys: keys),
+    ]);
+
+    expect(results[0].key, results[1].key);
+    expect(keys.writes, 1);
   });
 
   test('generated keys are 256 bits and do not repeat', () {

@@ -9,6 +9,7 @@ library;
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:sqlite3/sqlite3.dart';
 
 import 'database_key.dart';
@@ -16,22 +17,60 @@ import 'database_key.dart';
 const _plainHeader = 'SQLite format 3\u0000';
 const _sqliteNotADatabase = 26;
 const _sqliteCorrupt = 11;
+final _keyPattern = RegExp(r'^[0-9a-f]{64}$');
 
 /// The file the plaintext copy is encrypted into before it replaces the live
 /// one. A leftover from a crashed run is disposable and deleted on the next.
 String _stagingPath(File live) => '${live.path}.encrypting';
 
-/// Applies [key] to a freshly opened connection. Raw-key form skips the
-/// password KDF, which is pointless for a 256-bit random key and would cost
-/// every open. The SQLCipher profile keeps the file readable by stock tools.
+/// Applies [key] to a freshly opened connection, refusing to go on when the
+/// linked SQLite has no cipher. Raw-key form skips the password KDF, which is
+/// pointless for a 256-bit random key and would cost every open. The SQLCipher
+/// profile keeps the file readable by stock tools.
 void applyDatabaseKey(Database db, String key) {
-  _selectCipher(db);
-  db.execute('''PRAGMA key = "x'$key'"''');
+  if (!_keyPattern.hasMatch(key)) {
+    throw ArgumentError('the database key is not 64 lowercase hex digits');
+  }
+  _sanitized(() {
+    _selectCipher(db);
+    db.execute('''PRAGMA key = "x'$key'"''');
+  });
+  _requireCipher(db);
+  db.execute('PRAGMA temp_store = MEMORY');
 }
 
 void _selectCipher(Database db) {
   db.execute("PRAGMA cipher = 'sqlcipher'");
   db.execute('PRAGMA legacy = 4');
+}
+
+/// Stock SQLite treats `PRAGMA key` and `PRAGMA rekey` as no-ops, so the only
+/// way to know encryption is real is to ask the library for a function only
+/// the cipher build has.
+void _requireCipher(Database db) {
+  try {
+    db.select('SELECT sqlite3mc_version()');
+  } on SqliteException catch (error) {
+    if (!error.message.contains('no such function')) {
+      throw DatabaseCipherException(error.resultCode, error.message);
+    }
+    throw const DatabaseEncryptionUnavailable(
+      'the linked SQLite is not the multiple-ciphers build',
+    );
+  }
+}
+
+/// Runs statements that carry the key and rethrows a failure without the
+/// statement text, which is where the key would otherwise reach a log.
+@visibleForTesting
+T sanitizeCipherErrors<T>(T Function() body) => _sanitized(body);
+
+T _sanitized<T>(T Function() body) {
+  try {
+    return body();
+  } on SqliteException catch (error) {
+    throw DatabaseCipherException(error.resultCode, error.message);
+  }
 }
 
 /// A database file that opens with [key], and why the cache was cleared on the
@@ -40,14 +79,46 @@ typedef PreparedDatabase = ({String key, DatabaseResetReason? reset});
 
 /// Makes [file] safe to open with the stored key.
 ///
-/// Throws [LocalDatabaseKeyUnavailable] when the key store cannot be reached;
-/// the file is not touched in that case.
+/// Throws [LocalDatabaseKeyUnavailable] when the key store cannot be reached,
+/// and [DatabaseEncryptionUnavailable] when the linked SQLite cannot encrypt;
+/// the file is not touched in either case. An advisory lock keeps two app
+/// instances from each minting a key for the same file.
 Future<PreparedDatabase> prepareEncryptedDatabase({
   required File file,
   required DatabaseKeyStore keys,
-}) async {
+}) {
+  final run = _inProcess.then((_) => _prepareLocked(file, keys));
+  _inProcess = run.then((_) {}, onError: (_) {});
+  return run;
+}
+
+/// The file lock is per process on POSIX, so callers in this process queue
+/// here and the lock only has to arbitrate between processes.
+Future<void> _inProcess = Future<void>.value();
+
+Future<PreparedDatabase> _prepareLocked(
+  File file,
+  DatabaseKeyStore keys,
+) async {
+  await file.parent.create(recursive: true);
+  final lock = await File('${file.path}.lock').open(mode: FileMode.write);
+  try {
+    await lock.lock(FileLock.blockingExclusive);
+    return await _prepare(file, keys);
+  } finally {
+    await lock.close();
+  }
+}
+
+Future<PreparedDatabase> _prepare(File file, DatabaseKeyStore keys) async {
+  final memory = sqlite3.openInMemory();
+  try {
+    _requireCipher(memory);
+  } finally {
+    memory.close();
+  }
   _removeStaging(file);
-  final stored = await _readKey(keys);
+  final stored = _wellFormed(await _readKey(keys));
   switch (_stateOf(file)) {
     case _FileState.missing:
       _removeSidecars(file);
@@ -61,11 +132,21 @@ Future<PreparedDatabase> prepareEncryptedDatabase({
         const reset = DatabaseResetReason.keyMissing;
         return (key: await _mintKey(keys), reset: reset);
       }
-      if (_opensWith(file, stored)) return (key: stored, reset: null);
-      _deleteDatabase(file);
+      switch (_probe(file, stored)) {
+        case _Probe.opens:
+          return (key: stored, reset: null);
+        case _Probe.wrongKey:
+          _deleteDatabase(file);
+        case _Probe.damaged:
+          _quarantine(file);
+      }
       return (key: stored, reset: DatabaseResetReason.unreadable);
   }
 }
+
+/// A stored value that is not a well-formed key is as good as no key.
+String? _wellFormed(String? key) =>
+    key != null && _keyPattern.hasMatch(key) ? key : null;
 
 Future<String?> _readKey(DatabaseKeyStore keys) async {
   try {
@@ -116,7 +197,7 @@ DatabaseResetReason? _migratePlaintext(File file, String key) {
     _copyEncrypted(file, staging, key);
   } on SqliteException catch (error) {
     _removeStaging(file);
-    if (!_isUnreadable(error)) rethrow;
+    if (!_isUnreadable(error.resultCode)) rethrow;
     _deleteDatabase(file);
     return DatabaseResetReason.unreadable;
   } catch (_) {
@@ -129,20 +210,33 @@ DatabaseResetReason? _migratePlaintext(File file, String key) {
 }
 
 void _copyEncrypted(File source, File staging, String key) {
-  final rowCount = _snapshotInto(source, staging);
+  final expected = _snapshotInto(source, staging);
   final copy = sqlite3.open(staging.path);
   try {
-    _selectCipher(copy);
-    // Encrypts the copy in place; it is disposable, so nothing is at risk.
-    copy.execute('''PRAGMA rekey = "x'$key'"''');
+    _requireCipher(copy);
+    _sanitized(() {
+      _selectCipher(copy);
+      // Encrypts the copy in place; it is disposable, so nothing is at risk.
+      copy.execute('''PRAGMA rekey = "x'$key'"''');
+    });
   } finally {
     copy.close();
+  }
+  if (_startsWithPlainHeader(staging)) {
+    throw const DatabaseEncryptionUnavailable(
+      'the copy is still plaintext after the rekey',
+    );
   }
   final check = sqlite3.open(staging.path);
   try {
     applyDatabaseKey(check, key);
-    final seen = check.select('SELECT count(*) AS n FROM sqlite_master');
-    if (seen.first['n'] != rowCount) {
+    final integrity = _sanitized(
+      () => check.select('PRAGMA integrity_check').first.values.first,
+    );
+    if (integrity != 'ok') {
+      throw StateError('the encrypted copy failed its integrity check');
+    }
+    if (!_sameCounts(expected, _sanitized(() => _tableCounts(check)))) {
       throw StateError('the encrypted copy does not match the original');
     }
   } finally {
@@ -151,37 +245,82 @@ void _copyEncrypted(File source, File staging, String key) {
 }
 
 /// A consistent single-file snapshot of [source], WAL content included, and
-/// the number of schema objects in it.
-int _snapshotInto(File source, File target) {
+/// the row count of every table in it. The staging file is made private
+/// before the plaintext snapshot is written into it.
+Map<String, int> _snapshotInto(File source, File target) {
+  target.createSync();
+  _restrictToOwner(target);
   final db = sqlite3.open(source.path);
   try {
     db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
     db.execute("VACUUM INTO '${target.path.replaceAll("'", "''")}'");
-    return db.select('SELECT count(*) AS n FROM sqlite_master').first['n']
-        as int;
+    return _tableCounts(db);
   } finally {
     db.close();
   }
 }
 
-bool _opensWith(File file, String key) {
-  Database? db;
-  try {
-    db = sqlite3.open(file.path);
-    applyDatabaseKey(db, key);
-    db.select('SELECT count(*) FROM sqlite_master');
-    return true;
-  } on SqliteException catch (error) {
-    if (_isUnreadable(error)) return false;
-    rethrow;
-  } finally {
-    db?.close();
+Map<String, int> _tableCounts(Database db) {
+  final names = db.select(
+    "SELECT name FROM sqlite_master WHERE type = 'table' "
+    "AND name NOT LIKE 'sqlite_%'",
+  );
+  return {
+    for (final row in names)
+      row['name'] as String: db
+          .select(
+              'SELECT count(*) AS n FROM "${_quoted(row['name'] as String)}"')
+          .first['n'] as int,
+  };
+}
+
+String _quoted(String name) => name.replaceAll('"', '""');
+
+bool _sameCounts(Map<String, int> a, Map<String, int> b) =>
+    a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
+
+void _restrictToOwner(File file) {
+  if (Platform.isWindows) return;
+  final result = Process.runSync('chmod', ['600', file.path]);
+  if (result.exitCode != 0) {
+    throw FileSystemException('chmod 600 failed: ${result.stderr}', file.path);
   }
 }
 
-bool _isUnreadable(SqliteException error) =>
-    error.resultCode == _sqliteNotADatabase ||
-    error.resultCode == _sqliteCorrupt;
+bool _startsWithPlainHeader(File file) =>
+    _stateOf(file) == _FileState.plaintext;
+
+enum _Probe { opens, wrongKey, damaged }
+
+/// Tells a wrong key (the file does not decrypt at all) from a file that
+/// decrypts but is damaged, because the second is worth keeping.
+_Probe _probe(File file, String key) {
+  final db = sqlite3.open(file.path);
+  try {
+    applyDatabaseKey(db, key);
+    _sanitized(() => db.select('SELECT count(*) FROM sqlite_master'));
+    return _Probe.opens;
+  } on DatabaseCipherException catch (error) {
+    if (error.resultCode == _sqliteNotADatabase) return _Probe.wrongKey;
+    if (error.resultCode == _sqliteCorrupt) return _Probe.damaged;
+    rethrow;
+  } finally {
+    db.close();
+  }
+}
+
+bool _isUnreadable(int resultCode) =>
+    resultCode == _sqliteNotADatabase || resultCode == _sqliteCorrupt;
+
+/// Moves an unreadable-but-encrypted file aside instead of deleting it, so a
+/// corruption that turns out to be fixable is not made permanent. One copy is
+/// kept; it is still encrypted, so it leaks nothing.
+void _quarantine(File file) {
+  _removeSidecars(file);
+  final aside = File('${file.path}.corrupt');
+  if (aside.existsSync()) aside.deleteSync();
+  file.renameSync(aside.path);
+}
 
 void _deleteDatabase(File file) {
   _removeSidecars(file);
