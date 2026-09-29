@@ -44,6 +44,7 @@ import 'src/providers/sync_controller.dart';
 import 'src/providers/voice_controller.dart';
 import 'src/push/android_push_messages.dart';
 import 'src/routing/router.dart';
+import 'src/web_update/web_update_pill.dart';
 import 'src/widgets/app_lock_gate.dart';
 import 'src/widgets/client_too_old_gate.dart';
 import 'src/widgets/incoming_call_overlay.dart';
@@ -323,6 +324,7 @@ Widget appChromeBuilder(BuildContext context, Widget? child) => Consumer(
             // Outside everything routed: a client the server refuses has nothing useful behind this. Fail-open.
             ClientTooOldGate(child: densityWrapped),
             const Positioned.fill(child: ToastOverlay()),
+            const Positioned.fill(child: WebUpdatePill()),
             const Positioned.fill(child: IncomingCallOverlay()),
             // Last, so a locked screen covers a toast or a ring too, not just the routed app underneath.
             const Positioned.fill(child: AppLockGate()),

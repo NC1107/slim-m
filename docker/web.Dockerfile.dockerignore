@@ -1,0 +1,17 @@
+# The web image needs client/ and nothing else; the root .dockerignore is the server's and excludes client/.
+/target
+/crates
+/data
+/perf
+/docs
+.git
+.github
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+**/.dart_tool
+**/build
+**/.gradle
+**/Pods

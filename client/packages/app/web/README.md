@@ -3,7 +3,7 @@
 
 The web build exists to drive this UI automatically.
 Native Linux runs, but no synthetic input reaches it on a Wayland desktop, and a browser can be driven over the DevTools protocol.
-It is a test surface, not a distribution target.
+It is also what `docker/web.Dockerfile` ships as the `slim-m-web` image.
 The browser database is not encrypted at rest, and `sqlite3.wasm` below is the plain build, not `sqlite3mc.wasm`.
 See `docs/decisions/0042-encrypt-local-database.md` for why.
 
