@@ -78,6 +78,14 @@ final _analyticsFixture = api.SpaceAnalytics(
   ),
 );
 
+/// The shared fixture's fixed `connectedAt` reads as weeks in the rail's timer, so the rail cases start relative to now.
+VoiceState _callFor({int hours = 0, int minutes = 0, int seconds = 0}) =>
+    connectedCallState.copyWith(
+      connectedAt: DateTime.now().subtract(
+        Duration(hours: hours, minutes: minutes, seconds: seconds),
+      ),
+    );
+
 /// Shell states reachable only by overriding a provider the plain [snapshotSurfaces]
 /// table has no way to reach: a collapsed rail, a day divider forced to show,
 /// the transcript's connecting/genuinely-empty states (which the default
@@ -117,7 +125,10 @@ final _shellStateSurfaces =
         viewports: const ['desktop-narrow', 'desktop'],
         overrides: () => [
           voiceControllerProvider.overrideWith(
-            (ref) => SnapshotVoiceController(ref, connectedCallState),
+            (ref) => SnapshotVoiceController(
+              ref,
+              _callFor(minutes: 12, seconds: 34),
+            ),
           ),
         ],
       ),
@@ -127,7 +138,10 @@ final _shellStateSurfaces =
         overrides: () => [
           channelRailExpandedProvider.overrideWith((ref) => false),
           voiceControllerProvider.overrideWith(
-            (ref) => SnapshotVoiceController(ref, connectedCallState),
+            (ref) => SnapshotVoiceController(
+              ref,
+              _callFor(minutes: 12, seconds: 34),
+            ),
           ),
         ],
       ),
@@ -136,7 +150,10 @@ final _shellStateSurfaces =
         viewports: const ['phone-portrait'],
         overrides: () => [
           voiceControllerProvider.overrideWith(
-            (ref) => SnapshotVoiceController(ref, connectedCallState),
+            (ref) => SnapshotVoiceController(
+              ref,
+              _callFor(hours: 1, minutes: 2, seconds: 5),
+            ),
           ),
         ],
       ),
