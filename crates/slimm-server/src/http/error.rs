@@ -39,6 +39,8 @@ pub(crate) enum ApiError {
     /// A write refused because it would grant permission bits the caller does
     /// not hold. Carries those bits so the client can name them.
     MissingPermissions(Permissions),
+    /// A refusal for a reason worth telling the caller, where "insufficient permissions" would mislead.
+    ForbiddenBecause(&'static str),
     NotFound(&'static str),
     Conflict(&'static str),
     TooManyRequests,
@@ -109,6 +111,7 @@ impl IntoResponse for ApiError {
                 StatusCode::FORBIDDEN,
                 "cannot grant a permission you do not hold".into(),
             ),
+            ApiError::ForbiddenBecause(message) => (StatusCode::FORBIDDEN, message.into()),
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message.into()),
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message.into()),
             ApiError::TooManyRequests => {
