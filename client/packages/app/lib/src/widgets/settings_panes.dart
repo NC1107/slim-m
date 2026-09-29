@@ -246,6 +246,27 @@ class _PaneBody extends StatelessWidget {
                 Builder(builder: pane.builder),
               ],
             )
+          : showHeading
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  child: _PaneHeading(pane.label),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      pane.padding.left,
+                      0,
+                      pane.padding.right,
+                      pane.padding.bottom,
+                    ),
+                    child: Builder(builder: pane.builder),
+                  ),
+                ),
+              ],
+            )
           : Padding(
               padding: pane.padding,
               child: Builder(builder: pane.builder),

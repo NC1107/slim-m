@@ -47,7 +47,7 @@ void main() {
   ) async {
     await pumpSpaceSettings(tester, Perm.manageMessages);
 
-    expect(find.text('Reports'), findsOneWidget);
+    expect(find.widgetWithText(AppListRow, 'Reports'), findsOneWidget);
     expect(find.text('Invites'), findsNothing);
     expect(find.text('Roles'), findsNothing);
     expect(find.text('Channel permissions'), findsNothing);
@@ -122,7 +122,7 @@ void main() {
   testWidgets('an administrator sees every row', (tester) async {
     await pumpSpaceSettings(tester, allPermissionBits);
 
-    expect(find.text('Reports'), findsOneWidget);
+    expect(find.widgetWithText(AppListRow, 'Reports'), findsOneWidget);
     expect(find.text('Invites'), findsOneWidget);
     expect(find.text('Roles'), findsOneWidget);
     expect(find.text('Channel permissions'), findsOneWidget);

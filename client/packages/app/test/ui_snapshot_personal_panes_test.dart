@@ -2,13 +2,19 @@
 /// Every personal settings pane, opened by tapping its nav row the way a
 /// person does, at the phone and desktop widths in both themes.
 ///
+/// The voice controller is pinned to an idle fake: the real one reaches livekit's
+/// device enumeration, which throws on the missing webrtc plugin in whichever
+/// test happens to mount the voice pane first in a process.
+///
 /// `/settings` alone only ever renders the first pane, which is how the other
 /// eight went unlooked-at by the snapshot matrix.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slimm_app/src/providers/voice_controller.dart';
 
 import 'ui_snapshot_support.dart';
+import 'voice_snapshot_fixtures.dart' show SnapshotVoiceController;
 
 const _panes = <String, String>{
   'profile': 'Profile',
@@ -37,6 +43,11 @@ void main() {
             viewport,
             theme,
             'settings-pane-${pane.key}-$viewport-$theme',
+            overrides: [
+              voiceControllerProvider.overrideWith(
+                (ref) => SnapshotVoiceController(ref, const VoiceState()),
+              ),
+            ],
             afterSettle: (tester) async {
               await tester.tap(find.text(pane.value).first);
               await tester.pump();
