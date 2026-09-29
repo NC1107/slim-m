@@ -94,6 +94,7 @@ class MemberRow extends ConsumerWidget {
     required this.profile,
     required this.isSelf,
     this.channelId,
+    this.sectionRoleId,
     super.key,
   });
 
@@ -101,6 +102,9 @@ class MemberRow extends ConsumerWidget {
   final String? channelId;
 
   final api.UserProfile profile;
+
+  /// The role section this row sits under; its badge would only repeat the heading.
+  final String? sectionRoleId;
 
   /// Nothing opens a DM with yourself: `POST /dms/{userId}` has no concept
   /// of one, and a self-conversation would just be a second copy of the
@@ -123,7 +127,9 @@ class MemberRow extends ConsumerWidget {
     // One slot only in a 236px pane; bot beats a role, whose names are a tap away.
     final badge = displayed.isBot
         ? 'Bot'
-        : displayed.roles.isEmpty
+        : displayed.roles.isEmpty ||
+              (sectionRoleId != null &&
+                  displayed.roleIds.firstOrNull == sectionRoleId)
         ? null
         : displayed.roles.first;
 
