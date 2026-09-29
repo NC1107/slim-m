@@ -12,9 +12,9 @@ Each section below is named for its workflow file.
 | --- | --- | --- |
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
 | `client-ci` | changes under `client/`, or to `schema/openapi.yaml`; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
-| `client-macos-ci` | changes under `client/packages/app/macos/`, `rtc/`, `platform/`, the pubspec files on pull requests; every push to `main` that touches `client/` | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
-| `client-windows-ci` | changes under `client/` | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
-| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files; every push to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
+| `client-macos-ci` | a nightly schedule, and by hand | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
+| `client-windows-ci` | pushes to `main` that touch `client/`, a nightly schedule, and by hand; not pull requests | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
+| `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files, on pull requests and pushes to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
 | `hygiene` | every push and pull request | iOS purpose strings, the iOS broadcast extension is wired up, orientation is locked on phones only, no emoji in UI source, SPDX headers on Rust source, the file-size budget, the comment cap, and the `scripts/lib` unit tests, which include the two structural gates on `required_checks` |
@@ -124,7 +124,7 @@ Both checks are in `verify-client-ci`'s `required_checks`, since each can fail w
 
 It lives in `client-ios-ci.yml` rather than beside the Dart job because it is the expensive one by an order of magnitude: 14 minutes against 5, measured across recent runs, which made `client-ci` a median of 11 minutes when the Dart half finishes in a third of that.
 A GitHub workflow cannot path-filter one job, so the split is what lets it be gated on the paths that can actually change its answer: the iOS project, the plugins carrying CallKit and WebRTC, and the dependency set, which is how a Dart-side change reaches an Xcode build.
-Every push to `main` runs it whatever changed, so `main` is never trusted on a path filter alone.
+A push to `main` uses the same filter, since it gates nothing except a release, and the release commit always matches it: release-please bumps `client/packages/app/pubspec.yaml`, which is in the filter.
 CocoaPods is cached on the lockfiles, since rebuilding those pods is most of what the project-generation step spends its five minutes on.
 
 `flutter build ios --simulator --no-codesign` runs first because xcodebuild needs the generated Flutter config and the plugin registrant to exist before the project will open, and only a Flutter build makes them.
@@ -531,7 +531,7 @@ Do not re-add that exclusion to save a run on a version bump; it silently breaks
 Those names are matched by exact string against check-run names, and nothing in the workflow graph connects the string to the jobs it names.
 `scripts/lib/test_release_required_checks_exist.py` is what closes that: it fails a pull request when a `required_checks` entry names no job, so a rename is caught there rather than at release time on `main`. Its sibling `test_release_required_checks_schema_gate.py` checks the other half - that the entry named can structurally reach a release commit at all.
 The two Linux jobs joined the list on 2026-08-11: a release ships a Linux tarball, rpm and flatpak from every `client-v*` tag, and until then a client release could cut with the Linux desktop build red - the exact class both jobs' own doc comments describe main going red on, only at release time with nothing failing loudly.
-Neither is path-filtered on `main` (both run on every push there), so the same guarantee the iOS checks rely on - `main` is never trusted on a filter alone - already holds for them.
+Neither is path-filtered on `main` (both run on every push there), so the release commit always carries them; the iOS checks get the same guarantee from the pubspec bump matching their filter.
 Those are exact check-run names (a job's `name:`, or its id when a job sets none), matched literally; renaming one of those jobs without updating the matching `required_checks` string silently reopens the gap this closes, since the renamed check is simply absent and the gate times out and fails rather than warns.
 
 ~~`schema-ci` is not required: `tests/openapi_contract.rs` already runs inside `server-ci`'s `cargo test --all`, and `schema-ci`'s own job is a redocly lint of the document's syntax, not part of what either release actually ships.~~
@@ -738,6 +738,9 @@ The pubspec version is a local-build default and has sat at 0.1.0 across every r
 ## client-macos-ci and client-windows-ci
 
 Both are compile-only, both are deliberately not required checks, and both exist to catch a native break early rather than to prove the app works.
+Because they gate nothing, neither runs per pull request: `client-macos-ci` is nightly and manual, and `client-windows-ci` runs on pushes to `main` plus nightly.
+The macOS runner pool is five jobs, so this keeps slots free for the release's `ios-testflight` job; a native break now shows up within a day rather than on the PR.
+`client-ios-ci` is the one that gates a release, so it stays, but its push trigger uses the same native-path filter as its pull request trigger; the release commit still matches it through the pubspec bump, which is what `verify-release-checks` waits for.
 
 `client-macos-ci` builds `client/packages/app/macos/`, which is still a fresh `flutter create` scaffold with no signing identity, no notarization credential and no Apple Developer team behind it.
 It builds `--debug` on this project's SPM-only plugin tree with no CocoaPods step, exactly as `client-ios-ci` does, which produces a local "Sign to Run Locally" binary needing no Apple account.
