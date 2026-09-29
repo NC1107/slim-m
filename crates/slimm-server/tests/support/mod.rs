@@ -16,6 +16,10 @@ use slimm_server::store::Store;
 /// `tests/openapi_429_coverage.rs`.
 pub mod openapi;
 
+/// A one-member deployment plus helpers to install and run a wasm module.
+#[allow(dead_code)]
+pub mod module_world;
+
 /// Wasm fixtures for `crate::module_runtime`, shared by every test that
 /// installs a module and actually invokes it.
 #[allow(dead_code)]

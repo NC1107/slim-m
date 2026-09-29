@@ -41,6 +41,7 @@ use super::AppState;
 use super::dock::validate_module_id;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, AuthedLimited, Json, MODULE};
+use super::module_host;
 use crate::ids::UserId;
 use crate::module_runtime::{ModuleHost, RunError, RunLimits};
 use crate::permissions::Permissions;
@@ -209,7 +210,16 @@ pub(crate) async fn execute_command(
     })
     .map_err(|_| ApiError::Internal)?;
 
-    let outcome = match ModuleHost::run(wasm, module.artifact_sha256, limits, request_json).await {
+    let surface = module_host::surface_for(state, &module, user_id);
+    let ran = ModuleHost::run_with_capabilities(
+        wasm,
+        module.artifact_sha256,
+        limits,
+        request_json,
+        surface,
+    )
+    .await;
+    let outcome = match ran {
         Ok(bytes) => match serde_json::from_slice::<ModuleWireResponse>(&bytes) {
             Ok(wire) if wire.ok && wire.output.is_some() => CommandOutcome {
                 ok: true,

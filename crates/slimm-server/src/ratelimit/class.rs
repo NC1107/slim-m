@@ -267,6 +267,15 @@ pub enum Class {
     /// costs nothing this budget needs to protect against. See
     /// `docs/decisions/0032-voice-participant-webhooks.md`.
     LiveKitWebhook,
+    /// A module's `message.post` host call (decision 0023), charged in
+    /// addition to the [`Class::Module`] run that made it.
+    ///
+    /// Keyed per (module, invoking user): five posts in a burst, then one every
+    /// six seconds. The same class is charged against the module as a whole at a
+    /// quarter of a token per post, so many users together still cannot push one
+    /// module past twenty in a burst. A module is admin-approved code, but a
+    /// buggy loop in one should cost a channel a few messages, not a flood.
+    ModulePost,
 }
 
 impl Class {
@@ -302,6 +311,8 @@ impl Class {
             Class::Webhook => (30.0, 1.0 / 3.0),
             // See this variant's own doc comment for how these were sized.
             Class::LiveKitWebhook => (120.0, 20.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::ModulePost => (5.0, 1.0 / 6.0),
         }
     }
 
@@ -310,7 +321,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 20] = [
+    pub const ALL: [Class; 21] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -331,6 +342,7 @@ impl Class {
         Class::CodeRunner,
         Class::Webhook,
         Class::LiveKitWebhook,
+        Class::ModulePost,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -357,6 +369,7 @@ impl Class {
             Class::CodeRunner => "code_runner",
             Class::Webhook => "webhook",
             Class::LiveKitWebhook => "livekit_webhook",
+            Class::ModulePost => "module_post",
         }
     }
 }

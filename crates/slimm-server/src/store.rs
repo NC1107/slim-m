@@ -59,6 +59,7 @@ mod messages_bulk_window;
 mod moderation_audit;
 mod moderation_history;
 mod module_artifacts;
+mod module_kv;
 mod module_permissions;
 mod modules;
 mod notification_schedule;
@@ -137,6 +138,7 @@ pub use message_search::{MessageSearchFilters, SearchError};
 pub use messages::{Edited, MessageDeletion, NewMessage, SendError, Sent};
 pub use messages_bulk::{BulkDeleteError, BulkDeletion, DeletedMessage};
 pub use moderation_history::{AuditLogEntry, HistoryCursor, ModerationHistoryItem};
+pub use module_kv::KvSetError;
 pub use module_permissions::{
     GrantModulePermissionError, GrantedModulePermission, ModulePermission,
 };

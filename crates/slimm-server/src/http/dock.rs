@@ -31,6 +31,7 @@ use super::AppState;
 use super::error::ApiError;
 use super::extract::require_manage_server;
 use super::extract::{Authed, Json, enforce};
+use super::module_host;
 use crate::config::Config;
 use crate::media::to_hex;
 use crate::ratelimit::Class;
@@ -236,6 +237,13 @@ struct InstallRequest {
     /// against the freshly re-fetched manifest's own `version` so a race
     /// with an upstream release cannot install something nobody reviewed.
     version: String,
+    /// The host capabilities the admin approved after seeing them listed
+    /// (decision 0023). Each must be one the manifest declared and the host
+    /// implements. Omitted keeps what was approved before, minus anything the
+    /// new manifest no longer declares, and never adds one; an empty list
+    /// withdraws every approval.
+    #[serde(default)]
+    approved_host_capabilities: Option<Vec<String>>,
 }
 
 async fn install(
@@ -255,6 +263,10 @@ async fn install(
             "the module's current version no longer matches the one requested; reopen it in the Dock",
         ));
     }
+    let approved_host = match &req.approved_host_capabilities {
+        Some(requested) => approvable_host_capabilities(&manifest, requested)?,
+        None => carried_host_capabilities(&state, &manifest).await?,
+    };
     let artifact = fetch_artifact(dock, &manifest).await?;
 
     let permissions: Vec<ModulePermissionSpec> = manifest
@@ -299,7 +311,54 @@ async fn install(
             &artifact,
         )
         .await?;
+    state
+        .store
+        .set_module_host_capabilities(&installed.id, &approved_host)
+        .await?;
+    let installed = state
+        .store
+        .installed_module(&installed.id)
+        .await?
+        .ok_or(ApiError::NotFound("module not installed"))?;
     Ok(Json(InstalledModuleDto::from(installed)))
+}
+
+/// What an install that named no approvals keeps: the module's current host
+/// capabilities that the new manifest still declares. Nothing is added.
+async fn carried_host_capabilities(
+    state: &AppState,
+    manifest: &Manifest,
+) -> Result<Vec<String>, ApiError> {
+    let Some(current) = state.store.installed_module(&manifest.id).await? else {
+        return Ok(Vec::new());
+    };
+    Ok(current
+        .approved_host_capabilities
+        .into_iter()
+        .filter(|c| manifest.capabilities.contains(c))
+        .collect())
+}
+
+/// `requested`, deduplicated, if every entry is a capability the manifest
+/// declared and this host implements; anything else refuses the install rather
+/// than quietly approving less than the admin asked for.
+fn approvable_host_capabilities(
+    manifest: &Manifest,
+    requested: &[String],
+) -> Result<Vec<String>, ApiError> {
+    let mut approved: Vec<String> = Vec::new();
+    for capability in requested {
+        let implemented = module_host::HOST_CAPABILITIES.contains(&capability.as_str());
+        if !implemented || !manifest.capabilities.contains(capability) {
+            return Err(ApiError::BadRequest(
+                "cannot approve a capability the module does not declare or the host does not implement",
+            ));
+        }
+        if !approved.contains(capability) {
+            approved.push(capability.clone());
+        }
+    }
+    Ok(approved)
 }
 
 /// Fetches the module's own artifact bytes at `manifest.artifact.path`,

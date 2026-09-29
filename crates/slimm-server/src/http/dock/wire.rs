@@ -150,6 +150,9 @@ pub(super) struct InstalledModuleDto {
     version: String,
     artifact_sha256: String,
     approved_capabilities: Vec<String>,
+    /// The host capabilities an admin approved the module to use at install;
+    /// empty for a module installed before that approval existed.
+    approved_host_capabilities: Vec<String>,
     extension_points: Vec<ExtensionPointDto>,
     enabled: bool,
     installed_at: i64,
@@ -163,6 +166,7 @@ impl From<InstalledModule> for InstalledModuleDto {
             version: m.version,
             artifact_sha256: m.artifact_sha256,
             approved_capabilities: m.approved_capabilities,
+            approved_host_capabilities: m.approved_host_capabilities,
             extension_points: m
                 .extension_points
                 .into_iter()

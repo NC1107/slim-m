@@ -171,6 +171,9 @@ void main() {
   testWidgets('opening a module and installing it shows the install as done', (
     tester,
   ) async {
+    // The host-access card sits above the button and needs the height.
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     var installed = false;
     String? installedPath;
     final client = MockClient((request) async {
