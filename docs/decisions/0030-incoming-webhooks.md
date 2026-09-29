@@ -373,3 +373,10 @@ It carries no moderation-audit action of its own, matching bot lifecycle: 0077 a
 
 **Admin routes live in `http/webhooks_admin.rs`, not `http/webhooks.rs`.**
 Delivery and administration are different threat surfaces with almost no shared code - delivery has no `Authed`, no permission check, and a permissive body; admin is an ordinary `MANAGE_SERVER`-gated CRUD surface - and combining them into one file would have pushed it well past the file-budget review threshold for no shared benefit. `store/webhooks.rs` stayed one file: the store methods are small and the module doc already explains the whole shape in one place.
+
+## Addendum, 2026-09-29: rotation
+
+Rotation shipped after the admin surface: `POST /webhooks/{id}/rotate` replaces `token_hash` in place and answers a `NewWebhook`, so the new path is shown once exactly as at mint.
+The row and its principal are kept, and the old token stops resolving in the same transaction.
+`webhook_rotate` joins the audit log as migration 0082, the same CHECK rebuild as 0078, with the acting admin as `actor_id` and the webhook principal as `subject_id`.
+The list shows how long ago a webhook last delivered, not only whether it has.

@@ -11,7 +11,10 @@ Space settings -> Addons -> Webhooks, as somebody holding MANAGE_SERVER.
 Pick a channel and give it a label - "sonarr", "uptime-kuma", whatever tells you what is posting - and you get a URL.
 
 **The URL is shown once.** The server keeps only a hash of its token, so it cannot be shown again.
-If you lose it, revoke the webhook and mint another.
+If you lose it, or it leaks, use Rotate on that webhook: you get a new URL, and the old one stops working at once.
+Rotating keeps the webhook and what it already posted, so the history stays attributed to it.
+Revoke it instead if the tool should stop posting for good.
+Mint, rotate and revoke all appear in the moderation audit log.
 
 The URL shape is:
 

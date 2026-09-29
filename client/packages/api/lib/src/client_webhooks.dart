@@ -52,8 +52,8 @@ class NewWebhook {
   final String deliveryPath;
 }
 
-/// Webhooks: minting, listing, renaming and revoking, the `webhooks` tag.
-/// All four need MANAGE_SERVER. See
+/// Webhooks: minting, listing, renaming, rotating and revoking, the
+/// `webhooks` tag. All five need MANAGE_SERVER. See
 /// `docs/decisions/0030-incoming-webhooks.md`.
 extension SlimmApiWebhooks on SlimmApi {
   /// Webhooks in the deployment, newest first. Carries no credential.
@@ -83,6 +83,13 @@ extension SlimmApiWebhooks on SlimmApi {
       body: {'label': label},
     );
     return Webhook.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Replaces a webhook's token, keeping the webhook and its principal. The
+  /// old delivery path 404s at once; the new one is in the result, once.
+  Future<NewWebhook> rotateWebhook(String webhookId) async {
+    final json = await _send('POST', '/webhooks/$webhookId/rotate');
+    return NewWebhook.fromJson(json as Map<String, dynamic>);
   }
 
   /// Revokes a webhook. Its delivery path 404s on its very next attempt.

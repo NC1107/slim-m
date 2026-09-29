@@ -313,6 +313,45 @@ impl Store {
         Ok(username)
     }
 
+    /// Replaces a webhook's token in place and returns the new one, the only
+    /// time it is legible. The row, and so the principal, is kept, so what
+    /// the webhook already posted stays attributed to it; the old token stops
+    /// resolving in the same transaction. `None` if no such webhook exists.
+    pub async fn rotate_webhook(
+        &self,
+        webhook_id: WebhookId,
+        rotated_by: UserId,
+    ) -> anyhow::Result<Option<(Webhook, String)>> {
+        let token = generate_secret();
+        let token_hash = hash_secret(&token);
+        let mut tx = self.pool.begin().await?;
+        let user_id = sqlx::query_scalar!(
+            r#"UPDATE webhooks SET token_hash = ? WHERE id = ?
+               RETURNING user_id AS "user_id!: UserId""#,
+            token_hash,
+            webhook_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(user_id) = user_id else {
+            return Ok(None);
+        };
+        record_moderation_audit(
+            &mut tx,
+            ModerationAudit {
+                actor_id: rotated_by,
+                subject_id: user_id,
+                action: "webhook_rotate",
+                reason: None,
+                until: None,
+                created_at: now_ms(),
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(self.webhook_by_id(webhook_id).await?.map(|w| (w, token)))
+    }
+
     /// Revokes a webhook by deleting its row outright. There is no session
     /// and no socket to also close, so the row going away is the whole of
     /// it - simpler than [`Store::revoke_bot`], and immediate the same way.
