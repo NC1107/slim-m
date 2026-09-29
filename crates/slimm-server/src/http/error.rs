@@ -35,6 +35,8 @@ pub(crate) enum ApiError {
     BadRequestDetail(String),
     Unauthorized,
     Forbidden,
+    /// A refusal for a reason worth telling the caller, where "insufficient permissions" would mislead.
+    ForbiddenBecause(&'static str),
     NotFound(&'static str),
     Conflict(&'static str),
     TooManyRequests,
@@ -94,6 +96,7 @@ impl IntoResponse for ApiError {
             ApiError::BadRequestDetail(message) => (StatusCode::BAD_REQUEST, message.into()),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "invalid credentials".into()),
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "insufficient permissions".into()),
+            ApiError::ForbiddenBecause(message) => (StatusCode::FORBIDDEN, message.into()),
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message.into()),
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message.into()),
             ApiError::TooManyRequests => {
