@@ -64,6 +64,8 @@ The host validates every field; the module is never trusted to have sent a well-
 
 A `host_call` runs inside a known context the host establishes before it ever calls `run`: **which module, which space, which invoking user, which channel.**
 The module cannot set or spoof any of these - they come from the request that reached slim, not from the wasm.
+This context is the host's own, used to gate a `host_call`, and the module never receives it.
+The plain `run` path hands a module only `command`, `input` and an opaque `caller.id` ([0038](0038-module-caller-id.md)).
 So a capability that acts on the user's behalf (posting a message) posts as that user in that channel, and a capability's permission check is evaluated against that user, in that channel, exactly as any other action is.
 
 ## Capability gating

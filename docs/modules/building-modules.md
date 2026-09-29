@@ -53,7 +53,7 @@ pub extern "C" fn run(in_ptr: i32, in_len: i32) -> i64 {
     let request = unsafe {
         std::slice::from_raw_parts(in_ptr as *const u8, in_len as usize)
     };
-    // The request is {"command": "...", "input": "..."} as UTF-8 JSON.
+    // The request is {"command", "input", "caller": {"id"}} as UTF-8 JSON.
     // Echo a success response of the same shape the host expects.
     let response = br#"{"ok":true,"output":"hello from a module"}"#;
     let ptr = response.as_ptr() as i64;
@@ -112,11 +112,33 @@ Every extension point that runs is, underneath, a call to one of the module's co
 The **request** the host writes is a JSON object:
 
 ```json
-{ "command": "roll", "input": "2d20+3" }
+{ "command": "roll", "input": "2d20+3", "caller": { "id": "9f2c...e1" } }
 ```
 
 - `command` is the name of a `command` extension point the module declared.
 - `input` is a string whose meaning is entirely the module's own - a code snippet, a dice notation, a JSON blob, whatever the command wants.
+- `caller.id` is an opaque, stable id for whoever ran the command, and it is the only thing the module is told about them.
+
+### Who is calling
+
+A module is told who is asking by `caller.id` and nothing else.
+There is no display name, no user id, no channel, no space, no roles and no permissions in the request.
+The id is a lowercase hex string derived from the module and the user.
+It is the same for one person across runs of the same module, differs between people, and differs between modules for the same person.
+It is not a user id and cannot be turned back into one.
+
+Use it to dedupe against yourself, for example "one vote per person" in a poll.
+Do not treat it as authentication or as a way to act as the person.
+A module cannot post, read or spend anything on someone's behalf through it.
+A module that runs at all was already allowed to by its permission, so "does the caller hold the permission" is always yes and is not sent.
+
+The field is additive and the ABI stays v1.
+Read the fields you need and ignore the rest, so a module built before `caller` existed keeps working.
+A module cannot remember ids between runs until `kv.store` is enforced, so keep them in the state you round-trip through `input`.
+
+This is separate from the call context in [0023](../decisions/0023-mediated-host-capabilities.md).
+That context (module, space, invoking user, channel) is what the host holds to gate a deferred `host_call` capability, and it is never handed to the module.
+The reasoning is in [0038](../decisions/0038-module-caller-id.md).
 
 The **response** the module returns is a JSON object, one of two shapes:
 

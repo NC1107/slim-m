@@ -14,6 +14,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use slimm_server::auth::Auth;
 use slimm_server::config::Config;
 use slimm_server::db;
@@ -31,7 +32,7 @@ use slimm_server::voice::VoiceService;
 use tower::ServiceExt;
 
 mod support;
-use support::wasm_fixtures::{canned_ok_wasm, fuel_burner_wasm, sha256_hex};
+use support::wasm_fixtures::{canned_ok_wasm, echo_request_wasm, fuel_burner_wasm, sha256_hex};
 
 async fn store(name: &str) -> (Store, support::TestDbGuard) {
     let (path, guard) = support::TestDbGuard::new(name);
@@ -269,4 +270,41 @@ async fn a_fuel_exhausting_module_answers_cleanly_instead_of_hanging() {
     let body = json_body(response).await;
     assert_eq!(body["ok"], json!(false));
     assert!(body["error"].as_str().unwrap().contains("limit"));
+}
+
+/// The request the wasm sees carries `command`, `input` and an opaque
+/// `caller.id`, and nothing else about the caller.
+#[tokio::test]
+async fn the_wasm_receives_an_opaque_caller_id_and_nothing_else() {
+    let (s, _guard) = store("slimm-module-cmd-caller").await;
+    let member = deployment(&s).await;
+    install(&s, echo_request_wasm(), true, None).await;
+    grant_run_permission(&s, &member).await;
+    let token = s.open_session(member.id, "phone").await.unwrap();
+    let router = app(s);
+
+    let response = router
+        .oneshot(req_json(
+            "POST",
+            "/modules/code-exec/commands/run",
+            token.access_token.as_str(),
+            json!({ "input": "hi" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let echoed = json_body(response).await["output"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let mut hasher = Sha256::new();
+    hasher.update(format!("slim-module-caller-v1\0code-exec\0{}", member.id));
+    let expected = slimm_server::media::to_hex(&hasher.finalize());
+    assert_eq!(
+        echoed,
+        format!("{{'command':'run','input':'hi','caller':{{'id':'{expected}'}}}}")
+    );
+    assert!(!echoed.contains(&member.id.to_string()));
+    assert!(!echoed.contains("Nia"));
 }
