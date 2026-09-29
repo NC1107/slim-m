@@ -626,7 +626,7 @@ It builds with `--locked`, the same as the container image and every other serve
 ### linux-client
 
 The job publishes `slim-m-client-<version>-linux-amd64.tar.gz` on every client release, gated on nothing.
-It is the Flutter bundle as built, plus the licence and `packaging/linux/README.md`, under one top-level directory.
+It is the Flutter bundle as built, plus the licence, `packaging/linux/README.md` and the `slim-m` launcher that names any missing shared library, under one top-level directory.
 It resolves with `dart pub get --enforce-lockfile`, the same as the Android and iOS builds, so this download and the tarball the rpm and Flatpak jobs both build from are resolved from exactly what `pubspec.lock` pins.
 That one artifact serves both readers: it is the download for a user whose distribution has no package, and it is the `Source0` the rpm spec fetches from the release.
 Naming follows the server binaries in this same workflow (`slimm-server-<version>-linux-<arch>`), so one release page does not call the same machine `amd64` in one asset and `x86_64` in another.
