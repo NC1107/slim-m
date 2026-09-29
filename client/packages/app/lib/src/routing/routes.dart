@@ -73,11 +73,20 @@ abstract final class Routes {
   static String channel(String id, {bool openChat = false}) =>
       openChat ? '/channels/$id?$_openChatQuery=1' : '/channels/$id';
 
+  /// One message in [channelId]: opens the channel scrolled to it and lit.
+  /// Always reads rather than joins, like a jump from search (see `openChat`).
+  static String message(String channelId, String messageId) =>
+      '/channels/$channelId/m/$messageId';
+
   /// Whether [uri] was built by [channel] with `openChat`.
   static bool opensChat(Uri uri) => uri.queryParameters[_openChatQuery] == '1';
 
   /// The pattern go_router matches, as distinct from a built path.
   static const channelPattern = '/channels/:channelId';
+
+  /// [message]'s pattern, relative to `/channels`. A sibling of the channel's
+  /// own route rather than nested under it, or both would stack as pages.
+  static const messagePattern = ':channelId/m/:messageId';
 
   /// A thread's own messages, opened from a message's context menu rather
   /// than from the rail - see docs/decisions/0005-threads.md.

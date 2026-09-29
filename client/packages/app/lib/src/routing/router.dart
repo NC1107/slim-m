@@ -34,6 +34,7 @@ import '../screens/admin/storage_screen.dart';
 import '../screens/admin/webhooks_screen.dart';
 import '../screens/channel_settings_screen.dart';
 import '../screens/home_shell.dart';
+import '../screens/message_deep_link.dart';
 import '../screens/debug_log_screen.dart';
 import '../screens/personal_settings_screen.dart';
 import '../screens/space_settings_screen.dart';
@@ -280,6 +281,27 @@ final routerProvider = Provider<GoRouter>((ref) {
                       channelId: channelId,
                       openChat: Routes.opensChat(state.uri),
                     ),
+                    key: ValueKey('channel-$channelId'),
+                  );
+                },
+              ),
+              GoRoute(
+                path: Routes.messagePattern,
+                pageBuilder: (context, state) {
+                  final channelId = state.pathParameters['channelId']!;
+                  final messageId = state.pathParameters['messageId']!;
+                  // Same bound as the channel route above.
+                  if (channelId.length > 128 || messageId.length > 128) {
+                    return fadeThroughPage(
+                      context,
+                      const NoChannelSelected(),
+                      key: const ValueKey('no-channel'),
+                    );
+                  }
+                  // One page key per channel, so moving between a channel and its links swaps the child, not the page.
+                  return fadeThroughPage(
+                    context,
+                    MessageDeepLink(channelId: channelId, messageId: messageId),
                     key: ValueKey('channel-$channelId'),
                   );
                 },
