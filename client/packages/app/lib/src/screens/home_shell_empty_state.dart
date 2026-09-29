@@ -86,9 +86,8 @@ class _NothingSelected extends StatelessWidget {
 
 /// One row of the empty pane's shortcut list: what it does, and the keys.
 ///
-/// Laid out as two columns meeting in the middle rather than a wide stretched
-/// row - a pane this size would otherwise strand the label and the keycaps at
-/// opposite edges with a gulf between them.
+/// Two equal halves meeting on the pane's centre line, so the seam between
+/// labels and keycaps lines up under the icon and heading above it.
 class _ShortcutHint extends StatelessWidget {
   const _ShortcutHint({required this.action, required this.tokens});
 
@@ -99,7 +98,6 @@ class _ShortcutHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final keys = describeAppAction(action);
     if (keys.isEmpty) return const SizedBox.shrink();
-    // Fixed columns overflowed a 600-wide pane; the keycaps are what must not cut.
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 360),
       child: Row(
@@ -113,17 +111,31 @@ class _ShortcutHint extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.s12),
-          for (final (i, key) in keys.indexed) ...[
-            if (i > 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Text(
-                  '+',
-                  style: AppText.micro.copyWith(color: tokens.textDisabled),
-                ),
+          Expanded(
+            // Keycaps shrink rather than cut in a narrow pane.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final (i, key) in keys.indexed) ...[
+                    if (i > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Text(
+                          '+',
+                          style: AppText.micro.copyWith(
+                            color: tokens.textDisabled,
+                          ),
+                        ),
+                      ),
+                    AppKbd(key),
+                  ],
+                ],
               ),
-            AppKbd(key),
-          ],
+            ),
+          ),
         ],
       ),
     );
