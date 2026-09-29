@@ -188,12 +188,12 @@ def existing_file(path: Path) -> Path:
 
 
 def output_file(path: Path, expected: str) -> Path:
-    """Each command writes one fixed file in the working directory; the argument is only checked against it."""
-    target = Path.cwd() / expected
-    if path.name != expected or path.resolve() != target.resolve():
+    """Each command writes one fixed file in the working directory; the argument must name exactly that file."""
+    if str(path) not in (expected, f"./{expected}"):
         raise ManifestError(f"cannot write to {path}: this command writes {expected} in the working directory")
+    target = Path.cwd() / expected
     if target.exists() and not target.is_file():
-        raise ManifestError(f"cannot write to {path}")
+        raise ManifestError(f"cannot write to {expected}")
     return target
 
 
