@@ -29,6 +29,8 @@ An Android tester making a call is doing something nobody has done successfully 
 
 ## The four iOS paths nobody has confirmed
 
+The step-by-step version to hand a tester is `docs/PHONE-TESTER-CHECKLIST.md`.
+
 Each of these is covered only by unit tests against fakes.
 There is precedent for taking that seriously: an iOS screen-share fix was recorded as done on 2026-07-29 and a real device later disproved it.
 
