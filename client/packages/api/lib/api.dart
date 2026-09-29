@@ -90,6 +90,7 @@ export 'src/events.dart'
         MemberTimeoutChanged,
         MessageCreated,
         MessageDeleted,
+        MessageEphemeral,
         MessageEdited,
         MessagePinned,
         MessageUnpinned,

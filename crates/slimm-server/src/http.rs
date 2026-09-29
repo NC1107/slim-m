@@ -51,6 +51,7 @@ mod dms;
 pub mod dock;
 mod embeds;
 mod emoji;
+mod ephemeral_messages;
 mod error;
 mod escalation;
 mod extract;
@@ -216,6 +217,7 @@ pub fn router(state: AppState) -> Router {
         .merge(threads::routes())
         .merge(bots::routes())
         .merge(bot_commands::routes())
+        .merge(ephemeral_messages::routes())
         .merge(voice::routes())
         .merge(voice_ring::routes())
         .merge(voice_webhook::routes())

@@ -5625,6 +5625,54 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/ephemeral-messages:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      operationId: sendEphemeralMessage
+      tags: [bots]
+      summary: Answer a member privately, so only they see it.
+      description: >-
+        Bot-only (decision 0037-ephemeral-bot-messages). The message is never
+        stored: it goes out over the live socket to the recipient's own
+        connections and is gone on reload. It has no `seq`, so it leaves no
+        gap in the channel's ordering, and it never appears in
+        `listMessages`, search or `sync`. Moderators cannot see it, and there
+        is no id to report.
+
+        The recipient is not named. It is the author of `in_reply_to_id`, a
+        live message in this channel sent within the last 15 minutes, so a bot
+        can answer a member who spoke to it and reach nobody else. The caller
+        needs `VIEW_CHANNEL` and `SEND_MESSAGES` in the channel, and the
+        recipient must still be able to view it. A member who has blocked the
+        bot never receives it, and the call still succeeds. Bots and the
+        caller's own messages are not valid anchors. The 403 is the same
+        whatever the reason. Content follows the same length rules as
+        `sendMessage`. Metered as an ordinary write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEphemeralMessageRequest"
+      responses:
+        "200":
+          description: Sent to the recipient's connected devices, if any.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EphemeralMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /bots/{botId}/commands:
     parameters:
       - name: botId
@@ -8423,6 +8471,69 @@ components:
           default: []
           items:
             $ref: "#/components/schemas/BotCommandInput"
+    SendEphemeralMessageRequest:
+      type: object
+      required: [in_reply_to_id, content]
+      properties:
+        in_reply_to_id:
+          type: string
+          format: uuid
+          description: >-
+            The member's message being answered. Its author is the recipient.
+        content:
+          type: string
+    EphemeralMessage:
+      type: object
+      required:
+        [
+          id,
+          channel_id,
+          author_id,
+          author_display_name,
+          content,
+          in_reply_to_id,
+          created_at,
+        ]
+      description: >-
+        A message only its recipient sees. Not a `Message`: it has no `seq`,
+        is never stored, and cannot be fetched again.
+      properties:
+        id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+        author_id:
+          type: string
+          format: uuid
+        author_display_name:
+          type: string
+        content:
+          type: string
+        in_reply_to_id:
+          type: string
+          format: uuid
+        created_at:
+          type: integer
+          format: int64
+    MessageEphemeral:
+      type: object
+      required: [type, channel_id, message]
+      description: >
+        A bot answered this account privately. Delivered only to the
+        recipient's own connections, and only while they can view the channel.
+        It carries no `seq` and there is no catch-up: a client keeps it in
+        memory and drops it on dismissal or reload. Best effort, like typing.
+      properties:
+        type:
+          type: string
+          enum: [message.ephemeral]
+        channel_id:
+          type: string
+          format: uuid
+        message:
+          $ref: "#/components/schemas/EphemeralMessage"
     RegisteredBotCommand:
       type: object
       required: [name, description]
@@ -10946,6 +11057,7 @@ components:
         - $ref: "#/components/schemas/CanvasMediaSlotChanged"
         - $ref: "#/components/schemas/ReportsChanged"
         - $ref: "#/components/schemas/ReadStateChanged"
+        - $ref: "#/components/schemas/MessageEphemeral"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
     CanvasObjectPlaced:

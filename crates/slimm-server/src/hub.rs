@@ -155,7 +155,8 @@ fn moves_permissions(event: &Event) -> bool {
         // A report being filed or resolved changes no permission's answer either.
         | Event::ReportsChanged
         // A read marker moves no permission and needs no fan-out ordering.
-        | Event::ReadStateChanged { .. } => false,
+        | Event::ReadStateChanged { .. }
+        | Event::EphemeralMessage { .. } => false,
         Event::Stamped { event, .. } => moves_permissions(event),
     }
 }
@@ -169,7 +170,9 @@ fn moves_permissions(event: &Event) -> bool {
 /// dropped durable event is a much larger surprise than a slightly stale
 /// cursor.
 ///
-/// Only [`Event::CanvasCursorMoved`] and [`Event::CanvasStrokePreview`]
+/// [`Event::EphemeralMessage`] rides here too, being unnumbered and never
+/// stored, at a rate a bot's write limit keeps far below the cursors'.
+/// Otherwise only [`Event::CanvasCursorMoved`] and [`Event::CanvasStrokePreview`]
 /// qualify: both are rate-limited well above what a human notices, carry no
 /// `seq`, are never persisted, and have no catch-up path a reconnect could use
 /// anyway (see their own doc comments in `hub/event.rs`). `TypingStarted`/
@@ -184,7 +187,9 @@ fn moves_permissions(event: &Event) -> bool {
 /// capacity in the first place.
 fn is_ephemeral(event: &Event) -> bool {
     match event {
-        Event::CanvasCursorMoved { .. } | Event::CanvasStrokePreview { .. } => true,
+        Event::CanvasCursorMoved { .. }
+        | Event::CanvasStrokePreview { .. }
+        | Event::EphemeralMessage { .. } => true,
         Event::MessageCreated { .. }
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }

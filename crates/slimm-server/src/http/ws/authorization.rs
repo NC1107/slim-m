@@ -102,6 +102,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
+        | Event::EphemeralMessage { .. }
         | Event::Stamped { .. } => None,
     }
 }
@@ -171,6 +172,13 @@ pub(super) async fn authorize_unstamped(
         } else {
             Authorization::Withhold
         };
+    }
+    if let Event::EphemeralMessage {
+        recipient_id,
+        message,
+    } = &event
+    {
+        return super::ephemeral_frames::authorize(store, ctx, *recipient_id, message).await;
     }
     // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
     if let Event::ReportsChanged = event {
@@ -300,6 +308,7 @@ pub(super) async fn authorize_unstamped(
             | Event::CategoryChanged
             | Event::ReportsChanged
             | Event::ReadStateChanged { .. }
+            | Event::EphemeralMessage { .. }
             | Event::Stamped { .. } => return Authorization::Withhold,
         },
     };
@@ -613,6 +622,7 @@ pub(super) async fn authorize_unstamped(
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
+        | Event::EphemeralMessage { .. }
         | Event::Stamped { .. } => return Authorization::Withhold,
     }))
 }
