@@ -27,6 +27,7 @@ use std::collections::HashMap;
 
 use sqlx::QueryBuilder;
 
+use super::forward_cascade::live_copies_of;
 use super::{Store, now_ms};
 use crate::ids::{ChannelId, MessageId, UserId};
 
@@ -36,6 +37,10 @@ const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 /// row costs an op insert and an attachment release, so this is smaller than
 /// [`OP_FLOOR_SWEEP_BATCH`], whose rows are one bare `DELETE` each.
 const CONTENT_SWEEP_BATCH: i64 = 200;
+/// Bounds how many forwarded copies one batch pulls in with its originals, so
+/// the batch's bound-variable count stays far under SQLite's limit; the rest
+/// are found as orphans on the next tick.
+const COPY_SWEEP_CAP: usize = 2_000;
 /// Bounds the op-log reclaim pass.
 const OP_FLOOR_SWEEP_BATCH: i64 = 2_000;
 
@@ -130,6 +135,28 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
+        let mut candidates = candidates;
+        // Copies whose original is already gone, left over when an earlier tick hit COPY_SWEEP_CAP.
+        let orphans = sqlx::query_scalar!(
+            r#"SELECT f.message_id AS "id!: MessageId" FROM message_forwards f
+               JOIN messages m ON m.id = f.message_id AND m.deleted_at IS NULL
+               JOIN messages o ON o.id = f.origin_message_id AND o.deleted_at IS NOT NULL
+               LIMIT ?"#,
+            CONTENT_SWEEP_BATCH
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        // Copies of this batch join it, sharing its one write and its dense seq runs.
+        let mut copies: Vec<MessageId> = live_copies_of(&mut tx, &candidates)
+            .await?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        copies.truncate(COPY_SWEEP_CAP);
+        candidates.extend(orphans);
+        candidates.extend(copies);
+        candidates.sort_unstable_by_key(|id| id.0);
+        candidates.dedup();
         if candidates.is_empty() {
             tx.commit().await?;
             return Ok(Vec::new());

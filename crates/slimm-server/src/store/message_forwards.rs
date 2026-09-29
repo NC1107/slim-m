@@ -5,6 +5,8 @@
 //! [`crate::http::message_enrich`] already runs. See
 //! `migrations/0059_message_forwards.sql` for why the origin is snapshotted
 //! here instead of resolved live the way a reply's parent is.
+//! Deleting or ageing out the origin removes its copies; see
+//! [`super::forward_cascade`].
 
 use sqlx::QueryBuilder;
 

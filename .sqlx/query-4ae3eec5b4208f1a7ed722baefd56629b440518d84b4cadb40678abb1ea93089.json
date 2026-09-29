@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM pinned_messages WHERE message_id = ?) AS \"p!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "p!: bool",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4ae3eec5b4208f1a7ed722baefd56629b440518d84b4cadb40678abb1ea93089"
+}

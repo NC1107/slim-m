@@ -23,15 +23,16 @@ use serde::Serialize;
 
 use super::AppState;
 use super::error::ApiError;
+use crate::hub::Event;
 use crate::ids::{MessageId, UserId};
 use crate::permissions::Permissions;
-use crate::store::{ForwardOrigin, ForwardSummary};
+use crate::store::{CascadedDeletion, ForwardOrigin, ForwardSummary};
 
 /// What a message was forwarded from, or absent on a message that forwards
 /// nothing.
 ///
-/// A snapshot taken when the forward was sent, not a live read, so it stays
-/// answerable once the original is edited or deleted.
+/// A snapshot taken when the forward was sent, so a later edit does not
+/// rewrite it. Deleting or ageing out the original removes the whole copy.
 #[derive(Serialize, Clone)]
 pub(crate) struct ForwardedDto {
     /// The original, for a client that wants to jump to it. An id the reader
@@ -117,4 +118,34 @@ pub(crate) async fn for_messages(
         .into_iter()
         .map(|(message_id, summary)| (message_id, summary.into()))
         .collect())
+}
+
+/// Tells live clients about forwarded copies removed with their original, in
+/// whichever channels they live, then reclaims any files they freed.
+pub(super) async fn publish_cascaded(state: &AppState, cascaded: Vec<CascadedDeletion>) {
+    let mut channels = Vec::new();
+    for copy in cascaded {
+        state.hub.publish(Event::MessageDeleted {
+            op_seq: Some(copy.op_seq),
+            channel_id: copy.channel_id,
+            message_id: copy.message_id,
+        });
+        if copy.was_pinned {
+            state.hub.publish(Event::MessageUnpinned {
+                channel_id: copy.channel_id,
+                message_id: copy.message_id,
+            });
+        }
+        if !channels.contains(&copy.channel_id) {
+            channels.push(copy.channel_id);
+        }
+        for hex in copy.freed_attachments {
+            if let Err(err) = state.media.delete_attachment(&hex).await {
+                tracing::warn!(%hex, error = %err, "failed to remove a forwarded copy's attachment file");
+            }
+        }
+    }
+    for channel_id in channels {
+        super::threads::notify_reply(state, channel_id).await;
+    }
 }
