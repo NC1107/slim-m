@@ -26,11 +26,14 @@
 /// lengths.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_selection.dart';
+import 'member_moderation_sheet.dart';
 import 'member_profile_sections.dart';
 
 /// The bar itself. Both callbacks are passed in rather than called from here,
@@ -56,6 +59,7 @@ class MemberSelectionBar extends ConsumerWidget {
     final selection = ref.watch(memberSelectionProvider);
     final controller = ref.read(memberSelectionProvider.notifier);
     final any = selection.count > 0;
+    final compact = MediaQuery.sizeOf(context).width < kCompactWidth;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -78,27 +82,78 @@ class MemberSelectionBar extends ConsumerWidget {
                 color: any ? tokens.textPrimary : tokens.textSecondary,
               ),
             ),
-            if (any && canTimeOut) TimeoutDurationChips(onChosen: onTimeOut),
-            // Stacked, not a Row: 236px will not hold two verbs and a cancel.
-            if (any && canRemove) ...[
+            if (compact)
+              ..._compactActions(
+                context,
+                count: selection.count,
+                controller: controller,
+              )
+            else ...[
+              if (any && canTimeOut) TimeoutDurationChips(onChosen: onTimeOut),
+              // Stacked, not a Row: 236px will not hold two verbs and a cancel.
+              if (any && canRemove) ...[
+                const SizedBox(height: AppSpacing.s8),
+                AppButton(
+                  label: 'Remove',
+                  variant: AppButtonVariant.danger,
+                  icon: AppIcons.revoke,
+                  onPressed: onRemove,
+                ),
+              ],
               const SizedBox(height: AppSpacing.s8),
               AppButton(
-                label: 'Remove',
-                variant: AppButtonVariant.danger,
-                icon: AppIcons.revoke,
-                onPressed: onRemove,
+                label: 'Cancel',
+                variant: AppButtonVariant.ghost,
+                onPressed: controller.clear,
               ),
             ],
-            const SizedBox(height: AppSpacing.s8),
-            AppButton(
-              label: 'Cancel',
-              variant: AppButtonVariant.ghost,
-              onPressed: controller.clear,
-            ),
           ],
         ),
       ),
     );
+  }
+
+  /// One slim row under the count: the verbs live in a sheet at this width.
+  List<Widget> _compactActions(
+    BuildContext context, {
+    required int count,
+    required MemberSelectionController controller,
+  }) {
+    return [
+      const SizedBox(height: AppSpacing.s8),
+      Row(
+        children: [
+          Expanded(
+            child: AppButton(
+              label: 'Cancel',
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
+              onPressed: controller.clear,
+            ),
+          ),
+          if (count > 0) ...[
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: AppButton(
+                label: 'Moderate',
+                icon: AppIcons.shield,
+                size: AppButtonSize.sm,
+                onPressed: () => unawaited(
+                  showMemberModerationSheet(
+                    context,
+                    count: count,
+                    canTimeOut: canTimeOut,
+                    canRemove: canRemove,
+                    onTimeOut: onTimeOut,
+                    onRemove: onRemove,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ];
   }
 
   /// Says how many, and says so once the cap is why there are no more.
