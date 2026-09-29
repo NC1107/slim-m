@@ -191,5 +191,6 @@ pub(crate) async fn record_call(
         code_run: None,
         poll: None,
         embeds: std::sync::Arc::new(Vec::new()),
+        components: std::sync::Arc::new(Vec::new()),
     });
 }

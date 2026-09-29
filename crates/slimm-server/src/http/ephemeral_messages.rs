@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::AppState;
-use super::ephemeral_anchor::resolve_message;
+use super::ephemeral_anchor::resolve;
 use super::error::ApiError;
 use super::extract::{Authed, Json, enforce};
 use super::messages::{parse_uuid, validate_content};
@@ -91,7 +91,7 @@ async fn send_ephemeral(
     {
         return Err(ApiError::Forbidden);
     }
-    let anchor = resolve_message(&state, ctx.user_id, channel_id, anchor_id).await?;
+    let anchor = resolve(&state, ctx.user_id, channel_id, anchor_id.0).await?;
     let recipient_id = anchor.recipient_id;
     if !state
         .store
@@ -128,5 +128,8 @@ async fn send_ephemeral(
         recipient_id,
         message,
     });
+    if let Some(press) = anchor.press {
+        super::interactions::answer_from_bot(&state, ctx.user_id, channel_id, press).await?;
+    }
     Ok(Json(dto))
 }

@@ -33,6 +33,7 @@ pub(super) struct MessageExtras {
     pub poll: Option<Poll>,
     /// Raw; image tokens resolve here, per connection.
     pub embeds: Vec<Embed>,
+    pub components: Vec<crate::components::ComponentRow>,
 }
 
 /// The frame for a freshly sent message, with `mentions_me` resolved by one
@@ -60,6 +61,7 @@ pub(super) async fn created(
     dto.app_surface = extras.app_surface.map(AppSurfaceDto::from);
     dto.poll = extras.poll.map(PollDto::from);
     dto.embeds = embeds::dtos_from_stored(link_previews, extras.embeds);
+    dto.components = extras.components;
     if let Some(run) = extras.code_run {
         dto.code_runs = vec![CodeRunDto {
             block_index: run.block_index,

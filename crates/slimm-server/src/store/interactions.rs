@@ -1,0 +1,104 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+//! A button click awaiting the bot's answer. See
+//! `docs/decisions/0038-bot-message-buttons.md`.
+
+use sqlx::Row;
+
+use crate::components::INTERACTION_WINDOW_MS;
+use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
+
+use super::{Store, now_ms};
+
+#[derive(Debug, Clone)]
+pub struct Interaction {
+    pub id: InteractionId,
+    pub bot_id: UserId,
+    pub clicker_id: UserId,
+    pub channel_id: ChannelId,
+    pub message_id: MessageId,
+    pub custom_id: String,
+    pub created_at: i64,
+    pub answered: bool,
+}
+
+impl Store {
+    /// Records a click, idempotent by its client-chosen id. `Ok(None)` means
+    /// the id already belongs to a different click.
+    pub async fn record_interaction(
+        &self,
+        new: &Interaction,
+    ) -> anyhow::Result<Option<(Interaction, bool)>> {
+        let inserted = sqlx::query(
+            "INSERT OR IGNORE INTO interactions
+                (id, bot_id, clicker_id, channel_id, message_id, custom_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(new.id)
+        .bind(new.bot_id)
+        .bind(new.clicker_id)
+        .bind(new.channel_id)
+        .bind(new.message_id)
+        .bind(&new.custom_id)
+        .bind(new.created_at)
+        .execute(&self.pool)
+        .await?
+        .rows_affected()
+            == 1;
+        let stored = self.interaction(new.id).await?;
+        Ok(stored
+            .filter(|s| s.clicker_id == new.clicker_id && s.message_id == new.message_id)
+            .map(|s| (s, inserted)))
+    }
+
+    /// A click still inside its answer window.
+    pub async fn interaction(&self, id: InteractionId) -> anyhow::Result<Option<Interaction>> {
+        let row = sqlx::query(
+            "SELECT id, bot_id, clicker_id, channel_id, message_id, custom_id,
+                    created_at, answered_at
+             FROM interactions WHERE id = ? AND created_at > ?",
+        )
+        .bind(id)
+        .bind(now_ms() - INTERACTION_WINDOW_MS)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(|r| {
+            let answered_at: Option<i64> = r.try_get("answered_at")?;
+            Ok(Interaction {
+                id: r.try_get("id")?,
+                bot_id: r.try_get("bot_id")?,
+                clicker_id: r.try_get("clicker_id")?,
+                channel_id: r.try_get("channel_id")?,
+                message_id: r.try_get("message_id")?,
+                custom_id: r.try_get("custom_id")?,
+                created_at: r.try_get("created_at")?,
+                answered: answered_at.is_some(),
+            })
+        })
+        .transpose()
+    }
+
+    /// Marks the click answered. True only the first time, so the clicker is
+    /// told once.
+    pub async fn mark_interaction_answered(&self, id: InteractionId) -> anyhow::Result<bool> {
+        Ok(sqlx::query(
+            "UPDATE interactions SET answered_at = ? WHERE id = ? AND answered_at IS NULL",
+        )
+        .bind(now_ms())
+        .bind(id)
+        .execute(&self.pool)
+        .await?
+        .rows_affected()
+            == 1)
+    }
+
+    /// Deletes clicks past their window; returns how many.
+    pub async fn sweep_interactions(&self) -> anyhow::Result<u64> {
+        Ok(
+            sqlx::query("DELETE FROM interactions WHERE created_at <= ?")
+                .bind(now_ms() - INTERACTION_WINDOW_MS)
+                .execute(&self.pool)
+                .await?
+                .rows_affected(),
+        )
+    }
+}

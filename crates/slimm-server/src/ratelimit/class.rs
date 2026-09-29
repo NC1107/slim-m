@@ -267,6 +267,11 @@ pub enum Class {
     /// costs nothing this budget needs to protect against. See
     /// `docs/decisions/0032-voice-participant-webhooks.md`.
     LiveKitWebhook,
+    /// Pressing a bot's button. Charged per clicker, and tighter than
+    /// [`Class::Write`]: each press wakes a bot, which may run real work, so a
+    /// held-down key must not be able to drive it as fast as it can open
+    /// connections. Sized for a person tapping a button a few times, not a loop.
+    Interaction,
 }
 
 impl Class {
@@ -302,6 +307,8 @@ impl Class {
             Class::Webhook => (30.0, 1.0 / 3.0),
             // See this variant's own doc comment for how these were sized.
             Class::LiveKitWebhook => (120.0, 20.0),
+            // A person pressing buttons: a short burst, then about one press a second.
+            Class::Interaction => (8.0, 1.0),
         }
     }
 
@@ -310,7 +317,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 20] = [
+    pub const ALL: [Class; 21] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -331,6 +338,7 @@ impl Class {
         Class::CodeRunner,
         Class::Webhook,
         Class::LiveKitWebhook,
+        Class::Interaction,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -357,6 +365,7 @@ impl Class {
             Class::CodeRunner => "code_runner",
             Class::Webhook => "webhook",
             Class::LiveKitWebhook => "livekit_webhook",
+            Class::Interaction => "interaction",
         }
     }
 }

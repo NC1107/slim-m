@@ -9,7 +9,7 @@ use uuid::Uuid;
 use super::AppState;
 use super::error::ApiError;
 use crate::ephemeral::{ANCHOR_WINDOW_MS, invokes_command};
-use crate::ids::{ChannelId, MessageId, UserId};
+use crate::ids::{ChannelId, InteractionId, MessageId, UserId};
 use crate::store::Message;
 
 /// A resolved anchor: who it entitles the bot to answer, and until when.
@@ -19,6 +19,8 @@ pub(super) struct Anchor {
     pub recipient_id: UserId,
     pub in_reply_to_id: MessageId,
     pub expires_at: i64,
+    /// Set when the anchor is a button press, which the answer then closes.
+    pub press: Option<InteractionId>,
 }
 
 /// A person's recent message in this channel that is addressed to `bot`.
@@ -54,7 +56,22 @@ pub(super) async fn resolve_message(
         recipient_id,
         in_reply_to_id: message_id,
         expires_at,
+        press: None,
     })
+}
+
+/// A button press on this bot's message, else a person's message addressed to it.
+/// One id space, so the caller need not say which it holds.
+pub(super) async fn resolve(
+    state: &AppState,
+    bot: UserId,
+    channel_id: ChannelId,
+    anchor: Uuid,
+) -> Result<Anchor, ApiError> {
+    match super::interactions::resolve_press(state, bot, channel_id, InteractionId(anchor)).await? {
+        Some(press) => Ok(press),
+        None => resolve_message(state, bot, channel_id, MessageId(anchor)).await,
+    }
 }
 
 /// Whether the message mentions the bot, replies to one of its messages, or

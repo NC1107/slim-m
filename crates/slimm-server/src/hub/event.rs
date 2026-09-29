@@ -8,6 +8,7 @@
 
 use std::sync::Arc;
 
+use crate::components::ComponentRow;
 use crate::ephemeral::EphemeralMessage;
 use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
@@ -55,6 +56,8 @@ pub enum Event {
         poll: Option<Arc<Poll>>,
         /// Raw, like `attachments`; image tokens resolve per connection.
         embeds: Arc<Vec<Embed>>,
+        /// The buttons a bot posted with the message; see decision 0038.
+        components: Arc<Vec<ComponentRow>>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,
     /// a different sequence from the message's own `seq`, which an edit does
@@ -76,6 +79,13 @@ pub enum Event {
         channel_id: ChannelId,
         message_id: MessageId,
         options: Vec<(i64, i64)>,
+    },
+    /// A bot replaced or cleared the buttons on its message. Carries the whole
+    /// list, like `PollVoted`, so a client that missed a frame cannot drift.
+    MessageComponentsChanged {
+        channel_id: ChannelId,
+        message_id: MessageId,
+        components: Arc<Vec<ComponentRow>>,
     },
     /// A message was soft-deleted; carries only the ids a live connection
     /// needs to drop it from view, not the content it no longer shows.
@@ -605,5 +615,16 @@ pub enum Event {
     EphemeralMessage {
         recipient_id: UserId,
         message: Arc<EphemeralMessage>,
+    },
+    /// A member pressed a button. Private to the owning bot: only its own
+    /// connections receive it, and nothing is stored beyond the click row.
+    InteractionCreated {
+        interaction: Arc<crate::store::Interaction>,
+        clicker_display_name: String,
+    },
+    /// The bot answered a click. Private to the clicker, so the pressed
+    /// button can leave its pending state.
+    InteractionAnswered {
+        interaction: Arc<crate::store::Interaction>,
     },
 }

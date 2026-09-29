@@ -128,6 +128,9 @@ pub(crate) struct MessageDto {
     /// Fixed once a message exists, like `attachments`.
     #[serde(default)]
     pub(crate) embeds: Vec<EmbedDto>,
+    /// Buttons a bot attached; see decision 0038. A bot may replace them.
+    #[serde(default)]
+    pub(crate) components: Vec<crate::components::ComponentRow>,
 }
 
 /// One attachment as it appears on a message.
@@ -244,6 +247,7 @@ impl From<Message> for MessageDto {
             code_runs: Vec::new(),
             mentions_me: false,
             embeds: Vec::new(),
+            components: Vec::new(),
         }
     }
 }

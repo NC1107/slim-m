@@ -43,6 +43,7 @@ mod authorization;
 mod canvas_frames;
 mod ephemeral_frames;
 mod frames;
+mod interaction_frames;
 mod message_frames;
 mod permission_cache;
 mod signals;

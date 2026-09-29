@@ -75,6 +75,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
         | Event::PollVoted { .. }
+        | Event::MessageComponentsChanged { .. }
         | Event::TypingStarted { .. }
         | Event::TypingStopped { .. }
         | Event::ChannelCreated(_)
@@ -102,7 +103,9 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
-        | Event::EphemeralMessage { .. } => None,
+        | Event::EphemeralMessage { .. }
+        | Event::InteractionCreated { .. }
+        | Event::InteractionAnswered { .. } => None,
     }
 }
 
@@ -154,6 +157,9 @@ pub(super) async fn authorize(
     } = &event
     {
         return super::ephemeral_frames::authorize(store, ctx, *recipient_id, message).await;
+    }
+    if let Some(decision) = super::interaction_frames::authorize(store, ctx, &event).await {
+        return decision;
     }
     // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
     if let Event::ReportsChanged = event {
@@ -243,6 +249,7 @@ pub(super) async fn authorize(
             Event::MessagePinned { channel_id, .. } => *channel_id,
             Event::MessageUnpinned { channel_id, .. } => *channel_id,
             Event::PollVoted { channel_id, .. } => *channel_id,
+            Event::MessageComponentsChanged { channel_id, .. } => *channel_id,
             Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
                 *channel_id
             }
@@ -278,7 +285,9 @@ pub(super) async fn authorize(
             | Event::CategoryChanged
             | Event::ReportsChanged
             | Event::ReadStateChanged { .. }
-            | Event::EphemeralMessage { .. } => return Authorization::Withhold,
+            | Event::EphemeralMessage { .. }
+            | Event::InteractionCreated { .. }
+            | Event::InteractionAnswered { .. } => return Authorization::Withhold,
         },
     };
     // The one event whose subject may have just lost this very view.
@@ -364,6 +373,7 @@ pub(super) async fn authorize(
             code_run,
             poll,
             embeds,
+            components,
         } => match super::message_frames::created(
             store,
             link_previews,
@@ -377,6 +387,7 @@ pub(super) async fn authorize(
                 code_run: code_run.map(|c| (*c).clone()),
                 poll: poll.map(|p| (*p).clone()),
                 embeds: (*embeds).clone(),
+                components: (*components).clone(),
             },
         )
         .await
@@ -514,6 +525,15 @@ pub(super) async fn authorize(
                 .map(|(position, votes)| PollOptionCountDto { position, votes })
                 .collect(),
         },
+        Event::MessageComponentsChanged {
+            channel_id,
+            message_id,
+            components,
+        } => ServerFrame::MessageComponentsChanged {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            components: (*components).clone(),
+        },
         Event::TypingStarted {
             channel_id,
             user_id,
@@ -606,6 +626,8 @@ pub(super) async fn authorize(
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
-        | Event::EphemeralMessage { .. } => return Authorization::Withhold,
+        | Event::EphemeralMessage { .. }
+        | Event::InteractionCreated { .. }
+        | Event::InteractionAnswered { .. } => return Authorization::Withhold,
     }))
 }
