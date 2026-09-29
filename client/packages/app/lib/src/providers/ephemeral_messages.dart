@@ -14,7 +14,7 @@ import 'package:slimm_api/api.dart' as api;
 import 'live_events.dart';
 
 /// Per channel, so a chatty bot cannot grow the tray without bound.
-const int maxEphemeralPerChannel = 5;
+const int maxEphemeralPerChannel = 3;
 
 class EphemeralMessagesController
     extends StateNotifier<Map<String, List<api.EphemeralMessage>>> {

@@ -87,7 +87,7 @@ If abuse shows up, the follow-up is a report that snapshots the ephemeral text a
 
 ### Client
 
-The client keeps them in memory, per channel, capped at five, and renders them in a tray above the composer.
+The client keeps them in memory, per channel, capped at three, and renders them in a tray above the composer.
 Each is a card marked "Only you can see this", with the bot's name and a dismiss control.
 A tray rather than an in-transcript row: the transcript is ordered by `seq`, an ephemeral message has none, and a tray stays visible when the reader is scrolled back.
 It survives leaving and re-entering the channel and is cleared at sign-out.
