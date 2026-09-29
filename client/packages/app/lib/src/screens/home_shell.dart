@@ -21,6 +21,7 @@ import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
+import '../providers/last_text_channel.dart';
 import '../providers/member_selection.dart';
 import '../providers/module_sound_settings.dart';
 import '../providers/notification_schedule_controller.dart';
@@ -361,6 +362,11 @@ class ConversationPane extends ConsumerWidget {
               : dmCallOpen
               ? 'dm-call'
               : 'text';
+          if (stage == 'text' && channel != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ref.read(lastTextChannelProvider.notifier).state = channelId;
+            });
+          }
           final body = AppFadeIn(
             key: ValueKey('pane-$stage'),
             child: canvasOpen

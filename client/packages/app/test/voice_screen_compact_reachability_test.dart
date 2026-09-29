@@ -136,7 +136,7 @@ Future<_Fixture> _pump(WidgetTester tester, String location) async {
 void main() {
   testWidgets(
     'a real voice channel keeps its back affordance through join, hang up, '
-    'the rejoin screen, and rejoining',
+    'a revisit to the rejoin screen, and rejoining',
     (tester) async {
       final f = await _pump(tester, '/channels/$_voiceChannelId');
 
@@ -151,6 +151,14 @@ void main() {
       );
 
       await f.controller.leave();
+      await tester.pumpAndSettle();
+      expect(
+        f.router.routerDelegate.currentConfiguration.uri.toString(),
+        '/channels',
+        reason: 'a phone hang-up leaves the call screen (voice_hangup_return)',
+      );
+
+      f.router.go('/channels/$_voiceChannelId');
       await tester.pumpAndSettle();
       expect(
         find.byType(CompactChannelAppBar),
