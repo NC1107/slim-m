@@ -43,4 +43,39 @@ void main() {
     expect(find.byType(AppKbd), findsNothing);
     expect(find.textContaining('Choose one from the list'), findsOneWidget);
   });
+
+  testWidgets('the shortcut list is centred under the heading', (tester) async {
+    // The seam once sat right of centre because keycaps set the row's end.
+    await tester.binding.setSurfaceSize(const Size(480, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pump(tester, touch: false);
+
+    final centre = tester.getCenter(find.byIcon(AppIcons.hash)).dx;
+    expect(centre, moreOrLessEquals(240, epsilon: 0.5));
+    expect(
+      tester.getCenter(find.text('Pick a channel to start reading.')).dx,
+      moreOrLessEquals(centre, epsilon: 0.5),
+    );
+    for (final label in [
+      'Quick switcher',
+      'Next channel',
+      'Previous channel',
+      'Open settings',
+    ]) {
+      final row = find.ancestor(
+        of: find.text(label),
+        matching: find.byType(Row),
+      );
+      final kbd = find.descendant(of: row.first, matching: find.byType(AppKbd));
+      final labelRight = tester.getTopRight(find.text(label)).dx;
+      final keysLeft = tester.getTopLeft(kbd.first).dx;
+      expect(labelRight, lessThanOrEqualTo(centre), reason: label);
+      expect(keysLeft, greaterThanOrEqualTo(centre), reason: label);
+      expect(
+        (labelRight + keysLeft) / 2,
+        moreOrLessEquals(centre, epsilon: 1),
+        reason: label,
+      );
+    }
+  });
 }
