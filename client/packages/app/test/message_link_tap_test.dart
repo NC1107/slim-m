@@ -124,7 +124,7 @@ void main() {
     _tapLink(tester);
     await tester.pumpAndSettle();
 
-    expect(h.location, Routes.channel('c-target'));
+    expect(h.location, Routes.channel('c-target', openChat: true));
     expect(h.jump.jumps, [
       ('c-target', 'm-9'),
     ], reason: 'the jump names the channel and message the link pointed at');
