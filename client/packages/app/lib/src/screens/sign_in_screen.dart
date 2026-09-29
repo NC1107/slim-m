@@ -216,6 +216,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     return host.isEmpty ? _server.text.trim() : host;
   }
 
+  bool _targetsOfficial() {
+    final target = _probeTarget(_server.text);
+    return target != null && isOfficialServer(target);
+  }
+
   void _onServerEdited(String _) {
     // The old answer is about the old address the moment the field changes,
     // and the line naming the destination is read off the field itself.
@@ -441,6 +446,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             displayName: _displayName,
             password: _password,
             creatingAccount: _creatingAccount,
+            askDisplayName: !_targetsOfficial(),
             busy: _busy,
             errorFor: _errorFor,
             onSubmit: _submit,

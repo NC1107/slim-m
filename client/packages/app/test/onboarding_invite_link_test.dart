@@ -162,11 +162,15 @@ void main() {
       'consumes itself', (tester) async {
     await _pumpWithTappedInvite(tester);
 
-    final fields = tester
-        .widgetList<TextField>(find.byType(TextField))
-        .toList();
-    expect(fields, hasLength(2), reason: 'the redeem dialog is open');
+    expect(find.text('Joining chat.example'), findsOneWidget);
+    var fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields, hasLength(1), reason: 'the link named the server');
+    expect(fields[0].controller?.text, 'C1');
+
+    await tester.tap(find.text('Use a different server'));
+    await tester.pumpAndSettle();
+    fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields, hasLength(2));
     expect(fields[0].controller?.text, 'https://chat.example:8443');
-    expect(fields[1].controller?.text, 'C1');
   });
 }
