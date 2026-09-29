@@ -127,6 +127,15 @@ class SyncTestServer {
     }
   }
 
+  /// Closes every connected socket the way a restarting server would, leaving
+  /// the listener up so the client's retry can connect again. Call as
+  /// `await tester.runAsync(server.dropSockets)` - see the class doc.
+  Future<void> dropSockets() async {
+    for (final socket in List.of(_sockets)) {
+      await socket.close();
+    }
+  }
+
   /// Call as `await tester.runAsync(server.close)` - see the class doc.
   Future<void> close() async {
     for (final socket in List.of(_sockets)) {
