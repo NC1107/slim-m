@@ -5,8 +5,8 @@
 /// where the roster and presence data this pane renders all live now)
 /// batch-fetches status for the resolved member list and
 /// [presenceControllerProvider] keeps it current from live
-/// `presence.changed` events, so `groupMembersByPresence` is finally called
-/// with a real status map instead of an empty one.
+/// `presence.changed` events, so the roster grouping gets a real
+/// status map instead of an empty one.
 ///
 /// A member's first role becomes a badge. `@everyone` is excluded server-side,
 /// so an empty list means no badge rather than no data. There is still no
@@ -45,6 +45,7 @@ import '../providers/member_presence.dart';
 import '../providers/member_selection.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart';
+import '../providers/roster_grouping.dart';
 import 'member_bulk_actions.dart';
 import 'member_pane_rows.dart';
 import 'member_selection_bar.dart';
@@ -142,16 +143,8 @@ class AppMemberPane extends ConsumerWidget {
                   ),
                 ),
               ),
-              data: (members) {
-                // A read, not a watch: this build already reruns on the scoped watch above.
-                final presence = ref.read(presenceControllerProvider);
-                final statusOf = {
-                  for (final entry in presence.entries)
-                    entry.key: presenceOf(entry.value),
-                };
-                final entries = rosterEntries(
-                  groupMembersByPresence(members, statusOf),
-                );
+              data: (_) {
+                final entries = ref.watch(rosterEntriesProvider(channelId));
                 // Lazy, so a large roster builds only the rows on screen.
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(
