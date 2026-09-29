@@ -12,37 +12,11 @@ name: client-macos-ci
 # install`, matching how `client-ios-ci.yml` already builds with no
 # CocoaPods step), which produces a local "Sign to Run Locally" binary
 # with no Apple account of any kind.
-#
-# Narrower trigger paths than client-ios-ci.yml's release-build job on
-# purpose: nothing outside macos/, the two native-leaning packages, and the
-# workspace lockfile can change whether this compiles.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "client/**"
-      - ".github/workflows/client-macos-ci.yml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
-      - "!client/CHANGELOG.md"
-      - "!client/pubspec.yaml"
-      - "!client/packages/app/pubspec.yaml"
-  pull_request:
-    paths:
-      - "client/packages/app/macos/**"
-      - "client/packages/rtc/**"
-      - "client/packages/platform/**"
-      - "client/pubspec.yaml"
-      - "client/pubspec.lock"
-      - "client/packages/app/pubspec.yaml"
-      - ".github/workflows/client-macos-ci.yml"
-      # A release-please version bump touches these three and nothing else.
-      # It never moves client/pubspec.lock, so a genuine dependency change
-      # still triggers a full run through the lock file.
-      - "!client/CHANGELOG.md"
-      - "!client/pubspec.yaml"
-      - "!client/packages/app/pubspec.yaml"
+  # Nightly and manual only: it gates nothing, so it does not take a macOS slot per merge.
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read

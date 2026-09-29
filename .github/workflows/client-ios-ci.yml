@@ -8,8 +8,9 @@ name: client-ios-ci
 #
 # The paths are what can actually change the answer: the iOS project itself,
 # the plugins that pull in CallKit and WebRTC, and the dependency set, which is
-# how a Dart-side change reaches an Xcode build. Push to main runs it whatever
-# changed, so main is never trusted on a filter alone.
+# how a Dart-side change reaches an Xcode build. Push to main uses the same
+# filter: it gates nothing outside a release, and the release commit always
+# matches it through its pubspec bump.
 #
 # PR #292 shipped a category on a private engine class, an undefined-symbol
 # link error that "ios unit tests" (a simulator, Debug build) could not see
@@ -26,7 +27,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "client/**"
+      - "client/packages/app/ios/**"
+      - "client/packages/rtc/**"
+      - "client/packages/platform/**"
+      - "client/pubspec.yaml"
+      - "client/pubspec.lock"
+      - "client/packages/app/pubspec.yaml"
       - ".github/workflows/client-ios-ci.yml"
       # A release-please version bump is deliberately NOT excluded:
       # verify-release-checks.yml gates the client publish jobs on this
