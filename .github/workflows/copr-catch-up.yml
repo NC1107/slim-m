@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+name: copr-catch-up
+
+# The Linux client reaches `dnf upgrade` only through COPR, and main-builds.yml's
+# copr job is a single push-triggered path that a merge storm cancels. This
+# submits the client when COPR's newest live build is behind client/pubspec.yaml,
+# and does nothing otherwise, so any missed submit heals on the next trigger.
+# Triggers and the concurrency choice are argued in docs/ci.md.
+on:
+  workflow_run:
+    workflows: [main-builds]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never cancels a submit; a newer trigger queues one pending run, which is enough because every run asks the same question of COPR's current state.
+concurrency:
+  group: copr-catch-up
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      behind: ${{ steps.behind.outputs.behind }}
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: resolve version
+        id: ver
+        run: |
+          version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: compare with COPR
+        id: behind
+        env:
+          PUBSPEC_VERSION: ${{ steps.ver.outputs.version }}
+        run: bash scripts/copr-behind.sh
+
+  tarball:
+    needs: [check]
+    if: needs.check.outputs.behind == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: build linux tarball
+        uses: ./.github/actions/linux-tarball
+        with:
+          version: ${{ needs.check.outputs.version }}
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: slim-m-client-tarball
+          path: dist/*-linux-amd64.tar.gz
+          if-no-files-found: error
+
+  copr:
+    needs: [check, tarball]
+    if: needs.check.outputs.behind == 'true'
+    uses: ./.github/workflows/copr-publish.yml
+    # Named rather than `inherit`, for the reason main-builds.yml's copr job gives.
+    secrets:
+      COPR_CONFIG: ${{ secrets.COPR_CONFIG }}

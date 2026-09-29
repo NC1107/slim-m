@@ -141,36 +141,11 @@ jobs:
           version="$(grep -m1 '^version:' client/pubspec.yaml | awk '{print $2}')"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      - name: linux build deps
-        uses: ./.github/actions/linux-build-deps
-
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      # The tarball's name matches the spec's Source0 basename exactly, which is what lets the copr job skip spectool.
+      - name: build linux tarball
+        uses: ./.github/actions/linux-tarball
         with:
-          channel: stable
-          flutter-version: 3.47.0
-
-      - name: build linux release
-        run: |
-          flutter config --enable-linux-desktop
-          dart pub get --enforce-lockfile
-          flutter build linux --release
-        working-directory: client/packages/app
-
-      # This tarball's name matches the spec's Source0 basename exactly, which is what lets the copr job skip spectool.
-      - name: stage portable tarball
-        run: |
-          version="${{ steps.ver.outputs.version }}"
-          name="slim-m-client-${version}"
-          bundle="client/packages/app/build/linux/x64/release/bundle"
-          if [ ! -x "${bundle}/slimm_app" ]; then
-            echo "::error::no linux bundle at ${bundle}"
-            exit 1
-          fi
-          mkdir -p "stage/${name}" dist
-          cp -a "${bundle}/." "stage/${name}/"
-          cp LICENSES/LicenseRef-PolyForm-Noncommercial-1.0.0.txt "stage/${name}/LICENSE"
-          cp packaging/linux/README.md "stage/${name}/README.md"
-          tar -C stage -czf "dist/${name}-linux-amd64.tar.gz" "${name}"
+          version: ${{ steps.ver.outputs.version }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
