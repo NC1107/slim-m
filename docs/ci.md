@@ -493,6 +493,7 @@ Measured on 2026-08-18 over every `hygiene` run ever queued on a release-please 
 The discriminator is `triggering_actor`, not the workflow, the branch or the event.
 
 With `RELEASE_PLEASE_TOKEN` set to a fine-grained PAT, the PR is authored by the token's owner and its checks run like any other PR's.
+The secret is set on this repository now, and the release PRs and the tags release-please cuts are authored by the owner.
 The PAT needs `contents: read and write` and `pull requests: read and write` on this repository, and nothing else.
 Set it with `gh secret set RELEASE_PLEASE_TOKEN` so the value never lands in a file or a shell history; rotating it is a re-run of that one command.
 
