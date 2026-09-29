@@ -32,6 +32,7 @@ import 'module_scene_frame.dart';
 import 'module_scene_keyboard.dart';
 import 'module_scene_pacing.dart';
 import 'module_scene_painter.dart';
+import 'module_scene_timeline.dart';
 
 /// Runs one action against the module and returns its raw result. The action
 /// and the current scene state are already packed into [input] as
@@ -467,12 +468,10 @@ class _ModuleSceneViewState extends State<ModuleSceneView> {
               onPanUpdate: (d) => _handlePanUpdate(d, size),
               child: Stack(
                 children: [
-                  CustomPaint(
-                    painter: ModuleScenePainter(
-                      scene: _scene,
-                      tokens: tokens,
-                      images: _images.snapshot(_scene),
-                    ),
+                  SceneTimeline(
+                    scene: _scene,
+                    tokens: tokens,
+                    images: _images.snapshot(_scene),
                     size: size,
                   ),
                   // Above the paint: a tap for a field must not also fall through.

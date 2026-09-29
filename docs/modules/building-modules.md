@@ -398,6 +398,26 @@ Four things to know:
 
 An `input` op carries no `tap`. A tap in its area goes to the field, never to the scene underneath it.
 
+### Motion
+
+A `rect`, `circle`, `line` or `text` op may carry a `sweep`, and slim plays it locally with no further call to your module.
+
+```json
+{ "op": "rect", "x": 4, "y": 12, "w": 3, "h": 68, "sweep": { "dx": 149, "secs": 2 } }
+```
+
+- `dx` and `dy` move the op.
+  `dw` and `dh` grow a rect's width and height, or a circle's radius (`dw`).
+- `secs` is how long it takes and `delay` how long before it starts.
+  Motion is linear, happens once, then holds.
+- A scene stops moving after 10 seconds, delay included.
+  Eight ops per scene may move, and later ones draw still.
+- A new frame restarts the motion, which is how a playhead advances one step per frame.
+- With reduced motion, or with the app in the background, the scene just shows where everything ends up.
+- A `tap` on a moving op hits the place it was declared, not where it is now.
+
+See decision 0043 for why this is declared motion and not a timer you control.
+
 ## Interactive scenes
 
 A scene becomes interactive by offering `controls` and carrying `state`, and by drawing ops with a `tap`.
