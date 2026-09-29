@@ -150,10 +150,20 @@ async fn scene(s: &Store) -> (User, User, ChannelId, String, String) {
 }
 
 async fn run(router: &Router, message_id: MessageId, token: &str, input: &str) -> StatusCode {
+    run_block(router, message_id, 0, token, input).await
+}
+
+async fn run_block(
+    router: &Router,
+    message_id: MessageId,
+    block_index: i64,
+    token: &str,
+    input: &str,
+) -> StatusCode {
     router
         .clone()
         .oneshot(post(
-            &format!("/messages/{message_id}/blocks/0/run"),
+            &format!("/messages/{message_id}/blocks/{block_index}/run"),
             token,
             json!({ "module_id": "dice", "command": "run", "input": input }),
         ))
@@ -234,4 +244,66 @@ async fn a_refused_run_stores_nothing() {
     );
     let stored = s.code_runs_for_messages(&[id]).await.unwrap();
     assert!(stored.iter().all(|(_, runs)| runs.is_empty()));
+}
+
+#[tokio::test]
+async fn the_stored_block_is_judged_not_the_input_a_client_sends() {
+    let (s, _guard) = new_store("slimm-run-extracts-stored-block").await;
+    let (author, _runner, channel_id, _author_token, runner_token) = scene(&s).await;
+    let router = app(s.clone());
+
+    let hidden = post_block(&s, channel_id, &author, "```js\nroll()\u{202E}\n```").await;
+    assert_eq!(
+        run(&router, hidden, &runner_token, "roll()").await,
+        StatusCode::FORBIDDEN,
+        "a clean input cannot launder a block that hides characters"
+    );
+
+    let clean = post_block(&s, channel_id, &author, "```js\nroll()\n```").await;
+    assert_eq!(
+        run(&router, clean, &runner_token, "attack()\u{202E}").await,
+        StatusCode::OK,
+        "the stored block runs, whatever input the client claims"
+    );
+}
+
+#[tokio::test]
+async fn a_block_index_with_no_block_is_a_conflict_and_stores_nothing() {
+    let (s, _guard) = new_store("slimm-run-no-such-block").await;
+    let (author, _runner, channel_id, _author_token, runner_token) = scene(&s).await;
+    let router = app(s.clone());
+
+    let one = post_block(&s, channel_id, &author, "```js\nroll()\n```").await;
+    assert_eq!(
+        run_block(&router, one, 1, &runner_token, "roll()").await,
+        StatusCode::CONFLICT
+    );
+    let prose = post_block(&s, channel_id, &author, "no code here").await;
+    assert_eq!(
+        run(&router, prose, &runner_token, "roll()").await,
+        StatusCode::CONFLICT
+    );
+    let stored = s.code_runs_for_messages(&[one, prose]).await.unwrap();
+    assert!(stored.iter().all(|(_, runs)| runs.is_empty()));
+}
+
+#[tokio::test]
+async fn the_second_block_runs_by_its_own_index_after_an_edit_moves_it() {
+    let (s, _guard) = new_store("slimm-run-stale-index").await;
+    let (author, _runner, channel_id, _author_token, runner_token) = scene(&s).await;
+    let router = app(s.clone());
+
+    let id = post_block(&s, channel_id, &author, "```js\na()\n```\n```js\nb()\n```").await;
+    assert_eq!(
+        run_block(&router, id, 1, &runner_token, "").await,
+        StatusCode::OK
+    );
+    s.edit_message(id, "```js\na()\n```", author.id)
+        .await
+        .unwrap();
+    assert_eq!(
+        run_block(&router, id, 1, &runner_token, "").await,
+        StatusCode::CONFLICT,
+        "an index from before the edit no longer names a block"
+    );
 }

@@ -45,6 +45,7 @@ mod channel_order;
 mod channel_permissions;
 mod channel_slow_mode;
 mod channels;
+mod code_fences;
 mod code_runs;
 mod device_client_info;
 mod dms;

@@ -123,15 +123,22 @@ The run is attributed (`ran_by` is stored and broadcast), so it stays visible wh
 **What must hold instead is that what is read is what runs.**
 The server refuses a run whose `input` contains a control character (other than tab, line feed and carriage return), a text-direction character (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) or a zero-width character (U+200B to U+200D, U+2060, U+FEFF).
 The refusal is a 403 naming the reason, it applies to the author too, and nothing is stored or broadcast.
-It judges `input` and not the message text, because `input` is the bytes that run: an honest client sends the block verbatim, so it is exactly what the viewer was shown, and a zero-width joiner in prose beside a block does not block a clean run.
-A caller who sends different input is running their own chosen input, not being deceived.
+It judges the block the server runs, not the message text, so a zero-width joiner in prose beside a block does not block a clean run.
+
+**The server runs its own extraction of the block, and never the caller's claim of it.**
+This first shipped judging the request's `input`, which left a hole: `input` could be anything, so a member could run other code and have its output shared under someone else's block.
+Now `POST /messages/{id}/blocks/{n}/run` extracts block `n` from the stored message (`http/code_fences.rs`) and runs that; `input` is ignored.
+The extractor mirrors the client's fence rules (`message_fences.dart`): a fence marker occupies its whole line, the tag is `[A-Za-z0-9_+#-]*`, an opening fence with no close is text, and the client's `\s` is spelled out rather than approximated with Rust's `is_whitespace`.
+Both sides assert against one vector list, `crates/slimm-server/tests/fixtures/code_fence_vectors.json`, so a change to either fails the other.
+A message with no block at that index, including a stale index after an edit, answers 409 and stores nothing.
+A message that launched an app surface is the one exception: its input belongs to the module (a move, a click), so `input` is used as-is there, still behind the surface's own module and command check and the hidden-character refusal.
 
 The stored message is never rewritten.
 These characters are legitimate in real text, and a server that silently edits content is a worse property than the one being fixed.
 The client shows each one in place as a named marker (`<U+202E>`) with a warning band and no Run button, so the block is visibly marked before anyone can press Run.
 The marker is text and an icon, so it does not rely on colour.
 
-The server set is the same as the client's (`code_hidden_characters.dart`) and reuses the label validator's blocklist.
+The hidden-character set is the same as the client's (`code_hidden_characters.dart`) and reuses the label validator's blocklist.
 Zero-width joiners inside a string literal, such as an emoji sequence, are refused too.
 That is a deliberate trade for one rule that is easy to state; a block that needs one can build it from an escape.
 

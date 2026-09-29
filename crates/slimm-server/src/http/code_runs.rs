@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 use super::auth::is_disallowed_label_char;
+use super::code_fences::code_block;
 use super::error::ApiError;
 use super::extract::{AuthedLimited, Json, MODULE};
 use super::messages::parse_uuid;
@@ -118,30 +119,33 @@ async fn run(
         return Err(ApiError::NotFound("no such message"));
     }
 
-    // The input is the bytes that run; an honest client sends the block verbatim, so this is what the viewer was shown.
-    if has_hidden_characters(&req.input) {
-        return Err(ApiError::ForbiddenBecause(HIDDEN_CHARACTERS_REFUSAL));
-    }
-
     // An app surface owns its whole code-run surface; see this file's doc comment.
-    if let Some(surface) = state.store.app_surface_for_message(message_id).await?
+    let surface = state.store.app_surface_for_message(message_id).await?;
+    if let Some(surface) = &surface
         && (surface.module_id != req.module_id || surface.command != req.command)
     {
         return Err(ApiError::Forbidden);
     }
 
+    // A surface's input is the module's own; a plain message runs only its own stored block, never the caller's claim of it.
+    let code = match surface {
+        Some(_) => req.input.clone(),
+        None => usize::try_from(block_index)
+            .ok()
+            .and_then(|index| code_block(&message.content, index))
+            .ok_or(ApiError::Conflict(
+                "this message has no code block at that index",
+            ))?,
+    };
+    if has_hidden_characters(&code) {
+        return Err(ApiError::ForbiddenBecause(HIDDEN_CHARACTERS_REFUSAL));
+    }
+
     // Gating happens inside execute_command / execute_code_runner below.
     let outcome = if req.module_id == CODE_RUNNER_MODULE_ID {
-        execute_code_runner(&state, permissions, ctx.user_id, &req.command, &req.input).await?
+        execute_code_runner(&state, permissions, ctx.user_id, &req.command, &code).await?
     } else {
-        execute_command(
-            &state,
-            ctx.user_id,
-            &req.module_id,
-            &req.command,
-            &req.input,
-        )
-        .await?
+        execute_command(&state, ctx.user_id, &req.module_id, &req.command, &code).await?
     };
     let (ok, stored) = stored_payload(req.module_id == CODE_RUNNER_MODULE_ID, outcome);
     let ran_at = state
