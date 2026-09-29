@@ -25,6 +25,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/code_block_runner.dart';
 import '../providers/message_extras.dart';
 import '../providers/providers.dart';
+import 'code_hidden_characters.dart';
 import 'message_code_lexer.dart';
 import 'module_command_output.dart';
 import 'run_guarded.dart';
@@ -121,6 +122,7 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
   Widget build(BuildContext context) {
     final runners = ref.watch(codeBlockRunnerProvider).valueOrNull ?? const [];
     final runner = matchCodeBlockRunner(runners, widget.language);
+    final hidden = hasHiddenCodeCharacters(widget.code);
     final sharedRun = _shared ? _sharedRun() : null;
     final result = _shared
         ? (sharedRun == null ? null : _asResult(sharedRun))
@@ -130,10 +132,15 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
       children: [
         AppCodeBlock(
           language: widget.language,
-          lines: lexCodeBlock(widget.code, widget.language),
+          lines: hidden
+              ? revealHiddenCodeCharacters(
+                  lexCodeBlock(widget.code, widget.language),
+                )
+              : lexCodeBlock(widget.code, widget.language),
+          notice: hidden ? const _HiddenCharactersNotice() : null,
           // A long paste folds so it does not eat the transcript; the header (and its Run) stays, so it can be run without expanding.
           collapseAfterLines: _collapseAfterLines,
-          action: runner == null
+          action: runner == null || hidden
               ? null
               : _RunAction(
                   running: _running,
@@ -167,6 +174,45 @@ class _MessageCodeBlockRunnerState extends ConsumerState<MessageCodeBlockRunner>
         output: run.ok ? run.output : null,
         error: run.ok ? null : run.output,
       );
+}
+
+/// Shown above a block that hides characters, in words and an icon so it
+/// reads without colour.
+class _HiddenCharactersNotice extends StatelessWidget {
+  const _HiddenCharactersNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s12,
+        vertical: AppSpacing.s8,
+      ),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            AppIcons.warning,
+            size: AppSizes.icon16,
+            color: tokens.dangerText,
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          Expanded(
+            child: Text(
+              'This block contains hidden characters, shown in place as '
+              '<U+XXXX>. It cannot be run.',
+              style: AppText.micro.copyWith(color: tokens.dangerText),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The header's action slot while idle, or a spinner while a run is in
