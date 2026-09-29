@@ -20,12 +20,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../providers/call_recap.dart';
+import '../providers/last_text_channel.dart';
+import '../providers/toasts.dart';
 import '../providers/member_presence.dart' show membersProvider, presenceOf;
 import '../providers/presence_controller.dart';
 import '../providers/voice_controller.dart';
 import '../providers/voice_flags.dart';
 import '../routing/breakpoints.dart';
+import '../routing/routes.dart';
+import '../widgets/call_recap_card.dart' show formatCallDuration;
 import '../widgets/call_stage_layout.dart';
 import '../widgets/member_profile.dart';
 import '../widgets/participant_call_menu.dart';
@@ -139,8 +145,32 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen> {
     controller.join(widget.channelId);
   }
 
+  /// Owner: the rejoin screen after a hang-up is a "useless screen". On a
+  /// phone a hang-up returns to the last text channel with the recap as a
+  /// toast; a dropped or failed call never sets `justLeftAt`, so it keeps
+  /// the rejoin screen. Wide layouts keep the stage beside the rail.
+  void _returnAfterHangUp(VoiceFlags? before, VoiceFlags now) {
+    if (widget.isDm || before?.justLeftAt == now.justLeftAt) return;
+    if (now.justLeftChannelId != widget.channelId || now.justLeftAt == null) {
+      return;
+    }
+    if (LayoutClass.of(context) != LayoutClass.compact) return;
+    final recap = recapForChannel(now, widget.channelId);
+    if (recap != null && recap.isWorthShowing) {
+      ref
+          .read(toastsProvider.notifier)
+          .show(
+            'Call ended - ${formatCallDuration(recap.duration)}.',
+            severity: AppToastSeverity.success,
+          );
+    }
+    final last = ref.read(lastTextChannelProvider);
+    context.go(last == null ? Routes.channels : Routes.channel(last));
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<VoiceFlags>(voiceFlagsProvider, _returnAfterHangUp);
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final voice = ref.watch(voiceFlagsProvider);
     final controller = ref.read(voiceControllerProvider.notifier);
