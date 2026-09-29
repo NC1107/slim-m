@@ -102,6 +102,7 @@ class DesktopWindowShell {
     _trayController = null;
     _active = false;
     _framelessApplied = false;
+    _handoffTargetSize = null;
   }
 
   /// Flips the two flags [DesktopChrome] reads, so a widget test can render
