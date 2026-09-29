@@ -15,10 +15,10 @@ WEB=web
 
 # Digests are the contract. A silently different worker talking to a client
 # from another drift version fails at runtime in the browser, not at build.
-SQLITE3_VERSION=2.9.4
-SQLITE3_SHA=922a76b182b6af69b030c8e2fdd3283ecc8e827248b20e4b1f3f3db170b52117
-DRIFT_VERSION=2.31.0
-DRIFT_SHA=f0a9b87085f732fd7b6ee7eb34d3858c556f05d221eb1febfc443649cd365752
+SQLITE3_VERSION=3.6.0
+SQLITE3_SHA=13d3f11d05b39ba0618a7115fb41640a5d48b6300f5d3f325f554b42bd6688a4
+DRIFT_VERSION=2.35.0
+DRIFT_SHA=df0066e75363a9bed59a14eedbbded421c1f5910f8379812df164716aa2e6eed
 
 pinned() {
   local name=$1

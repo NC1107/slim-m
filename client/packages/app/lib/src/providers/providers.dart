@@ -18,6 +18,7 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import 'database_key_store.dart';
 import 'live_events.dart';
 
 /// The server the user picked, with null meaning one has never been picked on
@@ -339,7 +340,13 @@ final probeApiProvider = Provider<SlimmApi Function(Uri)>(
 
 /// The local database. Opened once and closed with the container.
 final databaseProvider = FutureProvider<SlimmDatabase>((ref) async {
-  final db = SlimmDatabase(await openSlimmDatabase());
+  final db = SlimmDatabase(
+    await openSlimmDatabase(
+      keys: KeyStoreDatabaseKey(ref.read(keyStoreProvider)),
+      onReset: (reason) =>
+          ref.read(databaseResetProvider.notifier).state = reason,
+    ),
+  );
   ref.onDispose(db.close);
   return db;
 });

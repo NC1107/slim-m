@@ -4,6 +4,8 @@
 The web build exists to drive this UI automatically.
 Native Linux runs, but no synthetic input reaches it on a Wayland desktop, and a browser can be driven over the DevTools protocol.
 It is a test surface, not a distribution target.
+The browser database is not encrypted at rest, and `sqlite3.wasm` below is the plain build, not `sqlite3mc.wasm`.
+See `docs/decisions/0042-encrypt-local-database.md` for why.
 
 Two of the files the build needs are binaries rather than source. **Neither is committed.**
 `tool/fetch_web_assets.sh` downloads both, refusing to run if the versions it pins have drifted from `client/pubspec.lock`, and checking each against a recorded sha256.
@@ -21,7 +23,7 @@ curl -sSL -o web/sqlite3.wasm \
   https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-<version>/sqlite3.wasm
 ```
 
-Currently sqlite3 2.9.4, carrying SQLite 3.50.4, sha256 `922a76b182b6af69b030c8e2fdd3283ecc8e827248b20e4b1f3f3db170b52117`.
+Currently sqlite3 3.6.0, carrying SQLite 3.53.4, sha256 `13d3f11d05b39ba0618a7115fb41640a5d48b6300f5d3f325f554b42bd6688a4`.
 
 ## `drift_worker.js`
 
@@ -33,7 +35,7 @@ curl -sSL -o web/drift_worker.js \
   https://github.com/simolus3/drift/releases/download/drift-<version>/drift_worker.js
 ```
 
-Currently drift 2.31.0, sha256 `f0a9b87085f732fd7b6ee7eb34d3858c556f05d221eb1febfc443649cd365752`.
+Currently drift 2.35.0, sha256 `df0066e75363a9bed59a14eedbbded421c1f5910f8379812df164716aa2e6eed`.
 
 Drift also exposes `WasmDatabase.workerMainForOpen`, so this file can be compiled from source with `dart compile js` instead of downloaded.
 The published artifact is used because it is what the drift documentation points at, and because compiling it locally adds a build step nothing else in this repo needs.

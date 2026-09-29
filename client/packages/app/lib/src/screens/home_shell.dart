@@ -22,6 +22,7 @@ import '../providers/blocks_controller.dart';
 import '../providers/hold_music_controller.dart';
 import '../providers/channel_notification_overrides_controller.dart';
 import '../providers/composer_focus.dart';
+import '../providers/database_key_store.dart';
 import '../providers/last_text_channel.dart';
 import '../providers/member_selection.dart';
 import '../providers/module_sound_settings.dart';
@@ -264,7 +265,9 @@ class HomeShell extends ConsumerWidget {
             autofocus: true,
             child: _LayoutBridge(
               layout: layout,
-              child: UpdateBannerHost(child: scaffold),
+              child: UpdateBannerHost(
+                child: DatabaseResetNotice(child: scaffold),
+              ),
             ),
           ),
         ),
@@ -355,7 +358,7 @@ class ConversationPane extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.s16),
           child: AppErrorState(
-            message: 'Could not load this screen.',
+            message: localStoreErrorMessage(e),
             onRetry: () => ref.invalidate(storeProvider),
           ),
         ),

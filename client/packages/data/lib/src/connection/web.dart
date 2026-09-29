@@ -12,6 +12,8 @@ import 'package:drift/drift.dart';
 import 'package:drift/wasm.dart';
 import 'package:flutter/foundation.dart';
 
+import 'database_key.dart';
+
 /// The IndexedDB/OPFS database name. Changing it orphans every existing
 /// browser's cache rather than migrating it.
 const slimmDatabaseName = 'slimm';
@@ -22,7 +24,15 @@ const slimmDatabaseName = 'slimm';
 /// The cache is disposable by design (see `SlimmDatabase`'s migration notes),
 /// so an unlucky browser degrades to re-syncing rather than to losing
 /// anything the server does not already hold.
-Future<QueryExecutor> openSlimmDatabase() async {
+///
+/// Not encrypted, and [keys] goes unused: a browser has no place to keep a key
+/// that script on the same origin cannot also read, so encrypting here would
+/// be theatre. See docs/decisions/0042-encrypt-local-database.md.
+Future<QueryExecutor> openSlimmDatabase({
+  required DatabaseKeyStore keys,
+  String? directoryPath,
+  void Function(DatabaseResetReason reason)? onReset,
+}) async {
   final result = await WasmDatabase.open(
     databaseName: slimmDatabaseName,
     sqlite3Uri: Uri.parse('sqlite3.wasm'),
