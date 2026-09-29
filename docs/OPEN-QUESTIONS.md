@@ -24,6 +24,8 @@ This matters more than it normally would, because an iOS screen-share fix was re
 
 *What the run did instead:* covered each with unit tests against fakes, and said plainly in every PR body that device confirmation is outstanding rather than calling them done.
 
+The steps to run these with a TestFlight or Android build, and what to report, are in `docs/PHONE-TESTER-CHECKLIST.md`.
+
 ## 2. Android has never had a call held on it
 
 `RECORD_AUDIO` was missing from the Android manifest from the day voice shipped until #231, so a call on Android could never have captured audio.
