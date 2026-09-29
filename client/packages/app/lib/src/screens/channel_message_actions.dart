@@ -112,13 +112,15 @@ Future<void> confirmAndDeleteSelectedMessages(
   );
   if (!confirmed || !context.mounted) return;
   // runGuarded directly rather than _reporting, which cannot say it succeeded.
+  final error = messageBulkDeleteErrorProvider(channelId);
+  ref.read(error.notifier).state = null;
   final failure = await runGuarded(
     whatFailed: ids.length == 1 ? 'delete the message' : 'delete the messages',
     action: () =>
         bulkDeleteMessagesAction(ref, channelId: channelId, messageIds: ids),
   );
   if (failure != null) {
-    if (context.mounted) showAppSnackbar(context, failure);
+    ref.read(error.notifier).state = failure;
     return;
   }
   ref.read(messageSelectionProvider(channelId).notifier).clear();

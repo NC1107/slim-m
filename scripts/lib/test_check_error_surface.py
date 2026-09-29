@@ -242,5 +242,127 @@ class Foo {
         self.assertIn("0 offender(s)", result.stdout)
 
 
+    def _assert_flagged(self, name, line):
+        result = self._run()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(
+            f"file=client/packages/app/lib/{name},line={line}",
+            result.stdout + result.stderr)
+
+    def test_a_runguarded_sentence_shown_as_a_snackbar_is_caught(self):
+        """runGuarded catches internally, so the caller has no catch block at
+        all; the bulk member actions shipped this shape past the gate."""
+        self._write("bad_guarded.dart", """
+Future<void> remove(WidgetRef ref, BuildContext context) async {
+  final failure = await runGuarded(
+    whatFailed: 'remove the member',
+    action: () => ref.read(apiProvider).removeMember(),
+  );
+  if (failure != null) {
+    if (context.mounted) showAppSnackbar(context, failure);
+    return;
+  }
+}
+""")
+        self._assert_flagged("bad_guarded.dart", 8)
+
+    def test_a_then_bound_runguarded_sentence_is_caught(self):
+        self._write("bad_then.dart", """
+Future<void> remove(BuildContext host, ProviderContainer container) async {
+  await runGuarded(
+    whatFailed: 'remove them',
+    action: () => container.read(apiProvider).removeMember(),
+  ).then((failure) {
+    if (failure != null) {
+      showAppSnackbar(host, failure);
+    }
+  });
+}
+""")
+        self._assert_flagged("bad_then.dart", 8)
+
+    def test_a_class_member_runguarded_sentence_is_caught(self):
+        self._write("bad_member.dart", """
+class Foo {
+  Future<void> _eject(BuildContext host) async {
+    final failure = await runGuarded(
+      whatFailed: 'eject',
+      action: () => api.kick(),
+    );
+    if (failure != null && host.mounted) {
+      showAppSnackbar(host, failure);
+    }
+  }
+}
+""")
+        self._assert_flagged("bad_member.dart", 9)
+
+    def test_a_runguarded_sentence_held_for_an_error_state_is_fine(self):
+        self._write("ok_guarded.dart", """
+Future<void> remove(WidgetRef ref) async {
+  final failure = await runGuarded(
+    whatFailed: 'remove the member',
+    action: () => ref.read(apiProvider).removeMember(),
+  );
+  if (failure != null) {
+    ref.read(errorProvider.notifier).state = failure;
+  }
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("0 offender(s)", result.stdout)
+
+    def test_a_snackbar_in_another_function_is_not_this_ones_failure(self):
+        """The variable is only the failure inside the function that bound
+        it; a same-named local elsewhere in the file is not."""
+        self._write("ok_scope.dart", """
+Future<void> remove(WidgetRef ref) async {
+  final failure = await runGuarded(
+    whatFailed: 'remove the member',
+    action: () => ref.read(apiProvider).removeMember(),
+  );
+  if (failure != null) {
+    ref.read(errorProvider.notifier).state = failure;
+  }
+}
+
+void copy(BuildContext context) {
+  final failure = 'copied';
+  showAppSnackbar(context, failure);
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_a_literal_snackbar_beside_runguarded_is_fine(self):
+        self._write("ok_literal.dart", """
+Future<void> save(WidgetRef ref, BuildContext context) async {
+  final failure = await runGuarded(
+    whatFailed: 'save',
+    action: () => ref.read(apiProvider).save(),
+  );
+  if (failure != null) return;
+  showAppSnackbar(context, 'Saved.');
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_a_commented_out_guarded_snackbar_is_ignored(self):
+        self._write("ok_comment.dart", """
+Future<void> remove(WidgetRef ref, BuildContext context) async {
+  final failure = await runGuarded(
+    whatFailed: 'remove',
+    action: () => ref.read(apiProvider).removeMember(),
+  );
+  // showAppSnackbar(context, failure);
+  if (failure != null) ref.read(errorProvider.notifier).state = failure;
+}
+""")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

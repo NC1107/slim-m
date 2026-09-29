@@ -51,13 +51,28 @@ class ChannelComposerArea extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (ref.watch(messageSelectionProvider(channelId)).active) {
-      return MessageSelectionBar(
-        channelId: channelId,
-        onDelete: () => confirmAndDeleteSelectedMessages(
-          ref,
-          context,
-          channelId: channelId,
-        ),
+      final error = messageBulkDeleteErrorProvider(channelId);
+      final failure = ref.watch(error);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (failure != null)
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.s8),
+              child: AppErrorState(
+                message: failure,
+                onDismiss: () => ref.read(error.notifier).state = null,
+              ),
+            ),
+          MessageSelectionBar(
+            channelId: channelId,
+            onDelete: () => confirmAndDeleteSelectedMessages(
+              ref,
+              context,
+              channelId: channelId,
+            ),
+          ),
+        ],
       );
     }
     final me = ref.watch(meProvider).valueOrNull;

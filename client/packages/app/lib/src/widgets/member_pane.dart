@@ -41,6 +41,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../permissions.dart';
 import '../providers/admin_providers.dart';
+import '../providers/member_moderation_error.dart';
 import '../providers/member_presence.dart';
 import '../providers/member_selection.dart';
 import '../providers/presence_controller.dart';
@@ -91,6 +92,7 @@ class AppMemberPane extends ConsumerWidget {
     final selecting = ref.watch(
       memberSelectionProvider.select((s) => s.active),
     );
+    final moderationError = ref.watch(memberModerationErrorProvider);
     // A bit revoked mid-selection leaves a mode with no verb left in it.
     ref.listen(myPermissionsProvider, (_, next) {
       final stillAllowed =
@@ -114,6 +116,16 @@ class AppMemberPane extends ConsumerWidget {
                 ? ref.read(memberSelectionProvider.notifier).enter
                 : null,
           ),
+          if (moderationError != null)
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.s8),
+              child: AppErrorState(
+                message: moderationError,
+                onDismiss: () =>
+                    ref.read(memberModerationErrorProvider.notifier).state =
+                        null,
+              ),
+            ),
           Expanded(
             child: membersAsync.when(
               loading: () => const Center(

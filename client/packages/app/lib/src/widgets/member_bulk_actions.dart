@@ -19,9 +19,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart';
 
+import '../providers/member_moderation_error.dart';
 import '../providers/member_selection.dart';
 import '../providers/providers.dart';
-import 'app_snackbar.dart';
 import 'confirm_dialog.dart';
 import 'run_guarded.dart';
 
@@ -45,12 +45,13 @@ Future<void> confirmAndRemoveSelectedMembers(
   );
   if (!confirmed || !context.mounted) return;
 
+  ref.read(memberModerationErrorProvider.notifier).state = null;
   final failure = await runGuarded(
     whatFailed: ids.length == 1 ? 'remove the member' : 'remove the members',
     action: () => ref.read(apiProvider).bulkRemoveMembers(userIds: ids),
   );
   if (failure != null) {
-    if (context.mounted) showAppSnackbar(context, failure);
+    ref.read(memberModerationErrorProvider.notifier).state = failure;
     return;
   }
   ref.read(memberSelectionProvider.notifier).clear();
@@ -69,6 +70,7 @@ Future<void> timeOutSelectedMembers(
   final ids = ref.read(memberSelectionProvider).ids.toList();
   if (ids.isEmpty) return;
 
+  ref.read(memberModerationErrorProvider.notifier).state = null;
   final failure = await runGuarded(
     whatFailed: ids.length == 1
         ? 'time the member out'
@@ -78,7 +80,7 @@ Future<void> timeOutSelectedMembers(
         .bulkTimeoutMembers(userIds: ids, duration: duration),
   );
   if (failure != null) {
-    if (context.mounted) showAppSnackbar(context, failure);
+    ref.read(memberModerationErrorProvider.notifier).state = failure;
     return;
   }
   ref.read(memberSelectionProvider.notifier).clear();

@@ -20,6 +20,7 @@ import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/permissions.dart';
 import 'package:slimm_app/src/providers/admin_providers.dart';
+import 'package:slimm_app/src/providers/member_moderation_error.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
@@ -49,7 +50,7 @@ const _other = api.UserProfile(
 /// button's own `ProviderScope.containerOf` reading a container this test
 /// cannot see requests through.
 ({ProviderContainer container, List<String> requests, FakeSession session})
-_wire({int permissions = 0, api.Me? selfProfile}) {
+_wire({int permissions = 0, api.Me? selfProfile, bool refuseKick = false}) {
   final requests = <String>[];
   final session = FakeSession();
   final container = ProviderContainer(
@@ -87,6 +88,9 @@ _wire({int permissions = 0, api.Me? selfProfile}) {
                 200,
                 headers: {'content-type': 'application/json'},
               );
+            }
+            if (refuseKick && request.url.path.endsWith('/kick')) {
+              return http.Response('boom', 500);
             }
             return http.Response('', 204);
           }),
@@ -261,6 +265,31 @@ void main() {
       contains(
         'POST /channels/$_channelId/voice/participants/${_other.id}/kick',
       ),
+    );
+    await wired.container.read(voiceControllerProvider.notifier).leave();
+  });
+
+  testWidgets('a refused eject is held for the member pane, not snackbarred', (
+    tester,
+  ) async {
+    _giveDesktopMenuRoom(tester);
+    final wired = _wire(permissions: Perm.kickMembers, refuseKick: true);
+    await tester.pumpWidget(
+      reducedMotionApp(container: wired.container, child: _body()),
+    );
+    await _joinShared(tester, wired.container, wired.session);
+    await tester.tap(find.text('Moderate...'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eject from call...'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Eject'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+    expect(
+      wired.container.read(memberModerationErrorProvider),
+      contains('eject maya from the call'),
     );
     await wired.container.read(voiceControllerProvider.notifier).leave();
   });
