@@ -4029,6 +4029,12 @@ paths:
         every block index, or the call is refused with 403 - a module
         permission held for something else can never overwrite a surface it
         did not launch.
+
+
+        An `input` containing a control, text-direction or zero-width
+        character (tab and line breaks aside) is refused with 403, for every
+        caller, so what a viewer reads is what runs (decision 0026's
+        addendum).
       requestBody:
         required: true
         content:

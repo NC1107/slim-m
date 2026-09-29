@@ -107,3 +107,34 @@ The WebAssembly route was not wrong so much as **it was solving a problem that a
 Lua as a first language existed only because a WebAssembly interpreter is small, which stopped being a consideration the moment we stopped shipping interpreters.
 
 What survives unchanged from the original is everything about the boundary, because that half was never about the backend: the server brokers and never executes, an invocation carries the block and nothing else, absent configuration is a normal state, the permission bit defaults to nobody, and the ceilings are the server's own.
+
+## Addendum, 2026-09-28: who may run a block, and hidden characters
+
+Raised by a discovery run that found two facts which are harmless alone.
+Nothing marks a text-direction or zero-width character in a code block, and anyone who holds the module permission can press Run on anyone's block.
+Together they are the trojan-source shape (CVE-2021-42574): a block renders as one thing and runs as another, and the person who runs it is not the person who wrote it.
+
+**Anyone who holds the permission may still run anyone's block.**
+The author-only alternative was rejected.
+0021 makes a run's output shared so a long job runs once for everyone, and a snippet posted for others to try is the point of the feature.
+A new permission bit was rejected as well: the module permission is already the operator's trust decision, and 0026 already tells them not to enable this for people they do not trust.
+The run is attributed (`ran_by` is stored and broadcast), so it stays visible who pressed it.
+
+**What must hold instead is that what is read is what runs.**
+The server refuses a run whose `input` contains a control character (other than tab, line feed and carriage return), a text-direction character (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) or a zero-width character (U+200B to U+200D, U+2060, U+FEFF).
+The refusal is a 403 naming the reason, it applies to the author too, and nothing is stored or broadcast.
+It judges `input` and not the message text, because `input` is the bytes that run: an honest client sends the block verbatim, so it is exactly what the viewer was shown, and a zero-width joiner in prose beside a block does not block a clean run.
+A caller who sends different input is running their own chosen input, not being deceived.
+
+The stored message is never rewritten.
+These characters are legitimate in real text, and a server that silently edits content is a worse property than the one being fixed.
+The client shows each one in place as a named marker (`<U+202E>`) with a warning band and no Run button, so the block is visibly marked before anyone can press Run.
+The marker is text and an icon, so it does not rely on colour.
+
+The server set is the same as the client's (`code_hidden_characters.dart`) and reuses the label validator's blocklist.
+Zero-width joiners inside a string literal, such as an emoji sequence, are refused too.
+That is a deliberate trade for one rule that is easy to state; a block that needs one can build it from an escape.
+
+**Unchanged.**
+The module protocol still carries no `language`, so matching a fence to a runner stays a client courtesy.
+The generic `POST /modules/{moduleId}/commands/{command}` route does not apply this refusal: it answers only its caller and backs slash commands, where the caller wrote the input.

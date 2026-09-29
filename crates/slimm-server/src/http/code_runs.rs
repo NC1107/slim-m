@@ -39,6 +39,7 @@ use axum::routing::post;
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
+use super::auth::is_disallowed_label_char;
 use super::error::ApiError;
 use super::extract::{AuthedLimited, Json, MODULE};
 use super::messages::parse_uuid;
@@ -57,6 +58,18 @@ const BODY_LIMIT: usize = 256 * 1024;
 /// A message cannot hold anything like this many fenced blocks; the bound just
 /// keeps a caller from writing rows at arbitrary indices.
 const MAX_BLOCK_INDEX: i64 = 1000;
+
+const HIDDEN_CHARACTERS_REFUSAL: &str =
+    "this block contains hidden text-direction or zero-width characters, so it will not run";
+
+/// True when [`text`] carries a control, text-direction or zero-width
+/// character that changes what a reader sees without changing what runs
+/// (trojan source, CVE-2021-42574). Tab and line breaks are ordinary code.
+fn has_hidden_characters(text: &str) -> bool {
+    text.chars().any(|c| {
+        !matches!(c, '\t' | '\n' | '\r') && (is_disallowed_label_char(c) || c == '\u{061C}')
+    })
+}
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -103,6 +116,11 @@ async fn run(
         .await?;
     if !permissions.contains(Permissions::VIEW_CHANNEL) {
         return Err(ApiError::NotFound("no such message"));
+    }
+
+    // The input is the bytes that run; an honest client sends the block verbatim, so this is what the viewer was shown.
+    if has_hidden_characters(&req.input) {
+        return Err(ApiError::ForbiddenBecause(HIDDEN_CHARACTERS_REFUSAL));
     }
 
     // An app surface owns its whole code-run surface; see this file's doc comment.
@@ -187,6 +205,15 @@ fn stored_payload(is_text: bool, outcome: CommandOutcome) -> (bool, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hidden_characters_are_told_apart_from_ordinary_code() {
+        assert!(has_hidden_characters("a\u{202E}b"));
+        assert!(has_hidden_characters("a\u{200B}b"));
+        assert!(has_hidden_characters("a\u{061C}b"));
+        assert!(has_hidden_characters("a\u{0}b"));
+        assert!(!has_hidden_characters("if (x) {\r\n\tf(\"caf\u{e9}\");\n}"));
+    }
 
     fn outcome(payload: String) -> CommandOutcome {
         CommandOutcome { ok: true, payload }

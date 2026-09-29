@@ -14,8 +14,17 @@ import '../../app_typography.dart';
 
 /// The syntax role a span of code plays, matched one-to-one with
 /// [AppCodeColors]'s five fields so a role can never be added on one side
-/// without the other.
-enum AppCodeRole { keyword, string, number, comment, punctuation, plain }
+/// without the other. [hidden] is the exception: a visible stand-in for a
+/// character that would otherwise not show, drawn from the danger tokens.
+enum AppCodeRole {
+  keyword,
+  string,
+  number,
+  comment,
+  punctuation,
+  plain,
+  hidden,
+}
 
 /// One run of source text and the role it should be coloured as.
 ///
@@ -41,15 +50,18 @@ class AppCodeLine {
   final List<AppCodeSpan> spans;
 }
 
-Color _roleColor(AppCodeRole role, AppCodeColors code, Color plain) =>
-    switch (role) {
-      AppCodeRole.keyword => code.keyword,
-      AppCodeRole.string => code.string,
-      AppCodeRole.number => code.number,
-      AppCodeRole.comment => code.comment,
-      AppCodeRole.punctuation => code.punctuation,
-      AppCodeRole.plain => plain,
-    };
+Color _roleColor(AppCodeRole role, AppTokens tokens, Color plain) {
+  final code = tokens.code;
+  return switch (role) {
+    AppCodeRole.keyword => code.keyword,
+    AppCodeRole.string => code.string,
+    AppCodeRole.number => code.number,
+    AppCodeRole.comment => code.comment,
+    AppCodeRole.punctuation => code.punctuation,
+    AppCodeRole.plain => plain,
+    AppCodeRole.hidden => tokens.dangerText,
+  };
+}
 
 /// A fenced code block: a raised monospace panel with a header row above a
 /// hairline, one line per row so a caller can classify by line without
@@ -72,12 +84,17 @@ class AppCodeBlock extends StatefulWidget {
     required this.lines,
     this.language,
     this.action,
+    this.notice,
     this.collapseAfterLines,
   });
 
   final List<AppCodeLine> lines;
   final String? language;
   final Widget? action;
+
+  /// A band between the header and the body, for a warning the reader must
+  /// see before acting on the block.
+  final Widget? notice;
 
   /// When set and the block has more than this many lines, it renders
   /// collapsed to this many with a "show more"/"show less" toggle, the way a
@@ -97,7 +114,6 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    final code = tokens.code;
     final threshold = widget.collapseAfterLines;
     final collapsible = threshold != null && widget.lines.length > threshold;
     final visible = collapsible && !_expanded
@@ -137,6 +153,7 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
               ],
             ),
           ),
+          if (widget.notice != null) widget.notice!,
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             // 10/12 are literal in the source, not on the --space-* grid.
@@ -149,9 +166,21 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
                     for (final span in visible[i].spans)
                       TextSpan(
                         text: span.text,
-                        style: TextStyle(
-                            color: _roleColor(
-                                span.role, code, tokens.textPrimary)),
+                        style: span.role == AppCodeRole.hidden
+                            ? TextStyle(
+                                color: tokens.dangerText,
+                                fontWeight: FontWeight.w600,
+                                backgroundColor: tokens.dangerBorder.withValues(
+                                  alpha: 0.2,
+                                ),
+                              )
+                            : TextStyle(
+                                color: _roleColor(
+                                  span.role,
+                                  tokens,
+                                  tokens.textPrimary,
+                                ),
+                              ),
                       ),
                   ],
                 ],
@@ -160,7 +189,10 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
               // 13/1.6 are literal in the source; AppText.code (13.5/1.5) is
               // tuned for inline running text rather than a fenced block.
               style: TextStyle(
-                  fontFamily: AppFonts.mono, fontSize: 13, height: 1.6),
+                fontFamily: AppFonts.mono,
+                fontSize: 13,
+                height: 1.6,
+              ),
             ),
           ),
           if (collapsible)
@@ -236,8 +268,10 @@ class AppInlineCode extends StatelessWidget {
         border: Border.all(color: tokens.borderSubtle),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
-      child:
-          Text(text, style: AppText.code.copyWith(color: tokens.textPrimary)),
+      child: Text(
+        text,
+        style: AppText.code.copyWith(color: tokens.textPrimary),
+      ),
     );
   }
 }
