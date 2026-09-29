@@ -127,7 +127,7 @@ impl Store {
         for chunk in ids.chunks(super::MAX_IDS_PER_QUERY) {
             let mut builder = QueryBuilder::new(
                 "SELECT id, name, kind, topic, position, parent_message_id, category_id, \
-                 created_at, slow_mode_seconds \
+                 created_at, slow_mode_seconds, join_muted \
                  FROM channels WHERE deleted_at IS NULL AND id IN (",
             );
             let mut separated = builder.separated(", ");
@@ -146,6 +146,7 @@ impl Store {
                     category_id: row.try_get("category_id")?,
                     created_at: row.try_get("created_at")?,
                     slow_mode_seconds: row.try_get("slow_mode_seconds")?,
+                    join_muted: row.try_get("join_muted")?,
                 };
                 found.insert(channel.id, channel);
             }

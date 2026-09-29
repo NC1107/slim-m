@@ -90,6 +90,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
   final _name = TextEditingController();
   late String _kind = widget.initialKind;
   bool _restricted = false;
+  bool _joinMuted = false;
   bool _submitting = false;
   String? _error;
 
@@ -127,6 +128,7 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
             kind: _kind,
             categoryId: widget.categoryId,
             restricted: _restricted,
+            joinMuted: _kind == 'voice' && _joinMuted,
           );
       final store = await ref.read(storeProvider.future);
       await store.upsertChannels([created]);
@@ -229,6 +231,15 @@ class _CreateChannelSheetState extends ConsumerState<_CreateChannelSheet> {
                 value: _restricted,
                 onChanged: (v) => setState(() => _restricted = v),
                 semanticLabel: 'Make this channel private',
+              ),
+            if (_kind == 'voice')
+              SettingsToggleRow(
+                label: 'Join muted',
+                description:
+                    'Members start with their mic off. They can unmute.',
+                value: _joinMuted,
+                onChanged: (v) => setState(() => _joinMuted = v),
+                semanticLabel: 'Members join this channel muted',
               ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.s8),

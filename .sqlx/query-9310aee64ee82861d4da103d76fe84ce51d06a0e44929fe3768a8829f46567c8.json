@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                  position AS \"position!: i64\",\n                  parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                  category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                  created_at AS \"created_at!\",\n                  slow_mode_seconds AS \"slow_mode_seconds!: i64\"\n           FROM channels WHERE id = ?",
+  "query": "SELECT id AS \"id!: ChannelId\", name AS \"name!\", kind AS \"kind!\", topic,\n                      position AS \"position!: i64\",\n                      parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      created_at AS \"created_at!\",\n                      slow_mode_seconds AS \"slow_mode_seconds!: i64\",\n                      join_muted AS \"join_muted!: bool\"\n               FROM channels WHERE id = ? AND deleted_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,11 @@
         "name": "slow_mode_seconds!: i64",
         "ordinal": 8,
         "type_info": "Integer"
+      },
+      {
+        "name": "join_muted!: bool",
+        "ordinal": 9,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -61,8 +66,9 @@
       true,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "b35971f931edfd07606813e1e4bf4ecfa72f440bf1d24b3dc17fa5c5e93d3f3b"
+  "hash": "9310aee64ee82861d4da103d76fe84ce51d06a0e44929fe3768a8829f46567c8"
 }
