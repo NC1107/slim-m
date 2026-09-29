@@ -37,7 +37,8 @@ PLATFORMS = {
     "macos": re.compile(r"^slim-m-client-.+-macos\.zip$"),
 }
 DEFAULT_REQUIRE = "windows-x64,macos"
-OUTPUT_NAMES = ("manifest.json", "manifest.json.sig")
+MANIFEST_NAME = "manifest.json"
+SIGNATURE_NAME = "manifest.json.sig"
 
 
 class ManifestError(Exception):
@@ -186,14 +187,11 @@ def existing_file(path: Path) -> Path:
     return found
 
 
-def output_file(path: Path) -> Path:
-    """Outputs are only the two files the release workflow writes, always in the working directory."""
-    name = next((n for n in OUTPUT_NAMES if n == path.name), None)
-    if name is None:
-        raise ManifestError(f"cannot write to {path}: output must be one of {', '.join(OUTPUT_NAMES)}")
-    target = Path.cwd() / name
-    if path.resolve() != target.resolve():
-        raise ManifestError(f"cannot write to {path}: outputs go in the working directory")
+def output_file(path: Path, expected: str) -> Path:
+    """Each command writes one fixed file in the working directory; the argument is only checked against it."""
+    target = Path.cwd() / expected
+    if path.name != expected or path.resolve() != target.resolve():
+        raise ManifestError(f"cannot write to {path}: this command writes {expected} in the working directory")
     if target.exists() and not target.is_file():
         raise ManifestError(f"cannot write to {path}")
     return target
@@ -237,10 +235,10 @@ def main(argv: list[str]) -> int:
         if args.cmd == "build":
             require = [name for name in args.require.split(",") if name]
             manifest = build_manifest(args.tag, existing_dir(args.dir), args.repo, require)
-            output_file(args.out).write_bytes(canonical(manifest))
+            output_file(args.out, MANIFEST_NAME).write_bytes(canonical(manifest))
         elif args.cmd == "sign":
             signature = sign_bytes(existing_file(args.manifest).read_bytes())
-            output_file(args.sig).write_text(base64.b64encode(signature).decode() + "\n")
+            output_file(args.sig, SIGNATURE_NAME).write_text(base64.b64encode(signature).decode() + "\n")
         elif args.cmd == "pubkey":
             print(public_key_b64())
         else:
