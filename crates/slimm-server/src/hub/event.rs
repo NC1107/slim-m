@@ -56,7 +56,7 @@ pub enum Event {
         poll: Option<Arc<Poll>>,
         /// Raw, like `attachments`; image tokens resolve per connection.
         embeds: Arc<Vec<Embed>>,
-        /// The buttons a bot posted with the message; see decision 0038.
+        /// The buttons a bot posted with the message; see decision 0039.
         components: Arc<Vec<ComponentRow>>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,

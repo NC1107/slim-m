@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Buttons on a bot's own message: the send-path helpers and the route a bot
-//! uses to replace or clear them. See docs/decisions/0038-bot-message-buttons.md.
+//! uses to replace or clear them. See docs/decisions/0039-bot-message-buttons.md.
 
 use std::sync::Arc;
 

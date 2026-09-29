@@ -1,4 +1,4 @@
-# 0038 - Buttons on bot messages, and private answers to a press
+# 0039 - Buttons on bot messages, and private answers to a press
 
 Status: accepted, implemented
 Date: 2026-09-29

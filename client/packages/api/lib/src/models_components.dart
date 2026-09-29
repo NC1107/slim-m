@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Buttons a bot attaches to its own message. See
-/// docs/decisions/0038-bot-message-buttons.md.
+/// docs/decisions/0039-bot-message-buttons.md.
 library;
 
 enum ComponentButtonStyle {

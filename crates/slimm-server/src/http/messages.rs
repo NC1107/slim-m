@@ -87,7 +87,7 @@ struct SendRequest {
     /// Structured content, honoured only from a bot; see [`send`].
     #[serde(default)]
     embeds: Vec<embeds::RawEmbed>,
-    /// Buttons, honoured only from a bot; see decision 0038.
+    /// Buttons, honoured only from a bot; see decision 0039.
     #[serde(default)]
     components: Vec<crate::components::ComponentRow>,
 }

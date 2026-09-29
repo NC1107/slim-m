@@ -3,7 +3,7 @@ part of 'client.dart';
 
 /// Pressing a bot's button. The bot's own answers (replace the buttons, ack,
 /// reply privately) are called from its process, never from this client. See
-/// docs/decisions/0038-bot-message-buttons.md.
+/// docs/decisions/0039-bot-message-buttons.md.
 extension SlimmApiInteractions on SlimmApi {
   /// Presses [customId] on [messageId]. [id] is the caller's own UUID, so a
   /// retry after a timeout is the same press rather than a second one.

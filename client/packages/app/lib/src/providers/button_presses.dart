@@ -5,7 +5,7 @@
 /// fails visibly if the request is refused or nothing comes back in time. It
 /// is in memory only: the server keeps a press for a quarter of an hour and
 /// nothing here should outlive a reload. See
-/// docs/decisions/0038-bot-message-buttons.md.
+/// docs/decisions/0039-bot-message-buttons.md.
 library;
 
 import 'dart:async';

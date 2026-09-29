@@ -178,7 +178,7 @@ A member's client shows the button as pending, and shows an error on that messag
 Presses are rate limited per member.
 A press is best effort like typing: if you were offline, it is lost.
 
-See `docs/decisions/0038-bot-message-buttons.md`.
+See `docs/decisions/0039-bot-message-buttons.md`.
 
 ## Registering your commands
 

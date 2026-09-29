@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-//! See docs/decisions/0038-bot-message-buttons.md.
+//! See docs/decisions/0039-bot-message-buttons.md.
 
 use super::*;
 

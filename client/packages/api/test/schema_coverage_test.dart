@@ -78,10 +78,10 @@ const Map<String, String> _allowlist = {
   'PUT /channels/{}/messages/{}/components': 'a bot replaces its own '
       'buttons from its process; this client only receives the '
       'message.components frame. See '
-      'docs/decisions/0038-bot-message-buttons.md',
+      'docs/decisions/0039-bot-message-buttons.md',
   'POST /channels/{}/interactions/{}/ack': 'a bot acknowledges a press from '
       'its own process; this client only receives interaction.answered. See '
-      'docs/decisions/0038-bot-message-buttons.md',
+      'docs/decisions/0039-bot-message-buttons.md',
   'POST /voice/webhook': 'called only by the configured LiveKit deployment '
       'itself, verified by its own JWT signature rather than a session - '
       'the same "no client binding by design" shape as POST /webhooks/{}/{} '

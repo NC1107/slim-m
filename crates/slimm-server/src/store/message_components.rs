@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Buttons on a bot's message: a side table, never a column on
-//! [`super::Message`]. See `docs/decisions/0038-bot-message-buttons.md`.
+//! [`super::Message`]. See `docs/decisions/0039-bot-message-buttons.md`.
 
 use sqlx::Row;
 

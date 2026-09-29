@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The rows of buttons a bot attaches to its message. See
-/// docs/decisions/0038-bot-message-buttons.md.
+/// docs/decisions/0039-bot-message-buttons.md.
 ///
 /// Layout follows the width it is given, never the platform: a row wraps
 /// rather than scrolling, so five buttons fit a phone as two lines.

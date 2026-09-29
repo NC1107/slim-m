@@ -5692,7 +5692,7 @@ paths:
       tags: [bots]
       summary: Press a button on a bot's message.
       description: >-
-        Decision 0038-bot-message-buttons. The press is delivered to the
+        Decision 0039-bot-message-buttons. The press is delivered to the
         message's author bot only, as an `interaction.created` frame carrying
         the presser's id and display name, and nothing about it is stored
         beyond a row that expires after 15 minutes. The caller needs
@@ -5742,7 +5742,7 @@ paths:
       tags: [bots]
       summary: Replace or clear the buttons on a bot's own message.
       description: >-
-        Decision 0038-bot-message-buttons. Only the bot that authored the
+        Decision 0039-bot-message-buttons. Only the bot that authored the
         message, with `VIEW_CHANNEL` and `SEND_MESSAGES`. The list replaces the
         old one whole (an empty list clears it), is checked against the same
         caps as `sendMessage`, and reaches every viewer as a
@@ -5792,7 +5792,7 @@ paths:
       tags: [bots]
       summary: Say a button press was seen and needs no visible answer.
       description: >-
-        Decision 0038-bot-message-buttons. Only the bot the press was sent to,
+        Decision 0039-bot-message-buttons. Only the bot the press was sent to,
         within 15 minutes of it. The presser's button stops waiting; nobody
         else is told. Answering with a private reply or a components change
         that names the press does the same, so this is only for a press that
@@ -8615,7 +8615,7 @@ components:
           description: >-
             The member's message being answered. Its author is the recipient.
             It may instead be the `interaction_id` of a button press on this
-            bot's message (decision 0038-bot-message-buttons): the recipient is
+            bot's message (decision 0039-bot-message-buttons): the recipient is
             then whoever pressed, within 15 minutes of the press and under the
             same limit of 3.
         content:
@@ -8772,7 +8772,7 @@ components:
       description: >
         A member pressed one of this bot's buttons. Delivered to the bot's own
         connections only. The presser's id is given deliberately (decision
-        0038), unlike an advertised command. Reply within 15 minutes with
+        0039), unlike an advertised command. Reply within 15 minutes with
         `sendEphemeralMessage` using `interaction_id` as `in_reply_to_id`
         (three replies at most), `setMessageComponents`, or
         `acknowledgeInteraction`. Best effort, with no catch-up.
@@ -9986,7 +9986,7 @@ components:
           type: array
           description: >-
             Buttons a bot attached to its own message (decision
-            0038-bot-message-buttons), in rows. Empty when there are none.
+            0039-bot-message-buttons), in rows. Empty when there are none.
             Unlike `embeds` a bot can replace them after the fact
             (`setMessageComponents`), so a live `message.components` frame
             carries the whole current list. An edit of the text never changes

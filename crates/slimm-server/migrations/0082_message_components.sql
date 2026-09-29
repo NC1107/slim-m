@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: AGPL-3.0-only
 -- Buttons on a bot's message, and the clicks they produce
--- (docs/decisions/0038-bot-message-buttons.md).
+-- (docs/decisions/0039-bot-message-buttons.md).
 --
 -- `message_components` is a side table like `message_embeds`, never a column
 -- on `messages`. Unlike an embed it is replaced whole by the bot (to disable

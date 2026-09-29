@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! A member presses a bot's button, and the bot answers. Nothing about a press
 //! is stored beyond one short-lived row. See
-//! docs/decisions/0038-bot-message-buttons.md.
+//! docs/decisions/0039-bot-message-buttons.md.
 
 use std::sync::Arc;
 

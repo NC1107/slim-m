@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Authorizing a button click and its answer for one connection. See
-//! docs/decisions/0038-bot-message-buttons.md.
+//! docs/decisions/0039-bot-message-buttons.md.
 
 use super::authorization::Authorization;
 use super::frames::ServerFrame;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Buttons on a bot's message, the click that reaches only that bot, and the
 //! private answer that reaches only the clicker.
-//! See docs/decisions/0038-bot-message-buttons.md.
+//! See docs/decisions/0039-bot-message-buttons.md.
 
 use std::time::Duration;
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 //! Buttons a bot attaches to its own message, and the caps that keep them
-//! bounded. See docs/decisions/0038-bot-message-buttons.md.
+//! bounded. See docs/decisions/0039-bot-message-buttons.md.
 //!
 //! One shape serves the wire and storage: a bot sends it, the server checks it
 //! once here, stores it as JSON and reads it back unchanged.

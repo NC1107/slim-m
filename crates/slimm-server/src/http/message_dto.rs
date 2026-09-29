@@ -128,7 +128,7 @@ pub(crate) struct MessageDto {
     /// Fixed once a message exists, like `attachments`.
     #[serde(default)]
     pub(crate) embeds: Vec<EmbedDto>,
-    /// Buttons a bot attached; see decision 0038. A bot may replace them.
+    /// Buttons a bot attached; see decision 0039. A bot may replace them.
     #[serde(default)]
     pub(crate) components: Vec<crate::components::ComponentRow>,
 }

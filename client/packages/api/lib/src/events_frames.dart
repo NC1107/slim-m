@@ -471,7 +471,7 @@ class MessageComponentsChanged extends ServerEvent {
 }
 
 /// The bot answered this account's button press, so the button can stop
-/// showing as pending. See docs/decisions/0038-bot-message-buttons.md.
+/// showing as pending. See docs/decisions/0039-bot-message-buttons.md.
 class InteractionAnswered extends ServerEvent {
   const InteractionAnswered({
     required this.interactionId,
