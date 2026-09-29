@@ -206,3 +206,11 @@ Rich presence (`docs/decisions/0044-rich-presence.md`) reads the current track f
 It is imported only through `now_playing.dart`'s conditional import, so a web build never compiles it, and only a Linux build ever opens a bus connection, and only while the person has switched sharing on.
 
 License is BSD-3-Clause, already on `deny.toml`'s allowlist.
+
+### `flutter_webrtc`, pinned to a fork for the Wayland screen picker
+
+`flutter_webrtc` resolves from `github.com/Slim-m-org/flutter-webrtc` at a commit SHA, through `dependency_overrides` in `client/pubspec.yaml`.
+The fork is upstream v1.6.0 plus one commit adding a `resetDesktopSources` method, so a share on Linux/Wayland can open the portal picker again.
+It is an override rather than a dependency of `slimm_rtc` because `livekit_client` 2.10.0 requires `flutter_webrtc` from pub.dev, and pub refuses two sources for one package.
+`scripts/check-dart-licenses.py` reads the fork's LICENSE (MIT) from the pub cache's checkout, so it is classified like a hosted package.
+Rebase steps are in `docs/research/linux-wayland-share-switch-2026-09-29/README.md`.

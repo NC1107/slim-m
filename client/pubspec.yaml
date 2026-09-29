@@ -13,6 +13,11 @@ environment:
 # file_picker 12 needs win32 ^6.3.0. Drop when livekit ships a 13.x.
 dependency_overrides:
   device_info_plus: ^13.2.0
+  # Fork adds resetDesktopSources; see docs/dependencies.md. livekit_client needs it hosted, so it is an override.
+  flutter_webrtc:
+    git:
+      url: https://github.com/Slim-m-org/flutter-webrtc.git
+      ref: 52a0c681c9173b9dab6fda9f761d56d708cc58a5
 workspace:
   - packages/api
   - packages/design_system
