@@ -100,7 +100,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
-        | Event::ReportsChanged => None,
+        | Event::ReportsChanged
+        | Event::ReadStateChanged { .. } => None,
     }
 }
 
@@ -129,6 +130,22 @@ pub(super) async fn authorize(
             user_id: target_id.to_string(),
             status: status.as_str().to_owned(),
         }));
+    }
+    // Private to one account, so it is decided before any channel permission is consulted.
+    if let Event::ReadStateChanged {
+        user_id,
+        channel_id,
+        last_read_seq,
+    } = event
+    {
+        return if user_id == ctx.user_id {
+            Authorization::Deliver(Box::new(ServerFrame::ReadStateChanged {
+                channel_id: channel_id.to_string(),
+                last_read_seq,
+            }))
+        } else {
+            Authorization::Withhold
+        };
     }
     // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
     if let Event::ReportsChanged = event {
@@ -251,7 +268,8 @@ pub(super) async fn authorize(
             | Event::MemberRoleChanged { .. }
             | Event::ChannelDeleted { .. }
             | Event::CategoryChanged
-            | Event::ReportsChanged => return Authorization::Withhold,
+            | Event::ReportsChanged
+            | Event::ReadStateChanged { .. } => return Authorization::Withhold,
         },
     };
     // The one event whose subject may have just lost this very view.
@@ -577,6 +595,7 @@ pub(super) async fn authorize(
         | Event::MemberRoleChanged { .. }
         | Event::ChannelDeleted { .. }
         | Event::CategoryChanged
-        | Event::ReportsChanged => return Authorization::Withhold,
+        | Event::ReportsChanged
+        | Event::ReadStateChanged { .. } => return Authorization::Withhold,
     }))
 }

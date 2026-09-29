@@ -79,6 +79,7 @@ mod presence;
 mod push;
 mod quiet_hours;
 mod reactions;
+mod read_sync;
 mod recovery;
 mod reports;
 mod reports_cursor;

@@ -216,8 +216,7 @@ async fn send(
 
     let stored_embeds = embeds::store_and_reload(&state, id, sent.fresh, &embeds).await?;
 
-    // An idempotent retry must not fan out or push again; see the note on
-    // this function.
+    // An idempotent retry must not fan out or push again; see this function's note.
     if sent.fresh {
         super::message_mentions::resolve_and_store(
             &state,
@@ -227,6 +226,7 @@ async fn send(
             &sent.message.content,
         )
         .await?;
+        super::read_sync::advance_for_author(&state, ctx.user_id, &sent.message).await;
 
         state.hub.publish(Event::MessageCreated {
             message: Arc::new(sent.message.clone()),

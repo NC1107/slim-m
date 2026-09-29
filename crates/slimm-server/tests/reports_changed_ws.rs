@@ -107,7 +107,8 @@ async fn read_frame(ws: &mut Client) -> Value {
         match ws.next().await {
             Some(Ok(WsMessage::Text(text))) => {
                 let frame: Value = serde_json::from_str(text.as_str()).unwrap();
-                if frame["type"] == "presence.changed" {
+                // The author's own read marker moves with every send; not what this file measures.
+                if frame["type"] == "presence.changed" || frame["type"] == "read_state.changed" {
                     continue;
                 }
                 return frame;

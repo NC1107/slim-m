@@ -1,0 +1,325 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+//! Read state across one account's devices: a read on one device clears the
+//! badge on the others, your own send is never unread to you, and push skips
+//! a message the recipient already read or has open.
+
+use std::collections::HashSet;
+use std::time::Duration;
+
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use futures_util::{SinkExt, StreamExt};
+use serde_json::{Value, json};
+use slimm_server::auth::Auth;
+use slimm_server::config::Config;
+use slimm_server::db;
+use slimm_server::http::{self, AppState};
+use slimm_server::hub::Hub;
+use slimm_server::ids::{ChannelId, MessageId, UserId};
+use slimm_server::permissions::Permissions;
+use slimm_server::presence::PresenceTracker;
+use slimm_server::push::PushSender;
+use slimm_server::ratelimit::RateLimiter;
+use slimm_server::store::{NewMessage, Store};
+use tokio::net::TcpListener;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message as WsMessage;
+use tower::ServiceExt;
+use uuid::Uuid;
+
+mod support;
+
+type Client =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+async fn new_store() -> (Store, support::TestDbGuard) {
+    let (path, guard) = support::TestDbGuard::new("slimm-read-state-devices");
+    let config = Config {
+        port: 0,
+        database_path: path,
+        hash_concurrency: 2,
+        ..Config::default()
+    };
+    let pool = db::connect(&config).await.expect("connect + migrate");
+    (Store::new(pool), guard)
+}
+
+fn state_for(store: &Store) -> AppState {
+    AppState {
+        store: store.clone(),
+        auth: Auth::new(2).unwrap(),
+        hub: Hub::new(),
+        limiter: RateLimiter::new(),
+        push: PushSender::disabled(),
+        voice: slimm_server::voice::VoiceService::disabled(),
+        media: slimm_server::media::Media::for_tests(),
+        gifs: slimm_server::http::gifs::GifSearch::disabled(),
+        link_previews: slimm_server::http::link_preview::LinkPreviews::disabled(),
+        dock: slimm_server::http::dock::Dock::disabled(),
+        code_runner: slimm_server::code_runner::CodeRunner::disabled(),
+    }
+}
+
+async fn seed_everyone(store: &Store) {
+    store
+        .create_role(
+            "everyone",
+            Permissions::VIEW_CHANNEL.union(Permissions::SEND_MESSAGES),
+            true,
+        )
+        .await
+        .unwrap();
+}
+
+/// One more device for `user`: (rest access token, ws connect ticket).
+async fn device(store: &Store, user: UserId) -> (String, String) {
+    let tokens = store.open_session(user, "device").await.unwrap();
+    let ctx = store
+        .authenticate(&tokens.access_token)
+        .await
+        .unwrap()
+        .unwrap();
+    let (ticket, _expires_at) = store.mint_ws_ticket(&ctx).await.unwrap();
+    (tokens.access_token, ticket)
+}
+
+/// A new account with its first device: (user id, token, ticket).
+async fn account(store: &Store, name: &str) -> (UserId, String, String) {
+    let user = store.create_user(name, name).await.unwrap();
+    let (token, ticket) = device(store, user.id).await;
+    (user.id, token, ticket)
+}
+
+async fn serve(state: AppState) -> std::net::SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, http::router(state)).await.unwrap();
+    });
+    addr
+}
+
+async fn connect(addr: std::net::SocketAddr, ticket: &str) -> Client {
+    let (mut ws, _response) = connect_async(format!("ws://{addr}/ws")).await.unwrap();
+    ws.send(WsMessage::Text(
+        json!({ "type": "hello", "ticket": ticket, "protocol": 1 }).to_string(),
+    ))
+    .await
+    .unwrap();
+    let ack = read_frame(&mut ws).await;
+    assert_eq!(ack["type"], "hello");
+    ws
+}
+
+/// The next text frame, skipping `presence.changed` chatter from every connect.
+async fn read_frame(ws: &mut Client) -> Value {
+    loop {
+        match ws.next().await {
+            Some(Ok(WsMessage::Text(text))) => {
+                let frame: Value = serde_json::from_str(text.as_str()).unwrap();
+                if frame["type"] != "presence.changed" {
+                    return frame;
+                }
+            }
+            Some(Ok(_)) => continue,
+            other => panic!("expected a text frame, got {other:?}"),
+        }
+    }
+}
+
+async fn frame_within(ws: &mut Client, within: Duration) -> Option<Value> {
+    tokio::time::timeout(within, read_frame(ws)).await.ok()
+}
+
+/// Reads frames until one of `kind` arrives; `None` once the socket goes quiet.
+async fn frame_of_kind(ws: &mut Client, kind: &str) -> Option<Value> {
+    while let Some(frame) = frame_within(ws, Duration::from_millis(500)).await {
+        if frame["type"] == kind {
+            return Some(frame);
+        }
+    }
+    None
+}
+
+fn request(method: &str, uri: &str, token: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+async fn send(state: &AppState, token: &str, channel: ChannelId) -> Value {
+    let response = http::router(state.clone())
+        .oneshot(request(
+            "POST",
+            &format!("/channels/{channel}/messages"),
+            token,
+            json!({ "id": Uuid::now_v7().to_string(), "content": "hello" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+async fn wait_until(mut condition: impl FnMut() -> bool) {
+    for _ in 0..100 {
+        if condition() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("condition never held");
+}
+
+#[tokio::test]
+async fn a_read_on_one_device_reaches_the_same_accounts_other_device_only() {
+    let (store, _guard) = new_store().await;
+    seed_everyone(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+    let (alice, phone_token, _phone_ticket) = account(&store, "alice").await;
+    let (_desktop_token, desktop_ticket) = device(&store, alice).await;
+    let (_bob, bob_token, bob_ticket) = account(&store, "bob").await;
+    send(&state, &bob_token, channel.id).await;
+
+    let addr = serve(state.clone()).await;
+    let mut desktop = connect(addr, &desktop_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    let response = http::router(state.clone())
+        .oneshot(request(
+            "PUT",
+            &format!("/channels/{}/read", channel.id),
+            &phone_token,
+            json!({ "seq": 1 }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let frame = frame_of_kind(&mut desktop, "read_state.changed")
+        .await
+        .expect("the other device must hear about the read");
+    assert_eq!(frame["channel_id"], channel.id.to_string());
+    assert_eq!(frame["last_read_seq"], 1);
+
+    let leaked = frame_within(&mut bob_ws, Duration::from_millis(300)).await;
+    assert!(
+        leaked.is_none(),
+        "another account must hear nothing: {leaked:?}"
+    );
+}
+
+#[tokio::test]
+async fn sending_advances_your_own_marker_on_every_device_and_nobody_elses() {
+    let (store, _guard) = new_store().await;
+    seed_everyone(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+    let (alice, phone_token, _phone_ticket) = account(&store, "alice").await;
+    let (_desktop_token, desktop_ticket) = device(&store, alice).await;
+    let (bob, _bob_token, bob_ticket) = account(&store, "bob").await;
+
+    let addr = serve(state.clone()).await;
+    let mut desktop = connect(addr, &desktop_ticket).await;
+    let mut bob_ws = connect(addr, &bob_ticket).await;
+
+    let message = send(&state, &phone_token, channel.id).await;
+    assert_eq!(message["seq"], 1);
+
+    let frame = frame_of_kind(&mut desktop, "read_state.changed")
+        .await
+        .expect("the author's other device must clear its badge");
+    assert_eq!(frame["last_read_seq"], 1);
+    assert_eq!(store.unread_count(alice, channel.id).await.unwrap(), 0);
+
+    assert_eq!(
+        store.unread_count(bob, channel.id).await.unwrap(),
+        1,
+        "the recipient still has it unread"
+    );
+    let bob_frame = frame_of_kind(&mut bob_ws, "read_state.changed").await;
+    assert!(
+        bob_frame.is_none(),
+        "another account must not get the frame"
+    );
+}
+
+#[tokio::test]
+async fn push_skips_a_recipient_who_read_or_is_viewing_the_channel() {
+    let (store, _guard) = new_store().await;
+    seed_everyone(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let other = store.create_channel("random", "text").await.unwrap();
+    let author = store.create_user("author", "Author").await.unwrap().id;
+    let read = store.create_user("read", "Read").await.unwrap().id;
+    let watching = store.create_user("watching", "Watching").await.unwrap().id;
+    let elsewhere = store
+        .create_user("elsewhere", "Elsewhere")
+        .await
+        .unwrap()
+        .id;
+    let behind = store.create_user("behind", "Behind").await.unwrap().id;
+    let mut seq = slimm_server::ids::Seq(0);
+    for _ in 0..2 {
+        let sent = store
+            .send_message(NewMessage::plain(
+                channel.id,
+                author,
+                MessageId::generate(),
+                "hi",
+            ))
+            .await
+            .unwrap();
+        seq = sent.message.seq;
+    }
+    store.mark_read(read, channel.id, seq.0).await.unwrap();
+    store
+        .mark_read(behind, channel.id, seq.0 - 1)
+        .await
+        .unwrap();
+
+    let viewing = PresenceTracker::new().viewing();
+    viewing.set(watching, 1, HashSet::from([channel.id]));
+    viewing.set(elsewhere, 1, HashSet::from([other.id]));
+
+    let candidates = vec![read, watching, elsewhere, behind];
+    let kept =
+        slimm_server::push::narrow_for_attention(&store, channel.id, seq, &viewing, candidates)
+            .await
+            .unwrap();
+    assert_eq!(kept, vec![elsewhere, behind]);
+}
+
+#[tokio::test]
+async fn a_viewing_frame_is_recorded_and_forgotten_when_the_socket_closes() {
+    let (store, _guard) = new_store().await;
+    seed_everyone(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+    let (alice, _token, ticket) = account(&store, "alice").await;
+    let addr = serve(state.clone()).await;
+    let mut ws = connect(addr, &ticket).await;
+    let viewing = state.hub.presence().viewing();
+    let open = json!({ "type": "viewing", "channel_ids": [channel.id.to_string(), "not-a-uuid"] });
+
+    ws.send(WsMessage::Text(open.to_string())).await.unwrap();
+    wait_until(|| viewing.is_viewing(alice, channel.id)).await;
+
+    let close = json!({ "type": "viewing", "channel_ids": [] });
+    ws.send(WsMessage::Text(close.to_string())).await.unwrap();
+    wait_until(|| !viewing.is_viewing(alice, channel.id)).await;
+
+    ws.send(WsMessage::Text(open.to_string())).await.unwrap();
+    wait_until(|| viewing.is_viewing(alice, channel.id)).await;
+    ws.close(None).await.unwrap();
+    drop(ws);
+    wait_until(|| !viewing.is_viewing(alice, channel.id)).await;
+}

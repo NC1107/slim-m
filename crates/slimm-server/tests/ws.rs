@@ -116,17 +116,16 @@ async fn connect(addr: std::net::SocketAddr, ticket: &str) -> Client {
 
 /// Reads the next text frame as JSON, skipping any control frames.
 ///
-/// Also skips `presence.changed`: every connect and disconnect in this file
-/// publishes one on the same shared hub these tests assert against, so with
-/// two or more live sockets it is real, expected chatter rather than
-/// something any test here is checking. Presence has its own dedicated
-/// coverage in `tests/presence.rs`.
+/// Also skips `presence.changed`, which every connect and disconnect publishes
+/// on the shared hub (`presence.rs` covers it), and `read_state.changed`,
+/// which a send publishes for its author (`read_state_devices.rs` covers it).
 async fn read_frame(ws: &mut Client) -> Value {
     loop {
         match ws.next().await {
             Some(Ok(WsMessage::Text(text))) => {
                 let frame: Value = serde_json::from_str(text.as_str()).unwrap();
-                if frame["type"] == "presence.changed" {
+                let kind = frame["type"].as_str().unwrap_or_default();
+                if kind == "presence.changed" || kind == "read_state.changed" {
                     continue;
                 }
                 return frame;

@@ -10795,6 +10795,7 @@ components:
         - $ref: "#/components/schemas/ClientHello"
         - $ref: "#/components/schemas/ClientPing"
         - $ref: "#/components/schemas/ClientTyping"
+        - $ref: "#/components/schemas/ClientViewing"
         - $ref: "#/components/schemas/ClientCanvasStrokePreview"
 
     ClientHello:
@@ -10834,6 +10835,27 @@ components:
         channel_id:
           type: string
           format: uuid
+
+    ClientViewing:
+      type: object
+      required: [type, channel_ids]
+      description: >
+        The channels this connection has open and focused right now,
+        replacing its previous report; an empty list clears it. A client
+        re-sends it about every 30 seconds while it holds, because the
+        server lets a report lapse after 90 seconds. It is used only to skip
+        a push notification for a message this account is already reading,
+        is never broadcast, and is unaffected by presence visibility. At
+        most 8 ids are honoured and ids that do not parse are ignored.
+      properties:
+        type:
+          type: string
+          enum: [viewing]
+        channel_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
 
     ClientCanvasStrokePreview:
       type: object
@@ -10917,6 +10939,7 @@ components:
         - $ref: "#/components/schemas/CanvasObjectReordered"
         - $ref: "#/components/schemas/CanvasMediaSlotChanged"
         - $ref: "#/components/schemas/ReportsChanged"
+        - $ref: "#/components/schemas/ReadStateChanged"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
     CanvasObjectPlaced:
@@ -11777,6 +11800,27 @@ components:
         type:
           type: string
           enum: [reports.changed]
+
+    ReadStateChanged:
+      type: object
+      required: [type, channel_id, last_read_seq]
+      description: >
+        This account's read marker in a channel moved, from any of its
+        devices: a `putRead` from one, or a message the account itself sent.
+        Delivered only to the account's own connections, so a badge clears on
+        every device; nobody else receives it, and it is not a read receipt.
+        `last_read_seq` is the stored marker, which only moves forward, so a
+        receiver applies it as `max(current, last_read_seq)`.
+      properties:
+        type:
+          type: string
+          enum: [read_state.changed]
+        channel_id:
+          type: string
+          format: uuid
+        last_read_seq:
+          type: integer
+          format: int64
 
     VoiceActivityChanged:
       type: object

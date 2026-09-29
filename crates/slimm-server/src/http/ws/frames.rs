@@ -230,6 +230,14 @@ pub(super) enum ServerFrame {
     /// boundary, not a visibility nicety.
     #[serde(rename = "reports.changed")]
     ReportsChanged,
+    /// The account's read marker in a channel moved on some device; see
+    /// [`crate::hub::Event::ReadStateChanged`]. Delivered only to that
+    /// account's own connections.
+    #[serde(rename = "read_state.changed")]
+    ReadStateChanged {
+        channel_id: String,
+        last_read_seq: i64,
+    },
     #[serde(rename = "pong")]
     Pong,
     #[serde(rename = "error")]
@@ -264,6 +272,12 @@ pub(super) enum ClientFrame {
     /// no explicit "stop" frame: the state lapses on its own without a refresh.
     #[serde(rename = "typing")]
     Typing { channel_id: String },
+    /// The channels this connection has open and focused right now, replacing
+    /// its previous report; empty when none. Lapses after
+    /// [`crate::viewing::VIEWING_TTL`], so a client refreshes it periodically.
+    /// Used only to skip push for what this account is already reading.
+    #[serde(rename = "viewing")]
+    Viewing { channel_ids: Vec<String> },
     /// A pointer position on a channel's canvas. Rate-limited and authorized
     /// the same bar the canvas HTTP routes use (view plus `USE_CANVAS`); see
     /// [`super::signals::handle_canvas_cursor`]. No "stop" frame either, for

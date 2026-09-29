@@ -29,6 +29,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use crate::ids::UserId;
+use crate::viewing::ViewingTracker;
 
 /// How long a connected user with no observed activity (a ping, a typing
 /// refresh, anything inbound) is shown as away rather than online, absent an
@@ -129,6 +130,7 @@ pub fn status_for(
 #[derive(Clone)]
 pub struct PresenceTracker {
     state: Arc<Mutex<HashMap<UserId, Entry>>>,
+    viewing: ViewingTracker,
 }
 
 struct Entry {
@@ -151,7 +153,14 @@ impl PresenceTracker {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(HashMap::new())),
+            viewing: ViewingTracker::default(),
         }
+    }
+
+    /// The open-channel reports beside the connection counts, shared so the
+    /// push path, which already carries a tracker, needs no extra handle.
+    pub fn viewing(&self) -> ViewingTracker {
+        self.viewing.clone()
     }
 
     /// Records a new live connection. Returns `true` if this is the user's

@@ -144,6 +144,11 @@ class SyncController extends StateNotifier<SyncStatus> {
   /// error to the person typing.
   void notifyTyping(String channelId) => _connection?.typing(channelId);
 
+  /// Tells the server which channels this device has open and focused; a
+  /// no-op while the socket is down, like [notifyTyping].
+  void notifyViewing(Iterable<String> channelIds) =>
+      _connection?.viewing(channelIds);
+
   /// Tells the server this user's pointer moved on a channel's canvas.
   ///
   /// The same no-op-while-down shape as [notifyTyping]: a cursor position

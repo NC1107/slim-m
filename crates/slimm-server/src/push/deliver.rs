@@ -14,7 +14,7 @@ use crate::ids::{ChannelId, UserId};
 use crate::store::{Store, now_ms};
 
 use super::debounce::Debounce;
-use super::{Enabled, SentMessage, envelope, message_recipients, relay};
+use super::{Enabled, SentMessage, envelope, message_recipients, narrow_for_attention, relay};
 
 /// How long a device's `foreground` report counts as still current. Past this
 /// the app could have backgrounded or been killed without a fresh report (the
@@ -69,6 +69,21 @@ pub(super) async fn deliver(
                 return;
             }
         };
+    let recipients = match narrow_for_attention(
+        &store,
+        channel_id,
+        seq,
+        &presence.viewing(),
+        recipients,
+    )
+    .await
+    {
+        Ok(recipients) => recipients,
+        Err(err) => {
+            tracing::warn!(error = %err, %channel_id, "push: failed to read attention state");
+            return;
+        }
+    };
     if recipients.is_empty() {
         return;
     }

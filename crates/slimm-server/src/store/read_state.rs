@@ -115,6 +115,35 @@ impl Store {
         Ok(seq.unwrap_or(0))
     }
 
+    /// Each listed user's last-read seq in one channel; a user with no row is
+    /// absent, which callers read as 0, matching [`Store::last_read_seq`].
+    pub async fn last_read_seqs(
+        &self,
+        channel_id: ChannelId,
+        user_ids: &[UserId],
+    ) -> anyhow::Result<HashMap<UserId, i64>> {
+        use sqlx::Row;
+
+        let mut seqs = HashMap::new();
+        for chunk in user_ids.chunks(super::MAX_IDS_PER_QUERY - 1) {
+            // Built, not a fixed query!: a variable-length id list, the shape unread_counts uses.
+            let mut builder = QueryBuilder::new(
+                "SELECT user_id, last_read_seq FROM read_states WHERE channel_id = ",
+            );
+            builder.push_bind(channel_id);
+            builder.push(" AND user_id IN (");
+            let mut separated = builder.separated(", ");
+            for id in chunk {
+                separated.push_bind(*id);
+            }
+            builder.push(")");
+            for row in builder.build().fetch_all(&self.pool).await? {
+                seqs.insert(row.try_get("user_id")?, row.try_get("last_read_seq")?);
+            }
+        }
+        Ok(seqs)
+    }
+
     /// The count of live messages a user has not read in a channel.
     pub async fn unread_count(
         &self,

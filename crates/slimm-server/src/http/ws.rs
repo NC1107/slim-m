@@ -109,7 +109,7 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
-    let _presence_guard =
+    let presence_guard =
         signals::PresenceGuard::connect(state.hub.clone(), state.store.clone(), ctx.user_id).await;
 
     if send_frame(
@@ -136,6 +136,10 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
                                 if send_frame(&mut sink, &ServerFrame::Pong).await.is_err() {
                                     break;
                                 }
+                            }
+                            Ok(ClientFrame::Viewing { channel_ids }) => {
+                                // Not a touch: a timer on a focused window is not the user being active.
+                                presence_guard.set_viewing(&channel_ids);
                             }
                             Ok(ClientFrame::Typing { channel_id }) => {
                                 signals::handle_typing(
