@@ -26,6 +26,10 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'sync_controller.dart';
+
 class VoiceAutoRejoin {
   VoiceAutoRejoin({this.delays = defaultDelays});
 
@@ -74,6 +78,33 @@ class VoiceAutoRejoin {
       _timer = null;
       attempt();
     });
+    return true;
+  }
+
+  bool _watchingSync = false;
+
+  /// Runs [attempt] the moment sync reports the socket live again, if one is
+  /// waiting.
+  ///
+  /// Subscribed on the first call rather than at construction, so a client
+  /// that never loses a call never builds the sync controller for this.
+  void watchSync(Ref ref, void Function() attempt) {
+    if (_watchingSync) return;
+    _watchingSync = true;
+    ref.listen<SyncStatus>(syncControllerProvider, (previous, next) {
+      if (next != SyncStatus.live || previous == SyncStatus.live) return;
+      runNow(attempt);
+    });
+  }
+
+  /// Runs the waiting attempt now instead of when its timer fires, and
+  /// answers whether there was one. Nothing pending means an attempt is
+  /// already in flight or the budget is spent, so a caller cannot double a join.
+  bool runNow(void Function() attempt) {
+    if (_timer == null) return false;
+    _timer!.cancel();
+    _timer = null;
+    attempt();
     return true;
   }
 
