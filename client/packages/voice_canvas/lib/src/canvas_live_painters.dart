@@ -88,7 +88,7 @@ class DraftPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final points = draft.points;
-    if (points.length < 2) return;
+    if (points.isEmpty) return;
     final paint = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke
@@ -97,6 +97,7 @@ class DraftPainter extends CustomPainter {
       ..strokeWidth = width * document.camera.zoom
       ..isAntiAlias = true;
     final path = Path()..moveTo(points.first.dx, points.first.dy);
+    if (points.length == 1) path.lineTo(points.first.dx, points.first.dy);
     for (var i = 1; i < points.length; i++) {
       path.lineTo(points[i].dx, points[i].dy);
     }
