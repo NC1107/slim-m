@@ -10,8 +10,9 @@
 
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, State};
+use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::get;
+use axum::routing::{get, put};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
@@ -21,6 +22,7 @@ use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::UserId;
 use crate::presence::{self, Visibility};
+use crate::presence_activity::Activity;
 use crate::ratelimit::Class;
 
 const BODY_LIMIT: usize = 1024;
@@ -33,6 +35,10 @@ const MAX_BATCH: usize = 100;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/presence", get(list).patch(set_visibility))
+        .route(
+            "/presence/activity",
+            put(set_activity).delete(clear_activity),
+        )
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }
 
@@ -42,6 +48,8 @@ pub fn routes() -> Router<AppState> {
 struct PresenceDto {
     user_id: String,
     status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    activity: Option<Activity>,
 }
 
 #[derive(Deserialize)]
@@ -95,6 +103,7 @@ async fn list(
         dtos.push(PresenceDto {
             user_id: target.to_string(),
             status: status.as_str().to_owned(),
+            activity: tracker.activity_visible_at(target, status),
         });
     }
     Ok(Json(dtos))
@@ -129,4 +138,37 @@ async fn set_visibility(
     Ok(Json(VisibilityDto {
         visibility: visibility.as_str().to_owned(),
     }))
+}
+
+/// Sets what the caller is doing. Held only in memory against their live
+/// socket, so a caller with none is accepted and simply forgotten.
+async fn set_activity(
+    Authed(ctx): Authed,
+    parts: Parts,
+    State(state): State<AppState>,
+    Json(activity): Json<Activity>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::PresenceActivity)?;
+    activity.validate().map_err(ApiError::BadRequest)?;
+    announce_if_changed(&state, ctx.user_id, Some(activity));
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Clears the caller's activity. Idempotent.
+async fn clear_activity(
+    Authed(ctx): Authed,
+    parts: Parts,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    enforce(&state, &parts, Some(&ctx), Class::PresenceActivity)?;
+    announce_if_changed(&state, ctx.user_id, None);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Fans out through [`Event::PresenceChanged`], so each viewer's frame is
+/// resolved by the same rule as their status and a hidden user stays silent.
+fn announce_if_changed(state: &AppState, user_id: UserId, activity: Option<Activity>) {
+    if state.hub.presence().set_activity(user_id, activity) {
+        state.hub.publish(Event::PresenceChanged(user_id));
+    }
 }

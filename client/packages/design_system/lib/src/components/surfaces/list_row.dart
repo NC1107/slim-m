@@ -109,6 +109,7 @@ class AppListRow extends StatefulWidget {
     this.semanticLabel,
     this.stateDescription,
     this.subtitle,
+    this.subtitleIcon,
   });
 
   final String label;
@@ -125,6 +126,10 @@ class AppListRow extends StatefulWidget {
   /// the Discord/Slack pattern this replaces a detached caption block with.
   /// Null keeps the row exactly as single-line as it always was.
   final String? subtitle;
+
+  /// A small glyph before [subtitle], for a line that names an activity
+  /// rather than a typed status. Ignored without a subtitle.
+  final IconData? subtitleIcon;
 
   /// A control rendered after [trailing] (or the unread dot it falls back
   /// to), still inside the same tinted [AnimatedContainer] the row's hover
@@ -337,12 +342,26 @@ class _AppListRowState extends State<AppListRow> {
                           Text(widget.label,
                               overflow: TextOverflow.ellipsis,
                               style: labelStyle),
-                          Text(
-                            widget.subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.caption
-                                .copyWith(color: tokens.textSecondary),
+                          Row(
+                            children: [
+                              if (widget.subtitleIcon != null) ...[
+                                Icon(
+                                  widget.subtitleIcon,
+                                  size: 12,
+                                  color: tokens.textSecondary,
+                                ),
+                                const SizedBox(width: AppSpacing.s4),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  widget.subtitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.caption
+                                      .copyWith(color: tokens.textSecondary),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

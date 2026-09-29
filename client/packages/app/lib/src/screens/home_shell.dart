@@ -17,6 +17,7 @@ import 'package:slimm_rtc/rtc.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../providers/activity_publisher.dart';
 import '../providers/admin_providers.dart';
 import '../providers/blocks_controller.dart';
 import '../providers/hold_music_controller.dart';
@@ -89,6 +90,7 @@ class HomeShell extends ConsumerWidget {
     ref.watch(notificationSoundControllerProvider);
     // Session-lifetime, so hold music reacts to the call without a screen mounting it.
     ref.watch(holdMusicControllerProvider);
+    ref.watch(activityPublisherProvider);
     // Same reasoning: read lazily, its first read would race a module's own sound trigger against this provider's async load from disk.
     ref.watch(moduleSoundSettingsProvider);
     // Same reasoning as the channel-mute watch above: session-lifetime, for the sound and desktop-notifier paths.

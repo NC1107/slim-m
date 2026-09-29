@@ -158,6 +158,11 @@ abstract final class AppIcons {
   static const IconData micOff = LucideIcons.micOff300;
   static const IconData headphones = LucideIcons.headphones300;
 
+  /// What a member's activity line shows, by kind: listening to something, or
+  /// playing a game. Presence copy, never a status dot.
+  static const IconData listening = LucideIcons.headphones300;
+  static const IconData playing = LucideIcons.gamepad2300;
+
   /// Hearing one person, and not hearing them. Distinct from [mic]/[micOff],
   /// which are about your own microphone: these two are about what reaches
   /// your ears, so a call site that confuses them says the opposite thing.

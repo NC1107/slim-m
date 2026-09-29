@@ -49,6 +49,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 import '../routing/routes.dart';
+import '../widgets/activity_sharing_section.dart';
 import '../widgets/app_info_section.dart';
 import '../widgets/app_lock_section.dart';
 import '../widgets/appearance_settings_section.dart';
@@ -87,6 +88,7 @@ class PersonalSettingsScreen extends StatelessWidget {
                   AvatarSettingsSection(),
                   ProfileFieldsSection(),
                   SettingsProfilePreview(),
+                  ActivitySharingSection(),
                 ],
               ),
             ),

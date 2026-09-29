@@ -196,3 +196,11 @@ Permissions: iOS gets `NSPhotoLibraryAddUsageDescription` (write only, so no rea
 Android gets `WRITE_EXTERNAL_STORAGE` capped at `maxSdkVersion="29"`, which `gal` documents as the only case needing it; Android 10 and later need none.
 A refused permission surfaces as an `AppErrorState` naming Settings, never a silent no-op.
 Neither iOS nor Android behavior has been run on a real device yet.
+
+### `dbus`, for reading what a local player is playing
+
+Rich presence (`docs/decisions/0044-rich-presence.md`) reads the current track from any MPRIS player on Linux, which means talking to the session bus.
+`dbus` is the pure-Dart D-Bus client (`canonical/dbus.dart`), already in the tree as a transitive dependency at 0.7.14 and now a direct one of `slimm_platform`.
+It is imported only through `now_playing.dart`'s conditional import, so a web build never compiles it, and only a Linux build ever opens a bus connection, and only while the person has switched sharing on.
+
+License is BSD-3-Clause, already on `deny.toml`'s allowlist.

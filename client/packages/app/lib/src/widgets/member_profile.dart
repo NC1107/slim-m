@@ -43,6 +43,7 @@ import 'member_actions.dart';
 import 'member_moderate_view.dart';
 import 'member_moderation_gates.dart';
 import 'member_notify_off_hours_item.dart';
+import 'member_profile_activity.dart';
 import 'member_profile_bot_commands.dart';
 import 'member_profile_identity.dart';
 import 'member_profile_note_field.dart';
@@ -317,6 +318,7 @@ class _MemberProfileBodyState extends ConsumerState<MemberProfileBody>
       ),
       if (profile.about case final about? when about.isNotEmpty)
         MemberProfileAbout(about: about),
+      MemberProfileActivity(userId: profile.id),
       MemberProfileRolesAndJoin(
         roles: profile.roles,
         createdAt: profile.createdAt,

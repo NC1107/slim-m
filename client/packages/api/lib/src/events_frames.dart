@@ -170,10 +170,18 @@ class PollOptionTally {
 /// (a user who chose to appear offline reaches everyone but themselves as
 /// [PresenceState.offline]).
 class PresenceChanged extends ServerEvent {
-  const PresenceChanged({required this.userId, required this.status});
+  const PresenceChanged({
+    required this.userId,
+    required this.status,
+    this.activity,
+  });
 
   final String userId;
   final PresenceState status;
+
+  /// What they are listening to or playing, when they share it and this
+  /// viewer may see their presence.
+  final PresenceActivity? activity;
 }
 
 /// A member was timed out, or their timeout was lifted.

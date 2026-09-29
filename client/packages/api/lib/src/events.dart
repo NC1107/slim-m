@@ -125,6 +125,7 @@ sealed class ServerEvent {
         PresenceChanged(
           userId: decoded['user_id'] as String,
           status: _presenceStateOf(decoded['status'])!,
+          activity: PresenceActivity.tryFromJson(decoded['activity']),
         ),
       'member.timeout' when decoded['user_id'] is String =>
         MemberTimeoutChanged(

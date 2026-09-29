@@ -167,6 +167,22 @@ pub async fn run(c: &mut Contract) {
     c.bare("getSpaceAnalytics", "GET", "/space/analytics", root)
         .await;
 
+    c.json(
+        "setPresenceActivity",
+        "PUT",
+        "/presence/activity",
+        root,
+        json!({"type": "listening", "title": "Song", "subtitle": "Artist"}),
+    )
+    .await;
+    c.bare(
+        "clearPresenceActivity",
+        "DELETE",
+        "/presence/activity",
+        root,
+    )
+    .await;
+
     c.bare("getSpaceRetention", "GET", "/space/retention", root)
         .await;
     // Set back to disabled, so the rest of the pass keeps its own history.

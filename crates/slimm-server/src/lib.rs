@@ -22,6 +22,7 @@ pub mod notification_schedule;
 pub mod notifications;
 pub mod permissions;
 pub mod presence;
+pub mod presence_activity;
 mod process_metrics;
 pub mod push;
 pub mod ratelimit;

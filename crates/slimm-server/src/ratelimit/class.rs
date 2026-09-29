@@ -267,6 +267,14 @@ pub enum Class {
     /// costs nothing this budget needs to protect against. See
     /// `docs/decisions/0032-voice-participant-webhooks.md`.
     LiveKitWebhook,
+    /// A member's rich-presence activity (`PUT`/`DELETE /presence/activity`).
+    ///
+    /// A player reports a track change every few minutes at most, but a
+    /// skipping listener can change it every few seconds and each accepted
+    /// write fans out to every connected member. Burst six absorbs a skip
+    /// streak; a refill of one per five seconds bounds the sustained rate.
+    /// See `docs/decisions/0044-rich-presence.md`.
+    PresenceActivity,
 }
 
 impl Class {
@@ -302,6 +310,8 @@ impl Class {
             Class::Webhook => (30.0, 1.0 / 3.0),
             // See this variant's own doc comment for how these were sized.
             Class::LiveKitWebhook => (120.0, 20.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::PresenceActivity => (6.0, 1.0 / 5.0),
         }
     }
 
@@ -310,7 +320,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 20] = [
+    pub const ALL: [Class; 21] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -331,6 +341,7 @@ impl Class {
         Class::CodeRunner,
         Class::Webhook,
         Class::LiveKitWebhook,
+        Class::PresenceActivity,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -357,6 +368,7 @@ impl Class {
             Class::CodeRunner => "code_runner",
             Class::Webhook => "webhook",
             Class::LiveKitWebhook => "livekit_webhook",
+            Class::PresenceActivity => "presence_activity",
         }
     }
 }

@@ -92,7 +92,12 @@ pub(super) enum ServerFrame {
         options: Vec<PollOptionCountDto>,
     },
     #[serde(rename = "presence.changed")]
-    PresenceChanged { user_id: String, status: String },
+    PresenceChanged {
+        user_id: String,
+        status: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        activity: Option<crate::presence_activity::Activity>,
+    },
     #[serde(rename = "member.timeout")]
     MemberTimeoutChanged {
         user_id: String,

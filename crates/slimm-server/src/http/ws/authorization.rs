@@ -154,6 +154,7 @@ pub(super) async fn authorize_unstamped(
         return Authorization::Deliver(Box::new(ServerFrame::PresenceChanged {
             user_id: target_id.to_string(),
             status: status.as_str().to_owned(),
+            activity: hub.presence().activity_visible_at(target_id, status),
         }));
     }
     // Private to one account, so it is decided before any channel permission is consulted.
