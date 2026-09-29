@@ -17,6 +17,7 @@ class Channel {
     this.categoryId,
     this.permissions,
     this.slowModeSeconds = 0,
+    this.joinMuted = false,
     this.restricted,
   });
 
@@ -81,6 +82,10 @@ class Channel {
   /// server too old to send this field reads as) means off.
   final int slowModeSeconds;
 
+  /// Whether joining this voice channel starts with the mic off. A default a
+  /// member can override, not a lock; false for a server too old to send it.
+  final bool joinMuted;
+
   /// Whether `@everyone` lacks VIEW_CHANNEL here, so the channel is hidden
   /// from ordinary members. Identical for every caller, unlike
   /// [permissions]. Null on a server too old to send it, which reads the
@@ -107,6 +112,7 @@ class Channel {
         categoryId: json['category_id'] as String?,
         permissions: json['permissions'] as int?,
         slowModeSeconds: json['slow_mode_seconds'] as int? ?? 0,
+        joinMuted: json['join_muted'] as bool? ?? false,
         restricted: json['restricted'] as bool?,
       );
 }

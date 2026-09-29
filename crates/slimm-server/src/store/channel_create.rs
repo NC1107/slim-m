@@ -215,6 +215,7 @@ impl Store {
                 created_at: now,
                 // The column default; a fresh channel has no slow mode set yet.
                 slow_mode_seconds: 0,
+                join_muted: false,
             },
             fresh: true,
         })
@@ -266,7 +267,8 @@ where
                   parent_message_id AS "parent_message_id: crate::ids::MessageId",
                   category_id AS "category_id: crate::ids::ChannelCategoryId",
                   created_at AS "created_at!",
-                  slow_mode_seconds AS "slow_mode_seconds!: i64"
+                  slow_mode_seconds AS "slow_mode_seconds!: i64",
+                  join_muted AS "join_muted!: bool"
            FROM channels WHERE id = ?"#,
         id
     )
@@ -282,5 +284,6 @@ where
         category_id: r.category_id,
         created_at: r.created_at,
         slow_mode_seconds: r.slow_mode_seconds,
+        join_muted: r.join_muted,
     }))
 }

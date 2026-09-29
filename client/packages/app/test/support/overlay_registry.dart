@@ -60,6 +60,7 @@ final _localChannel = Channel(
   lastReadSeq: 0,
   mentionedSeq: 0,
   slowModeSeconds: 0,
+  joinMuted: false,
   isPersonalSpace: false,
 );
 

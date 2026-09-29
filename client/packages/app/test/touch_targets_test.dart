@@ -32,6 +32,7 @@ Channel _channel(String id, String name) => Channel(
   lastReadSeq: 0,
   mentionedSeq: 0,
   slowModeSeconds: 0,
+  joinMuted: false,
   isPersonalSpace: false,
 );
 

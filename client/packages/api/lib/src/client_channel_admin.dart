@@ -8,16 +8,18 @@ part of 'client.dart';
 extension SlimmApiChannelAdmin on SlimmApi {
   /// Renames a channel, replaces its topic, and/or sets its slow-mode
   /// interval. Requires MANAGE_CHANNELS at the deployment level, the same
-  /// check creating a channel uses. At least one of [name], [topic] and
-  /// [slowModeSeconds] must be given; a blank or whitespace-only [topic]
+  /// check creating a channel uses. At least one of [name], [topic],
+  /// [slowModeSeconds] and [joinMuted] must be given; a blank or whitespace-only [topic]
   /// clears it back to none rather than storing an empty string.
   /// [slowModeSeconds] of 0 turns slow mode off; the server refuses, rather
-  /// than clamps, a value outside 0 to 21600 (six hours).
+  /// than clamps, a value outside 0 to 21600 (six hours). [joinMuted] sets
+  /// whether joining a voice channel starts with the mic off.
   Future<Channel> updateChannel({
     required String channelId,
     String? name,
     String? topic,
     int? slowModeSeconds,
+    bool? joinMuted,
   }) async {
     final json = await _send(
       'PATCH',
@@ -26,6 +28,7 @@ extension SlimmApiChannelAdmin on SlimmApi {
         if (name != null) 'name': name,
         if (topic != null) 'topic': topic,
         if (slowModeSeconds != null) 'slow_mode_seconds': slowModeSeconds,
+        if (joinMuted != null) 'join_muted': joinMuted,
       },
     );
     return Channel.fromJson(json as Map<String, dynamic>);

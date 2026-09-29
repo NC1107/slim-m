@@ -43,6 +43,7 @@ Channel _channel(
   lastReadSeq: lastReadSeq,
   mentionedSeq: 0,
   slowModeSeconds: 0,
+  joinMuted: false,
   isPersonalSpace: false,
 );
 

@@ -38,6 +38,7 @@ Channel _dm(String id, String name, String peerId) => Channel(
   lastReadSeq: 0,
   mentionedSeq: 0,
   slowModeSeconds: 0,
+  joinMuted: false,
   isPersonalSpace: false,
   dmParticipantId: peerId,
 );

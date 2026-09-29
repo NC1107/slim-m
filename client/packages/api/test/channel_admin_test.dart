@@ -25,6 +25,7 @@ Map<String, dynamic> _channelJson({
   String kind = 'text',
   String? topic,
   int slowModeSeconds = 0,
+  bool joinMuted = false,
 }) =>
     {
       'id': id,
@@ -33,6 +34,7 @@ Map<String, dynamic> _channelJson({
       'topic': topic,
       'created_at': 1,
       'slow_mode_seconds': slowModeSeconds,
+      'join_muted': joinMuted,
     };
 
 void main() {
@@ -133,6 +135,28 @@ void main() {
       expect(sentBody, {'slow_mode_seconds': 30});
       expect(updated.slowModeSeconds, 30);
       expect(updated.slowModeEnabled, isTrue);
+    });
+
+    test('a join-muted-only update sends just that field and round-trips',
+        () async {
+      Map<String, dynamic>? sentBody;
+      final api = SlimmApi(
+        baseUrl: _base,
+        session: SessionStore(tokens: _tokens()),
+        httpClient: MockClient((request) async {
+          sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode(_channelJson(kind: 'voice', joinMuted: true)),
+            200,
+          );
+        }),
+      );
+      final updated = await api.updateChannel(
+        channelId: 'chan-1',
+        joinMuted: true,
+      );
+      expect(sentBody, {'join_muted': true});
+      expect(updated.joinMuted, isTrue);
     });
   });
 

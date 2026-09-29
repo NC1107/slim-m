@@ -8688,6 +8688,14 @@ components:
             off. Set with `updateChannel`. Absent on servers older than this
             field, which a client must treat as unknown rather than
             assuming 0.
+        join_muted:
+          type: boolean
+          description: >
+            True when joining this voice channel should start with the mic
+            off. A default members can override by unmuting, not a lock:
+            SPEAK overwrites are what restrict who may speak. Set with
+            `updateChannel` or at `createChannel`. Absent on servers older
+            than this field, which a client must treat as false.
         permissions:
           type: integer
           format: int64
@@ -8807,12 +8815,17 @@ components:
             MANAGE_CHANNELS this route already needs; there is no role
             picker here, others are granted afterwards through
             `setRoleOverwrite`/`setMemberOverwrite`.
+        join_muted:
+          type: boolean
+          description: >
+            True creates a channel whose joins start with the mic off. Absent
+            or false leaves the default off.
 
     UpdateChannelRequest:
       type: object
       description: >
-        At least one of `name`, `topic` and `slow_mode_seconds` must be
-        present; a request with none of them is a 400. Each is independent:
+        At least one of `name`, `topic`, `slow_mode_seconds` and
+        `join_muted` must be present; a request with none of them is a 400. Each is independent:
         sending only one leaves the others untouched.
       properties:
         name:
@@ -8832,6 +8845,10 @@ components:
           maximum: 21600
           description: >
             0 turns slow mode off. Refused, not clamped, outside this range.
+        join_muted:
+          type: boolean
+          description: >
+            Sets the join-muted default. Absent leaves it unchanged.
 
     ReorderChannelsRequest:
       type: object

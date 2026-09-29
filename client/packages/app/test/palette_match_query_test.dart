@@ -21,6 +21,7 @@ Channel _channel(String name, {bool personal = false}) => Channel(
   lastReadSeq: 0,
   mentionedSeq: 0,
   slowModeSeconds: 0,
+  joinMuted: false,
   isPersonalSpace: personal,
 );
 

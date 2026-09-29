@@ -116,6 +116,16 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _joinMutedMeta =
+      const VerificationMeta('joinMuted');
+  @override
+  late final GeneratedColumn<bool> joinMuted = GeneratedColumn<bool>(
+      'join_muted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("join_muted" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _restrictedMeta =
       const VerificationMeta('restricted');
   @override
@@ -143,6 +153,7 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
         parentMessageId,
         categoryId,
         slowModeSeconds,
+        joinMuted,
         restricted
       ];
   @override
@@ -242,6 +253,10 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           slowModeSeconds.isAcceptableOrUnknown(
               data['slow_mode_seconds']!, _slowModeSecondsMeta));
     }
+    if (data.containsKey('join_muted')) {
+      context.handle(_joinMutedMeta,
+          joinMuted.isAcceptableOrUnknown(data['join_muted']!, _joinMutedMeta));
+    }
     if (data.containsKey('restricted')) {
       context.handle(
           _restrictedMeta,
@@ -289,6 +304,8 @@ class $ChannelsTable extends Channels with TableInfo<$ChannelsTable, Channel> {
           .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
       slowModeSeconds: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}slow_mode_seconds'])!,
+      joinMuted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}join_muted'])!,
       restricted: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}restricted']),
     );
@@ -386,6 +403,10 @@ class Channel extends DataClass implements Insertable<Channel> {
   /// fills in the real value.
   final int slowModeSeconds;
 
+  /// `channels.join_muted`: joining this voice channel starts with the mic
+  /// off. False for every existing row until the next channel refresh.
+  final bool joinMuted;
+
   /// Whether `@everyone` lacks VIEW_CHANNEL here, mirroring the server's
   /// `channels.restricted` - null for a server too old to send it, which
   /// reads the same as false: nothing here claims a channel is public that
@@ -408,6 +429,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       this.parentMessageId,
       this.categoryId,
       required this.slowModeSeconds,
+      required this.joinMuted,
       this.restricted});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -440,6 +462,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       map['category_id'] = Variable<String>(categoryId);
     }
     map['slow_mode_seconds'] = Variable<int>(slowModeSeconds);
+    map['join_muted'] = Variable<bool>(joinMuted);
     if (!nullToAbsent || restricted != null) {
       map['restricted'] = Variable<bool>(restricted);
     }
@@ -475,6 +498,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           ? const Value.absent()
           : Value(categoryId),
       slowModeSeconds: Value(slowModeSeconds),
+      joinMuted: Value(joinMuted),
       restricted: restricted == null && nullToAbsent
           ? const Value.absent()
           : Value(restricted),
@@ -501,6 +525,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       parentMessageId: serializer.fromJson<String?>(json['parentMessageId']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       slowModeSeconds: serializer.fromJson<int>(json['slowModeSeconds']),
+      joinMuted: serializer.fromJson<bool>(json['joinMuted']),
       restricted: serializer.fromJson<bool?>(json['restricted']),
     );
   }
@@ -524,6 +549,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       'parentMessageId': serializer.toJson<String?>(parentMessageId),
       'categoryId': serializer.toJson<String?>(categoryId),
       'slowModeSeconds': serializer.toJson<int>(slowModeSeconds),
+      'joinMuted': serializer.toJson<bool>(joinMuted),
       'restricted': serializer.toJson<bool?>(restricted),
     };
   }
@@ -545,6 +571,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           Value<String?> parentMessageId = const Value.absent(),
           Value<String?> categoryId = const Value.absent(),
           int? slowModeSeconds,
+          bool? joinMuted,
           Value<bool?> restricted = const Value.absent()}) =>
       Channel(
         id: id ?? this.id,
@@ -568,6 +595,7 @@ class Channel extends DataClass implements Insertable<Channel> {
             : this.parentMessageId,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
         slowModeSeconds: slowModeSeconds ?? this.slowModeSeconds,
+        joinMuted: joinMuted ?? this.joinMuted,
         restricted: restricted.present ? restricted.value : this.restricted,
       );
   Channel copyWithCompanion(ChannelsCompanion data) {
@@ -602,6 +630,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       slowModeSeconds: data.slowModeSeconds.present
           ? data.slowModeSeconds.value
           : this.slowModeSeconds,
+      joinMuted: data.joinMuted.present ? data.joinMuted.value : this.joinMuted,
       restricted:
           data.restricted.present ? data.restricted.value : this.restricted,
     );
@@ -626,6 +655,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           ..write('parentMessageId: $parentMessageId, ')
           ..write('categoryId: $categoryId, ')
           ..write('slowModeSeconds: $slowModeSeconds, ')
+          ..write('joinMuted: $joinMuted, ')
           ..write('restricted: $restricted')
           ..write(')'))
         .toString();
@@ -649,6 +679,7 @@ class Channel extends DataClass implements Insertable<Channel> {
       parentMessageId,
       categoryId,
       slowModeSeconds,
+      joinMuted,
       restricted);
   @override
   bool operator ==(Object other) =>
@@ -670,6 +701,7 @@ class Channel extends DataClass implements Insertable<Channel> {
           other.parentMessageId == this.parentMessageId &&
           other.categoryId == this.categoryId &&
           other.slowModeSeconds == this.slowModeSeconds &&
+          other.joinMuted == this.joinMuted &&
           other.restricted == this.restricted);
 }
 
@@ -690,6 +722,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
   final Value<String?> parentMessageId;
   final Value<String?> categoryId;
   final Value<int> slowModeSeconds;
+  final Value<bool> joinMuted;
   final Value<bool?> restricted;
   final Value<int> rowid;
   const ChannelsCompanion({
@@ -709,6 +742,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.parentMessageId = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.slowModeSeconds = const Value.absent(),
+    this.joinMuted = const Value.absent(),
     this.restricted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -729,6 +763,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     this.parentMessageId = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.slowModeSeconds = const Value.absent(),
+    this.joinMuted = const Value.absent(),
     this.restricted = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -752,6 +787,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     Expression<String>? parentMessageId,
     Expression<String>? categoryId,
     Expression<int>? slowModeSeconds,
+    Expression<bool>? joinMuted,
     Expression<bool>? restricted,
     Expression<int>? rowid,
   }) {
@@ -772,6 +808,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       if (parentMessageId != null) 'parent_message_id': parentMessageId,
       if (categoryId != null) 'category_id': categoryId,
       if (slowModeSeconds != null) 'slow_mode_seconds': slowModeSeconds,
+      if (joinMuted != null) 'join_muted': joinMuted,
       if (restricted != null) 'restricted': restricted,
       if (rowid != null) 'rowid': rowid,
     });
@@ -794,6 +831,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       Value<String?>? parentMessageId,
       Value<String?>? categoryId,
       Value<int>? slowModeSeconds,
+      Value<bool>? joinMuted,
       Value<bool?>? restricted,
       Value<int>? rowid}) {
     return ChannelsCompanion(
@@ -813,6 +851,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
       parentMessageId: parentMessageId ?? this.parentMessageId,
       categoryId: categoryId ?? this.categoryId,
       slowModeSeconds: slowModeSeconds ?? this.slowModeSeconds,
+      joinMuted: joinMuted ?? this.joinMuted,
       restricted: restricted ?? this.restricted,
       rowid: rowid ?? this.rowid,
     );
@@ -869,6 +908,9 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
     if (slowModeSeconds.present) {
       map['slow_mode_seconds'] = Variable<int>(slowModeSeconds.value);
     }
+    if (joinMuted.present) {
+      map['join_muted'] = Variable<bool>(joinMuted.value);
+    }
     if (restricted.present) {
       map['restricted'] = Variable<bool>(restricted.value);
     }
@@ -897,6 +939,7 @@ class ChannelsCompanion extends UpdateCompanion<Channel> {
           ..write('parentMessageId: $parentMessageId, ')
           ..write('categoryId: $categoryId, ')
           ..write('slowModeSeconds: $slowModeSeconds, ')
+          ..write('joinMuted: $joinMuted, ')
           ..write('restricted: $restricted, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2397,6 +2440,7 @@ typedef $$ChannelsTableCreateCompanionBuilder = ChannelsCompanion Function({
   Value<String?> parentMessageId,
   Value<String?> categoryId,
   Value<int> slowModeSeconds,
+  Value<bool> joinMuted,
   Value<bool?> restricted,
   Value<int> rowid,
 });
@@ -2417,6 +2461,7 @@ typedef $$ChannelsTableUpdateCompanionBuilder = ChannelsCompanion Function({
   Value<String?> parentMessageId,
   Value<String?> categoryId,
   Value<int> slowModeSeconds,
+  Value<bool> joinMuted,
   Value<bool?> restricted,
   Value<int> rowid,
 });
@@ -2482,6 +2527,9 @@ class $$ChannelsTableFilterComposer
   ColumnFilters<int> get slowModeSeconds => $composableBuilder(
       column: $table.slowModeSeconds,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get joinMuted => $composableBuilder(
+      column: $table.joinMuted, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get restricted => $composableBuilder(
       column: $table.restricted, builder: (column) => ColumnFilters(column));
@@ -2550,6 +2598,9 @@ class $$ChannelsTableOrderingComposer
       column: $table.slowModeSeconds,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get joinMuted => $composableBuilder(
+      column: $table.joinMuted, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get restricted => $composableBuilder(
       column: $table.restricted, builder: (column) => ColumnOrderings(column));
 }
@@ -2611,6 +2662,9 @@ class $$ChannelsTableAnnotationComposer
   GeneratedColumn<int> get slowModeSeconds => $composableBuilder(
       column: $table.slowModeSeconds, builder: (column) => column);
 
+  GeneratedColumn<bool> get joinMuted =>
+      $composableBuilder(column: $table.joinMuted, builder: (column) => column);
+
   GeneratedColumn<bool> get restricted => $composableBuilder(
       column: $table.restricted, builder: (column) => column);
 }
@@ -2654,6 +2708,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String?> parentMessageId = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             Value<int> slowModeSeconds = const Value.absent(),
+            Value<bool> joinMuted = const Value.absent(),
             Value<bool?> restricted = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2674,6 +2729,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             parentMessageId: parentMessageId,
             categoryId: categoryId,
             slowModeSeconds: slowModeSeconds,
+            joinMuted: joinMuted,
             restricted: restricted,
             rowid: rowid,
           ),
@@ -2694,6 +2750,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             Value<String?> parentMessageId = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             Value<int> slowModeSeconds = const Value.absent(),
+            Value<bool> joinMuted = const Value.absent(),
             Value<bool?> restricted = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -2714,6 +2771,7 @@ class $$ChannelsTableTableManager extends RootTableManager<
             parentMessageId: parentMessageId,
             categoryId: categoryId,
             slowModeSeconds: slowModeSeconds,
+            joinMuted: joinMuted,
             restricted: restricted,
             rowid: rowid,
           ),

@@ -102,6 +102,9 @@ pub(crate) struct ChannelDto {
     /// caller, so there is no reason to omit it anywhere `ChannelDto`
     /// appears.
     slow_mode_seconds: i64,
+    /// Whether joining this voice channel starts with the mic off. A
+    /// default members can override, not a lock; always present.
+    join_muted: bool,
     /// Whether `@everyone` lacks VIEW_CHANNEL here, so the channel is hidden
     /// from ordinary members rather than visible to anyone in the
     /// deployment. Identical for every caller, unlike `permissions` - see
@@ -125,6 +128,7 @@ impl From<Channel> for ChannelDto {
             created_at: channel.created_at,
             permissions: None,
             slow_mode_seconds: channel.slow_mode_seconds,
+            join_muted: channel.join_muted,
             restricted: None,
         }
     }
@@ -156,6 +160,10 @@ struct CreateRequest {
     /// channel-permissions surface.
     #[serde(default)]
     restricted: Option<bool>,
+    /// True creates a voice channel that starts every join with the mic off.
+    /// Absent or false leaves the default off.
+    #[serde(default)]
+    join_muted: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -175,6 +183,9 @@ struct UpdateChannelRequest {
     /// `0..=SLOW_MODE_MAX_SECONDS` - see [`validate_slow_mode_seconds`].
     #[serde(default)]
     slow_mode_seconds: Option<i64>,
+    /// Absent leaves the join-muted default unchanged; present replaces it.
+    #[serde(default)]
+    join_muted: Option<bool>,
 }
 
 /// Lists the channels the caller can view. One batched store call: the
@@ -260,13 +271,22 @@ async fn create(
         .store
         .create_channel_with_id(id, name, kind, category_id, private_to)
         .await?;
+    let mut channel = created.channel;
+    // Only a fresh create may still choose the default; a retry keeps what the first call stored.
+    if created.fresh && req.join_muted == Some(true) {
+        channel = state
+            .store
+            .update_channel_join_muted(id, true)
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?;
+    }
     // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
     if created.fresh {
         state
             .hub
-            .publish(Event::ChannelCreated(Arc::new(created.channel.clone())));
+            .publish(Event::ChannelCreated(Arc::new(channel.clone())));
     }
-    Ok(Json(created.channel.into()))
+    Ok(Json(channel.into()))
 }
 
 /// Renames a channel, replaces its topic, and/or sets its slow-mode interval.
@@ -302,7 +322,8 @@ async fn update(
         .slow_mode_seconds
         .map(validate_slow_mode_seconds)
         .transpose()?;
-    if name.is_none() && topic.is_none() && slow_mode_seconds.is_none() {
+    if name.is_none() && topic.is_none() && slow_mode_seconds.is_none() && req.join_muted.is_none()
+    {
         return Err(ApiError::BadRequest("nothing to update"));
     }
 
@@ -323,6 +344,13 @@ async fn update(
         channel = state
             .store
             .update_channel_slow_mode(channel_id, seconds)
+            .await?
+            .ok_or(ApiError::NotFound("channel not found"))?;
+    }
+    if let Some(join_muted) = req.join_muted {
+        channel = state
+            .store
+            .update_channel_join_muted(channel_id, join_muted)
             .await?
             .ok_or(ApiError::NotFound("channel not found"))?;
     }
