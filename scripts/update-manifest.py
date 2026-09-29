@@ -126,7 +126,9 @@ def verify_signature(data: bytes, signature: bytes, pubkey_b64: str) -> None:
     if len(signature) != 64:
         raise ManifestError("signature must be 64 raw bytes")
     with tempfile.TemporaryDirectory() as tmp:
-        pub, payload, sig = (Path(tmp) / name for name in ("pub.der", "payload", "sig"))
+        pub = Path(tmp) / "pub.der"
+        payload = Path(tmp) / "payload"
+        sig = Path(tmp) / "sig"
         pub.write_bytes(SPKI_PREFIX + raw)
         payload.write_bytes(data)
         sig.write_bytes(signature)
@@ -137,26 +139,59 @@ def verify_signature(data: bytes, signature: bytes, pubkey_b64: str) -> None:
             raise ManifestError("signature does not match the manifest") from err
 
 
+def artifact_path(directory: Path, name: str) -> Path:
+    """A manifest is untrusted input until proven otherwise: only a bare filename inside the directory is acceptable."""
+    if not name or name in (".", "..") or any(c in name for c in ("/", "\\", "\0")) or Path(name).is_absolute():
+        raise ManifestError(f"unsafe artifact name in manifest: {name!r}")
+    root = directory.resolve()
+    path = (root / name).resolve()
+    if not path.is_relative_to(root) or path.parent != root:
+        raise ManifestError(f"artifact escapes the artifact directory: {name!r}")
+    return path
+
+
 def check_artifacts(manifest: dict, directory: Path) -> None:
     for platform, entry in manifest["artifacts"].items():
         name = entry["url"].rsplit("/", 1)[-1]
-        path = directory / name
+        path = artifact_path(directory, name)
         if not path.is_file():
             raise ManifestError(f"{platform}: {name} not found in {directory}")
         if path.stat().st_size != entry["size"] or sha256_of(path) != entry["sha256"]:
             raise ManifestError(f"{platform}: {name} does not match the manifest")
 
 
+def existing_file(path: Path) -> Path:
+    resolved = path.resolve()
+    if not resolved.is_file():
+        raise ManifestError(f"not a regular file: {path}")
+    return resolved
+
+
+def existing_dir(path: Path) -> Path:
+    resolved = path.resolve()
+    if not resolved.is_dir():
+        raise ManifestError(f"not a directory: {path}")
+    return resolved
+
+
+def output_file(path: Path) -> Path:
+    resolved = path.resolve()
+    if not resolved.parent.is_dir() or (resolved.exists() and not resolved.is_file()):
+        raise ManifestError(f"cannot write to {path}")
+    return resolved
+
+
 def verify(manifest_path: Path, sig_path: Path, pubkey: str, directory, newer_than) -> dict:
-    data = manifest_path.read_bytes()
-    verify_signature(data, base64.b64decode(sig_path.read_text().strip(), validate=True), pubkey)
+    data = existing_file(manifest_path).read_bytes()
+    encoded = existing_file(sig_path).read_text().strip()
+    verify_signature(data, base64.b64decode(encoded, validate=True), pubkey)
     manifest = json.loads(data)
     if manifest.get("schema") != SCHEMA:
         raise ManifestError(f"unsupported manifest schema {manifest.get('schema')!r}")
     if newer_than and version_tuple(manifest["version"]) <= version_tuple(newer_than):
         raise ManifestError(f"manifest {manifest['version']} is not newer than {newer_than}")
     if directory:
-        check_artifacts(manifest, directory)
+        check_artifacts(manifest, existing_dir(directory))
     return manifest
 
 
@@ -183,11 +218,11 @@ def main(argv: list[str]) -> int:
     try:
         if args.cmd == "build":
             require = [name for name in args.require.split(",") if name]
-            manifest = build_manifest(args.tag, args.dir, args.repo, require)
-            args.out.write_bytes(canonical(manifest))
+            manifest = build_manifest(args.tag, existing_dir(args.dir), args.repo, require)
+            output_file(args.out).write_bytes(canonical(manifest))
         elif args.cmd == "sign":
-            signature = sign_bytes(args.manifest.read_bytes())
-            args.sig.write_text(base64.b64encode(signature).decode() + "\n")
+            signature = sign_bytes(existing_file(args.manifest).read_bytes())
+            output_file(args.sig).write_text(base64.b64encode(signature).decode() + "\n")
         elif args.cmd == "pubkey":
             print(public_key_b64())
         else:

@@ -5,6 +5,7 @@ The key is generated per run and never leaves the temp dir; the real signing
 key lives only in the UPDATE_SIGNING_KEY Actions secret.
 """
 import base64
+import importlib.util
 import json
 import os
 import shutil
@@ -149,6 +150,58 @@ class UpdateManifestTest(unittest.TestCase):
         self.assertEqual(self.verify("--newer-than", "0.89.9").returncode, 0)
         self.assertEqual(self.verify("--newer-than", "0.90.0").returncode, 1)
         self.assertEqual(self.verify("--newer-than", "0.91.0").returncode, 1)
+
+    def sign_custom(self, name):
+        data = json.loads(self.manifest.read_text())
+        data["artifacts"]["macos"]["url"] = "https://x/y/" + name
+        self.manifest.write_text(json.dumps(data))
+        done = run("sign", "--manifest", self.manifest, "--sig", self.sig, key=self.key)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_unsafe_artifact_names_are_refused_without_reading_outside(self):
+        self.build()
+        outside = self.tmp / "x"
+        outside.write_bytes(b"mac" * 10)
+        for name in ("..", "%2e%2e", "a\\b", "x\0y"):
+            self.sign_custom(name)
+            done = self.verify("--dir", self.assets)
+            self.assertEqual(done.returncode, 1, name)
+            self.assertNotIn("Traceback", done.stderr)
+
+    def test_absolute_and_traversal_names_are_refused(self):
+        self.build()
+        for name in ("/etc/passwd", "../x", "sub/../../x"):
+            data = json.loads(self.manifest.read_text())
+            data["artifacts"]["macos"]["url"] = "https://x/" + name
+            self.manifest.write_text(json.dumps(data))
+            run("sign", "--manifest", self.manifest, "--sig", self.sig, key=self.key)
+            done = self.verify("--dir", self.assets)
+            self.assertEqual(done.returncode, 1, name)
+
+    def test_traversal_name_is_rejected_by_the_name_check(self):
+        spec = importlib.util.spec_from_file_location("um", SCRIPT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for name in ("../x", "/etc/passwd", "..", "", "a/b", "a\\b", "x\0y"):
+            with self.assertRaises(mod.ManifestError, msg=name):
+                mod.artifact_path(self.assets, name)
+        self.assertEqual(mod.artifact_path(self.assets, "ok.zip").parent, self.assets.resolve())
+
+    def test_signature_is_checked_before_any_artifact_is_touched(self):
+        self.signed()
+        data = json.loads(self.manifest.read_text())
+        data["artifacts"]["macos"]["url"] = "https://x/../../etc/passwd"
+        self.manifest.write_text(json.dumps(data))
+        done = self.verify("--dir", self.assets)
+        self.assertIn("signature", done.stderr)
+
+    def test_non_regular_file_arguments_are_refused(self):
+        self.signed()
+        done = run("verify", "--manifest", self.tmp, "--sig", self.sig, "--pubkey", self.pub)
+        self.assertEqual(done.returncode, 1)
+        done = run("build", "--tag", TAG, "--dir", self.manifest, "--repo", "o/r",
+                   "--out", self.tmp / "nodir" / "m.json")
+        self.assertEqual(done.returncode, 1)
 
     def test_sign_without_a_key_fails_cleanly(self):
         self.build()
