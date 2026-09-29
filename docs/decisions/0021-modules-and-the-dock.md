@@ -279,6 +279,14 @@ There is no bot identity: a module is a pure function, so its output goes out un
 The surface's live state is the module's own output, run and broadcast through the shared code-run route at block 0 exactly like a run fenced code block, so everyone viewing the message sees the same state and any viewer holding the permission can act on it.
 Rendering is the scene contract below, including its interactive path.
 
+Manifest validation holds extension-point names to what a client can route.
+A `command` or `slash-command` name must be one keyword (no whitespace or `/`, at most 64 bytes), because the composer cuts at the first whitespace and the name is a route segment.
+Two points of the same kind and name, compared case-insensitively, are refused for `command`, `slash-command` and `app`: the first declared wins at run time, so a stricter permission declared second would be silently ignored.
+`code-block-runner` names are labels and may repeat.
+Collisions across modules are deliberately not part of the manifest contract; that stays a discovery and client-matching concern.
+Every displayed manifest string is also refused when it carries a control, bidi or zero-width character (`http::hidden_chars`, the same set code runs refuse), since the admin reads those strings to decide whether to install.
+The refusal is a 502 naming the field, like every other unacceptable registry content, and the Dock shows it.
+
 Both kinds shipped after decision 0022 and were added here afterwards; they are the additive, bounded contracts that record describes, and `app` is the inline half of the `panel` shape it lists as future work.
 
 ## Rendering: the scene contract (scene/1)

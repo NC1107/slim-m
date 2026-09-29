@@ -12,6 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::super::hidden_chars::is_hidden_char;
 use crate::module_runtime::{MAX_FUEL, MAX_MEMORY_MB, MAX_WALL_MS};
 
 /// The one schema version this server understands. A registry that bumps it
@@ -280,6 +281,7 @@ fn validate_manifest(raw: RawManifest) -> Result<Manifest, ManifestError> {
         .into_iter()
         .map(|ep| validate_extension_point(ep, &seen_keys, &command_names))
         .collect::<Result<Vec<_>, _>>()?;
+    names::reject_colliding_names(&extension_points)?;
 
     Ok(Manifest {
         id: raw.id,
@@ -404,6 +406,7 @@ fn validate_extension_point(
 ) -> Result<ManifestExtensionPoint, ManifestError> {
     let kind = bounded(&raw.kind, MAX_SLUG, "extension_points[].kind")?;
     let name = bounded(&raw.name, MAX_SHORT_FIELD, "extension_points[].name")?;
+    names::validate_point_name(&kind, &name)?;
     let description = raw
         .description
         .map(|d| bounded(&d, MAX_LONG_FIELD, "extension_points[].description"))
@@ -468,9 +471,9 @@ fn bounded(value: &str, max_len: usize, field: &str) -> Result<String, ManifestE
             "{field} must be 1 to {max_len} characters"
         )));
     }
-    if trimmed.chars().any(|c| c.is_control()) {
+    if trimmed.chars().any(is_hidden_char) {
         return Err(malformed(&format!(
-            "{field} must not contain control characters"
+            "{field} must not contain control or hidden text-direction characters"
         )));
     }
     Ok(trimmed.to_owned())
@@ -480,5 +483,10 @@ fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+mod names;
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod validation_tests;
