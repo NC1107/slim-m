@@ -92,7 +92,10 @@ class VoiceStripIndicator extends ConsumerWidget {
                     Flexible(
                       child: Text(
                         // Says what the call is, so no unseen share is a mystery.
-                        voice.screenSharing ? ' - sharing' : ' - audio only',
+                        _subtitle(
+                          sharing: voice.screenSharing,
+                          hasTimer: voice.connectedAt != null,
+                        ),
                         overflow: TextOverflow.ellipsis,
                         style: AppText.micro.copyWith(
                           color: voice.screenSharing
@@ -111,6 +114,12 @@ class VoiceStripIndicator extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The separator only exists to sit after the timer; without one it would lead.
+String _subtitle({required bool sharing, required bool hasTimer}) {
+  if (hasTimer) return sharing ? ' - sharing' : ' - audio only';
+  return sharing ? 'Sharing' : 'Audio only';
 }
 
 /// The channel a call is in, read from the local store rather than passed in:
