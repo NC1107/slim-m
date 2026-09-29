@@ -198,6 +198,7 @@ async fn create(
             code_run: block_zero.map(Arc::new),
             poll: None,
             embeds: Arc::new(Vec::new()),
+            call: None,
         });
         state.push.notify_message(
             state.store.clone(),

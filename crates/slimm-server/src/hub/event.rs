@@ -12,8 +12,8 @@ use crate::ids::{
     CallRingId, CanvasObjectId, CanvasOpId, ChannelId, MessageId, RoleId, Seq, SessionId, UserId,
 };
 use crate::store::{
-    AppSurface, AttachmentSummary, CanvasObject, Channel, CodeRunSummary, Embed, ForwardSummary,
-    MediaSlotKind, Message, Poll,
+    AppSurface, AttachmentSummary, CallRecord, CanvasObject, Channel, CodeRunSummary, Embed,
+    ForwardSummary, MediaSlotKind, Message, Poll,
 };
 use crate::voice::CallRingOutcome;
 
@@ -54,6 +54,10 @@ pub enum Event {
         poll: Option<Arc<Poll>>,
         /// Raw, like `attachments`; image tokens resolve per connection.
         embeds: Arc<Vec<Embed>>,
+        /// The call this message records, if any. Resolved once by the
+        /// publisher that just wrote it rather than looked up per subscriber:
+        /// nothing in it depends on who is reading.
+        call: Option<Arc<CallRecord>>,
     },
     /// A message was edited. `op_seq` is its place in the *message-op* stream,
     /// a different sequence from the message's own `seq`, which an edit does

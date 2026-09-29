@@ -172,7 +172,7 @@ pub(crate) async fn record_call(
     caller_id: crate::ids::UserId,
     outcome: CallRingOutcome,
 ) {
-    let sent = match state
+    let (sent, record) = match state
         .store
         .record_call(channel_id, caller_id, outcome.as_str(), None)
         .await
@@ -191,5 +191,6 @@ pub(crate) async fn record_call(
         code_run: None,
         poll: None,
         embeds: std::sync::Arc::new(Vec::new()),
+        call: Some(std::sync::Arc::new(record)),
     });
 }

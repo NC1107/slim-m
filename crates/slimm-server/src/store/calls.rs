@@ -55,7 +55,7 @@ impl Store {
         caller_id: UserId,
         outcome: &str,
         duration_ms: Option<i64>,
-    ) -> anyhow::Result<Sent> {
+    ) -> anyhow::Result<(Sent, CallRecord)> {
         let now = now_ms();
         let id = MessageId::generate();
         let mut tx = self.begin_write().await?;
@@ -105,7 +105,13 @@ impl Store {
         .await?;
 
         tx.commit().await?;
-        Ok(Sent {
+        let record = CallRecord {
+            caller_id: Some(caller_id),
+            outcome: outcome.to_owned(),
+            duration_ms,
+            created_at: now,
+        };
+        let sent = Sent {
             message: Message {
                 id,
                 channel_id,
@@ -118,22 +124,8 @@ impl Store {
                 reply_to_id: None,
             },
             fresh: true,
-        })
-    }
-
-    /// A single message's call record, or `None` if it carries none. The
-    /// live `message.created` frame uses this: a call message whose record
-    /// has not arrived renders as the empty string it stores.
-    pub async fn call_for_message(
-        &self,
-        message_id: MessageId,
-    ) -> anyhow::Result<Option<CallRecord>> {
-        Ok(self
-            .calls_for_messages(&[message_id])
-            .await?
-            .into_iter()
-            .next()
-            .map(|(_, record)| record))
+        };
+        Ok((sent, record))
     }
 
     /// Call records for a page of messages in one query, the same batch-enrich
