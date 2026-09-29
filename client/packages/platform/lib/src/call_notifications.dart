@@ -50,4 +50,19 @@ class CallNotifications {
       // A build or isolate with no native CallNotificationPlugin registered; there is no notification surface to reach.
     }
   }
+
+  /// Takes down every incoming-call notification and ringing Telecom
+  /// connection, for a push saying the ring has ended. Cancelled by channel
+  /// on the native side because the notification id is derived from a call
+  /// id this push does not carry.
+  Future<void> endIncomingCalls() async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('endIncomingCalls');
+    } on PlatformException {
+      // Same background-isolate reasoning as showIncomingCall: a missed teardown is better than an uncaught throw.
+    } on MissingPluginException {
+      // No native CallNotificationPlugin in this build or isolate; there is nothing ringing to end.
+    }
+  }
 }

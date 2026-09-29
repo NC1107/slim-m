@@ -71,6 +71,11 @@ class SlimmConnection(
         end(DisconnectCause.LOCAL)
     }
 
+    /** The ring ended on the caller's side or timed out; nobody here answered. */
+    fun endAsMissed() {
+        end(DisconnectCause.MISSED)
+    }
+
     private fun end(reason: Int) {
         setDisconnected(DisconnectCause(reason))
         destroy()

@@ -50,6 +50,17 @@ void main() {
         isNot(LocalAlertChannel.mentions.notificationId),
       );
     });
+
+    test('the security channel is versioned and has its own ids', () {
+      expect(securityChannelId, 'security_v1');
+      final others = LocalAlertChannel.values
+          .where((c) => c != LocalAlertChannel.security);
+      expect(others.map((c) => c.id), isNot(contains(securityChannelId)));
+      expect(
+        others.map((c) => c.notificationId),
+        isNot(contains(LocalAlertChannel.security.notificationId)),
+      );
+    });
   });
 
   group('LocalNotifications.show', () {
@@ -131,7 +142,7 @@ void main() {
 
       expect(
         createdChannelIds,
-        containsAll([messagesChannelId, mentionsChannelId]),
+        containsAll([messagesChannelId, mentionsChannelId, securityChannelId]),
         reason: 'idempotent readiness creates the whole channel set up '
             'front rather than lazily per kind, so a first-ever mention '
             'never races a channel that has not been created yet',

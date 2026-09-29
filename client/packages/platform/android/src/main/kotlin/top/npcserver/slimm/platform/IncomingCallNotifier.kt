@@ -4,7 +4,10 @@ package top.npcserver.slimm.platform
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
+import android.os.Build
 import android.os.Bundle
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
@@ -62,6 +65,7 @@ class IncomingCallNotifier(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
+            .setTimeoutAfter(RING_TIMEOUT_MS)
             .setAutoCancel(false)
             .setContentIntent(openApp)
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(person, declineIntent, answerIntent))
@@ -82,6 +86,32 @@ class IncomingCallNotifier(private val context: Context) {
 
         reportToTelecom(callId, callerName)
     }
+
+    /**
+     * Ends every ring this app is showing: disconnects each ringing Telecom
+     * connection as missed, then cancels whatever is still posted on
+     * [CHANNEL_ID]. Cancels by channel because the notification id is a hash
+     * of a call id the `call_end` push does not carry.
+     */
+    fun endIncomingCalls() {
+        for (connection in SlimmConnection.registry.values.toList()) {
+            connection.endAsMissed()
+        }
+        val manager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                ?: return
+        for (active in manager.activeNotifications) {
+            if (isCallNotification(active.notification)) manager.cancel(active.tag, active.id)
+        }
+    }
+
+    /** Below API 26 there are no channels, so the call category is the only marker left. */
+    private fun isCallNotification(notification: Notification): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            notification.channelId == CHANNEL_ID
+        } else {
+            notification.category == Notification.CATEGORY_CALL
+        }
 
     private fun ensureChannel() {
         val channel = NotificationChannelCompat.Builder(
@@ -166,6 +196,9 @@ class IncomingCallNotifier(private val context: Context) {
         const val CHANNEL_ID = "calls_v1"
         private const val CHANNEL_NAME = "Calls"
         private const val CONTENT_TEXT = "slim-m"
+
+        /** Matches the server's `RING_TIMEOUT` (`voice/ring.rs`), so a ring whose end push never arrives still stops. */
+        private const val RING_TIMEOUT_MS = 30_000L
         private const val PHONE_ACCOUNT_ID = "slimm_calls"
 
         /** Stable across a repeat push for the same call; see the class doc. */

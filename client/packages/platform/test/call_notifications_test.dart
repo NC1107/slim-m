@@ -18,6 +18,7 @@ void _mockPlugin(Future<Object?> Function(MethodCall call)? handler) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  _endCallGroup();
 
   group('CallNotifications.showIncomingCall', () {
     test('a non-Android platform never touches the channel', () async {
@@ -68,6 +69,51 @@ void main() {
       final notifications = CallNotifications(isAndroid: true);
       await expectLater(
         notifications.showIncomingCall(callId: 'call-1', callerName: 'Ada'),
+        completes,
+      );
+    });
+  });
+}
+
+void _endCallGroup() {
+  group('CallNotifications.endIncomingCalls', () {
+    test('a non-Android platform never touches the channel', () async {
+      await expectLater(
+        CallNotifications(isAndroid: false).endIncomingCalls(),
+        completes,
+      );
+    });
+
+    test('invokes endIncomingCalls with no arguments on Android', () async {
+      final calls = <MethodCall>[];
+      _mockPlugin((call) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(() => _mockPlugin(null));
+
+      await CallNotifications(isAndroid: true).endIncomingCalls();
+
+      expect(calls, hasLength(1));
+      expect(calls.single.method, 'endIncomingCalls');
+      expect(calls.single.arguments, isNull);
+    });
+
+    test('a platform exception is swallowed', () async {
+      _mockPlugin((call) async {
+        throw PlatformException(code: 'ERR', message: 'native side blew up');
+      });
+      addTearDown(() => _mockPlugin(null));
+
+      await expectLater(
+        CallNotifications(isAndroid: true).endIncomingCalls(),
+        completes,
+      );
+    });
+
+    test('a missing native plugin is swallowed too', () async {
+      await expectLater(
+        CallNotifications(isAndroid: true).endIncomingCalls(),
         completes,
       );
     });

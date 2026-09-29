@@ -19,6 +19,14 @@ void main() {
       expect(genericAlertTextFor('mention'), 'You were mentioned');
     });
 
+    test('security gets a fixed line matching the one iOS shows', () {
+      expect(genericAlertTextFor('security'), 'New sign-in to your account');
+    });
+
+    test('call_end stays silent as a plain alert', () {
+      expect(genericAlertTextFor('call_end'), isNull);
+    });
+
     test('call stays silent here: it rings through its own path', () {
       expect(genericAlertTextFor('call'), isNull);
     });
@@ -43,6 +51,10 @@ void main() {
 
     test('mention posts through its own, separate channel', () {
       expect(genericAlertChannelFor('mention'), LocalAlertChannel.mentions);
+    });
+
+    test('security posts through its own channel', () {
+      expect(genericAlertChannelFor('security'), LocalAlertChannel.security);
     });
 
     test('a kind with no text has no channel either', () {
@@ -107,6 +119,22 @@ void main() {
       expect(
         (action as PushActionGenericAlert).channel,
         LocalAlertChannel.mentions,
+      );
+    });
+
+    test('security becomes a generic alert on the security channel', () {
+      final action = actionFor({'kind': 'security', 'payload': 'sealed'});
+      expect(action, isA<PushActionGenericAlert>());
+      final alert = action as PushActionGenericAlert;
+      expect(alert.text, 'New sign-in to your account');
+      expect(alert.channel, LocalAlertChannel.security);
+    });
+
+    test('call_end becomes an end-call action, not an alert or a ring', () {
+      expect(actionFor({'kind': 'call_end'}), isA<PushActionEndCall>());
+      expect(
+        actionFor({'kind': 'call_end', 'payload': 'sealed'}),
+        isA<PushActionEndCall>(),
       );
     });
 

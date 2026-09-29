@@ -20,11 +20,11 @@ import 'package:slimm_platform/platform.dart';
 import '../ids.dart';
 
 /// Mirrors the relay's own `genericAlert` map (see
-/// `slim-m-relay/internal/apns/apns.go`): only the two kinds a person should
+/// `slim-m-relay/internal/apns/apns.go`): only the kinds a person should
 /// actually be alerted about get a fixed, sender-and-content-free line.
-/// "call" rings through its own path (below) and "wake" is a deliberately
-/// silent background sync hint - both stay unshown here exactly as they do
-/// on iOS, where only `message` and `mention` carry a plaintext `aps.alert`.
+/// "call" rings through its own path (below), "call_end" stops that ring,
+/// and "wake" is a deliberately silent background sync hint - none of them
+/// show a plain alert here, exactly as on iOS.
 ///
 /// The text and the [LocalAlertChannel] it posts through are one record per
 /// kind, not two parallel maps: a second map keyed the same way is exactly
@@ -34,6 +34,10 @@ import '../ids.dart';
 const _genericAlerts = <String, ({String text, LocalAlertChannel channel})>{
   'message': (text: 'New message', channel: LocalAlertChannel.messages),
   'mention': (text: 'You were mentioned', channel: LocalAlertChannel.mentions),
+  'security': (
+    text: 'New sign-in to your account',
+    channel: LocalAlertChannel.security,
+  ),
 };
 
 /// The fixed, content-free text to show for a push of this `kind`, or null
@@ -103,11 +107,17 @@ class PushActionIncomingCall extends PushAction {
   final String callerName;
 }
 
+/// Stop ringing: the caller hung up or the ring timed out.
+class PushActionEndCall extends PushAction {
+  const PushActionEndCall();
+}
+
 /// Decides what a push's [data] should do, before anything native is ever
 /// touched - so the whole kind-to-action decision, including the branch a
 /// `call` kind takes, has a unit test that needs neither a plugin nor an
 /// Android device, the same reason [genericAlertTextFor] is its own function.
 PushAction actionFor(Map<String, dynamic> data) {
+  if (data['kind'] == 'call_end') return const PushActionEndCall();
   if (data['kind'] == 'call') {
     return PushActionIncomingCall(
       callId: callIdFor(data),
@@ -151,5 +161,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         callId: callId,
         callerName: callerName,
       );
+    case PushActionEndCall():
+      await CallNotifications().endIncomingCalls();
   }
 }

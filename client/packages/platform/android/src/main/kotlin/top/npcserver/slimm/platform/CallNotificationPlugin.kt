@@ -40,6 +40,10 @@ class CallNotificationPlugin : FlutterPlugin, MethodCallHandler {
                 notifier.showIncomingCall(callId, callerName)
                 result.success(null)
             }
+            "endIncomingCalls" -> {
+                notifier.endIncomingCalls()
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
