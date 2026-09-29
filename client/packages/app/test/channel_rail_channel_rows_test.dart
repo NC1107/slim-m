@@ -448,4 +448,50 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     },
   );
+
+  testWidgets(
+    "hovering an unselected row's kebab keeps the row's hover fill under it "
+    'and shows no second fill (backlog 131)',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+
+      await tester.pumpWidget(
+        _harness(
+          ChannelCategorySections(
+            channels: [_channel('c1', 'general')],
+            categories: const [],
+            selectedId: null,
+            canManage: true,
+            onReorder: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final kebabFinder = find.byIcon(AppIcons.moreVertical);
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(kebabFinder));
+      await tester.pumpAndSettle();
+
+      final hoverFill = find
+          .descendant(
+            of: find.byType(AppListRow),
+            matching: find.byType(AnimatedContainer),
+          )
+          .at(1);
+      expect(
+        (tester.widget<AnimatedContainer>(hoverFill).decoration
+                as BoxDecoration)
+            .color,
+        AppTokens.light.surfaceRaised,
+      );
+      final fill = tester.getRect(hoverFill);
+      final kebab = tester.getRect(kebabFinder);
+      expect(fill.inflate(0.5).expandToInclude(kebab), fill.inflate(0.5));
+      await gesture.removePointer();
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 }

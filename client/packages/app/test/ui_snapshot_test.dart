@@ -111,6 +111,35 @@ final _shellStateSurfaces =
           channelRailExpandedProvider.overrideWith((ref) => false),
         ],
       ),
+      // A call live in another channel: the footer stays one bar, the call's name and timer in the name line's place.
+      'rail-in-call': (
+        route: '/channels/c-general',
+        viewports: const ['desktop-narrow', 'desktop'],
+        overrides: () => [
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(ref, connectedCallState),
+          ),
+        ],
+      ),
+      'rail-compact-in-call': (
+        route: '/channels/c-general',
+        viewports: const ['desktop-narrow', 'desktop'],
+        overrides: () => [
+          channelRailExpandedProvider.overrideWith((ref) => false),
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(ref, connectedCallState),
+          ),
+        ],
+      ),
+      'rail-in-call-phone': (
+        route: '/channels',
+        viewports: const ['phone-portrait'],
+        overrides: () => [
+          voiceControllerProvider.overrideWith(
+            (ref) => SnapshotVoiceController(ref, connectedCallState),
+          ),
+        ],
+      ),
       // The thread docked beside the transcript, the presentation an in-app open now takes at expanded widths (UX1); the `thread` surface's pushed route still covers the compact modal.
       'thread-docked': (
         route: '/channels/c-general',

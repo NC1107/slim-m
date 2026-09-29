@@ -398,22 +398,45 @@ class RailUserFooter extends ConsumerWidget {
             horizontal: AppSpacing.s8,
             vertical: AppSpacing.s4,
           ),
-          // The call-elsewhere row grows the footer rather than sharing the identity row's width; see RailCallSummary's own doc for why.
-          child: AnimatedSize(
-            duration: AppMotion.reducedSize(context, AppMotion.base),
-            curve: AppMotion.entrance,
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) => Row(
+          // The Column keeps the row's height unbounded: without it the status menu opened off the top of the window in presence_visibility_test.
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final controls = [
+                    ...railVoiceToggleButtons(
+                      voice: voice,
+                      voiceController: voiceController,
+                    ),
+                    if (inCallElsewhere)
+                      railLeaveCallButton(voiceController.leave),
+                    railSettingsButton(context),
+                  ];
+                  return Row(
                     children: [
                       PresenceMenuButton(presence: presence),
                       const SizedBox(width: 9),
-                      // At ChannelRail.compactWidth the three controls win; the presence dot still says who and how.
+                      // At ChannelRail.compactWidth the controls win, scaled down if a notch inset leaves too little; the presence dot still says who and how.
                       if (constraints.maxWidth < _footerNameMinWidth)
-                        const Spacer()
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: controls,
+                            ),
+                          ),
+                        )
+                      else if (inCallElsewhere)
+                        Expanded(
+                          child: RailCallSummary(
+                            channelId: callChannelId,
+                            connectedAt: voice.connectedAt,
+                            screenSharing: voice.screenSharing,
+                          ),
+                        )
                       else
                         Expanded(
                           child: Column(
@@ -439,25 +462,13 @@ class RailUserFooter extends ConsumerWidget {
                             ],
                           ),
                         ),
-                      ...railVoiceToggleButtons(
-                        voice: voice,
-                        voiceController: voiceController,
-                      ),
-                      railSettingsButton(context),
+                      if (constraints.maxWidth >= _footerNameMinWidth)
+                        ...controls,
                     ],
-                  ),
-                ),
-                if (inCallElsewhere) ...[
-                  const SizedBox(height: 6),
-                  RailCallSummary(
-                    channelId: callChannelId,
-                    connectedAt: voice.connectedAt,
-                    screenSharing: voice.screenSharing,
-                    onLeave: voiceController.leave,
-                  ),
-                ],
-              ],
-            ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
