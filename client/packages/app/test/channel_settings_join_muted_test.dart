@@ -5,7 +5,6 @@
 library;
 
 import 'dart:convert';
-import 'dart:ui' show Size;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,7 +64,7 @@ void main() {
     final requests = await _openSettings(tester, kind: 'voice', name: 'stage');
 
     expect(find.text('Join muted'), findsOneWidget);
-    expect(find.textContaining('can unmute themselves'), findsOneWidget);
+    expect(find.textContaining('can unmute'), findsOneWidget);
     expect(find.textContaining('deny Speak'), findsOneWidget);
 
     final toggle = find.byWidgetPredicate(
