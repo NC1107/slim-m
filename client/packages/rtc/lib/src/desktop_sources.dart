@@ -33,6 +33,7 @@
 /// and the patch itself.
 library;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart' as lk;
 
@@ -62,20 +63,43 @@ abstract class DesktopSources {
   Future<List<ScreenShareSource>> list();
 }
 
+/// The plugin's own method channel; `resetDesktopSources` exists only in a
+/// flutter_webrtc carrying docs/research/linux-wayland-share-switch-2026-09-29.
+const _webrtcChannel = MethodChannel('FlutterWebRTC.Method');
+
 class WebrtcDesktopSources implements DesktopSources {
-  const WebrtcDesktopSources();
+  /// [isLinux] exists so a test can drive the Linux branch.
+  const WebrtcDesktopSources({bool? isLinux}) : _isLinux = isLinux;
+
+  final bool? _isLinux;
+
+  bool get _linux => _isLinux ?? lk.lkPlatformIs(lk.PlatformType.linux);
 
   @override
   bool get required => lk.lkPlatformIsDesktop();
 
   @override
-  bool get sourcePickerUseful => !lk.lkPlatformIs(lk.PlatformType.linux);
+  bool get sourcePickerUseful => !_linux;
+
+  /// flutter_webrtc caches the portal session for the life of the process, so
+  /// a share started after the first one would silently reuse its screen.
+  /// Best effort: an unpatched plugin has no such method and keeps the cache.
+  Future<void> _dropPortalSession() async {
+    try {
+      await _webrtcChannel.invokeMethod<void>(
+        'resetDesktopSources',
+      );
+    } on MissingPluginException {
+      return;
+    }
+  }
 
   /// [webrtc.SourceType.Window] is deliberately never requested: see
   /// [ScreenShareSource] for the crash that causes.
   @override
   Future<List<ScreenShareSource>> list() async {
     if (!required) return const [];
+    if (_linux) await _dropPortalSession();
     final sources = await webrtc.desktopCapturer.getSources(
       types: [webrtc.SourceType.Screen],
     );
