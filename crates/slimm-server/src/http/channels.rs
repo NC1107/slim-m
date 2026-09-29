@@ -269,17 +269,16 @@ async fn create(
 
     let created = state
         .store
-        .create_channel_with_id(id, name, kind, category_id, private_to)
+        .create_channel_with_id(
+            id,
+            name,
+            kind,
+            category_id,
+            private_to,
+            req.join_muted == Some(true),
+        )
         .await?;
-    let mut channel = created.channel;
-    // Only a fresh create may still choose the default; a retry keeps what the first call stored.
-    if created.fresh && req.join_muted == Some(true) {
-        channel = state
-            .store
-            .update_channel_join_muted(id, true)
-            .await?
-            .ok_or(ApiError::NotFound("channel not found"))?;
-    }
+    let channel = created.channel;
     // An idempotent retry must not fan out again; see the note on `CreatedChannel::fresh`.
     if created.fresh {
         state

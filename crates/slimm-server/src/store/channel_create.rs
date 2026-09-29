@@ -110,6 +110,10 @@ impl Store {
     /// channel that exists but is not yet private. `None` creates a channel
     /// visible to `@everyone` as usual. Never consulted on a retry: the
     /// first, fresh create is the only one that can still choose visibility.
+    ///
+    /// `join_muted` is written by the same INSERT, for the same reason: a
+    /// follow-up UPDATE would let a reader see the channel before its flag.
+    /// Like `private_to`, it is ignored on a retry.
     pub async fn create_channel_with_id(
         &self,
         id: ChannelId,
@@ -117,6 +121,7 @@ impl Store {
         kind: &str,
         category_id: Option<ChannelCategoryId>,
         private_to: Option<UserId>,
+        join_muted: bool,
     ) -> Result<CreatedChannel, CreateChannelError> {
         let now = now_ms();
         let mut tx = self.begin_write().await?;
@@ -157,14 +162,15 @@ impl Store {
         }
 
         sqlx::query!(
-            "INSERT INTO channels (id, name, kind, position, created_at, category_id) \
-             VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO channels (id, name, kind, position, created_at, category_id, join_muted) \
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
             id,
             name,
             kind,
             position,
             now,
-            category_id
+            category_id,
+            join_muted
         )
         .execute(&mut *tx)
         .await?;
@@ -215,7 +221,7 @@ impl Store {
                 created_at: now,
                 // The column default; a fresh channel has no slow mode set yet.
                 slow_mode_seconds: 0,
-                join_muted: false,
+                join_muted,
             },
             fresh: true,
         })
@@ -233,7 +239,7 @@ impl Store {
     /// this ever actually surfaces is `Internal`.
     pub async fn create_channel(&self, name: &str, kind: &str) -> anyhow::Result<Channel> {
         match self
-            .create_channel_with_id(ChannelId::generate(), name, kind, None, None)
+            .create_channel_with_id(ChannelId::generate(), name, kind, None, None, false)
             .await
         {
             Ok(created) => Ok(created.channel),

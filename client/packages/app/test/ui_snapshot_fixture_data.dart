@@ -366,6 +366,7 @@ const fixtureChannels = [
     kind: 'voice',
     createdAt: 0,
     categoryId: 'cat-voice',
+    joinMuted: true,
   ),
   // A thread's own channel row, hanging off m-1: the stacked-header render.
   api.Channel(
