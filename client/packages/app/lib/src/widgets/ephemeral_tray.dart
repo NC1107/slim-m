@@ -15,7 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/ephemeral_messages.dart';
 
 /// Tall enough for a few lines; a long answer scrolls inside its own card.
-const double _maxBodyHeight = 140;
+const double _maxBodyHeight = 96;
 
 class EphemeralTray extends ConsumerWidget {
   const EphemeralTray({super.key, required this.channelId});
