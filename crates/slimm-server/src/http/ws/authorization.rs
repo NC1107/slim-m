@@ -106,6 +106,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::EphemeralMessage { .. }
         | Event::InteractionCreated { .. }
         | Event::InteractionAnswered { .. }
+        | Event::NewDeviceSignIn { .. }
         | Event::Stamped { .. } => None,
     }
 }
@@ -185,6 +186,26 @@ pub(super) async fn authorize_unstamped(
     }
     if let Some(decision) = super::interaction_frames::authorize(store, ctx, &event).await {
         return decision;
+    }
+    // Private to one account and never to the device that just signed in.
+    if let Event::NewDeviceSignIn {
+        user_id,
+        device_id,
+        device_name,
+        client_kind,
+        signed_in_at,
+    } = event
+    {
+        return if user_id == ctx.user_id && device_id != ctx.device_id {
+            Authorization::Deliver(Box::new(ServerFrame::NewDeviceSignIn {
+                device_id: device_id.to_string(),
+                device_name,
+                client_kind,
+                signed_in_at,
+            }))
+        } else {
+            Authorization::Withhold
+        };
     }
     // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
     if let Event::ReportsChanged = event {
@@ -318,6 +339,7 @@ pub(super) async fn authorize_unstamped(
             | Event::EphemeralMessage { .. }
             | Event::InteractionCreated { .. }
             | Event::InteractionAnswered { .. }
+            | Event::NewDeviceSignIn { .. }
             | Event::Stamped { .. } => return Authorization::Withhold,
         },
     };
@@ -643,6 +665,7 @@ pub(super) async fn authorize_unstamped(
         | Event::EphemeralMessage { .. }
         | Event::InteractionCreated { .. }
         | Event::InteractionAnswered { .. }
+        | Event::NewDeviceSignIn { .. }
         | Event::Stamped { .. } => return Authorization::Withhold,
     }))
 }

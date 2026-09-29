@@ -45,6 +45,7 @@ import '../widgets/command_palette.dart';
 import '../widgets/compact_channel_app_bar.dart';
 import '../widgets/drawer_edge_swipe.dart';
 import '../widgets/member_pane.dart';
+import '../widgets/new_device_banner_host.dart';
 import '../widgets/push_to_talk_listener.dart';
 import '../widgets/rail_slot.dart';
 import '../widgets/update_banner_host.dart';
@@ -267,8 +268,10 @@ class HomeShell extends ConsumerWidget {
             autofocus: true,
             child: _LayoutBridge(
               layout: layout,
-              child: UpdateBannerHost(
-                child: DatabaseResetNotice(child: scaffold),
+              child: NewDeviceBannerHost(
+                child: UpdateBannerHost(
+                  child: DatabaseResetNotice(child: scaffold),
+                ),
               ),
             ),
           ),

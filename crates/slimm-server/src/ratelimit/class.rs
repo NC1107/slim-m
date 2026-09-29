@@ -281,6 +281,13 @@ pub enum Class {
     /// module past twenty in a burst. A module is admin-approved code, but a
     /// buggy loop in one should cost a channel a few messages, not a flood.
     ModulePost,
+    /// The "a new device signed in" notice, keyed per account.
+    ///
+    /// Sustained refill of one per ten minutes after a burst of three, so a
+    /// login loop (or someone probing a stolen password) cannot turn the
+    /// account's other devices into a notification firehose. Sign-ins past
+    /// the budget still succeed; only the notice is dropped.
+    SignInAlert,
 }
 
 impl Class {
@@ -320,6 +327,8 @@ impl Class {
             Class::Interaction => (8.0, 1.0),
             // See this variant's own doc comment for how these were sized.
             Class::ModulePost => (5.0, 1.0 / 6.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::SignInAlert => (3.0, 1.0 / 600.0),
         }
     }
 
@@ -328,7 +337,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 22] = [
+    pub const ALL: [Class; 23] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -351,6 +360,7 @@ impl Class {
         Class::LiveKitWebhook,
         Class::Interaction,
         Class::ModulePost,
+        Class::SignInAlert,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -379,6 +389,7 @@ impl Class {
             Class::LiveKitWebhook => "livekit_webhook",
             Class::Interaction => "interaction",
             Class::ModulePost => "module_post",
+            Class::SignInAlert => "sign_in_alert",
         }
     }
 }

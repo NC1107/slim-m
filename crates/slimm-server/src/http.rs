@@ -99,6 +99,7 @@ mod safety;
 mod saved_messages;
 mod scene_limits;
 mod search;
+mod sign_in_alert;
 mod space;
 mod storage;
 mod sync;
