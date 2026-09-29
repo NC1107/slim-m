@@ -51,3 +51,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/check-stuck-release-label.sh
+
+  # Dispatches release.yml once on a tag whose verify timed out and whose checks are green now.
+  redispatch:
+    name: redispatch a release stalled by a verify timeout
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: dispatch release.yml for a tag whose verify failed and checks are green
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/redispatch-stalled-release.py

@@ -88,9 +88,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    # Generous but bounded: a required check missing outright fails at the
-    # deadline below well before this, so the ceiling only covers slow queues.
-    timeout-minutes: 75
+    # Ceiling over the script's 180-minute deadline (10800s), which is sized to
+    # the worst measured Linux queue plus a run; see docs/ci.md.
+    timeout-minutes: 195
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
