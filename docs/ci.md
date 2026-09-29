@@ -27,6 +27,7 @@ Each section below is named for its workflow file.
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
 | `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
 | `web-image` | called by `main-builds` (a client change) and by `release` (a server release) | the web client built into a signed multi-arch `ghcr.io/nc1107/slim-m-web` image, split out into its own file because `main-builds` is at the 500-line ceiling |
+| `server-binaries` | called by `release` | the static musl server binaries per arch, uploaded as run artifacts for `server-release-assets`, split out into its own file because `release` is past the 500-line budget |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
 | `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline, including the web image under the server's version |
@@ -614,6 +615,7 @@ Without this, republishing a newer-than-nothing-else tag would silently roll eve
 ### server-binaries and server-release-assets
 
 `server-binaries` produces static musl binaries for direct download, built per arch into artifacts and aggregated by `server-release-assets`.
+It is a reusable workflow (`server-binaries.yml`, one `server_version` input) called by the `server-binaries` job in `release`, which keeps that job's name and result for `server-release-assets` to gate on.
 Each arch builds its own musl target natively on a native runner, with no `cross` and no QEMU, the same approach the container image uses.
 It builds with `--locked`, the same as the container image and every other server build in this workflow, so the raw binary someone downloads is built from exactly what `Cargo.lock` pins.
 

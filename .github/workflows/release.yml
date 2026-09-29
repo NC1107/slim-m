@@ -224,56 +224,11 @@ jobs:
   server-binaries:
     needs: [release-please, verify-server-ci]
     if: needs.verify-server-ci.result == 'success'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-musl
-            arch: amd64
-            runner: ubuntu-latest
-          - target: aarch64-unknown-linux-musl
-            arch: arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: resolve version
-        id: ver
-        run: |
-          if [ -n "${{ needs.release-please.outputs.server_version }}" ]; then
-            version="${{ needs.release-please.outputs.server_version }}"
-          else
-            version="${GITHUB_REF_NAME#server-v}"
-          fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-
-      # Each arch builds its own musl target natively (no cross, no QEMU), the
-      # same approach the container image uses.
-      - name: musl toolchain
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
-
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
-        with:
-          target: ${{ matrix.target }}
-
-      - name: build static binary
-        run: cargo build --locked --release --target ${{ matrix.target }} --bin slimm-server
-
-      - name: stage binary
-        id: stage
-        run: |
-          name="slimm-server-${{ steps.ver.outputs.version }}-linux-${{ matrix.arch }}"
-          install -Dm755 "target/${{ matrix.target }}/release/slimm-server" "dist/${name}"
-          echo "name=${name}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: server-binary-${{ matrix.arch }}
-          path: dist/${{ steps.stage.outputs.name }}
-          if-no-files-found: error
+    uses: ./.github/workflows/server-binaries.yml
+    with:
+      server_version: ${{ needs.release-please.outputs.server_version }}
 
   # GPG-signable SHA256SUMS plus the raw binaries on the server GitHub Release.
   # The GPG secrets are optional; only the .asc is skipped. See docs/ci.md.
