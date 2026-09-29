@@ -180,6 +180,7 @@ impl Store {
                 created_at: now,
                 // Never read: a thread has no slow-mode setter of its own.
                 slow_mode_seconds: 0,
+                join_muted: false,
             },
             fresh: true,
         })

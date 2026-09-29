@@ -22,6 +22,7 @@ import 'voice_auto_rejoin.dart';
 import 'voice_call_heartbeat.dart';
 import 'voice_call_lifecycle_report.dart';
 import 'voice_camera_failure.dart';
+import 'voice_join_muted.dart';
 import 'voice_settings_controller.dart';
 import 'voice_sfu_security.dart';
 import 'voice_state.dart';
@@ -151,6 +152,7 @@ class VoiceController extends StateNotifier<VoiceState>
   final CallLifecycleChannel _callLifecycle;
   final VoiceCallHeartbeat _heartbeat;
   final VoiceAutoRejoin _autoRejoin;
+  final VoiceJoinMuted _joinMuted = VoiceJoinMuted();
   final DateTime Function() _now;
   final CallActivityTracker _activity;
   late final StreamSubscription<VoiceSessionState> _states;
@@ -198,6 +200,7 @@ class VoiceController extends StateNotifier<VoiceState>
     // Set before the first await, so an arrival elsewhere reads this as busy (VoiceState.joining); clearJustLeft because any real join attempt is never a stale rejoin to suppress.
     state = state.copyWith(
       channelId: channelId,
+      microphoneEnabled: _joinMuted.preferenceAtJoin(state.microphoneEnabled),
       clearError: true,
       clearRecap: true,
       joining: true,
@@ -206,6 +209,7 @@ class VoiceController extends StateNotifier<VoiceState>
     );
     try {
       final token = await _ref.read(apiProvider).voiceToken(channelId);
+      final mutedByChannel = await _joinMuted.asksFor(_ref, channelId);
       if (superseded()) return;
       final insecureReason = insecureSfuReason(token.url);
       if (insecureReason != null) {
@@ -217,6 +221,7 @@ class VoiceController extends StateNotifier<VoiceState>
         return;
       }
       state = state.copyWith(canPublish: token.canPublish);
+      if (mutedByChannel) state = _joinMuted.showMuted(state);
       // Push-to-talk joins closed: it opens only while the key is held; see setPushToTalkPreference.
       final microphoneAtJoin =
           state.microphoneEnabled && token.canPublish && !_pushToTalkEnabled;
@@ -308,7 +313,7 @@ class VoiceController extends StateNotifier<VoiceState>
     if (channelId != null) unawaited(_heartbeat.forget(channelId));
     // The mic/camera preference survives the reset (no lobby left to re-set them on); justLeftChannelId/justLeftAt are set only here, see VoiceState.rejoinGuardWindow.
     state = VoiceState(
-      microphoneEnabled: state.microphoneEnabled,
+      microphoneEnabled: _joinMuted.preferenceAtLeave(state.microphoneEnabled),
       cameraEnabled: state.cameraEnabled,
       recap: recap,
       justLeftChannelId: channelId,

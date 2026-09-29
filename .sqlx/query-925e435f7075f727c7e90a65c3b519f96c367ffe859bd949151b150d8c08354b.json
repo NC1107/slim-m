@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT c.id AS \"id!: ChannelId\", c.name AS \"name!\", c.kind AS \"kind!\", c.topic,\n                      c.position AS \"position!: i64\",\n                      c.parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      c.category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      c.created_at AS \"created_at!\",\n                      c.slow_mode_seconds AS \"slow_mode_seconds!: i64\"\n               FROM channels c\n               LEFT JOIN channel_categories cc ON cc.id = c.category_id\n               WHERE c.deleted_at IS NULL AND c.kind != 'dm' AND c.parent_message_id IS NULL\n               ORDER BY CASE WHEN c.category_id IS NULL THEN -1 ELSE cc.position END,\n                        c.position, c.created_at",
+  "query": "SELECT c.id AS \"id!: ChannelId\", c.name AS \"name!\", c.kind AS \"kind!\", c.topic,\n                      c.position AS \"position!: i64\",\n                      c.parent_message_id AS \"parent_message_id: crate::ids::MessageId\",\n                      c.category_id AS \"category_id: crate::ids::ChannelCategoryId\",\n                      c.created_at AS \"created_at!\",\n                      c.slow_mode_seconds AS \"slow_mode_seconds!: i64\",\n                      c.join_muted AS \"join_muted!: bool\"\n               FROM channels c\n               LEFT JOIN channel_categories cc ON cc.id = c.category_id\n               WHERE c.deleted_at IS NULL AND c.kind != 'dm' AND c.parent_message_id IS NULL\n               ORDER BY CASE WHEN c.category_id IS NULL THEN -1 ELSE cc.position END,\n                        c.position, c.created_at",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,11 @@
         "name": "slow_mode_seconds!: i64",
         "ordinal": 8,
         "type_info": "Integer"
+      },
+      {
+        "name": "join_muted!: bool",
+        "ordinal": 9,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -61,8 +66,9 @@
       true,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "efc5c44f3acb018b0a538b28f3927f36b9752721b0178ddbff06911c0601118d"
+  "hash": "925e435f7075f727c7e90a65c3b519f96c367ffe859bd949151b150d8c08354b"
 }

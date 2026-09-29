@@ -195,4 +195,24 @@ void main() {
       expect(tester.widget<AppToggle>(_privateToggle()).value, isTrue);
     },
   );
+
+  testWidgets('Join muted is offered for a voice channel only, and defaults '
+      'off', (tester) async {
+    await _openSheet(tester);
+    final toggle = find.byWidgetPredicate(
+      (w) =>
+          w is AppToggle &&
+          w.semanticLabel == 'Members join this channel muted',
+    );
+    expect(toggle, findsNothing);
+
+    await tester.tap(find.text('Voice'));
+    await tester.pump();
+
+    expect(toggle, findsOneWidget);
+    expect(tester.widget<AppToggle>(toggle).value, isFalse);
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(tester.widget<AppToggle>(toggle).value, isTrue);
+  });
 }

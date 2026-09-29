@@ -222,6 +222,7 @@ class SlimmApi {
     String kind = 'text',
     String? categoryId,
     bool restricted = false,
+    bool joinMuted = false,
   }) async {
     final json = await _send(
       'POST',
@@ -231,6 +232,7 @@ class SlimmApi {
         'kind': kind,
         if (categoryId != null) 'category_id': categoryId,
         if (restricted) 'restricted': true,
+        if (joinMuted) 'join_muted': true,
       },
     );
     return Channel.fromJson(json as Map<String, dynamic>);

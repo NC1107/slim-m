@@ -25,6 +25,7 @@ import '../widgets/settings_notice.dart';
 import 'admin/channel_permissions_screen.dart';
 import 'channel_settings_danger_zone.dart';
 import 'channel_settings_general_section.dart';
+import 'channel_settings_join_muted_section.dart';
 import 'channel_settings_slow_mode_section.dart';
 import 'settings_screen_scaffold.dart';
 
@@ -111,6 +112,10 @@ class ChannelSettingsPane extends ConsumerWidget {
         if (canManageChannels) ...[
           const SizedBox(height: AppSpacing.s16),
           ChannelSlowModeSection(channel: channel),
+          if (channel.kind == 'voice') ...[
+            const SizedBox(height: AppSpacing.s16),
+            ChannelJoinMutedSection(channel: channel),
+          ],
         ],
         if (canManageChannels && canManageRoles)
           const SizedBox(height: AppSpacing.s16),

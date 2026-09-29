@@ -30,6 +30,7 @@ Future<void> _upsertChannels(
           parentMessageId: Value(channel.parentMessageId),
           categoryId: Value(channel.categoryId),
           slowModeSeconds: Value(channel.slowModeSeconds),
+          joinMuted: Value(channel.joinMuted),
           restricted: Value(channel.restricted),
         ),
         onConflict: DoUpdate(
@@ -43,6 +44,7 @@ Future<void> _upsertChannels(
             parentMessageId: Variable(channel.parentMessageId),
             categoryId: Variable(channel.categoryId),
             slowModeSeconds: Variable(channel.slowModeSeconds),
+            joinMuted: Variable(channel.joinMuted),
             restricted: Variable(channel.restricted),
           ),
         ),

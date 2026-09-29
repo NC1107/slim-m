@@ -36,6 +36,7 @@ mod canvas_ops_sweep;
 mod canvas_ops_write;
 mod categories;
 mod channel_create;
+mod channel_join_muted;
 mod channel_notification_prefs;
 mod channel_order;
 mod channel_slow_mode;
@@ -231,6 +232,10 @@ pub struct Channel {
     /// or a thread, neither of which exposes a setter for it - see
     /// [`super::channel_slow_mode::Store::update_channel_slow_mode`].
     pub slow_mode_seconds: i64,
+    /// Voice-channel default that every client opens its mic off on join. A
+    /// default, not a lock: SPEAK overwrites are what restrict speaking. See
+    /// [`super::channel_join_muted::Store::update_channel_join_muted`].
+    pub join_muted: bool,
 }
 
 /// A rail section: a channel of any kind may be filed under one, per

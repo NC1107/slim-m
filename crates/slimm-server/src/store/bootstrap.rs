@@ -143,7 +143,8 @@ impl Store {
                       c.parent_message_id AS "parent_message_id: crate::ids::MessageId",
                       c.category_id AS "category_id: crate::ids::ChannelCategoryId",
                       c.created_at AS "created_at!",
-                      c.slow_mode_seconds AS "slow_mode_seconds!: i64"
+                      c.slow_mode_seconds AS "slow_mode_seconds!: i64",
+                      c.join_muted AS "join_muted!: bool"
                FROM channels c
                LEFT JOIN channel_categories cc ON cc.id = c.category_id
                WHERE c.deleted_at IS NULL AND c.kind != 'dm' AND c.parent_message_id IS NULL
@@ -164,6 +165,7 @@ impl Store {
                 category_id: r.category_id,
                 created_at: r.created_at,
                 slow_mode_seconds: r.slow_mode_seconds,
+                join_muted: r.join_muted,
             })
             .collect())
     }
