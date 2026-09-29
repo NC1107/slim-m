@@ -113,9 +113,9 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      IMAGE: ghcr.io/nc1107/slim-m-server
     steps:
+      - name: name the image after this repo's owner, lowercased for GHCR
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/slim-m-server" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
       - uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4
@@ -158,9 +158,9 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    env:
-      IMAGE: ghcr.io/nc1107/slim-m-server
     steps:
+      - name: name the image after this repo's owner, lowercased for GHCR
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/slim-m-server" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: resolve version
         id: ver

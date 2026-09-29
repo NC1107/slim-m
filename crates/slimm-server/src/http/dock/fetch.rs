@@ -27,8 +27,12 @@ pub(super) enum FetchError {
     /// The URL is not well-formed, or does not point at the allowed host.
     Refused,
     /// A well-formed request to the allowed host that still could not be
-    /// completed: unreachable, non-2xx, or the body ran over its cap.
+    /// completed: unreachable, a non-200 other than [`FetchError::Missing`]'s,
+    /// or the body ran over its cap.
     Unavailable,
+    /// The host answered that nothing is there: a 404, or a redirect, which
+    /// this client never follows. The only error [`fetch_first`] moves past.
+    Missing,
 }
 
 impl From<UrlError> for FetchError {
@@ -51,10 +55,35 @@ pub(super) async fn fetch_capped(
         .send()
         .await
         .map_err(|_| FetchError::Unavailable)?;
-    if response.status() != StatusCode::OK {
+    let status = response.status();
+    if status == StatusCode::NOT_FOUND || status.is_redirection() {
+        return Err(FetchError::Missing);
+    }
+    if status != StatusCode::OK {
         return Err(FetchError::Unavailable);
     }
     read_capped(response, cap).await
+}
+
+/// GETs [path] under each of [bases] in turn and returns the first body
+/// found, moving on only when a base answers [`FetchError::Missing`]. An
+/// outage stops the walk instead, so a down host costs one timeout rather
+/// than one per base, and every candidate stays on [allowed_host].
+pub(super) async fn fetch_first(
+    client: &Client,
+    bases: &[Url],
+    path: &str,
+    allowed_host: &str,
+    cap: usize,
+) -> Result<Vec<u8>, FetchError> {
+    for base in bases {
+        let url = base.join(path).map_err(|_| FetchError::Refused)?;
+        match fetch_capped(client, &url, allowed_host, cap).await {
+            Err(FetchError::Missing) => continue,
+            found => return found,
+        }
+    }
+    Err(FetchError::Missing)
 }
 
 /// Reads at most [cap] bytes from [response], stopping the moment the body

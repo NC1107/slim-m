@@ -17,10 +17,10 @@ use crate::http::AppState;
 use crate::http::dock_sources::OFFICIAL_ID;
 use crate::http::error::ApiError;
 
-/// Where a Dock call reads from: the base its files live under, and the repo
-/// recorded on an install (`None` for the official source).
+/// Where a Dock call reads from: the bases its files live under, tried in
+/// order, and the repo recorded on an install (`None` for the official source).
 pub(super) struct Resolved {
-    pub(super) base: Url,
+    pub(super) bases: Vec<Url>,
     pub(super) repo: Option<String>,
 }
 
@@ -36,7 +36,7 @@ pub(super) async fn resolve(
 ) -> Result<Resolved, ApiError> {
     match source {
         None | Some(OFFICIAL_ID) => Ok(Resolved {
-            base: dock.base_url.clone(),
+            bases: dock.official_bases.clone(),
             repo: None,
         }),
         Some(id) => {
@@ -46,7 +46,7 @@ pub(super) async fn resolve(
                 .await?
                 .ok_or(ApiError::NotFound("unknown module source"))?;
             Ok(Resolved {
-                base: dock.base_for(&found.repo)?,
+                bases: vec![dock.base_for(&found.repo)?],
                 repo: Some(found.repo),
             })
         }
@@ -61,7 +61,7 @@ pub(super) async fn taken_ids(
     dock: &Enabled,
     repo: &str,
 ) -> Result<HashSet<String>, ApiError> {
-    let mut taken: HashSet<String> = match fetch_index(dock, &dock.base_url).await {
+    let mut taken: HashSet<String> = match fetch_index(dock, &dock.official_bases).await {
         Ok(index) => index.into_iter().map(|e| e.id).collect(),
         Err(_) => HashSet::new(),
     };
@@ -90,7 +90,7 @@ pub(super) async fn check_id_free(
         ));
     }
     if resolved.repo.is_some() {
-        let official = fetch_index(dock, &dock.base_url).await?;
+        let official = fetch_index(dock, &dock.official_bases).await?;
         if official.iter().any(|e| e.id == id) {
             return Err(ApiError::Conflict(
                 "that module id belongs to the official source",

@@ -20,7 +20,7 @@ use crate::net_guard::GuardResolver;
 
 /// Identifies the fetch as this server's Dock, the marketplace-browsing
 /// counterpart to link preview's own user agent.
-const USER_AGENT: &str = "slimm-dock/1.0 (+https://github.com/NC1107/slim-m)";
+const USER_AGENT: &str = "slimm-dock/1.0 (+https://github.com/Slim-m-org/slim-m)";
 
 const TOTAL_TIMEOUT: Duration = Duration::from_secs(5);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);

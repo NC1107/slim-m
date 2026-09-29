@@ -571,6 +571,23 @@ The host currently unpacks a hand-built tarball into an nginx container through 
 4. `docker compose pull web && docker compose up -d web`, then open the app and check `curl -s https://<host>/app/version.json` names a build id.
 5. Delete the old unpacked bundle directory once the new container has served a day.
 
+## Verifying the images
+
+Release images (`slim-m-server` and `slim-m-web`) are signed with cosign in keyless mode, so there is no key to download.
+The signature names the GitHub workflow that built the image, and that name includes the repository's owner.
+The project moved from `NC1107/slim-m` to `Slim-m-org/slim-m`, so an image signed before the move carries the old owner and one signed after carries the new one.
+Accept both:
+
+```
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/(NC1107|Slim-m-org)/slim-m/\.github/workflows/(release|web-image)\.yml@refs/' \
+  ghcr.io/slim-m-org/slim-m-server:<version>
+```
+
+Swap in `slim-m-web` for the web image, and `ghcr.io/nc1107/...` for an image published before the move.
+The continuous `main` and `latest` tags of `slim-m-server` are not signed; only release versions are.
+
 ## Files
 
 - `docker-compose.yml` (repository root) - the stack itself.

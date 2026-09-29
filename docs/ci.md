@@ -26,7 +26,7 @@ Each section below is named for its workflow file.
 | `push-relay-contract` | changes to the server's push path, and by hand | a server-generated envelope through the relay repo's real HTTP handler |
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
 | `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
-| `web-image` | called by `main-builds` (a client change) and by `release` (a server release) | the web client built into a signed multi-arch `ghcr.io/nc1107/slim-m-web` image, split out into its own file because `main-builds` is at the 500-line ceiling |
+| `web-image` | called by `main-builds` (a client change) and by `release` (a server release) | the web client built into a signed multi-arch `ghcr.io/<owner>/slim-m-web` image, split out into its own file because `main-builds` is at the 500-line ceiling |
 | `server-binaries` | called by `release` | the static musl server binaries per arch, uploaded as run artifacts for `server-release-assets`, split out into its own file because `release` is past the 500-line budget |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
@@ -412,6 +412,7 @@ Surfacing a break while it is cheap to fix is worth a slow check; blocking a mer
 The server and the relay agree on the push envelope's wire framing (field names, types, the platform and kind vocabulary, the payload size limit) but live in separate repos and languages, so nothing else here would notice one side changing it.
 This is the only job that checks out both and runs a server-produced request through the relay's real HTTP handler.
 See `crates/slimm-server/tests/push_relay_contract_fixture.rs` and slim-m-relay's `internal/api/push_relay_contract_test.go`.
+The relay is checked out from this repository's own owner (`github.repository_owner`), so the two repos have to live under the same owner.
 
 ### No `token:` input on the relay checkout
 
@@ -589,6 +590,8 @@ A push-triggered check cannot close this on its own, because the push that shoul
 `server-image` builds one single-arch image per architecture on a native runner (amd64 on `ubuntu-latest`, arm64 on `ubuntu-24.04-arm`), each pushed to GHCR by digest with an SBOM and max provenance.
 There is no QEMU cross-compilation.
 It needs no secrets beyond the automatic `GITHUB_TOKEN` (`packages: write` to push to GHCR), and no cosign key material is stored.
+Every image job (here, `main-builds`' `server-image` and `web-image`) names its image `ghcr.io/<owner>/<image>`, with the owner taken from `GITHUB_REPOSITORY_OWNER` and lowercased, so the images follow the repository from `NC1107` to `Slim-m-org` rather than pushing to a namespace the moved repo's token cannot write.
+`scripts/decide-latest-tag.sh` reads the owner back out of the image and lists its tags under `orgs/` first, then `users/`.
 
 `server-image-merge` assembles the per-arch digests into one multi-arch manifest tag and cosign-signs it keylessly over OIDC.
 It signs the manifest-list digest, which covers both arch images and every tag that resolves to it.
@@ -769,7 +772,7 @@ Verifying `github.sha` then waits on a check a path filter correctly skipped, ti
 
 ## web-image
 
-Builds `docker/web.Dockerfile` into `ghcr.io/nc1107/slim-m-web`: `flutter build web --release --base-href /app/` at the pinned Flutter version, behind the unprivileged nginx image (`docker/web-nginx.conf`), which runs as a non-root user on port 8080.
+Builds `docker/web.Dockerfile` into `ghcr.io/<owner>/slim-m-web`: `flutter build web --release --base-href /app/` at the pinned Flutter version, behind the unprivileged nginx image (`docker/web-nginx.conf`), which runs as a non-root user on port 8080.
 It is a reusable workflow with one input, the newline-separated tags for the merged manifest, and it has the same shape as `server-image` and `server-image-merge`: one image per architecture on a native runner, pushed by digest with an SBOM and provenance, then merged and cosign-signed keylessly.
 The merge job checks it got two digests, so a failed arch cannot ship a single-arch manifest.
 

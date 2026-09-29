@@ -16,11 +16,17 @@ set -euo pipefail
 
 image="$1"
 version="$2"
-package="${image#ghcr.io/nc1107/}"
+path="${image#ghcr.io/}"
+owner="${path%%/*}"
+package="${path#*/}"
 
-if ! raw="$(gh api --paginate \
-  "users/nc1107/packages/container/${package}/versions" \
-  --jq '.[].metadata.container.tags[]' 2>&1)"; then
+# GHCR's listing lives under orgs/ or users/ depending on who owns the image; the repo moved between the two.
+list_tags() {
+  gh api --paginate "$1/${owner}/packages/container/${package}/versions" \
+    --jq '.[].metadata.container.tags[]' 2>&1
+}
+
+if ! raw="$(list_tags orgs)" && ! raw="$(list_tags users)"; then
   reason="$(printf '%s' "$raw" | tr '\n' ' ')"
   echo "::warning::could not list published tags for ${package} (${reason}); leaving :latest where it is" >&2
   echo false
