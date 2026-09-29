@@ -32,6 +32,7 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
+import '../providers/call_solo.dart';
 import '../providers/voice_controller.dart';
 import 'call_participant_tiles.dart';
 import 'call_roster_motion.dart';
@@ -324,7 +325,7 @@ class _ParticipantGrid extends StatelessWidget {
                       menuItemsBuilder: menuItemsBuilder,
                     ),
                   ),
-                  if (participants.length == 1) ...[
+                  if (isAloneInCall(participants)) ...[
                     const SizedBox(height: AppSpacing.s24),
                     _AloneHint(isDm: isDm),
                   ],

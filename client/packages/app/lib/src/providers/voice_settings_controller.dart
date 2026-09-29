@@ -14,6 +14,7 @@ import 'providers.dart';
 import 'voice_controller.dart';
 
 const _soundsKey = 'slimm.voice.join_leave_sounds_enabled';
+const _holdMusicKey = 'slimm.voice.hold_music_enabled';
 const _callRingSoundKey = 'slimm.voice.call_ring_sound_enabled';
 const _qualityKey = 'slimm.voice.screen_share_quality';
 const _cameraOnJoinKey = 'slimm.voice.camera_on_join';
@@ -82,6 +83,7 @@ class VoiceSettingsState {
   const VoiceSettingsState({
     this.joinLeaveSoundsEnabled = true,
     this.callRingSoundEnabled = true,
+    this.holdMusicEnabled = false,
     this.screenShareQuality = ScreenShareQuality.balanced,
     this.cameraOnJoin = false,
     this.pushToTalkEnabled = false,
@@ -99,6 +101,9 @@ class VoiceSettingsState {
   /// since someone may want to hear an incoming call and not care about
   /// roster chatter inside one already joined, or the other way round.
   final bool callRingSoundEnabled;
+
+  /// Soft local music while you are the only one in a call. Off by default (owner decision 2026-09-28).
+  final bool holdMusicEnabled;
   final ScreenShareQuality screenShareQuality;
 
   /// Whether a fresh session's first join should ask for a camera; see
@@ -142,6 +147,7 @@ class VoiceSettingsState {
   VoiceSettingsState copyWith({
     bool? joinLeaveSoundsEnabled,
     bool? callRingSoundEnabled,
+    bool? holdMusicEnabled,
     ScreenShareQuality? screenShareQuality,
     bool? cameraOnJoin,
     bool? pushToTalkEnabled,
@@ -156,6 +162,7 @@ class VoiceSettingsState {
     joinLeaveSoundsEnabled:
         joinLeaveSoundsEnabled ?? this.joinLeaveSoundsEnabled,
     callRingSoundEnabled: callRingSoundEnabled ?? this.callRingSoundEnabled,
+    holdMusicEnabled: holdMusicEnabled ?? this.holdMusicEnabled,
     screenShareQuality: screenShareQuality ?? this.screenShareQuality,
     cameraOnJoin: cameraOnJoin ?? this.cameraOnJoin,
     pushToTalkEnabled: pushToTalkEnabled ?? this.pushToTalkEnabled,
@@ -187,6 +194,7 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     state = state.copyWith(
       joinLeaveSoundsEnabled: prefs.getBool(_soundsKey) ?? true,
       callRingSoundEnabled: prefs.getBool(_callRingSoundKey) ?? true,
+      holdMusicEnabled: prefs.getBool(_holdMusicKey) ?? false,
       screenShareQuality: ScreenShareQuality.values
           .where((q) => q.name == storedQuality)
           .firstOrDefault(ScreenShareQuality.balanced),
@@ -212,6 +220,12 @@ class VoiceSettingsController extends StateNotifier<VoiceSettingsState> {
     state = state.copyWith(callRingSoundEnabled: enabled);
     final prefs = await _ref.read(preferencesProvider.future);
     await prefs.setBool(_callRingSoundKey, enabled);
+  }
+
+  Future<void> setHoldMusicEnabled(bool enabled) async {
+    state = state.copyWith(holdMusicEnabled: enabled);
+    final prefs = await _ref.read(preferencesProvider.future);
+    await prefs.setBool(_holdMusicKey, enabled);
   }
 
   Future<void> setScreenShareQuality(ScreenShareQuality quality) async {
