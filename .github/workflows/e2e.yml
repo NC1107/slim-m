@@ -6,38 +6,56 @@ name: e2e
 # onboarding, messaging, moderation, screen share and a two-party voice call,
 # checking each scenario against the server or the SFU. See docs/e2e.md.
 #
-# Runs on pull requests as well as on push to main, on a nightly schedule for
-# slower drift (a renamed label, a restructured screen), and on
-# workflow_dispatch for an ad hoc run.
+# Runs on every push to main, on a nightly schedule for slower drift (a renamed
+# label, a restructured screen), on workflow_dispatch for an ad hoc run, and on
+# a pull request only when it touches a path that can break what the harness
+# drives: voice and calls, the rtc and api packages, the server's auth, ws, hub
+# and voice code, the canvas, the image, or the harness itself.
 #
-# The pull_request trigger reverses what this header used to argue - that e2e
-# was too slow and heavy for a PR, and the faster per-area workflows already
-# gated one. That reasoning held right up until it did not. #653 moved the
-# canvas into voice channels, the harness kept driving a text channel, and
-# fourteen scenarios went red on every commit for two days before anybody
-# looked; the per-area workflows were all green throughout, because none of
-# them drives the product. Both fixes then had to be merged unvalidated, since
-# nothing ran e2e until after the merge.
+# The pull_request trigger exists because #653 moved the canvas into voice
+# channels, the harness kept driving a text channel, and fourteen scenarios went
+# red on every commit for two days while every per-area workflow stayed green.
+# It is narrowed to those paths because at ~20 minutes it saturated the
+# account's runners on every PR push and starved the required checks; a change
+# outside them is still covered by the push to main and the nightly run.
 #
-# Path-filtered so the cost lands only where it can be earned: a docs-only or
-# workflow-only PR still pays nothing.
-#
-# Still advisory rather than required, and deliberately so even now that it
-# runs on a PR: browser automation can be flaky for reasons unrelated to the
-# change under test, and a red check nobody trusts teaches people to ignore CI.
-# Running on a PR is about surfacing a break at the moment it is cheap to fix;
-# blocking a merge on it is a separate decision, and one to take only once real
-# runs show it stable. See docs/ci.md.
+# Still advisory rather than required: browser automation can be flaky for
+# reasons unrelated to the change under test, and a red check nobody trusts
+# teaches people to ignore CI. See docs/ci.md.
 on:
   push:
     branches: [main]
   pull_request:
     paths:
-      - "client/**"
-      - "crates/**"
+      - "client/packages/rtc/**"
+      - "client/packages/api/**"
+      - "client/packages/voice_canvas/**"
+      - "client/packages/platform/**"
+      - "client/packages/app/lib/src/**/*voice*"
+      - "client/packages/app/lib/src/**/*call*"
+      - "client/packages/app/lib/src/**/*canvas*"
+      - "client/packages/app/lib/src/**/*screen_share*"
+      - "client/packages/app/lib/src/**/*stream*"
+      - "client/packages/app/lib/src/routing/**"
+      - "client/packages/app/lib/main.dart"
+      - "client/pubspec.lock"
+      - "crates/slimm-server/src/voice/**"
+      - "crates/slimm-server/src/hub/**"
+      - "crates/slimm-server/src/hub.rs"
+      - "crates/slimm-server/src/auth.rs"
+      - "crates/slimm-server/src/http/auth.rs"
+      - "crates/slimm-server/src/http/ws.rs"
+      - "crates/slimm-server/src/http/ws/**"
+      - "crates/slimm-server/src/http/voice*.rs"
+      - "crates/slimm-server/src/http/canvas*.rs"
+      - "crates/slimm-server/src/lib.rs"
+      - "crates/slimm-server/migrations/**"
+      - "Cargo.lock"
+      - "docker/**"
       - "schema/openapi.yaml"
       - "scripts/e2e.sh"
-      - "scripts/lib/**"
+      - "scripts/lib/e2e_*.py"
+      - "scripts/lib/test_e2e_*.py"
       - ".github/workflows/e2e.yml"
   schedule:
     - cron: "0 6 * * *"
@@ -46,10 +64,10 @@ on:
 permissions:
   contents: read
 
-# Queued, not cancelled: a merge burst would otherwise leave no verdict at all.
+# A superseded PR run is cancelled; main, nightly and manual runs queue so a merge burst still leaves a verdict.
 concurrency:
   group: e2e-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   SQLX_OFFLINE: "true"

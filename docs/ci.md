@@ -22,7 +22,7 @@ Each section below is named for its workflow file.
 | `licenses` | changes to any dependency manifest or lockfile or to `deny.toml`; every push to `main` | every Rust crate's and every pub package's license is in the one allowlist |
 | `perf` | changes under `crates/`, `perf/`, the Cargo files; plus published releases | benches compile on PRs, benches run on a release |
 | `compose-smoke` | changes to the self-host stack, a weekly schedule, and by hand | `docker compose up` on a fresh box produces a working deployment |
-| `e2e` | pull requests touching `client/`, `crates/`, the schema or the harness; every push to `main`; a nightly schedule; and by hand | the whole product through two real headless browsers; advisory, not required |
+| `e2e` | every push to `main`; a nightly schedule; by hand; and pull requests only when they touch voice, calls, the canvas, the rtc/api packages, server auth/ws/hub/voice, migrations, the image, the schema or the harness (a superseded PR run is cancelled) | the whole product through two real headless browsers; advisory, not required |
 | `push-relay-contract` | changes to the server's push path, and by hand | a server-generated envelope through the relay repo's real HTTP handler |
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
 | `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
@@ -179,7 +179,7 @@ The three `SC2015` sites it did find (`[[ -n "$PID" ]] && kill "$PID" || true` i
 ### The e2e harness's own unit tests
 
 `scripts/lib/test_*.py` covers the harness's scenario logic (the read-state and sync assertions, the settings assertions) against stubs, with no server and no browser.
-`e2e.yml` runs the same discovery, but only on push to main, and only as an advisory check; this is the `pull_request` gate on it, so a regression in the harness itself fails a PR rather than a nightly run nobody is watching.
+`e2e.yml` runs the same discovery, but only on push to main and on path-matching PRs, and only as an advisory check; this is the unconditional `pull_request` gate on it, so a regression in the harness itself fails a PR rather than a nightly run nobody is watching.
 
 ### iOS purpose strings
 
@@ -389,9 +389,12 @@ Pulled into a script for the same reason `check-release-tag-lag.sh` was: `script
 
 No concurrency group, the same reasoning `release-tag-watchdog.yml`'s own header gives for having none: an unconditional `cancel-in-progress: true` over a cron interval is what made that workflow fail three times within an hour of shipping (a run slower than its own 15-minute interval gets cancelled by the next one, and a cancelled run never asks the question), and this job is read-only and idempotent, so two of it overlapping costs nothing worth guarding against.
 
-**This does not promote `e2e` to a required check.** `verify-release-checks.yml`'s required-check lists are untouched, and `e2e` still does not run on pull requests. Whether to promote it is still the open question this section's own advisory-not-required paragraph leaves for the owner; this closes the separate problem of a red streak going unnoticed regardless of what the answer turns out to be.
+**This does not promote `e2e` to a required check.** `verify-release-checks.yml`'s required-check lists are untouched, and `e2e` runs on a pull request only when its path filter matches (see below). Whether to promote it is still the open question this section's own advisory-not-required paragraph leaves for the owner; this closes the separate problem of a red streak going unnoticed regardless of what the answer turns out to be.
 
-It runs on pull requests as well, path-filtered to `client/`, `crates/`, `schema/openapi.yaml` and the harness itself, so a docs-only change pays nothing.
+It runs on pull requests as well, but only for the paths that can break what the harness drives (voice, calls, canvas, the rtc and api packages, server auth, ws, hub and voice code, migrations, `docker/`, the schema and the harness itself).
+Owner decision 2026-09-29: at ~20 minutes it saturated the account's runners on every PR push and starved required checks, so a docs-only, bot-only or settings-UI change pays nothing and is covered by the push to `main` and the nightly run.
+A superseded PR run is cancelled; runs on `main`, nightly and by hand still queue.
+The red-streak watchdog reads only `main` runs, so it is unaffected.
 
 That reverses the workflow's original position, and the reversal is worth recording because the original reasoning was good and still turned out to be incomplete.
 The argument was that e2e is too slow and heavy for a pull request, and that the faster per-area workflows already gate one.
