@@ -170,4 +170,34 @@ void main() {
 
     await teardown(tester, s.container, s.db);
   });
+
+  for (final width in [390.0, 1400.0]) {
+    testWidgets('leaving from another channel still toasts the recap, once, '
+        'at $width', (tester) async {
+      final s = await _inCall(tester, width);
+      tester.element(find.byType(HomeShell)).go(Routes.channel('t1'));
+      await tester.pumpAndSettle();
+
+      await s.voice.leave();
+      await tester.pumpAndSettle();
+
+      expect(_location(tester), Routes.channel('t1'));
+      final toasts = s.container.read(toastsProvider);
+      expect(toasts.single.message, 'Call ended - 42 sec.');
+
+      await teardown(tester, s.container, s.db);
+    });
+  }
+
+  testWidgets('a wide hang-up on the call itself shows the recap card, not a '
+      'second toast', (tester) async {
+    final s = await _inCall(tester, 1400);
+
+    await s.voice.leave();
+    await tester.pumpAndSettle();
+
+    expect(s.container.read(toastsProvider), isEmpty);
+
+    await teardown(tester, s.container, s.db);
+  });
 }

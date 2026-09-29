@@ -52,6 +52,7 @@ import 'canvas/canvas_fullscreen.dart';
 import 'canvas/canvas_pane.dart';
 import 'channel_screen.dart';
 import 'dm_call_pane.dart';
+import 'hang_up_recap_toast.dart';
 import 'thread_screen.dart';
 import 'voice_screen.dart';
 import 'voice_text_pane.dart';
@@ -75,6 +76,7 @@ class HomeShell extends ConsumerWidget {
     final layout = LayoutClass.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final selected = selectedChannelId(context);
+    listenForHangUpRecap(context, ref, selectedChannelId: selected);
     // Loaded with the shell so the first surface to consult it filters against none; selecting a constant keeps this mounted without rebuilding the whole shell on every block/unblock.
     ref.watch(blocksProvider.select((_) => null));
     // Same reasoning, including the constant select: a channel mute must not rebuild the whole shell either.
