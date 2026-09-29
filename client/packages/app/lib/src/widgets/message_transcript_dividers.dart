@@ -14,10 +14,17 @@ import 'package:slimm_data/data.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 /// A continuation of the same author's previous message inside the density's
-/// grouping window drops its avatar and header.
-bool isGrouped(Message message, Message? previous) =>
+/// grouping window drops its avatar and header. A webhook posting under a
+/// different username starts a new group so its label shows.
+bool isGrouped(
+  Message message,
+  Message? previous, {
+  String? webhookUsername,
+  String? previousWebhookUsername,
+}) =>
     previous != null &&
     previous.authorId == message.authorId &&
+    webhookUsername?.trim() == previousWebhookUsername?.trim() &&
     (message.createdAt - previous.createdAt).abs() <
         AppDensity.normal.groupWindow.inMilliseconds;
 
