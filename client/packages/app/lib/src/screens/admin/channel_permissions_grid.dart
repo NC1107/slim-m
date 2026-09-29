@@ -25,6 +25,8 @@ import '../../providers/channel_permissions.dart';
 import '../../providers/member_presence.dart' show membersProvider;
 import '../../providers/providers.dart';
 import '../../widgets/run_guarded.dart';
+import 'channel_permissions_body.dart';
+import 'channel_permissions_escalation.dart';
 import 'channel_permissions_grid_rows.dart';
 import 'overwrite_target_picker_sheets.dart';
 
@@ -174,21 +176,59 @@ class _ChannelPermissionsGridState extends ConsumerState<ChannelPermissionsGrid>
     }
   }
 
+  int _escalation(int myPermissions) {
+    var bits = 0;
+    for (final key in _removed) {
+      final (_, deny) = _original[key] ?? (0, 0);
+      bits |= deny & ~myPermissions;
+    }
+    for (final entry in _pending.entries) {
+      final (oldAllow, oldDeny) = _original[entry.key] ?? (0, 0);
+      bits |= escalatedBits(
+        oldAllow: oldAllow,
+        oldDeny: oldDeny,
+        newAllow: entry.value.$1,
+        newDeny: entry.value.$2,
+        myPermissions: myPermissions,
+      );
+    }
+    return bits;
+  }
+
+  /// Clears removals one at a time and forgets each once done, so a later
+  /// refusal of the batch cannot make a retry delete the same column twice.
+  Future<void> _applyRemovals() async {
+    for (final key in _removed.toList()) {
+      final (kind, id) = _parseKey(key);
+      try {
+        await ref
+            .read(apiProvider)
+            .deleteChannelOverwrite(
+              channelId: widget.channel.id,
+              kind: kind,
+              id: id,
+            );
+      } on api.NotFoundException {
+        // Already gone, which is what a removal asks for.
+      }
+      _removed.remove(key);
+      _original.remove(key);
+    }
+  }
+
   Future<void> _save() async {
+    final blocked = _escalation(
+      ref.read(myChannelPermissionsProvider(widget.channel.id)),
+    );
+    if (blocked != 0) {
+      setActionError(escalationMessage(blocked));
+      return;
+    }
     setState(() => _saving = true);
     final ok = await guard(
       whatFailed: 'save the permissions grid',
       action: () async {
-        for (final key in _removed) {
-          final (kind, id) = _parseKey(key);
-          await ref
-              .read(apiProvider)
-              .deleteChannelOverwrite(
-                channelId: widget.channel.id,
-                kind: kind,
-                id: id,
-              );
-        }
+        await _applyRemovals();
         final edits = <api.ChannelOverwriteEdit>[
           for (final entry in _pending.entries)
             if (_original[entry.key] != entry.value)
@@ -211,11 +251,24 @@ class _ChannelPermissionsGridState extends ConsumerState<ChannelPermissionsGrid>
     );
     if (!mounted) return;
     setState(() => _saving = false);
-    if (ok) {
-      _loaded = false;
-      _addedLocally.clear();
-      _removed.clear();
-      ref.invalidate(channelOverwritesProvider(widget.channel.id));
+    if (ok) await _reloadSaved();
+  }
+
+  /// Reseeds from the server's answer rather than the provider's previous
+  /// value, which an invalidate would hand straight back and pin as saved.
+  Future<void> _reloadSaved() async {
+    final provider = channelOverwritesProvider(widget.channel.id);
+    try {
+      final fresh = await ref.refresh(provider.future);
+      if (!mounted) return;
+      setState(() {
+        _loaded = false;
+        _addedLocally.clear();
+        _removed.clear();
+        _seedFrom(fresh);
+      });
+    } on api.ApiException {
+      if (mounted) setActionError('Saved, but could not reload the grid.');
     }
   }
 
@@ -307,76 +360,36 @@ class _ChannelPermissionsGridState extends ConsumerState<ChannelPermissionsGrid>
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s20,
+            AppSpacing.s16,
             AppSpacing.s12,
-            AppSpacing.s20,
+            AppSpacing.s16,
             AppSpacing.s8,
           ),
           child: const Legend(),
         ),
         if (actionError case final error?)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
             child: AppErrorState(message: error, onDismiss: clearActionError),
           ),
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, viewport) {
-              // Content width or viewport, whichever is wider; a bare minWidth constraint here leaves maxWidth infinite and crashes the stretching column below.
-              final contentWidth =
-                  gridLabelWidth + (columns.length + 1) * gridCellWidth;
-              final totalWidth = contentWidth < viewport.maxWidth
-                  ? viewport.maxWidth
-                  : contentWidth;
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: totalWidth,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      HeaderRow(
-                        columns: columns,
-                        onAdd: _pickTarget,
-                        onRemove: _removeColumn,
-                      ),
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.only(
-                            bottom: AppSpacing.s16,
-                          ),
-                          children: [
-                            for (final group in Perm.groups) ...[
-                              GroupHeaderRow(title: group.title),
-                              for (final spec in group.permissions)
-                                GridRow(
-                                  label: spec.label,
-                                  columns: columns,
-                                  cellBuilder: (column) {
-                                    final grantable = myPermissions
-                                        .hasPermission(spec.bit);
-                                    final (allow, deny) =
-                                        _pending[column.key] ?? (0, 0);
-                                    final state = allow & spec.bit != 0
-                                        ? CellState.allow
-                                        : deny & spec.bit != 0
-                                        ? CellState.deny
-                                        : CellState.inherit;
-                                    return Cell(
-                                      state: state,
-                                      disabled: !grantable,
-                                      onTap: () =>
-                                          _cycle(column, spec.bit, grantable),
-                                    );
-                                  },
-                                ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+          child: PermissionGridView(
+            columns: columns,
+            onAdd: _pickTarget,
+            onRemove: _removeColumn,
+            cellBuilder: (column, spec) {
+              final grantable = myPermissions.hasPermission(spec.bit);
+              final (allow, deny) = _pending[column.key] ?? (0, 0);
+              final state = allow & spec.bit != 0
+                  ? CellState.allow
+                  : deny & spec.bit != 0
+                  ? CellState.deny
+                  : CellState.inherit;
+              return Cell(
+                key: ValueKey('cell:${column.key}:${spec.bit}'),
+                state: state,
+                disabled: !grantable,
+                onTap: () => _cycle(column, spec.bit, grantable),
               );
             },
           ),

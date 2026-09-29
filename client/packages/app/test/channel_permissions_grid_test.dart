@@ -90,17 +90,9 @@ Widget _wrap({
   );
 }
 
-Finder _firstCellFor(String permissionLabel) => find
-    .descendant(
-      of: find
-          .ancestor(
-            of: find.text(permissionLabel),
-            matching: find.byType(GridRow),
-          )
-          .first,
-      matching: find.byType(Cell),
-    )
-    .first;
+final _everyoneSend = find.byKey(
+  ValueKey('cell:role:${_everyone.id}:${Perm.sendMessages}'),
+);
 
 void main() {
   testWidgets('the legend and the everyone column always show', (tester) async {
@@ -150,7 +142,7 @@ void main() {
     await tester.pumpWidget(_wrap(myPermissions: Perm.sendMessages));
     await tester.pumpAndSettle();
 
-    final cell = _firstCellFor('Send messages');
+    final cell = _everyoneSend;
     expect(tester.widget<Cell>(cell).state, CellState.inherit);
 
     await tester.tap(cell);
@@ -172,7 +164,7 @@ void main() {
       await tester.pumpWidget(_wrap(myPermissions: 0));
       await tester.pumpAndSettle();
 
-      final cell = _firstCellFor('Send messages');
+      final cell = _everyoneSend;
       expect(tester.widget<Cell>(cell).disabled, isTrue);
 
       await tester.tap(cell);
@@ -203,7 +195,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(_firstCellFor('Send messages'));
+    await tester.tap(_everyoneSend);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('unsaved change'), findsOneWidget);

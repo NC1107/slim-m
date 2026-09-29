@@ -10,6 +10,9 @@ import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../../widgets/bot_avatar_placeholder.dart';
+import 'channel_permissions_cell.dart';
+
+export 'channel_permissions_cell.dart';
 
 /// One grid column: the role or member it targets, resolved for display.
 class GridColumn {
@@ -28,12 +31,63 @@ class GridColumn {
   String get key => '${kind.wire}:$id';
 }
 
-enum CellState { allow, inherit, deny }
+/// Widths and heights every part of the grid aligns to, decided by the
+/// space the grid actually has (`desktop-vs-mobile.md`: width, never
+/// platform). Compact rows meet the 44dp touch minimum and, when the
+/// principal columns fit, stretch to fill the width so none is ever cut.
+class GridMetrics {
+  const GridMetrics._({
+    required this.labelWidth,
+    required this.cellWidth,
+    required this.rowHeight,
+    required this.contentWidth,
+    required this.viewportWidth,
+  });
 
-/// The column width every header, group header and row aligns its label
-/// column and cell columns to.
-const double gridLabelWidth = 220;
-const double gridCellWidth = 72;
+  factory GridMetrics.forWidth(double width, {required int columnCount}) {
+    final compact = width < kCompactWidth;
+    final labelWidth = compact ? compactLabelWidth : wideLabelWidth;
+    final viewport = (width - labelWidth).clamp(0.0, double.infinity);
+    final slots = columnCount + 1;
+    final double cellWidth;
+    if (compact) {
+      final fit = viewport / slots;
+      cellWidth = fit >= minCellWidth
+          ? fit.clamp(minCellWidth, maxCellWidth)
+          : minCellWidth;
+    } else {
+      cellWidth = wideCellWidth;
+    }
+    return GridMetrics._(
+      labelWidth: labelWidth,
+      cellWidth: cellWidth,
+      rowHeight: compact ? AppSizes.rowTouch : wideRowHeight,
+      contentWidth: cellWidth * slots,
+      viewportWidth: viewport,
+    );
+  }
+
+  static const double compactLabelWidth = 132;
+  static const double wideLabelWidth = 220;
+  static const double minCellWidth = 60;
+  static const double maxCellWidth = 96;
+  static const double wideCellWidth = 72;
+  static const double wideRowHeight = 40;
+  static const double groupHeaderHeight = 32;
+  static const double headerHeight = 72;
+
+  final double labelWidth;
+  final double cellWidth;
+  final double rowHeight;
+
+  /// Width of every principal column plus the add column.
+  final double contentWidth;
+
+  /// Width left for those columns beside the pinned label column.
+  final double viewportWidth;
+
+  bool get scrolls => contentWidth > viewportWidth + 0.5;
+}
 
 class Legend extends StatelessWidget {
   const Legend({super.key});
@@ -41,10 +95,10 @@ class Legend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    Widget item(IconData icon, Color color, String label) => Row(
+    Widget item(CellState state, String label, {bool disabled = false}) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: color),
+        CellChip(state: state, disabled: disabled, width: 24, height: 20),
         const SizedBox(width: 6),
         Text(
           label,
@@ -54,30 +108,32 @@ class Legend extends StatelessWidget {
     );
     return Wrap(
       spacing: AppSpacing.s16,
-      runSpacing: AppSpacing.s4,
+      runSpacing: AppSpacing.s8,
       children: [
-        item(AppIcons.check, tokens.status.online, 'Allow'),
-        item(AppIcons.shapeArrow, tokens.textSecondary, 'Inherit from role'),
-        item(AppIcons.dismiss, tokens.dangerText, 'Deny'),
-        item(
-          AppIcons.restrictedChannel,
-          tokens.textSecondary,
-          "you can't grant this",
-        ),
+        item(CellState.allow, 'Allow'),
+        item(CellState.inherit, 'Inherit from role'),
+        item(CellState.deny, 'Deny'),
+        item(CellState.inherit, "you can't grant this", disabled: true),
       ],
     );
   }
 }
 
+/// The principal columns' headers, kept in step with the body by
+/// [controller]; the body is what the user drags.
 class HeaderRow extends StatelessWidget {
   const HeaderRow({
     super.key,
     required this.columns,
+    required this.metrics,
+    required this.controller,
     required this.onAdd,
     required this.onRemove,
   });
 
   final List<GridColumn> columns;
+  final GridMetrics metrics;
+  final ScrollController controller;
   final VoidCallback onAdd;
 
   /// Removing a column clears its pending state - a full inherit, applied on
@@ -92,23 +148,38 @@ class HeaderRow extends StatelessWidget {
         border: Border(bottom: BorderSide(color: tokens.borderSubtle)),
       ),
       child: SizedBox(
-        height: 64,
+        height: GridMetrics.headerHeight,
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const SizedBox(width: gridLabelWidth),
-            for (final column in columns)
-              _HeaderCell(column: column, onRemove: () => onRemove(column)),
-            SizedBox(
-              width: gridCellWidth,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                child: Center(
-                  child: AppIconButton(
-                    icon: AppIcons.add,
-                    semanticLabel: 'Add a role or member to this grid',
-                    onPressed: onAdd,
-                  ),
+            SizedBox(width: metrics.labelWidth),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: controller,
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final column in columns)
+                      _HeaderCell(
+                        column: column,
+                        width: metrics.cellWidth,
+                        onRemove: () => onRemove(column),
+                      ),
+                    SizedBox(
+                      width: metrics.cellWidth,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                        child: Center(
+                          child: AppIconButton(
+                            icon: AppIcons.add,
+                            semanticLabel: 'Add a role or member to this grid',
+                            onPressed: onAdd,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -120,18 +191,23 @@ class HeaderRow extends StatelessWidget {
 }
 
 class _HeaderCell extends StatelessWidget {
-  const _HeaderCell({required this.column, required this.onRemove});
+  const _HeaderCell({
+    required this.column,
+    required this.width,
+    required this.onRemove,
+  });
 
   final GridColumn column;
+  final double width;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return SizedBox(
-      width: gridCellWidth,
+      width: width,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -159,15 +235,20 @@ class _HeaderCell extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppText.caption.copyWith(color: tokens.textPrimary),
             ),
-            GestureDetector(
-              onTap: onRemove,
-              child: Semantics(
-                button: true,
-                label: 'Remove ${column.label} from this grid',
-                child: Icon(
-                  AppIcons.dismiss,
-                  size: 11,
-                  color: tokens.textDisabled,
+            Semantics(
+              button: true,
+              label: 'Remove ${column.label} from this grid',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onRemove,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 28,
+                  child: Icon(
+                    AppIcons.dismiss,
+                    size: 12,
+                    color: tokens.textDisabled,
+                  ),
                 ),
               ),
             ),
@@ -178,6 +259,7 @@ class _HeaderCell extends StatelessWidget {
   }
 }
 
+/// A group title in the pinned label column.
 class GroupHeaderRow extends StatelessWidget {
   const GroupHeaderRow({super.key, required this.title});
 
@@ -186,20 +268,21 @@ class GroupHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        gridLabelWidth,
-        AppSpacing.s12,
-        0,
-        AppSpacing.s4,
-      ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title.toUpperCase(),
-          style: AppText.micro.copyWith(
-            color: tokens.textDisabled,
-            fontWeight: AppWeights.medium,
+    return SizedBox(
+      height: GridMetrics.groupHeaderHeight,
+      child: Padding(
+        padding: const EdgeInsets.only(
+          left: AppSpacing.s16,
+          bottom: AppSpacing.s4,
+        ),
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: Text(
+            title.toUpperCase(),
+            style: AppText.micro.copyWith(
+              color: tokens.textDisabled,
+              fontWeight: AppWeights.medium,
+            ),
           ),
         ),
       ),
@@ -207,99 +290,62 @@ class GroupHeaderRow extends StatelessWidget {
   }
 }
 
-class GridRow extends StatelessWidget {
-  const GridRow({
-    super.key,
-    required this.label,
-    required this.columns,
-    required this.cellBuilder,
-  });
+/// One permission's name in the pinned label column.
+class GridLabelRow extends StatelessWidget {
+  const GridLabelRow({super.key, required this.label, required this.height});
 
   final String label;
-  final List<GridColumn> columns;
-  final Widget Function(GridColumn column) cellBuilder;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return SizedBox(
-      height: 40,
-      child: Row(
-        children: [
-          SizedBox(
-            width: gridLabelWidth,
-            child: Text(
-              label,
-              style: AppText.ui.copyWith(
-                color: tokens.textPrimary,
-                fontSize: 13.5,
-              ),
-              overflow: TextOverflow.ellipsis,
+      height: height,
+      child: Padding(
+        padding: const EdgeInsets.only(left: AppSpacing.s16, right: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.ui.copyWith(
+              color: tokens.textPrimary,
+              fontSize: 13.5,
             ),
-          ),
-          for (final column in columns)
-            SizedBox(
-              width: gridCellWidth,
-              child: Center(child: cellBuilder(column)),
-            ),
-          const SizedBox(width: gridCellWidth),
-        ],
-      ),
-    );
-  }
-}
-
-class Cell extends StatelessWidget {
-  const Cell({
-    super.key,
-    required this.state,
-    required this.disabled,
-    required this.onTap,
-  });
-
-  final CellState state;
-  final bool disabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    // Only Allow is ever blocked; Deny needs no permission, so the cell always stays tappable.
-    final (color, icon) = switch (state) {
-      CellState.allow => (tokens.status.online, AppIcons.check),
-      CellState.deny => (tokens.dangerText, AppIcons.dismiss),
-      CellState.inherit when disabled => (
-        tokens.textDisabled,
-        AppIcons.restrictedChannel,
-      ),
-      CellState.inherit => (tokens.textSecondary, null),
-    };
-    final boxed = state != CellState.inherit;
-    return Semantics(
-      button: true,
-      label: switch (state) {
-        CellState.allow => 'Allow',
-        CellState.deny => 'Deny',
-        CellState.inherit =>
-          disabled ? "Inherit; you can't grant this" : 'Inherit from role',
-      },
-      child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: boxed ? color.withValues(alpha: 0.12) : null,
-            border: boxed ? Border.all(color: color) : null,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: SizedBox(
-            width: 30,
-            height: 26,
-            child: Icon(icon ?? AppIcons.shapeArrow, size: 14, color: color),
           ),
         ),
       ),
     );
   }
+}
+
+/// One permission's cells, one per principal column plus the add column's
+/// empty slot, so it lines up under [HeaderRow].
+class GridRow extends StatelessWidget {
+  const GridRow({
+    super.key,
+    required this.columns,
+    required this.metrics,
+    required this.cellBuilder,
+  });
+
+  final List<GridColumn> columns;
+  final GridMetrics metrics;
+  final Widget Function(GridColumn column) cellBuilder;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: metrics.rowHeight,
+    child: Row(
+      children: [
+        for (final column in columns)
+          SizedBox(width: metrics.cellWidth, child: cellBuilder(column)),
+        SizedBox(width: metrics.cellWidth),
+      ],
+    ),
+  );
 }
 
 class AddColumnKindSheet extends StatelessWidget {
