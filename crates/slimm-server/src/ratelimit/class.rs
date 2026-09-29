@@ -288,6 +288,14 @@ pub enum Class {
     /// account's other devices into a notification firehose. Sign-ins past
     /// the budget still succeed; only the notice is dropped.
     SignInAlert,
+    /// A member's rich-presence activity (`PUT`/`DELETE /presence/activity`).
+    ///
+    /// A player reports a track change every few minutes at most, but a
+    /// skipping listener can change it every few seconds and each accepted
+    /// write fans out to every connected member. Burst six absorbs a skip
+    /// streak; a refill of one per five seconds bounds the sustained rate.
+    /// See `docs/decisions/0044-rich-presence.md`.
+    PresenceActivity,
 }
 
 impl Class {
@@ -329,6 +337,8 @@ impl Class {
             Class::ModulePost => (5.0, 1.0 / 6.0),
             // See this variant's own doc comment for how these were sized.
             Class::SignInAlert => (3.0, 1.0 / 600.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::PresenceActivity => (6.0, 1.0 / 5.0),
         }
     }
 
@@ -337,7 +347,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 23] = [
+    pub const ALL: [Class; 24] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -361,6 +371,7 @@ impl Class {
         Class::Interaction,
         Class::ModulePost,
         Class::SignInAlert,
+        Class::PresenceActivity,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -390,6 +401,7 @@ impl Class {
             Class::Interaction => "interaction",
             Class::ModulePost => "module_post",
             Class::SignInAlert => "sign_in_alert",
+            Class::PresenceActivity => "presence_activity",
         }
     }
 }

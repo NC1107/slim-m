@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 
 import 'live_events.dart';
+import 'presence_activity.dart';
 import 'providers.dart';
 
 /// Every user this session currently has a presence status for. A user
@@ -21,6 +22,9 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
     _sub = _ref.read(liveEventsProvider).listen((event) {
       if (event is api.PresenceChanged) {
         state = {...state, event.userId: event.status};
+        _ref
+            .read(presenceActivityProvider.notifier)
+            .apply(event.userId, event.activity);
       }
     });
   }
@@ -53,6 +57,7 @@ class PresenceController extends StateNotifier<Map<String, api.PresenceState>> {
         ...state,
         for (final status in statuses) status.userId: status.status,
       };
+      _ref.read(presenceActivityProvider.notifier).applyBatch(statuses);
     } on api.ApiException {
       // Nothing useful to do; the next refresh (or a live event) corrects it.
     }

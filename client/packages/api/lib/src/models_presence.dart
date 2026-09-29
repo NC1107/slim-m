@@ -51,15 +51,93 @@ enum PresenceVisibility {
       };
 }
 
+/// What kind of thing a member is sharing.
+enum ActivityKind {
+  listening,
+  playing;
+
+  String get wire => name;
+
+  /// Null for a kind this client does not know, so the activity is dropped
+  /// rather than shown as something it is not.
+  static ActivityKind? tryParse(Object? value) => switch (value) {
+        'listening' => ActivityKind.listening,
+        'playing' => ActivityKind.playing,
+        _ => null,
+      };
+}
+
+/// What a member is listening to or playing. Ephemeral: the server holds it
+/// only for as long as their socket is open and tells only those who may see
+/// their presence.
+class PresenceActivity {
+  const PresenceActivity({
+    required this.kind,
+    required this.title,
+    this.subtitle,
+    this.startedAt,
+  });
+
+  /// The most characters the server accepts in [title] or [subtitle].
+  static const maxTextChars = 128;
+
+  final ActivityKind kind;
+  final String title;
+  final String? subtitle;
+
+  /// Epoch milliseconds the activity began, when the source knows.
+  final int? startedAt;
+
+  /// Null when [json] is absent or unreadable.
+  static PresenceActivity? tryFromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final kind = ActivityKind.tryParse(json['type']);
+    final title = json['title'];
+    if (kind == null || title is! String || title.isEmpty) return null;
+    final subtitle = json['subtitle'];
+    final startedAt = json['started_at'];
+    return PresenceActivity(
+      kind: kind,
+      title: title,
+      subtitle: subtitle is String && subtitle.isNotEmpty ? subtitle : null,
+      startedAt: startedAt is int ? startedAt : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'type': kind.wire,
+        'title': title,
+        if (subtitle != null) 'subtitle': subtitle,
+        if (startedAt != null) 'started_at': startedAt,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is PresenceActivity &&
+      other.kind == kind &&
+      other.title == title &&
+      other.subtitle == subtitle &&
+      other.startedAt == startedAt;
+
+  @override
+  int get hashCode => Object.hash(kind, title, subtitle, startedAt);
+}
+
 /// One user's presence, as told to the asking caller.
 class PresenceStatus {
-  const PresenceStatus({required this.userId, required this.status});
+  const PresenceStatus({
+    required this.userId,
+    required this.status,
+    this.activity,
+  });
 
   final String userId;
   final PresenceState status;
+  final PresenceActivity? activity;
 
   factory PresenceStatus.fromJson(Map<String, dynamic> json) => PresenceStatus(
         userId: json['user_id'] as String,
         status: PresenceState.parse(json['status'] as String),
+        activity: PresenceActivity.tryFromJson(json['activity']),
       );
 }
