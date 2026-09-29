@@ -12,6 +12,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import 'custom_emoji_image.dart';
 import 'emoji_picker.dart';
+import 'standard_emoji.dart';
 
 /// 16, not the 13 the chip's text glyph uses: 13 is a font size, and an emoji
 /// face draws well inside its em box while an image fills whatever box it gets.
@@ -133,11 +134,15 @@ class _ReactionsRowState extends State<ReactionsRow> {
   }
 
   Widget _chip(api.ReactionSummary reaction, {required bool exiting}) {
+    final customId = customEmojiIdFor(reaction.emoji, widget.customEmoji);
     return AppChip.reaction(
-      emoji: reaction.emoji,
+      // The deployment's own emoji wins a name clash; the key stays the tap target.
+      emoji: customId == null
+          ? standardEmojiFor(reaction.emoji) ?? reaction.emoji
+          : reaction.emoji,
       count: reaction.count,
       active: reaction.reacted,
-      glyph: switch (customEmojiIdFor(reaction.emoji, widget.customEmoji)) {
+      glyph: switch (customId) {
         final String id => CustomEmojiImage(
           emojiId: id,
           size: _reactionEmojiSize,

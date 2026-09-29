@@ -139,6 +139,10 @@ InlineSpan _emojiSpan(String raw, Map<String, String> customEmoji) {
         );
 }
 
+/// A pill's own padding is layout width: at 4dp a side it read as a second space
+/// on each side of the mention, so it stays under half a space.
+const double _mentionPillInset = 2;
+
 /// `--accent-text` on `--accent-soft`, matching the design's mention pill.
 /// Not a design-system component: a mention is a message-body decoration
 /// specific to this screen, not a control other surfaces reuse.
@@ -151,7 +155,7 @@ class _MentionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+      padding: const EdgeInsets.symmetric(horizontal: _mentionPillInset),
       decoration: BoxDecoration(
         color: tokens.accentSoft,
         borderRadius: BorderRadius.circular(AppRadii.control),
