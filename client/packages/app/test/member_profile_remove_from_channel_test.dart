@@ -43,6 +43,7 @@ data.Channel _channel(String kind) => data.Channel(
   lastReadSeq: 0,
   mentionedSeq: 0,
   isPersonalSpace: false,
+  joinMuted: false,
   position: 0,
   slowModeSeconds: 0,
 );
