@@ -32,6 +32,7 @@ import '../routing/breakpoints.dart';
 import 'app_surface_view.dart';
 import 'attachment_view.dart';
 import 'embed_card.dart';
+import 'message_buttons.dart';
 import 'emoji_picker.dart';
 import 'forwarded_message_card.dart';
 import 'hover_reveal.dart';
@@ -77,6 +78,7 @@ class MessageRow extends StatelessWidget {
     this.attachments = const [],
     this.embeds = const [],
     this.webhookUsername,
+    this.components = const [],
     this.poll,
     this.appSurface,
     this.call,
@@ -166,6 +168,9 @@ class MessageRow extends StatelessWidget {
 
   /// The webhook post's own username label, shown beside the Webhook badge.
   final String? webhookUsername;
+
+  /// A bot's buttons; they stay visible but disabled once its account is gone.
+  final List<api.ComponentRow> components;
 
   /// The poll this message carries, if it is a poll message.
   final api.Poll? poll;
@@ -331,6 +336,13 @@ class MessageRow extends StatelessWidget {
                                     ),
                                   if (!editing && embeds.isNotEmpty)
                                     EmbedList(embeds: embeds),
+                                  if (!editing && components.isNotEmpty)
+                                    MessageButtons(
+                                      channelId: message.channelId,
+                                      messageId: message.id,
+                                      rows: components,
+                                      unavailable: message.authorId == null,
+                                    ),
                                   if (message.forwarded case final forwarded?)
                                     Padding(
                                       padding: const EdgeInsets.only(

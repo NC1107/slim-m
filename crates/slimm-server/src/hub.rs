@@ -128,6 +128,7 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
         | Event::PollVoted { .. }
+        | Event::MessageComponentsChanged { .. }
         | Event::TypingStarted { .. }
         | Event::TypingStopped { .. }
         | Event::PresenceChanged(_)
@@ -158,7 +159,9 @@ fn moves_permissions(event: &Event) -> bool {
         | Event::ReportsChanged
         // A read marker moves no permission and needs no fan-out ordering.
         | Event::ReadStateChanged { .. }
-        | Event::EphemeralMessage { .. } => false,
+        | Event::EphemeralMessage { .. }
+        | Event::InteractionCreated { .. }
+        | Event::InteractionAnswered { .. } => false,
         Event::Stamped { event, .. } => moves_permissions(event),
     }
 }
@@ -191,7 +194,9 @@ fn is_ephemeral(event: &Event) -> bool {
     match event {
         Event::CanvasCursorMoved { .. }
         | Event::CanvasStrokePreview { .. }
-        | Event::EphemeralMessage { .. } => true,
+        | Event::EphemeralMessage { .. }
+        | Event::InteractionCreated { .. }
+        | Event::InteractionAnswered { .. } => true,
         Event::MessageCreated { .. }
         | Event::MessageEdited { .. }
         | Event::MessageDeleted { .. }
@@ -202,6 +207,7 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
         | Event::PollVoted { .. }
+        | Event::MessageComponentsChanged { .. }
         | Event::TypingStarted { .. }
         | Event::TypingStopped { .. }
         | Event::PresenceChanged(_)

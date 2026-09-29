@@ -68,6 +68,48 @@ pub(crate) async fn bot_calls(c: &mut Contract, root: &str, channel: &str) {
     )
     .await;
 
+    let with_buttons = c
+        .json(
+            "sendMessage",
+            "POST",
+            &format!("/channels/{channel}/messages"),
+            &bot_token,
+            json!({
+                "id": uuid::Uuid::now_v7().to_string(),
+                "content": "pick one",
+                "components": [{ "buttons": [
+                    { "label": "Yes", "style": "primary", "custom_id": "yes" },
+                    { "label": "Docs", "style": "link", "url": "https://example.com" }
+                ]}]
+            }),
+        )
+        .await;
+    let message_id = text(&with_buttons, "id");
+    let press_id = uuid::Uuid::now_v7().to_string();
+    c.json(
+        "pressMessageButton",
+        "POST",
+        &format!("/channels/{channel}/messages/{message_id}/interactions"),
+        root,
+        json!({ "id": press_id, "custom_id": "yes" }),
+    )
+    .await;
+    c.json(
+        "setMessageComponents",
+        "PUT",
+        &format!("/channels/{channel}/messages/{message_id}/components"),
+        &bot_token,
+        json!({ "components": [], "interaction_id": press_id }),
+    )
+    .await;
+    c.bare(
+        "acknowledgeInteraction",
+        "POST",
+        &format!("/channels/{channel}/interactions/{press_id}/ack"),
+        &bot_token,
+    )
+    .await;
+
     c.json(
         "setBotPermissions",
         "PATCH",

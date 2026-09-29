@@ -165,6 +165,55 @@ A member who blocked you still gets a 200 back, so you cannot tell.
 
 See `docs/decisions/0037-ephemeral-bot-messages.md`.
 
+## Buttons
+
+A message you send can carry buttons, so a member answers by pressing one rather than retyping a command:
+
+```
+POST /channels/{channelId}/messages
+{
+  "id": "<a uuid you generate>",
+  "content": "Hit or stand?",
+  "components": [
+    { "buttons": [
+      { "label": "Hit", "style": "primary", "custom_id": "hit" },
+      { "label": "Stand", "style": "secondary", "custom_id": "stand" },
+      { "label": "Rules", "style": "link", "url": "https://example.com/rules" }
+    ] }
+  ]
+}
+```
+
+Styles are `primary`, `secondary`, `danger` and `link`.
+A link button opens its `url` and never reaches you.
+Every other button needs a `custom_id` you choose, unique within the message.
+The limits are 5 rows, 5 buttons a row, an 80-character label and a 100-character `custom_id`.
+Only a bot may send buttons; anyone else gets a 403.
+
+When a member presses one, the bot that sent the message receives:
+
+```json
+{ "type": "interaction.created", "interaction_id": "...", "channel_id": "...", "message_id": "...",
+  "custom_id": "hit", "user_id": "...", "user_display_name": "...", "created_at": 0 }
+```
+
+No other bot and no other member gets it.
+Unlike a command advertisement it names who pressed, because you cannot answer a press without knowing.
+Answer within 15 minutes, in any of three ways, and the presser's button stops waiting as soon as you do:
+
+- `POST /channels/{channelId}/ephemeral-messages` with `interaction_id` set to the press's id, in place of `in_reply_to_id` (send exactly one of the two).
+  Only the presser sees it, and you get three replies per press; the fourth is a 429.
+- `PUT /channels/{channelId}/messages/{messageId}/components` to replace the buttons, for example to disable them.
+  Pass `interaction_id` to say which press it answers.
+  An empty list clears them.
+- `POST /channels/{channelId}/interactions/{interactionId}/ack` when the press needs no visible answer.
+
+A member's client shows the button as pending, and shows an error on that message if none of these arrives within about five seconds, so answer quickly and do slow work afterwards.
+Presses are rate limited per member.
+A press is best effort like typing: if you were offline, it is lost.
+
+See `docs/decisions/0039-bot-message-buttons.md`.
+
 ## Registering your commands
 
 Call this once you are connected, and again every time you reconnect:

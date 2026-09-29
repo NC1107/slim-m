@@ -83,6 +83,9 @@ pub(crate) fn spawn_token_sweep(store: store::Store) {
                 }
                 Err(err) => tracing::warn!(error = %err, "token sweep failed"),
             }
+            if let Err(err) = store.sweep_interactions().await {
+                tracing::warn!(error = %err, "interaction sweep failed");
+            }
         }
     });
 }
@@ -379,6 +382,7 @@ async fn record_timed_out_call(
                 poll: None,
                 embeds: std::sync::Arc::new(Vec::new()),
                 call: Some(std::sync::Arc::new(record)),
+                components: std::sync::Arc::new(Vec::new()),
             });
         }
         Err(err) => tracing::warn!(

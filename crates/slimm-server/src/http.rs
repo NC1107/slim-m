@@ -59,16 +59,19 @@ mod escalation;
 mod extract;
 pub mod gifs;
 mod hidden_chars;
+mod interactions;
 mod invites;
 pub mod link_preview;
 mod members;
 mod members_bulk;
+mod message_components;
 mod message_dto;
 mod message_enrich;
 mod message_forwards;
 mod message_get;
 mod message_history;
 mod message_mentions;
+mod message_validation;
 mod messages;
 mod messages_bulk;
 mod messages_bulk_window;
@@ -222,6 +225,8 @@ pub fn router(state: AppState) -> Router {
         .merge(bots::routes())
         .merge(bot_commands::routes())
         .merge(ephemeral_messages::routes())
+        .merge(interactions::routes())
+        .merge(message_components::routes())
         .merge(voice::routes())
         .merge(voice_ring::routes())
         .merge(voice_webhook::routes())

@@ -17,7 +17,6 @@ use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::routing::get;
 use serde::Deserialize;
-use uuid::Uuid;
 
 use super::AppState;
 use super::attachment_ids::parse_attachment_ids;
@@ -25,6 +24,7 @@ use super::channel_slow_mode::enforce_slow_mode;
 use super::embeds;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, Query, enforce};
+use super::message_components;
 use super::message_get::get_message;
 use super::message_history::history;
 use crate::hub::Event;
@@ -34,11 +34,11 @@ use crate::ratelimit::Class;
 use crate::store::{Edited, NewMessage};
 
 pub(crate) use super::message_dto::{AttachmentDto, MessageDto, ReactionDto};
+pub(crate) use super::message_validation::parse_uuid;
+pub(super) use super::message_validation::validate_content;
 
 /// Message bodies carry one text field; cap it generously but bounded.
 const MESSAGE_BODY_LIMIT: usize = 64 * 1024;
-/// Longest a single message may be, in characters.
-const MESSAGE_MAX_CHARS: usize = 4000;
 /// Default and maximum page sizes for history.
 const DEFAULT_LIMIT: i64 = 50;
 const MAX_LIMIT: i64 = 100;
@@ -87,6 +87,9 @@ struct SendRequest {
     /// Structured content, honoured only from a bot; see [`send`].
     #[serde(default)]
     embeds: Vec<embeds::RawEmbed>,
+    /// Buttons, honoured only from a bot; see decision 0039.
+    #[serde(default)]
+    components: Vec<crate::components::ComponentRow>,
 }
 
 #[derive(Deserialize)]
@@ -160,6 +163,8 @@ async fn send(
     let content = validate_content(&req.content, carries_more)?;
     let id = MessageId(parse_uuid(&req.id)?);
     let embeds = embeds::honored_for_send(&state, ctx.user_id, req.embeds).await?;
+    let components =
+        message_components::honored_for_send(&state, ctx.user_id, req.components).await?;
     let reply_to_id = req
         .reply_to_id
         .as_deref()
@@ -215,6 +220,8 @@ async fn send(
         .map(|(_, summary)| summary);
 
     let stored_embeds = embeds::store_and_reload(&state, id, sent.fresh, &embeds).await?;
+    let stored_components =
+        message_components::store_and_reload(&state, id, sent.fresh, &components).await?;
 
     // An idempotent retry must not fan out or push again; see this function's note.
     if sent.fresh {
@@ -238,6 +245,7 @@ async fn send(
             poll: None,
             embeds: Arc::new(stored_embeds.clone()),
             call: None,
+            components: Arc::new(stored_components.clone()),
         });
 
         // Cheap in-memory decision only, real work detached; see this function's note.
@@ -260,6 +268,7 @@ async fn send(
     dto.attachments = attachments.into_iter().map(AttachmentDto::from).collect();
     dto.forwarded = forwarded.map(Into::into);
     dto.embeds = embeds::dtos_from_stored(&state.link_previews, stored_embeds);
+    dto.components = stored_components;
     Ok(Json(dto))
 }
 
@@ -469,32 +478,4 @@ async fn edit(
     let mut dto: MessageDto = updated.into();
     dto.forwarded = forwarded.map(Into::into);
     Ok(Json(dto))
-}
-
-// --- Validation ---
-
-/// Bounds a message's text. [`empty_ok`] is set by a send that carries
-/// attachments, where the file is the message and the text is genuinely
-/// optional; every other caller passes false, so the relaxation cannot spread
-/// by being the default.
-///
-/// The over-limit reply names how far over and what the limit is, rather
-/// than a bare "too long": a client composing a long paste (logs, say) needs
-/// the number to trim by, not just the fact that it failed.
-pub(super) fn validate_content(content: &str, empty_ok: bool) -> Result<&str, ApiError> {
-    if !empty_ok && content.trim().is_empty() {
-        return Err(ApiError::BadRequest("message content must not be empty"));
-    }
-    let len = content.chars().count();
-    if len > MESSAGE_MAX_CHARS {
-        return Err(ApiError::BadRequestDetail(format!(
-            "message is {} characters over the {MESSAGE_MAX_CHARS}-character limit",
-            len - MESSAGE_MAX_CHARS,
-        )));
-    }
-    Ok(content)
-}
-
-pub(crate) fn parse_uuid(value: &str) -> Result<Uuid, ApiError> {
-    Uuid::parse_str(value).map_err(|_| ApiError::BadRequest("invalid uuid"))
 }

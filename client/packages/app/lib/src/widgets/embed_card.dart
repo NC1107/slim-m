@@ -19,7 +19,8 @@ import 'attachment_reveal.dart';
 import 'attachment_view.dart' show kInlineImageMax;
 import 'image_decode.dart';
 
-Future<void> _launchIfHttp(String rawUrl) async {
+/// Opens an http or https link outside the app, and ignores anything else.
+Future<void> launchIfHttp(String rawUrl) async {
   final uri = Uri.tryParse(rawUrl);
   if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
   await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -179,7 +180,7 @@ class _EmbedAuthorRow extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => unawaited(_launchIfHttp(authorUrl)),
+        onTap: () => unawaited(launchIfHttp(authorUrl)),
         child: row,
       ),
     );
@@ -207,7 +208,7 @@ class _EmbedTitle extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => unawaited(_launchIfHttp(targetUrl)),
+        onTap: () => unawaited(launchIfHttp(targetUrl)),
         child: text,
       ),
     );

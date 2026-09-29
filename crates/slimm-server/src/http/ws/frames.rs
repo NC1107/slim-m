@@ -92,6 +92,30 @@ pub(super) enum ServerFrame {
         message_id: String,
         options: Vec<PollOptionCountDto>,
     },
+    #[serde(rename = "message.components")]
+    MessageComponentsChanged {
+        channel_id: String,
+        message_id: String,
+        components: Vec<crate::components::ComponentRow>,
+    },
+    /// A member pressed this bot's button. Bot connections only.
+    #[serde(rename = "interaction.created")]
+    InteractionCreated {
+        interaction_id: String,
+        channel_id: String,
+        message_id: String,
+        custom_id: String,
+        user_id: String,
+        user_display_name: String,
+        created_at: i64,
+    },
+    /// The bot answered this account's click.
+    #[serde(rename = "interaction.answered")]
+    InteractionAnswered {
+        interaction_id: String,
+        channel_id: String,
+        message_id: String,
+    },
     #[serde(rename = "presence.changed")]
     PresenceChanged { user_id: String, status: String },
     #[serde(rename = "member.timeout")]

@@ -19,6 +19,7 @@ export 'models_voice.dart';
 export 'models_attachments.dart';
 export 'models_dms.dart';
 export 'models_dock.dart';
+export 'models_components.dart';
 export 'models_embeds.dart';
 export 'models_emoji.dart';
 export 'models_forwards.dart';
@@ -52,6 +53,7 @@ import 'models_app_surface.dart';
 import 'models_call_record.dart';
 import 'models_attachments.dart';
 import 'models_code_runs.dart';
+import 'models_components.dart';
 import 'models_embeds.dart';
 import 'models_forwards.dart';
 import 'models_message_ops.dart';
@@ -143,6 +145,7 @@ class Message {
     this.mentionsMe = false,
     this.embeds = const [],
     this.webhookUsername,
+    this.components = const [],
   });
 
   final String id;
@@ -245,6 +248,10 @@ class Message {
   /// beside the webhook badge, never in place of it.
   final String? webhookUsername;
 
+  /// Buttons a bot attached, in rows. A bot can replace them later, so a live
+  /// `message.components` frame, not this field on an edit, is what changes them.
+  final List<ComponentRow> components;
+
   bool get isEdited => editedAt != null;
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
@@ -296,6 +303,7 @@ class Message {
                 .toList(growable: false) ??
             const [],
         webhookUsername: json['webhook_username'] as String?,
+        components: ComponentRow.listFromJson(json['components']),
       );
 }
 

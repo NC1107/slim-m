@@ -199,6 +199,7 @@ async fn create(
             poll: None,
             embeds: Arc::new(Vec::new()),
             call: None,
+            components: std::sync::Arc::new(Vec::new()),
         });
         state.push.notify_message(
             state.store.clone(),

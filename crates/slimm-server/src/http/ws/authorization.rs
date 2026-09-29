@@ -75,6 +75,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::MessagePinned { .. }
         | Event::MessageUnpinned { .. }
         | Event::PollVoted { .. }
+        | Event::MessageComponentsChanged { .. }
         | Event::TypingStarted { .. }
         | Event::TypingStopped { .. }
         | Event::ChannelCreated(_)
@@ -103,6 +104,8 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
         | Event::EphemeralMessage { .. }
+        | Event::InteractionCreated { .. }
+        | Event::InteractionAnswered { .. }
         | Event::Stamped { .. } => None,
     }
 }
@@ -179,6 +182,9 @@ pub(super) async fn authorize_unstamped(
     } = &event
     {
         return super::ephemeral_frames::authorize(store, ctx, *recipient_id, message).await;
+    }
+    if let Some(decision) = super::interaction_frames::authorize(store, ctx, &event).await {
+        return decision;
     }
     // A security boundary, not a visibility nicety; see `Event::ReportsChanged`'s own doc for why a failed permission read withholds rather than delivers.
     if let Event::ReportsChanged = event {
@@ -273,6 +279,7 @@ pub(super) async fn authorize_unstamped(
             Event::MessagePinned { channel_id, .. } => *channel_id,
             Event::MessageUnpinned { channel_id, .. } => *channel_id,
             Event::PollVoted { channel_id, .. } => *channel_id,
+            Event::MessageComponentsChanged { channel_id, .. } => *channel_id,
             Event::TypingStarted { channel_id, .. } | Event::TypingStopped { channel_id, .. } => {
                 *channel_id
             }
@@ -309,6 +316,8 @@ pub(super) async fn authorize_unstamped(
             | Event::ReportsChanged
             | Event::ReadStateChanged { .. }
             | Event::EphemeralMessage { .. }
+            | Event::InteractionCreated { .. }
+            | Event::InteractionAnswered { .. }
             | Event::Stamped { .. } => return Authorization::Withhold,
         },
     };
@@ -530,6 +539,15 @@ pub(super) async fn authorize_unstamped(
                 .map(|(position, votes)| PollOptionCountDto { position, votes })
                 .collect(),
         },
+        Event::MessageComponentsChanged {
+            channel_id,
+            message_id,
+            components,
+        } => ServerFrame::MessageComponentsChanged {
+            channel_id: channel_id.to_string(),
+            message_id: message_id.to_string(),
+            components: (*components).clone(),
+        },
         Event::TypingStarted {
             channel_id,
             user_id,
@@ -623,6 +641,8 @@ pub(super) async fn authorize_unstamped(
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
         | Event::EphemeralMessage { .. }
+        | Event::InteractionCreated { .. }
+        | Event::InteractionAnswered { .. }
         | Event::Stamped { .. } => return Authorization::Withhold,
     }))
 }

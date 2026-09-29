@@ -5688,6 +5688,135 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /channels/{channelId}/messages/{messageId}/interactions:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: pressMessageButton
+      tags: [bots]
+      summary: Press a button on a bot's message.
+      description: >-
+        Decision 0039-bot-message-buttons. The press is delivered to the
+        message's author bot only, as an `interaction.created` frame carrying
+        the presser's id and display name, and nothing about it is stored
+        beyond a row that expires after 15 minutes. The caller needs
+        `VIEW_CHANNEL`, must not be a bot, and the message must be a live bot
+        message carrying an enabled, non-link button with that `custom_id`.
+        Every refusal that depends on the message or the button is the same
+        404. The `id` is chosen by the caller, so a retry is the same press;
+        an id already used by another account is a 409. Charged to its own
+        per-caller rate limit class.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PressButtonRequest"
+      responses:
+        "200":
+          description: Recorded and delivered to the bot, if it is connected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Interaction"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/messages/{messageId}/components:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: setMessageComponents
+      tags: [bots]
+      summary: Replace or clear the buttons on a bot's own message.
+      description: >-
+        Decision 0039-bot-message-buttons. Only the bot that authored the
+        message, with `VIEW_CHANNEL` and `SEND_MESSAGES`. The list replaces the
+        old one whole (an empty list clears it), is checked against the same
+        caps as `sendMessage`, and reaches every viewer as a
+        `message.components` frame. Naming the press being answered in
+        `interaction_id` also marks it answered.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetMessageComponentsRequest"
+      responses:
+        "200":
+          description: The buttons as stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [components]
+                properties:
+                  components:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComponentRow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /channels/{channelId}/interactions/{interactionId}/ack:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - name: interactionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: acknowledgeInteraction
+      tags: [bots]
+      summary: Say a button press was seen and needs no visible answer.
+      description: >-
+        Decision 0039-bot-message-buttons. Only the bot the press was sent to,
+        within 15 minutes of it. The presser's button stops waiting; nobody
+        else is told. Answering with a private reply or a components change
+        that names the press does the same, so this is only for a press that
+        needs neither.
+      responses:
+        "204":
+          description: Acknowledged. Repeating it is harmless.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /bots/{botId}/commands:
     parameters:
       - name: botId
@@ -8495,13 +8624,24 @@ components:
             $ref: "#/components/schemas/BotCommandInput"
     SendEphemeralMessageRequest:
       type: object
-      required: [in_reply_to_id, content]
+      required: [content]
+      description: >-
+        Send exactly one of `in_reply_to_id` and `interaction_id`; anything
+        else is a 400. They are separate ids and never read as each other.
       properties:
         in_reply_to_id:
           type: string
           format: uuid
           description: >-
             The member's message being answered. Its author is the recipient.
+        interaction_id:
+          type: string
+          format: uuid
+          description: >-
+            A button press on this bot's message (decision
+            0039-bot-message-buttons): the recipient is whoever pressed, within
+            15 minutes of the press and under the same limit of 3. A press
+            that is not this bot's, or is in another channel, is a 404.
         content:
           type: string
     EphemeralMessage:
@@ -8556,6 +8696,152 @@ components:
           format: uuid
         message:
           $ref: "#/components/schemas/EphemeralMessage"
+    ComponentRow:
+      type: object
+      required: [buttons]
+      description: One row of buttons on a bot's message.
+      properties:
+        buttons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Button"
+    Button:
+      type: object
+      required: [label, style]
+      description: >-
+        A link button carries a `url` and never reaches the bot. Every other
+        style carries a `custom_id` the bot chose, and pressing it delivers an
+        interaction to that bot.
+      properties:
+        label:
+          type: string
+        style:
+          type: string
+          enum: [primary, secondary, danger, link]
+        custom_id:
+          type: string
+          description: Absent on a link button.
+        url:
+          type: string
+          description: Present only on a link button, http or https.
+        disabled:
+          type: boolean
+          description: A disabled button cannot be pressed. Absent means false.
+    PressButtonRequest:
+      type: object
+      required: [id, custom_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Chosen by the caller, so a retried press is the same press.
+        custom_id:
+          type: string
+    Interaction:
+      type: object
+      required: [id, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: integer
+          format: int64
+    SetMessageComponentsRequest:
+      type: object
+      required: [components]
+      properties:
+        components:
+          type: array
+          description: The whole new list. Empty clears every button.
+          items:
+            $ref: "#/components/schemas/ComponentRow"
+        interaction_id:
+          type: string
+          format: uuid
+          description: The press this change answers, if any.
+    MessageComponents:
+      type: object
+      required: [type, channel_id, message_id, components]
+      description: >
+        A bot replaced or cleared the buttons on its message. The whole current
+        list, so a client that missed a frame still converges.
+      properties:
+        type:
+          type: string
+          enum: [message.components]
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentRow"
+    InteractionCreated:
+      type: object
+      required:
+        [
+          type,
+          interaction_id,
+          channel_id,
+          message_id,
+          custom_id,
+          user_id,
+          user_display_name,
+          created_at,
+        ]
+      description: >
+        A member pressed one of this bot's buttons. Delivered to the bot's own
+        connections only. The presser's id is given deliberately (decision
+        0039), unlike an advertised command. Reply within 15 minutes with
+        `sendEphemeralMessage` with `interaction_id`
+        (three replies at most), `setMessageComponents`, or
+        `acknowledgeInteraction`. Best effort, with no catch-up.
+      properties:
+        type:
+          type: string
+          enum: [interaction.created]
+        interaction_id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        custom_id:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+        user_display_name:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+    InteractionAnswered:
+      type: object
+      required: [type, interaction_id, channel_id, message_id]
+      description: >
+        The bot answered this account's press. Delivered to the presser's own
+        connections only, so the pressed button can stop showing as pending.
+      properties:
+        type:
+          type: string
+          enum: [interaction.answered]
+        interaction_id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
     RegisteredBotCommand:
       type: object
       required: [name, description]
@@ -9743,6 +10029,17 @@ components:
             "Where embeds live".
           items:
             $ref: "#/components/schemas/Embed"
+        components:
+          type: array
+          description: >-
+            Buttons a bot attached to its own message (decision
+            0039-bot-message-buttons), in rows. Empty when there are none.
+            Unlike `embeds` a bot can replace them after the fact
+            (`setMessageComponents`), so a live `message.components` frame
+            carries the whole current list. An edit of the text never changes
+            them.
+          items:
+            $ref: "#/components/schemas/ComponentRow"
 
     Embed:
       type: object
@@ -10365,6 +10662,18 @@ components:
             exists. See the `Embed` schema for what a caller gets back.
           items:
             $ref: "#/components/schemas/RequestEmbed"
+        components:
+          type: array
+          description: >-
+            Rows of buttons, bot accounts only: from anyone else the request is
+            refused with 403 rather than the field being dropped, because the
+            caller is a program that would otherwise never learn its buttons
+            were discarded. At most 5 rows of 5 buttons, an 80-character label,
+            a 100-character `custom_id` unique within the message and a
+            512-character `url` (http or https, link buttons only). Any overrun
+            is a 400 naming the rule.
+          items:
+            $ref: "#/components/schemas/ComponentRow"
 
     RequestEmbed:
       type: object
@@ -11111,6 +11420,9 @@ components:
         - $ref: "#/components/schemas/ReportsChanged"
         - $ref: "#/components/schemas/ReadStateChanged"
         - $ref: "#/components/schemas/MessageEphemeral"
+        - $ref: "#/components/schemas/MessageComponents"
+        - $ref: "#/components/schemas/InteractionCreated"
+        - $ref: "#/components/schemas/InteractionAnswered"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
     CanvasObjectPlaced:
