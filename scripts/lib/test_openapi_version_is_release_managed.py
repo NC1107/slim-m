@@ -139,8 +139,15 @@ class OpenapiVersionIsReleaseManagedTest(unittest.TestCase):
 
     def test_a_schema_release_cannot_reach_a_publish_job(self):
         workflow = (REPO_ROOT / ".github" / "workflows" / "release.yml").read_text()
-        tag_globs = re.findall(r'^\s+- "([a-z]+-v\*)"$', workflow, re.M)
-        self.assertEqual(sorted(tag_globs), ["client-v*", "server-v*"])
+        self.assertNotRegex(
+            workflow,
+            r"(?m)^\s+tags:",
+            "a tag push starts a second release run on the commit release-please already published",
+        )
+        self.assertEqual(
+            sorted(set(re.findall(r"refs/tags/([a-z]+-v)'", workflow))),
+            ["client-v", "server-v"],
+        )
         perf = (REPO_ROOT / ".github" / "workflows" / "perf.yml").read_text()
         self.assertIn(
             "!startsWith(github.event.release.tag_name, 'schema-v')",

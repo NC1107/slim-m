@@ -8,9 +8,9 @@ name: release
 on:
   push:
     branches: [main]
-    tags:
-      - "server-v*"
-      - "client-v*"
+  # No tag trigger: release-please's own PAT-created tag would start a second run on the same commit and publish everything twice.
+  # Republish by hand with `gh workflow run release.yml --ref <server-v*|client-v*>`; the run then reads that tag as github.ref.
+  workflow_dispatch:
 
 # Minimal default. Individual jobs widen this to exactly what they require.
 permissions:
@@ -22,8 +22,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Opens and maintains release PRs, and cuts releases on merge. A no-op on a tag
-  # push, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
+  # Opens and maintains release PRs, and cuts releases on merge. A no-op on a
+  # manual run on a tag, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
   #
   # Two independent invocations, one manifest file each, rather than one call
   # sharing `.release-please-manifest.json` across both packages: a release
