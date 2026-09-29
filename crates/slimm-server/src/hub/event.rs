@@ -595,4 +595,17 @@ pub enum Event {
         channel_id: ChannelId,
         last_read_seq: i64,
     },
+    /// A moderation event with its number, added by [`crate::hub::Hub::publish`]
+    /// and never built by a handler. See `hub::moderation_seq`.
+    Stamped { seq: u64, event: Box<Event> },
+}
+
+impl Event {
+    /// The event without any moderation stamp.
+    pub fn into_inner(self) -> Event {
+        match self {
+            Event::Stamped { event, .. } => *event,
+            other => other,
+        }
+    }
 }

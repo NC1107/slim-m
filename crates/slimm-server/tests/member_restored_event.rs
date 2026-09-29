@@ -85,7 +85,7 @@ async fn restoring_a_removed_member_publishes_member_restored() {
 
     let mut restored = false;
     while let Ok(event) = rx.try_recv() {
-        if matches!(event, Event::MemberRestored(id) if id == bob.id) {
+        if matches!(event.into_inner(), Event::MemberRestored(id) if id == bob.id) {
             restored = true;
         }
     }

@@ -110,7 +110,7 @@ fn count_matching(
 ) -> usize {
     let mut count = 0;
     while let Ok(event) = events.try_recv() {
-        if matches(&event) {
+        if matches(&event.into_inner()) {
             count += 1;
         }
     }
