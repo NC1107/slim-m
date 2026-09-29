@@ -155,7 +155,9 @@ fn moves_permissions(event: &Event) -> bool {
         // A report being filed or resolved changes no permission's answer either.
         | Event::ReportsChanged
         // A read marker moves no permission and needs no fan-out ordering.
-        | Event::ReadStateChanged { .. } => false,
+        | Event::ReadStateChanged { .. }
+        // A private notice moves no permission and needs no fan-out ordering.
+        | Event::NewDeviceSignIn { .. } => false,
         Event::Stamped { event, .. } => moves_permissions(event),
     }
 }
@@ -226,7 +228,9 @@ fn is_ephemeral(event: &Event) -> bool {
         | Event::CallRingEnded { .. }
         | Event::ReportsChanged
         // A read marker moves no permission and needs no fan-out ordering.
-        | Event::ReadStateChanged { .. } => false,
+        | Event::ReadStateChanged { .. }
+        // A private notice moves no permission and needs no fan-out ordering.
+        | Event::NewDeviceSignIn { .. } => false,
         Event::Stamped { event, .. } => is_ephemeral(event),
     }
 }

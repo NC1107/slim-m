@@ -445,3 +445,23 @@ class ReadStateChanged extends ServerEvent {
   final String channelId;
   final int lastReadSeq;
 }
+
+/// A device this account has not used before just signed in. Delivered only
+/// to the account's other sockets, never to the device that signed in.
+class NewDeviceSignIn extends ServerEvent {
+  const NewDeviceSignIn({
+    required this.deviceId,
+    required this.deviceName,
+    required this.signedInAt,
+    this.clientKind,
+  });
+
+  final String deviceId;
+  final String deviceName;
+
+  /// "ios", "android", "desktop" or "web", or null when the device did not say.
+  final String? clientKind;
+
+  /// Unix milliseconds.
+  final int signedInAt;
+}

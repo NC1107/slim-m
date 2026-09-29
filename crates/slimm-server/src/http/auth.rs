@@ -241,6 +241,7 @@ async fn login(
             client_version.as_deref(),
         )
         .await?;
+    super::sign_in_alert::announce(&state, &tokens, &req.device_name, client_kind.as_deref()).await;
     Ok(Json(token_response(&tokens)))
 }
 

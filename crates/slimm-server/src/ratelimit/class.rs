@@ -267,6 +267,13 @@ pub enum Class {
     /// costs nothing this budget needs to protect against. See
     /// `docs/decisions/0032-voice-participant-webhooks.md`.
     LiveKitWebhook,
+    /// The "a new device signed in" notice, keyed per account.
+    ///
+    /// Sustained refill of one per ten minutes after a burst of three, so a
+    /// login loop (or someone probing a stolen password) cannot turn the
+    /// account's other devices into a notification firehose. Sign-ins past
+    /// the budget still succeed; only the notice is dropped.
+    SignInAlert,
 }
 
 impl Class {
@@ -302,6 +309,8 @@ impl Class {
             Class::Webhook => (30.0, 1.0 / 3.0),
             // See this variant's own doc comment for how these were sized.
             Class::LiveKitWebhook => (120.0, 20.0),
+            // See this variant's own doc comment for how these were sized.
+            Class::SignInAlert => (3.0, 1.0 / 600.0),
         }
     }
 
@@ -310,7 +319,7 @@ impl Class {
     /// [`Self::label`]; a class added to the enum without extending this
     /// array compiles clean and is simply never counted, so add to all three
     /// together.
-    pub const ALL: [Class; 20] = [
+    pub const ALL: [Class; 21] = [
         Class::Password,
         Class::Refresh,
         Class::Ticket,
@@ -331,6 +340,7 @@ impl Class {
         Class::CodeRunner,
         Class::Webhook,
         Class::LiveKitWebhook,
+        Class::SignInAlert,
     ];
 
     /// The Prometheus label value for this class: lowercase, snake_case, and
@@ -357,6 +367,7 @@ impl Class {
             Class::CodeRunner => "code_runner",
             Class::Webhook => "webhook",
             Class::LiveKitWebhook => "livekit_webhook",
+            Class::SignInAlert => "sign_in_alert",
         }
     }
 }

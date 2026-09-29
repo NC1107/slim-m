@@ -102,6 +102,7 @@ fn extra_bit(event: &Event) -> Option<Permissions> {
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
+        | Event::NewDeviceSignIn { .. }
         | Event::Stamped { .. } => None,
     }
 }
@@ -167,6 +168,26 @@ pub(super) async fn authorize_unstamped(
             Authorization::Deliver(Box::new(ServerFrame::ReadStateChanged {
                 channel_id: channel_id.to_string(),
                 last_read_seq,
+            }))
+        } else {
+            Authorization::Withhold
+        };
+    }
+    // Private to one account and never to the device that just signed in.
+    if let Event::NewDeviceSignIn {
+        user_id,
+        device_id,
+        device_name,
+        client_kind,
+        signed_in_at,
+    } = event
+    {
+        return if user_id == ctx.user_id && device_id != ctx.device_id {
+            Authorization::Deliver(Box::new(ServerFrame::NewDeviceSignIn {
+                device_id: device_id.to_string(),
+                device_name,
+                client_kind,
+                signed_in_at,
             }))
         } else {
             Authorization::Withhold
@@ -300,6 +321,7 @@ pub(super) async fn authorize_unstamped(
             | Event::CategoryChanged
             | Event::ReportsChanged
             | Event::ReadStateChanged { .. }
+            | Event::NewDeviceSignIn { .. }
             | Event::Stamped { .. } => return Authorization::Withhold,
         },
     };
@@ -613,6 +635,7 @@ pub(super) async fn authorize_unstamped(
         | Event::CategoryChanged
         | Event::ReportsChanged
         | Event::ReadStateChanged { .. }
+        | Event::NewDeviceSignIn { .. }
         | Event::Stamped { .. } => return Authorization::Withhold,
     }))
 }

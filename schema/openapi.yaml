@@ -10946,6 +10946,7 @@ components:
         - $ref: "#/components/schemas/CanvasMediaSlotChanged"
         - $ref: "#/components/schemas/ReportsChanged"
         - $ref: "#/components/schemas/ReadStateChanged"
+        - $ref: "#/components/schemas/NewDeviceSignIn"
         - $ref: "#/components/schemas/ServerPong"
         - $ref: "#/components/schemas/ServerError"
     CanvasObjectPlaced:
@@ -11858,6 +11859,34 @@ components:
         last_read_seq:
           type: integer
           format: int64
+
+    NewDeviceSignIn:
+      type: object
+      required: [type, device_id, device_name, signed_in_at]
+      description: >
+        A device this account has not used before just signed in. Delivered
+        only to the account's other connections, never to the device that
+        signed in and never to anyone else. "Not used before" means no earlier
+        device row with the same name and client kind; a first device, a
+        re-login of a known one and a token refresh send nothing. Sent at most
+        a few times per account per ten minutes. A client offers a way to
+        review and sign out devices from it.
+      properties:
+        type:
+          type: string
+          enum: [device.signed_in]
+        device_id:
+          type: string
+          format: uuid
+        device_name:
+          type: string
+        client_kind:
+          type: string
+          nullable: true
+        signed_in_at:
+          type: integer
+          format: int64
+          description: Unix milliseconds.
 
     VoiceActivityChanged:
       type: object

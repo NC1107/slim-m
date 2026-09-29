@@ -86,6 +86,7 @@ mod roles;
 mod safety;
 mod saved_messages;
 mod sessions;
+mod sign_in_alert;
 mod space;
 mod storage;
 mod thread_listing;
