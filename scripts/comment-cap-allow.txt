@@ -4,6 +4,28 @@
 # you fix a file, never raise one. A file not listed here must be clean.
 # See scripts/check-comment-cap.sh and the rule in CLAUDE.md.
 
+.github/workflows/advisory-watchdog.yml 3
+.github/workflows/audio-ci.yml 3
+.github/workflows/client-ci.yml 19
+.github/workflows/client-ios-ci.yml 14
+.github/workflows/client-macos-ci.yml 5
+.github/workflows/client-windows-ci.yml 4
+.github/workflows/compose-smoke.yml 16
+.github/workflows/copr-catch-up.yml 1
+.github/workflows/copr-publish.yml 1
+.github/workflows/e2e.yml 2
+.github/workflows/flatpak-ci.yml 5
+.github/workflows/hygiene.yml 25
+.github/workflows/main-builds.yml 11
+.github/workflows/perf.yml 3
+.github/workflows/push-relay-contract.yml 6
+.github/workflows/red-streak-watchdog.yml 3
+.github/workflows/release-tag-watchdog.yml 2
+.github/workflows/release.yml 33
+.github/workflows/schema-ci.yml 8
+.github/workflows/server-ci.yml 7
+.github/workflows/verify-release-checks.yml 2
+Cargo.toml 11
 assets/audio/notifications/sounds.py 2
 assets/audio/synth.py 4
 client/packages/api/lib/api.dart 1
@@ -20,6 +42,7 @@ client/packages/api/test/compression_interop_test.dart 2
 client/packages/api/test/live_server_test.dart 3
 client/packages/api/test/new_routes_test.dart 2
 client/packages/api/test/schema_coverage_test.dart 2
+client/packages/app/analysis_options.yaml 3
 client/packages/app/lib/main.dart 4
 client/packages/app/lib/src/providers/pins_controller.dart 1
 client/packages/app/lib/src/providers/providers.dart 5
@@ -67,6 +90,7 @@ client/packages/app/lib/src/widgets/personal_account_sections.dart 1
 client/packages/app/lib/src/widgets/pinned_messages_sheet.dart 1
 client/packages/app/lib/src/widgets/presence_menu.dart 4
 client/packages/app/lib/src/widgets/server_fingerprint_step.dart 1
+client/packages/app/pubspec.yaml 10
 client/packages/app/test/channel_management_test.dart 2
 client/packages/app/test/channel_rail_test.dart 2
 client/packages/app/test/channel_screen_attachment_send_test.dart 3
@@ -111,11 +135,13 @@ client/packages/app/test/voice_controller_harness.dart 1
 client/packages/app/test/voice_screen_test.dart 3
 client/packages/app/test/voice_settings_screen_test.dart 1
 client/packages/app/test/voice_share_indicator_test.dart 1
+client/packages/app/tool/fetch_web_assets.sh 3
 client/packages/data/lib/src/connection/web.dart 1
 client/packages/data/lib/src/database.dart 3
 client/packages/data/lib/src/message_store.dart 1
 client/packages/data/test/message_store_test.dart 3
 client/packages/data/test/migration_test.dart 2
+client/packages/design_system/brand/generate.sh 6
 client/packages/design_system/lib/src/app_icons.dart 1
 client/packages/design_system/lib/src/app_theme.dart 3
 client/packages/design_system/lib/src/app_tokens.dart 3
@@ -133,6 +159,7 @@ client/packages/design_system/lib/src/components/surfaces/code_block.dart 1
 client/packages/design_system/lib/src/components/surfaces/list_row.dart 11
 client/packages/design_system/lib/src/components/surfaces/menu.dart 3
 client/packages/design_system/lib/src/components/surfaces/sheet.dart 1
+client/packages/design_system/pubspec.yaml 2
 client/packages/design_system/test/components/core_test.dart 2
 client/packages/design_system/test/components/forms_test.dart 6
 client/packages/design_system/test/components/semantics_test.dart 3
@@ -143,6 +170,7 @@ client/packages/design_system/test/golden_matrix_test.dart 3
 client/packages/design_system/test/reduce_motion_test.dart 1
 client/packages/platform/lib/src/apns_token_channel.dart 2
 client/packages/platform/lib/src/persistent_key_store.dart 4
+client/packages/platform/pubspec.yaml 1
 client/packages/platform/test/apns_token_channel_test.dart 3
 client/packages/platform/test/device_push_keys_test.dart 1
 client/packages/platform/test/host_platform_test.dart 1
@@ -152,10 +180,14 @@ client/packages/platform/test/platform_test.dart 4
 client/packages/rtc/lib/src/broadcast_bridge.dart 1
 client/packages/rtc/lib/src/media_capabilities.dart 1
 client/packages/rtc/lib/src/voice_session.dart 6
+client/packages/rtc/pubspec.yaml 1
 client/packages/rtc/test/broadcast_bridge_test.dart 2
 client/packages/rtc/test/media_capabilities_test.dart 2
 client/packages/rtc/test/voice_session_test.dart 10
 client/packages/voice_canvas/benchmark/spatial_grid_benchmark.dart 1
+client/packages/voice_canvas/pubspec.yaml 1
+client/pubspec.yaml 2
+crates/slimm-server/Cargo.toml 4
 crates/slimm-server/src/cors.rs 4
 crates/slimm-server/src/emoji.rs 3
 crates/slimm-server/src/emoji/import.rs 4
@@ -251,7 +283,17 @@ crates/slimm-server/tests/token_sweep.rs 2
 crates/slimm-server/tests/typing.rs 6
 crates/slimm-server/tests/users.rs 1
 crates/slimm-server/tests/ws.rs 1
+deny.toml 3
+docker-compose.voice.yml 8
+docker-compose.yml 14
+packaging/flatpak/top.npcserver.slimm.yaml 4
+schema/openapi.yaml 1
+scripts/check-comment-cap.sh 3
 scripts/check-dart-licenses.py 1
+scripts/check-ios-nse-wired.sh 7
+scripts/check-workflow-red-streak.sh 2
+scripts/desktop-shell-smoke.sh 1
+scripts/e2e.sh 3
 scripts/lib/e2e_api.py 1
 scripts/lib/e2e_fixtures.py 1
 scripts/lib/e2e_js.py 2

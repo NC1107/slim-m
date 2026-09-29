@@ -234,8 +234,10 @@ Splitting them is real work with real regression risk and does not belong in the
 `scripts/check-comment-cap.sh` enforces the other half of the same `CLAUDE.md` rule: a plain `//` or `#` comment never exceeds one line.
 It ratchets rather than merely allows: a file may not gain a new run past its listed count, and the pre-existing ones are frozen at the count they were found at in `scripts/comment-cap-allow.txt`, the same shape as the file-size allowlist above.
 Doc comments (`///`, `//!`, `/**`) are exempt everywhere.
-Scope is Dart, Rust and Python: shell, YAML and TOML are not checked at all, because a `#` block at the top of one is that file's only documentation mechanism and the counter cannot tell it from an ordinary run further down.
-So the `CLAUDE.md` rule is stated for everywhere and enforced here for three languages; the inline `run:` blocks in these workflows are not covered.
+Scope is Dart, Rust, Python, shell, YAML (inline workflow `run:` blocks included) and TOML.
+Shell, YAML and TOML only have `#` comments, and a `#` block is also how such a file documents itself, so the leading block at the top of the file is a header and never counts as a run.
+That covers the shebang, the SPDX line, a description and the blank lines between them, up to the first line of real content.
+Any run after that point counts like it does in every other language, and `//` and `/* */` are not read as comments in these file types.
 
 ## licenses
 

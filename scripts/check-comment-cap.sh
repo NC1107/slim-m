@@ -9,17 +9,17 @@
 # Doc comments are exempt (`///`, `//!`, `/**`): they carry an item's contract
 # to its callers and to `dart doc` / `cargo doc`, which is a different job.
 #
-# Scope is Dart, Rust and Python only. Shell, YAML and TOML are not checked at
-# all - not exempted in part, not checked - because a `#` block at the top of
-# one is that file's only documentation mechanism and this counter cannot tell
-# it from a run of ordinary comments further down. So the rule CLAUDE.md states
-# for everywhere is enforced here for three languages; extending it means
-# teaching the counter about file headers first, and seeding the allowlist.
+# Scope is Dart, Rust, Python, shell, YAML (inline workflow `run:` blocks
+# included) and TOML. Shell, YAML and TOML only have `#` comments, and a `#`
+# block is also how such a file documents itself, so the leading block at the
+# top of the file (shebang, SPDX line, description, blank lines between them)
+# is a file header and is never a run. Any run after the first line of real
+# content counts like it does everywhere else.
 #
-# Ratcheting, not a big-bang sweep: 174 runs across 68 files predate this gate
-# (an audit counted them), so scripts/comment-cap-allow.txt holds each file's
-# count at the time it was listed and this fails if a file exceeds its own
-# number. Fixing a file lowers its entry; a file not listed must be clean.
+# Ratcheting, not a big-bang sweep: runs that predate this gate are held in
+# scripts/comment-cap-allow.txt at each file's count when it was listed, and
+# this fails if a file exceeds its own number. Fixing a file lowers its entry;
+# a file not listed must be clean.
 
 set -euo pipefail
 
@@ -53,11 +53,18 @@ fi
 # allow nesting and this closes on the first '*/', which is wrong for a
 # nested one, but nothing in this tree nests one today.
 runs_in() {
-  local file="$1"
-  awk '
+  local file="$1" hash_only=0
+  case $file in
+    *.sh | *.yml | *.yaml | *.toml) hash_only=1 ;;
+    *) ;;
+  esac
+  awk -v hash_only="$hash_only" -v header="$hash_only" '
+    # The top-of-file block of a #-only file is its header, not a run.
+    header && (/^[[:space:]]*$/ || /^[[:space:]]*#/) { next }
+    { header = 0 }
     # A plain comment is // followed by neither / nor ! (both are doc
-    # comments), or # not followed by !.
-    /^[[:space:]]*\/\/[^\/!]/ || /^[[:space:]]*\/\/$/ { streak++; next }
+    # comments), or # not followed by !. Shell and YAML have no // or /*.
+    !hash_only && (/^[[:space:]]*\/\/[^\/!]/ || /^[[:space:]]*\/\/$/) { streak++; next }
     /^[[:space:]]*#([^!]|$)/ { streak++; next }
     in_block {
       block_lines++
@@ -66,7 +73,7 @@ runs_in() {
       streak = 0
       next
     }
-    /^[[:space:]]*\/\*[^*!]/ || /^[[:space:]]*\/\*$/ {
+    !hash_only && (/^[[:space:]]*\/\*[^*!]/ || /^[[:space:]]*\/\*$/) {
       if (streak > 1) runs++
       streak = 0
       if ($0 ~ /\*\//) next
@@ -105,7 +112,7 @@ while IFS= read -r file; do
       echo "::error file=$file::$count multi-line comment run(s); a plain comment is capped at one line (a doc comment is not)" >&2
     fi
   fi
-done < <(git ls-files '*.dart' '*.rs' '*.py')
+done < <(git ls-files '*.dart' '*.rs' '*.py' '*.sh' '*.yml' '*.yaml' '*.toml')
 
 # A file that dropped off the list entirely (deleted, or renamed) is not an
 # error, but a stale entry is worth saying so the allowlist stays honest.
