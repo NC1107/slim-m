@@ -466,7 +466,6 @@ Future<void> renderSurface(
   }
   // A fetch landing on the final frame above mounts its fade at t=0; one more timed frame lets it land - see this function's own doc.
   await tester.pump(const Duration(milliseconds: 350));
-
   if (afterSettle != null) {
     await afterSettle(tester);
     await tester.pump(const Duration(milliseconds: 350));
@@ -492,13 +491,10 @@ Future<void> renderSurface(
 class _SilentPlayer implements SoundPlayer {
   @override
   Future<void> play(NotificationSound sound) async {}
-
   @override
   Future<void> loop(NotificationSound sound) async {}
-
   @override
   Future<void> stopLoop() async {}
-
   @override
   Future<void> dispose() async {}
 }
