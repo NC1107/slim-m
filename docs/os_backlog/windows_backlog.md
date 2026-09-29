@@ -31,12 +31,13 @@ This is real evidence the dependency *graph* is Windows-capable; it is not evide
 Read directly from source rather than assumed: `close_behavior.dart`'s `DesktopPlatform` enum already has a `windows` member and `currentDesktopPlatform()` already detects it via `isWindowsHost`; `tray_availability.dart`'s `trayAvailabilityCheck` already treats Windows (like macOS) as unconditionally available with no runtime probe, matching decision 0012's stated design ("Windows always has a notification area... neither platform needs a runtime capability probe the way Linux does"); and `composer_clipboard_image_stub.dart`'s own doc comment already says, in these words, "Windows and macOS register no platform-side handler at all... treated as 'not supported' rather than surfaced as a crash," with every call site wrapped in a `MissingPluginException` catch that answers `false`/`null` rather than throwing.
 None of this needed building or fixing in this pass; it is recorded here because "gate desktop-shell features honestly rather than stubbing silently" was this pass's own instruction, and the honest answer for these three files is that they already do.
 
-**Voice and video calls work on Windows.**
-Confirmed 2026-09-29 on a win11 libvirt test VM with client v0.87.0: a two-party call with the web client held 5+ minutes, both participants saw and heard each other, and LiveKit selected a direct `udp4` host ICE pair without relay.
+**Voice calls work on Windows.**
+Confirmed 2026-09-29 on a win11 libvirt test VM with client v0.87.0: a two-party call with the web client held 5+ minutes, both participants saw each other in the call, the Windows side showed the other participant speaking (audio reached Windows), and LiveKit selected a direct `udp4` host ICE pair without relay.
 The earlier "unable to join call on windows" report (backlog seq 121) was environmental, not a client bug: the VM's user-mode network stack (SLIRP, later passt) blocked direct UDP, and the app was not allowed past Windows Defender Firewall for inbound UDP until manually added.
 For the next Windows VM tester: use the `passt` backend (not SLIRP), add an inbound firewall rule for just `slimm_app.exe` (`netsh advfirewall firewall add rule name="slim-m" dir=in action=allow program="C:\slimm\slimm_app.exe" enable=yes profile=any protocol=any`), and keep the firewall enabled - do not disable it.
 Under `passt` the guest shares the host IP, so host services are reached at `10.0.0.1` (not the host's LAN address).
 An A/B test without the firewall rule was cut short, so the rule is the likely (but unproven) fix for the earlier failure.
+Not yet checked: video and screen share on Windows, and audio in the Windows-to-host direction.
 A real-hardware Windows check is still worthwhile before 1.0.
 
 **No second-instance dedup exists on Windows, and this is a genuine gap this pass left in place rather than one it silently papered over.**
