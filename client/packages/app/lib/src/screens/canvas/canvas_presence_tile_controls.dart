@@ -15,7 +15,11 @@ import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
 /// The corner handle a tile's own resize drag starts from.
-class TileResizeGrip extends StatelessWidget {
+///
+/// Grows its hit area to [AppSizes.rowTouch] at touch widths and paints the
+/// same hover fill and press scale as [AppIconButton], so it reads as one of
+/// the tile's controls rather than a bare glyph.
+class TileResizeGrip extends StatefulWidget {
   const TileResizeGrip({
     super.key,
     required this.onUpdate,
@@ -26,23 +30,65 @@ class TileResizeGrip extends StatelessWidget {
   final GestureDragEndCallback onEnd;
 
   @override
+  State<TileResizeGrip> createState() => _TileResizeGripState();
+}
+
+class _TileResizeGripState extends State<TileResizeGrip> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final hitTarget = AppTouchTargets.of(context)
+        ? AppSizes.rowTouch
+        : AppSizes.controlSm;
     return MouseRegion(
       cursor: SystemMouseCursors.resizeUpLeftDownRight,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onPanUpdate: onUpdate,
-        onPanEnd: onEnd,
-        child: Container(
-          width: AppSizes.controlSm,
-          height: AppSizes.controlSm,
-          alignment: Alignment.center,
-          child: Icon(
-            AppIcons.tileResize,
-            size: AppSizes.icon16,
-            color: tokens.textSecondary,
-            shadows: [Shadow(color: tokens.surfaceBase, blurRadius: 4)],
+        onPanDown: (_) => _setPressed(true),
+        onPanCancel: () => _setPressed(false),
+        onPanUpdate: widget.onUpdate,
+        onPanEnd: (details) {
+          _setPressed(false);
+          widget.onEnd(details);
+        },
+        child: SizedBox(
+          width: hitTarget,
+          height: hitTarget,
+          child: Align(
+            alignment: Alignment.bottomRight,
+            child: AnimatedScale(
+              scale: _pressed ? AppMotion.pressScale : 1,
+              duration: AppMotion.reduced(context, AppMotion.fast),
+              curve: AppMotion.entrance,
+              child: AnimatedContainer(
+                duration: AppMotion.reduced(context, AppMotion.fast),
+                curve: AppMotion.entrance,
+                width: AppSizes.controlSm,
+                height: AppSizes.controlSm,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _hovered || _pressed
+                      ? tokens.surfaceRaised
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+                child: Icon(
+                  AppIcons.tileResize,
+                  size: AppSizes.icon16,
+                  color: tokens.textSecondary,
+                  shadows: [Shadow(color: tokens.surfaceBase, blurRadius: 4)],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -86,53 +132,59 @@ class TileControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (onExpand case final onExpand?)
+    final tokens = Theme.of(context).extension<AppTokens>()!;
+    return IconTheme.merge(
+      data: IconThemeData(
+        shadows: [Shadow(color: tokens.surfaceBase, blurRadius: 4)],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onExpand case final onExpand?)
+            AppIconButton(
+              icon: AppIcons.expand,
+              semanticLabel: 'Show this tile full screen',
+              tooltip: 'Full screen',
+              size: AppIconButtonSize.sm,
+              onPressed: onExpand,
+            ),
+          if (onToggleLocked case final onToggleLocked?)
+            AppIconButton(
+              icon: locked ? AppIcons.tileLocked : AppIcons.tileUnlocked,
+              semanticLabel: locked
+                  ? 'Unlock this tile'
+                  : 'Lock this tile in place',
+              tooltip: locked
+                  ? 'Unlock - drag and resize again'
+                  : 'Lock in place - a drawing tool reaches through it',
+              size: AppIconButtonSize.sm,
+              active: locked,
+              onPressed: onToggleLocked,
+            ),
+          // The object menu's own "Bring to front"/"Send to back", reached here since a tile absorbs its own right-click - see `canvas_presence_tile.dart`'s own library doc.
+          if (onToggleSentToBack case final onToggleSentToBack?)
+            AppIconButton(
+              icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
+              semanticLabel: sentToBack
+                  ? 'Bring this tile to the front'
+                  : 'Send this tile to the back',
+              tooltip: sentToBack
+                  ? 'Bring to front - back above the ink'
+                  : 'Send to back - draw over it',
+              size: AppIconButtonSize.sm,
+              active: sentToBack,
+              onPressed: onToggleSentToBack,
+            ),
           AppIconButton(
-            icon: AppIcons.expand,
-            semanticLabel: 'Show this tile full screen',
-            tooltip: 'Full screen',
+            icon: AppIcons.tileHide,
+            semanticLabel:
+                'Hide this tile on your canvas; other participants still see it',
+            tooltip: 'Hide on your canvas - others still see it',
             size: AppIconButtonSize.sm,
-            onPressed: onExpand,
+            onPressed: onHide,
           ),
-        if (onToggleLocked case final onToggleLocked?)
-          AppIconButton(
-            icon: locked ? AppIcons.tileLocked : AppIcons.tileUnlocked,
-            semanticLabel: locked
-                ? 'Unlock this tile'
-                : 'Lock this tile in place',
-            tooltip: locked
-                ? 'Unlock - drag and resize again'
-                : 'Lock in place - a drawing tool reaches through it',
-            size: AppIconButtonSize.sm,
-            active: locked,
-            onPressed: onToggleLocked,
-          ),
-        // The object menu's own "Bring to front"/"Send to back", reached here since a tile absorbs its own right-click - see `canvas_presence_tile.dart`'s own library doc.
-        if (onToggleSentToBack case final onToggleSentToBack?)
-          AppIconButton(
-            icon: sentToBack ? AppIcons.sendToBack : AppIcons.bringToFront,
-            semanticLabel: sentToBack
-                ? 'Bring this tile to the front'
-                : 'Send this tile to the back',
-            tooltip: sentToBack
-                ? 'Bring to front - back above the ink'
-                : 'Send to back - draw over it',
-            size: AppIconButtonSize.sm,
-            active: sentToBack,
-            onPressed: onToggleSentToBack,
-          ),
-        AppIconButton(
-          icon: AppIcons.tileHide,
-          semanticLabel:
-              'Hide this tile on your canvas; other participants still see it',
-          tooltip: 'Hide on your canvas - others still see it',
-          size: AppIconButtonSize.sm,
-          onPressed: onHide,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

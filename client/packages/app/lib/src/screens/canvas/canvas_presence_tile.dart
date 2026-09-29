@@ -463,8 +463,8 @@ class _CanvasPresenceManipulableTileState
                 ),
                 if (!_passThrough && widget.fixedRenderSize == null)
                   Positioned(
-                    right: -4,
-                    bottom: -4,
+                    right: 0,
+                    bottom: 0,
                     child: _revealable(
                       context,
                       TileResizeGrip(onUpdate: _resize, onEnd: _settle),
