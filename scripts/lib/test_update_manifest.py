@@ -19,6 +19,9 @@ SCRIPT = Path(__file__).resolve().parent.parent / "update-manifest.py"
 TAG = "client-v0.90.0"
 
 
+RUN_CWD = None
+
+
 def run(*args, key=None):
     env = {**os.environ}
     env.pop("UPDATE_SIGNING_KEY", None)
@@ -26,7 +29,7 @@ def run(*args, key=None):
         env["UPDATE_SIGNING_KEY"] = key
     return subprocess.run(
         [sys.executable, str(SCRIPT), *map(str, args)],
-        capture_output=True, text=True, env=env,
+        capture_output=True, text=True, env=env, cwd=RUN_CWD,
     )
 
 
@@ -43,6 +46,8 @@ class UpdateManifestTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.tmp = Path(tmp.name)
+        global RUN_CWD
+        RUN_CWD = self.tmp
         self.assets = self.tmp / "assets"
         self.assets.mkdir()
         (self.assets / "slim-m-client-0.90.0-windows-x64.zip").write_bytes(b"win" * 10)
