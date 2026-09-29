@@ -137,6 +137,34 @@ void main() {
     });
   });
 
+  test('an outage of a few minutes still ends in a rejoin, untapped', () {
+    fakeAsync((async) {
+      final session = _RejoiningSession();
+      final controller = harness.controllerWith(session, voiceApi());
+
+      unawaited(controller.join('channel-1'));
+      async.flushMicrotasks();
+      session.connects = false;
+      session.dropWith(VoiceDisconnect.connectionLost);
+      async.flushMicrotasks();
+
+      async.elapse(const Duration(minutes: 3));
+      async.flushMicrotasks();
+      expect(controller.state.state, VoiceSessionState.failed);
+      expect(
+        controller.state.rejoining,
+        isTrue,
+        reason: 'three minutes offline is inside the window, not the end of it',
+      );
+
+      session.connects = true;
+      async.elapse(const Duration(seconds: 31));
+      async.flushMicrotasks();
+      expect(controller.state.state, VoiceSessionState.connected);
+      expect(controller.state.rejoining, isFalse);
+    });
+  });
+
   test('a device that answered somewhere else is not dragged back', () {
     fakeAsync((async) {
       final session = _RejoiningSession();

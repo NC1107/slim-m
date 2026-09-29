@@ -132,6 +132,22 @@ class Client:
         time.sleep(4)
         self.enable_semantics()
 
+    def go_offline(self):
+        """Cuts the page's network under it without navigating away.
+
+        A reload would leave the call and prove the deliberate-rejoin path
+        again; this is the transport vanishing under a page that never moved.
+        """
+        self.send("Network.enable")
+        self.send("Network.emulateNetworkConditions", {
+            "offline": True, "latency": 0,
+            "downloadThroughput": -1, "uploadThroughput": -1})
+
+    def go_online(self):
+        self.send("Network.emulateNetworkConditions", {
+            "offline": False, "latency": 0,
+            "downloadThroughput": -1, "uploadThroughput": -1})
+
     def nodes(self):
         """Every leaf widget on screen, plus the fields.
 
