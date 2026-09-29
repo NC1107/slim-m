@@ -26,12 +26,13 @@ Each section below is named for its workflow file.
 | `push-relay-contract` | changes to the server's push path, and by hand | a server-generated envelope through the relay repo's real HTTP handler |
 | `verify-release-checks` | called by `release`, twice, once per component | that this exact commit's own CI completed and succeeded before any publish job runs, on both the release-please and the hand-pushed-tag paths |
 | `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
+| `web-image` | called by `main-builds` (a client change) and by `release` (a server release) | the web client built into a signed multi-arch `ghcr.io/nc1107/slim-m-web` image, split out into its own file because `main-builds` is at the 500-line ceiling |
 | `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
-| `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline |
+| `release` | pushes to `main`, and `server-v*` / `client-v*` tags | the whole publish pipeline, including the web image under the server's version |
 | `release-tag-watchdog` | a 15-minute schedule, and by hand | every release-please manifest's version has a matching git tag, catching a release PR that merged with no tag ever following it, and no merged release PR is still labelled `autorelease: pending`, which silently fails every later release run |
 | `red-streak-watchdog` | an hourly schedule, and by hand | opens a GitHub issue once `e2e` or `main-builds` has failed 3 consecutive completed runs on `main`, closes it once that workflow is green again; does not gate anything |
-| `main-builds` | changes under `client/`, `crates/` or `packaging/` on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
+| `main-builds` | changes under `client/`, `crates/`, `packaging/` or the web image's own files on every push to `main`, excluding a release commit's own files; and by hand, with a boolean per side | a Fedora COPR snapshot, an Android artifact, `latest` on the live server image, `latest` on the web image after a client change, and continuous TestFlight unless the repo variable `CONTINUOUS_TESTFLIGHT` is `false`, in which case iOS builds only from a client release in `release`, or when this is run by hand; never a version bump, changelog or GitHub Release |
 | `flatpak-ci` | changes to the flatpak manifest or its vendored shared-modules, on pull requests and every push to `main`; and by hand | builds the flatpak for real, installs it, and checks a headless launch does not fail with a missing shared library, the failure class `release.yml` cannot catch before a `client-v*` tag |
 
 ## Keeping this table honest
@@ -762,6 +763,25 @@ Before it existed, the tag path published unconditionally with no test workflow 
 The `ref` input carries the sharp edge.
 It defaults to `github.sha`, which is right for the tag-push path, but the release-please path must pass the created tag instead: release-please acts on the repository's current state while `github.sha` is whatever commit started the run, and the two diverge whenever a release merge lands while an earlier run is still going.
 Verifying `github.sha` then waits on a check a path filter correctly skipped, times out, and skips every publish job behind it, which is what happened to server 0.23.0 on 2026-08-01.
+
+## web-image
+
+Builds `docker/web.Dockerfile` into `ghcr.io/nc1107/slim-m-web`: `flutter build web --release --base-href /app/` at the pinned Flutter version, behind nginx (`docker/web-nginx.conf`).
+It is a reusable workflow with one input, the newline-separated tags for the merged manifest, and it has the same shape as `server-image` and `server-image-merge`: one image per architecture on a native runner, pushed by digest with an SBOM and provenance, then merged and cosign-signed keylessly.
+The merge job checks it got two digests, so a failed arch cannot ship a single-arch manifest.
+
+Two callers.
+`main-builds` calls it on a client change with `sha-<commit>`, `main` and `latest`, and Watchtower on the live host follows `latest`.
+`release` calls it after `server-image-merge` with the server version as the only tag, so `SLIMM_VERSION` pins both images to the same release and `latest` never moves from a release.
+A server-only merge does not rebuild it, because nothing in the bundle changed.
+
+The build id is the commit sha.
+It is compiled into the bundle (`--dart-define=SLIMM_WEB_BUILD`), written to `version.json`, and appended as `?v=<sha>` to `flutter_bootstrap.js` and `main.dart.js`, so a new build is a new URL for the one large file.
+The Dockerfile fails the build if either rewrite did not match, since a silent miss would serve a stale bundle from a cache.
+The page polls `version.json` and shows a reload pill when the id differs (decision 0025).
+
+nginx marks the entry points and `version.json` `no-cache`, `main.dart.js` immutable (it is only requested through its `?v=` URL) and everything else, `canvaskit/` included, revalidating on ETag because its URL carries no version, and answers at `/` and at `/app/`, because the live host's Traefik strips `/app` and a plain `docker run` does not.
+`--pwa-strategy=none` keeps Flutter's service worker from serving an old bundle after a redeploy.
 
 ## copr-publish
 

@@ -528,6 +528,49 @@ Anonymizing their content is what *deleting an account* does, which is a separat
 Neither tool can be used on yourself, nor on a member whose permissions your own do not already include - so holding KICK_MEMBERS is not a way to silence the administrators one at a time.
 The last remaining administrator cannot be removed at all.
 
+## Web client image (`slim-m-web`)
+
+CI publishes the browser client as `ghcr.io/nc1107/slim-m-web`: nginx plus a release web build, signed with cosign like the server image.
+A client merge to `main` moves `latest`, and a server release tags the same version as the server, so `SLIMM_VERSION` pins both.
+It listens on port 80 inside the container, serves the app at `/` and also at `/app/`, and is not started by default.
+
+To run it from this compose file, add `COMPOSE_PROFILES=web` to `.env` and route it from your proxy.
+With the bundled Caddy that is one more block in `deploy/Caddyfile`, on the same domain or another one:
+
+```
+{$SLIMM_API_DOMAIN} {
+	handle /app* {
+		reverse_proxy web:80
+	}
+	reverse_proxy server:8080
+}
+```
+
+A web client on the same origin as the API needs no `SLIMM_CORS_ALLOWED_ORIGINS`.
+The service carries the `com.centurylinklabs.watchtower.enable` label, so a host running Watchtower with label filtering follows `latest` for the web client the way it does for the server.
+
+An open tab notices a redeploy by itself: the page polls `version.json` every few minutes and when the tab regains focus, and offers a "New version available" pill.
+Reloading is always the person's own click, so nothing half-typed is lost.
+
+### Rolling the web client back
+
+The web image has no database, so rolling it back is only a pin.
+Set `SLIMM_VERSION` in `.env` to the last good version and run `docker compose up -d`.
+Watchtower re-pulls the tag a container already runs and a version tag never moves, so the pin holds until you clear the variable.
+That variable also pins the server, so read [If an upgrade goes wrong](#if-an-upgrade-goes-wrong) first: the server half of a rollback has a database in it.
+To roll back only the web client, give the `web` service its own pin instead of the shared variable.
+
+### Owner: switching the live host from the hand-copied bundle
+
+This is a one-time change on the host, and CI does not make it.
+The host currently unpacks a hand-built tarball into an nginx container through a bind mount.
+
+1. In the host's `docker-compose.override.yml`, replace that nginx service's `image:` with `ghcr.io/nc1107/slim-m-web:latest` and delete its bind mount of the unpacked bundle.
+2. Add the label `com.centurylinklabs.watchtower.enable: "true"` if the host's Watchtower runs with label filtering.
+3. Keep the Traefik router as it is. It strips `/app` today and the image answers either way, so nothing about routing changes.
+4. `docker compose pull web && docker compose up -d web`, then open the app and check `curl -s https://<host>/app/version.json` names a build id.
+5. Delete the old unpacked bundle directory once the new container has served a day.
+
 ## Files
 
 - `docker-compose.yml` (repository root) - the stack itself.

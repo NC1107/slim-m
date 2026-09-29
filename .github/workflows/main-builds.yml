@@ -43,6 +43,8 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "docker/server.Dockerfile"
+      - "docker/web*"
+      - ".github/workflows/web-image.yml"
       - ".sqlx/**"
       # Its own file, so a change to how these builds work is validated and
       # deployed by them rather than waiting on unrelated work to trigger it.
@@ -108,6 +110,8 @@ jobs:
           filters: |
             client:
               - 'client/**'
+              - 'docker/web*'
+              - '.github/workflows/web-image.yml'
             server:
               - 'crates/**'
             packaging:
@@ -478,3 +482,18 @@ jobs:
           provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The web client as ghcr.io/nc1107/slim-m-web, which Watchtower follows on the live host; see web-image.yml.
+  web-image:
+    needs: [changes]
+    if: needs.changes.outputs.client == 'true'
+    uses: ./.github/workflows/web-image.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      tags: |
+        sha-${{ github.sha }}
+        main
+        latest

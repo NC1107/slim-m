@@ -210,6 +210,15 @@ jobs:
       - name: cosign sign (keyless)
         run: cosign sign --yes "${IMAGE}@${{ steps.manifest.outputs.digest }}"
 
+  # The web bundle under the server's version, so SLIMM_VERSION pins both images (decision 0025); never moves latest.
+  web-image:
+    needs: [release-please, server-image-merge]
+    if: needs.server-image-merge.result == 'success'
+    uses: ./.github/workflows/web-image.yml
+    permissions: {contents: read, packages: write, id-token: write}
+    with:
+      version: ${{ needs.release-please.outputs.server_version || github.ref_name }}
+
   # Static musl binaries for direct download, built per arch into artifacts and
   # aggregated by server-release-assets.
   server-binaries:

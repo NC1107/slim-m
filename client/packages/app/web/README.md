@@ -3,7 +3,7 @@
 
 The web build exists to drive this UI automatically.
 Native Linux runs, but no synthetic input reaches it on a Wayland desktop, and a browser can be driven over the DevTools protocol.
-It is a test surface, not a distribution target.
+It is also what `docker/web.Dockerfile` ships as the `slim-m-web` image.
 
 Two of the files the build needs are binaries rather than source. **Neither is committed.**
 `tool/fetch_web_assets.sh` downloads both, refusing to run if the versions it pins have drifted from `client/pubspec.lock`, and checking each against a recorded sha256.

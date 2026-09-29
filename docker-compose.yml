@@ -137,6 +137,18 @@ services:
       replicate /data/slimm.db
       "s3://${LITESTREAM_S3_BUCKET}/${LITESTREAM_S3_PATH:-slimm}?endpoint=${LITESTREAM_S3_ENDPOINT}&region=${LITESTREAM_S3_REGION:-auto}"
 
+  web:
+    # Opt-in (COMPOSE_PROFILES=web); pinned by the same SLIMM_VERSION as the server, routed from your proxy: deploy/README.md.
+    image: ghcr.io/nc1107/slim-m-web:${SLIMM_VERSION:-latest}
+    profiles:
+      - web
+    restart: unless-stopped
+    labels:
+      # A host running Watchtower with label-enable follows this tag, as it does the server's.
+      com.centurylinklabs.watchtower.enable: "true"
+    expose:
+      - "80"
+
 volumes:
   slimm_data:   # the embedded SQLite database
   caddy_data:   # Caddy's ACME account and issued certificates
