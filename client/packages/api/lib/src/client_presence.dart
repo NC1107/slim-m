@@ -32,4 +32,15 @@ extension SlimmApiPresence on SlimmApi {
       (json as Map<String, dynamic>)['visibility'] as String,
     );
   }
+
+  /// Says what the caller is listening to or playing. Held in memory against
+  /// their live socket and never stored.
+  Future<void> setPresenceActivity(PresenceActivity activity) async {
+    await _send('PUT', '/presence/activity', body: activity.toJson());
+  }
+
+  /// Clears the caller's activity. Idempotent.
+  Future<void> clearPresenceActivity() async {
+    await _send('DELETE', '/presence/activity');
+  }
 }

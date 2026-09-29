@@ -29,6 +29,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use crate::ids::UserId;
+use crate::presence_activity::Activity;
 use crate::viewing::ViewingTracker;
 
 /// How long a connected user with no observed activity (a ping, a typing
@@ -141,6 +142,8 @@ struct Entry {
     /// memory instead of a per-viewer database round trip. `None` until the
     /// connection loads it; readers fall back to the store in that window.
     visibility: Option<Visibility>,
+    /// What the user last said they are doing; dies with the entry.
+    activity: Option<Activity>,
 }
 
 impl Default for PresenceTracker {
@@ -179,6 +182,7 @@ impl PresenceTracker {
             connections: 0,
             last_active: now,
             visibility: None,
+            activity: None,
         });
         entry.connections += 1;
         entry.last_active = now;
@@ -245,6 +249,31 @@ impl PresenceTracker {
     /// store, so a miss is exactly the old behaviour, never a wrong answer.
     pub fn visibility(&self, user_id: UserId) -> Option<Visibility> {
         lock(&self.state).get(&user_id).and_then(|e| e.visibility)
+    }
+
+    /// Replaces [user_id]'s activity. Returns whether anything changed, so an
+    /// unchanged repeat is not re-announced; a user with no live socket has
+    /// nowhere to hold it and reads as unchanged.
+    pub fn set_activity(&self, user_id: UserId, activity: Option<Activity>) -> bool {
+        let mut state = lock(&self.state);
+        let Some(entry) = state.get_mut(&user_id) else {
+            return false;
+        };
+        let changed = entry.activity != activity;
+        entry.activity = activity;
+        changed
+    }
+
+    /// What a viewer may be told [target] is doing: nothing whenever `status`
+    /// (already resolved by [`status_for`]) reads offline, which is how a
+    /// hidden user's activity stays hidden through the same choke point.
+    pub fn activity_visible_at(&self, target: UserId, status: Status) -> Option<Activity> {
+        if status == Status::Offline {
+            return None;
+        }
+        lock(&self.state)
+            .get(&target)
+            .and_then(|e| e.activity.clone())
     }
 
     pub fn is_connected(&self, user_id: UserId) -> bool {

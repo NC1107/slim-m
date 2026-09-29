@@ -614,6 +614,47 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /presence/activity:
+    put:
+      operationId: setPresenceActivity
+      tags: [presence]
+      summary: Say what the caller is listening to or playing.
+      description: >
+        Ephemeral and opt-in on the client: held in memory against the
+        caller's live socket, cleared when the last socket closes, never
+        stored. It reaches exactly the viewers who can already see the
+        caller's presence, through the same rule, so a `hidden` user's
+        activity is invisible to everyone else. Title and subtitle are at
+        most 128 characters and free of control and direction characters.
+        Rate limited more tightly than an ordinary write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresenceActivity"
+      responses:
+        "204":
+          description: Accepted, or ignored when the caller has no live socket.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: clearPresenceActivity
+      tags: [presence]
+      summary: Clear the caller's activity.
+      description: Idempotent; clearing nothing is still a 204.
+      responses:
+        "204":
+          description: Cleared.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
   /me/avatar:
     post:
       operationId: uploadAvatar
@@ -8198,6 +8239,32 @@ components:
             What this specific caller may be told. Never `hidden`: a user who
             chose it is `offline` here to anyone but themselves, and their
             true state when they ask about their own id.
+        activity:
+          $ref: "#/components/schemas/PresenceActivity"
+
+    PresenceActivity:
+      type: object
+      required: [type, title]
+      additionalProperties: false
+      description: >
+        What a member is doing right now. Absent when they are doing nothing
+        they chose to share, when they are offline, and to every viewer but
+        themselves when they chose `hidden`. There is deliberately no image
+        field: art is never fetched from a sender-supplied URL.
+      properties:
+        type:
+          type: string
+          enum: [listening, playing]
+        title:
+          type: string
+          description: At most 128 characters.
+        subtitle:
+          type: string
+          description: At most 128 characters, for example the artist.
+        started_at:
+          type: integer
+          format: int64
+          description: Epoch milliseconds the activity began, when known.
 
     SetVisibilityRequest:
       type: object
@@ -12101,6 +12168,8 @@ components:
         status:
           type: string
           enum: [online, away, dnd, offline]
+        activity:
+          $ref: "#/components/schemas/PresenceActivity"
 
     MemberTimeout:
       type: object

@@ -4,6 +4,7 @@
 //! handling. Split out of `super` (the envelope and connection loop) so that
 //! file stays focused on the wire protocol itself.
 
+use super::frames::ServerFrame;
 use crate::hub::{Event, Hub};
 use crate::ids::{CanvasObjectId, ChannelId, UserId};
 use crate::permissions::Permissions;
@@ -152,6 +153,16 @@ pub(super) async fn presence_status(
         tracker.is_connected(target),
         tracker.is_idle(target),
     )))
+}
+
+/// The frame telling a viewer `target`'s resolved status, and the activity
+/// that status permits them to see.
+pub(super) fn presence_frame(hub: &Hub, target: UserId, status: Status) -> ServerFrame {
+    ServerFrame::PresenceChanged {
+        user_id: target.to_string(),
+        status: status.as_str().to_owned(),
+        activity: hub.presence().activity_visible_at(target, status),
+    }
 }
 
 /// Accepts a typing refresh from `ctx`'s user for `channel_id`, if the rate

@@ -17,6 +17,7 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/member_presence.dart';
 import '../providers/member_selection.dart';
+import '../providers/presence_activity.dart';
 import '../providers/presence_controller.dart';
 import 'member_profile.dart';
 import 'user_avatar.dart';
@@ -124,6 +125,7 @@ class MemberRow extends ConsumerWidget {
           memberProfileOverridesProvider.select((m) => m[profile.id]),
         ) ??
         profile;
+    final activity = ref.watch(memberActivityProvider(profile.id));
     // One slot only in a 236px pane; bot beats a role, whose names are a tap away.
     final badge = displayed.isBot
         ? 'Bot'
@@ -162,8 +164,11 @@ class MemberRow extends ConsumerWidget {
       // Taller than a channel row: a 26px avatar's corner status dot crops at the default height.
       height: 36,
       label: displayed.displayName,
-      // Tucked under the name, with the avatar centred across both lines.
-      subtitle: displayed.statusText,
+      // What they are playing wins over a typed status; the card shows both.
+      subtitle: activity == null
+          ? displayed.statusText
+          : describeActivity(activity),
+      subtitleIcon: activity == null ? null : activityIcon(activity.kind),
       muted: status == AppPresence.offline,
       // On screen presence is only a dot and an opacity; this is how it is spoken.
       stateDescription: _presenceDescription(status),

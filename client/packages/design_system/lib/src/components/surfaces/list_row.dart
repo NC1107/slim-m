@@ -18,6 +18,7 @@ import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../app_typography.dart';
 import '../../touch_targets.dart';
+import 'list_row_label.dart';
 
 /// Reads every [AppListRow] label below it in `text-primary` at rest, for a
 /// settings card where each label names a control rather than a destination.
@@ -109,6 +110,7 @@ class AppListRow extends StatefulWidget {
     this.semanticLabel,
     this.stateDescription,
     this.subtitle,
+    this.subtitleIcon,
   });
 
   final String label;
@@ -125,6 +127,10 @@ class AppListRow extends StatefulWidget {
   /// the Discord/Slack pattern this replaces a detached caption block with.
   /// Null keeps the row exactly as single-line as it always was.
   final String? subtitle;
+
+  /// A small glyph before [subtitle], for a line that names an activity
+  /// rather than a typed status. Ignored without a subtitle.
+  final IconData? subtitleIcon;
 
   /// A control rendered after [trailing] (or the unread dot it falls back
   /// to), still inside the same tinted [AnimatedContainer] the row's hover
@@ -326,26 +332,12 @@ class _AppListRowState extends State<AppListRow> {
               // Excluded because the Semantics wrapper below already names this
               // row; without it a screen reader announces "general, general".
               child: ExcludeSemantics(
-                child: widget.subtitle == null
-                    ? Text(widget.label,
-                        overflow: TextOverflow.ellipsis, style: labelStyle)
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: labelStyle),
-                          Text(
-                            widget.subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppText.caption
-                                .copyWith(color: tokens.textSecondary),
-                          ),
-                        ],
-                      ),
+                child: AppListRowLabel(
+                  label: widget.label,
+                  subtitle: widget.subtitle,
+                  subtitleIcon: widget.subtitleIcon,
+                  labelStyle: labelStyle,
+                ),
               ),
             ),
             if (widget.meta != null)
