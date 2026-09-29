@@ -434,6 +434,10 @@ class MessageStore {
     ));
   }
 
+  /// Clears a forward's snapshot once its original was removed; the note stays.
+  Future<void> removeForwardSnapshot(String messageId) =>
+      _removeForwardSnapshot(db, messageId);
+
   /// Mirrors the server's read marker.
   Future<void> setReadMarker(
     String channelId,

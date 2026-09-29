@@ -19,6 +19,12 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 pub async fn new_store() -> (Store, crate::support::TestDbGuard) {
+    let (store, _pool, guard) = new_store_with_pool().await;
+    (store, guard)
+}
+
+/// The pool too, for a test that has to backdate a row the API cannot.
+pub async fn new_store_with_pool() -> (Store, sqlx::SqlitePool, crate::support::TestDbGuard) {
     let (path, guard) = crate::support::TestDbGuard::new("slimm-message-forwards");
     let config = Config {
         port: 0,
@@ -27,7 +33,7 @@ pub async fn new_store() -> (Store, crate::support::TestDbGuard) {
         ..Config::default()
     };
     let pool = db::connect(&config).await.expect("connect + migrate");
-    (Store::new(pool), guard)
+    (Store::new(pool.clone()), pool, guard)
 }
 
 pub fn app_with_hub(store: Store, hub: Hub) -> Router {

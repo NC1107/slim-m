@@ -42,11 +42,16 @@ Future<OpsOutcome> applyOps(
 ) async {
   for (final op in ops) {
     switch (op) {
-      case MessageEditOp(:final content, :final editedAt):
+      case MessageEditOp(
+        :final content,
+        :final editedAt,
+        :final forwardedRemoved,
+      ):
         // Gone or collapsed; a later op is what the client acts on instead.
         if (content != null) {
           await store.applyEdit(op.messageId, content, editedAt);
         }
+        if (forwardedRemoved) await store.removeForwardSnapshot(op.messageId);
       case MessageDeleteOp():
         await store.discard(op.messageId);
       case MessageUnknownOp():

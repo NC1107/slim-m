@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE message_forwards\n         SET origin_removed_at = ?, origin_content = '', origin_author_id = NULL\n         WHERE message_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "5563913fd1248a715a7b7f171e126ee6e0bd62b854bd7c8e3d7787012886d9e8"
+}

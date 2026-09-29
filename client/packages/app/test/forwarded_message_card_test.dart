@@ -196,4 +196,34 @@ void main() {
     expect(node.label, contains('Forwarded message from Alice in #general'));
     expect(node.label, contains('the original text'));
   });
+
+  testWidgets('a forward whose original was deleted says so and shows no '
+      'author or text', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildTheme(Brightness.light, AppTokens.light),
+          home: const Scaffold(
+            body: ForwardedMessageCard(
+              forwarded: ForwardedMessage(
+                messageId: 'm-origin',
+                channelId: 'c-origin',
+                createdAt: 0,
+                content: '',
+                removed: true,
+              ),
+              body: null,
+              attachments: [],
+              currentChannelId: 'c-here',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Original message was deleted'), findsOneWidget);
+    expect(find.text('Unknown user'), findsNothing);
+    expect(find.byType(InkWell), findsNothing);
+  });
 }

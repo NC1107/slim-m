@@ -423,6 +423,7 @@ pub(crate) fn spawn_message_retention_sweep(
                         );
                     }
                     record_sweep_run(&store, "message_retention", pruned_count as i64).await;
+                    crate::forward_events::publish_detached(&store, &hub, &swept.detached).await;
                     for message in swept.pruned {
                         hub.publish(hub::Event::MessageDeleted {
                             channel_id: message.channel_id,

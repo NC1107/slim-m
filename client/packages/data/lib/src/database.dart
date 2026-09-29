@@ -221,6 +221,10 @@ class Messages extends Table {
   IntColumn get forwardedCreatedAt => integer().nullable()();
   TextColumn get forwardedContent => text().nullable()();
 
+  /// The forward's original was deleted or aged out; the snapshot is blank.
+  BoolColumn get forwardedRemoved =>
+      boolean().withDefault(const Constant(false))();
+
   /// True while the send is in flight. The UI shows these differently and they
   /// are replaced in place by the server's copy on acknowledgement.
   BoolColumn get pending => boolean().withDefault(const Constant(false))();
@@ -260,6 +264,7 @@ extension MessageRowMapping on MessageRow {
                 authorAvatarUpdatedAt: forwardedAuthorAvatarUpdatedAt,
                 createdAt: forwardedCreatedAt!,
                 content: forwardedContent!,
+                removed: forwardedRemoved,
               ),
         pending: pending,
         failed: failed,
@@ -272,7 +277,7 @@ class SlimmDatabase extends _$SlimmDatabase {
   SlimmDatabase(super.e);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   /// How each schema version is reached, and why v3 throws the cache away.
   ///
@@ -368,6 +373,8 @@ class SlimmDatabase extends _$SlimmDatabase {
   /// v19 adds `channels.joinMuted` in place the same way, false until the
   /// next channel refresh.
   ///
+  /// v20 adds `messages.forwardedRemoved`, false for every existing row.
+  ///
   /// v17 adds `channels.manuallyUnread` the same way: false for every existing
   /// row, and the next refresh reads each channel's real flag back from the
   /// server, since the refresher already fetches read state per channel.
@@ -436,6 +443,9 @@ class SlimmDatabase extends _$SlimmDatabase {
           }
           if (from < 19) {
             await m.addColumn(channels, channels.joinMuted);
+          }
+          if (from < 20) {
+            await m.addColumn(messages, messages.forwardedRemoved);
           }
           // v2's null display names and the pre-op-stream epoch are both
           // unreachable by a keyset sync. See the doc comment above.

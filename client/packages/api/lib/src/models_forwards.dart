@@ -24,6 +24,7 @@ class ForwardedMessage {
     required this.authorAvatarUpdatedAt,
     required this.createdAt,
     required this.content,
+    this.removed = false,
   });
 
   final String messageId;
@@ -45,6 +46,10 @@ class ForwardedMessage {
   /// What the original said at the moment it was forwarded.
   final String content;
 
+  /// The original was deleted or aged out, so the snapshot fields are blank
+  /// and the card says so instead.
+  final bool removed;
+
   factory ForwardedMessage.fromJson(Map<String, dynamic> json) =>
       ForwardedMessage(
         messageId: json['message_id'] as String,
@@ -54,5 +59,6 @@ class ForwardedMessage {
         authorAvatarUpdatedAt: json['author_avatar_updated_at'] as int?,
         createdAt: json['created_at'] as int,
         content: json['content'] as String,
+        removed: json['removed'] as bool? ?? false,
       );
 }

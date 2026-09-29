@@ -27,6 +27,9 @@ use std::collections::HashMap;
 
 use sqlx::QueryBuilder;
 
+use super::forward_cascade::{
+    Copy, DetachedForward, detach_forward, live_copies_of, orphaned_copies,
+};
 use super::{Store, now_ms};
 use crate::ids::{ChannelId, MessageId, UserId};
 
@@ -36,6 +39,10 @@ const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 /// row costs an op insert and an attachment release, so this is smaller than
 /// [`OP_FLOOR_SWEEP_BATCH`], whose rows are one bare `DELETE` each.
 const CONTENT_SWEEP_BATCH: i64 = 200;
+/// Bounds how many forwarded copies one batch pulls in with its originals, so
+/// the batch's bound-variable count stays far under SQLite's limit; the rest
+/// are found as orphans on the next tick.
+const COPY_SWEEP_CAP: usize = 2_000;
 /// Bounds the op-log reclaim pass.
 const OP_FLOOR_SWEEP_BATCH: i64 = 2_000;
 
@@ -60,6 +67,8 @@ pub struct PrunedMessage {
 #[derive(Debug, Default)]
 pub struct SweptMessageRetention {
     pub pruned: Vec<PrunedMessage>,
+    /// Forwarded copies that kept the forwarder's note and lost only the snapshot.
+    pub detached: Vec<DetachedForward>,
     /// Stale `message_ops` rows the same tick reclaimed; see the module doc.
     pub ops_reclaimed: u64,
 }
@@ -101,10 +110,11 @@ impl Store {
         }
         let cutoff = now_ms() - days * DAY_MS;
 
-        let pruned = self.prune_messages_before(cutoff).await?;
+        let (pruned, detached) = self.prune_messages_before(cutoff).await?;
         let ops_reclaimed = self.reclaim_message_ops_before(cutoff).await?;
         Ok(SweptMessageRetention {
             pruned,
+            detached,
             ops_reclaimed,
         })
     }
@@ -116,7 +126,10 @@ impl Store {
     /// (`actor_id: None`), but batched rather than per message so the write
     /// lock is held across a handful of round trips instead of one per
     /// message; see SRV2.
-    async fn prune_messages_before(&self, cutoff: i64) -> anyhow::Result<Vec<PrunedMessage>> {
+    async fn prune_messages_before(
+        &self,
+        cutoff: i64,
+    ) -> anyhow::Result<(Vec<PrunedMessage>, Vec<DetachedForward>)> {
         use sqlx::Row;
 
         let mut tx = self.begin_write().await?;
@@ -130,12 +143,29 @@ impl Store {
         )
         .fetch_all(&mut *tx)
         .await?;
+        let mut candidates = candidates;
+        // Copies of this batch and leftovers from a capped earlier tick; those with a note are detached, the rest join the delete.
+        let mut copies = live_copies_of(&mut tx, &candidates).await?;
+        copies.truncate(COPY_SWEEP_CAP);
+        copies.extend(orphaned_copies(&mut tx, CONTENT_SWEEP_BATCH).await?);
+        let (noted, bare): (Vec<Copy>, Vec<Copy>) = copies.into_iter().partition(|c| c.has_note);
+        candidates.extend(bare.iter().map(|c| c.message_id));
+        candidates.sort_unstable_by_key(|id| id.0);
+        candidates.dedup();
+        let now = now_ms();
+        let mut detached = Vec::new();
+        for copy in noted.iter().filter(|c| !candidates.contains(&c.message_id)) {
+            if detached
+                .iter()
+                .all(|d: &DetachedForward| d.message_id != copy.message_id)
+            {
+                detached.push(detach_forward(&mut tx, copy, None, now).await?);
+            }
+        }
         if candidates.is_empty() {
             tx.commit().await?;
-            return Ok(Vec::new());
+            return Ok((Vec::new(), detached));
         }
-
-        let now = now_ms();
 
         // One soft-delete for the whole batch; RETURNING names the rows it actually flipped and their channel.
         let mut update = QueryBuilder::new("UPDATE messages SET deleted_at = ");
@@ -155,7 +185,7 @@ impl Store {
             .collect::<Result<_, sqlx::Error>>()?;
         if channel_of.is_empty() {
             tx.commit().await?;
-            return Ok(Vec::new());
+            return Ok((Vec::new(), detached));
         }
 
         // Candidate (created_at ASC) order, restricted to what was really deleted, so seqs land in that order.
@@ -217,7 +247,7 @@ impl Store {
 
         tx.commit().await?;
 
-        Ok(ordered
+        let pruned = ordered
             .into_iter()
             .map(|(message_id, channel_id)| PrunedMessage {
                 channel_id,
@@ -225,7 +255,8 @@ impl Store {
                 op_seq: Some(op_seq_of[&message_id]),
                 freed_attachments: freed_of.remove(&message_id).unwrap_or_default(),
             })
-            .collect())
+            .collect();
+        Ok((pruned, detached))
     }
 
     /// Deletes up to [`OP_FLOOR_SWEEP_BATCH`] `message_ops` rows older than

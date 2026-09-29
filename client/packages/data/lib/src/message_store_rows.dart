@@ -37,5 +37,19 @@ MessagesCompanion _rowFor(api.Message message) {
     forwardedAuthorAvatarUpdatedAt: Value(forwarded.authorAvatarUpdatedAt),
     forwardedCreatedAt: Value(forwarded.createdAt),
     forwardedContent: Value(forwarded.content),
+    forwardedRemoved: Value(forwarded.removed),
+  );
+}
+
+/// [MessageStore.removeForwardSnapshot]'s body, split out to keep that file under its budget.
+Future<void> _removeForwardSnapshot(SlimmDatabase db, String messageId) async {
+  await (db.update(db.messages)..where((m) => m.id.equals(messageId))).write(
+    const MessagesCompanion(
+      forwardedRemoved: Value(true),
+      forwardedContent: Value(''),
+      forwardedAuthorId: Value(null),
+      forwardedAuthorDisplayName: Value(null),
+      forwardedAuthorAvatarUpdatedAt: Value(null),
+    ),
   );
 }

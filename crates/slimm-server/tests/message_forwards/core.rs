@@ -194,61 +194,6 @@ async fn a_deleted_message_cannot_be_forwarded() {
     assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
 }
 
-/// The snapshot is the point: a forward outlives the original being edited or
-/// deleted, and shows what was actually passed on rather than blanking.
-#[tokio::test]
-async fn the_forward_outlives_the_original() {
-    let (store, _guard) = new_store().await;
-    let (channel, token) = open_deployment(&store).await;
-    let app = app(store.clone());
-    let channel = channel.to_string();
-
-    let original = send(&app, &channel, &token, "as it was").await;
-    let forward = json_body(post(&app, &channel, &token, forward_body("", &original)).await).await;
-    let original_uri = format!(
-        "/channels/{channel}/messages/{}",
-        original["id"].as_str().unwrap()
-    );
-
-    let edited = app
-        .clone()
-        .oneshot(request(
-            "PATCH",
-            &original_uri,
-            &token,
-            Some(json!({ "content": "rewritten after the fact" })),
-        ))
-        .await
-        .unwrap();
-    assert_eq!(edited.status(), StatusCode::OK);
-    let deleted = app
-        .clone()
-        .oneshot(request("DELETE", &original_uri, &token, None))
-        .await
-        .unwrap();
-    assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
-
-    let page = json_body(
-        app.clone()
-            .oneshot(request(
-                "GET",
-                &format!("/channels/{channel}/messages"),
-                &token,
-                None,
-            ))
-            .await
-            .unwrap(),
-    )
-    .await;
-    let listed = page
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|m| m["id"] == forward["id"])
-        .expect("the forward is still listed");
-    assert_eq!(listed["forwarded"]["content"], "as it was");
-}
-
 /// An ordinary message carries the key with a null, never omits it - the
 /// convention `poll` and the thread fields already follow.
 #[tokio::test]
@@ -455,5 +400,6 @@ async fn retrying_a_forward_still_works_after_the_original_is_deleted() {
     );
     let retried = json_body(retry).await;
     assert_eq!(retried["id"], send_id);
-    assert_eq!(retried["forwarded"]["content"], "the original text");
+    assert_eq!(retried["forwarded"]["removed"], true);
+    assert_eq!(retried["forwarded"]["content"], "");
 }
