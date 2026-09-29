@@ -109,7 +109,7 @@ struct PushEnvelope: Decodable {
   }
 
   /// Rewrites the placeholder in place, leaving everything the relay set -
-  /// sound, badge, thread - alone.
+  /// sound and badge alone, and groups by channel.
   ///
   /// The channel becomes a subtitle rather than part of the title, so a
   /// name too long for one line elides its own line instead of pushing the
@@ -143,9 +143,15 @@ struct PushEnvelope: Decodable {
   /// this notification is tapped. `userInfo` is merged rather than replaced:
   /// the sealed `payload` and the relay's `kind` both live there too, and
   /// this must not be the thing that drops them.
+  ///
+  /// The channel id doubles as the thread identifier so a busy channel
+  /// groups into one stack on the lock screen instead of one per message.
   private func attachRouting(to content: UNMutableNotificationContent) {
     var info = content.userInfo
-    if let channelId, !channelId.isEmpty { info[Self.channelIdKey] = channelId }
+    if let channelId, !channelId.isEmpty {
+      info[Self.channelIdKey] = channelId
+      content.threadIdentifier = channelId
+    }
     if let messageId, !messageId.isEmpty { info[Self.messageIdKey] = messageId }
     content.userInfo = info
   }

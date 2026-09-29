@@ -31,6 +31,8 @@ const mentionsChannelName = 'Mentions';
 /// there, so this side must never create it - see [LocalAlertChannel.calls].
 const callsChannelId = 'calls_v1';
 const callsChannelName = 'Calls';
+const securityChannelId = 'security_v1';
+const securityChannelName = 'Security alerts';
 
 /// The Android channel a plain content-free alert posts through, and the
 /// stable notification id it replaces rather than stacks beside.
@@ -71,6 +73,15 @@ enum LocalAlertChannel {
     description: 'Someone is calling you.',
     notificationId: 3,
     critical: true,
+  ),
+
+  /// Account security alerts, such as a sign-in from a new device. Its own
+  /// channel so a person can keep these loud while muting ordinary chat.
+  security(
+    id: securityChannelId,
+    name: securityChannelName,
+    description: 'Sign-ins and other account security alerts.',
+    notificationId: 4,
   );
 
   const LocalAlertChannel({
