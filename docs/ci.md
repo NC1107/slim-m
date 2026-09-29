@@ -28,7 +28,7 @@ Each section below is named for its workflow file.
 | `copr-catch-up` | a completed `main-builds` run on `main` (any conclusion, cancelled included), a six-hourly schedule, and by hand | submits the client to COPR only when COPR's newest live build is older than `client/pubspec.yaml`, so a `main-builds` run cancelled by a merge storm no longer strands the Linux client; does nothing when COPR is current |
 | `web-image` | called by `main-builds` (a client change) and by `release` (a server release) | the web client built into a signed multi-arch `ghcr.io/<owner>/slim-m-web` image, split out into its own file because `main-builds` is at the 500-line ceiling |
 | `server-binaries` | called by `release` | the static musl server binaries per arch, uploaded as run artifacts for `server-release-assets`, split out into its own file because `release` is past the 500-line budget |
-| `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling |
+| `copr-publish` | called by `main-builds` and `copr-catch-up` | the Fedora COPR snapshot submission, split out into its own file once `main-builds` hit the 500-line ceiling; a failed submit is retried up to three times and then fails the job |
 | `desktop-clients` | `client-v*` tag pushes, and by hand with a tag input | unsigned Windows and macOS tester archives, attached to the client's GitHub release. The two desktop platforms `release` does not package |
 | `update-manifest` | called by `desktop-clients` after its archives attach, and by hand with a tag input | signs a manifest (versions, artifact URLs, sha256s) of the desktop artifacts on a client release with the `UPDATE_SIGNING_KEY` secret, for the self-updater in decision 0041. Skips with a warning while the secret is unset |
 | `release` | pushes to `main`, and by hand on a `server-v*` / `client-v*` tag ref | the whole publish pipeline, including the web image under the server's version |
@@ -799,6 +799,11 @@ nginx marks the entry points and `version.json` `no-cache`, `main.dart.js` immut
 
 The Fedora COPR snapshot submission `main-builds` and `copr-catch-up` call, pulled into its own file once that workflow reached the 500-line hard ceiling.
 
+A submit that is attempted and fails goes red.
+It is tried up to three times with a 30 and 60 second backoff, so a transient COPR outage still passes, while an authentication or expiry error fails at once because a retry cannot help.
+A missing `COPR_CONFIG` or spec file is still a warning and a skip.
+The release path's own `copr` job (see `desktop-clients`) keeps its warning, since the release has already published by then.
+
 A reusable workflow rather than a composite action, because it needs its own container image (`fedora:44`), which a composite action cannot declare.
 
 ## copr-catch-up
@@ -819,7 +824,7 @@ Triggers:
 - `workflow_dispatch`, to catch up on demand.
 
 Idempotence rests on counting pending and running builds as current, so a check that lands while `main-builds` has just submitted does nothing; a build that failed or was canceled does not count, so the next trigger retries it.
-A submit that `copr-publish` attempts and fails stays a warning, as it does there, and heals on the next trigger for the same reason.
+A submit that `copr-publish` attempts and fails is retried, then fails the job (see `copr-publish`), and the next trigger heals it because a failed build does not count as current.
 
 The concurrency group `copr-catch-up` has `cancel-in-progress: false`: a submit must never be killed halfway.
 GitHub keeps one pending run and replaces older pending ones, which is fine here because every run asks the same question of COPR's current state rather than carrying a payload.
