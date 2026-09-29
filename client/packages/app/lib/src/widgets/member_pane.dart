@@ -154,11 +154,13 @@ class AppMemberPane extends ConsumerWidget {
                   itemCount: entries.length,
                   itemBuilder: (context, index) => switch (entries[index]) {
                     RosterGroupLabel(:final text) => MemberGroupLabel(text),
-                    RosterMember(:final profile) => MemberRow(
-                      profile: profile,
-                      isSelf: profile.id == myId,
-                      channelId: channelId,
-                    ),
+                    RosterMember(:final profile, :final sectionRoleId) =>
+                      MemberRow(
+                        profile: profile,
+                        sectionRoleId: sectionRoleId,
+                        isSelf: profile.id == myId,
+                        channelId: channelId,
+                      ),
                   },
                 );
               },
