@@ -352,11 +352,16 @@ class SlimmApi {
 
   /// Files a report for a human to review. [id] is the client-minted UUIDv7
   /// that lets a retry replay the same report instead of colliding with it.
+  /// [channelId], [authorId] and [snapshot] go only with
+  /// [ReportSubject.ephemeralMessage].
   Future<String> report({
     required ReportSubject subject,
     required String subjectId,
     required String reason,
     String? id,
+    String? channelId,
+    String? authorId,
+    String? snapshot,
   }) async {
     final json = await _send(
       'POST',
@@ -366,6 +371,9 @@ class SlimmApi {
         'subject_kind': subject.wire,
         'subject_id': subjectId,
         'reason': reason,
+        if (channelId != null) 'channel_id': channelId,
+        if (authorId != null) 'author_id': authorId,
+        if (snapshot != null) 'snapshot': snapshot,
       },
     );
     return (json as Map<String, dynamic>)['id'] as String;

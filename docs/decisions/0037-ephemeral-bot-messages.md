@@ -106,11 +106,33 @@ That is acceptable for a message that is already lossy, and it is preferable to 
 
 ### Moderation
 
-Moderators cannot see ephemeral messages, and there is no id to report against, because reports name a stored message.
-That is deliberate, and it is a real limit.
-The controls that exist are the ones that already bound a bot: revoke its token, remove it from the space, or take its permissions away.
+Moderators cannot browse ephemeral messages, because nothing stores them.
+The controls that bound a bot are still the ones that exist: revoke its token, remove it from the space, or take its permissions away.
 A member can block the bot to stop receiving them.
-If abuse shows up, the follow-up is a report that snapshots the ephemeral text at report time, not persisting every message.
+
+A recipient can also report one.
+`POST /reports` takes `subject_kind: ephemeral_message` with the private message's id, the channel, the bot's id and the text the client showed.
+That report goes through the ordinary queue, and a moderator sees the text and the bot where they would see a message report's snapshot and author.
+Nothing new is stored beyond a `reports.snapshot_author_id` column that holds the bot, because a stored message is what a report's author is normally joined from.
+
+The server cannot check the text, so it is the reporter's word, and the queue card says so.
+What it does check is that the reporter can view the channel and that the named author is a bot.
+A member could therefore file a report that misquotes a bot.
+That costs a moderator a look and no more, since a report changes nothing until a moderator acts on it, and the same member could as easily misdescribe a real message in the reason.
+Keeping a short in-memory copy on the server to verify against was rejected: it would hold every private message for as long as the window is open, which is the exposure this record set out to avoid.
+An old client reads the new kind as a user report, so it would show the bot's message id as a user with no name.
+
+### Files and embeds
+
+An ephemeral message may carry embeds and attachments, in the same request shape as `sendMessage`.
+Embeds are built by the same code, so the caps and the image handling are the same, and the card renders them with the transcript's own embed widget.
+Attachments ride by id and are never uploaded here.
+Each id must already be fetchable by the bot and by the recipient, meaning uploaded by them or attached to a message in a channel they can view.
+Anything else is one 400 that does not say which side failed.
+The reason is that nothing here can make a file fetchable: the fetch route reads message links, an unattached upload is swept after a day, and storing a link for a private message would make it a stored message.
+So a bot can privately re-show a file that is already in the channel, and cannot privately send a new one.
+A message may be only an embed or only files, with empty text, and the bot needs `ATTACH_FILES` to send any.
+A refused call spends none of the per-anchor budget.
 
 ### Client
 
@@ -129,6 +151,4 @@ The canvas-board refusal is the first user.
 - Buttons and interactions.
   This record fixes only the private-reply half of them.
 - Whether ephemeral messages should ever persist across a reload.
-- Reporting an ephemeral message.
-- Attachments, embeds and rich content on an ephemeral message.
-  It carries text only.
+- Buttons on an ephemeral message.

@@ -171,7 +171,10 @@ pub use reactions::{MAX_EMOJI_BYTES, ReactError, ReactionSummary};
 pub use recovery::{ConsumeResetError, IssueResetError};
 pub use refresh_rotation::RefreshOutcome;
 pub use removals::{RemoveMemberError, SpaceRemoval};
-pub use reports::{FiledReport, Report, ReportError, ReportSubject, ReporterOwnReport};
+pub use reports::{
+    EPHEMERAL_KIND, EphemeralSubject, FiledReport, Report, ReportError, ReportSubject,
+    ReporterOwnReport,
+};
 pub use role_hierarchy::RoleWithCount;
 pub use role_reorder::{ReorderRolesError, RoleReorderOutcome};
 pub use roles::{CreateRoleError, CreatedRole, Role, RoleGuardError};

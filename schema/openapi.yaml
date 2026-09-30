@@ -5691,8 +5691,8 @@ paths:
         stored: it goes out over the live socket to the recipient's own
         connections and is gone on reload. It has no `seq`, so it leaves no
         gap in the channel's ordering, and it never appears in
-        `listMessages`, search or `sync`. Moderators cannot see it, and there
-        is no id to report.
+        `listMessages`, search or `sync`. Moderators cannot see it; a recipient can report it with
+        `fileReport` and `subject_kind: ephemeral_message`.
 
         The recipient is not named. It is the author of `in_reply_to_id`, a
         live message from a person in this channel, sent within the last 15
@@ -5706,8 +5706,12 @@ paths:
         fourth is a 429. A member who has blocked the bot never receives it,
         and the call still succeeds. Bots and the caller's own messages are
         not valid anchors. The 403 is the same whatever the reason. Content
-        follows the same length rules as `sendMessage`. Also metered as an
-        ordinary write.
+        follows the same length rules as `sendMessage`, except that it may be
+        empty when `embeds` or `attachment_ids` is given. Embeds follow
+        `sendMessage`'s caps. An attachment must already be fetchable by both
+        the bot and the recipient, since nothing here can make a file
+        fetchable; anything else is one 400. Also metered as an ordinary
+        write.
       requestBody:
         required: true
         content:
@@ -8599,14 +8603,33 @@ components:
             retry cannot be told apart from a second report.
         subject_kind:
           type: string
-          enum: [message, user]
+          enum: [message, user, ephemeral_message]
         subject_id:
           type: string
           format: uuid
+          description: >-
+            For `ephemeral_message`, the private message's own id.
         reason:
           type: string
           minLength: 1
           maxLength: 2000
+        channel_id:
+          type: string
+          format: uuid
+          description: >-
+            Only with `ephemeral_message`, where all three of this,
+            `author_id` and `snapshot` are required; the reporter must be able
+            to view the channel.
+        author_id:
+          type: string
+          format: uuid
+          description: The bot that sent it; anything else is a 404.
+        snapshot:
+          type: string
+          description: >-
+            The text the reporter was shown, at most 4000 characters. The
+            server stored nothing, so this is the reporter's word and is
+            shown to moderators as such.
 
     ReportFiled:
       type: object
@@ -8629,7 +8652,7 @@ components:
           description: Null once the reporter's account has been anonymized.
         subject_kind:
           type: string
-          enum: [message, user]
+          enum: [message, user, ephemeral_message]
         subject_id:
           type: string
           format: uuid
@@ -8686,7 +8709,7 @@ components:
           format: uuid
         subject_kind:
           type: string
-          enum: [message, user]
+          enum: [message, user, ephemeral_message]
         subject_id:
           type: string
           format: uuid
@@ -8741,7 +8764,7 @@ components:
           description: Null once the reporter's account has been anonymized.
         subject_kind:
           type: string
-          enum: [message, user]
+          enum: [message, user, ephemeral_message]
         subject_id:
           type: string
           format: uuid
@@ -9037,6 +9060,18 @@ components:
             that is not this bot's, or is in another channel, is a 404.
         content:
           type: string
+        attachment_ids:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+          description: >-
+            Hex sha256 ids of files already on a message both sides can see.
+            Needs `ATTACH_FILES`.
+        embeds:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequestEmbed"
     EphemeralMessage:
       type: object
       required:
@@ -9048,6 +9083,8 @@ components:
           content,
           in_reply_to_id,
           created_at,
+          attachments,
+          embeds,
         ]
       description: >-
         A message only its recipient sees. Not a `Message`: it has no `seq`,
@@ -9072,6 +9109,14 @@ components:
         created_at:
           type: integer
           format: int64
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+        embeds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Embed"
     MessageEphemeral:
       type: object
       required: [type, channel_id, message]

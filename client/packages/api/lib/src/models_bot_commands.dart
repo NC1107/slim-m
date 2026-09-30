@@ -3,6 +3,9 @@
 /// docs/decisions/0031-bot-command-registration.md.
 library;
 
+import 'models_attachments.dart';
+import 'models_embeds.dart';
+
 /// One bot command offered in a channel, from `GET
 /// /channels/{channelId}/bot-commands`; already permission- and
 /// visibility-filtered server-side.
@@ -91,6 +94,8 @@ class EphemeralMessage {
     required this.content,
     required this.inReplyToId,
     required this.createdAt,
+    this.attachments = const [],
+    this.embeds = const [],
   });
 
   final String id;
@@ -101,6 +106,10 @@ class EphemeralMessage {
   final String inReplyToId;
   final int createdAt;
 
+  /// Files that were already fetchable; the message itself owns no bytes.
+  final List<Attachment> attachments;
+  final List<Embed> embeds;
+
   factory EphemeralMessage.fromJson(Map<String, dynamic> json) =>
       EphemeralMessage(
         id: json['id'] as String,
@@ -110,5 +119,13 @@ class EphemeralMessage {
         content: json['content'] as String,
         inReplyToId: json['in_reply_to_id'] as String,
         createdAt: json['created_at'] as int,
+        attachments: (json['attachments'] as List<dynamic>?)
+                ?.map((a) => Attachment.fromJson(a as Map<String, dynamic>))
+                .toList(growable: false) ??
+            const [],
+        embeds: (json['embeds'] as List<dynamic>?)
+                ?.map((e) => Embed.fromJson(e as Map<String, dynamic>))
+                .toList(growable: false) ??
+            const [],
       );
 }

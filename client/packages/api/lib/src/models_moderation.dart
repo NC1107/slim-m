@@ -7,6 +7,31 @@ library;
 
 import 'models.dart';
 
+/// What a report is about.
+enum ReportSubject {
+  message,
+  user,
+
+  /// A bot's private message. The server kept no copy, so a report carries the
+  /// text the reporter was shown.
+  ephemeralMessage;
+
+  String get wire => switch (this) {
+        ephemeralMessage => 'ephemeral_message',
+        _ => name,
+      };
+
+  /// An unrecognised value reads as [user]: it is the more generic subject,
+  /// so a future kind this client has never heard of does not get rendered
+  /// as reported message content - an author and a snapshot - that may not
+  /// exist for whatever that new kind turns out to be.
+  static ReportSubject parse(String value) => switch (value) {
+        'message' => ReportSubject.message,
+        'ephemeral_message' => ReportSubject.ephemeralMessage,
+        _ => ReportSubject.user,
+      };
+}
+
 /// A moderation report awaiting triage.
 class Report {
   const Report({

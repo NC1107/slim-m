@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE reports SET snapshot_author_id = NULL WHERE snapshot_author_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b1a25f341b688e6f1bca2ade53d14c4c56761d3def35c4132295a3940fd6ee25"
+}

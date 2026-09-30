@@ -76,8 +76,8 @@ class ReportHistoryRow extends ConsumerWidget {
     Map<String, api.UserProfile?> profiles,
     bool use24Hour,
   ) {
-    final isMessageReport = entry.subjectKind == api.ReportSubject.message;
-    final subjectName = isMessageReport
+    final hasAuthor = entry.subjectKind != api.ReportSubject.user;
+    final subjectName = hasAuthor
         ? authorHeadline(entry.subjectAuthorId, profiles)
         : subjectHeadline(entry.subjectId, profiles);
     final (variant, label) = _reportBadge(entry.resolution);

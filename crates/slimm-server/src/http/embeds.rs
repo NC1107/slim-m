@@ -67,7 +67,7 @@ pub fn accent_for(color: i64) -> Option<EmbedAccent> {
 }
 
 /// One field on an embed, exactly as it renders.
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct EmbedFieldDto {
     pub(crate) name: String,
     pub(crate) value: String,
@@ -76,7 +76,7 @@ pub(crate) struct EmbedFieldDto {
 
 /// One embed as a message carries it. `image_token`/`thumbnail_token` are
 /// redeemable tokens, never raw URLs - see decision 0019.
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct EmbedDto {
     pub(crate) title: Option<String>,
     pub(crate) description: Option<String>,

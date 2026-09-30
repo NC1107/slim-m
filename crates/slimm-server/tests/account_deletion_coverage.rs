@@ -133,6 +133,7 @@ const DECISIONS: &[(&str, &str, OnDelete)] = &[
     ("read_states", "user_id", OnDelete::Purge),
     ("reports", "reporter_id", OnDelete::Anonymize),
     ("reports", "resolved_by", OnDelete::Anonymize),
+    ("reports", "snapshot_author_id", OnDelete::Anonymize),
     ("roles", "managed_bot_id", OnDelete::Anonymize),
     ("saved_messages", "user_id", OnDelete::Purge),
     ("sessions", "user_id", OnDelete::CascadesFrom("devices")),

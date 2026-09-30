@@ -165,10 +165,11 @@ class _ReportCardState extends ConsumerState<ReportCard>
     final customEmoji = ref.watch(customEmojiIndexProvider);
 
     final isMessageReport = report.subjectKind == api.ReportSubject.message;
-    final targetUserId = isMessageReport
-        ? report.subjectAuthorId
-        : report.subjectId;
-    final targetName = isMessageReport
+    final isPrivateBotReport =
+        report.subjectKind == api.ReportSubject.ephemeralMessage;
+    final hasAuthor = isMessageReport || isPrivateBotReport;
+    final targetUserId = hasAuthor ? report.subjectAuthorId : report.subjectId;
+    final targetName = hasAuthor
         ? authorHeadline(report.subjectAuthorId, profiles)
         : subjectHeadline(report.subjectId, profiles);
     final isSelf = targetUserId != null && me != null && targetUserId == me.id;
@@ -188,11 +189,19 @@ class _ReportCardState extends ConsumerState<ReportCard>
         canJump || canDeleteMessage || canTimeOut || canRemove;
 
     return SettingsSectionCard(
-      title: isMessageReport ? 'Reported message' : 'Reported user',
+      title: switch (report.subjectKind) {
+        api.ReportSubject.message => 'Reported message',
+        api.ReportSubject.ephemeralMessage => 'Reported private message',
+        api.ReportSubject.user => 'Reported user',
+      },
       children: [
         ReportLabeledValue(
           // 'Subject' rather than repeating the card's own title, which AppCard(title:)'s uppercase used to hide.
-          label: isMessageReport ? 'Reported author' : 'Subject',
+          label: isMessageReport
+              ? 'Reported author'
+              : isPrivateBotReport
+              ? 'Reported bot'
+              : 'Subject',
           value: targetName,
         ),
         const SizedBox(height: AppSpacing.s8),
@@ -200,6 +209,14 @@ class _ReportCardState extends ConsumerState<ReportCard>
           report.reason,
           style: AppText.body.copyWith(color: tokens.textPrimary),
         ),
+        if (isPrivateBotReport)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.s4),
+            child: Text(
+              'The server kept no copy. This is the text the reporter says they were shown.',
+              style: AppText.caption.copyWith(color: tokens.textSecondary),
+            ),
+          ),
         if (report.snapshot != null) ...[
           const SizedBox(height: AppSpacing.s8),
           Container(

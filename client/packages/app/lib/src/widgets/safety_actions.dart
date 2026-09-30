@@ -43,7 +43,8 @@ Future<void> _tell(
 /// Files a report about [subjectId], once the reporter has given a reason.
 ///
 /// [subjectLabel] names the thing in the prompt ("this member", "this message"),
-/// and is the only difference between the two callers.
+/// and is the only difference between the two callers. A private bot message
+/// also passes the [channelId], [authorId] and [snapshot] the server cannot look up.
 ///
 /// Remembers the new report's id in [filedReportsProvider] on success, so it
 /// shows up in `ReportStatusSection` without the reporter ever seeing, let
@@ -54,6 +55,9 @@ Future<void> fileReport(
   required api.ReportSubject subject,
   required String subjectId,
   required String subjectLabel,
+  String? channelId,
+  String? authorId,
+  String? snapshot,
 }) async {
   final reason = await promptReportReason(context, subjectLabel: subjectLabel);
   if (reason == null || !context.mounted) return;
@@ -70,6 +74,9 @@ Future<void> fileReport(
             subjectId: subjectId,
             reason: reason,
             id: id,
+            channelId: channelId,
+            authorId: authorId,
+            snapshot: snapshot,
           );
       await container.read(filedReportsProvider.notifier).record(reportId);
     },
