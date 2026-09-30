@@ -20,7 +20,6 @@ class CallDockButton extends StatelessWidget {
     required this.onPressed,
     this.destructive = false,
     this.pending = false,
-    this.onLongPress,
   });
 
   final IconData icon;
@@ -36,16 +35,10 @@ class CallDockButton extends StatelessWidget {
   final bool pending;
   final VoidCallback onPressed;
 
-  /// A secondary action reached by a long press or a right-click, leaving
-  /// [onPressed] itself untouched - the share button's own "change source"
-  /// needs exactly this, without disturbing the tap-to-stop behaviour
-  /// `scripts/lib/e2e_voice.py` already drives by that same tooltip. Null
-  /// (every other caller) offers no secondary action at all.
-  final VoidCallback? onLongPress;
-
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final joined = AppControlWithOptions.joinedOf(context);
     // Danger is outlined, never filled: unmistakable without being the brightest thing on screen.
     final background = destructive
         ? Colors.transparent
@@ -65,32 +58,53 @@ class CallDockButton extends StatelessWidget {
     const visualSize = AppSizes.controlMd;
     final outerSize = visualSize > hitTarget ? visualSize : hitTarget;
 
+    final radius = joined
+        ? const BorderRadius.horizontal(left: Radius.circular(AppRadii.control))
+        : BorderRadius.circular(AppRadii.control);
+
     return Tooltip(
       message: tooltip,
+      // A held press belongs to the options; hover still shows the tooltip.
+      triggerMode: joined
+          ? TooltipTriggerMode.manual
+          : TooltipTriggerMode.longPress,
       child: Semantics(
         button: true,
         label: tooltip,
-        child: AppFocusRing(
-          radius: AppRadii.control,
-          builder: (context, onFocusChange) => InkWell(
+        child: _chipFocus(
+          joined: joined,
+          builder: (context, onFocusChange, focused) => InkWell(
             onTap: onPressed,
-            onLongPress: onLongPress,
-            onSecondaryTap: onLongPress,
-            // AppFocusRing replaces this overlay; see its own doc comment.
+            // The ring is drawn by the chip itself; see AppInsetFocus and AppFocusRing.
             focusColor: Colors.transparent,
             onFocusChange: onFocusChange,
-            borderRadius: BorderRadius.circular(AppRadii.control),
+            borderRadius: radius,
             child: SizedBox(
               width: outerSize,
               height: outerSize,
-              child: Center(
+              child: Align(
+                alignment: joined ? Alignment.centerRight : Alignment.center,
                 child: Container(
                   width: visualSize,
                   height: visualSize,
+                  foregroundDecoration: joined
+                      ? appInsetFocusDecoration(
+                          context,
+                          focused: focused,
+                          borderRadius: radius,
+                        )
+                      : null,
                   decoration: BoxDecoration(
                     color: background,
-                    borderRadius: BorderRadius.circular(AppRadii.control),
-                    border: Border.all(color: border),
+                    borderRadius: radius,
+                    // The caret's left border is the seam, so this half has none.
+                    border: joined
+                        ? Border(
+                            top: BorderSide(color: border),
+                            left: BorderSide(color: border),
+                            bottom: BorderSide(color: border),
+                          )
+                        : Border.all(color: border),
                   ),
                   child: pending
                       ? Center(
@@ -110,6 +124,20 @@ class CallDockButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// A lone chip keeps [AppFocusRing]; the leading half of a pair draws its
+  /// ring inset so the two halves can touch.
+  static Widget _chipFocus({
+    required bool joined,
+    required Widget Function(BuildContext, ValueChanged<bool>, bool) builder,
+  }) {
+    if (joined) return AppInsetFocus(builder: builder);
+    return AppFocusRing(
+      radius: AppRadii.control,
+      builder: (context, onFocusChange) =>
+          builder(context, onFocusChange, false),
     );
   }
 }

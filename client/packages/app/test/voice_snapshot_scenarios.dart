@@ -162,6 +162,35 @@ void _pinnedLoop(
   }
 }
 
+/// The local share with a source to switch to, so the dock shows the options
+/// caret; `voice-in-call-local-share` above is the same call without it.
+void registerVoiceShareOptions(String theme, RenderSurface render) {
+  for (final viewportName in _phoneAndDesktop) {
+    testWidgets(
+      'voice-in-call-local-share-options at $viewportName ($theme) fits its '
+      'viewport',
+      (tester) async {
+        await render(
+          tester,
+          '/channels/c-main',
+          viewportName,
+          theme,
+          'voice-in-call-local-share-options-$viewportName-$theme',
+          overrides: [
+            voiceControllerProvider.overrideWith(
+              (ref) => SnapshotVoiceController(
+                ref,
+                localSharingCallState,
+                needsSource: true,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 void registerVoiceCallVariants(String theme, RenderSurface render) =>
     _pinnedLoop(theme, render, _voiceCallVariantSurfaces);
 

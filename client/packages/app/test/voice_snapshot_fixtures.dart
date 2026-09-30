@@ -19,6 +19,8 @@ import 'voice_controller_harness.dart' show FakeSession;
 /// deployment has actual pixels to show, and this box only exists to prove
 /// the *layout* holds one, so a flat colour and a label are enough.
 class VisibleSnapshotSession extends FakeSession {
+  VisibleSnapshotSession({super.needsSource});
+
   @override
   Widget cameraViewFor(String identity) => const ColoredBox(
     color: Color(0xFF2D5F7C),
@@ -41,8 +43,11 @@ class VisibleSnapshotSession extends FakeSession {
 /// 'joining'` branch for (connected, connecting, or busy-elsewhere), since
 /// those never call [VoiceController.join] at all.
 class SnapshotVoiceController extends VoiceController {
-  SnapshotVoiceController(super.ref, VoiceState fixed)
-    : super(session: VisibleSnapshotSession()) {
+  SnapshotVoiceController(
+    super.ref,
+    VoiceState fixed, {
+    bool needsSource = false,
+  }) : super(session: VisibleSnapshotSession(needsSource: needsSource)) {
     state = fixed;
   }
 }

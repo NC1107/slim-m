@@ -174,6 +174,8 @@ abstract final class AppIcons {
   /// Flipping between front/back on mobile, or picking a webcam on desktop.
   static const IconData switchCamera = LucideIcons.switchCamera300;
   static const IconData screenShare = LucideIcons.monitorUp300;
+  static const IconData screenShareStop = LucideIcons.monitorOff300;
+  static const IconData screenShareSwitch = LucideIcons.monitorCog300;
   static const IconData leaveCall = LucideIcons.phoneOff300;
 
   /// Expanding a call tile's video to fill the screen.

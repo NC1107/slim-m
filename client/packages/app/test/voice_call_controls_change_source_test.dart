@@ -7,11 +7,11 @@
 /// short of ending the share and hoping to notice a second, separate tap
 /// would start a fresh one.
 ///
-/// A long press (or a right-click) is the route this file proves: it stops
-/// the running share and reopens the picker, with the source just used
-/// highlighted rather than silently reused, while an ordinary tap keeps
-/// stopping outright - `scripts/lib/e2e_voice.py` already drives that same
-/// tap by its "Stop sharing" tooltip.
+/// The options caret beside the share button (or a long press, or a
+/// right-click) is the route this file proves: its menu offers "Switch
+/// screen..." and "Stop sharing", while an ordinary tap keeps stopping
+/// outright - `scripts/lib/e2e_voice.py` already drives that same tap by its
+/// "Stop sharing" tooltip.
 library;
 
 import 'package:flutter/material.dart';
@@ -35,6 +35,22 @@ const _sources = [
   ScreenShareSource(id: '1', name: 'Screen 1'),
   ScreenShareSource(id: '2', name: 'Screen 2'),
 ];
+
+const _caretLabel = 'Screen share options';
+
+const _sharing = VoiceFlags(
+  state: VoiceSessionState.connected,
+  screenSharing: true,
+);
+
+/// Opens the share button's options menu from its caret and picks the
+/// "Switch screen..." row.
+Future<void> _switchScreen(WidgetTester tester) async {
+  await tester.tap(find.byTooltip(_caretLabel));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Switch screen...'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -64,8 +80,8 @@ void main() {
   );
 
   testWidgets(
-    'a long press on an active share stops it, then reopens the picker to '
-    'choose a different source',
+    'Switch screen stops the share, then reopens the picker to choose a '
+    'different source',
     (tester) async {
       final session = InertSession(
         needsSource: true,
@@ -80,8 +96,7 @@ void main() {
         session: session,
       );
 
-      await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
-      await tester.pumpAndSettle();
+      await _switchScreen(tester);
 
       expect(
         find.text('Everyone in the call will see it until you stop sharing.'),
@@ -143,8 +158,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
-    await tester.pumpAndSettle();
+    await _switchScreen(tester);
 
     final rows = tester
         .widgetList<AppListRow>(find.byType(AppListRow))
@@ -155,7 +169,7 @@ void main() {
   });
 
   testWidgets(
-    'on Linux the long press still switches, going straight to the other '
+    'on Linux Switch screen still switches, going straight to the other '
     'source with no second dialog',
     (tester) async {
       final session = InertSession(
@@ -172,8 +186,7 @@ void main() {
         session: session,
       );
 
-      await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
-      await tester.pumpAndSettle();
+      await _switchScreen(tester);
 
       expect(
         find.text('Everyone in the call will see it until you stop sharing.'),
@@ -186,24 +199,96 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a long press does nothing on a platform with no source to switch '
-    'between at all',
-    (tester) async {
-      final session = InertSession();
-      await pumpControls(
-        tester,
-        const VoiceFlags(
-          state: VoiceSessionState.connected,
-          screenSharing: true,
-        ),
-        session: session,
-      );
+  testWidgets('with no source to switch between there is no caret and no '
+      'long press', (tester) async {
+    final session = InertSession();
+    await pumpControls(
+      tester,
+      const VoiceFlags(state: VoiceSessionState.connected, screenSharing: true),
+      session: session,
+    );
 
-      await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
-      await tester.pumpAndSettle();
+    expect(find.byTooltip(_caretLabel), findsNothing);
+    await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
+    await tester.pumpAndSettle();
 
-      expect(session.screenShareCalls, isEmpty);
-    },
-  );
+    expect(find.text('Switch screen...'), findsNothing);
+    expect(session.screenShareCalls, isEmpty);
+  });
+
+  testWidgets('not sharing shows no caret even where sources exist', (
+    tester,
+  ) async {
+    await pumpControls(
+      tester,
+      const VoiceFlags(state: VoiceSessionState.connected),
+      session: InertSession(needsSource: true, sources: Future.value(_sources)),
+    );
+    expect(find.byTooltip(_caretLabel), findsNothing);
+  });
+
+  testWidgets('the caret menu offers Stop sharing, which stops and nothing '
+      'else', (tester) async {
+    final session = InertSession(
+      needsSource: true,
+      sources: Future.value(_sources),
+    );
+    await pumpControls(tester, _sharing, session: session);
+
+    await tester.tap(find.byTooltip(_caretLabel));
+    await tester.pumpAndSettle();
+    expect(find.text('Switch screen...'), findsOneWidget);
+    await tester.tap(find.text('Stop sharing'));
+    await tester.pumpAndSettle();
+
+    expect(session.screenShareCalls.map((c) => c.enabled), [false]);
+  });
+
+  testWidgets('a long press on the share button opens the same menu', (
+    tester,
+  ) async {
+    await pumpControls(
+      tester,
+      _sharing,
+      session: InertSession(needsSource: true, sources: Future.value(_sources)),
+    );
+
+    await tester.longPress(find.byTooltip(RegExp(r'^Stop sharing')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Switch screen...'), findsOneWidget);
+    expect(find.text('Stop sharing'), findsOneWidget);
+  });
+
+  testWidgets('on a phone the menu is a bottom sheet and the dock still fits', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpControls(
+      tester,
+      _sharing,
+      session: InertSession(needsSource: true, sources: Future.value(_sources)),
+    );
+
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip(_caretLabel));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppSheetMenu), findsOneWidget);
+    expect(find.text('Switch screen...'), findsOneWidget);
+  });
+
+  testWidgets('the caret has its own semantics label', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpControls(
+      tester,
+      _sharing,
+      session: InertSession(needsSource: true, sources: Future.value(_sources)),
+    );
+    expect(find.bySemanticsLabel(_caretLabel), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Stop sharing')), findsOneWidget);
+    handle.dispose();
+  });
 }
