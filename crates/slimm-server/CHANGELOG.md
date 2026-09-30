@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.77.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.76.0...server-v0.77.0) (2026-09-30)
+
+
+### Features
+
+* durable watch session and watch.tick for a real position readout ([#1527](https://github.com/Slim-m-org/slim-m/issues/1527)) ([7039fc6](https://github.com/Slim-m-org/slim-m/commit/7039fc6526ee7ff081913a1b2516da9fa86eede1))
+* files and embeds on a private bot message, and reporting one ([#1494](https://github.com/Slim-m-org/slim-m/issues/1494)) ([29d53ce](https://github.com/Slim-m-org/slim-m/commit/29d53ce959813f5478e3eab5926ac3480484f1b8))
+* optional TOTP two-factor authentication ([#1512](https://github.com/Slim-m-org/slim-m/issues/1512)) ([ff1c2c4](https://github.com/Slim-m-org/slim-m/commit/ff1c2c494e1d1763a144c444c5bc4b1f14999389))
+* role hoist flag and top hoisted role on member rows ([#1492](https://github.com/Slim-m-org/slim-m/issues/1492)) ([2c1893a](https://github.com/Slim-m-org/slim-m/commit/2c1893ac02e398b1bd9a15b73fa78e9b0c28590f))
+* **server:** report a build id on /version ([#1498](https://github.com/Slim-m-org/slim-m/issues/1498)) ([b27c649](https://github.com/Slim-m-org/slim-m/commit/b27c649bb9e9dd75f8c4c6bb85b47a643e27b1c0))
+
+
+### Bug Fixes
+
+* a channel's notification override decides its badge, not only its push ([#1515](https://github.com/Slim-m-org/slim-m/issues/1515)) ([3b2fa1e](https://github.com/Slim-m-org/slim-m/commit/3b2fa1ecee38ed5a78e20f6f6175e3501aee6718))
+* **server:** derive the ws viewing report and the push lifecycle report from one foreground rule ([#1496](https://github.com/Slim-m-org/slim-m/issues/1496)) ([1669839](https://github.com/Slim-m-org/slim-m/commit/166983983af0e46333b46f432518b0aa7e1229c6))
+* **server:** refuse to enable a module whose slash keyword another enabled module owns ([#1493](https://github.com/Slim-m-org/slim-m/issues/1493)) ([fadf826](https://github.com/Slim-m-org/slim-m/commit/fadf8265eed00c53adf61f1561e5a557189c2356))
+* **server:** remove forwarded copies of originals deleted before copies followed them ([#1495](https://github.com/Slim-m-org/slim-m/issues/1495)) ([755de13](https://github.com/Slim-m-org/slim-m/commit/755de13f26eebf973d11c782352fbe4b4e44847b))
+* **server:** ring iOS through its VoIP token, end rings by push, and push mentions and sign-in alerts ([#1479](https://github.com/Slim-m-org/slim-m/issues/1479)) ([e59c12c](https://github.com/Slim-m-org/slim-m/commit/e59c12c195fc8530763110126d96c4c7dd3fba12))
+* **server:** validate bot button labels with the shared hidden-char classifier ([#1491](https://github.com/Slim-m-org/slim-m/issues/1491)) ([919aa49](https://github.com/Slim-m-org/slim-m/commit/919aa49b6e6226862013c2a27e123ec36ed24d4f))
+* write join_muted in the channel create and mark join_muted channels in the rail and rejoin screen ([#1486](https://github.com/Slim-m-org/slim-m/issues/1486)) ([263117e](https://github.com/Slim-m-org/slim-m/commit/263117e08cd4ab8592371296decb9ea6486cec71))
+
 ## [0.76.0](https://github.com/Slim-m-org/slim-m/compare/server-v0.75.0...server-v0.76.0) (2026-09-29)
 
 
