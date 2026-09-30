@@ -374,4 +374,28 @@ void main() {
       expect(find.text('What are you up to?'), findsOneWidget);
     },
   );
+
+  testWidgets('the footer stays one row tall and its menu opens above it in a '
+      'bounded-height parent', (tester) async {
+    final container = _container();
+    addTearDown(container.dispose);
+    await _pumpFooter(tester, container);
+
+    final footerHeight = tester.getSize(find.byType(RailUserFooter)).height;
+    expect(
+      footerHeight,
+      lessThan(80),
+      reason: 'the avatar tap area must not grow to fill a bounded parent',
+    );
+
+    await tester.tap(find.byType(UserAvatar));
+    await tester.pumpAndSettle();
+
+    final menu = tester.getRect(find.byType(AppMenu));
+    expect(menu.top, greaterThanOrEqualTo(0));
+    expect(
+      menu.bottom,
+      lessThanOrEqualTo(tester.getTopLeft(find.byType(UserAvatar)).dy),
+    );
+  });
 }

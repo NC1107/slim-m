@@ -180,7 +180,9 @@ class _PresenceMenuButtonState extends ConsumerState<PresenceMenuButton> {
                 minWidth: AppSizes.rowTouch,
                 minHeight: AppSizes.rowTouch,
               ),
+              // heightFactor: a bare Center fills any bounded height, which stretched the whole footer row and sent the menu off the top.
               child: Center(
+                heightFactor: 1,
                 child: AnimatedScale(
                   scale: _pressed ? AppMotion.pressScale : 1,
                   duration: AppMotion.reduced(context, AppMotion.fast),
