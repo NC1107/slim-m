@@ -219,6 +219,54 @@ const List<WhatsNewEntry> whatsNewEntries = [
       ),
     ],
   ),
+  WhatsNewEntry(
+    version: '0.89.0',
+    headline:
+        'A second factor, calls that follow you, and updates that '
+        'install themselves',
+    points: [
+      WhatsNewPoint(
+        'You can add a second factor to your account: an authenticator app '
+        'code on top of your password, with recovery codes for when you lose '
+        'the phone. It is optional, and an administrator can clear it if you '
+        'are locked out.',
+      ),
+      WhatsNewPoint(
+        'A call no longer stops being visible when you look at something '
+        'else. Video follows you to other channels in a small player you can '
+        'move, on Android it keeps playing when you leave the app, and on '
+        'desktop a share or a camera can be popped out into its own window. '
+        'The call bar now says which channel you are in and how long you '
+        'have been there, plays something quiet while you are the only one '
+        'in the room, and keeps trying to rejoin for a few minutes if your '
+        'connection drops rather than giving up in seconds.',
+      ),
+      WhatsNewPoint(
+        'The canvas has a proper hand tool for panning, keyboard shortcuts '
+        'for every tool, and colour, width and shape options on the tool you '
+        'have selected. On a phone the tools now sit on their own row, so '
+        'the eraser is no longer off the edge of the screen.',
+      ),
+      WhatsNewPoint(
+        'slim-m can show what you are listening to on Spotify, which works '
+        'even when the music is playing on your phone, and what you are '
+        'playing from a short list of games. Both are off until you turn '
+        'them on, both stop while you are appearing offline, and nothing '
+        'outside that list of games is ever read or reported.',
+      ),
+      WhatsNewPoint(
+        'Hovering a message shows its actions rather than hiding them behind '
+        'a menu, a channel set to mentions only now stays quiet in the '
+        'sidebar until you are actually mentioned, and the desktop app keeps '
+        'its local copy of your messages encrypted on disk.',
+      ),
+      WhatsNewPoint(
+        'The desktop app checks for a new build, makes sure it is genuinely '
+        'signed before trusting it, and installs it for you, keeping the old '
+        'version until the new one has started once.',
+      ),
+    ],
+  ),
 ];
 
 /// Parses a dot-separated version like `0.17.2` into its numeric segments,
