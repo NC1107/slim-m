@@ -28,20 +28,45 @@ final slashCommandProvider = FutureProvider.autoDispose<List<api.SlashCommand>>(
 /// `/` trigger at offset zero), so this matches from the start: the first
 /// token after `/` is the keyword, case-insensitive, and everything after the
 /// first run of whitespace is the argument string handed to the module as-is.
+///
+/// A keyword offered by two different modules matches nothing: the server now
+/// refuses to enable a second one, so this only guards a deployment that
+/// already had the clash, where running an arbitrary one would be worse.
+/// [clashingSlashKeyword] lets the composer say so instead of posting it.
 (api.SlashCommand, String)? matchSlashCommand(
   List<api.SlashCommand> commands,
   String text,
 ) {
+  final name = _keywordOf(text);
+  if (name == null) return null;
+  final matches = _withKeyword(commands, name);
+  if (matches.isEmpty || _isClash(matches)) return null;
+  final trimmed = text.trimLeft();
+  final rest = trimmed.substring(1 + name.length);
+  return (matches.first, rest.trim());
+}
+
+/// The keyword [text] types when two different modules offer it, else null.
+String? clashingSlashKeyword(List<api.SlashCommand> commands, String text) {
+  final name = _keywordOf(text);
+  if (name == null) return null;
+  return _isClash(_withKeyword(commands, name)) ? name : null;
+}
+
+bool _isClash(List<api.SlashCommand> matches) =>
+    matches.any((command) => command.moduleId != matches.first.moduleId);
+
+List<api.SlashCommand> _withKeyword(
+  List<api.SlashCommand> commands,
+  String name,
+) => commands.where((c) => c.name.toLowerCase() == name).toList();
+
+String? _keywordOf(String text) {
   final trimmed = text.trimLeft();
   if (!trimmed.startsWith('/')) return null;
   final body = trimmed.substring(1);
   final match = RegExp(r'\s').firstMatch(body);
   final name = (match == null ? body : body.substring(0, match.start))
       .toLowerCase();
-  if (name.isEmpty) return null;
-  final args = match == null ? '' : body.substring(match.start).trim();
-  for (final command in commands) {
-    if (command.name.toLowerCase() == name) return (command, args);
-  }
-  return null;
+  return name.isEmpty ? null : name;
 }

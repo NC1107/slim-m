@@ -43,6 +43,8 @@ pub(crate) enum ApiError {
     ForbiddenBecause(&'static str),
     NotFound(&'static str),
     Conflict(&'static str),
+    /// Like [`ApiError::Conflict`], naming the other party, which is only known at request time.
+    ConflictDetail(String),
     TooManyRequests,
     /// A fresh send arrived before the channel's slow-mode interval elapsed
     /// since the author's own last message here. Carries how many seconds
@@ -114,6 +116,7 @@ impl IntoResponse for ApiError {
             ApiError::ForbiddenBecause(message) => (StatusCode::FORBIDDEN, message.into()),
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message.into()),
             ApiError::Conflict(message) => (StatusCode::CONFLICT, message.into()),
+            ApiError::ConflictDetail(message) => (StatusCode::CONFLICT, message.into()),
             ApiError::TooManyRequests => {
                 (StatusCode::TOO_MANY_REQUESTS, "slow down and retry".into())
             }

@@ -148,7 +148,7 @@ impl From<Manifest> for ManifestDto {
 /// an already-installed module offers, and which permission each needs,
 /// without re-browsing the Dock.
 #[derive(Serialize)]
-pub(super) struct InstalledModuleDto {
+pub(in crate::http) struct InstalledModuleDto {
     id: String,
     name: String,
     version: String,
