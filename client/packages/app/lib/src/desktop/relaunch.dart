@@ -17,6 +17,8 @@ library;
 
 import 'dart:io';
 
+import 'self_update/linux_layout.dart';
+
 /// The program and arguments that start a fresh copy once process [pid] has
 /// exited, or null where no honest relaunch exists on this platform.
 ({String program, List<String> arguments})? relaunchCommand({
@@ -46,11 +48,18 @@ import 'dart:io';
   };
 }
 
+/// In the per-user layout the launcher, so a restart lands on whichever
+/// version `current` names; otherwise the running executable.
+String _executableToRun() {
+  final layout = detectLinuxLayout(Platform.resolvedExecutable);
+  return layout?.launcher.path ?? Platform.resolvedExecutable;
+}
+
 ({String program, List<String> arguments})? _thisProcessCommand() =>
     relaunchCommand(
       os: Platform.operatingSystem,
       environment: Platform.environment,
-      executable: Platform.resolvedExecutable,
+      executable: _executableToRun(),
       executableArguments: Platform.executableArguments,
       pid: pid,
     );

@@ -21,6 +21,7 @@ import '../providers/auto_update_preference.dart';
 import '../providers/providers.dart';
 import 'relaunch.dart';
 import 'rpm_updater.dart';
+import 'self_update/self_update_controller.dart';
 import 'startup_screen.dart';
 import 'startup_state.dart';
 import 'update_check.dart';
@@ -44,6 +45,7 @@ Future<void> runStartupUpdates(
   Relaunch relaunch = _realRelaunch,
   InstallFormat? format,
   String? currentVersion,
+  bool? selfApplies,
 }) async {
   if (!isDesktopHost || updateChecksDisabled()) return;
   try {
@@ -59,6 +61,11 @@ Future<void> runStartupUpdates(
 
     if (update.format == InstallFormat.rpm) {
       await _installWithDnf(container, version, update, rpm, relaunch);
+      return;
+    }
+    if (update.format == InstallFormat.tarball &&
+        (selfApplies ?? selfApplyLayout() != null)) {
+      await _installInPlace(container, version, update, relaunch);
       return;
     }
     await _offerManually(container, update);
@@ -100,6 +107,26 @@ Future<void> _installWithDnf(
 
   container.read(startupStatusProvider.notifier).state =
       'Restarting into ${update.version}';
+  await relaunch();
+}
+
+/// The per-user tarball path: install into a new version directory, then
+/// relaunch into it. A failure lands in the persistent banner and the client
+/// that is already installed starts as usual.
+Future<void> _installInPlace(
+  ProviderContainer container,
+  String currentVersion,
+  ClientUpdate update,
+  Relaunch relaunch,
+) async {
+  container.read(startupStatusProvider.notifier).state =
+      'Installing ${update.version}';
+  final installed = await container
+      .read(selfUpdateProvider)
+      .install(currentVersion: currentVersion);
+  if (installed == null) return;
+  container.read(startupStatusProvider.notifier).state =
+      'Restarting into $installed';
   await relaunch();
 }
 

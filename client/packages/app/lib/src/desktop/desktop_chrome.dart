@@ -31,6 +31,7 @@ import 'close_behavior.dart';
 import 'desktop_window_shell.dart';
 import 'first_run_tray_notice_banner.dart';
 import 'title_bar.dart';
+import 'self_update/self_update_failure_banner.dart';
 import 'update_available_banner.dart';
 import 'window_resize_frame.dart';
 
@@ -64,6 +65,7 @@ class DesktopChrome extends StatelessWidget {
                       ),
                     const FirstRunTrayNoticeBanner(),
                     const UpdateAvailableBanner(),
+                    const SelfUpdateFailureBanner(),
                     Expanded(child: child),
                   ],
                 ),

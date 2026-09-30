@@ -16,6 +16,7 @@ import 'package:slimm_platform/platform.dart';
 export 'src/desktop/startup_state.dart';
 
 import 'src/deep_links.dart';
+import 'src/desktop/self_update/self_update_controller.dart';
 import 'src/desktop/startup_updates.dart';
 import 'src/providers/app_lock_controller.dart';
 import 'src/providers/app_lock_preference.dart';
@@ -151,6 +152,7 @@ Future<void> _bootstrapApp(ProviderContainer container) async {
   // Revealed before the flip: a window reports its real size only once shown, and the real UI must not build at the splash's 380px.
   await DesktopWindowShell.revealAfterHandoff();
   container.read(appReadyProvider.notifier).state = true;
+  unawaited(container.read(selfUpdateProvider).confirmStart());
 }
 
 /// Restores the splash on/off and duration preferences and turns them into

@@ -12,6 +12,21 @@ Running `./slimm_app` directly works too, but a missing library then shows only 
 
 The runner locates `data/` and `lib/` relative to its own path, so the directory has to stay together, but it can live anywhere and it can be moved.
 
+## Per-user install that updates itself
+
+```bash
+./install.sh
+```
+
+This copies the bundle to `~/.local/share/slim-m/<version>/`, points `~/.local/share/slim-m/current` at it and links `~/.local/bin/slim-m` to the launcher.
+Nothing outside your home directory is touched.
+
+An install laid out this way updates itself.
+slim-m downloads the next release, checks its signature and sha256, unpacks it into a new version directory and moves `current` over with a rename.
+The previous version stays until the new one has run cleanly once.
+If the new version fails to start twice, the launcher moves `current` back and slim-m tells you on the next start.
+A tarball run from anywhere else, the rpm and the flatpak never replace themselves.
+
 ## What it needs from the system
 
 GTK 3, and the usual desktop graphics stack, come from your distribution.

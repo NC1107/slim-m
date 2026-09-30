@@ -12,6 +12,9 @@ enum SelfUpdateFailureKind {
   downloadFailed,
   sizeMismatch,
   checksumMismatch,
+  unsupportedInstall,
+  installFailed,
+  rolledBack,
 }
 
 class SelfUpdateFailure implements Exception {
