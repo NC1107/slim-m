@@ -13,7 +13,7 @@ Each section below is named for its workflow file.
 | `server-ci` | changes under `crates/`, `schema/openapi.yaml`, the Cargo files, `rust-toolchain.toml`, `docker/server.Dockerfile` | fmt, clippy, sqlx cache check, tests, release build, binary size budget |
 | `client-ci` | changes under `client/`, or to `schema/openapi.yaml`; `update-golden-references` also by hand (workflow_dispatch) | dart analyze and format in one job, every package's tests plus the web build in another, so a typo reports in about a minute rather than fourteen; `update-golden-references` regenerates design_system's golden PNGs for a human to commit |
 | `client-macos-ci` | a nightly schedule, and by hand | that the Dart and Swift compile against the macOS SDK. Compile-only, unsigned, and not a required check |
-| `client-windows-ci` | pushes to `main` that touch `client/`, a nightly schedule, and by hand; not pull requests | that the native plugin graph links against the Windows SDK. Compile-only, and not a required check |
+| `client-windows-ci` | pushes to `main` that touch `client/` or `packaging/windows/`, a nightly schedule, and by hand; not pull requests | that the native plugin graph links against the Windows SDK, and the Windows launcher's Go tests. Compile-only, and not a required check |
 | `client-ios-ci` | changes under `client/packages/app/ios/`, `rtc/`, `platform/`, the pubspec files, on pull requests and pushes to `main` | every `Runner` source file is registered in `project.pbxproj` (ubuntu, always), the iOS CallKit XCTest and extension-embeds-no-frameworks checks on macOS, and an unsigned Release-configuration device build when a native-relevant path changed |
 | `schema-ci` | changes under `schema/`, `redocly.yaml` on pull requests; every push to `main` unconditionally | redocly lint, the additive-only oasdiff gate against a PR's base on pull requests, and the same gate against the immediate parent commit on every push to `main` (required for a release; see below) |
 | `audio-ci` | changes under `assets/audio/` | the seven notification sounds rebuild to the bytes that are committed, and the family is level with itself |
@@ -858,6 +858,7 @@ Because a catch-up only submits a Version COPR does not yet have, it cannot coll
 
 The two desktop platforms `release` does not package: iOS goes through TestFlight, Android attaches an apk and aab, and `linux-client` ships a tarball, an rpm and a flatpak, all from `release` itself.
 This fills the gap with unsigned archives good enough to hand a tester, without touching `release`'s gated publish jobs.
+The Windows zip also carries the `slim-m.exe` launcher built from `packaging/windows/launcher`, `install.cmd` and `install.ps1` for the first per-user install, and a `VERSION` file (decision 0041).
 
 Unsigned is a stated trade rather than an oversight.
 Windows has no signing certificate anywhere in this project, so SmartScreen shows "unrecognized app" and the tester clicks through.

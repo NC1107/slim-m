@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - "client/**"
+      - "packaging/windows/**"
       - ".github/workflows/client-windows-ci.yml"
       # A release-please version bump touches these three and nothing else.
       # It never moves client/pubspec.lock, so a genuine dependency change
@@ -65,3 +66,10 @@ jobs:
       - name: windows compiles
         working-directory: client/packages/app
         run: flutter build windows --debug
+
+      # Go's own test run, since the launcher is the one native piece the updater depends on (decision 0041).
+      - name: launcher tests
+        working-directory: packaging/windows/launcher
+        run: |
+          go vet ./...
+          go test ./...
