@@ -86,14 +86,13 @@ void main() {
 
   testWidgets(
     'a tool clipped by the strip is unreachable by a bare tap and reachable '
-    'once dragged, unchanged by the call section sharing the same card',
+    'once dragged, below any width the stacked tools row can fit',
     (tester) async {
       var placed = 0;
       await pumpCanvasCallDock(
         tester,
-        withCall: true,
         canvas: buildCanvasDockData(onToolChanged: (_) => placed++),
-        width: 320,
+        width: 240,
         touch: true,
       );
 

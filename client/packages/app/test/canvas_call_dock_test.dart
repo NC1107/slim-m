@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// The dock's own composition: which sections it draws for which inputs,
-/// and the single-row-versus-two-row switch at [kCompactWidth]. Real hit
+/// and the single-row-versus-stacked switch at the measured one-row width. Real hit
 /// testing at phone width, with both sections present, is
 /// `canvas_call_dock_touch_reach_test.dart` - this file covers what is
 /// drawn, that file covers what a thumb can actually reach.
@@ -45,28 +45,31 @@ void main() {
     expect(find.byType(FloatingDockCard), findsOneWidget);
   });
 
-  testWidgets('below kCompactWidth the two sections stack as two rows', (
+  testWidgets(
+    'below the measured one-row width the dock stacks tools, edit and call as three rows',
+    (tester) async {
+      await pumpCanvasCallDock(
+        tester,
+        withCall: true,
+        canvas: buildCanvasDockData(),
+        width: 799,
+      );
+
+      final card = tester.widget<FloatingDockCard>(
+        find.byType(FloatingDockCard),
+      );
+      expect(card.rows, hasLength(3));
+    },
+  );
+
+  testWidgets('at the measured one-row width the two sections share one row', (
     tester,
   ) async {
     await pumpCanvasCallDock(
       tester,
       withCall: true,
       canvas: buildCanvasDockData(),
-      width: kCompactWidth - 1,
-    );
-
-    final card = tester.widget<FloatingDockCard>(find.byType(FloatingDockCard));
-    expect(card.rows, hasLength(2));
-  });
-
-  testWidgets('at or above kCompactWidth the two sections share one row', (
-    tester,
-  ) async {
-    await pumpCanvasCallDock(
-      tester,
-      withCall: true,
-      canvas: buildCanvasDockData(),
-      width: kCompactWidth,
+      width: 800,
     );
 
     final card = tester.widget<FloatingDockCard>(find.byType(FloatingDockCard));

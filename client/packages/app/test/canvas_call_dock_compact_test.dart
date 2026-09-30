@@ -59,12 +59,15 @@ void main() {
     },
   );
 
-  testWidgets('the two-row dock (phone-390) measures well under its old 131dp, '
-      'without shrinking either row below the touch floor', (tester) async {
-    final s = await _pumpCallAndCanvas(tester, width: 390);
+  testWidgets(
+    'the stacked dock (phone-390) is 176dp with tools on their own row, '
+    'without shrinking either row below the touch floor',
+    (tester) async {
+      final s = await _pumpCallAndCanvas(tester, width: 390);
 
-    expect(s.container.read(bottomDockReservationProvider), 123);
+      expect(s.container.read(bottomDockReservationProvider), 176);
 
-    await teardown(tester, s.container, s.db);
-  });
+      await teardown(tester, s.container, s.db);
+    },
+  );
 }
