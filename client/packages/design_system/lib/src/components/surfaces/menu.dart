@@ -301,6 +301,7 @@ class _AppMenuItemState extends State<AppMenuItem> {
     return Semantics(
       label: widget.semanticLabel ?? widget.label,
       button: true,
+      selected: widget.selected,
       enabled: active,
       child: FocusableActionDetector(
         enabled: active,

@@ -24,6 +24,7 @@ import 'canvas_bar.dart';
 import 'canvas_call_dock.dart';
 import 'canvas_hidden_tiles.dart';
 import 'canvas_object_context_menu.dart';
+import 'canvas_pen_style.dart';
 import 'canvas_pane_hints.dart';
 import 'canvas_presence_layer.dart';
 import 'canvas_presence_roster.dart';
@@ -61,6 +62,8 @@ class CanvasPaneBody extends StatefulWidget {
     required this.onShapePlace,
     required this.shapeKind,
     required this.onShapeKindChanged,
+    required this.pen,
+    required this.onPenChanged,
     required this.onBringToFront,
     required this.onSendToBack,
     required this.onDeleteSelected,
@@ -135,6 +138,8 @@ class CanvasPaneBody extends StatefulWidget {
   /// own picker for changing it.
   final CanvasShapeKind shapeKind;
   final ValueChanged<CanvasShapeKind> onShapeKindChanged;
+  final CanvasPenStyle pen;
+  final ValueChanged<CanvasPenStyle> onPenChanged;
   final ValueChanged<String> onBringToFront;
   final ValueChanged<String> onSendToBack;
 
@@ -339,6 +344,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         setState(() => _activityLogOpen = !_activityLogOpen),
     shapeKind: widget.shapeKind,
     onShapeKindChanged: widget.onShapeKindChanged,
+    pen: widget.pen,
+    onPenChanged: widget.onPenChanged,
     onClose: widget.onClose,
     hasSelfBubble: _hasSelfBubble,
     selfBubbleHidden: widget.selfBubbleHidden,
@@ -401,6 +408,9 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
         CanvasSurface(
           document: widget.document,
           ink: AppCanvasColors.annotation,
+          inkColors: canvasPenInkByKey,
+          penInk: widget.pen.color,
+          strokeWidth: widget.pen.width,
           // AppTokens.stripe: its own doc reserves it for exactly this state.
           placeholderFill: tokens.stripe,
           placeholderIcon: tokens.textDisabled,
@@ -474,10 +484,8 @@ class _CanvasPaneBodyState extends State<CanvasPaneBody> {
     ),
   );
 
-  /// "N objects on this canvas: X strokes, Y images, Z notes, W shapes" - so
-  /// a screen-reader user, or anyone reading the panel's own header, can
-  /// tell an empty canvas from a busy one at a glance, not only from a bare
-  /// total.
+  /// "N objects: X strokes, Y images, Z notes, W shapes", so a screen-reader
+  /// user or the panel header can tell an empty canvas from a busy one.
   String _summary() {
     final counts = widget.document.liveCountsByKind;
     final total = counts.strokes + counts.images + counts.notes + counts.shapes;

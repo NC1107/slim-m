@@ -15,6 +15,8 @@ import 'package:slimm_voice_canvas/src/canvas_painters.dart';
 import 'support/canvas_painter_fixtures.dart';
 
 void main() {
+  pathColorTests();
+
   test(
       'a draft stroke reaches the same on-screen width as the committed '
       'stroke once zoom is not 1', () {
@@ -154,5 +156,29 @@ void main() {
         .paint(canvas, const Size(400, 400));
 
     expect(canvas.deviceStrokeWidths, [8.0]);
+  });
+}
+
+void pathColorTests() {
+  const blue = Color(0xFF5B8FD6);
+
+  test('a committed stroke paints in the colour its own key names', () {
+    final document = documentWithCommittedStroke(2);
+    addTearDown(document.dispose);
+    final canvas = RecordingCanvas();
+    StrokePainter(document: document, ink: ink, inkColors: const {'ink': blue})
+        .paint(canvas, const Size(400, 400));
+    expect(canvas.pathColors.map((c) => c.toARGB32()), [blue.toARGB32()]);
+  });
+
+  test('a key the painter does not know falls back to the default ink', () {
+    final document = documentWithCommittedStroke(2);
+    addTearDown(document.dispose);
+    final canvas = RecordingCanvas();
+    StrokePainter(
+        document: document,
+        ink: ink,
+        inkColors: const {'other': blue}).paint(canvas, const Size(400, 400));
+    expect(canvas.pathColors.map((c) => c.toARGB32()), [ink.toARGB32()]);
   });
 }

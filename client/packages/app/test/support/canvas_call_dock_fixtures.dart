@@ -13,6 +13,7 @@ import 'package:slimm_app/src/providers/providers.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
 import 'package:slimm_app/src/providers/voice_flags.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_call_dock.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_pen_style.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_platform/platform.dart';
 import 'package:slimm_rtc/rtc.dart';
@@ -100,6 +101,11 @@ CanvasDockData buildCanvasDockData({
   VoidCallback? onUndo,
   bool canUndo = false,
   ValueChanged<CanvasTool>? onToolChanged,
+  CanvasTool tool = CanvasTool.pen,
+  CanvasPenStyle pen = const CanvasPenStyle(),
+  ValueChanged<CanvasPenStyle>? onPenChanged,
+  CanvasShapeKind shapeKind = CanvasShapeKind.rectangle,
+  ValueChanged<CanvasShapeKind>? onShapeKindChanged,
   bool fullscreen = false,
   VoidCallback? onToggleFullscreen,
 }) {
@@ -109,6 +115,11 @@ CanvasDockData buildCanvasDockData({
     onUndo: onUndo,
     canUndo: canUndo,
     onToolChanged: onToolChanged,
+    tool: tool,
+    pen: pen,
+    onPenChanged: onPenChanged,
+    shapeKind: shapeKind,
+    onShapeKindChanged: onShapeKindChanged,
   );
   return CanvasDockData(
     tool: row.tool,
@@ -129,6 +140,8 @@ CanvasDockData buildCanvasDockData({
     onToggleActivityLog: row.onToggleActivityLog,
     shapeKind: row.shapeKind,
     onShapeKindChanged: row.onShapeKindChanged,
+    pen: row.pen,
+    onPenChanged: row.onPenChanged,
     onClose: row.onClose,
     hasSelfBubble: row.hasSelfBubble,
     selfBubbleHidden: row.selfBubbleHidden,

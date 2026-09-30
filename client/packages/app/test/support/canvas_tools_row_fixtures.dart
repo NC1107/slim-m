@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_pen_style.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_tools_row.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
@@ -64,6 +65,8 @@ CanvasToolsRow buildCanvasToolsRow({
   VoidCallback? onToggleActivityLog,
   CanvasShapeKind shapeKind = CanvasShapeKind.rectangle,
   ValueChanged<CanvasShapeKind>? onShapeKindChanged,
+  CanvasPenStyle pen = const CanvasPenStyle(),
+  ValueChanged<CanvasPenStyle>? onPenChanged,
   VoidCallback? onClose,
   bool hasSelfBubble = false,
   bool selfBubbleHidden = false,
@@ -92,6 +95,8 @@ CanvasToolsRow buildCanvasToolsRow({
   onToggleFullscreen: onToggleFullscreen ?? () {},
   shapeKind: shapeKind,
   onShapeKindChanged: onShapeKindChanged ?? (_) {},
+  pen: pen,
+  onPenChanged: onPenChanged ?? (_) {},
   onClose: onClose ?? () {},
   hasSelfBubble: hasSelfBubble,
   selfBubbleHidden: selfBubbleHidden,

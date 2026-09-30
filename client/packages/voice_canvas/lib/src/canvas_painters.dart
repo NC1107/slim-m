@@ -81,6 +81,7 @@ class StrokePainter extends CustomPainter {
   StrokePainter({
     required this.document,
     required this.ink,
+    this.inkColors = const {},
     this.noteColor,
     this.shapeColor,
     this.textInk = const Color(0xFF1A1A1A),
@@ -96,6 +97,10 @@ class StrokePainter extends CustomPainter {
   /// [shapeColor] when the caller has no opinion about either - the same
   /// "cheap to omit" shape [CanvasSurface.cursorColors] already uses.
   final Color ink;
+
+  /// Pen colours by the wire `color` key; a stroke whose key is absent here
+  /// (an older or newer client's) paints in [ink] rather than vanishing.
+  final Map<String, Color> inkColors;
   final Color? noteColor;
   final Color? shapeColor;
 
@@ -177,7 +182,9 @@ class StrokePainter extends CustomPainter {
         (stroke.y - camera.y) * camera.zoom,
       );
       canvas.scale(camera.zoom);
-      paint.strokeWidth = stroke.width;
+      paint
+        ..color = inkColors[stroke.colorKey] ?? ink
+        ..strokeWidth = stroke.width;
       canvas.drawPath(stroke.path, paint);
       canvas.restore();
     }

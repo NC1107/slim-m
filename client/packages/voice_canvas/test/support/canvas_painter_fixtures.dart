@@ -40,6 +40,9 @@ class PainterTransform {
 class RecordingCanvas implements Canvas {
   final List<double> deviceStrokeWidths = <double>[];
   final List<Rect> deviceBounds = <Rect>[];
+
+  /// The colour of every pen-path draw, in call order.
+  final List<Color> pathColors = <Color>[];
   final List<PainterTransform> _stack = <PainterTransform>[
     const PainterTransform(0, 0, 1),
   ];
@@ -122,6 +125,7 @@ class RecordingCanvas implements Canvas {
   void drawPath(Path path, Paint paint) {
     deviceStrokeWidths.add(paint.strokeWidth * _current.scale);
     deviceBounds.add(_current.apply(path.getBounds()));
+    pathColors.add(paint.color);
   }
 
   @override

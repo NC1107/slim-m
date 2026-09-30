@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_activity_log.dart';
 import 'package:slimm_app/src/screens/canvas/canvas_pane_body.dart';
+import 'package:slimm_app/src/screens/canvas/canvas_pen_style.dart';
 import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
@@ -47,6 +48,8 @@ Widget _pane(CanvasDocument document, {required bool loading}) => ProviderScope(
           onShapePlace: (_, __) {},
           shapeKind: CanvasShapeKind.rectangle,
           onShapeKindChanged: (_) {},
+          pen: const CanvasPenStyle(),
+          onPenChanged: (_) {},
           onBringToFront: (_) {},
           onSendToBack: (_) {},
           onDeleteSelected: (_) {},

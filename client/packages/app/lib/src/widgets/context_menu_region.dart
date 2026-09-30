@@ -58,6 +58,7 @@ class ContextMenuRegion extends StatefulWidget {
     this.onHoldChanged,
     this.ownsFocusNode = true,
     this.enableLongPress = true,
+    this.opensAbove = false,
   });
 
   /// Builds the menu's items given a callback that closes it. Called fresh
@@ -107,6 +108,10 @@ class ContextMenuRegion extends StatefulWidget {
   /// itself. See `channel_rail_reorder.dart`'s own doc comment for the
   /// concrete conflict this exists to resolve.
   final bool enableLongPress;
+
+  /// Opens the anchored menu above [child]'s top-left instead of at the
+  /// pointer, for a control docked near the bottom edge that it would cover.
+  final bool opensAbove;
 
   @override
   State<ContextMenuRegion> createState() => ContextMenuRegionState();
@@ -202,6 +207,12 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return _rowInset;
+    if (widget.opensAbove) {
+      final box = context.findRenderObject() as RenderBox?;
+      if (box != null) {
+        return box.localToGlobal(const Offset(0, -4), ancestor: overlay);
+      }
+    }
     if (pointerGlobal != null) {
       return overlay.globalToLocal(pointerGlobal) + _pointerInset;
     }
@@ -218,6 +229,7 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
         child: CustomSingleChildLayout(
           delegate: MessageMenuLayout(
             anchor: _anchor,
+            above: widget.opensAbove,
             padding:
                 MediaQuery.paddingOf(overlayContext) +
                 const EdgeInsets.all(menuScreenMargin),

@@ -20,8 +20,8 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_overflow_menu.dart';
-import 'canvas_shape_icons.dart';
-import 'canvas_tool_model.dart';
+import 'canvas_pen_style.dart';
+import 'canvas_tool_buttons.dart';
 
 /// Read by tests to find the tool strip's edge fades without matching on any
 /// decorated container that merely happens to carry a gradient.
@@ -60,6 +60,8 @@ class CanvasToolsRow extends StatefulWidget {
     required this.onToggleActivityLog,
     required this.shapeKind,
     required this.onShapeKindChanged,
+    required this.pen,
+    required this.onPenChanged,
     required this.onClose,
     required this.hasSelfBubble,
     required this.selfBubbleHidden,
@@ -90,11 +92,14 @@ class CanvasToolsRow extends StatefulWidget {
   /// timeout freeze does not), which this row is not told.
   final bool canDraw;
 
-  /// The primitive the next tap with the shape tool places. Read only by
-  /// [CanvasOverflowMenu]'s own picker, which appears while [tool] is
-  /// [CanvasTool.shape]; this row has no picker of its own.
+  /// The primitive the next tap with the shape tool places, picked from the
+  /// shape's own options and, for `line`, [CanvasOverflowMenu]'s picker.
   final CanvasShapeKind shapeKind;
   final ValueChanged<CanvasShapeKind> onShapeKindChanged;
+
+  /// The colour and width the next pen stroke takes, offered by the pen's options.
+  final CanvasPenStyle pen;
+  final ValueChanged<CanvasPenStyle> onPenChanged;
 
   final bool canUndo;
   final VoidCallback onUndo;
@@ -254,66 +259,14 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
           child: SingleChildScrollView(
             controller: _toolsScroll,
             scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIconButton(
-                  icon: AppIcons.pan,
-                  semanticLabel: 'Pan',
-                  tooltip:
-                      'Pan the canvas, move an object, or select a stroke '
-                      'to reorder it · hold Shift while resizing to free '
-                      'the aspect ratio',
-                  active: widget.tool == CanvasTool.pan,
-                  onPressed: () => widget.onToolChanged(CanvasTool.pan),
-                ),
-                const SizedBox(width: AppSpacing.s4),
-                AppIconButton(
-                  icon: AppIcons.pen,
-                  semanticLabel: 'Pen',
-                  tooltip: widget.canDraw ? 'Pen' : "Can't draw right now",
-                  active: widget.tool == CanvasTool.pen,
-                  onPressed: CanvasTool.pen.isAvailable(canDraw: widget.canDraw)
-                      ? () => widget.onToolChanged(CanvasTool.pen)
-                      : null,
-                ),
-                const SizedBox(width: AppSpacing.s4),
-                AppIconButton(
-                  icon: AppIcons.note,
-                  semanticLabel: 'Note',
-                  tooltip: widget.canDraw ? 'Note' : "Can't draw right now",
-                  active: widget.tool == CanvasTool.note,
-                  onPressed:
-                      CanvasTool.note.isAvailable(canDraw: widget.canDraw)
-                      ? () => widget.onToolChanged(CanvasTool.note)
-                      : null,
-                ),
-                const SizedBox(width: AppSpacing.s4),
-                AppIconButton(
-                  // The armed kind's own glyph, not a generic one - state must be visible, not just remembered.
-                  icon: canvasShapeKindIcon(widget.shapeKind),
-                  semanticLabel: 'Shape',
-                  tooltip: widget.canDraw
-                      ? 'Shape · ${canvasShapeKindLabel(widget.shapeKind)} armed, '
-                            'pick another from "More canvas actions"'
-                      : "Can't draw right now",
-                  active: widget.tool == CanvasTool.shape,
-                  onPressed:
-                      CanvasTool.shape.isAvailable(canDraw: widget.canDraw)
-                      ? () => widget.onToolChanged(CanvasTool.shape)
-                      : null,
-                ),
-                const SizedBox(width: AppSpacing.s4),
-                AppIconButton(
-                  icon: AppIcons.eraser,
-                  semanticLabel: 'Eraser',
-                  tooltip:
-                      'Eraser · pen ink only, select then Delete for a '
-                      'note, shape or image',
-                  active: widget.tool == CanvasTool.eraser,
-                  onPressed: () => widget.onToolChanged(CanvasTool.eraser),
-                ),
-              ],
+            child: CanvasToolButtons(
+              tool: widget.tool,
+              onToolChanged: widget.onToolChanged,
+              canDraw: widget.canDraw,
+              shapeKind: widget.shapeKind,
+              onShapeKindChanged: widget.onShapeKindChanged,
+              pen: widget.pen,
+              onPenChanged: widget.onPenChanged,
             ),
           ),
         ),

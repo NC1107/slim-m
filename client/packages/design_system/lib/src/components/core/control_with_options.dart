@@ -37,6 +37,7 @@ class AppControlWithOptions extends StatelessWidget {
     this.active = false,
     this.touch,
     this.caretFocusNode,
+    this.visualHeight = AppSizes.controlMd,
   });
 
   final Widget child;
@@ -55,6 +56,9 @@ class AppControlWithOptions extends StatelessWidget {
   final bool? touch;
 
   final FocusNode? caretFocusNode;
+
+  /// The caret's drawn height, to match a primary that is not a full chip.
+  final double visualHeight;
 
   /// True inside an [AppControlWithOptions] that is showing its caret.
   ///
@@ -85,6 +89,7 @@ class AppControlWithOptions extends StatelessWidget {
               active: active,
               touch: touch ?? AppTouchTargets.of(context),
               focusNode: caretFocusNode,
+              visualHeight: visualHeight,
               onPressed: () {
                 AppHaptics.selection();
                 open();
@@ -116,6 +121,7 @@ class _OptionsCaret extends StatelessWidget {
     required this.touch,
     required this.onPressed,
     required this.focusNode,
+    required this.visualHeight,
   });
 
   final String label;
@@ -123,12 +129,12 @@ class _OptionsCaret extends StatelessWidget {
   final bool touch;
   final VoidCallback onPressed;
   final FocusNode? focusNode;
+  final double visualHeight;
 
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final hit = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
-    const visualHeight = AppSizes.controlMd;
     final outerHeight = visualHeight > hit ? visualHeight : hit;
 
     return Tooltip(

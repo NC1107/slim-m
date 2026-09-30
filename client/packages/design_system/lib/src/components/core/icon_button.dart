@@ -10,6 +10,7 @@ import '../../app_metrics.dart';
 import '../../app_motion.dart';
 import '../../app_tokens.dart';
 import '../../touch_targets.dart';
+import 'control_with_options.dart';
 
 /// `danger` states the consequence at rest, for a destructive action sitting
 /// among ordinary ones. `dangerGhost` withholds it until hover, for the case
@@ -106,8 +107,12 @@ class _AppIconButtonState extends State<AppIconButton> {
     final tokens = Theme.of(context).extension<AppTokens>()!;
     final enabled = widget.onPressed != null;
     final visualSize = _diameterFor(widget.size);
-    final radius =
+    final baseRadius =
         visualSize >= AppSizes.controlMd ? AppRadii.card : AppRadii.control;
+    final joined = AppControlWithOptions.joinedOf(context);
+    final radius = joined
+        ? BorderRadius.horizontal(left: Radius.circular(baseRadius))
+        : BorderRadius.circular(baseRadius);
     final touch = widget.touch ?? AppTouchTargets.of(context);
     final hitTarget = touch ? AppSizes.rowTouch : AppSizes.rowPointer;
     final outerSize = visualSize > hitTarget ? visualSize : hitTarget;
@@ -142,7 +147,8 @@ class _AppIconButtonState extends State<AppIconButton> {
     if (widget.active) {
       fill = tokens.accentSoft;
       ink = tokens.accent;
-      border = tokens.accentFill;
+      // The caret beside a joined control draws the seam in the subtle border.
+      border = joined ? tokens.borderSubtle : tokens.accentFill;
     }
 
     // Hover and active arrive on AppListRow's own fast clock, never snapping.
@@ -154,12 +160,20 @@ class _AppIconButtonState extends State<AppIconButton> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(radius),
-        border: border != null ? Border.all(color: border) : null,
+        borderRadius: radius,
+        border: border == null
+            ? null
+            : joined
+                ? Border(
+                    top: BorderSide(color: border),
+                    left: BorderSide(color: border),
+                    bottom: BorderSide(color: border),
+                  )
+                : Border.all(color: border),
       ),
       foregroundDecoration: _focused
           ? BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
+              borderRadius: radius,
               border: Border.all(color: tokens.focusRing, width: 2),
             )
           : null,
@@ -199,7 +213,8 @@ class _AppIconButtonState extends State<AppIconButton> {
             child: SizedBox(
               width: outerSize,
               height: outerSize,
-              child: Center(
+              child: Align(
+                alignment: joined ? Alignment.centerRight : Alignment.center,
                 child: AnimatedScale(
                   scale: _pressed ? AppMotion.pressScale : 1,
                   duration: AppMotion.reduced(context, AppMotion.fast),
@@ -217,6 +232,9 @@ class _AppIconButtonState extends State<AppIconButton> {
       // An included Tooltip's message joins the label in the accessible name, so a tooltip that only repeats the label doubled up what assistive tech announced; excluded only in that case, a genuinely different tooltip still reaches it.
       control = Tooltip(
         message: widget.tooltip!,
+        // A held press belongs to the options; hover still shows the tooltip.
+        triggerMode:
+            joined ? TooltipTriggerMode.manual : TooltipTriggerMode.longPress,
         excludeFromSemantics: widget.tooltip == widget.semanticLabel,
         child: control,
       );

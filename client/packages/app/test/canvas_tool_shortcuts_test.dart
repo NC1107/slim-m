@@ -75,9 +75,11 @@ void main() {
     ];
     expect([...xs]..sort(), xs, reason: 'left to right');
     final gaps = [for (var i = 1; i < xs.length; i++) xs[i] - xs[i - 1]];
-    for (final gap in gaps) {
-      expect(gap, closeTo(gaps.first, 0.01), reason: 'even rhythm');
+    // The pen opens selected, so its caret widens only the pen-to-note gap.
+    for (final i in [2, 3]) {
+      expect(gaps[i], closeTo(gaps.first, 0.01), reason: 'even rhythm');
     }
+    expect(gaps[1] - gaps.first, AppSizes.rowPointer, reason: 'the caret');
     expect(gaps.first, greaterThan(AppSpacing.s4));
   });
 
