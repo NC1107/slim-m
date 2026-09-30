@@ -39,4 +39,45 @@ void main() {
     );
     expect(event, isNull);
   });
+
+  test('a message.ephemeral frame carries its files and embeds', () {
+    final event = ServerEvent.parse(
+      jsonEncode({
+        'type': 'message.ephemeral',
+        'channel_id': 'c1',
+        'message': {
+          'id': 'e1',
+          'channel_id': 'c1',
+          'author_id': 'b1',
+          'author_display_name': 'Helper',
+          'content': '',
+          'in_reply_to_id': 'm1',
+          'created_at': 12,
+          'attachments': [
+            {
+              'id': 'f1',
+              'filename': 'a.png',
+              'content_type': 'image/png',
+              'size': 3,
+            },
+          ],
+          'embeds': [
+            {'title': 'Balance', 'fields': <dynamic>[]},
+          ],
+        },
+      }),
+    );
+    final message = (event as MessageEphemeral).message;
+    expect(message.attachments.single.filename, 'a.png');
+    expect(message.embeds.single.title, 'Balance');
+  });
+
+  test('a report subject round-trips its wire name', () {
+    expect(ReportSubject.ephemeralMessage.wire, 'ephemeral_message');
+    expect(
+      ReportSubject.parse('ephemeral_message'),
+      ReportSubject.ephemeralMessage,
+    );
+    expect(ReportSubject.parse('something_new'), ReportSubject.user);
+  });
 }

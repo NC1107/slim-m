@@ -160,8 +160,12 @@ You get three private messages per anchor, and the fourth is a 429.
 It is never stored.
 It has no `seq`, never appears in a history page, in search or in `sync`, and is gone when the member reloads or dismisses it.
 A member who is offline when you send it never sees it, so use it for answers to something they just did, not for anything they must not miss.
-Moderators cannot see it either.
+Moderators cannot browse it, but the member can report it, and the report carries the text they were shown and your bot.
 A member who blocked you still gets a 200 back, so you cannot tell.
+
+It may carry `embeds`, the same shape as on a message, and `attachment_ids`.
+An attachment must already be visible to you and to the member, for example a file on a message in that channel, because a private message cannot make a new file fetchable.
+Anything else is a 400, and `content` may be empty when either is present.
 
 See `docs/decisions/0037-ephemeral-bot-messages.md`.
 

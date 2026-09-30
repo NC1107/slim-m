@@ -211,6 +211,23 @@ impl Store {
         Ok(row.is_some())
     }
 
+    /// Whether `user_id` could fetch `sha256` right now: they uploaded it, or
+    /// can view a channel that has it attached. The same rule as the fetch route.
+    pub async fn can_fetch_attachment(
+        &self,
+        user_id: UserId,
+        sha256: &[u8],
+    ) -> anyhow::Result<bool> {
+        if self.is_attachment_uploader(user_id, sha256).await? {
+            return Ok(true);
+        }
+        let channels = self.channels_referencing_attachment(sha256).await?;
+        let perms = self.permissions_in_channels(user_id, &channels).await?;
+        Ok(perms
+            .values()
+            .any(|p| p.contains(Permissions::VIEW_CHANNEL)))
+    }
+
     /// Attachment summaries for a page of messages, in one query, ordered by
     /// the position they were sent with. Mirrors
     /// `Store::reactions_for_messages`: a message with no attachments is

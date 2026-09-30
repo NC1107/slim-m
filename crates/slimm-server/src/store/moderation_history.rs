@@ -178,7 +178,7 @@ impl Store {
         let mut builder = QueryBuilder::new(
             r#"SELECT r.id, r.reporter_id, r.subject_kind, r.subject_id, r.channel_id,
                       r.reason, r.snapshot, r.created_at, r.resolved_at, r.resolved_by,
-                      r.resolution, m.author_id AS subject_author_id
+                      r.resolution, COALESCE(m.author_id, r.snapshot_author_id) AS subject_author_id
                FROM reports r
                LEFT JOIN messages m
                  ON r.subject_kind = 'message' AND m.id = r.subject_id

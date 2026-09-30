@@ -7,15 +7,23 @@
 /// docs/decisions/0037-ephemeral-bot-messages.md.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_design_system/design_system.dart';
 
 import '../providers/ephemeral_messages.dart';
+import 'attachment_view.dart';
+import 'embed_card.dart';
+import 'ephemeral_report.dart';
 
 /// Tall enough for a few lines; a long answer scrolls inside its own card.
 const double _maxBodyHeight = 96;
+
+/// Room for an embed or a file, which a line of text never needs.
+const double _maxRichBodyHeight = 240;
 
 class EphemeralTray extends ConsumerWidget {
   const EphemeralTray({super.key, required this.channelId});
@@ -35,6 +43,8 @@ class EphemeralTray extends ConsumerWidget {
                   EphemeralMessageCard(
                     key: ValueKey(message.id),
                     message: message,
+                    onReport: () =>
+                        unawaited(reportEphemeralMessage(context, message)),
                     onDismiss: () => ref
                         .read(ephemeralMessagesProvider.notifier)
                         .dismiss(channelId, message.id),
@@ -50,10 +60,15 @@ class EphemeralMessageCard extends StatelessWidget {
     super.key,
     required this.message,
     required this.onDismiss,
+    required this.onReport,
   });
 
   final api.EphemeralMessage message;
   final VoidCallback onDismiss;
+  final VoidCallback onReport;
+
+  bool get _hasRichContent =>
+      message.embeds.isNotEmpty || message.attachments.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +136,13 @@ class EphemeralMessageCard extends StatelessWidget {
                     ),
                   ),
                   AppIconButton(
+                    icon: AppIcons.report,
+                    semanticLabel: 'Report private message',
+                    tooltip: 'Report',
+                    size: AppIconButtonSize.sm,
+                    onPressed: onReport,
+                  ),
+                  AppIconButton(
                     icon: AppIcons.dismiss,
                     semanticLabel: 'Dismiss private message',
                     tooltip: 'Dismiss',
@@ -132,11 +154,32 @@ class EphemeralMessageCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.s8),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: _maxBodyHeight),
+                  constraints: BoxConstraints(
+                    maxHeight: _hasRichContent
+                        ? _maxRichBodyHeight
+                        : _maxBodyHeight,
+                  ),
                   child: SingleChildScrollView(
-                    child: SelectableText(
-                      message.content,
-                      style: AppText.ui.copyWith(color: tokens.textPrimary),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (message.content.isNotEmpty)
+                          SelectableText(
+                            message.content,
+                            style: AppText.ui.copyWith(
+                              color: tokens.textPrimary,
+                            ),
+                          ),
+                        EmbedList(embeds: message.embeds),
+                        for (final attachment in message.attachments)
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.s4),
+                            child: AttachmentView(
+                              attachment: attachment,
+                              siblings: openableImages(message.attachments),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

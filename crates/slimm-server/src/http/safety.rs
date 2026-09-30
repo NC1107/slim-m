@@ -14,16 +14,17 @@ use axum::routing::{delete, get, post};
 use serde::{Deserialize, Serialize};
 
 use super::AppState;
+use super::ephemeral_report;
 use super::error::ApiError;
 use super::extract::{AUTHED_READ, Authed, AuthedLimited, Json, WRITE, enforce};
 use super::messages::parse_uuid;
 use crate::hub::Event;
 use crate::ids::{DeviceId, MessageId, UserId};
 use crate::ratelimit::Class;
-use crate::store::{Device, ReportError, ReportSubject};
+use crate::store::{Device, EPHEMERAL_KIND, FiledReport, ReportError, ReportSubject};
 use crate::voice::VoiceError;
 
-const BODY_LIMIT: usize = 8 * 1024;
+const BODY_LIMIT: usize = 32 * 1024;
 const MAX_REASON_CHARS: usize = 2000;
 
 /// Trims a caller-supplied reason and bounds its length.
@@ -106,6 +107,14 @@ struct ReportRequest {
     subject_kind: String,
     subject_id: String,
     reason: String,
+    /// Only for "ephemeral_message": the channel, the bot and the text the
+    /// reporter was shown, since the server kept none of it.
+    #[serde(default)]
+    channel_id: Option<String>,
+    #[serde(default)]
+    author_id: Option<String>,
+    #[serde(default)]
+    snapshot: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -236,11 +245,23 @@ async fn file_report(
         .expect("a required reason is Some or the call above returned");
     let report_id = req.id.as_deref().map(parse_uuid).transpose()?;
 
+    if req.subject_kind == EPHEMERAL_KIND {
+        return file_ephemeral_report(&state, ctx.user_id, report_id, &req, &reason).await;
+    }
+    if req.channel_id.is_some() || req.author_id.is_some() || req.snapshot.is_some() {
+        return Err(ApiError::BadRequest(
+            "channel_id, author_id and snapshot are only for ephemeral_message",
+        ));
+    }
     let id = parse_uuid(&req.subject_id)?;
     let subject = match req.subject_kind.as_str() {
         "message" => ReportSubject::Message(MessageId(id)),
         "user" => ReportSubject::User(UserId(id)),
-        _ => return Err(ApiError::BadRequest("subject_kind must be message or user")),
+        _ => {
+            return Err(ApiError::BadRequest(
+                "subject_kind must be message, user or ephemeral_message",
+            ));
+        }
     };
 
     match subject {
@@ -282,6 +303,39 @@ async fn file_report(
             &reason,
         )
         .await;
+    filed_response(&state, filed)
+}
+
+async fn file_ephemeral_report(
+    state: &AppState,
+    reporter: UserId,
+    report_id: Option<uuid::Uuid>,
+    req: &ReportRequest,
+    reason: &str,
+) -> Result<Json<ReportFiled>, ApiError> {
+    let claim = ephemeral_report::parse(&ephemeral_report::Claim {
+        message_id: &req.subject_id,
+        channel_id: req.channel_id.as_deref(),
+        author_id: req.author_id.as_deref(),
+        snapshot: req.snapshot.as_deref(),
+    })?;
+    ephemeral_report::authorize(state, reporter, &claim).await?;
+    let filed = state
+        .store
+        .file_ephemeral_report(
+            report_id.unwrap_or_else(uuid::Uuid::now_v7),
+            reporter,
+            &claim.subject(),
+            reason,
+        )
+        .await;
+    filed_response(state, filed)
+}
+
+fn filed_response(
+    state: &AppState,
+    filed: Result<FiledReport, ReportError>,
+) -> Result<Json<ReportFiled>, ApiError> {
     match filed {
         Ok(filed) => {
             // A replay changed nothing, so nothing is announced; see `Event::ReportsChanged`'s own doc.

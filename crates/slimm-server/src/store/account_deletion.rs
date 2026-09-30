@@ -164,6 +164,12 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         sqlx::query!(
+            "UPDATE reports SET snapshot_author_id = NULL WHERE snapshot_author_id = ?",
+            user_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query!(
             "UPDATE member_timeouts SET issued_by = NULL WHERE issued_by = ?",
             user_id
         )

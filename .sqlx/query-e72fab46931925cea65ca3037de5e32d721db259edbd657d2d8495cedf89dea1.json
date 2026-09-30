@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO reports\n                (id, reporter_id, subject_kind, subject_id, channel_id, reason,\n                 snapshot, snapshot_author_id, created_at)\n             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "e72fab46931925cea65ca3037de5e32d721db259edbd657d2d8495cedf89dea1"
+}

@@ -56,6 +56,32 @@ pub struct Embed {
     pub fields: Vec<EmbedField>,
 }
 
+impl From<NewEmbed> for Embed {
+    fn from(e: NewEmbed) -> Self {
+        Self {
+            title: e.title,
+            description: e.description,
+            url: e.url,
+            color: e.color,
+            author_name: e.author_name,
+            author_url: e.author_url,
+            footer_text: e.footer_text,
+            timestamp: e.timestamp,
+            image_url: e.image_url,
+            thumbnail_url: e.thumbnail_url,
+            fields: e
+                .fields
+                .into_iter()
+                .map(|f| EmbedField {
+                    name: f.name,
+                    value: f.value,
+                    inline: f.inline,
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Writes `embeds` inside the caller's transaction, so a message and its
 /// embeds can commit or roll back together.
 pub(super) async fn insert_embeds(

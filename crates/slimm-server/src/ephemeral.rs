@@ -7,7 +7,9 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
+use crate::http::embeds::EmbedDto;
 use crate::ids::{ChannelId, MessageId, UserId};
+use crate::store::AttachmentSummary;
 
 /// How long after a member's message a bot may still answer it privately.
 pub const ANCHOR_WINDOW_MS: i64 = 15 * 60 * 1000;
@@ -23,6 +25,9 @@ pub struct EphemeralMessage {
     pub content: String,
     pub in_reply_to_id: MessageId,
     pub created_at: i64,
+    /// Files the recipient could already fetch; the message owns no bytes.
+    pub attachments: Vec<AttachmentSummary>,
+    pub(crate) embeds: Vec<EmbedDto>,
 }
 
 /// Most private messages one bot may send about one anchor.

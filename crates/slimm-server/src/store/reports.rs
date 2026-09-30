@@ -34,6 +34,28 @@ impl ReportSubject {
     }
 }
 
+/// The subject kind a report about a bot's private message carries.
+pub const EPHEMERAL_KIND: &str = "ephemeral_message";
+
+/// What a reporter says a bot privately sent them, as the client showed it.
+pub struct EphemeralSubject<'a> {
+    pub message_id: MessageId,
+    pub channel_id: ChannelId,
+    pub author_id: UserId,
+    pub snapshot: &'a str,
+}
+
+struct ReportRow<'a> {
+    id: Uuid,
+    reporter: UserId,
+    kind: &'a str,
+    subject_id: Uuid,
+    channel_id: Option<ChannelId>,
+    reason: &'a str,
+    snapshot: Option<&'a str>,
+    snapshot_author_id: Option<UserId>,
+}
+
 /// Why filing a report failed.
 #[derive(Debug)]
 pub enum ReportError {
@@ -145,11 +167,54 @@ impl Store {
             ReportSubject::User(_) => (None, None),
         };
 
-        let now = now_ms();
-        let kind = subject.kind();
-        let subject_id = subject.id();
-        let channel: Option<ChannelId> = channel_id;
+        self.insert_report(ReportRow {
+            id,
+            reporter,
+            kind: subject.kind(),
+            subject_id: subject.id(),
+            channel_id,
+            reason,
+            snapshot: snapshot.as_deref(),
+            snapshot_author_id: None,
+        })
+        .await
+    }
 
+    /// Files a report about a bot's private message. Nothing stored names it,
+    /// so the text and the bot are what the reporter says they saw; the caller
+    /// has checked the bot is a bot and the reporter can view the channel.
+    pub async fn file_ephemeral_report(
+        &self,
+        id: Uuid,
+        reporter: UserId,
+        subject: &EphemeralSubject<'_>,
+        reason: &str,
+    ) -> Result<FiledReport, ReportError> {
+        self.insert_report(ReportRow {
+            id,
+            reporter,
+            kind: EPHEMERAL_KIND,
+            subject_id: subject.message_id.0,
+            channel_id: Some(subject.channel_id),
+            reason,
+            snapshot: Some(subject.snapshot),
+            snapshot_author_id: Some(subject.author_id),
+        })
+        .await
+    }
+
+    async fn insert_report(&self, row: ReportRow<'_>) -> Result<FiledReport, ReportError> {
+        let ReportRow {
+            id,
+            reporter,
+            kind,
+            subject_id,
+            channel_id: channel,
+            reason,
+            snapshot,
+            snapshot_author_id,
+        } = row;
+        let now = now_ms();
         // Reads the id before deciding what to write; see Store::begin_write.
         let mut tx = self.begin_write().await?;
         let existing = sqlx::query!(
@@ -175,8 +240,8 @@ impl Store {
         let result = sqlx::query!(
             "INSERT INTO reports
                 (id, reporter_id, subject_kind, subject_id, channel_id, reason,
-                 snapshot, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                 snapshot, snapshot_author_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             id,
             reporter,
             kind,
@@ -184,6 +249,7 @@ impl Store {
             channel,
             reason,
             snapshot,
+            snapshot_author_id,
             now
         )
         .execute(&mut *tx)
@@ -233,7 +299,7 @@ impl Store {
         let mut builder = QueryBuilder::new(
             r#"SELECT r.id, r.reporter_id, r.subject_kind, r.subject_id, r.channel_id,
                       r.reason, r.snapshot, r.created_at, r.resolved_at, r.resolved_by,
-                      r.resolution, m.author_id AS subject_author_id
+                      r.resolution, COALESCE(m.author_id, r.snapshot_author_id) AS subject_author_id
                FROM reports r
                LEFT JOIN messages m
                  ON r.subject_kind = 'message' AND m.id = r.subject_id
