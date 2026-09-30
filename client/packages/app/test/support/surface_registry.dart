@@ -98,6 +98,11 @@ const snapshotSurfaces = <String, ({String route, List<String> viewports})>{
     route: '/settings/reports',
     viewports: [...phoneAndDesktop, ...compactBracket],
   ),
+  // The routed screen needs the channel as `extra`; channelSettingsFixtureRoute supplies #general.
+  'channel-settings': (
+    route: '/settings/channel',
+    viewports: [...phoneAndDesktop, ...compactBracket],
+  ),
   'admin-overwrites': (
     route: '/settings/permissions',
     viewports: [...phoneAndDesktop, ...compactBracket],

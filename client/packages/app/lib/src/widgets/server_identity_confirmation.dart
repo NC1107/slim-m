@@ -8,13 +8,8 @@
 /// the invite dialog, the manual dialog, and the official-server button -
 /// so the same pin is read and written no matter which door someone used.
 ///
-/// KNOWN GAP, deliberately left open here: a relaunch of an already
-/// signed-in session never calls this. `restoreSession` (`providers.dart`)
-/// is deliberately network-free, so nothing probes `/version` again once a
-/// session already exists, and a server that started answering with a
-/// different identity between launches is never caught until the next
-/// explicit connect. Closing it needs a probe wired into the sync-connect
-/// path, which is a separate change from any of these entry points.
+/// A relaunch of a signed-in session never reaches this: `restoreSession` is
+/// network-free, so `ServerIdentityChangeGate` re-probes it instead.
 library;
 
 import 'package:flutter/material.dart';

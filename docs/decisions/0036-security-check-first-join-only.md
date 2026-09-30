@@ -32,7 +32,8 @@ The pin lives in the platform key store, which is browser storage on web.
 If that storage is cleared, the pin is gone and the device is treated as a first join, so the check shows again.
 That is the safe direction: losing a pin can only cost an extra screen, never skip one.
 
-## Not changed
+## Relaunch
 
-A relaunch of a signed-in session still does not re-probe the server, so a key change is only caught on the next explicit connect.
-That gap is documented in `server_identity_confirmation.dart` and is separate from this decision.
+A relaunch of a signed-in session re-probes `/version` behind `ServerIdentityChangeGate`, and again on every reconnect.
+A key that contradicts the pin shows the same acknowledgement step as sign-in; trusting it re-pins, cancelling ends the session.
+An unreachable server, or nothing pinned yet, leaves the session alone.

@@ -15,16 +15,18 @@ import 'server_fingerprint_step.dart';
 /// pinned for it. Requires an explicit acknowledgement before the one action
 /// that re-pins the new key even unlocks, so it cannot be tapped through the
 /// way the ordinary confirmation can. Pops `true` only if that action fires;
-/// `false` on cancel.
+/// `false` on cancel. A caller with no route to pop passes [onDecision].
 class ServerIdentityChangedStep extends StatefulWidget {
   const ServerIdentityChangedStep({
     super.key,
     required this.address,
     required this.identity,
+    this.onDecision,
   });
 
   final Uri address;
   final api.ServerIdentity identity;
+  final void Function(bool trusted)? onDecision;
 
   @override
   State<ServerIdentityChangedStep> createState() =>
@@ -33,6 +35,11 @@ class ServerIdentityChangedStep extends StatefulWidget {
 
 class _ServerIdentityChangedStepState extends State<ServerIdentityChangedStep> {
   bool _acknowledged = false;
+
+  void _decide(bool trusted) {
+    if (widget.onDecision case final decide?) return decide(trusted);
+    Navigator.of(context).pop(trusted);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,14 +105,14 @@ class _ServerIdentityChangedStepState extends State<ServerIdentityChangedStep> {
                   variant: AppButtonVariant.danger,
                   full: true,
                   disabled: !_acknowledged,
-                  onPressed: () => Navigator.of(context).pop(true),
+                  onPressed: () => _decide(true),
                 ),
                 const SizedBox(height: AppSpacing.s12),
                 AppButton(
                   label: 'Cancel',
                   variant: AppButtonVariant.secondary,
                   full: true,
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => _decide(false),
                 ),
               ],
             ),
