@@ -116,7 +116,7 @@ class CanvasPresenceLayer extends StatefulWidget {
     this.onVideoInterest,
     this.hideSelfCamera = false,
     this.layout = const CanvasPresenceLayout(),
-    this.tool = CanvasTool.select,
+    this.tool = CanvasTool.pan,
     this.participantMenuItemsBuilder,
   });
 
@@ -128,8 +128,8 @@ class CanvasPresenceLayer extends StatefulWidget {
 
   /// The canvas's own active tool, forwarded to every tile - see
   /// `canvas_presence_tile.dart`'s own doc for why anything but
-  /// [CanvasTool.select] makes a tile transparent to a pointer. Defaults to
-  /// [CanvasTool.select] so a caller with no notion of tools (most of this
+  /// [CanvasTool.pan] makes a tile transparent to a pointer. Defaults to
+  /// [CanvasTool.pan] so a caller with no notion of tools (most of this
   /// file's own test suite) keeps every tile fully interactive, unchanged.
   final CanvasTool tool;
 

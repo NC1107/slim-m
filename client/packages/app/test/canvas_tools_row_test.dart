@@ -52,7 +52,7 @@ void main() {
     expect(chosen, CanvasTool.pen);
   });
 
-  testWidgets('tapping select calls onToolChanged with select', (tester) async {
+  testWidgets('tapping pan calls onToolChanged with pan', (tester) async {
     CanvasTool? chosen;
     await tester.pumpWidget(
       wrapCanvasToolsRow(
@@ -60,10 +60,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.bySemanticsLabel('Move'));
+    await tester.tap(find.bySemanticsLabel('Pan'));
     await tester.pump();
 
-    expect(chosen, CanvasTool.select);
+    expect(chosen, CanvasTool.pan);
   });
 
   testWidgets('tapping note or shape calls onToolChanged with that tool', (
@@ -95,7 +95,7 @@ void main() {
     expect(find.bySemanticsLabel('Note'), findsNothing);
     expect(find.bySemanticsLabel('Shape'), findsNothing);
     expect(find.bySemanticsLabel('Eraser'), findsNothing);
-    expect(find.bySemanticsLabel('Move'), findsNothing);
+    expect(find.bySemanticsLabel('Pan'), findsNothing);
     expect(find.bySemanticsLabel('Undo'), findsOneWidget);
     expect(find.bySemanticsLabel('More canvas actions'), findsOneWidget);
     expect(find.bySemanticsLabel('Close canvas'), findsOneWidget);
@@ -120,7 +120,7 @@ void main() {
   // screen-review canvas.md: the pen tool stayed selectable under an error banner, so a tap could pick a tool guaranteed to fail the identical write.
   testWidgets(
     'pen, note, shape and paste image are disabled while canDraw is false, '
-    'eraser and select stay live',
+    'eraser and pan stay live',
     (tester) async {
       var toolChanged = false;
       var pasted = false;
@@ -159,7 +159,7 @@ void main() {
       await tester.tapAt(const Offset(1, 1));
       await tester.pumpAndSettle();
 
-      for (final label in ['Eraser', 'Move']) {
+      for (final label in ['Eraser', 'Pan']) {
         final button = tester.widget<AppIconButton>(
           find.ancestor(
             of: find.bySemanticsLabel(label),

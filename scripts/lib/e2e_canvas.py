@@ -210,7 +210,7 @@ def move_and_resize_converges(a, b, admin_api, channel_id):
     image_id = object_of_kind(admin_api, channel_id, "image")["id"]
     before = admin_api.canvas_object(channel_id, image_id)
 
-    a.click(L.SELECT_TOOL)
+    a.click(L.PAN_TOOL)
     center = a.find("Canvas,")
     cx, cy = center["x"], center["y"]  # the paste centred the image here
     a.gestures(True)
@@ -364,7 +364,7 @@ def concurrent_edits_converge(a, b, admin_api, channel_id):
 
     # An object's position is in canvas coordinates; a drag is in screen ones.
     for c in (a, b):
-        c.click(L.SELECT_TOOL)
+        c.click(L.PAN_TOOL)
     org_a, org_b = origin(a), origin(b)
     centre_a = (org_a[0] + before["x"] + before["w"] / 2,
                 org_a[1] + before["y"] + before["h"] / 2)

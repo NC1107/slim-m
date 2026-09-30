@@ -47,7 +47,7 @@ const _tools = <String, CanvasTool>{
   'canvas-tool-note': CanvasTool.note,
   'canvas-tool-shape': CanvasTool.shape,
   'canvas-tool-eraser': CanvasTool.eraser,
-  'canvas-tool-select': CanvasTool.select,
+  'canvas-tool-select': CanvasTool.pan,
 };
 
 void registerCanvasErrorBanners() {

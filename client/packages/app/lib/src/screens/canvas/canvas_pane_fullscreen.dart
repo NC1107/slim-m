@@ -19,22 +19,22 @@ extension _CanvasPaneFullscreen on _CanvasPaneState {
   /// The tool swap is what makes a viewing mode safe to offer at all: with
   /// the tool strip folded away, a one-finger drag would otherwise still draw
   /// with whatever was armed, because `CanvasSurface` pans and zooms on two
-  /// pointers only. [CanvasTool.select] places nothing, and on empty space it
+  /// pointers only. [CanvasTool.pan] places nothing, and on empty space it
   /// selects nothing either, so a drag through open canvas does what a person
   /// entering a "just show me the content" mode expects it to.
   void _toggleFullscreen() {
     final notifier = ref.read(canvasFullscreenProvider.notifier);
     if (_fullscreen) {
       notifier.state = null;
-      // Whatever was armed on the way in, or the pen if this pane opened straight into fullscreen and has nothing of its own to restore.
-      _refresh(() => _tool = _toolBeforeFullscreen ?? CanvasTool.pen);
+      // Whatever was armed on the way in, or the default tool if this pane opened straight into fullscreen and has nothing of its own to restore.
+      _refresh(() => _tool = _toolBeforeFullscreen ?? _defaultTool);
       _toolBeforeFullscreen = null;
       return;
     }
     notifier.state = widget.channelId;
     _refresh(() {
       _toolBeforeFullscreen = _tool;
-      _tool = CanvasTool.select;
+      _tool = CanvasTool.pan;
     });
   }
 

@@ -54,6 +54,7 @@ import 'canvas_ops_controller.dart';
 import 'canvas_pane_body.dart';
 import 'canvas_quick_placement.dart';
 import 'canvas_stroke_preview_relay.dart';
+import 'canvas_tool_model.dart';
 import 'canvas_sync.dart';
 
 part 'canvas_pane_fullscreen.dart';
@@ -80,11 +81,12 @@ class CanvasPane extends ConsumerStatefulWidget {
 
 class _CanvasPaneState extends ConsumerState<CanvasPane> {
   int _localZ = provisionalLocalZIndex;
-  CanvasTool _tool = CanvasTool.pen;
+  late CanvasTool _tool;
+  bool _toolInitialised = false;
 
   /// What [_tool] was before fullscreen disarmed it, so leaving fullscreen
   /// hands back the tool the person was actually using rather than the
-  /// [CanvasTool.select] the mode itself forced.
+  /// [CanvasTool.pan] the mode itself forced.
   CanvasTool? _toolBeforeFullscreen;
   CanvasShapeKind _shapeKind = CanvasShapeKind.rectangle;
   CanvasImagePaste? _imagePasteHelper;
@@ -115,6 +117,14 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
     _engine; // touching the late field is what forces its ref.read now
     // This pane is the only content mounted while it exists, so one listener for the whole mount is safe: nothing else here could hold it at the same time.
     _imagePaste.start();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_toolInitialised) return;
+    _toolInitialised = true;
+    _tool = _defaultTool;
   }
 
   /// Disposes the engine directly, synchronously, rather than trusting
@@ -183,6 +193,11 @@ class _CanvasPaneState extends ConsumerState<CanvasPane> {
       },
       child: Focus(
         autofocus: true,
+        onKeyEvent: (_, event) => _onToolKey(
+          event,
+          canDraw: engineState.error == null,
+          fullscreen: fullscreen,
+        ),
         child: CanvasPaneBody(
           channelId: widget.channelId,
           onClose: _closeCanvas,

@@ -64,7 +64,7 @@ void main() {
               onDeleteSelected: (_) {},
               activityLogOpen: false,
               onToggleActivityLog: () {},
-              tool: CanvasTool.select,
+              tool: CanvasTool.pan,
               shapeKind: CanvasShapeKind.rectangle,
               onShapeKindChanged: (_) {},
               hasSelfBubble: true,

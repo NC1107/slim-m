@@ -60,11 +60,11 @@ typedef DraftPointAdded = void Function(Offset worldPoint);
 ///
 /// Decision 0004 named the tool dock as exactly three placement tools - pen,
 /// note, shape - each dropping a new object where a pointer taps. `eraser`
-/// and `select` are not placement modes: they act on objects already there
+/// and `pan` are not placement modes: they act on objects already there
 /// (erase, move, resize), added once this canvas grew objects worth acting
 /// on, and are additional to the three named tools rather than a fourth and
 /// fifth placement choice.
-enum CanvasTool { pen, eraser, select, note, shape }
+enum CanvasTool { pan, pen, note, shape, eraser }
 
 /// The canvas itself.
 ///
@@ -205,13 +205,13 @@ class CanvasSurface extends StatefulWidget {
   /// point, which is what makes undoing an erase drag a single op.
   final VoidCallback? onEraseEnd;
 
-  /// Fires on pointer-down while [tool] is [CanvasTool.select], in world
+  /// Fires on pointer-down while [tool] is [CanvasTool.pan], in world
   /// coordinates. Resolving whether an object was actually picked up (and
   /// which one) is the caller's job, the same division [onErase] already
   /// draws, so this widget carries no notion of hit testing either.
   final ValueChanged<Offset>? onSelectStart;
 
-  /// Fires on every pointer move while [tool] is [CanvasTool.select] and a
+  /// Fires on every pointer move while [tool] is [CanvasTool.pan] and a
   /// drag is under way, in world coordinates.
   final ValueChanged<Offset>? onSelectDrag;
 
@@ -425,13 +425,16 @@ class _CanvasSurfaceState extends State<CanvasSurface>
                   RepaintBoundary(child: CustomPaint(painter: _strokes)),
                   if (_remoteDraftPainter case final remoteDraftPainter?)
                     RepaintBoundary(
-                        child: CustomPaint(painter: remoteDraftPainter)),
+                      child: CustomPaint(painter: remoteDraftPainter),
+                    ),
                   RepaintBoundary(child: CustomPaint(painter: _draftPainter)),
                   RepaintBoundary(
-                      child: CustomPaint(painter: _shapeDraftPainter)),
+                    child: CustomPaint(painter: _shapeDraftPainter),
+                  ),
                   if (_selectionPainter case final selectionPainter?)
                     RepaintBoundary(
-                        child: CustomPaint(painter: selectionPainter)),
+                      child: CustomPaint(painter: selectionPainter),
+                    ),
                   if (_cursorPainter case final cursorPainter?)
                     RepaintBoundary(child: CustomPaint(painter: cursorPainter)),
                 ],

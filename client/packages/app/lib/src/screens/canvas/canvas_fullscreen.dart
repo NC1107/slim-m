@@ -21,7 +21,7 @@
 /// whatever tool is armed. Folding the tool strip away without also changing
 /// the tool would leave a mode that reads as "look around" and scribbles on
 /// a shared canvas when you do. `_CanvasPaneState` switches to
-/// `CanvasTool.select` on the way in - it places nothing, and on empty space
+/// `CanvasTool.pan` on the way in - it places nothing, and on empty space
 /// it selects nothing either - and puts the previous tool back on the way
 /// out.
 ///

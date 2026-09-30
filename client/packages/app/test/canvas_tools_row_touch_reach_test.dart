@@ -33,7 +33,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'), warnIfMissed: false);
+      await tester.tap(find.bySemanticsLabel('Eraser'), warnIfMissed: false);
       await tester.pump();
       expect(
         chosen,
@@ -47,9 +47,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Move'));
+      await tester.tap(find.bySemanticsLabel('Eraser'));
       await tester.pump();
-      expect(chosen, CanvasTool.select);
+      expect(chosen, CanvasTool.eraser);
     },
   );
 

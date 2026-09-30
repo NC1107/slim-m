@@ -18,7 +18,7 @@
 /// self-contained gesture handler instead, the same shape the self bubble's
 /// old screen-anchored drag already used before this file replaced it.
 ///
-/// Being locked, or [tool] not being [CanvasTool.select], wraps only the
+/// Being locked, or [tool] not being [CanvasTool.pan], wraps only the
 /// content in [IgnorePointer]: the resize grip disappears too (nothing to
 /// resize while it is not reachable) but the lock control itself never
 /// does, or a locked tile would be a dead end with no way back.
@@ -67,7 +67,7 @@
 ///
 /// The outer shell (the [MouseRegion] and the [Listener] both) is opaque,
 /// replicating a middle-mouse grab-pan and a mouse wheel itself against
-/// [document], only while this tile is unlocked with [CanvasTool.select]
+/// [document], only while this tile is unlocked with [CanvasTool.pan]
 /// active - the one state where a pointer here means "manipulate this
 /// tile". Any other [tool], or [locked] regardless of [tool], turns both
 /// `HitTestBehavior.translucent` and ignores the content: report 2 in the
@@ -122,7 +122,7 @@ class CanvasPresenceManipulableTile extends StatefulWidget {
   final bool locked;
 
   /// The canvas's own active tool - see this file's own library doc for why
-  /// anything but [CanvasTool.select] makes this tile transparent to a
+  /// anything but [CanvasTool.pan] makes this tile transparent to a
   /// pointer the same way [locked] already does.
   final CanvasTool tool;
 
@@ -201,7 +201,7 @@ class _CanvasPresenceManipulableTileState
   /// See this file's own library doc: true whenever a pointer landing on
   /// this tile means something to whatever is stacked behind it instead of
   /// to this tile itself.
-  bool get _passThrough => widget.locked || widget.tool != CanvasTool.select;
+  bool get _passThrough => widget.locked || widget.tool != CanvasTool.pan;
 
   /// [_rect], with its size swapped for [CanvasPresenceManipulableTile
   /// .fixedRenderSize] when one is given - the box this widget actually

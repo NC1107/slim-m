@@ -39,7 +39,7 @@ void main() {
       expect(surfaceDocument(tester).selectedObjectId.value, placedId);
       expect(
         tester.widget<CanvasSurface>(find.byType(CanvasSurface)).tool,
-        CanvasTool.select,
+        CanvasTool.pan,
         reason: 'resizing must not need a manual switch to Move first',
       );
     },
@@ -108,7 +108,7 @@ void main() {
       expect(surfaceDocument(tester).selectedObjectId.value, placedId);
       expect(
         tester.widget<CanvasSurface>(find.byType(CanvasSurface)).tool,
-        CanvasTool.select,
+        CanvasTool.pan,
       );
     },
   );

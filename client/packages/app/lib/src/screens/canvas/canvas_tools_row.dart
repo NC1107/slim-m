@@ -21,6 +21,7 @@ import 'package:slimm_voice_canvas/voice_canvas.dart';
 
 import 'canvas_overflow_menu.dart';
 import 'canvas_shape_icons.dart';
+import 'canvas_tool_model.dart';
 
 /// Read by tests to find the tool strip's edge fades without matching on any
 /// decorated container that merely happens to carry a gradient.
@@ -257,11 +258,22 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AppIconButton(
+                  icon: AppIcons.pan,
+                  semanticLabel: 'Pan',
+                  tooltip:
+                      'Pan the canvas, move an object, or select a stroke '
+                      'to reorder it · hold Shift while resizing to free '
+                      'the aspect ratio',
+                  active: widget.tool == CanvasTool.pan,
+                  onPressed: () => widget.onToolChanged(CanvasTool.pan),
+                ),
+                const SizedBox(width: AppSpacing.s4),
+                AppIconButton(
                   icon: AppIcons.pen,
                   semanticLabel: 'Pen',
                   tooltip: widget.canDraw ? 'Pen' : "Can't draw right now",
                   active: widget.tool == CanvasTool.pen,
-                  onPressed: widget.canDraw
+                  onPressed: CanvasTool.pen.isAvailable(canDraw: widget.canDraw)
                       ? () => widget.onToolChanged(CanvasTool.pen)
                       : null,
                 ),
@@ -271,7 +283,8 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
                   semanticLabel: 'Note',
                   tooltip: widget.canDraw ? 'Note' : "Can't draw right now",
                   active: widget.tool == CanvasTool.note,
-                  onPressed: widget.canDraw
+                  onPressed:
+                      CanvasTool.note.isAvailable(canDraw: widget.canDraw)
                       ? () => widget.onToolChanged(CanvasTool.note)
                       : null,
                 ),
@@ -285,7 +298,8 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
                             'pick another from "More canvas actions"'
                       : "Can't draw right now",
                   active: widget.tool == CanvasTool.shape,
-                  onPressed: widget.canDraw
+                  onPressed:
+                      CanvasTool.shape.isAvailable(canDraw: widget.canDraw)
                       ? () => widget.onToolChanged(CanvasTool.shape)
                       : null,
                 ),
@@ -298,17 +312,6 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
                       'note, shape or image',
                   active: widget.tool == CanvasTool.eraser,
                   onPressed: () => widget.onToolChanged(CanvasTool.eraser),
-                ),
-                const SizedBox(width: AppSpacing.s4),
-                AppIconButton(
-                  icon: AppIcons.select,
-                  semanticLabel: 'Move',
-                  tooltip:
-                      'Move an object, or select a stroke to reorder it '
-                      '· hold Shift while resizing to free the aspect '
-                      'ratio',
-                  active: widget.tool == CanvasTool.select,
-                  onPressed: () => widget.onToolChanged(CanvasTool.select),
                 ),
               ],
             ),

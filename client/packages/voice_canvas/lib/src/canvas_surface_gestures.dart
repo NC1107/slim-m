@@ -28,7 +28,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
       CanvasTool.note ||
       CanvasTool.shape =>
         SystemMouseCursors.precise,
-      CanvasTool.select => SystemMouseCursors.grab,
+      CanvasTool.pan => SystemMouseCursors.grab,
     };
   }
 
@@ -80,7 +80,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     switch (widget.tool) {
       case CanvasTool.eraser:
         _pendingErasePoint = _toWorld(event.localPosition);
-      case CanvasTool.select:
+      case CanvasTool.pan:
         widget.onSelectStart?.call(_toWorld(event.localPosition));
       case CanvasTool.note:
         _pendingPlacementTool = CanvasTool.note;
@@ -126,7 +126,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
           _pendingErasePoint = null;
         }
         widget.onErase?.call(_toWorld(event.localPosition));
-      case CanvasTool.select:
+      case CanvasTool.pan:
         widget.onSelectDrag?.call(_toWorld(event.localPosition));
       case CanvasTool.note:
         break;
@@ -165,7 +165,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
           _pendingErasePoint = null;
         }
         if (_totalPointers == 0) widget.onEraseEnd?.call();
-      case CanvasTool.select:
+      case CanvasTool.pan:
         if (_totalPointers == 0) widget.onSelectEnd?.call();
       case CanvasTool.note:
       case CanvasTool.shape:
@@ -200,7 +200,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
         widget.onShapePlace?.call(center, size);
       case CanvasTool.pen:
       case CanvasTool.eraser:
-      case CanvasTool.select:
+      case CanvasTool.pan:
         break;
     }
   }
@@ -258,7 +258,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
     switch (widget.tool) {
       case CanvasTool.eraser:
         _pendingErasePoint = _toWorld(screen);
-      case CanvasTool.select:
+      case CanvasTool.pan:
         widget.onSelectStart?.call(_toWorld(screen));
       case CanvasTool.note:
         _pendingPlacementTool = CanvasTool.note;
@@ -308,7 +308,7 @@ extension _CanvasSurfaceGestures on _CanvasSurfaceState {
           _pendingErasePoint = null;
         }
         widget.onEraseEnd?.call();
-      case CanvasTool.select:
+      case CanvasTool.pan:
         widget.onSelectEnd?.call();
       case CanvasTool.note:
       case CanvasTool.shape:

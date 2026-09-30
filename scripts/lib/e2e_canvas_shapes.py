@@ -169,7 +169,7 @@ def reorder_stroke_and_see_it_live(a, b, admin_api, channel_id):
     """
     stroke = object_of_kind(admin_api, channel_id, "stroke")
 
-    a.click(L.SELECT_TOOL)
+    a.click(L.PAN_TOOL)
     a.gestures(True)
     a.drag([at(origin(a), STROKE_MID)])
     a.gestures(False)

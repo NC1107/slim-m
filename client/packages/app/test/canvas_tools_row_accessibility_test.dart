@@ -33,11 +33,11 @@ void main() {
 
     expect(tester.takeException(), isNull);
     for (final label in [
+      'Pan',
       'Pen',
       'Note',
       'Shape',
       'Eraser',
-      'Move',
       'Undo',
       'More canvas actions',
       'Close canvas',
@@ -78,10 +78,10 @@ void main() {
       find.byWidgetPredicate(
         (widget) =>
             widget is Tooltip &&
-            (widget.message?.startsWith('Move an object') ?? false),
+            (widget.message?.startsWith('Pan the canvas') ?? false),
       ),
       findsOneWidget,
-      reason: 'Move\'s tooltip is the only place Shift-frees-aspect is said',
+      reason: 'Pan\'s tooltip is the only place Shift-frees-aspect is said',
     );
     expect(
       find.byWidgetPredicate(
