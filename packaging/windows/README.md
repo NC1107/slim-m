@@ -13,7 +13,12 @@ The previous version is kept until the new one has stayed up for 20 seconds, the
 If the new version fails to start three times in a row, the launcher moves `current` back to `previous` and the app says so in a banner.
 
 A copy run straight from the extracted folder, a machine-wide copy under `Program Files` and a packaged MSIX are never modified by the updater.
-The launcher itself is not replaced by updates, so a launcher fix needs another run of `install.cmd`.
+Each version folder also carries its own `slim-m.exe`.
+Once a version has run cleanly (`pending` is cleared), the launcher at the root compares itself to that copy and replaces itself if they differ.
+It copies the new one to `slim-m.new.exe`, runs it once with `--launcher-selftest`, renames itself to `slim-m.exe.old` (a running exe can be renamed but not overwritten) and renames the copy into place, undoing the first rename if the second fails.
+Any failure leaves the old launcher working, and a launcher that does not understand the self-test is never run or swapped in.
+If an interruption ever leaves no `slim-m.exe` at the root, running `app-<version>\slim-m.exe` starts the app and puts the launcher back.
+A launcher from before this change cannot swap itself, so one more run of `install.cmd` is needed to pick it up.
 The build is unsigned, so SmartScreen will warn on first run.
 
 `launcher/` holds the launcher's source (Go).
