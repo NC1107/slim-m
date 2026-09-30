@@ -407,21 +407,44 @@ void main() {
     expect(_plate, findsNothing);
   });
 
-  testWidgets('hover on a compact-width window keeps the tighter inset', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(harness(_row(message())));
-    final mouse = await _mouse(tester);
-    await _hover(tester, mouse, find.byType(MessageRow));
+  group('a compact-width window with a mouse', () {
+    Future<void> hoverAt390(
+      WidgetTester tester,
+      Message m, {
+      bool grouped = false,
+    }) async {
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(harness(_row(m, grouped: grouped)));
+      final mouse = await _mouse(tester);
+      await _hover(tester, mouse, find.byType(MessageRow));
+    }
 
-    expect(
-      tester.getRect(find.byType(MessageRow)).right -
-          tester.getRect(_plate).right,
-      AppSizes.paneGutterCompact,
-    );
+    void expectPlateClear(WidgetTester tester) {
+      if (_plate.evaluate().isEmpty) return;
+      final plate = tester.getRect(_plate);
+      final row = tester.getRect(find.byType(MessageRow));
+      expect(plate.bottom, lessThanOrEqualTo(row.bottom), reason: 'overhang');
+      for (final r in _headerTextRects(tester)) {
+        expect(plate.overlaps(r), isFalse, reason: 'plate covers header $r');
+      }
+    }
+
+    testWidgets('renders no toolbar, so nothing covers the header', (
+      tester,
+    ) async {
+      await hoverAt390(tester, message(content: 'hello'));
+      expect(_headerTextRects(tester), isNotEmpty);
+      expect(_plate, findsNothing);
+      expectPlateClear(tester);
+    });
+
+    testWidgets('renders no toolbar on a short grouped row', (tester) async {
+      await hoverAt390(tester, message(content: 'one line'), grouped: true);
+      expect(_plate, findsNothing);
+      expectPlateClear(tester);
+    });
   });
 
   testWidgets('a failed or pending message shows no toolbar', (tester) async {

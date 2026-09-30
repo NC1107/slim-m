@@ -468,13 +468,11 @@ class MessageRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Outside layout: revealing it must not resize the row.
-                if ((hovered || focusWithin) && !_unsent)
+                // Outside layout, and never on compact, which reserves no clearance for it.
+                if (!compact && (hovered || focusWithin) && !_unsent)
                   Positioned(
                     top: 0,
-                    right: compact
-                        ? AppSizes.paneGutterCompact
-                        : AppSizes.paneGutter,
+                    right: AppSizes.paneGutter,
                     child: MessageHoverToolbar(
                       actions: actions,
                       onPickReaction: onPickReaction,
