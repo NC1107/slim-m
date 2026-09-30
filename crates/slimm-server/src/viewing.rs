@@ -18,16 +18,28 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use crate::ids::{ChannelId, UserId};
+use crate::ids::{ChannelId, DeviceId, UserId};
 
-/// How long one report counts. Clients refresh well inside this.
-pub const VIEWING_TTL: Duration = Duration::from_secs(90);
+/// How long any foreground signal counts, the websocket viewing report and a
+/// device's push lifecycle report alike, so neither can outlive the other.
+/// Clients refresh both well inside this.
+pub const FOREGROUND_FRESHNESS: Duration = Duration::from_secs(60);
+
+/// How long one viewing report counts.
+pub const VIEWING_TTL: Duration = FOREGROUND_FRESHNESS;
+
+/// The one place that decides what a lifecycle label means: only "foreground"
+/// is foreground, and anything else is a device that has stepped back.
+pub fn is_foreground_label(state: &str) -> bool {
+    state == "foreground"
+}
 
 /// The most channels one connection may report at once; a thread and its
 /// parent are the realistic ceiling, the rest is abuse.
 pub const MAX_VIEWED_CHANNELS: usize = 8;
 
 struct Report {
+    device: DeviceId,
     channels: HashSet<ChannelId>,
     at: Instant,
 }
@@ -45,13 +57,20 @@ impl ViewingTracker {
     }
 
     /// Replaces what `connection` reports as open; an empty set clears it.
-    pub fn set(&self, user_id: UserId, connection: u64, channels: HashSet<ChannelId>) {
-        self.set_at(user_id, connection, channels, Instant::now());
+    pub fn set(
+        &self,
+        user_id: UserId,
+        device: DeviceId,
+        connection: u64,
+        channels: HashSet<ChannelId>,
+    ) {
+        self.set_at(user_id, device, connection, channels, Instant::now());
     }
 
     pub fn set_at(
         &self,
         user_id: UserId,
+        device: DeviceId,
         connection: u64,
         channels: HashSet<ChannelId>,
         now: Instant,
@@ -63,7 +82,14 @@ impl ViewingTracker {
         let mut reports = lock(&self.reports);
         let own = reports.entry(user_id).or_default();
         own.retain(|_, report| now.duration_since(report.at) < VIEWING_TTL);
-        own.insert(connection, Report { channels, at: now });
+        own.insert(
+            connection,
+            Report {
+                device,
+                channels,
+                at: now,
+            },
+        );
     }
 
     /// Forgets a connection, on every exit path of its socket.
@@ -71,6 +97,18 @@ impl ViewingTracker {
         let mut reports = lock(&self.reports);
         if let Some(own) = reports.get_mut(&user_id) {
             own.remove(&connection);
+            if own.is_empty() {
+                reports.remove(&user_id);
+            }
+        }
+    }
+
+    /// Drops every report from one device, for when its lifecycle report says
+    /// it is no longer in front of the user.
+    pub fn clear_device(&self, user_id: UserId, device: DeviceId) {
+        let mut reports = lock(&self.reports);
+        if let Some(own) = reports.get_mut(&user_id) {
+            own.retain(|_, report| report.device != device);
             if own.is_empty() {
                 reports.remove(&user_id);
             }
@@ -109,11 +147,37 @@ mod tests {
     }
 
     #[test]
+    fn clearing_a_device_drops_only_its_reports() {
+        let tracker = ViewingTracker::default();
+        let (user, channel) = (UserId::generate(), ChannelId::generate());
+        let (phone, laptop) = (DeviceId::generate(), DeviceId::generate());
+        tracker.set(user, phone, 1, one(channel));
+        tracker.clear_device(user, laptop);
+        assert!(tracker.is_viewing(user, channel));
+        tracker.set(user, laptop, 2, one(channel));
+        tracker.clear_device(user, phone);
+        assert!(
+            tracker.is_viewing(user, channel),
+            "the laptop still reports it"
+        );
+        tracker.clear_device(user, laptop);
+        assert!(!tracker.is_viewing(user, channel));
+        assert!(lock(&tracker.reports).is_empty());
+    }
+
+    #[test]
+    fn only_the_foreground_label_counts() {
+        assert!(is_foreground_label("foreground"));
+        assert!(!is_foreground_label("background"));
+        assert!(!is_foreground_label(""));
+    }
+
+    #[test]
     fn a_report_lapses_after_the_ttl() {
         let tracker = ViewingTracker::default();
         let (user, channel) = (UserId::generate(), ChannelId::generate());
         let start = Instant::now();
-        tracker.set_at(user, 1, one(channel), start);
+        tracker.set_at(user, DeviceId(uuid::Uuid::nil()), 1, one(channel), start);
         assert!(tracker.is_viewing_at(user, channel, start + VIEWING_TTL - Duration::from_secs(1)));
         assert!(!tracker.is_viewing_at(user, channel, start + VIEWING_TTL));
     }
@@ -122,11 +186,11 @@ mod tests {
     fn clearing_one_connection_keeps_another() {
         let tracker = ViewingTracker::default();
         let (user, channel) = (UserId::generate(), ChannelId::generate());
-        tracker.set(user, 1, one(channel));
-        tracker.set(user, 2, one(channel));
+        tracker.set(user, DeviceId(uuid::Uuid::nil()), 1, one(channel));
+        tracker.set(user, DeviceId(uuid::Uuid::nil()), 2, one(channel));
         tracker.clear(user, 1);
         assert!(tracker.is_viewing(user, channel));
-        tracker.set(user, 2, HashSet::new());
+        tracker.set(user, DeviceId(uuid::Uuid::nil()), 2, HashSet::new());
         assert!(!tracker.is_viewing(user, channel));
     }
 
@@ -139,13 +203,13 @@ mod tests {
             ChannelId::generate(),
         );
         let start = Instant::now();
-        tracker.set_at(idle, 1, one(channel), start);
+        tracker.set_at(idle, DeviceId(uuid::Uuid::nil()), 1, one(channel), start);
         let later = start + VIEWING_TTL + Duration::from_secs(1);
-        tracker.set_at(busy, 1, one(channel), later);
+        tracker.set_at(busy, DeviceId(uuid::Uuid::nil()), 1, one(channel), later);
         // A whole-map sweep would have dropped the lapsed report of `idle`.
         assert!(lock(&tracker.reports).contains_key(&idle));
-        tracker.set_at(idle, 1, one(channel), later);
-        tracker.set_at(idle, 2, one(channel), later);
+        tracker.set_at(idle, DeviceId(uuid::Uuid::nil()), 1, one(channel), later);
+        tracker.set_at(idle, DeviceId(uuid::Uuid::nil()), 2, one(channel), later);
         assert_eq!(lock(&tracker.reports)[&idle].len(), 2);
     }
 
@@ -154,8 +218,14 @@ mod tests {
         let tracker = ViewingTracker::default();
         let (user, channel) = (UserId::generate(), ChannelId::generate());
         let start = Instant::now();
-        tracker.set_at(user, 1, one(channel), start);
-        tracker.set_at(user, 2, one(channel), start + VIEWING_TTL);
+        tracker.set_at(user, DeviceId(uuid::Uuid::nil()), 1, one(channel), start);
+        tracker.set_at(
+            user,
+            DeviceId(uuid::Uuid::nil()),
+            2,
+            one(channel),
+            start + VIEWING_TTL,
+        );
         assert_eq!(lock(&tracker.reports)[&user].len(), 1);
     }
 
@@ -163,7 +233,7 @@ mod tests {
     fn clearing_the_last_connection_forgets_the_user() {
         let tracker = ViewingTracker::default();
         let (user, channel) = (UserId::generate(), ChannelId::generate());
-        tracker.set(user, 1, one(channel));
+        tracker.set(user, DeviceId(uuid::Uuid::nil()), 1, one(channel));
         tracker.clear(user, 1);
         assert!(lock(&tracker.reports).is_empty());
     }
@@ -172,7 +242,12 @@ mod tests {
     fn another_user_is_never_reported_as_viewing() {
         let tracker = ViewingTracker::default();
         let channel = ChannelId::generate();
-        tracker.set(UserId::generate(), 1, one(channel));
+        tracker.set(
+            UserId::generate(),
+            DeviceId(uuid::Uuid::nil()),
+            1,
+            one(channel),
+        );
         assert!(!tracker.is_viewing(UserId::generate(), channel));
     }
 }

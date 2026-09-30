@@ -17,11 +17,12 @@ use super::debounce::Debounce;
 use super::recipients::message_audience;
 use super::{Enabled, SentMessage, dispatch, envelope, narrow_for_attention, relay};
 
-/// How long a device's `foreground` report counts as still current. Past this
+/// How long a device's `foreground` report counts as still current, the same
+/// window a websocket viewing report gets. Past this
 /// the app could have backgrounded or been killed without a fresh report (the
 /// process was simply suspended, for instance), so treat the state as stale
 /// and push anyway rather than risk a silent notification gap.
-const FOREGROUND_FRESHNESS_MS: i64 = 60_000;
+const FOREGROUND_FRESHNESS_MS: i64 = crate::viewing::FOREGROUND_FRESHNESS.as_millis() as i64;
 
 /// Every error path logs and returns rather than propagating: there is no
 /// caller left to report to, only the process log.
@@ -257,7 +258,7 @@ pub(super) fn is_foreground_and_recent(target: &crate::store::PushTarget, now: i
     let Some(reported_at) = target.lifecycle_reported_at else {
         return false;
     };
-    state == "foreground" && now - reported_at < FOREGROUND_FRESHNESS_MS
+    crate::viewing::is_foreground_label(state) && now - reported_at < FOREGROUND_FRESHNESS_MS
 }
 
 #[cfg(test)]

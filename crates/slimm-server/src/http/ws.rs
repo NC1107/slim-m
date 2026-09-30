@@ -111,8 +111,13 @@ async fn serve(socket: WebSocket, state: AppState, _permit: OwnedSemaphorePermit
 
     // Guarantees the matching disconnect however this function returns; see
     // `signals::PresenceGuard`.
-    let presence_guard =
-        signals::PresenceGuard::connect(state.hub.clone(), state.store.clone(), ctx.user_id).await;
+    let presence_guard = signals::PresenceGuard::connect(
+        state.hub.clone(),
+        state.store.clone(),
+        ctx.user_id,
+        ctx.device_id,
+    )
+    .await;
 
     if send_frame(
         &mut sink,

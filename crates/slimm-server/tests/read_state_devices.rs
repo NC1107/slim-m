@@ -15,7 +15,7 @@ use slimm_server::config::Config;
 use slimm_server::db;
 use slimm_server::http::{self, AppState};
 use slimm_server::hub::Hub;
-use slimm_server::ids::{ChannelId, MessageId, UserId};
+use slimm_server::ids::{ChannelId, DeviceId, MessageId, UserId};
 use slimm_server::permissions::Permissions;
 use slimm_server::presence::PresenceTracker;
 use slimm_server::push::PushSender;
@@ -287,8 +287,18 @@ async fn push_skips_a_recipient_who_read_or_is_viewing_the_channel() {
         .unwrap();
 
     let viewing = PresenceTracker::new().viewing();
-    viewing.set(watching, 1, HashSet::from([channel.id]));
-    viewing.set(elsewhere, 1, HashSet::from([other.id]));
+    viewing.set(
+        watching,
+        DeviceId::generate(),
+        1,
+        HashSet::from([channel.id]),
+    );
+    viewing.set(
+        elsewhere,
+        DeviceId::generate(),
+        1,
+        HashSet::from([other.id]),
+    );
 
     let candidates = vec![read, watching, elsewhere, behind];
     let kept =
@@ -322,4 +332,50 @@ async fn a_viewing_frame_is_recorded_and_forgotten_when_the_socket_closes() {
     ws.close(None).await.unwrap();
     drop(ws);
     wait_until(|| !viewing.is_viewing(alice, channel.id)).await;
+}
+
+async fn report_lifecycle(state: &AppState, token: &str, label: &str) {
+    let response = http::router(state.clone())
+        .oneshot(request(
+            "PUT",
+            "/push/lifecycle",
+            token,
+            json!({ "state": label }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn a_device_that_reports_background_stops_being_counted_as_viewing() {
+    let (store, _guard) = new_store().await;
+    seed_everyone(&store).await;
+    let channel = store.create_channel("general", "text").await.unwrap();
+    let state = state_for(&store);
+    let (alice, phone_token, phone_ticket) = account(&store, "alice").await;
+    let (laptop_token, laptop_ticket) = device(&store, alice).await;
+    let addr = serve(state.clone()).await;
+    let mut phone = connect(addr, &phone_ticket).await;
+    let mut laptop = connect(addr, &laptop_ticket).await;
+    let viewing = state.hub.presence().viewing();
+    let open = json!({ "type": "viewing", "channel_ids": [channel.id.to_string()] });
+    phone.send(WsMessage::Text(open.to_string())).await.unwrap();
+    laptop
+        .send(WsMessage::Text(open.to_string()))
+        .await
+        .unwrap();
+    wait_until(|| viewing.is_viewing(alice, channel.id)).await;
+
+    report_lifecycle(&state, &phone_token, "foreground").await;
+    assert!(viewing.is_viewing(alice, channel.id));
+
+    report_lifecycle(&state, &phone_token, "background").await;
+    assert!(
+        viewing.is_viewing(alice, channel.id),
+        "the laptop still reports it"
+    );
+
+    report_lifecycle(&state, &laptop_token, "background").await;
+    assert!(!viewing.is_viewing(alice, channel.id));
 }

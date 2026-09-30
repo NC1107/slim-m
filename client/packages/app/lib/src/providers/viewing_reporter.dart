@@ -4,7 +4,7 @@
 ///
 /// A device that is not in front of the user reports nothing: an unfocused
 /// desktop window or a backgrounded phone must not silence the account's
-/// other devices. The server lets a report lapse after 90 seconds, so while
+/// other devices. The server lets a report lapse after 60 seconds, so while
 /// anything is open it is re-sent well inside that, and again after every
 /// reconnect, because a new socket starts with no report.
 ///
@@ -20,7 +20,7 @@ import 'app_lifecycle.dart';
 import 'mounted_channels.dart';
 import 'sync_controller.dart';
 
-/// Comfortably inside the server's 90 second lapse.
+/// Comfortably inside the server's 60 second lapse.
 const viewingRefreshInterval = Duration(seconds: 30);
 
 class ViewingReporter {

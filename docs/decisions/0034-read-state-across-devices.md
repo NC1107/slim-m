@@ -43,9 +43,10 @@ This step only ever removes people.
   This covers the window before that device has advanced the marker for a message that has only just landed, which the marker check alone cannot.
 
 The second signal is a new client frame, `viewing`, carrying the channel ids the connection has open in a focused window.
-It replaces the connection's previous report, is held in memory only, and lapses after 90 seconds, so a client that is suspended without closing its socket cannot silence push for long.
+It replaces the connection's previous report, is held in memory only, and lapses after 60 seconds, the same window a device's push lifecycle report gets, so a client that is suspended without closing its socket cannot silence push for long.
 Clients re-send it about every 30 seconds while a channel is open, on focus changes, and after a reconnect.
 An unfocused window or a backgrounded phone reports nothing, so it never silences the account's other devices.
+A lifecycle report other than "foreground" from a device also drops that device's viewing reports at once, because a phone that is suspended cannot send the empty frame and would otherwise keep silencing push until the window lapsed.
 
 ## Privacy
 
