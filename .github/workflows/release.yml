@@ -131,8 +131,7 @@ jobs:
           file: docker/server.Dockerfile
           platforms: linux/${{ matrix.arch }}
           build-args: SLIMM_BUILD_ID=${{ github.sha }}
-          # Push by digest; the tagged manifest is assembled in the merge job.
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true # by digest; the merge job tags it
           sbom: true
           provenance: mode=max
 
