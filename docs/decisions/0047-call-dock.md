@@ -35,7 +35,9 @@ One pill that grows reads as the same control with more in it, and the far edge 
 
 Today: below `kCompactWidth` the dock is two rows in one card, call on top and tools below, with 44px targets.
 Change: keep the stack and the `kCompactWidth` branch, and only change the order (tools and undo on the top row, call row below with leave last).
-More moves into the call row so the tool row never scrolls.
+More was meant to move into the call row so the tool row never scrolls.
+Amended 2026-09-30, while implementing this in #1517: at 360 wide the call row cannot hold mic, camera, share, more, the canvas toggle and leave at 44px targets, so more stays with the tools and the top row can still scroll.
+The consequence is that a phone user scrolls the strip to reach the eraser, which is tracked separately.
 
 Why: it already works, and the only thing wrong with it is the order that point 2 fixes everywhere.
 
