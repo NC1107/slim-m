@@ -71,7 +71,8 @@ struct RegisterRequest {
 struct LifecycleRequest {
     /// Free-form client lifecycle label, for example "foreground" or
     /// "background". Only "foreground" carries meaning to the server today;
-    /// anything else is just not-foreground.
+    /// anything else is just not-foreground, and also withdraws whatever
+    /// channels that device reported open over the socket.
     state: String,
 }
 
@@ -153,6 +154,14 @@ async fn report_lifecycle(
         .store
         .report_lifecycle(ctx.user_id, ctx.device_id, state_value)
         .await?;
+    if !crate::viewing::is_foreground_label(state_value) {
+        // A device that stepped back cannot keep silencing push for what it last reported open.
+        state
+            .hub
+            .presence()
+            .viewing()
+            .clear_device(ctx.user_id, ctx.device_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

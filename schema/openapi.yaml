@@ -4200,6 +4200,9 @@ paths:
         presence: a suspended-but-still-connected socket (iOS backgrounding)
         is not proof the app can show a notification. A recent `foreground`
         report suppresses push to that device until it goes stale or changes.
+        A report of any other state also withdraws the channels this device
+        reported open over the WebSocket (`ClientViewing`), and both signals go
+        stale after the same 60 seconds.
       requestBody:
         required: true
         content:
@@ -11789,7 +11792,7 @@ components:
         The channels this connection has open and focused right now,
         replacing its previous report; an empty list clears it. A client
         re-sends it about every 30 seconds while it holds, because the
-        server lets a report lapse after 90 seconds. It is used only to skip
+        server lets a report lapse after 60 seconds. It is used only to skip
         a push notification for a message this account is already reading,
         is never broadcast, and is unaffected by presence visibility. At
         most 8 ids are honoured and ids that do not parse are ignored.

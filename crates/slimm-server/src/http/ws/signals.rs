@@ -6,7 +6,7 @@
 
 use super::frames::ServerFrame;
 use crate::hub::{Event, Hub};
-use crate::ids::{CanvasObjectId, ChannelId, UserId};
+use crate::ids::{CanvasObjectId, ChannelId, DeviceId, UserId};
 use crate::permissions::Permissions;
 use crate::presence::{self, Status, Visibility};
 use crate::ratelimit::{Class, RateLimiter};
@@ -19,6 +19,7 @@ use crate::store::{SessionContext, Store, WORLD_LIMIT};
 pub(super) struct PresenceGuard {
     hub: Hub,
     user_id: UserId,
+    device_id: DeviceId,
     connection: u64,
     idle_watch: tokio::task::AbortHandle,
 }
@@ -27,7 +28,12 @@ impl PresenceGuard {
     /// Records a new live connection for `user_id` and publishes a change if
     /// this is their first (see [`crate::presence::PresenceTracker::connect`]).
     /// The returned guard must be held for the connection's whole lifetime.
-    pub(super) async fn connect(hub: Hub, store: Store, user_id: UserId) -> Self {
+    pub(super) async fn connect(
+        hub: Hub,
+        store: Store,
+        user_id: UserId,
+        device_id: DeviceId,
+    ) -> Self {
         let first = hub.presence().connect(user_id);
         // Fill the cache without clobbering a concurrent visibility change (see load_visibility).
         if let Ok(Some(visibility)) = store.presence_visibility(user_id).await {
@@ -41,6 +47,7 @@ impl PresenceGuard {
         Self {
             hub,
             user_id,
+            device_id,
             connection,
             idle_watch,
         }
@@ -60,7 +67,7 @@ impl PresenceGuard {
         self.hub
             .presence()
             .viewing()
-            .set(self.user_id, self.connection, channels);
+            .set(self.user_id, self.device_id, self.connection, channels);
     }
 }
 
