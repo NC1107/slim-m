@@ -25,6 +25,7 @@ An install laid out this way updates itself.
 slim-m downloads the next release, checks its signature and sha256, unpacks it into a new version directory and moves `current` over with a rename.
 The previous version stays until the new one has run cleanly once.
 If the new version fails to start twice, the launcher moves `current` back and slim-m tells you on the next start.
+The launcher is part of each version directory and `~/.local/bin/slim-m` links through `current`, so an update replaces the launcher along with the app with no extra step.
 A tarball run from anywhere else, the rpm and the flatpak never replace themselves.
 
 ## What it needs from the system

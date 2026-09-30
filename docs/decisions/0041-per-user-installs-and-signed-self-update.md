@@ -46,6 +46,11 @@ What differs is where things live and what the switch is.
 The desktop shell needs a tiny launcher on Windows and Linux so that "which version runs" is data rather than the path of the running executable.
 That launcher is the one piece of new native surface this design adds and it stays deliberately dumb: read the pointer, exec, nothing else.
 
+The launcher can be replaced by an update too, with one exception to "nothing else" on Windows.
+On Linux it lives in each version directory and the `~/.local/bin/slim-m` link goes through `current`, so switching versions replaces it.
+On Windows the root `slim-m.exe` is running when it matters, so once a version has run cleanly the launcher compares itself with the `slim-m.exe` shipped in that version's folder and swaps itself for it.
+It self-tests the copy first, steps the old file aside by rename and renames the copy in, and any failure leaves the old launcher in place.
+
 ### Coexisting with the COPR rpm and the flatpak
 
 A system install must never be self-modified.
