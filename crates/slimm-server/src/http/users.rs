@@ -97,6 +97,12 @@ pub(super) struct UserDto {
     /// client deciding "does this member hold that role" by name would answer
     /// yes for both of them.
     role_ids: Vec<String>,
+    /// The hoisted role this member is listed under in the member pane, or
+    /// `null` when none of theirs is hoisted. Always one of [`Self::role_ids`].
+    hoisted_role_id: Option<String>,
+    /// That role's hierarchy position, so a client orders sections exactly
+    /// without `GET /roles`, which needs MANAGE_ROLES.
+    hoisted_role_position: Option<i64>,
     /// When this member's timeout lifts, in Unix milliseconds, or `null` if
     /// they are not timed out. An elapsed timeout reads as `null` rather than
     /// as a past deadline, so a client never has to do the comparison to know
@@ -170,6 +176,7 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
         store.roles_for_users(&ids).await?.into_iter().collect();
     // Batched for the same reason the roles above are; see this function's note.
     let timed_out = store.timed_out_among_until(&ids).await?;
+    let hoisted = store.hoisted_roles_for_users(&ids).await?;
     Ok(users
         .into_iter()
         .map(|user| {
@@ -182,6 +189,8 @@ async fn to_dtos(store: &Store, users: Vec<User>) -> anyhow::Result<Vec<UserDto>
                 avatar_updated_at: user.avatar_updated_at,
                 roles: held.iter().map(|(_, name)| name.clone()).collect(),
                 role_ids: held.iter().map(|(id, _)| id.to_string()).collect(),
+                hoisted_role_id: hoisted.get(&user.id).map(|role| role.id.to_string()),
+                hoisted_role_position: hoisted.get(&user.id).map(|role| role.position),
                 timed_out_until: timed_out.get(&user.id).copied(),
                 status_text: user.status_text,
                 pronouns: user.pronouns,

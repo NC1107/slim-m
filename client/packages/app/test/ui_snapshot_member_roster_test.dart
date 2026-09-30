@@ -21,15 +21,25 @@ Map<String, Object?> _member(
   String name, {
   List<List<String>> roles = const [],
   bool bot = false,
-}) => {
-  'id': id,
-  'username': id,
-  'display_name': name,
-  'created_at': 0,
-  'is_bot': bot,
-  'role_ids': [for (final r in roles) r[0]],
-  'roles': [for (final r in roles) r[1]],
-};
+}) {
+  final hoisted = roles.where((r) => _hoistedPositions.containsKey(r[0]));
+  return {
+    'id': id,
+    'username': id,
+    'display_name': name,
+    'created_at': 0,
+    'is_bot': bot,
+    'role_ids': [for (final r in roles) r[0]],
+    'roles': [for (final r in roles) r[1]],
+    'hoisted_role_id': hoisted.firstOrNull?[0],
+    'hoisted_role_position': hoisted.isEmpty
+        ? null
+        : _hoistedPositions[hoisted.first[0]],
+  };
+}
+
+// Helper is deliberately not hoisted, so it never gets a heading.
+const _hoistedPositions = {'r-admin': 9, 'r-mod': 5};
 
 const _admin = ['r-admin', 'Admin'];
 const _mod = ['r-mod', 'Moderator'];

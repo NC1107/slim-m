@@ -17,6 +17,8 @@ class UserProfile {
     this.avatarUpdatedAt,
     this.roles = const [],
     this.roleIds = const [],
+    this.hoistedRoleId,
+    this.hoistedRolePosition,
     this.timedOutUntil,
     this.statusText,
     this.pronouns,
@@ -53,6 +55,15 @@ class UserProfile {
   /// both. Empty on a server older than the field, which is why the roles
   /// sheet treats an id it cannot resolve as unknown rather than as unheld.
   final List<String> roleIds;
+
+  /// The hoisted role the member pane lists this member under, or null when
+  /// none of theirs is hoisted (or the server predates the field). One of
+  /// [roleIds] when set.
+  final String? hoistedRoleId;
+
+  /// [hoistedRoleId]'s hierarchy position, higher first, so sections order
+  /// exactly without `GET /roles`, which needs MANAGE_ROLES.
+  final int? hoistedRolePosition;
 
   /// When this member's timeout lifts, in Unix milliseconds, or null if they
   /// are not timed out. Already resolved against the clock server-side, so an
@@ -110,6 +121,8 @@ class UserProfile {
         roles: (json['roles'] as List<dynamic>?)?.cast<String>() ?? const [],
         roleIds:
             (json['role_ids'] as List<dynamic>?)?.cast<String>() ?? const [],
+        hoistedRoleId: json['hoisted_role_id'] as String?,
+        hoistedRolePosition: json['hoisted_role_position'] as int?,
         timedOutUntil: json['timed_out_until'] as int?,
         statusText: json['status_text'] as String?,
         pronouns: json['pronouns'] as String?,
@@ -132,6 +145,8 @@ class UserProfile {
           displayName == other.displayName &&
           createdAt == other.createdAt &&
           avatarUpdatedAt == other.avatarUpdatedAt &&
+          hoistedRoleId == other.hoistedRoleId &&
+          hoistedRolePosition == other.hoistedRolePosition &&
           timedOutUntil == other.timedOutUntil &&
           statusText == other.statusText &&
           pronouns == other.pronouns &&
@@ -147,6 +162,8 @@ class UserProfile {
         displayName,
         createdAt,
         avatarUpdatedAt,
+        hoistedRoleId,
+        hoistedRolePosition,
         timedOutUntil,
         statusText,
         pronouns,

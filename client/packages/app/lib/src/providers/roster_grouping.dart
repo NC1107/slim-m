@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// How the member pane sections its roster: one section per role, then
-/// Online, Offline and Bots.
+/// How the member pane sections its roster: one section per hoisted role,
+/// then Online, Offline and Bots.
 ///
-/// Roles are not hoist-flagged on the wire yet, so every role a member holds
-/// as their highest one becomes a section, and only for members who are
-/// online. `GET /roles` needs MANAGE_ROLES, so the section order is derived
-/// from the members' own role lists (each is highest-position first) rather
-/// than from positions, which keeps it identical for every viewer.
+/// A member is listed under the highest-position hoisted role they hold, as
+/// the server reports it on the profile, and only while online. `GET /roles`
+/// needs MANAGE_ROLES, so sections order by the position carried on each
+/// member, which keeps the pane identical for every viewer.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +15,7 @@ import 'package:slimm_design_system/design_system.dart';
 import 'member_presence.dart';
 import 'presence_controller.dart';
 
-/// Online members whose highest role is [roleId], listed under [name].
+/// Online members whose top hoisted role is [roleId], listed under [name].
 typedef RoleSection = ({
   String roleId,
   String name,
@@ -38,15 +37,21 @@ class RosterGroups {
   final List<api.UserProfile> bots;
 }
 
-/// The role a member is listed under, or null when they hold none.
+/// The hoisted role a member is listed under, or null when none of theirs is
+/// hoisted.
 ///
-/// Null too on a server that sends no ids, or names that do not line up with
-/// them, since a section keyed on a guess would be worse than none.
-({String id, String name})? topRoleOf(api.UserProfile member) {
-  if (member.roleIds.isEmpty || member.roleIds.length != member.roles.length) {
-    return null;
-  }
-  return (id: member.roleIds.first, name: member.roles.first);
+/// Null too on a server that sends no hoisted role, or an id that is not among
+/// the member's own roles, since a section keyed on a guess would be worse than
+/// none.
+({String id, String name, int position})? hoistedRoleOf(
+  api.UserProfile member,
+) {
+  final id = member.hoistedRoleId;
+  final position = member.hoistedRolePosition;
+  if (id == null || position == null) return null;
+  final index = member.roleIds.indexOf(id);
+  if (index < 0 || index >= member.roles.length) return null;
+  return (id: id, name: member.roles[index], position: position);
 }
 
 /// Splits [members] into role sections, online, offline and bots, each
@@ -57,7 +62,7 @@ RosterGroups groupRoster(
   Map<String, AppPresence> statusOf,
 ) {
   final byRole = <String, List<api.UserProfile>>{};
-  final roleNames = <String, String>{};
+  final sectionOf = <String, ({String name, int position})>{};
   final online = <api.UserProfile>[];
   final offline = <api.UserProfile>[];
   final bots = <api.UserProfile>[];
@@ -71,24 +76,37 @@ RosterGroups groupRoster(
       offline.add(member);
       continue;
     }
-    final top = topRoleOf(member);
-    if (top == null) {
+    final hoisted = hoistedRoleOf(member);
+    if (hoisted == null) {
       online.add(member);
       continue;
     }
-    roleNames[top.id] = top.name;
-    (byRole[top.id] ??= []).add(member);
+    sectionOf[hoisted.id] = (name: hoisted.name, position: hoisted.position);
+    (byRole[hoisted.id] ??= []).add(member);
   }
   int byName(api.UserProfile a, api.UserProfile b) =>
       a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
   online.sort(byName);
   offline.sort(byName);
   bots.sort(byName);
-  final order = _roleOrder(members);
+  final order = byRole.keys.toList()
+    ..sort((a, b) {
+      final byPosition = sectionOf[b]!.position.compareTo(
+        sectionOf[a]!.position,
+      );
+      if (byPosition != 0) return byPosition;
+      final byRoleName = sectionOf[a]!.name.toLowerCase().compareTo(
+        sectionOf[b]!.name.toLowerCase(),
+      );
+      return byRoleName != 0 ? byRoleName : a.compareTo(b);
+    });
   final sections = [
     for (final id in order)
-      if (byRole.containsKey(id))
-        (roleId: id, name: roleNames[id]!, members: byRole[id]!..sort(byName)),
+      (
+        roleId: id,
+        name: sectionOf[id]!.name,
+        members: byRole[id]!..sort(byName),
+      ),
   ];
   return RosterGroups(
     roles: sections,
@@ -96,45 +114,6 @@ RosterGroups groupRoster(
     offline: offline,
     bots: bots,
   );
-}
-
-/// Every role id seen in [members], highest first. Each member's list is in
-/// position order, so consecutive ids are precedence edges; roles no member
-/// shares a list with are ordered by name.
-List<String> _roleOrder(List<api.UserProfile> members) {
-  final names = <String, String>{};
-  final below = <String, Set<String>>{};
-  final indegree = <String, int>{};
-  for (final member in members) {
-    if (topRoleOf(member) == null) continue;
-    for (var i = 0; i < member.roleIds.length; i++) {
-      final id = member.roleIds[i];
-      names[id] = member.roles[i];
-      indegree.putIfAbsent(id, () => 0);
-      below.putIfAbsent(id, () => {});
-      if (i == 0) continue;
-      final above = member.roleIds[i - 1];
-      if (below[above]!.add(id)) indegree[id] = indegree[id]! + 1;
-    }
-  }
-  int byName(String a, String b) {
-    final c = names[a]!.toLowerCase().compareTo(names[b]!.toLowerCase());
-    return c != 0 ? c : a.compareTo(b);
-  }
-
-  final order = <String>[];
-  final remaining = {...indegree.keys};
-  while (remaining.isNotEmpty) {
-    final ready = remaining.where((id) => indegree[id] == 0).toList();
-    final pool = ready.isEmpty ? remaining.toList() : ready;
-    final next = (pool..sort(byName)).first;
-    remaining.remove(next);
-    order.add(next);
-    for (final id in below[next]!) {
-      indegree[id] = indegree[id]! - 1;
-    }
-  }
-  return order;
 }
 
 /// One row of the member pane's roster: a group heading or a member.

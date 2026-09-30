@@ -132,10 +132,14 @@ void main() {
   });
 }
 
+/// A member holding [roles] (highest first), listed under [hoisted], a role
+/// of theirs paired with its position, when one is given.
 api.UserProfile _r(
   String id,
   String name,
   List<(String, String)> roles, {
+  (String, String)? hoisted,
+  int position = 0,
   bool isBot = false,
 }) => api.UserProfile(
   isBot: isBot,
@@ -145,6 +149,8 @@ api.UserProfile _r(
   createdAt: 0,
   roleIds: [for (final r in roles) r.$1],
   roles: [for (final r in roles) r.$2],
+  hoistedRoleId: hoisted?.$1,
+  hoistedRolePosition: hoisted == null ? null : position,
 );
 
 void roleGroupingTests() {
@@ -156,11 +162,11 @@ void roleGroupingTests() {
   };
 
   group('role sections', () {
-    test('online members list under their highest role, in role order', () {
+    test('sections follow hoisted role position, highest first', () {
       final grouped = groupRoster([
-        _r('v', 'Vera', [vip]),
-        _r('m', 'Max', [mod, vip]),
-        _r('a', 'Ada', [admin, mod]),
+        _r('v', 'Vera', [vip], hoisted: vip, position: 1),
+        _r('m', 'Max', [mod, vip], hoisted: mod, position: 5),
+        _r('a', 'Ada', [admin, mod], hoisted: admin, position: 9),
         _r('p', 'Pat', const []),
       ], allOnline);
       expect(grouped.roles.map((s) => s.name), ['Admin', 'Mod', 'VIP']);
@@ -168,11 +174,28 @@ void roleGroupingTests() {
       expect(grouped.online.map((m) => m.id), ['p']);
     });
 
-    test('an offline holder of a role goes to Offline, not the section', () {
+    test('a role held but not hoisted makes no section', () {
+      final grouped = groupRoster([
+        _r('a', 'Ada', [admin, mod], hoisted: mod, position: 5),
+        _r('v', 'Vera', [vip]),
+      ], allOnline);
+      expect(grouped.roles.map((s) => s.name), ['Mod']);
+      expect(grouped.online.map((m) => m.id), ['v']);
+    });
+
+    test('a member lands under the hoisted role, not their top role', () {
+      final grouped = groupRoster([
+        _r('a', 'Ada', [admin, mod], hoisted: mod, position: 5),
+      ], allOnline);
+      expect(grouped.roles.single.roleId, 'r-mod');
+      expect(grouped.online, isEmpty);
+    });
+
+    test('an offline holder of a hoisted role goes to Offline', () {
       final grouped = groupRoster(
         [
-          _r('a', 'Ada', [admin]),
-          _r('m', 'Max', [mod]),
+          _r('a', 'Ada', [admin], hoisted: admin, position: 9),
+          _r('m', 'Max', [mod], hoisted: mod, position: 5),
         ],
         {'a': AppPresence.online},
       );
@@ -180,38 +203,33 @@ void roleGroupingTests() {
       expect(grouped.offline.single.id, 'm');
     });
 
-    test('a bot with a role stays in Bots', () {
+    test('a bot with a hoisted role stays in Bots', () {
       final grouped = groupRoster([
-        _r('b', 'Botty', [admin], isBot: true),
+        _r('b', 'Botty', [admin], hoisted: admin, position: 9, isBot: true),
       ], allOnline);
       expect(grouped.roles, isEmpty);
       expect(grouped.bots.single.id, 'b');
     });
 
-    test('roles no member shares are ordered by name', () {
+    test('roles at one position are ordered by name', () {
       final grouped = groupRoster([
-        _r('m', 'Max', [mod]),
-        _r('v', 'Vera', [vip]),
-        _r('a', 'Ada', [admin]),
+        _r('m', 'Max', [mod], hoisted: mod),
+        _r('v', 'Vera', [vip], hoisted: vip),
+        _r('a', 'Ada', [admin], hoisted: admin),
       ], allOnline);
       expect(grouped.roles.map((s) => s.name), ['Admin', 'Mod', 'VIP']);
     });
 
-    test('a shared list decides the order over the name', () {
-      final grouped = groupRoster([
-        _r('v', 'Vera', [vip, admin]),
-        _r('a', 'Ada', [admin]),
-      ], allOnline);
-      expect(grouped.roles.map((s) => s.name), ['VIP', 'Admin']);
-    });
-
-    test('ids without matching names give no section', () {
+    test('a hoisted role beyond the member\'s own roles gives no section', () {
       final member = api.UserProfile(
         id: 'p',
         username: 'p',
         displayName: 'Pat',
         createdAt: 0,
         roleIds: const ['r-x'],
+        roles: const ['X'],
+        hoistedRoleId: 'r-other',
+        hoistedRolePosition: 3,
       );
       expect(groupRoster([member], allOnline).roles, isEmpty);
     });
@@ -220,10 +238,10 @@ void roleGroupingTests() {
   test('rosterEntries orders roles, Online, Offline, Bots', () {
     final grouped = groupRoster(
       [
-        _r('b', 'Botty', [admin], isBot: true),
+        _r('b', 'Botty', [admin], hoisted: admin, position: 9, isBot: true),
         _r('o', 'Off', const []),
         _r('p', 'Pat', const []),
-        _r('a', 'Ada', [admin]),
+        _r('a', 'Ada', [admin], hoisted: admin, position: 9),
       ],
       {'a': AppPresence.online, 'p': AppPresence.online},
     );
