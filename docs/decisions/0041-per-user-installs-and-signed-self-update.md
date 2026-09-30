@@ -1,7 +1,7 @@
 # 0041 - Per-user installs and signed self-update
 
 Date: 2026-09-28
-Status: proposed; the design, the CI signing, the verified download and the Linux and Windows appliers are built, the macOS applier is carded and not started
+Status: proposed; the design, the CI signing, the verified download and the Linux, Windows and macOS appliers are built; the macOS one has never run on a real Mac
 
 ## Context
 
@@ -142,3 +142,16 @@ The pending-start marker, the third-start rollback, the twenty-second settle and
 `install.cmd` in the zip is the first install, so no new distribution channel exists.
 Only a layout with the launcher and `current` beside an `app-<version>` folder self-updates: a bare extracted zip, `Program Files` and a packaged MSIX keep the release-page notifier.
 The launcher is not replaced by updates; a fix to it needs another run of `install.cmd`.
+
+## macOS applier as built
+
+Any `<name>.app` the user can write is replaceable, found from the running executable: `~/Applications` and a user-owned `/Applications` copy both qualify.
+System and library paths, a mounted disk image, a Gatekeeper translocated copy, a sandbox container and an App Store build (it has a `_MASReceipt`) are refused and keep the release-page notifier.
+The updater unpacks the `macos` zip with `ditto`, picks out its one `.app`, checks it holds this app's executable and an Info.plist, runs `codesign --verify --deep --strict`, and clears the quarantine attribute.
+The swap is two renames in the bundle's own folder: the running bundle to `.<name>.previous`, then the new one in.
+There is a window between them with no bundle at the path; a failed second rename undoes the first.
+macOS has no launcher, so the app counts its own starts in `pending.tries` under `~/Library/Application Support/slim-m/self-update`, and the third start that still finds `pending` moves the previous bundle back and restarts into it.
+That counter only sees starts that reach Dart: a bundle the kernel kills for a bad signature is caught by the verify step before the swap, not by the rollback.
+After the app has stayed up for twenty seconds the pending marker and every leftover are cleared, and one previous bundle is kept, as on Linux and Windows, so a subtly broken update can still be reverted by hand; the next update replaces it.
+The release zip is ad-hoc signed, not Developer ID signed or notarized.
+An ad-hoc bundle that the updater itself downloaded runs because it carries no quarantine flag, but a first install the user downloaded in a browser is still subject to Gatekeeper, and a bundle that loses its signature is refused.

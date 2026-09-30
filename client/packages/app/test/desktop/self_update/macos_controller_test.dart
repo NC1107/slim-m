@@ -101,28 +101,33 @@ void main() {
     },
   );
 
-  test('the restored version reports the rollback, then prunes', () async {
-    final state = stateDir();
-    File('${state.path}/rolled-back').writeAsStringSync('0.89.0');
-    final c = container();
-    await c
-        .read(selfUpdateProvider)
-        .confirmStart(
-          resolvedExecutable: exe,
-          os: 'macos',
-          home: home,
-          settle: Duration.zero,
-        );
-    expect(restarts, 0);
-    expect(
-      c.read(selfUpdateFailureProvider)?.kind,
-      SelfUpdateFailureKind.rolledBack,
-    );
-    expect(
-      Directory('${root.path}/Applications/.slim-m.app.previous').existsSync(),
-      isFalse,
-    );
-  });
+  test(
+    'the restored version reports the rollback and keeps the previous bundle',
+    () async {
+      final state = stateDir();
+      File('${state.path}/rolled-back').writeAsStringSync('0.89.0');
+      final c = container();
+      await c
+          .read(selfUpdateProvider)
+          .confirmStart(
+            resolvedExecutable: exe,
+            os: 'macos',
+            home: home,
+            settle: Duration.zero,
+          );
+      expect(restarts, 0);
+      expect(
+        c.read(selfUpdateFailureProvider)?.kind,
+        SelfUpdateFailureKind.rolledBack,
+      );
+      expect(
+        Directory(
+          '${root.path}/Applications/.slim-m.app.previous',
+        ).existsSync(),
+        isTrue,
+      );
+    },
+  );
 
   test('install refuses a disk-image copy before any network call', () async {
     var fetched = false;

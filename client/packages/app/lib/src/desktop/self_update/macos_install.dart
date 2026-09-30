@@ -193,11 +193,10 @@ String _readOr(File file, String fallback) {
 }
 
 /// Run once the new bundle has stayed up: stops the start counting and deletes
-/// the previous bundle and every leftover of an earlier attempt.
+/// every leftover of an earlier attempt, keeping one previous bundle to go back to.
 void confirmMacosCleanStart(MacosInstallLayout layout) {
   _delete(File(layout.path(MacosNames.pending)));
   _delete(File(layout.path(MacosNames.pendingTries)));
-  _delete(layout.previousBundle);
   _delete(layout.failedBundle);
   _delete(layout.newBundle);
   _delete(layout.unpackDir);

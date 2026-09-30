@@ -204,16 +204,21 @@ void main() {
   });
 
   group('confirmMacosCleanStart', () {
-    test('keeps the previous bundle until then, and prunes it after', () async {
-      await install();
-      File('${layout.stateDir.path}/.staging/leftover').createSync();
-      expect(layout.previousBundle.existsSync(), isTrue);
-      confirmMacosCleanStart(layout);
-      expect(apps(), ['slim-m.app']);
-      expect(_marker(layout.bundle.path), 'new');
-      expect(state('pending'), isNull);
-      expect(layout.stagingDir.existsSync(), isFalse);
-    });
+    test(
+      'keeps the previous bundle before and after, and prunes the leftovers',
+      () async {
+        await install();
+        File('${layout.stateDir.path}/.staging/leftover').createSync();
+        expect(layout.previousBundle.existsSync(), isTrue);
+        File('${layout.unpackDir.path}/half').createSync(recursive: true);
+        confirmMacosCleanStart(layout);
+        expect(apps(), ['.slim-m.app.previous', 'slim-m.app']);
+        expect(_marker(layout.previousBundle.path), 'old');
+        expect(_marker(layout.bundle.path), 'new');
+        expect(state('pending'), isNull);
+        expect(layout.stagingDir.existsSync(), isFalse);
+      },
+    );
   });
 
   group('detectMacosLayout', () {
