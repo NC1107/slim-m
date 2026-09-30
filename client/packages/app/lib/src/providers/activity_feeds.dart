@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_platform/platform.dart';
 
+import '../spotify/spotify_config.dart';
+import '../spotify/spotify_link.dart';
 import 'activity_sharing_settings.dart';
 
 /// The platform's now-playing source, or null where there is none. Overridden
@@ -96,10 +98,27 @@ final _gameFeed = ActivityFeed(
       .map((game) => game == null ? null : activityFromGame(game)),
 );
 
+final _spotifyFeed = ActivityFeed(
+  label: 'Show what I am playing on Spotify',
+  description:
+      'Links your Spotify account so the track shows even when you play on '
+      'another device, like a phone. It asks Spotify only what is playing '
+      'and keeps the token on this device. Turning it off deletes the '
+      'token here; to remove slim-m on Spotify too, use spotify.com/account/apps.',
+  enabled: shareSpotifyProvider,
+  available: spotifyClientIdProvider.select((id) => id.isNotEmpty),
+  open: (ref) => ref
+      .read(spotifySourceProvider)
+      .watch()
+      .map(
+        (playing) => playing == null ? null : activityFromNowPlaying(playing),
+      ),
+);
+
 /// In priority order: when two sources both report something, the first
 /// one is what others see.
 final activityFeedsProvider = Provider<List<ActivityFeed>>(
-  (ref) => [_listeningFeed, _gameFeed],
+  (ref) => [_listeningFeed, _spotifyFeed, _gameFeed],
 );
 
 /// Feeds this device can actually run, for Settings.
