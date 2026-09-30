@@ -45,6 +45,7 @@ mod debounce;
 mod deliver;
 mod dispatch;
 mod envelope;
+mod mention_grammar;
 // pub(crate): crate::mentions reuses resolved_mentions directly rather than reimplementing it.
 pub(crate) mod recipients;
 mod relay;

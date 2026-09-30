@@ -43,10 +43,12 @@ class AppStrongLabelScope extends InheritedWidget {
 ///   alike, so unread's *distinguishing* cue from selected is the dot, shown
 ///   only when [trailing] is absent (a trailing count badge already carries
 ///   the same meaning, so the dot would be redundant next to it). [muted]
-///   suppresses this lift: a muted channel still shows the dot, but reads no
-///   brighter than a read one, since mute is a request to be left alone that
-///   an unread lift would otherwise fight. [mentioned] still breaks through
-///   mute - the one thing muting a channel never silences.
+///   suppresses this lift: a row that still passes [unread] while muted reads
+///   no brighter than a read one, since mute is a request to be left alone
+///   that an unread lift would otherwise fight. Which rows pass it at all is
+///   the caller's rule rather than this component's - under
+///   `docs/decisions/0049-per-channel-notification-behaviour.md` a muted
+///   channel passes neither flag unless its reader hand-marked it unread.
 /// - [mentioned]: a diamond in place of the unread dot's circle, painted in
 ///   [AppTokens.accentFill] instead of [AppTokens.textPrimary] - "unread
 ///   badge" and "mentions of you" are two of the seven closed accent roles

@@ -413,18 +413,30 @@ impl Store {
     }
 
     /// Which of `viewer_ids` allow-list `channel_id` off hours.
+    ///
+    /// `parent_channel_id` is a thread's parent channel, and `None` for every
+    /// other channel: allow-listing a channel has to carry into its threads
+    /// for the same reason muting one does, and only the preference lookup in
+    /// [`Store::channel_notification_preferences`] is worded the other way
+    /// round.
     pub async fn viewers_allowing_channel_off_hours(
         &self,
         viewer_ids: &[UserId],
         channel_id: ChannelId,
+        parent_channel_id: Option<ChannelId>,
     ) -> anyhow::Result<HashSet<UserId>> {
         if viewer_ids.is_empty() {
             return Ok(HashSet::new());
         }
         let mut builder = QueryBuilder::new(
-            "SELECT user_id FROM notification_schedule_allowed_channels WHERE allowed_channel_id = ",
+            "SELECT user_id FROM notification_schedule_allowed_channels WHERE allowed_channel_id IN (",
         );
         builder.push_bind(channel_id);
+        if let Some(parent) = parent_channel_id {
+            builder.push(", ");
+            builder.push_bind(parent);
+        }
+        builder.push(")");
         builder.push(" AND user_id IN (");
         let mut separated = builder.separated(", ");
         for id in viewer_ids {

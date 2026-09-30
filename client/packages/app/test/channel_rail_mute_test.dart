@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// A muted channel's rail row: the bell-off glyph replaces the unread dot
-/// in `AppListRow.trailing`, but `AppListRow.unread` itself - the flag a
-/// screen reader and the row's own bold weight both key off - stays exactly
-/// what `channel.cursor > channel.lastReadSeq` says regardless of mute.
-/// Muting is about interruptions, never about read state; this is what
-/// proves the two never share a gate.
+/// A muted channel's rail row: the bell-off glyph, and nothing else.
+///
+/// `AppListRow.unread` used to stay exactly what `cursor > lastReadSeq` said
+/// regardless of mute, on the reading that muting is about interruptions and
+/// never about read state. Half of that still holds - the channel row behind
+/// the widget is untouched either way - but the owner settled the other half
+/// the other way in
+/// `docs/decisions/0049-per-channel-notification-behaviour.md`: a muted
+/// channel shows nothing at all, so the flag the bold weight and the screen
+/// reader key off is false while the read state behind it is not.
 library;
 
 import 'dart:convert';
@@ -140,15 +144,16 @@ void main() {
   });
 
   testWidgets(
-    'a muted, unread channel still reports itself unread to AppListRow - '
-    'muting is about interruptions, not read state',
+    'a muted, unread channel reports itself read to AppListRow, while the '
+    'channel row behind it stays unread',
     (tester) async {
       final container = _container();
+      final channel = _channel('c1', 'general', cursor: 5, lastReadSeq: 2);
       await tester.pumpWidget(
         _harness(
           container,
           ChannelCategorySections(
-            channels: [_channel('c1', 'general', cursor: 5, lastReadSeq: 2)],
+            channels: [channel],
             categories: const [],
             selectedId: null,
             onReorder: (_) {},
@@ -165,12 +170,17 @@ void main() {
       final row = tester.widget<AppListRow>(find.byType(AppListRow));
       expect(
         row.unread,
-        isTrue,
-        reason:
-            'a muted channel with unread messages is still unread; only the '
-            'chime and the push are what mute silences',
+        isFalse,
+        reason: 'mute is nothing at all, so the bold weight goes too',
       );
       expect(row.muted, isTrue);
+      expect(
+        channel.cursor > channel.lastReadSeq,
+        isTrue,
+        reason:
+            'hiding the indicator must not have marked anything read: the '
+            'unread divider and the read marker still read this row',
+      );
       container.dispose();
     },
   );

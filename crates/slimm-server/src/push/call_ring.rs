@@ -57,7 +57,7 @@ pub(super) async fn deliver(
     callee_id: UserId,
 ) {
     let preference = match store
-        .channel_notification_preferences(channel_id, &[callee_id])
+        .channel_notification_preferences(channel_id, None, &[callee_id])
         .await
     {
         Ok(preferences) => preferences.get(&callee_id).copied().unwrap_or_default(),

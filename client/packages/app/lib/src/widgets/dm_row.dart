@@ -45,6 +45,7 @@ import '../providers/member_presence.dart' show presenceOf;
 import '../providers/notification_schedule_controller.dart';
 import '../providers/presence_controller.dart';
 import '../providers/providers.dart' show apiProvider;
+import '../providers/unread_indicator_rules.dart';
 import '../routing/routes.dart';
 import '../screens/dm_call_pane.dart' show dmCallOpenProvider;
 import 'context_menu_region.dart';
@@ -196,8 +197,19 @@ class DmRow extends ConsumerWidget {
       dmCallActivityProvider.select((m) => m[channel.id] ?? false),
     );
     // A live call outranks the mute glyph in this one slot; unread still counts either way.
-    final muted = ref.watch(
-      channelNotificationOverridesProvider.select((s) => s.isMuted(channel.id)),
+    final override = ref.watch(
+      channelNotificationOverridesProvider.select(
+        (s) => s.overrideFor(channel.id),
+      ),
+    );
+    final muted = override == api.NotificationPreference.nothing;
+    // Mentions-only leaves a DM loud: somebody writing here is addressing this account directly.
+    final indicator = unreadIndicatorFor(
+      channelOverride: override,
+      isDm: true,
+      unread: channel.cursor > channel.lastReadSeq,
+      mentioned: channel.mentionedSeq > channel.lastReadSeq,
+      manuallyUnread: channel.manuallyUnread ?? false,
     );
     // Seeded by DirectMessagesSection from the deployment-wide roster; absent here, this stays offline until that seed or a live event lands.
     final peerId = channel.dmParticipantId;
@@ -213,8 +225,8 @@ class DmRow extends ConsumerWidget {
       child: AppListRow(
         label: channel.name,
         selected: selected,
-        unread: channel.cursor > channel.lastReadSeq,
-        mentioned: channel.mentionedSeq > channel.lastReadSeq,
+        unread: indicator.unread,
+        mentioned: indicator.mentioned,
         muted: muted,
         leading: AuthorAvatar(
           name: channel.name,
