@@ -25,12 +25,11 @@
 /// keep their own scroll-and-fade strip (decision 0004), which only scrolls
 /// when even the hugged width does not fit.
 ///
-/// **Phone width stacks two rows in one card; a wide pane draws one.** Both
-/// rows already fit their own width alone (four or five 44dp controls, or a
-/// tool strip with its own internal scroll fallback), so combining them
-/// needs no new overflow handling - only a width past which there is room to
-/// sit side by side, taken from [kCompactWidth], the same touch/pointer line
-/// `AppTouchTargets` already draws.
+/// **A narrow pane stacks rows in one card; a wide one draws one.** The five
+/// tools get a row of their own so the eraser is on screen at 360, 390 and
+/// 430; undo, the overflow and the canvas toggle share the next row, and the
+/// call controls the last. One row needs [_oneRowMinWidth], measured, not
+/// [kCompactWidth]: between the two the combined row overflows and scrolls.
 ///
 /// **The gaps either side of the divider shrank from [AppSpacing.s12] to
 /// [AppSpacing.s8], the same compaction pass as `FloatingDockCard`'s own
@@ -162,6 +161,10 @@ CallDockData? callDockDataFor(
   return CallDockData(voice: voice, controller: controller);
 }
 
+/// Measured: the one-row dock with the pen caret out is 776dp wide at touch
+/// density, so narrower panes stack instead of scrolling a tool off the edge.
+const _oneRowMinWidth = 800.0;
+
 class CanvasCallDock extends StatelessWidget {
   const CanvasCallDock({super.key, this.call, this.canvas})
     : assert(
@@ -177,16 +180,12 @@ class CanvasCallDock extends StatelessWidget {
     final call = this.call;
     final canvas = this.canvas;
     if (call == null) {
-      return FloatingDockCard(
-        rows: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(child: _ToolsRow(canvas: canvas!)),
-              ..._toggleAfterGap(canvas),
-            ],
-          ),
-        ],
+      return LayoutBuilder(
+        builder: (context, constraints) => FloatingDockCard(
+          rows: constraints.maxWidth >= kCompactWidth
+              ? [_inlineCanvasRow(canvas!)]
+              : _stackedCanvasRows(canvas!),
+        ),
       );
     }
     final leave = CallLeaveButton(controller: call.controller);
@@ -195,7 +194,7 @@ class CanvasCallDock extends StatelessWidget {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final oneRow = constraints.maxWidth >= kCompactWidth;
+        final oneRow = constraints.maxWidth >= _oneRowMinWidth;
         return FloatingDockCard(
           trailing: leave,
           rows: oneRow
@@ -211,19 +210,35 @@ class CanvasCallDock extends StatelessWidget {
                     ],
                   ),
                 ]
-              : [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(child: _ToolsRow(canvas: canvas)),
-                      ..._toggleAfterGap(canvas),
-                    ],
-                  ),
-                  _callRow(call),
-                ],
+              : [..._stackedCanvasRows(canvas), _callRow(call)],
         );
       },
     );
+  }
+
+  static Widget _inlineCanvasRow(CanvasDockData canvas) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Flexible(child: _ToolsRow(canvas: canvas)),
+      ..._toggleAfterGap(canvas),
+    ],
+  );
+
+  /// Tools on their own row so the eraser never scrolls out of reach; undo,
+  /// the overflow and the canvas toggle share the row beneath.
+  static List<Widget> _stackedCanvasRows(CanvasDockData canvas) {
+    if (canvas.fullscreen) return [_ToolsRow(canvas: canvas)];
+    return [
+      if (!canvas.activityLogOpen)
+        _ToolsRow(canvas: canvas, part: CanvasToolsRowPart.toolsOnly),
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToolsRow(canvas: canvas, part: CanvasToolsRowPart.editOnly),
+          ..._toggleAfterGap(canvas),
+        ],
+      ),
+    ];
   }
 
   static Widget _callRow(CallDockData call, {Widget? toggle}) => CallControls(
@@ -248,9 +263,10 @@ class CanvasCallDock extends StatelessWidget {
 /// The canvas half of the dock: the full tool strip normally, or the single
 /// way back out of fullscreen while the chrome is dropped.
 class _ToolsRow extends StatelessWidget {
-  const _ToolsRow({required this.canvas});
+  const _ToolsRow({required this.canvas, this.part = CanvasToolsRowPart.all});
 
   final CanvasDockData canvas;
+  final CanvasToolsRowPart part;
 
   @override
   Widget build(BuildContext context) => canvas.fullscreen
@@ -290,5 +306,6 @@ class _ToolsRow extends StatelessWidget {
           onShowTile: canvas.onShowTile,
           onToggleFullscreen: canvas.onToggleFullscreen,
           showTools: !canvas.activityLogOpen,
+          part: part,
         );
 }

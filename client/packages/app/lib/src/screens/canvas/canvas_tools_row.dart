@@ -39,6 +39,10 @@ class CanvasHiddenTile {
   final String label;
 }
 
+/// Which half of the row to draw, so a phone can stack the tools above undo
+/// and the overflow instead of scrolling the eraser out of reach.
+enum CanvasToolsRowPart { all, toolsOnly, editOnly }
+
 class CanvasToolsRow extends StatefulWidget {
   const CanvasToolsRow({
     super.key,
@@ -69,6 +73,7 @@ class CanvasToolsRow extends StatefulWidget {
     required this.onShowTile,
     required this.onToggleFullscreen,
     this.showTools = true,
+    this.part = CanvasToolsRowPart.all,
   });
 
   /// Which tool a tap or drag on the surface draws with. Pen, note and shape
@@ -146,6 +151,8 @@ class CanvasToolsRow extends StatefulWidget {
   /// close remain.
   final bool showTools;
 
+  final CanvasToolsRowPart part;
+
   @override
   State<CanvasToolsRow> createState() => _CanvasToolsRowState();
 }
@@ -196,10 +203,15 @@ class _CanvasToolsRowState extends State<CanvasToolsRow> {
   @override
   Widget build(BuildContext context) {
     final tokens = Theme.of(context).extension<AppTokens>()!;
+    final part = widget.part;
+    final tools = widget.showTools && part != CanvasToolsRowPart.editOnly;
+    if (part == CanvasToolsRowPart.toolsOnly) {
+      return tools ? _toolStrip(tokens) : const SizedBox.shrink();
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.showTools) ...[
+        if (tools) ...[
           Flexible(child: _toolStrip(tokens)),
           const SizedBox(width: AppSpacing.s8),
         ],
