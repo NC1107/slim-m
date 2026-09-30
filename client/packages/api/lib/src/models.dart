@@ -46,6 +46,7 @@ export 'models_reactions.dart';
 export 'models_roles.dart';
 export 'models_saved.dart';
 export 'models_users.dart';
+export 'models_totp.dart';
 export 'models_version.dart';
 
 // Message needs these in scope here, which only `import` grants; the exports

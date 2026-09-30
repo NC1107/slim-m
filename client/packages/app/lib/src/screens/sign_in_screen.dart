@@ -25,6 +25,7 @@ import '../providers/toasts.dart';
 import 'reset_password_sheet.dart';
 import 'sign_in_alternatives.dart';
 import 'sign_in_credential_fields.dart';
+import '../widgets/totp_sign_in_prompt.dart';
 import 'sign_in_error.dart';
 
 /// Sign in or create an account on a chosen server.
@@ -334,13 +335,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           clientVersion: clientVersion,
         );
       } else {
-        await api.login(
+        final outcome = await api.login(
           username: _username.text.trim(),
           password: _password.text,
           deviceName: deviceDisplayName,
           clientKind: deviceClientKind,
           clientVersion: clientVersion,
         );
+        // No session yet, so nothing below may run until one exists; abandoning the sheet leaves the screen as it was.
+        if (outcome case SignInChallenged(:final challenge)) {
+          if (!mounted) return;
+          final signedIn = await promptForTotpCode(context, ref, challenge);
+          if (!signedIn) return;
+        }
         // An existing account can still spend a code, for the role it grants.
         if (invite != null) {
           try {

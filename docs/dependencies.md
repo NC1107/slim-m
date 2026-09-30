@@ -170,6 +170,13 @@ The portable Linux tarball does not bundle `libmpv.so.2`, and this was decided r
 
 The web backend is different again: `media_kit` embeds a plain HTML `<video>` element there rather than `libmpv`, and that element cannot carry the app's own bearer-token header the way a native network request can - see `attachment_video_source.dart`'s own doc comment for how each platform actually gets authenticated bytes to the player.
 
+### `qr_flutter`, for the TOTP enrolment QR
+
+The enrolment secret has to be scannable, or every member types 32 base32 characters by hand (decision 0048 keeps the text as well, because on a desktop the text is the normal path).
+
+Chosen because it is the smallest thing that does the job: pure Dart painting over `qr`, no platform channel, no camera, no native build on any of the six targets, and BSD-3-Clause like most of this tree.
+It only *draws* a code; nothing here reads one, so none of the camera-permission and platform-plugin weight of a scanner package comes with it.
+
 ### `local_auth`, for the biometric app lock
 
 The owner's own ask ("Face ID login or finger print for devices without faceid") is really an app-lock feature, not a login: the server has no notion of a face or a fingerprint, so this can only ever gate access to a session slim-m already holds. `local_auth` is the Flutter team's own package for exactly that gate.

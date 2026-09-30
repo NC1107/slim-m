@@ -58,6 +58,8 @@ dependencies:
   package_info_plus: ^10.2.1
   path: ^1.9.0
   path_provider: ^2.1.0
+  # The TOTP enrolment QR (decision 0048); pure Dart, no platform channel. See docs/dependencies.md.
+  qr_flutter: ^4.1.0
   shared_preferences: ^2.3.0
   # Frameless/drag/resize/minimize-hide and off-screen-geometry validation;
   # see docs/decisions/0012-desktop-window-shell.md and docs/dependencies.md.
