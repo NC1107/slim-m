@@ -7,9 +7,10 @@
 /// same seam `sign_in_error.dart` already took - a self-contained piece with no
 /// state of its own, driven entirely by what it is handed.
 ///
-/// The helpers matter more than they look: the server enforces a charset and
-/// two lengths, and before these lines existed the first a newcomer heard of
-/// any of it was a rejection after pressing the button.
+/// The username and password rules are stated only while creating an account:
+/// they are what a newcomer needs before choosing, and to someone signing in
+/// with a password they already have they read as the app doubting it. The
+/// server still names the field when it rejects either.
 library;
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,10 @@ import 'package:slimm_design_system/design_system.dart';
 
 import '../widgets/labeled_field.dart';
 import 'sign_in_error.dart';
+
+const usernameRule = 'Letters, digits, _ . and - only. Up to 32 characters.';
+const passwordRule = 'At least 8 characters.';
+const displayNameHelper = 'What others see. Defaults to your username.';
 
 class SignInCredentialFields extends StatelessWidget {
   const SignInCredentialFields({
@@ -29,6 +34,7 @@ class SignInCredentialFields extends StatelessWidget {
     required this.busy,
     required this.errorFor,
     required this.onSubmit,
+    required this.onRecoverAccount,
   });
 
   final TextEditingController username;
@@ -48,6 +54,10 @@ class SignInCredentialFields extends StatelessWidget {
   final String? Function(SignInErrorField) errorFor;
   final VoidCallback onSubmit;
 
+  /// Opens the reset-code flow; offered under the password while signing in
+  /// only, since a new account has nothing to recover.
+  final VoidCallback onRecoverAccount;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -56,7 +66,7 @@ class SignInCredentialFields extends StatelessWidget {
       children: [
         LabeledField(
           label: 'Username',
-          helper: 'Letters, digits, _ . and - only. Up to 32 characters.',
+          helper: creatingAccount ? usernameRule : null,
           child: AppInput(
             controller: username,
             errorText: errorFor(SignInErrorField.username),
@@ -70,7 +80,7 @@ class SignInCredentialFields extends StatelessWidget {
           const SizedBox(height: AppSpacing.s16),
           LabeledField(
             label: 'Display name',
-            helper: 'What others see. Defaults to your username.',
+            helper: displayNameHelper,
             child: AppInput(
               controller: displayName,
               textInputAction: TextInputAction.next,
@@ -81,7 +91,7 @@ class SignInCredentialFields extends StatelessWidget {
         const SizedBox(height: AppSpacing.s16),
         LabeledField(
           label: 'Password',
-          helper: 'At least 8 characters.',
+          helper: creatingAccount ? passwordRule : null,
           child: AppInput(
             controller: password,
             errorText: errorFor(SignInErrorField.password),
@@ -92,6 +102,16 @@ class SignInCredentialFields extends StatelessWidget {
             onSubmitted: (_) => busy ? null : onSubmit(),
           ),
         ),
+        if (!creatingAccount)
+          Align(
+            alignment: Alignment.centerRight,
+            child: AppButton(
+              label: 'Trouble signing in?',
+              variant: AppButtonVariant.ghost,
+              disabled: busy,
+              onPressed: onRecoverAccount,
+            ),
+          ),
       ],
     );
   }
