@@ -21,8 +21,10 @@ import 'package:slimm_design_system/design_system.dart';
 import 'package:slimm_rtc/rtc.dart';
 
 import '../format.dart';
+import '../providers/call_mini_player.dart';
 import 'context_menu_region.dart';
 import 'fullscreen_video_overlay.dart';
+import 'popout_video_button.dart';
 import 'user_avatar.dart';
 
 /// The tile's size floor: the original fixed width, still right once a call
@@ -234,6 +236,18 @@ class CallParticipantTile extends StatelessWidget {
             child: ExpandVideoButton(
               label: "View ${participant.name}'s camera full screen",
               onTap: onExpand!,
+            ),
+          ),
+        if (_showsCamera && !participant.isLocal)
+          Positioned(
+            left: 36,
+            top: 4,
+            child: PopOutVideoButton(
+              feed: (
+                identity: participant.identity,
+                name: participant.name,
+                kind: FeedKind.camera,
+              ),
             ),
           ),
       ],

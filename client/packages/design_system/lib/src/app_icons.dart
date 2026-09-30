@@ -349,6 +349,9 @@ abstract final class AppIcons {
   /// queue's "Jump to message", not a link to another site.
   static const IconData jumpToMessage = LucideIcons.externalLink300;
 
+  /// Moves a call's video into its own OS window on desktop.
+  static const IconData popOut = LucideIcons.squareArrowOutUpRight300;
+
   /// A button that opens another site in the browser, as a bot's link button does.
   static const IconData externalLink = LucideIcons.externalLink300;
 

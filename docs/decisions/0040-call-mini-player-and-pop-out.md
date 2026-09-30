@@ -1,6 +1,6 @@
 # 0040 - Mini-player, desktop pop-out and phone picture-in-picture
 
-Status: accepted (parts 1 and 3 built for Android; pop-out and iOS PiP are follow-ups)
+Status: accepted (parts 1 and 3 built for Android, part 2 built for Linux; iOS PiP is a follow-up)
 Date: 2026-09-28
 
 ## The ask
@@ -73,7 +73,7 @@ Merging the two would either make the strip grow a video (a banner that overlays
 None of the seven surfaces in the guide describes a persistent, non-modal, draggable card, so this adds rule 8 to the guide: a persistent floating view of content the user chose to watch, allowed only over the routed pane, never over composer, keyboard or a status banner, sized by width.
 Rules 6 and 7 are the nearest neighbours and the reason it must not overlay a banner and must not steal focus.
 
-### 2. Desktop pop-out window (follow-up)
+### 2. Desktop pop-out window (built for Linux)
 
 A separate OS window for a stream or share, Discord's Pop Out.
 
@@ -85,7 +85,20 @@ A separate OS window for a stream or share, Discord's Pop Out.
 - I could not confirm a stable first-party multi-window API in Flutter 3.47.0.
   The framework has had multi-window work in progress for desktop, but this record does not depend on it; check the flutter/flutter tracker before starting the card, since a first-party API would replace the plugin.
 
-**Sharing the LiveKit track.**
+**What was built, and why it is not the plugin.**
+Flutter 3.47.0 ships first-party windowing (`_window.dart`, `_window_linux.dart`): several `FlutterView`s in one engine and one isolate.
+A pop-out is a `RegularWindow` hosted through `ViewAnchor`, so it renders the same `screenShareViewFor`/`cameraViewFor` widget from the same `Room`.
+There is no second subscription, no second decode and no server token route, which is why `desktop_multi_window` (second engine) was not taken.
+- The gate is `isWindowingEnabled`, read from the compile-time define `FLUTTER_ENABLED_FEATURE_FLAGS`, and it is not guarded by `kDebugMode`, so a release build honours it.
+- The flutter tool only sets that define on the master channel and rejects it from `--dart-define`, so `client/packages/app/linux/flutter/CMakeLists.txt` appends it to `FLUTTER_TOOL_ENVIRONMENT`.
+- `popout_windowing.dart` is the one file that imports the internal API, so a framework change lands there.
+- The API is marked unstable, so a Flutter upgrade can break the build; treat a bump as needing a pop-out check.
+- Windows and macOS builds do not carry the flag yet, so `popOutSupportedProvider` is false there and no button shows.
+- Web never offers it.
+- Always-on-top is not requested: the controller exposes no such call, and on KDE the user can set "keep above" from the window menu.
+- Checked on the owner's KDE Wayland box with a release build, a real LiveKit SFU and a remote camera: the window renders live video and keeps updating while the main window is minimised.
+
+**Sharing the LiveKit track (the second-engine option, not taken).**
 It is not feasible to hand the existing track to a second engine: a texture belongs to the engine that created it.
 The honest options are:
 - The pop-out opens its own subscribe-only LiveKit connection for the one publisher and renders that.

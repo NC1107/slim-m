@@ -10,8 +10,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:slimm_design_system/design_system.dart';
 
+import '../providers/call_mini_player.dart';
 import 'fullscreen_video_overlay.dart';
 import 'media_label.dart';
+import 'popout_video_button.dart';
 
 /// A dark stage with the share inside it, labelled on hover.
 ///
@@ -37,6 +39,7 @@ class ScreenShareStage extends StatelessWidget {
     required this.child,
     this.isLocal = false,
     this.onExpand,
+    this.popOutIdentity,
   });
 
   final String sharerName;
@@ -51,6 +54,10 @@ class ScreenShareStage extends StatelessWidget {
   /// Opens this share full screen. Null only in the tests that build this
   /// widget in isolation with nothing behind it to expand into.
   final VoidCallback? onExpand;
+
+  /// The remote sharer's identity, which offers the pop-out button; null for
+  /// the local share, which is never previewed back to the sharer.
+  final String? popOutIdentity;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +87,18 @@ class ScreenShareStage extends StatelessWidget {
                       ? 'View your screen full screen'
                       : "View $sharerName's screen full screen",
                   onTap: onExpand!,
+                ),
+              ),
+            if (popOutIdentity != null && !isLocal)
+              Positioned(
+                left: 36,
+                top: 4,
+                child: PopOutVideoButton(
+                  feed: (
+                    identity: popOutIdentity!,
+                    name: sharerName,
+                    kind: FeedKind.screenShare,
+                  ),
                 ),
               ),
             Positioned(
