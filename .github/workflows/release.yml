@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: release
 
-# Full release and publish pipeline. How a release is cut, why server and client
-# version independently, why every publish job requires this commit's own CI
-# to have passed, and what each job needs: docs/ci.md.
+# Full release and publish pipeline. How a release is cut, why server and client version independently, why every publish job requires this commit's own CI to have passed, and what each job needs: docs/ci.md.
 
 on:
   push:
@@ -21,9 +19,11 @@ concurrency:
   group: release-${{ github.sha }}
   cancel-in-progress: false
 
+# Public by design (a PKCE client id); empty on a fork pull request, which leaves the feature off.
+env: {SLIMM_SPOTIFY_CLIENT_ID: "${{ vars.SLIMM_SPOTIFY_CLIENT_ID }}"}
+
 jobs:
-  # Opens and maintains release PRs, and cuts releases on merge. A no-op on a
-  # manual run on a tag, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
+  # Opens and maintains release PRs, and cuts releases on merge. A no-op on a manual run on a tag, so downstream jobs can still resolve it via `needs`. See docs/ci.md.
   #
   # Two invocations, one manifest file each, so neither package's release commit conflicts the other's PR. See docs/ci.md.
   #
@@ -317,7 +317,7 @@ jobs:
         run: |
           flutter config --enable-linux-desktop
           dart pub get --enforce-lockfile
-          flutter build linux --release
+          flutter build linux --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}"
         working-directory: client/packages/app
 
       # Published on every client release and gated on nothing. It is both the
@@ -589,10 +589,10 @@ jobs:
           flutter pub get --enforce-lockfile
           # Build number from the run number and build name from the tag, never
           # from pubspec. Both stores reject a reuse; see docs/ci.md.
-          flutter build appbundle --release \
+          flutter build appbundle --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}" \
             --build-name=${{ steps.ver.outputs.version }} \
             --build-number=${{ github.run_number }}
-          flutter build apk --release \
+          flutter build apk --release --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}" \
             --build-name=${{ steps.ver.outputs.version }} \
             --build-number=${{ github.run_number }}
 
@@ -788,7 +788,7 @@ jobs:
           flutter pub get --enforce-lockfile
           # Build number from the run number and build name from the tag, never
           # from pubspec. Both stores reject a reuse; see docs/ci.md.
-          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist \
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist --dart-define=SLIMM_SPOTIFY_CLIENT_ID="${SLIMM_SPOTIFY_CLIENT_ID}" \
             --build-name=${{ steps.ver.outputs.version }} \
             --build-number=${{ github.run_number }}
 
