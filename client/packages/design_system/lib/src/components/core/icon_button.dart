@@ -200,6 +200,8 @@ class _AppIconButtonState extends State<AppIconButton> {
                       onInvoke: (_) => widget.onPressed!()),
                 },
           child: GestureDetector(
+            // Opaque so the whole hit box responds, not just the visual inside it.
+            behavior: HitTestBehavior.opaque,
             onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
             onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
             onTapCancel:

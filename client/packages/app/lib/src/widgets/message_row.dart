@@ -35,6 +35,7 @@ import 'embed_card.dart';
 import 'bot_ui_failure.dart';
 import 'message_buttons.dart';
 import 'emoji_picker.dart';
+import 'message_hover_toolbar.dart';
 import 'forwarded_message_card.dart';
 import 'hover_reveal.dart';
 import 'link_preview_card.dart';
@@ -229,7 +230,7 @@ class MessageRow extends StatelessWidget {
     final compact = LayoutClass.of(context) == LayoutClass.compact;
     final tokens = Theme.of(context).extension<AppTokens>()!;
     return HoverReveal(
-      builder: (context, hovered, menuOpen) => Column(
+      builder: (context, hovered, menuOpen, focusWithin) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (dayLabel != null) DayDivider(label: dayLabel!),
@@ -243,6 +244,8 @@ class MessageRow extends StatelessWidget {
             // (error grammar 01) - the row itself stays at full strength,
             // because its content is still the author's to act on.
             child: Stack(
+              // The toolbar's shadow spills past the row; clipping it would cut the blur.
+              clipBehavior: Clip.none,
               children: [
                 // Full-bleed, edge to edge; see this file's own doc comment.
                 Positioned.fill(
@@ -255,233 +258,230 @@ class MessageRow extends StatelessWidget {
                         : Colors.transparent,
                   ),
                 ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: message.failed
-                        ? Border(
-                            left: BorderSide(
-                              color: tokens.dangerBorder,
-                              width: 2,
-                            ),
-                          )
-                        : const Border(),
+                ConstrainedBox(
+                  // A row shorter than the toolbar would leave part of it painted but unhittable.
+                  constraints: BoxConstraints(
+                    minHeight: compact ? 0 : MessageHoverToolbar.height,
                   ),
-                  child: Padding(
-                    // Top-only: a bottom inset here doubled the next row's top inset.
-                    padding: EdgeInsets.fromLTRB(
-                      compact
-                          ? AppSizes.paneGutterCompact
-                          : AppSizes.paneGutter,
-                      grouped
-                          ? AppDensity.normal.groupedRowGap
-                          : AppDensity.normal.rowGap,
-                      compact
-                          ? AppSizes.paneGutterCompact
-                          : AppSizes.paneGutter,
-                      0,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        MessageRowLeading(
-                          grouped: grouped,
-                          message: message,
-                          hovered: hovered,
-                        ),
-                        const SizedBox(width: AppSpacing.s12),
-                        Expanded(
-                          // Align loosens Expanded's tight width so the cap can
-                          // bite: without it the max was silently a no-op and body
-                          // text ran the full pane on any monitor.
-                          child: Align(
-                            alignment: Alignment.topLeft,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                maxWidth: kMessageColumnMax,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: message.failed
+                          ? Border(
+                              left: BorderSide(
+                                color: tokens.dangerBorder,
+                                width: 2,
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (!grouped)
-                                    MessageRowHeader(
-                                      message: message,
-                                      webhookUsername: webhookUsername,
-                                    ),
-                                  if (message.replyToId != null)
-                                    ReplyQuote(
-                                      resolved: replyTo,
-                                      onTap: onReplyTap ?? () {},
-                                    ),
-                                  if (editing)
-                                    MessageEditField(
-                                      initialContent: message.content,
-                                      onSubmit: onSubmitEdit,
-                                      onCancel: onCancelEdit,
-                                    )
-                                  // An attachment-only message has no body; an empty one still adds a blank line above the image. A forward's own note is often empty too.
-                                  else if (message.content.isNotEmpty)
-                                    MessageBody(
-                                      content: message.content,
-                                      messageId: message.id,
-                                      knownUsernames: knownUsernames,
-                                      knownRoleNames: knownRoleNames,
-                                      customEmoji: customEmoji,
-                                      dim: message.pending,
-                                      announceSending: message.pending,
-                                    ),
-                                  if (!editing && message.content.isNotEmpty)
-                                    LinkPreviewList(
-                                      urls: extractLinkPreviewUrls(
-                                        message.content,
+                            )
+                          : const Border(),
+                    ),
+                    child: Padding(
+                      // Top-only: a bottom inset here doubled the next row's top inset.
+                      padding: EdgeInsets.fromLTRB(
+                        compact
+                            ? AppSizes.paneGutterCompact
+                            : AppSizes.paneGutter,
+                        grouped
+                            ? AppDensity.normal.groupedRowGap
+                            : AppDensity.normal.rowGap,
+                        compact
+                            ? AppSizes.paneGutterCompact
+                            : AppSizes.paneGutter,
+                        0,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          MessageRowLeading(
+                            grouped: grouped,
+                            message: message,
+                            hovered: hovered,
+                          ),
+                          const SizedBox(width: AppSpacing.s12),
+                          Expanded(
+                            // Align loosens Expanded's tight width so the cap can
+                            // bite: without it the max was silently a no-op and body
+                            // text ran the full pane on any monitor.
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: kMessageColumnMax,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!grouped)
+                                      Padding(
+                                        // Compact has no hover to reserve for, and no room to spare.
+                                        padding: MessageHoverToolbar.clearance(
+                                          compact: compact,
+                                        ),
+                                        child: MessageRowHeader(
+                                          message: message,
+                                          webhookUsername: webhookUsername,
+                                        ),
                                       ),
-                                    ),
-                                  if (!editing && embeds.isNotEmpty)
-                                    EmbedList(embeds: embeds),
-                                  if (!editing && components.isNotEmpty)
-                                    MessageButtons(
-                                      channelId: message.channelId,
-                                      messageId: message.id,
-                                      rows: components,
-                                      unavailable: message.authorId == null,
-                                    ),
-                                  BotUiFailureLine(messageId: message.id),
-                                  if (message.forwarded case final forwarded?)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4,
+                                    if (message.replyToId != null)
+                                      ReplyQuote(
+                                        resolved: replyTo,
+                                        onTap: onReplyTap ?? () {},
                                       ),
-                                      child: ForwardedMessageCard(
-                                        forwarded: forwarded,
-                                        body: forwarded.content.isEmpty
-                                            ? null
-                                            : MessageBody(
-                                                content: forwarded.content,
-                                                knownUsernames: knownUsernames,
-                                                knownRoleNames: knownRoleNames,
-                                                customEmoji: customEmoji,
-                                              ),
-                                        attachments: attachments,
-                                        currentChannelId: message.channelId,
+                                    if (editing)
+                                      MessageEditField(
+                                        initialContent: message.content,
+                                        onSubmit: onSubmitEdit,
+                                        onCancel: onCancelEdit,
+                                      )
+                                    // An attachment-only message has no body; an empty one still adds a blank line above the image. A forward's own note is often empty too.
+                                    else if (message.content.isNotEmpty)
+                                      Padding(
+                                        // A headerless row's first line is what the toolbar would sit on.
+                                        padding: grouped
+                                            ? MessageHoverToolbar.clearance(
+                                                compact: compact,
+                                              )
+                                            : EdgeInsets.zero,
+                                        child: MessageBody(
+                                          content: message.content,
+                                          messageId: message.id,
+                                          knownUsernames: knownUsernames,
+                                          knownRoleNames: knownRoleNames,
+                                          customEmoji: customEmoji,
+                                          dim: message.pending,
+                                          announceSending: message.pending,
+                                        ),
                                       ),
-                                    ),
-                                  if (message.editedAt != null && !editing)
-                                    EditedMarker(onTap: onViewEditHistory),
-                                  if (poll != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4,
+                                    if (!editing && message.content.isNotEmpty)
+                                      LinkPreviewList(
+                                        urls: extractLinkPreviewUrls(
+                                          message.content,
+                                        ),
                                       ),
-                                      child: PollView(
-                                        poll: poll!,
-                                        onVote: onVote,
-                                      ),
-                                    ),
-                                  if (call != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4,
-                                      ),
-                                      child: CallRecordView(
-                                        record: call!,
-                                        viewerIsCaller: viewerIsCaller,
-                                      ),
-                                    ),
-                                  if (appSurface != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.s4,
-                                      ),
-                                      child: AppSurfaceView(
+                                    if (!editing && embeds.isNotEmpty)
+                                      EmbedList(embeds: embeds),
+                                    if (!editing && components.isNotEmpty)
+                                      MessageButtons(
+                                        channelId: message.channelId,
                                         messageId: message.id,
-                                        surface: appSurface!,
-                                        title: appSurface!.moduleId,
+                                        rows: components,
+                                        unavailable: message.authorId == null,
                                       ),
-                                    ),
-                                  // A forward's attachments are part of what was forwarded, and are drawn inside its card instead.
-                                  if (message.forwarded == null)
-                                    for (final attachment in attachments)
+                                    BotUiFailureLine(messageId: message.id),
+                                    if (message.forwarded case final forwarded?)
                                       Padding(
                                         padding: const EdgeInsets.only(
                                           top: AppSpacing.s4,
                                         ),
-                                        child: AttachmentView(
-                                          attachment: attachment,
-                                          siblings: openableImages(attachments),
+                                        child: ForwardedMessageCard(
+                                          forwarded: forwarded,
+                                          body: forwarded.content.isEmpty
+                                              ? null
+                                              : MessageBody(
+                                                  content: forwarded.content,
+                                                  knownUsernames:
+                                                      knownUsernames,
+                                                  knownRoleNames:
+                                                      knownRoleNames,
+                                                  customEmoji: customEmoji,
+                                                ),
+                                          attachments: attachments,
+                                          currentChannelId: message.channelId,
                                         ),
                                       ),
-                                  if (!_unsent)
-                                    ReactionsRow(
-                                      reactions: reactions,
-                                      onReactionTap: onReactionTap,
-                                      onPickReaction: onPickReaction,
-                                      customEmoji: customEmoji,
-                                    ),
-                                  if ((threadReplyCount ?? 0) > 0)
-                                    ThreadReplySummary(
-                                      replyCount: threadReplyCount!,
-                                      lastReplyAt: threadLastReplyAt,
-                                      unread: (threadUnreadCount ?? 0) > 0,
-                                      onTap: actions.canOpenThread
-                                          ? actions.onOpenThread
-                                          : null,
-                                    ),
-                                  if (message.failed)
-                                    FailedRow(
-                                      onRetry: onRetry,
-                                      onEdit: onEditFailed,
-                                      onDiscard: onDiscard,
-                                      reason: message.failureReason,
-                                    ),
-                                ],
+                                    if (message.editedAt != null && !editing)
+                                      EditedMarker(onTap: onViewEditHistory),
+                                    if (poll != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: PollView(
+                                          poll: poll!,
+                                          onVote: onVote,
+                                        ),
+                                      ),
+                                    if (call != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: CallRecordView(
+                                          record: call!,
+                                          viewerIsCaller: viewerIsCaller,
+                                        ),
+                                      ),
+                                    if (appSurface != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.s4,
+                                        ),
+                                        child: AppSurfaceView(
+                                          messageId: message.id,
+                                          surface: appSurface!,
+                                          title: appSurface!.moduleId,
+                                        ),
+                                      ),
+                                    // A forward's attachments are part of what was forwarded, and are drawn inside its card instead.
+                                    if (message.forwarded == null)
+                                      for (final attachment in attachments)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: AppSpacing.s4,
+                                          ),
+                                          child: AttachmentView(
+                                            attachment: attachment,
+                                            siblings: openableImages(
+                                              attachments,
+                                            ),
+                                          ),
+                                        ),
+                                    if (!_unsent)
+                                      ReactionsRow(
+                                        reactions: reactions,
+                                        onReactionTap: onReactionTap,
+                                        onPickReaction: onPickReaction,
+                                        customEmoji: customEmoji,
+                                      ),
+                                    if ((threadReplyCount ?? 0) > 0)
+                                      ThreadReplySummary(
+                                        replyCount: threadReplyCount!,
+                                        lastReplyAt: threadLastReplyAt,
+                                        unread: (threadUnreadCount ?? 0) > 0,
+                                        onTap: actions.canOpenThread
+                                            ? actions.onOpenThread
+                                            : null,
+                                      ),
+                                    if (message.failed)
+                                      FailedRow(
+                                        onRetry: onRetry,
+                                        onEdit: onEditFailed,
+                                        onDiscard: onDiscard,
+                                        reason: message.failureReason,
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                // Outside layout: revealing it must not resize the row.
-                if (hovered && !_unsent)
+                // Outside layout, and never on compact, which reserves no clearance for it.
+                if (!compact && (hovered || focusWithin) && !_unsent)
                   Positioned(
                     top: 0,
-                    right: compact
-                        ? AppSizes.paneGutterCompact
-                        : AppSizes.paneGutter,
-                    child: _HoverActions(onPickReaction: onPickReaction),
+                    right: AppSizes.paneGutter,
+                    child: MessageHoverToolbar(
+                      actions: actions,
+                      onPickReaction: onPickReaction,
+                    ),
                   ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// The floating action cluster a hovered message shows, pinned to its top
-/// right and drawn over the row rather than inside it.
-///
-/// A surface of its own so it reads as chrome rather than content: a bare
-/// button laid straight onto the transcript is hard to tell from a reaction
-/// chip, which is the thing directly below it.
-class _HoverActions extends StatelessWidget {
-  const _HoverActions({required this.onPickReaction});
-
-  final ValueChanged<String> onPickReaction;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = Theme.of(context).extension<AppTokens>()!;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
-        border: Border.all(color: tokens.borderSubtle),
-        borderRadius: BorderRadius.circular(AppRadii.control),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s4),
-        child: EmojiPickerButton(onSelect: onPickReaction),
       ),
     );
   }

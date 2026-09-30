@@ -142,7 +142,10 @@ class ContextMenuRegionState extends State<ContextMenuRegion> {
   /// Opens the same menu a right-click or long-press would, for a caller
   /// with no pointer position of its own to anchor to - a kebab button, like
   /// the context-menu key [ContextMenuFocus] already handles the same way.
-  void open() => _setOpen(true);
+  ///
+  /// [at], a global position, anchors the menu beside the control that asked
+  /// instead of at the region's corner.
+  void open({Offset? at}) => _setOpen(true, pointerGlobal: at);
 
   /// [pinRow] mirrors [onOpenChanged]'s own doc: true (the default) for a
   /// right-click and every close, false for a long press, which has nothing

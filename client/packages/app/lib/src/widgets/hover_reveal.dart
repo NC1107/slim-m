@@ -24,7 +24,15 @@ class HoverReveal extends StatefulWidget {
   /// included - the one [hovered] cannot answer, since a long press
   /// deliberately never pins (`ContextMenuRegion._setOpen`'s own doc says
   /// why: touch has no hover-revealed control to keep mounted).
-  final Widget Function(BuildContext context, bool hovered, bool menuOpen)
+  ///
+  /// [focusWithin] is true while keyboard focus is on the subtree, never for
+  /// a mouse click that happened to focus something inside it.
+  final Widget Function(
+    BuildContext context,
+    bool hovered,
+    bool menuOpen,
+    bool focusWithin,
+  )
   builder;
 
   @override
@@ -35,6 +43,14 @@ class _HoverRevealState extends State<HoverReveal> {
   bool _hovered = false;
   bool _pinned = false;
   bool _menuOpen = false;
+  bool _focusWithin = false;
+
+  void _onFocusChange(bool focused) {
+    final visible =
+        focused &&
+        FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
+    if (_focusWithin != visible) setState(() => _focusWithin = visible);
+  }
 
   void _pin(bool pinned) {
     if (_pinned != pinned) setState(() => _pinned = pinned);
@@ -52,7 +68,17 @@ class _HoverRevealState extends State<HoverReveal> {
       child: HoverRevealScope(
         pin: _pin,
         reportMenuOpen: _reportMenuOpen,
-        child: widget.builder(context, _hovered || _pinned, _menuOpen),
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: _onFocusChange,
+          child: widget.builder(
+            context,
+            _hovered || _pinned,
+            _menuOpen,
+            _focusWithin,
+          ),
+        ),
       ),
     );
   }
