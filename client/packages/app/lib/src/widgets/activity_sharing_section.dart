@@ -14,6 +14,7 @@ import 'package:slimm_design_system/design_system.dart';
 import '../providers/activity_feeds.dart';
 import '../providers/activity_sharing_settings.dart';
 import '../providers/presence_activity.dart';
+import '../spotify/spotify_link.dart';
 import 'activity_game_list.dart';
 import 'settings_section_header.dart';
 import 'settings_toggle_row.dart';
@@ -47,10 +48,25 @@ class ActivitySharingSection extends ConsumerWidget {
               ),
               if (feed.enabled == shareGameProvider) const ActivityGameList(),
             ],
+            const _LinkError(),
             const _SharingNow(),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _LinkError extends ConsumerWidget {
+  const _LinkError();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final message = ref.watch(spotifyLinkErrorProvider);
+    if (message == null) return const SizedBox.shrink();
+    return AppErrorState(
+      message: message,
+      onDismiss: () => ref.read(spotifyLinkErrorProvider.notifier).state = null,
     );
   }
 }

@@ -19,5 +19,6 @@ export 'src/local_notifications.dart';
 export 'src/notification_tap_channel.dart';
 export 'src/now_playing.dart';
 export 'src/persistent_key_store.dart';
+export 'src/polled_stream.dart';
 export 'src/picture_in_picture_channel.dart';
 export 'src/shortcuts.dart';

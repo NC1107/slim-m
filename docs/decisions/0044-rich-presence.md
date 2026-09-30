@@ -39,7 +39,7 @@ This record fixes the privacy model, where activity comes from, the wire shape a
 | Linux MPRIS over D-Bus | none | Linux desktop, any player that exposes `org.mpris.MediaPlayer2.*` (Spotify, browsers, mpv, VLC) | First slice. Local, private, no third party. |
 | Windows SMTC (`GlobalSystemMediaTransportControls`) | none | Windows 10+ desktop, any app that registers a media session | Built, see the amendment below. A runner method channel, no account. |
 | macOS Now Playing | none | macOS | Not built, see the amendment below. The only supported route is scripting Music and Spotify, and it needs an owner decision first. |
-| Spotify Web API | an OAuth app registered by the owner | any platform incl. phones | Later. Only the Spotify account, needs a token store and a refresh path. |
+| Spotify Web API | an OAuth app registered by the owner | any platform incl. phones | Built. Needs a client id at build time, which CI supplies from the `SLIMM_SPOTIFY_CLIENT_ID` repository variable; an empty value keeps it off. See the amendment below. |
 | Game detection | none | desktop | Built, see the amendment below. Opt-in, allowlist only. |
 
 Why MPRIS first: it needs no account linking and reads exactly what the person is already playing, on the machine the owner develops on.
@@ -169,3 +169,33 @@ A program that is not on the list is matched against nothing, stored nowhere and
   Steam-only titles need a `steamAppId` in their entry.
 - Wire kind is `playing`, title is the list's friendly name, capped like every other activity.
 - When both feeds report, listening wins, since it is first in `activityFeedsProvider`.
+
+### Spotify account linking
+
+Built, and absent from any build that does not set `--dart-define=SLIMM_SPOTIFY_CLIENT_ID=<id>`, so nothing shows in Settings until the owner has an app.
+
+- **Flow:** authorization code with PKCE (S256), so there is no client secret anywhere.
+  The browser opens Spotify's consent page, the redirect `slimm://spotify-callback` comes back through the existing deep-link stream, and the `state` must match or nothing is linked.
+- **Scope:** `user-read-currently-playing` only.
+  It returns the track, its artists and whether it is playing.
+  Cover art is never read or sent, and podcasts, ads and a paused player report nothing.
+- **Token:** on the device, in the key store (`slimm.spotify.tokens`).
+  The server never holds a third-party credential, which is also why a second device has to link on its own.
+- **The switch is the link.**
+  On starts the flow and only turns on when it finishes, off deletes the token.
+  Spotify has no revoke call, so Settings points at spotify.com/account/apps for removing slim-m on their side.
+- **Polling:** every 10 seconds, only while the switch is on and the person is not hidden.
+  A rate limit pauses requests for `Retry-After` and keeps the last answer, a network failure keeps it too, and a refused refresh (link revoked) deletes the token.
+- **Priority:** a local player (MPRIS, SMTC) wins over the same track via Spotify, since it is first in the feed list.
+- **Limits:** an app in Spotify's development mode only works for accounts the owner adds by hand (a small cap) until Spotify approves an extension request.
+  The redirect needs the `slimm` scheme registered on the platform.
+  That exists on Android, iOS, macOS and Linux, but not on Windows, where the installer does not register it yet, so linking cannot finish there.
+
+What the owner has to do:
+
+1. Create an app at developer.spotify.com/dashboard and accept the developer terms.
+2. Add the redirect URI `slimm://spotify-callback` (one URI covers every platform, because it is a custom scheme).
+3. Add the testers' Spotify accounts under the app's User Management (development mode), or request a quota extension for wider use.
+4. Pass the client id as `SLIMM_SPOTIFY_CLIENT_ID` when building the client (CI build steps and release workflows).
+   It is an identifier, not a secret, but it is not committed.
+5. Decide whether Windows needs linking, which means registering the `slimm` scheme in the installer.
