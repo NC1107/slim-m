@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_api/api.dart' as api;
 import 'package:slimm_app/src/providers/channel_by_id_provider.dart';
+import 'package:slimm_app/src/providers/live_events.dart';
 import 'package:slimm_app/src/providers/member_presence.dart';
 import 'package:slimm_app/src/providers/presence_controller.dart';
 import 'package:slimm_app/src/providers/voice_controller.dart';
@@ -55,37 +56,40 @@ class FakePresence extends PresenceController {
 }
 
 /// Everyone listed is a channel member; [online] are the ids reading online.
-List<Override> callPeople(List<api.UserProfile> members, Set<String> online) =>
-    [
-      voiceRosterProvider.overrideWith(
-        (ref, channelId) =>
-            const Stream<List<api.VoiceRosterParticipant>>.empty(),
+List<Override> callPeople(
+  List<api.UserProfile> members,
+  Set<String> online,
+) => [
+  voiceRosterProvider.overrideWith(
+    (ref, channelId) => const Stream<List<api.VoiceRosterParticipant>>.empty(),
+  ),
+  channelMembersProvider.overrideWith((ref, channelId) async => members),
+  // The real presence controller listens to live events, which would start sync against a server that is not there.
+  liveEventsProvider.overrideWithValue(const Stream<api.ServerEvent>.empty()),
+  presenceSeedProvider.overrideWith((ref, channelId) async {}),
+  presenceControllerProvider.overrideWith(
+    (ref) => FakePresence(ref, {
+      for (final id in online) id: api.PresenceState.online,
+    }),
+  ),
+  channelByIdProvider.overrideWith(
+    (ref, id) => Stream.value(
+      data.Channel(
+        id: id,
+        name: 'test-voice',
+        kind: 'voice',
+        createdAt: 0,
+        cursor: 0,
+        lastReadSeq: 0,
+        mentionedSeq: 0,
+        isPersonalSpace: false,
+        joinMuted: false,
+        position: 0,
+        slowModeSeconds: 0,
       ),
-      channelMembersProvider.overrideWith((ref, channelId) async => members),
-      presenceSeedProvider.overrideWith((ref, channelId) async {}),
-      presenceControllerProvider.overrideWith(
-        (ref) => FakePresence(ref, {
-          for (final id in online) id: api.PresenceState.online,
-        }),
-      ),
-      channelByIdProvider.overrideWith(
-        (ref, id) => Stream.value(
-          data.Channel(
-            id: id,
-            name: 'test-voice',
-            kind: 'voice',
-            createdAt: 0,
-            cursor: 0,
-            lastReadSeq: 0,
-            mentionedSeq: 0,
-            isPersonalSpace: false,
-            joinMuted: false,
-            position: 0,
-            slowModeSeconds: 0,
-          ),
-        ),
-      ),
-    ];
+    ),
+  ),
+];
 
 class CallFixture {
   CallFixture(this.tester, this.harness, this.session);

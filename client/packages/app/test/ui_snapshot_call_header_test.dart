@@ -4,7 +4,6 @@
 /// screen lays out without overflow.
 library;
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slimm_app/src/widgets/call_participant_tiles.dart';
 
@@ -43,8 +42,6 @@ void main() {
           await writeSnapshot(tester, 'call-$state-${entry.key}-$theme');
           expect(tester.takeException(), isNull);
           await call.leave();
-          await tester.pumpWidget(const SizedBox());
-          await tester.pump(const Duration(seconds: 5));
         });
       }
     }
