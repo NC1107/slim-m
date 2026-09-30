@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The row of ways out from under the sign-in button.
+/// The two ways out from under the sign-in button: the other mode of this
+/// form, and a different Space.
 ///
-/// Split from `sign_in_screen.dart` when adding recovery pushed that file
-/// past the size ceiling. They read as alternatives to the action above
-/// rather than a list under it, which is why they share one [Wrap] instead of
-/// stacking.
+/// Split from `sign_in_screen.dart` for the size ceiling. They read as
+/// alternatives to the action above rather than a list under it, which is why
+/// they share one [Wrap]. "Trouble signing in?" lives under the password
+/// instead, because it is about that field and not a way out of the screen.
 ///
-/// "Trouble signing in?" is last and only while signing in: it is meaningless
-/// on the create-account branch, where there is no account to recover yet.
+/// A Space is one deployment, so to a user "server" and "Space" are the same
+/// thing. One action leads to the onboarding choice, which already offers an
+/// invite, an address, or the official Space - the two routes differ only in
+/// what you hold, never in where you are going.
 library;
 
 import 'package:flutter/material.dart';
@@ -18,22 +21,16 @@ class SignInAlternatives extends StatelessWidget {
     super.key,
     required this.creatingAccount,
     required this.busy,
-    required this.addressExpanded,
     required this.onToggleCreating,
-    required this.onExpandAddress,
-    required this.onJoinDifferentSpace,
-    required this.onRecoverAccount,
+    required this.onUseDifferentSpace,
   });
 
   final bool creatingAccount;
   final bool busy;
-  final bool addressExpanded;
   final VoidCallback onToggleCreating;
-  final VoidCallback onExpandAddress;
-  final VoidCallback onJoinDifferentSpace;
 
-  /// Opens the reset-code flow. Absent while creating an account.
-  final VoidCallback onRecoverAccount;
+  /// Once a Space is remembered this is the only way back to invite redemption.
+  final VoidCallback onUseDifferentSpace;
 
   @override
   Widget build(BuildContext context) => Wrap(
@@ -49,27 +46,12 @@ class SignInAlternatives extends StatelessWidget {
         disabled: busy,
         onPressed: onToggleCreating,
       ),
-      if (!addressExpanded)
-        AppButton(
-          label: 'Use a different server',
-          variant: AppButtonVariant.ghost,
-          disabled: busy,
-          onPressed: onExpandAddress,
-        ),
-      // Once a Space is remembered this is the only way back to invite redemption.
       AppButton(
-        label: 'Join a different Space',
+        label: 'Use a different Space',
         variant: AppButtonVariant.ghost,
         disabled: busy,
-        onPressed: onJoinDifferentSpace,
+        onPressed: onUseDifferentSpace,
       ),
-      if (!creatingAccount)
-        AppButton(
-          label: 'Trouble signing in?',
-          variant: AppButtonVariant.ghost,
-          disabled: busy,
-          onPressed: onRecoverAccount,
-        ),
     ],
   );
 }

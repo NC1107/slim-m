@@ -33,9 +33,9 @@ import 'sign_in_error.dart';
 /// because self-hosting is the normal case: which server you are on is a
 /// first-class choice, not an advanced option. The one exception is the
 /// compiled-in official server, where that choice was already made by
-/// picking "Join the official Space" in onboarding: the field starts
-/// collapsed behind "Use a different server" so joining it is username and
-/// password, nothing else. It also opens straight on creating an account,
+/// picking "Join the official Space" in onboarding: the field stays
+/// collapsed so joining it is username and password, nothing else, and
+/// "Use a different Space" leads back to onboarding for any other address. It also opens straight on creating an account,
 /// for the same reason an invite does: that button means there is no
 /// account here yet.
 ///
@@ -60,11 +60,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     text: ref.read(serverUrlProvider).toString(),
   );
 
-  /// Whether the address field is on screen. Starts collapsed for the
-  /// compiled-in official server, where an address is not a decision anyone
-  /// joining it needs to make; "Use a different server" below reveals it for
-  /// the self-hoster this build was not necessarily built for.
-  late bool _addressExpanded = !isOfficialServer(ref.read(serverUrlProvider));
+  /// Whether the address field is on screen. Collapsed for the compiled-in
+  /// official server, where an address is not a decision anyone joining it
+  /// needs to make; a different address is chosen through onboarding.
+  late final bool _addressExpanded = !isOfficialServer(
+    ref.read(serverUrlProvider),
+  );
   final _username = TextEditingController();
   final _password = TextEditingController();
   final _displayName = TextEditingController();
@@ -425,7 +426,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               icon: AppIcons.invite,
               message:
                   'This Space is invite only. Ask a member for a '
-                  'code, then use "Join a different Space" below '
+                  'code, then use "Use a different Space" below '
                   'to redeem it. An admin can open joining to '
                   'anyone in Settings, under Space.',
             ),
@@ -447,6 +448,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             busy: _busy,
             errorFor: _errorFor,
             onSubmit: _submit,
+            onRecoverAccount: () => unawaited(_recoverAccount()),
           ),
           if (_errorFor(SignInErrorField.form) case final formError?) ...[
             const SizedBox(height: AppSpacing.s16),
@@ -468,18 +470,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             onPressed: _submit,
           ),
           const SizedBox(height: AppSpacing.s12),
-          // The other ways out, in one row so they read as alternatives to the action above rather than a list under it.
+          // Alternatives to the action above, not a list under it.
           SignInAlternatives(
             creatingAccount: _creatingAccount,
             busy: _busy,
-            addressExpanded: _addressExpanded,
             onToggleCreating: () => setState(() {
               _creatingAccount = !_creatingAccount;
               _error = null;
             }),
-            onExpandAddress: () => setState(() => _addressExpanded = true),
-            onJoinDifferentSpace: () => context.go(Routes.onboarding),
-            onRecoverAccount: () => unawaited(_recoverAccount()),
+            onUseDifferentSpace: () => context.go(Routes.onboarding),
           ),
         ],
       ),

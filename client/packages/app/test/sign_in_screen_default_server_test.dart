@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 /// Tests for the compiled-in official server collapsing the address field on
-/// sign-in: skipped entirely by default, revealed by "Use a different
-/// server", and never collapsed for any other address. Also covers the
+/// sign-in: skipped entirely, with "Use a different Space" as the one way to
+/// another address, and never collapsed for any other address. Also covers the
 /// related default mode: creating an account, when onboarding signals a
 /// fresh join, versus signing in otherwise.
 ///
@@ -99,31 +99,9 @@ void main() {
         findsNWidgets(2),
         reason: 'username and password only - no address field to fill in',
       );
-      expect(find.text('Use a different server'), findsOneWidget);
+      expect(find.text('Use a different Space'), findsOneWidget);
     },
   );
-
-  testWidgets('"Use a different server" reveals the address field', (
-    tester,
-  ) async {
-    await _pumpSignIn(tester, server: Uri.parse(officialServer));
-
-    await tester.tap(find.text('Use a different server'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byType(TextField),
-      findsNWidgets(3),
-      reason: 'address, username and password, once revealed',
-    );
-    expect(find.text('Use a different server'), findsNothing);
-    final field = tester.widget<TextField>(find.byType(TextField).first);
-    expect(
-      field.controller!.text,
-      officialServer,
-      reason: 'revealing the field must not lose the address it started on',
-    );
-  });
 
   testWidgets(
     'a self-hosted address keeps the full flow, with no default to skip',
@@ -135,7 +113,7 @@ void main() {
         findsNWidgets(3),
         reason: 'no compiled-in default for this address, so nothing to skip',
       );
-      expect(find.text('Use a different server'), findsNothing);
+      expect(find.text('Use a different Space'), findsOneWidget);
     },
   );
 

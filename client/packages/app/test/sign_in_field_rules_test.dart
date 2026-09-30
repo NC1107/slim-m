@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-/// The two sign-in fields that carry real constraints say so before a
-/// submission fails, and a rejection that names a field lands on that field.
+/// The username and password rules are said before a submission fails, but
+/// only while creating an account; a rejection that names a field lands on
+/// that field.
 ///
 /// Both halves guard the same complaint: the rules existed only on the server,
 /// so the first time a newcomer heard about them was after being told no. The
@@ -22,6 +23,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:slimm_api/api.dart';
 import 'package:slimm_app/src/providers/providers.dart';
+import 'package:slimm_app/src/screens/sign_in_credential_fields.dart';
 import 'package:slimm_app/src/screens/sign_in_error.dart';
 import 'package:slimm_app/src/screens/sign_in_screen.dart';
 import 'package:slimm_design_system/design_system.dart';
@@ -64,6 +66,10 @@ Future<void> _pumpSignIn(WidgetTester tester) async {
   );
   addTearDown(container.dispose);
 
+  tester.view.physicalSize = const Size(900, 1600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -77,26 +83,81 @@ Future<void> _pumpSignIn(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('the username rule is on screen before anything is submitted', (
-    tester,
-  ) async {
-    await _pumpSignIn(tester);
+  Future<void> toCreateAccount(WidgetTester tester) async {
+    await tester.tap(find.text('Create an account instead'));
+    await tester.pumpAndSettle();
+  }
 
-    expect(
-      find.text('Letters, digits, _ . and - only. Up to 32 characters.'),
-      findsOneWidget,
-      reason: 'the charset and the length are both enforced, so both are said',
-    );
-  });
-
-  testWidgets(
-    'the password minimum is on screen before anything is submitted',
-    (tester) async {
+  group('while signing in, no field states a creation rule', () {
+    testWidgets('username', (tester) async {
       await _pumpSignIn(tester);
 
+      expect(find.text(usernameRule), findsNothing);
+    });
+
+    testWidgets('password', (tester) async {
+      await _pumpSignIn(tester);
+
+      expect(find.text(passwordRule), findsNothing);
+    });
+
+    testWidgets('display name is not asked for at all', (tester) async {
+      await _pumpSignIn(tester);
+
+      expect(find.text('Display name'), findsNothing);
+      expect(find.text(displayNameHelper), findsNothing);
+    });
+
+    testWidgets('the screen carries no helper text on any field', (
+      tester,
+    ) async {
+      await _pumpSignIn(tester);
+
+      expect(find.textContaining('characters'), findsNothing);
+      expect(find.textContaining('Defaults to'), findsNothing);
+    });
+  });
+
+  group('while creating an account, each rule is said before submitting', () {
+    testWidgets('username: the charset and the length are both enforced, so '
+        'both are said', (tester) async {
+      await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+
+      expect(
+        find.text('Letters, digits, _ . and - only. Up to 32 characters.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('password minimum', (tester) async {
+      await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+
       expect(find.text('At least 8 characters.'), findsOneWidget);
-    },
-  );
+    });
+
+    testWidgets('display name says what it is and what it defaults to', (
+      tester,
+    ) async {
+      await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+
+      expect(find.text(displayNameHelper), findsOneWidget);
+    });
+
+    testWidgets('going back to sign in takes the rules away again', (
+      tester,
+    ) async {
+      await _pumpSignIn(tester);
+      await toCreateAccount(tester);
+      await tester.tap(find.text('I already have an account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(usernameRule), findsNothing);
+      expect(find.text(passwordRule), findsNothing);
+    });
+  });
 
   test(
     'the password helper states the minimum the server actually enforces',
@@ -112,7 +173,7 @@ void main() {
         reason: 'the wire message is expected to carry the length rule',
       );
       expect(
-        'At least 8 characters.',
+        passwordRule,
         contains(minimum!),
         reason:
             'the helper and the rejection must agree; if this fails the server '
