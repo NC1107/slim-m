@@ -41,17 +41,7 @@ if [[ -f $allowfile ]]; then
   done <"$allowfile"
 fi
 
-# Counts maximal runs of 2+ consecutive plain-comment lines in one file,
-# including a /* ... */ block (not /** or /*!, both doc forms) that opens
-# its own line - a plain block comment could span any number of lines with
-# nothing here to see it, since // and # were the only two shapes checked.
-# Only a block that *opens* its own line counts, matching the // rule
-# above (a trailing // after real code is not stripped either), which is
-# also what keeps a same-line '/*' inside a string literal - like
-# message_code_langs.dart's own blockComment: ('/*', '*/') tuple - out of
-# this entirely. Nested block comments are not modelled; Dart and Rust both
-# allow nesting and this closes on the first '*/', which is wrong for a
-# nested one, but nothing in this tree nests one today.
+# Counts maximal runs of 2+ plain-comment lines, including /* */ blocks that open their own line (not /** or /*!); nested blocks are not modelled.
 runs_in() {
   local file="$1" hash_only=0
   case $file in
@@ -62,8 +52,7 @@ runs_in() {
     # The top-of-file block of a #-only file is its header, not a run.
     header && (/^[[:space:]]*$/ || /^[[:space:]]*#/) { next }
     { header = 0 }
-    # A plain comment is // followed by neither / nor ! (both are doc
-    # comments), or # not followed by !. Shell and YAML have no // or /*.
+    # A plain comment is // not followed by / or !, or # not followed by !; shell and YAML have no // or /*.
     !hash_only && (/^[[:space:]]*\/\/[^\/!]/ || /^[[:space:]]*\/\/$/) { streak++; next }
     /^[[:space:]]*#([^!]|$)/ { streak++; next }
     in_block {
@@ -114,8 +103,7 @@ while IFS= read -r file; do
   fi
 done < <(git ls-files '*.dart' '*.rs' '*.py' '*.sh' '*.yml' '*.yaml' '*.toml')
 
-# A file that dropped off the list entirely (deleted, or renamed) is not an
-# error, but a stale entry is worth saying so the allowlist stays honest.
+# A stale allowlist entry (deleted or renamed file) is only a warning.
 for path in "${!ceiling[@]}"; do
   [[ -n ${seen[$path]:-} ]] || echo "::warning file=$allowfile::'$path' is listed but no longer exists; drop the line"
 done

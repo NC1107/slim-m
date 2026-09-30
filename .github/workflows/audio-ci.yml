@@ -1,14 +1,6 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: audio-ci
-#
-# The notification WAVs are committed and generated from source. This
-# regenerates them and fails if anything drifts, which is the whole reason
-# they are synthesised rather than authored: a sound file nobody can rebuild
-# from the repository is a binary blob with a plausible story attached.
-#
-# It also runs the family's own checks, the important one being that the seven
-# are level with each other. The first build of the set passed every per-file
-# check while spanning 3.4 dB, because nothing had ever compared them.
+# Regenerates the notification WAVs and fails on drift or on the set not being level with itself (docs/ci.md).
 on:
   push:
     branches: [main]
@@ -38,12 +30,9 @@ jobs:
         with:
           python-version: "3.14"
 
-      # Pinned to what the committed WAVs were generated with, interpreter
-      # included: a different float result is a different WAV, and this job
-      # would then fail for a reason nobody changed.
+      # Pinned to what generated the committed WAVs, interpreter included, since a float difference is a different WAV.
       - name: install the generator's dependencies
-        # --only-binary, so a source distribution cannot run its own setup
-        # code on the runner. Both of these publish wheels, checked.
+        # --only-binary so no sdist runs its setup code on the runner.
         run: |
           pip install --only-binary :all: "numpy==2.4.6" "pyloudnorm==0.2.0"
 

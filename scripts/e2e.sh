@@ -41,8 +41,7 @@ say_commit
 export E2E_SHOTS="$SHOTS"
 export E2E_FIXTURES="$WORK/fixtures"
 export E2E_SCHEMA="$ROOT/schema/openapi.yaml"
-# LiveKit's own dev-mode pair, for a throwaway container on this machine that
-# is torn down with the run. Overridable, so nothing here assumes them.
+# LiveKit's dev-mode key pair for a throwaway container; overridable.
 export LIVEKIT_API_KEY="${LIVEKIT_API_KEY:-devkey}"
 export LIVEKIT_API_SECRET="${LIVEKIT_API_SECRET:-secret}"
 
@@ -138,17 +137,14 @@ for asset in main.dart.js flutter_bootstrap.js sqlite3.wasm drift_worker.js; do
 done
 
 echo "== two browsers =="
-# Chrome's own fake tone is too quiet for LiveKit to call it speech - a real
-# run reached the call with both tiles named and neither ever flagged speaking
-# - so it captures this instead. See scripts/lib/make_fake_voice.py.
+# Chrome's fake tone is too quiet for LiveKit to call speech, so capture scripts/lib/make_fake_voice.py's WAV instead.
 VOICE_WAV="$WORK/fake-voice.wav"
 python3 "$(dirname "$0")/lib/make_fake_voice.py" "$VOICE_WAV"
 
 for pair in "9801:alice" "9802:bob"; do
   port="${pair%%:*}"; who="${pair##*:}"
   profile="$WORK/chrome-$who"; rm -rf "$profile"; mkdir -p "$profile"
-  # Detached headless Chrome is killed with the launching shell here, so each
-  # one is held open by a sleep it outlives.
+  # Detached headless Chrome dies with the launching shell, so each is held open by a sleep it outlives.
   nohup setsid bash -c "exec '$CHROME' --headless=new \
     --user-data-dir='$profile' --remote-debugging-port=$port \
     --window-size=1280,900 --no-first-run --no-default-browser-check \

@@ -9,16 +9,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Lucide is the icon set of record; AppIcons is the only place widgets touch
-  # it, so swapping sets later is one file.
+  # Lucide is the icon set of record, reached only through AppIcons.
   lucide_icons_flutter: ^3.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
 flutter:
-  # Bundled, not system-resolved: IBM Plex is not installed on a typical Linux or
-  # Windows box, and the mono fallback is proportional, breaking code and numerals.
+  # Bundled because IBM Plex is rarely installed on Linux or Windows and the mono fallback is proportional.
   fonts:
     - family: IBM Plex Sans
       fonts:

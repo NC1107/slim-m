@@ -33,9 +33,7 @@ confidence-threshold = 0.9
 # A license only the Dart half uses is not an unused Rust allowance.
 unused-allowed-license = "allow"
 
-# slim-m's own crate is not open source, so it is named here rather than
-# allowed outright: the allowlist above stays a statement about third-party
-# dependencies only.
+# slim-m's own crate is named here rather than allowed outright, so the allowlist stays about third parties.
 [[licenses.exceptions]]
 name = "slimm-server"
 allow = ["LicenseRef-PolyForm-Noncommercial-1.0.0"]
@@ -49,20 +47,12 @@ allow = ["MPL-2.0"]
 name = "nm"
 allow = ["MPL-2.0"]
 
-# The Dart pub package behind app_links_linux's GTK binding (invite deep
-# links). Same posture as dbus/nm above: per-file copyleft we depend on and
-# do not modify, so it reaches the built client no differently than they do.
+# Dart pub package behind app_links_linux's GTK binding: per-file copyleft we use unmodified, like dbus and nm above.
 [[licenses.exceptions]]
 name = "gtk"
 allow = ["MPL-2.0"]
 
-# Checked on a schedule by advisory-watchdog.yml, never on a pull request.
-# docs/ci.md's licenses section explains the split: a CVE published upstream
-# would otherwise turn every unrelated pull request red through no fault of
-# its own, so this "wants a different trigger" - that trigger exists now, and
-# reports by opening an issue rather than by reddening anybody's branch.
-# An entry in `ignore` is a deliberate, dated decision about one advisory,
-# never a way to quiet the check.
+# Advisories run on a schedule in advisory-watchdog.yml, not per PR (docs/ci.md); an `ignore` entry is a dated decision, never a way to quiet it.
 [advisories]
 ignore = []
 

@@ -47,9 +47,7 @@ else
     --jq '.workflow_runs')"
 fi
 
-# The API already answers newest-first; a cancelled run is skipped rather
-# than counted or treated as ending the streak, since it never actually
-# asked the question (see e2e.yml's own "queued, not cancelled" comment).
+# The API answers newest-first; a cancelled run is skipped, not counted and not a streak end.
 completed_json=$(jq -c '[.[] | select(.status=="completed")]' <<<"$runs_json")
 completed_count=$(jq 'length' <<<"$completed_json")
 
@@ -105,9 +103,7 @@ This issue closes itself the next time a run on main succeeds."
   else
     echo "issue #${existing} is already open for this"
   fi
-  # Zero: the issue is the signal, and this job going red for as long as the
-  # streak lasts is the second red workflow nobody opens that this watchdog
-  # exists to avoid. `set -e` still fails the job if the reporting itself broke.
+  # Exit zero: the issue is the signal, and set -e still fails the job if reporting broke.
   exit 0
 fi
 

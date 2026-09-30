@@ -392,7 +392,7 @@ Replayed against the actual 2026-08-09 incident's run history, three in a row wa
 
 Pulled into a script for the same reason `check-release-tag-lag.sh` was: `scripts/lib/test_check_workflow_red_streak.py` drives it against a fixture run list (`E2E_RUNS_JSON`) and a faked `gh` on PATH, so the threshold and the dedup/close logic are both tested without a real red workflow. One fixture replays the real 2026-08-09 history up to its third failure and asserts the script would have fired; a second is a genuinely mixed history (one failure among real successes) rather than an all-failure fixture, since an all-failure fixture proves nothing about where the threshold actually falls.
 
-No concurrency group, the same reasoning `release-tag-watchdog.yml`'s own header gives for having none: an unconditional `cancel-in-progress: true` over a cron interval is what made that workflow fail three times within an hour of shipping (a run slower than its own 15-minute interval gets cancelled by the next one, and a cancelled run never asks the question), and this job is read-only and idempotent, so two of it overlapping costs nothing worth guarding against.
+No concurrency group, the same reasoning the `release-tag-watchdog` section above gives for having none: an unconditional `cancel-in-progress: true` over a cron interval is what made that workflow fail three times within an hour of shipping (a run slower than its own 15-minute interval gets cancelled by the next one, and a cancelled run never asks the question), and this job is read-only and idempotent, so two of it overlapping costs nothing worth guarding against.
 
 **This does not promote `e2e` to a required check.** `verify-release-checks.yml`'s required-check lists are untouched, and `e2e` runs on a pull request only when its path filter matches (see below). Whether to promote it is still the open question this section's own advisory-not-required paragraph leaves for the owner; this closes the separate problem of a red streak going unnoticed regardless of what the answer turns out to be.
 
@@ -588,6 +588,8 @@ See PR #250 ("A release can succeed and still ship no store build") for the full
 The SHA-keyed group stops a run from being silently cancelled, but nothing before this watched for the state that cancellation already produced once: a release-please manifest bumped to a new version, meaning its release PR merged, with no tag ever following it.
 A push-triggered check cannot close this on its own, because the push that should have cut the tag is the same one that did not - there is no later event to hang a check on.
 `release-tag-watchdog.yml` runs on a 15-minute schedule instead (plus `workflow_dispatch`) and asks a plain question of git history: for each package, does the current manifest version have a matching `<component>-v<version>` tag, and if not, how long has the manifest read that version?
+The workflow has no concurrency group on purpose: it shipped with `cancel-in-progress: true`, and a run slower than the cron interval was cancelled by the next one, three times in the first hour.
+A cancelled run never asks the question, so the silent failure it exists to catch could pass underneath it; the job is read-only and idempotent, so overlap costs nothing.
 `scripts/check-release-tag-lag.sh` does the check itself, pulled out so `scripts/lib/test_check_release_tag_lag.py` can drive it against a real temp git repo rather than the live one; a missing tag inside a 15-minute grace window is normal (the same run that merges a release PR usually tags it within its own run) and a missing tag past it is reported with `::error::`, naming the tag, the version, and how long it has been missing.
 
 ### The watchdog re-dispatches a release that verify timed out on
@@ -797,6 +799,9 @@ Before it existed, the tag path published unconditionally with no test workflow 
 The `ref` input carries the sharp edge.
 It defaults to `github.sha`, which is right for the tag-push path, but the release-please path must pass the created tag instead: release-please acts on the repository's current state while `github.sha` is whatever commit started the run, and the two diverge whenever a release merge lands while an earlier run is still going.
 Verifying `github.sha` then waits on a check a path filter correctly skipped, times out, and skips every publish job behind it, which is what happened to server 0.23.0 on 2026-08-01.
+A check run is attached to the commit, not to the event, so polling the commit's check-runs answers both trigger paths the same way.
+The names in `required_checks` are matched exactly, so a job renamed in `server-ci` or `client-ci` without the matching edit here blocks every release, which is the safe direction to fail.
+The deadline covers queueing, not running: client 0.23.0 timed out at the old thirty-minute ceiling with `client-ios-ci` still queued, and that check passed minutes later.
 
 ## web-image
 
@@ -1038,3 +1043,39 @@ Still unconfirmed even after a green build: the launch check's own assertions pa
 `flatpak-builder` was not available locally while writing the launch-check logic, so the `124`-vs-any-other-nonzero-exit split (see above) is reasoned from documented `timeout` and `flatpak run` behavior, not confirmed against a live launch of this bundle.
 It is not yet confirmed that `flatpak run` actually reaches the plugin-loading stage within the 20-second timeout on a GitHub-hosted runner with no display attached at all, that unprivileged flatpak sandboxing works unmodified on `ubuntu-latest`'s current image, or that some other headless-environment quirk unrelated to a missing shared library (a portal or D-Bus service genuinely absent in that runner) does not also exit nonzero and trip the exit-code assertion.
 If a future run fails on exactly that shape, the fix is to loosen the exit-code assertion, not the `grep` patterns, which are the actual defect class this workflow exists to catch.
+
+## Notes moved out of workflow headers
+
+A `#` block in a workflow is capped at one line, so the longer reasons live here.
+
+### advisory-watchdog
+
+Nothing watched for a security advisory against a dependency.
+`licenses` runs `cargo deny check licenses` and not `check all`, because a CVE published upstream would turn every unrelated pull request red through no fault of its own.
+This workflow is the different trigger that reasoning asked for.
+It does not gate a pull request or a release and does not report by its own colour, since a scheduled workflow that only fails itself is a red tab nobody opens.
+The output is a deduplicated issue that closes itself once the tree is clean.
+It runs daily because the RustSec database is published on a human schedule.
+It has no concurrency group, because the reporting half is idempotent.
+
+### audio-ci
+
+The notification WAVs are committed and generated from source, and this job regenerates them and fails on drift.
+It also runs the family's own checks, the important one being that the seven are level with each other.
+The first build of the set passed every per-file check while spanning 3.4 dB, because nothing had compared them.
+
+### red-streak-watchdog
+
+Two workflows fail without anything else noticing.
+`e2e` is advisory, and its silence let a multi-day regression ship under two releases (PRs #379 and #550).
+`main-builds` puts a build on a phone between releases, and it sat red for five hours on 2026-08-11 with a missing signing profile.
+Neither becomes a required check; the watchdog opens an issue instead of adding a second red workflow.
+It has no concurrency group, since it runs hourly against workflows that run far less often and dedups issues by label.
+
+### client-windows-ci
+
+Compile-only and not a required check.
+It was the first CI job to build a Windows target for this client, and `docs/os_backlog/windows_backlog.md` has little confirmed behind it.
+A green run proves the native plugin graph links, not that the app runs or that the tray and window-shell features of decision 0012 work.
+Read that file before promoting it or building on a green run.
+The build is Debug because the job exists to catch link failures, and release packaging is not scheduled.

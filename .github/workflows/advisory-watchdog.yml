@@ -1,22 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 name: advisory-watchdog
 
-# Nothing in this repo watched for a security advisory against a dependency.
-# licenses.yml runs `cargo deny check licenses` and deliberately not
-# `check all`: docs/ci.md's own reasoning is that a CVE published upstream
-# would turn every unrelated pull request red through no fault of its own,
-# so it "wants a different trigger", and named cargo audit and osv-scanner
-# for a job that was never wired. This is that trigger.
-#
-# It does not gate a pull request or a release, and does not report by its
-# own colour - a scheduled workflow that only fails itself is a red tab
-# nobody opens, which is the failure red-streak-watchdog.yml already
-# exists to correct. The output is a deduplicated GitHub issue that closes
-# itself once the tree is clean again.
-#
-# Daily rather than hourly: the RustSec database is published on a human
-# schedule, and an advisory that lands overnight is not more actionable for
-# being found six hours sooner.
+# Daily scheduled security-advisory check that opens a deduplicated issue; it gates nothing (docs/ci.md).
 
 on:
   schedule:
@@ -27,9 +12,7 @@ permissions:
   contents: read
   issues: write
 
-# No concurrency group, for the reason release-tag-watchdog.yml already
-# gives: this runs once a day, and the reporting half is idempotent (issue
-# dedup is by label), so two overlapping runs cost nothing worth guarding.
+# No concurrency group: daily, and issue dedup by label makes overlapping runs harmless.
 
 jobs:
   check:
@@ -38,8 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # continue-on-error, so a real advisory reaches the reporting step
-      # below rather than ending the job with nothing said anywhere.
+      # continue-on-error so a real advisory reaches the reporting step instead of ending the job silently.
       - id: scan
         continue-on-error: true
         uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1

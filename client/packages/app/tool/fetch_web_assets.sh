@@ -13,8 +13,7 @@ cd "$(dirname "$0")/.."
 LOCK=../../pubspec.lock
 WEB=web
 
-# Digests are the contract. A silently different worker talking to a client
-# from another drift version fails at runtime in the browser, not at build.
+# Digests are the contract: a mismatched worker fails at runtime in the browser, not at build.
 SQLITE3_VERSION=3.6.0
 SQLITE3_SHA=13d3f11d05b39ba0618a7115fb41640a5d48b6300f5d3f325f554b42bd6688a4
 DRIFT_VERSION=2.35.0
@@ -25,8 +24,7 @@ pinned() {
   awk -v pkg="  $name:" '$0 == pkg {found=1} found && /version:/ {gsub(/[" ]/, "", $2); print $2; exit}' "$LOCK"
 }
 
-# A digest pinned here against a different lockfile version is worse than no
-# check at all, so refuse rather than fetch the wrong thing.
+# Refuse on a lockfile mismatch: a digest pinned against another version is worse than no check.
 check_pinned() {
   local pkg=$1 want=$2 actual
   actual=$(pinned "$pkg")
@@ -46,8 +44,7 @@ fetch() {
     echo "ok $out (cached)"
     return
   fi
-  # Retries cover the transient release-CDN 503 that killed three whole e2e
-  # runs in a row on 2026-08-12 (issue #621) before a single scenario ran.
+  # Retries cover the transient release-CDN 503 that killed three e2e runs on 2026-08-12 (#621).
   curl -sSfL --max-time 120 --retry 5 --retry-delay 5 --retry-all-errors \
     "$url" -o "$out"
   local got
